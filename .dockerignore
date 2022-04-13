@@ -3,9 +3,12 @@
 !lib
 !proto
 !src
+!Makefile
 !tests
 !build.rs
 !Cargo.lock
 !Cargo.toml
 !rust-toolchain.toml
 !scripts
+!vendor
+!8.6-compose.repo

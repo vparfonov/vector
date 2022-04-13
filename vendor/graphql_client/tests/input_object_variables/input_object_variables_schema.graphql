@@ -1,0 +1,49 @@
+schema {
+  query: InputObjectVariablesQuery
+}
+
+scalar Email
+
+enum Category {
+  PROFESSIONAL
+  PERSONAL
+}
+
+input Recipient {
+  email: Email!
+  name: String
+  category: Category
+}
+
+input Message {
+  to: Recipient
+  content: String
+}
+
+input Options {
+  pgpSignature: Boolean
+}
+
+input RecursiveInput {
+  head: String!
+  tail: RecursiveInput
+}
+
+input IndirectlyRecursiveInput {
+  head: String!
+  tail: IndirectlyRecursiveInputTailPart
+}
+
+input IndirectlyRecursiveInputTailPart {
+  name: String!
+  recursed_field: IndirectlyRecursiveInput
+}
+
+type InputObjectVariablesQuery {
+  echo(message: Message!, options: Options = { pgpSignature: true }): EchoResult
+  saveRecursiveInput(recursiveInput: RecursiveInput!): Category
+}
+
+type EchoResult {
+  result: String!
+}

@@ -25,3 +25,35 @@ rustflags = "-Lnative=/usr/local/aarch64-linux-musl/lib"
 
 [target.armv7-unknown-linux-musleabihf]
 rustflags = "-Lnative=/usr/local/arm-linux-musleabihf/lib"
+
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source."https://github.com/Azure/azure-sdk-for-rust.git"]
+git = "https://github.com/Azure/azure-sdk-for-rust.git"
+rev = "3ca5610b959b3b6b77bb88da09f0764b605b01bc"
+replace-with = "vendored-sources"
+
+[source."https://github.com/tokio-rs/tracing"]
+git = "https://github.com/tokio-rs/tracing"
+rev = "f470db1b0354b368f62f9ee4d763595d16373231"
+replace-with = "vendored-sources"
+
+[source."https://github.com/vectordotdev/chrono.git"]
+git = "https://github.com/vectordotdev/chrono.git"
+branch = "no-default-time"
+replace-with = "vendored-sources"
+
+[source."https://github.com/vectordotdev/heim.git"]
+git = "https://github.com/vectordotdev/heim.git"
+branch = "update-nix"
+replace-with = "vendored-sources"
+
+[source."https://github.com/vectordotdev/leveldb-sys.git"]
+git = "https://github.com/vectordotdev/leveldb-sys.git"
+branch = "leveldb_mmap_limit"
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"
+

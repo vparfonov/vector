@@ -1,0 +1,54 @@
+[package]
+name = "azure_core"
+version = "0.1.1"
+description = "Rust wrappers around Microsoft Azure REST APIs - Core crate"
+readme = "README.md"
+authors = ["Microsoft Corp."]
+license = "MIT"
+repository = "https://github.com/azure/azure-sdk-for-rust"
+homepage = "https://github.com/azure/azure-sdk-for-rust"
+documentation = "https://docs.rs/azure_core"
+keywords = ["sdk", "azure", "rest", "iot", "cloud"]
+categories = ["api-bindings"]
+edition = "2018"
+
+[dependencies]
+async-trait = "0.1"
+base64 = "0.13"
+bytes = "1.0"
+chrono = "0.4"
+dyn-clone = "1.0"
+futures = "0.3"
+http = "0.2"
+hyper = { version = "0.14", optional = true }
+hyper-rustls = { version = "0.23", optional = true }
+log = "0.4"
+oauth2 = { version = "4.0", default-features=false }
+rand = "0.8"
+reqwest = { version = "0.11", features = ["stream"], default-features=false, optional = true }
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+thiserror = "1.0"
+url = "2.2"
+uuid = { version = "0.8" }
+
+# Add dependency to getrandom to enable WASM support
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.2", features = ["js"] }
+
+[build-dependencies]
+rustc_version = "0.4"
+
+[dev-dependencies]
+env_logger = "0.9"
+tokio = { version = "1", features = ["default"] }
+
+[features]
+default = ["enable_reqwest"]
+enable_reqwest = ["reqwest/default-tls", "oauth2/native-tls"]
+enable_reqwest_rustls = ["reqwest/rustls-tls", "oauth2/rustls-tls"]
+enable_hyper = ["hyper", "hyper-rustls"]
+test_e2e = []
+azurite_workaround = []
+mock_transport_framework = []

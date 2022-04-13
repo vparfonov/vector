@@ -1,0 +1,23 @@
+[package]
+name = "bloom"
+description = "Fast Bloom Filter and Counting Bloom Filter implementation"
+version = "0.3.2"
+authors = ["Nick Lanham <nick@afternight.org>"]
+homepage = "https://github.com/nicklan/bloom-rs"
+documentation = "https://docs.rs/bloom/"
+readme = "README.md"
+keywords = ["bloom", "filter", "bloomfilter"]
+license = "GPL-2.0"
+
+[lib]
+name = "bloom"
+
+[dependencies]
+bit-vec = "0.4.3"
+
+[dev-dependencies]
+rand = "0.3.14"
+
+[features]
+do-bench=[]
+

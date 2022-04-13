@@ -13,7 +13,7 @@ ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
 	export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
-    export DEFAULT_FEATURES = default
+    export DEFAULT_FEATURES = ocp-logging
 	export DNSTAP_BENCHES := dnstap-benches
 endif
 

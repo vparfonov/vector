@@ -342,6 +342,7 @@ ocp-logging = [
   "sources-kubernetes_logs",
   "sources-prometheus",
   "sources-internal_metrics",
+  "sources-demo_logs",
 
   "transforms-remove_fields",
   "transforms-rename_fields",

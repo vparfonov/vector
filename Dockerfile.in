@@ -1,3 +1,4 @@
+#@follow_tag(registry.redhat.io/ubi8:8.6)
 FROM registry.redhat.io/ubi8:8.6-754 as builder
 
 RUN INSTALL_PKGS=" \
@@ -25,6 +26,7 @@ COPY . /src
 RUN make build
 
 
+#@follow_tag(registry.redhat.io/ubi8:8.6)
 FROM registry.redhat.io/ubi8:8.6-754
 
 COPY --from=builder /src/target/release/vector /usr/bin

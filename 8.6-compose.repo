@@ -1,9 +1,0 @@
-[xyz]    
-baseurl = http://download-node-02.eng.bos.redhat.com/rhel-8/nightly/RHEL-8/latest-RHEL-8.6.0/compose/AppStream/x86_64/os/
-enabled = 1    
-gpgcheck = 0    
-    
-[xyz2]    
-baseurl = http://download-node-02.eng.bos.redhat.com/rhel-8/nightly/RHEL-8/latest-RHEL-8.6.0/compose/BaseOS/x86_64/os/
-enabled = 1    
-gpgcheck = 0  

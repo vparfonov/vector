@@ -990,9 +990,10 @@ random_dirent(char const **name, char **namealloc)
   char const *src = *name;
   char *dst = *namealloc;
   static char const prefix[] = ".zic";
-  static char const alphabet[] = ("abcdefghijklmnopqrstuvwxyz"
-				  "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-				  "0123456789");
+  static char const alphabet[] =
+    "abcdefghijklmnopqrstuvwxyz"
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+    "0123456789";
   enum { prefixlen = sizeof prefix - 1, alphabetlen = sizeof alphabet - 1 };
   int suffixlen = 6;
   char const *lastslash = strrchr(src, '/');
@@ -3563,9 +3564,11 @@ mkdirs(char const *argname, bool ancestors)
 		if (mkdir(name, MKDIR_UMASK) != 0) {
 			/* Do not report an error if err == EEXIST, because
 			   some other process might have made the directory
-			   in the meantime.  */
+			   in the meantime.  Likewise for ENOSYS, because
+			   Solaris 10 mkdir fails with ENOSYS if the
+			   directory is an automounted mount point.  */
 			int err = errno;
-			if (err != EEXIST) {
+			if (err != EEXIST && err != ENOSYS) {
 				error(_("%s: Can't create directory %s: %s"),
 				      progname, name, strerror(err));
 				exit(EXIT_FAILURE);

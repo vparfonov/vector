@@ -2,6 +2,7 @@
 
 pub mod iter;
 pub mod iter_set;
+mod lock;
 pub mod mapref;
 mod read_only;
 #[cfg(feature = "serde")]
@@ -18,6 +19,12 @@ pub mod rayon {
     pub mod set;
 }
 
+#[cfg(not(feature = "raw-api"))]
+use crate::lock::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+
+#[cfg(feature = "raw-api")]
+pub use crate::lock::{RawRwLock, RwLock, RwLockReadGuard, RwLockWriteGuard};
+
 use cfg_if::cfg_if;
 use core::borrow::Borrow;
 use core::fmt;
@@ -28,7 +35,6 @@ use iter::{Iter, IterMut, OwningIter};
 use mapref::entry::{Entry, OccupiedEntry, VacantEntry};
 use mapref::multiple::RefMulti;
 use mapref::one::{Ref, RefMut};
-use parking_lot::{RwLock, RwLockReadGuard, RwLockWriteGuard};
 pub use read_only::ReadOnlyView;
 pub use set::DashSet;
 use std::collections::hash_map::RandomState;
@@ -43,10 +49,10 @@ cfg_if! {
     }
 }
 
-pub(crate) type HashMap<K, V, S> = std::collections::HashMap<K, SharedValue<V>, S>;
+pub(crate) type HashMap<K, V, S> = hashbrown::HashMap<K, SharedValue<V>, S>;
 
 fn default_shard_amount() -> usize {
-    (num_cpus::get() * 4).next_power_of_two()
+    (std::thread::available_parallelism().map_or(1, usize::from) * 4).next_power_of_two()
 }
 
 fn ncb(shard_amount: usize) -> usize {
@@ -873,11 +879,16 @@ impl<'a, K: 'a + Eq + Hash, V: 'a, S: 'a + BuildHasher + Clone> Map<'a, K, V, S>
 
         let mut shard = unsafe { self._yield_write_shard(idx) };
 
-        if let Some((k, v)) = shard.get_key_value(key) {
-            if f(k, v.get()) {
-                shard.remove_entry(key).map(|(k, v)| (k, v.into_inner()))
-            } else {
-                None
+        if let Some((kptr, vptr)) = shard.get_key_value(key) {
+            unsafe {
+                let kptr: *const K = kptr;
+                let vptr: *mut V = vptr.as_ptr();
+
+                if f(&*kptr, &mut *vptr) {
+                    shard.remove_entry(key).map(|(k, v)| (k, v.into_inner()))
+                } else {
+                    None
+                }
             }
         } else {
             None
@@ -895,7 +906,7 @@ impl<'a, K: 'a + Eq + Hash, V: 'a, S: 'a + BuildHasher + Clone> Map<'a, K, V, S>
 
         let mut shard = unsafe { self._yield_write_shard(idx) };
 
-        if let Some((kptr, vptr)) = shard.get_key_value(&key) {
+        if let Some((kptr, vptr)) = shard.get_key_value(key) {
             unsafe {
                 let kptr: *const K = kptr;
                 let vptr: *mut V = vptr.as_ptr();

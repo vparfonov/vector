@@ -98,7 +98,7 @@ const char *rd_kafka_ApiKey2str (int16_t ApiKey) {
         static const char *names[] = {
                 [RD_KAFKAP_Produce] = "Produce",
                 [RD_KAFKAP_Fetch] = "Fetch",
-                [RD_KAFKAP_Offset] = "Offset",
+                [RD_KAFKAP_ListOffsets] = "ListOffsets",
                 [RD_KAFKAP_Metadata] = "Metadata",
                 [RD_KAFKAP_LeaderAndIsr] = "LeaderAndIsr",
                 [RD_KAFKAP_StopReplica] = "StopReplica",
@@ -604,6 +604,36 @@ static RD_UNUSED RD_INLINE int rd_kafka_pid_eq (const rd_kafka_pid_t a,
                                                 const rd_kafka_pid_t b) {
         return a.id == b.id && a.epoch == b.epoch;
 }
+
+/**
+ * @brief Pid+epoch comparator
+ */
+static RD_UNUSED int rd_kafka_pid_cmp (const void *_a, const void *_b) {
+        const rd_kafka_pid_t *a = _a, *b = _b;
+
+        if (a->id < b->id)
+                return -1;
+        else if (a->id > b->id)
+                return 1;
+
+        return (int)a->epoch - (int)b->epoch;
+}
+
+
+/**
+ * @brief Pid (not epoch) comparator
+ */
+static RD_UNUSED int rd_kafka_pid_cmp_pid (const void *_a, const void *_b) {
+        const rd_kafka_pid_t *a = _a, *b = _b;
+
+        if (a->id < b->id)
+                return -1;
+        else if (a->id > b->id)
+                return 1;
+
+        return 0;
+}
+
 
 /**
  * @returns the string representation of a PID in a thread-safe

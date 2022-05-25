@@ -12,21 +12,48 @@
 [package]
 edition = "2018"
 name = "bson"
-version = "2.2.0"
-authors = ["Y. T. Chung <zonyitoo@gmail.com>", "Kevin Yeh <kevinyeah@utexas.edu>", "Saghm Rossi <saghmrossi@gmail.com>", "Patrick Freed <patrick.freed@mongodb.com>", "Isabel Atkinson <isabel.atkinson@mongodb.com>"]
-exclude = ["etc/**", "examples/**", "fuzz/**", "serde-tests/**", "src/tests/**", "rustfmt.toml", ".travis.yml", ".evergreen/**", ".gitignore"]
+version = "2.4.0"
+authors = [
+    "Y. T. Chung <zonyitoo@gmail.com>",
+    "Kevin Yeh <kevinyeah@utexas.edu>",
+    "Saghm Rossi <saghmrossi@gmail.com>",
+    "Patrick Freed <patrick.freed@mongodb.com>",
+    "Isabel Atkinson <isabel.atkinson@mongodb.com>",
+]
+exclude = [
+    "etc/**",
+    "examples/**",
+    "fuzz/**",
+    "serde-tests/**",
+    "src/tests/**",
+    "rustfmt.toml",
+    ".travis.yml",
+    ".evergreen/**",
+    ".gitignore",
+]
 description = "Encoding and decoding support for BSON in Rust"
 readme = "README.md"
-keywords = ["bson", "mongodb", "serde", "serialization", "deserialization"]
+keywords = [
+    "bson",
+    "mongodb",
+    "serde",
+    "serialization",
+    "deserialization",
+]
 categories = ["encoding"]
 license = "MIT"
 repository = "https://github.com/mongodb/bson-rust"
+
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+]
 
 [lib]
 name = "bson"
+
 [dependencies.ahash]
 version = "0.7.2"
 
@@ -36,6 +63,7 @@ version = "0.13.0"
 [dependencies.chrono]
 version = "0.4.15"
 features = ["std"]
+optional = true
 default-features = false
 
 [dependencies.hex]
@@ -65,15 +93,41 @@ features = ["preserve_order"]
 version = "1"
 optional = true
 
+[dependencies.time]
+version = "0.3.9"
+features = [
+    "formatting",
+    "parsing",
+    "macros",
+    "large-dates",
+]
+
 [dependencies.uuid]
+version = "1.1.2"
+features = [
+    "serde",
+    "v4",
+]
+
+[dependencies.uuid-0_8]
 version = "0.8.1"
-features = ["serde", "v4"]
+features = [
+    "serde",
+    "v4",
+]
+optional = true
+package = "uuid"
+
 [dev-dependencies.assert_matches]
 version = "1.2"
 
 [dev-dependencies.chrono]
 version = "0.4"
-features = ["serde", "clock", "std"]
+features = [
+    "serde",
+    "clock",
+    "std",
+]
 default-features = false
 
 [dev-dependencies.criterion]
@@ -89,6 +143,7 @@ version = "1.0.0"
 version = "0.11"
 
 [features]
-chrono-0_4 = []
+chrono-0_4 = ["chrono"]
 default = []
-uuid-0_8 = []
+time-0_3 = []
+uuid-1 = []

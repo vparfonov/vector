@@ -4,8 +4,6 @@
 //! Use these functions to perform a cast from any other numeric primitive:
 //!
 //! ```
-//! extern crate cast;
-//!
 //! use cast::{u8, u16, Error};
 //!
 //! # fn main() {
@@ -28,8 +26,6 @@
 //! be in the same scope:
 //!
 //! ```
-//! extern crate cast;
-//!
 //! use std::u8;
 //! use cast::{u8, u16};
 //!
@@ -47,8 +43,6 @@
 //! `cast` static method:
 //!
 //! ```
-//! extern crate cast;
-//!
 //! use std::os::raw::c_ulonglong;
 //! // NOTE avoid shadowing `std::convert::From` - cf. rust-lang/rfcs#1311
 //! use cast::From as _0;
@@ -63,8 +57,6 @@
 //! casted to `u32`.
 //!
 //! ```
-//! extern crate cast;
-//!
 //! fn to_u32<T>(x: T) -> u32
 //!     // reads as: "where u32 can be casted from T with output u32"
 //!     where u32: cast::From<T, Output=u32>,
@@ -83,8 +75,9 @@
 //!
 //! ## Minimal Supported Rust Version
 //!
-//! This crate is guaranteed to compile on stable Rust 1.13 and up. It *might* compile on older
-//! versions but that may change in any new patch release.
+//! This crate is guaranteed to compile *as a dependency* on stable Rust 1.31 and up.
+//! It's not guaranteed that `cargo test`-ing this crate follows the MSRV.
+//! It *might* compile on older versions but that may change in any new patch release.
 //!
 //! ## Building without `std`
 //!
@@ -95,13 +88,11 @@
 //! cast = { version = "*", default-features = false }
 //! ```
 
-#![deny(missing_docs)]
-#![deny(warnings)]
 #![allow(const_err)]
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(all(feature = "x128", not(stable_i128)), feature(i128_type, i128))]
-
-
+#![deny(missing_docs)]
+#![deny(unsafe_code)]
+#![deny(warnings)]
 
 #[cfg(test)]
 #[macro_use]
@@ -180,7 +171,6 @@ macro_rules! fns {
 
 fns!(f32, f64, i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
 
-#[cfg(feature = "x128")]
 fns!(i128, u128);
 
 /// `$dst` can hold any value of `$src`
@@ -275,7 +265,7 @@ macro_rules! from_signed {
 
 /// From a float `$src` to an integer `$dst`
 macro_rules! from_float {
-    ($($src:ident, $usrc:ident => $($dst:ident),+);+;) => {
+    ($($src:ident => $($dst:ident),+);+;) => {
         $(
             $(
                 impl From<$src> for $dst {
@@ -291,13 +281,19 @@ macro_rules! from_float {
                             src == $src::NEG_INFINITY {
                             Error::Infinite
                         } else if {
-                            // we subtract 1 ULP (unit of least precision) here because some
-                            // lossy conversions like `u64::MAX as f64` round *up* and we want
-                            // to avoid this evaluating to false in that case
-                            use core::mem::transmute;
-                            let max = unsafe {
-                                transmute::<_, $src>(transmute::<_, $usrc>($dst::MAX as $src) - 1)
+                            // this '$dst::BITS' works on 1.31.0 (MSRV)
+                            let dst_bits = core::mem::size_of::<$dst>() as u32 * 8;
+                            let lossless = dst_bits < core::$src::MANTISSA_DIGITS;
+
+                            let max = if lossless {
+                                $dst::MAX as $src
+                            } else {
+                                // we subtract 1 ULP (unit of least precision) here because some
+                                // lossy conversions like `u64::MAX as f64` round *up* and we want
+                                // to avoid the check below evaluating to false in that case
+                                $src::from_bits(($dst::MAX as $src).to_bits() - 1)
                             };
+
                             src > max
                         } {
                             Error::Overflow
@@ -324,7 +320,6 @@ macro_rules! from_float {
 
 /// From a float `$src` to an integer `$dst`, where $dst is large enough to contain
 /// all values of `$src`. We can't ever overflow here
-#[cfg(feature = "x128")]
 macro_rules! from_float_dst {
     ($($src:ident => $($dst:ident),+);+;) => {
         $(
@@ -409,8 +404,8 @@ mod _32 {
     }
 
     from_float! {
-        f32, u32 =>        i8, i16, i32, isize, i64, u8, u16, u32, usize, u64;
-        f64, u64 =>        i8, i16, i32, isize, i64, u8, u16, u32, usize, u64;
+        f32 =>             i8, i16, i32, isize, i64, u8, u16, u32, usize, u64;
+        f64 =>             i8, i16, i32, isize, i64, u8, u16, u32, usize, u64;
     }
 }
 
@@ -467,12 +462,11 @@ mod _64 {
     }
 
     from_float! {
-        f32, u32  =>       i8, i16, i32, i64, isize, u8, u16, u32, u64, usize;
-        f64, u64  =>       i8, i16, i32, i64, isize, u8, u16, u32, u64, usize;
+        f32 =>             i8, i16, i32, i64, isize, u8, u16, u32, u64, usize;
+        f64 =>             i8, i16, i32, i64, isize, u8, u16, u32, u64, usize;
     }
 }
 
-#[cfg(feature = "x128")]
 mod _x128 {
     use crate::{Error, From};
 
@@ -514,13 +508,13 @@ mod _x128 {
     }
 
     // Float
-    from_float! {
-        f32, u32  => i128;
-        f64, u64  => i128, u128;
+    from_float_dst! {
+        f32 =>                                                                u128;
     }
 
-    from_float_dst! {
-        f32       =>       u128;
+    from_float! {
+        f32 =>                                i128;
+        f64 =>                                i128,                           u128;
     }
 }
 

@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "openssl"
-version = "0.10.40"
+version = "0.10.41"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 description = "OpenSSL bindings"
 readme = "README.md"
@@ -36,7 +36,7 @@ version = "1.0"
 version = "1.0"
 
 [dependencies.ffi]
-version = "0.9.73"
+version = "0.9.75"
 package = "openssl-sys"
 
 [dependencies.foreign-types]

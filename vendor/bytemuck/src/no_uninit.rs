@@ -1,4 +1,18 @@
 use crate::Pod;
+use core::num::{
+    NonZeroU8,
+    NonZeroI8,
+    NonZeroU16,
+    NonZeroI16,
+    NonZeroU32,
+    NonZeroI32,
+    NonZeroU64,
+    NonZeroI64,
+    NonZeroU128,
+    NonZeroI128,
+    NonZeroUsize,
+    NonZeroIsize,
+};
 
 /// Marker trait for "plain old data" types with no uninit (or padding) bytes.
 ///
@@ -42,6 +56,13 @@ use crate::Pod;
 ///   all other rules end up being followed.
 /// * Enums need to have an explicit `#[repr(Int)]`
 /// * Enums must have only fieldless variants
+/// * It is disallowed for types to contain pointer types, `Cell`, `UnsafeCell`, atomics, and any
+///   other forms of interior mutability.
+/// * More precisely: A shared reference to the type must allow reads, and *only* reads. RustBelt's
+///   separation logic is based on the notion that a type is allowed to define a sharing predicate,
+///   its own invariant that must hold for shared references, and this predicate is the reasoning
+///   that allow it to deal with atomic and cells etc. We require the sharing predicate to be
+///   trivial and permit only read-only access.
 /// * There's probably more, don't mess it up (I mean it).
 pub unsafe trait NoUninit: Sized + Copy + 'static {}
 
@@ -50,3 +71,16 @@ unsafe impl<T: Pod> NoUninit for T {}
 unsafe impl NoUninit for char {}
 
 unsafe impl NoUninit for bool {}
+
+unsafe impl NoUninit for NonZeroU8 {}
+unsafe impl NoUninit for NonZeroI8 {}
+unsafe impl NoUninit for NonZeroU16 {}
+unsafe impl NoUninit for NonZeroI16 {}
+unsafe impl NoUninit for NonZeroU32 {}
+unsafe impl NoUninit for NonZeroI32 {}
+unsafe impl NoUninit for NonZeroU64 {}
+unsafe impl NoUninit for NonZeroI64 {}
+unsafe impl NoUninit for NonZeroU128 {}
+unsafe impl NoUninit for NonZeroI128 {}
+unsafe impl NoUninit for NonZeroUsize {}
+unsafe impl NoUninit for NonZeroIsize {}

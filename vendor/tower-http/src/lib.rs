@@ -285,6 +285,9 @@ pub mod trace;
 #[cfg(feature = "follow-redirect")]
 pub mod follow_redirect;
 
+#[cfg(feature = "limit")]
+pub mod limit;
+
 #[cfg(feature = "metrics")]
 pub mod metrics;
 
@@ -299,6 +302,9 @@ pub mod catch_panic;
 
 #[cfg(feature = "set-status")]
 pub mod set_status;
+
+#[cfg(feature = "timeout")]
+pub mod timeout;
 
 pub mod classify;
 pub mod services;

@@ -95,6 +95,7 @@ const char *rd_kafka_op2str (rd_kafka_op_type_t type) {
                 [RD_KAFKA_OP_GET_REBALANCE_PROTOCOL] =
                 "REPLY:GET_REBALANCE_PROTOCOL",
                 [RD_KAFKA_OP_LEADERS] = "REPLY:LEADERS",
+                [RD_KAFKA_OP_BARRIER] = "REPLY:BARRIER",
         };
 
         if (type & RD_KAFKA_OP_REPLY)
@@ -237,6 +238,7 @@ rd_kafka_op_t *rd_kafka_op_new0 (const char *source, rd_kafka_op_type_t type) {
                 [RD_KAFKA_OP_GET_REBALANCE_PROTOCOL] =
                 sizeof(rko->rko_u.rebalance_protocol),
                 [RD_KAFKA_OP_LEADERS] = sizeof(rko->rko_u.leaders),
+                [RD_KAFKA_OP_BARRIER] = _RD_KAFKA_OP_EMPTY,
         };
         size_t tsize = op2size[type & ~RD_KAFKA_OP_FLAGMASK];
 
@@ -381,6 +383,7 @@ void rd_kafka_op_destroy (rd_kafka_op_t *rko) {
                 break;
 
         case RD_KAFKA_OP_ADMIN_RESULT:
+                rd_list_destroy(&rko->rko_u.admin_result.args);
                 rd_list_destroy(&rko->rko_u.admin_result.results);
                 RD_IF_FREE(rko->rko_u.admin_result.errstr, rd_free);
                 rd_assert(!rko->rko_u.admin_result.fanout_parent);;
@@ -777,7 +780,8 @@ void rd_kafka_op_throttle_time (rd_kafka_broker_t *rkb,
 				int throttle_time) {
 	rd_kafka_op_t *rko;
 
-	rd_avg_add(&rkb->rkb_avg_throttle, throttle_time);
+        if (unlikely(throttle_time > 0))
+                rd_avg_add(&rkb->rkb_avg_throttle, throttle_time);
 
 	/* We send throttle events when:
 	 *  - throttle_time > 0

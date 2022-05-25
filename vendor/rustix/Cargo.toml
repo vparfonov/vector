@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "rustix"
-version = "0.34.4"
+version = "0.35.7"
 authors = [
     "Dan Gohman <dev@sunfishcode.online>",
     "Jakub Konka <kubkon@jakubkonka.com>",
@@ -40,7 +40,7 @@ license = "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
 repository = "https://github.com/bytecodealliance/rustix"
 
 [package.metadata.docs.rs]
-features = ["procfs"]
+features = ["all-apis"]
 rustdoc-args = [
     "--cfg",
     "doc_cfg",
@@ -74,7 +74,7 @@ optional = true
 package = "rustc-std-workspace-core"
 
 [dependencies.io-lifetimes]
-version = "0.6.0"
+version = "0.7.0"
 optional = true
 default-features = false
 
@@ -83,11 +83,20 @@ version = "1.0.1"
 optional = true
 default-features = false
 
-[dev-dependencies.errno]
-version = "0.2.8"
+[dev-dependencies.io-lifetimes]
+version = "0.7.0"
+default-features = false
 
 [dev-dependencies.libc]
-version = "0.2.118"
+version = "0.2.126"
+
+[dev-dependencies.libc_errno]
+version = "0.2.8"
+default-features = false
+package = "errno"
+
+[dev-dependencies.memoffset]
+version = "0.6.5"
 
 [dev-dependencies.serial_test]
 version = "0.6"
@@ -100,6 +109,20 @@ version = "1.0.68"
 optional = true
 
 [features]
+all-apis = [
+    "fs",
+    "io_uring",
+    "mm",
+    "net",
+    "param",
+    "process",
+    "procfs",
+    "rand",
+    "runtime",
+    "termios",
+    "thread",
+    "time",
+]
 all-impls = [
     "async-std",
     "tokio",
@@ -110,44 +133,65 @@ all-impls = [
 ]
 async-std = ["io-lifetimes/async-std"]
 default = ["std"]
+fs = []
 fs-err = ["io-lifetimes/fs-err"]
+io_uring = [
+    "linux-raw-sys",
+    "fs",
+    "net",
+]
 mio = ["io-lifetimes/mio"]
+mm = ["linux-raw-sys"]
+net = []
 os_pipe = ["io-lifetimes/os_pipe"]
+param = []
+process = []
 procfs = [
     "once_cell",
     "itoa",
 ]
+rand = []
+runtime = []
 rustc-dep-of-std = [
     "core",
     "alloc",
     "compiler_builtins",
     "linux-raw-sys/rustc-dep-of-std",
     "bitflags/rustc-dep-of-std",
-    "libc/rustc-dep-of-std",
 ]
 socket2 = ["io-lifetimes/socket2"]
-std = [
-    "io-lifetimes",
-    "linux-raw-sys/std",
-]
+std = ["io-lifetimes"]
+termios = []
+thread = []
+time = []
 tokio = ["io-lifetimes/tokio"]
 use-libc = [
-    "errno",
+    "libc_errno",
     "libc",
 ]
 
-[target."cfg(all(not(rustix_use_libc), not(miri), target_os = \"linux\", any(target_arch = \"x86\", all(target_arch = \"x86_64\", not(target_pointer_width = \"32\")), target_arch = \"arm\", target_arch = \"aarch64\", target_arch = \"powerpc64\", target_arch = \"riscv64\", target_arch = \"mips\", target_arch = \"mips64\")))".dependencies.errno]
-version = "0.2.8"
+[target."cfg(all(any(target_os = \"android\", target_os = \"linux\"), any(rustix_use_libc, miri, not(all(target_os = \"linux\", any(target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\"), all(target_endian = \"little\", any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"powerpc64\", target_arch = \"riscv64\", target_arch = \"mips\", target_arch = \"mips64\"))))))))".dependencies.linux-raw-sys]
+version = "0.0.46"
+features = [
+    "general",
+    "no_std",
+]
 optional = true
 default-features = false
 
-[target."cfg(all(not(rustix_use_libc), not(miri), target_os = \"linux\", any(target_arch = \"x86\", all(target_arch = \"x86_64\", not(target_pointer_width = \"32\")), target_arch = \"arm\", target_arch = \"aarch64\", target_arch = \"powerpc64\", target_arch = \"riscv64\", target_arch = \"mips\", target_arch = \"mips64\")))".dependencies.libc]
-version = "0.2.118"
+[target."cfg(all(not(rustix_use_libc), not(miri), target_os = \"linux\", any(target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\"), all(target_endian = \"little\", any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"powerpc64\", target_arch = \"riscv64\", target_arch = \"mips\", target_arch = \"mips64\")))))".dependencies.libc]
+version = "0.2.126"
 features = ["extra_traits"]
 optional = true
 
-[target."cfg(all(not(rustix_use_libc), not(miri), target_os = \"linux\", any(target_arch = \"x86\", all(target_arch = \"x86_64\", not(target_pointer_width = \"32\")), target_arch = \"arm\", target_arch = \"aarch64\", target_arch = \"powerpc64\", target_arch = \"riscv64\", target_arch = \"mips\", target_arch = \"mips64\")))".dependencies.linux-raw-sys]
-version = "0.0.42"
+[target."cfg(all(not(rustix_use_libc), not(miri), target_os = \"linux\", any(target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\"), all(target_endian = \"little\", any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"powerpc64\", target_arch = \"riscv64\", target_arch = \"mips\", target_arch = \"mips64\")))))".dependencies.libc_errno]
+version = "0.2.8"
+optional = true
+default-features = false
+package = "errno"
+
+[target."cfg(all(not(rustix_use_libc), not(miri), target_os = \"linux\", any(target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\"), all(target_endian = \"little\", any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"powerpc64\", target_arch = \"riscv64\", target_arch = \"mips\", target_arch = \"mips64\")))))".dependencies.linux-raw-sys]
+version = "0.0.46"
 features = [
     "general",
     "errno",
@@ -156,17 +200,14 @@ features = [
 ]
 default-features = false
 
-[target."cfg(all(windows, not(target_vendor = \"uwp\")))".dependencies.winapi]
-version = "0.3.9"
-features = ["handleapi"]
+[target."cfg(any(rustix_use_libc, miri, not(all(target_os = \"linux\", any(target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\"), all(target_endian = \"little\", any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"powerpc64\", target_arch = \"riscv64\", target_arch = \"mips\", target_arch = \"mips64\")))))))".dependencies.libc]
+version = "0.2.126"
+features = ["extra_traits"]
 
-[target."cfg(any(rustix_use_libc, miri, not(all(target_os = \"linux\", any(target_arch = \"x86\", all(target_arch = \"x86_64\", not(target_pointer_width = \"32\")), target_arch = \"arm\", target_arch = \"aarch64\", target_arch = \"powerpc64\", target_arch = \"riscv64\", target_arch = \"mips\", target_arch = \"mips64\")))))".dependencies.errno]
+[target."cfg(any(rustix_use_libc, miri, not(all(target_os = \"linux\", any(target_arch = \"x86\", all(target_arch = \"x86_64\", target_pointer_width = \"64\"), all(target_endian = \"little\", any(target_arch = \"arm\", all(target_arch = \"aarch64\", target_pointer_width = \"64\"), target_arch = \"powerpc64\", target_arch = \"riscv64\", target_arch = \"mips\", target_arch = \"mips64\")))))))".dependencies.libc_errno]
 version = "0.2.8"
 default-features = false
-
-[target."cfg(any(rustix_use_libc, miri, not(all(target_os = \"linux\", any(target_arch = \"x86\", all(target_arch = \"x86_64\", not(target_pointer_width = \"32\")), target_arch = \"arm\", target_arch = \"aarch64\", target_arch = \"powerpc64\", target_arch = \"riscv64\", target_arch = \"mips\", target_arch = \"mips64\")))))".dependencies.libc]
-version = "0.2.118"
-features = ["extra_traits"]
+package = "errno"
 
 [target."cfg(any(target_os = \"android\", target_os = \"linux\"))".dependencies.once_cell]
 version = "1.5.2"
@@ -175,11 +216,13 @@ optional = true
 [target."cfg(not(target_os = \"emscripten\"))".dev-dependencies.criterion]
 version = "0.3"
 
-[target."cfg(windows)".dependencies.winapi]
-version = "0.3.9"
+[target."cfg(windows)".dependencies.windows-sys]
+version = "0.36.0"
 features = [
-    "ws2ipdef",
-    "ws2tcpip",
+    "Win32_Foundation",
+    "Win32_Networking_WinSock",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_System_Threading",
 ]
 
 [target."cfg(windows)".dev-dependencies.ctor]

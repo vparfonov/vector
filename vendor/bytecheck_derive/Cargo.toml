@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "bytecheck_derive"
-version = "0.6.8"
+version = "0.6.9"
 authors = ["David Koloski <djkoloski@gmail.com>"]
 description = "Derive macro for bytecheck"
 documentation = "https://docs.rs/bytecheck_derive"
@@ -21,6 +21,7 @@ repository = "https://github.com/djkoloski/bytecheck"
 
 [lib]
 proc-macro = true
+
 [dependencies.proc-macro2]
 version = "1.0"
 

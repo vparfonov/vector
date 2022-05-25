@@ -11,13 +11,22 @@
 
 [package]
 edition = "2018"
-rust-version = "1.36"
+rust-version = "1.45"
 name = "dyn-clone"
-version = "1.0.6"
+version = "1.0.9"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 description = "Clone trait that is object-safe"
 documentation = "https://docs.rs/dyn-clone"
 readme = "README.md"
+keywords = [
+    "dyn",
+    "clone",
+    "trait-object",
+]
+categories = [
+    "rust-patterns",
+    "no-std",
+]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/dtolnay/dyn-clone"
 

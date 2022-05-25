@@ -12,15 +12,21 @@
 [package]
 edition = "2018"
 name = "tracing-test-macro"
-version = "0.2.1"
+version = "0.2.3"
 authors = ["Danilo Bargen <mail@dbrgn.ch>"]
-description = "A procedural macro that allow for easier testing of crates that use `tracing`.\n\nInternal crate, should only be used through the `tracing-test` crate.\n"
+description = """
+A procedural macro that allow for easier testing of crates that use `tracing`.
+
+Internal crate, should only be used through the `tracing-test` crate.
+"""
+readme = "../README.md"
 categories = ["development-tools::testing"]
 license = "MIT"
 repository = "https://github.com/dbrgn/tracing-test"
 
 [lib]
 proc-macro = true
+
 [dependencies.lazy_static]
 version = "1.4"
 
@@ -30,5 +36,9 @@ version = "1"
 [dependencies.syn]
 version = "1"
 features = ["full"]
+
+[features]
+no-env-filter = []
+
 [badges.maintenance]
 status = "experimental"

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 # make_unicode_property_data.py
-# Copyright (c) 2016-2020  K.Kosako
+# Copyright (c) 2016-2021  K.Kosako
 
 import sys
 import re
@@ -23,7 +23,7 @@ PA_LINE_REG  = re.compile("(\w+)\s*;\s*(\w+)")
 PVA_LINE_REG = re.compile("(sc|gc)\s*;\s*(\w+)\s*;\s*(\w+)(?:\s*;\s*(\w+))?")
 BL_LINE_REG  = re.compile("([0-9A-Fa-f]+)\.\.([0-9A-Fa-f]+)\s*;\s*(.*)")
 UNICODE_VERSION_REG = re.compile("#\s*.*-(\d+)\.(\d+)\.(\d+)\.txt")
-EMOJI_VERSION_REG   = re.compile("(?i)#\s*Version:\s*(\d+)\.(\d+)")
+EMOJI_VERSION_REG   = re.compile("(?i)#.+Version\s+(\d+)\.(\d+)")
 
 VERSION_INFO = [-1, -1, -1]
 EMOJI_VERSION_INFO = [-1, -1]
@@ -425,7 +425,7 @@ argc = len(argv)
 
 COPYRIGHT = '''
 /*-
- * Copyright (c) 2016-2020  K.Kosako
+ * Copyright (c) 2016-2021  K.Kosako
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without

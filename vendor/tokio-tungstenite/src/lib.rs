@@ -26,7 +26,7 @@ use std::io::{Read, Write};
 use compat::{cvt, AllowStd, ContextWaker};
 use futures_util::{
     sink::{Sink, SinkExt},
-    stream::Stream,
+    stream::{FusedStream, Stream},
 };
 use log::*;
 use std::{
@@ -182,6 +182,8 @@ where
 #[derive(Debug)]
 pub struct WebSocketStream<S> {
     inner: WebSocket<AllowStd<S>>,
+    closing: bool,
+    ended: bool,
 }
 
 impl<S> WebSocketStream<S> {
@@ -215,7 +217,7 @@ impl<S> WebSocketStream<S> {
     }
 
     pub(crate) fn new(ws: WebSocket<AllowStd<S>>) -> Self {
-        WebSocketStream { inner: ws }
+        WebSocketStream { inner: ws, closing: false, ended: false }
     }
 
     fn with_context<F, R>(&mut self, ctx: Option<(ContextWaker, &mut Context<'_>)>, f: F) -> R
@@ -270,14 +272,37 @@ where
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         trace!("{}:{} Stream.poll_next", file!(), line!());
+
+        // The connection has been closed or a critical error has occurred.
+        // We have already returned the error to the user, the `Stream` is unusable,
+        // so we assume that the stream has been "fused".
+        if self.ended {
+            return Poll::Ready(None);
+        }
+
         match futures_util::ready!(self.with_context(Some((ContextWaker::Read, cx)), |s| {
             trace!("{}:{} Stream.with_context poll_next -> read_message()", file!(), line!());
             cvt(s.read_message())
         })) {
             Ok(v) => Poll::Ready(Some(Ok(v))),
-            Err(WsError::AlreadyClosed) | Err(WsError::ConnectionClosed) => Poll::Ready(None),
-            Err(e) => Poll::Ready(Some(Err(e))),
+            Err(e) => {
+                self.ended = true;
+                if matches!(e, WsError::AlreadyClosed | WsError::ConnectionClosed) {
+                    Poll::Ready(None)
+                } else {
+                    Poll::Ready(Some(Err(e)))
+                }
+            }
         }
+    }
+}
+
+impl<T> FusedStream for WebSocketStream<T>
+where
+    T: AsyncRead + AsyncWrite + Unpin,
+{
+    fn is_terminated(&self) -> bool {
+        self.ended
     }
 }
 
@@ -294,9 +319,7 @@ where
     fn start_send(mut self: Pin<&mut Self>, item: Message) -> Result<(), Self::Error> {
         match (*self).with_context(None, |s| s.write_message(item)) {
             Ok(()) => Ok(()),
-            Err(::tungstenite::Error::Io(ref err))
-                if err.kind() == std::io::ErrorKind::WouldBlock =>
-            {
+            Err(::tungstenite::Error::Io(err)) if err.kind() == std::io::ErrorKind::WouldBlock => {
                 // the message was accepted and queued
                 // isn't an error.
                 Ok(())
@@ -313,9 +336,21 @@ where
     }
 
     fn poll_close(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        match (*self).with_context(Some((ContextWaker::Write, cx)), |s| s.close(None)) {
+        let res = if self.closing {
+            // After queueing it, we call `write_pending` to drive the close handshake to completion.
+            (*self).with_context(Some((ContextWaker::Write, cx)), |s| s.write_pending())
+        } else {
+            (*self).with_context(Some((ContextWaker::Write, cx)), |s| s.close(None))
+        };
+
+        match res {
             Ok(()) => Poll::Ready(Ok(())),
             Err(::tungstenite::Error::ConnectionClosed) => Poll::Ready(Ok(())),
+            Err(::tungstenite::Error::Io(err)) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                trace!("WouldBlock");
+                self.closing = true;
+                Poll::Pending
+            }
             Err(err) => {
                 debug!("websocket close error: {}", err);
                 Poll::Ready(Err(err))

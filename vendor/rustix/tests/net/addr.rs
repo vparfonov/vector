@@ -9,13 +9,13 @@ fn encode_decode() {
     unsafe {
         let orig = SocketAddrV4::new(Ipv4Addr::new(2, 3, 5, 6), 33);
         let mut encoded = std::mem::MaybeUninit::<SocketAddrStorage>::uninit();
-        let len = SocketAddrAny::V4(orig.clone()).write(encoded.as_mut_ptr());
+        let len = SocketAddrAny::V4(orig).write(encoded.as_mut_ptr());
         let decoded = SocketAddrAny::read(encoded.as_ptr(), len).unwrap();
         assert_eq!(decoded, SocketAddrAny::V4(orig));
 
         let orig = SocketAddrV6::new(Ipv6Addr::new(2, 3, 5, 6, 8, 9, 11, 12), 33, 34, 36);
         let mut encoded = std::mem::MaybeUninit::<SocketAddrStorage>::uninit();
-        let len = SocketAddrAny::V6(orig.clone()).write(encoded.as_mut_ptr());
+        let len = SocketAddrAny::V6(orig).write(encoded.as_mut_ptr());
         let decoded = SocketAddrAny::read(encoded.as_ptr(), len).unwrap();
         assert_eq!(decoded, SocketAddrAny::V6(orig));
 
@@ -33,24 +33,24 @@ fn encode_decode() {
 #[cfg(not(windows))]
 #[test]
 fn test_unix_addr() {
+    use rustix::cstr;
     use rustix::net::SocketAddrUnix;
-    use rustix::zstr;
 
     assert_eq!(
         SocketAddrUnix::new("/").unwrap().path().unwrap(),
-        zstr!("/")
+        cstr!("/")
     );
     assert_eq!(
         SocketAddrUnix::new("//").unwrap().path().unwrap(),
-        zstr!("//")
+        cstr!("//")
     );
     assert_eq!(
         SocketAddrUnix::new("/foo/bar").unwrap().path().unwrap(),
-        zstr!("/foo/bar")
+        cstr!("/foo/bar")
     );
     assert_eq!(
         SocketAddrUnix::new("foo").unwrap().path().unwrap(),
-        zstr!("foo")
+        cstr!("foo")
     );
     SocketAddrUnix::new("/foo\0/bar").unwrap_err();
     assert!(SocketAddrUnix::new("").unwrap().path().is_none());

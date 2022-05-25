@@ -7,7 +7,7 @@ use std::collections::HashMap;
 fn dir_entries() {
     let tmpdir = tempfile::tempdir().expect("construct tempdir");
     let dirfd = std::fs::File::open(tmpdir.path()).expect("open tempdir as file");
-    let mut dir = Dir::from(dirfd).expect("construct Dir from dirfd");
+    let mut dir = Dir::read_from(dirfd).expect("construct Dir from dirfd");
 
     let entries = read_entries(&mut dir);
     assert_eq!(entries.len(), 0, "no files in directory");
@@ -58,11 +58,11 @@ fn read_entries(dir: &mut Dir) -> HashMap<String, DirEntry> {
 #[test]
 fn dir_from_openat() {
     let dirfd = rustix::fs::openat(
-        &rustix::fs::cwd(),
+        rustix::fs::cwd(),
         ".",
         rustix::fs::OFlags::RDONLY,
         rustix::fs::Mode::empty(),
     )
     .expect("open cwd as file");
-    let _dir = Dir::from(dirfd).expect("construct Dir from dirfd");
+    let _dir = Dir::read_from(dirfd).expect("construct Dir from dirfd");
 }

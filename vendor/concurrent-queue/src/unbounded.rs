@@ -172,8 +172,8 @@ impl<T> Unbounded<T> {
                 if self
                     .tail
                     .block
-                    .compare_and_swap(block, new, Ordering::Release)
-                    == block
+                    .compare_exchange(block, new, Ordering::Release, Ordering::Relaxed)
+                    .is_ok()
                 {
                     self.head.block.store(new, Ordering::Release);
                     block = new;
@@ -371,9 +371,9 @@ impl<T> Unbounded<T> {
 
 impl<T> Drop for Unbounded<T> {
     fn drop(&mut self) {
-        let mut head = self.head.index.load(Ordering::Relaxed);
-        let mut tail = self.tail.index.load(Ordering::Relaxed);
-        let mut block = self.head.block.load(Ordering::Relaxed);
+        let mut head = *self.head.index.get_mut();
+        let mut tail = *self.tail.index.get_mut();
+        let mut block = *self.head.block.get_mut();
 
         // Erase the lower bits.
         head &= !((1 << SHIFT) - 1);
@@ -387,11 +387,11 @@ impl<T> Drop for Unbounded<T> {
                 if offset < BLOCK_CAP {
                     // Drop the value in the slot.
                     let slot = (*block).slots.get_unchecked(offset);
-                    let value = slot.value.get().read().assume_init();
-                    drop(value);
+                    let value = &mut *slot.value.get();
+                    value.as_mut_ptr().drop_in_place();
                 } else {
                     // Deallocate the block and move to the next one.
-                    let next = (*block).next.load(Ordering::Relaxed);
+                    let next = *(*block).next.get_mut();
                     drop(Box::from_raw(block));
                     block = next;
                 }

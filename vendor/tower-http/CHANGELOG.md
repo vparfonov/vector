@@ -23,6 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - None.
 
+# 0.3.4 (June 06, 2022)
+
+## Added
+
+- Add `Timeout` middleware ([#270])
+- Add `RequestBodyLimit` middleware ([#271])
+
+[#270]: https://github.com/tower-rs/tower-http/pull/270
+[#271]: https://github.com/tower-rs/tower-http/pull/271
+
 # 0.3.3 (May 08, 2022)
 
 ## Added

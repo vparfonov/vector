@@ -20,7 +20,7 @@ If you have any suggestions or tips do not hesitate to open an issue or a PR.
 
 [![downloads](https://img.shields.io/crates/d/dashmap)](https://crates.io/crates/dashmap)
 
-[![minimum rustc version](https://img.shields.io/badge/rustc-1.49-orange.svg)](https://crates.io/crates/dashmap)
+[![minimum rustc version](https://img.shields.io/badge/rustc-1.59-orange.svg)](https://crates.io/crates/dashmap)
 
 ## Cargo features
 
@@ -29,8 +29,6 @@ If you have any suggestions or tips do not hesitate to open an issue or a PR.
 - `raw-api` - Enables the unstable raw-shard api.
 
 - `rayon` - Enables rayon support.
-
-- `send_guard` - Enables the `send_guard` feature of `parking_lot`, making `Ref*` guards `Send`. This is on by default.
 
 ## Contributing
 

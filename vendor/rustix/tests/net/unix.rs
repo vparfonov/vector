@@ -1,5 +1,6 @@
-//! Test a simple Unix-domain socket server and client. The client sends lists
-//! of integers and the server sends back sums.
+//! Test a simple Unix-domain socket server and client.
+//!
+//! The client sends lists of integers and the server sends back sums.
 
 // This test uses `AF_UNIX` with `SOCK_SEQPACKET` which is unsupported on macOS.
 #![cfg(not(any(
@@ -10,6 +11,7 @@
 )))]
 // This test uses `DecInt`.
 #![cfg(feature = "itoa")]
+#![cfg(feature = "fs")]
 
 use rustix::fs::{cwd, unlinkat, AtFlags};
 use rustix::io::{read, write};
@@ -64,7 +66,7 @@ fn server(ready: Arc<(Mutex<bool>, Condvar)>, path: &Path) {
         write(&data_socket, DecInt::new(sum).as_bytes()).unwrap();
     }
 
-    unlinkat(&cwd(), path, AtFlags::empty()).unwrap();
+    unlinkat(cwd(), path, AtFlags::empty()).unwrap();
 }
 
 fn client(ready: Arc<(Mutex<bool>, Condvar)>, path: &Path, runs: &[(&[&str], i32)]) {

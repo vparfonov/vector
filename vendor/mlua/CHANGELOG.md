@@ -1,3 +1,21 @@
+## v0.8.3
+
+- Close to-be-closed variables for Lua 5.4 when using call_async functions (#192)
+- Fixed Lua assertion when inspecting another thread stack. (#195)
+- Use more reliable way to create LuaJIT VM (which can fail if use Rust allocator on non-x86 platforms)
+
+## v0.8.2
+
+- Performance optimizations in handling UserData
+- Minimal Luau updated to 0.536
+- Fixed bug in `Function::bind` when passing empty binds and no arguments (#189)
+
+## v0.8.1
+
+- Added `Lua::create_proxy` for accessing to UserData static fields and functions without instance
+- Added `Table::to_pointer()` and `String::to_pointer()` functions
+- Bugfixes and improvements (#176 #179)
+
 ## v0.8.0
 Changes since 0.7.4
 - Roblox Luau support

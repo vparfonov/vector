@@ -36,7 +36,7 @@ This crate is available on [crates.io](https://crates.io/crates/bson). To use it
 
 ```toml
 [dependencies]
-bson = "2.2.0"
+bson = "2.4.0"
 ```
 
 Note that if you are using `bson` through the `mongodb` crate, you do not need to specify it in your
@@ -48,6 +48,7 @@ Note that if you are using `bson` through the `mongodb` crate, you do not need t
 |:-------------|:----------------------------------------------------------------------------------------------------|:-------------------|:--------|
 | `chrono-0_4` | Enable support for v0.4 of the [`chrono`](docs.rs/chrono/0.4) crate in the public API.              | n/a                | no      |
 | `uuid-0_8`   | Enable support for v0.8 of the [`uuid`](docs.rs/uuid/0.8) crate in the public API.                  | n/a                | no      |
+| `uuid-1`     | Enable support for v1.x of the [`uuid`](docs.rs/uuid/1.0) crate in the public API.                  | n/a                | no      |
 | `serde_with` | Enable [`serde_with`](docs.rs/serde_with/latest) integrations for `bson::DateTime` and `bson::Uuid` | serde_with         | no      |
 
 ## Overview of the BSON Format
@@ -280,4 +281,4 @@ bash .evergreen/check-clippy.sh && bash .evergreen/check-rustfmt.sh
 ```
 
 ## Continuous Integration
-Commits to master are run automatically on [evergreen](https://evergreen.mongodb.com/waterfall/rust-bson).
+Commits to main are run automatically on [evergreen](https://evergreen.mongodb.com/waterfall/rust-bson).

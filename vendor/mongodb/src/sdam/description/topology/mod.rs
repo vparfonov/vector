@@ -7,21 +7,22 @@ use std::{
     time::Duration,
 };
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     bson::oid::ObjectId,
     client::ClusterTime,
     cmap::Command,
     options::{ClientOptions, ServerAddress},
-    sdam::description::server::{ServerDescription, ServerType},
+    sdam::{
+        description::server::{ServerDescription, ServerType},
+        DEFAULT_HEARTBEAT_FREQUENCY,
+    },
     selection_criteria::{ReadPreference, SelectionCriteria},
 };
 
-const DEFAULT_HEARTBEAT_FREQUENCY: Duration = Duration::from_secs(10);
-
 /// The possible types for a topology.
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Deserialize, Serialize)]
 #[non_exhaustive]
 pub enum TopologyType {
     /// A single mongod server.
@@ -64,10 +65,11 @@ impl Default for TopologyType {
 }
 
 /// A description of the most up-to-date information known about a topology.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 #[non_exhaustive]
 pub(crate) struct TopologyDescription {
     /// Whether or not the topology was initialized with a single seed.
+    #[serde(skip)]
     pub(crate) single_seed: bool,
 
     /// The current type of the topology.
@@ -88,19 +90,24 @@ pub(crate) struct TopologyDescription {
 
     /// Whether or not this topology supports sessions, and if so, what the logicalSessionTimeout
     /// is for them.
+    #[serde(skip)]
     pub(crate) session_support_status: SessionSupportStatus,
 
     /// Whether or not this topology supports transactions.
+    #[serde(skip)]
     pub(crate) transaction_support_status: TransactionSupportStatus,
 
     /// The highest reported cluster time by any server in this topology.
+    #[serde(skip)]
     pub(crate) cluster_time: Option<ClusterTime>,
 
     /// The amount of latency beyond that of the suitable server with the minimum latency that is
     /// acceptable for a read operation.
+    #[serde(skip)]
     pub(crate) local_threshold: Option<Duration>,
 
     /// The maximum amount of time to wait before checking a given server by sending server check.
+    #[serde(skip)]
     pub(crate) heartbeat_freq: Option<Duration>,
 
     /// The server descriptions of each member of the topology.
@@ -211,10 +218,15 @@ impl TopologyDescription {
 
     pub(crate) fn update_command_with_read_pref<T>(
         &self,
-        server_type: ServerType,
+        address: &ServerAddress,
         command: &mut Command<T>,
         criteria: Option<&SelectionCriteria>,
     ) {
+        let server_type = self
+            .get_server_description(address)
+            .map(|sd| sd.server_type)
+            .unwrap_or(ServerType::Unknown);
+
         match (self.topology_type, server_type) {
             (TopologyType::Sharded, ServerType::Mongos)
             | (TopologyType::Single, ServerType::Mongos)

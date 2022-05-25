@@ -11,7 +11,7 @@
 
 [package]
 name = "openssl-src"
-version = "111.20.0+1.1.1o"
+version = "111.22.0+1.1.1q"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
 exclude = [
     "openssl/boringssl/*",

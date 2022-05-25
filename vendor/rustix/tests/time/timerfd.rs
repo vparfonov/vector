@@ -20,7 +20,7 @@ fn test_timerfd() {
     let _old: Itimerspec = timerfd_settime(&fd, TimerfdTimerFlags::ABSTIME, &set).unwrap();
 
     // Wait for the timer to expire.
-    let mut buf = [0u8; 8usize];
+    let mut buf = [0_u8; 8];
     assert_eq!(rustix::io::read(&fd, &mut buf), Ok(8));
     assert!(u64::from_ne_bytes(buf) >= 1);
 
@@ -35,8 +35,8 @@ fn test_timerfd() {
     );
 }
 
-// Similar, but set an interval for a repeated timer. Don't check that the
-// times are monotonic because that would race with the timer repeating.
+/// Similar, but set an interval for a repeated timer. Don't check that the
+/// times are monotonic because that would race with the timer repeating.
 #[test]
 fn test_timerfd_with_interval() {
     let fd = timerfd_create(TimerfdClockId::Monotonic, TimerfdFlags::CLOEXEC).unwrap();
@@ -54,7 +54,7 @@ fn test_timerfd_with_interval() {
     let _old: Itimerspec = timerfd_settime(&fd, TimerfdTimerFlags::ABSTIME, &set).unwrap();
 
     // Wait for the timer to expire.
-    let mut buf = [0u8; 8usize];
+    let mut buf = [0_u8; 8];
     assert_eq!(rustix::io::read(&fd, &mut buf), Ok(8));
     assert!(u64::from_ne_bytes(buf) >= 1);
 
@@ -64,7 +64,7 @@ fn test_timerfd_with_interval() {
     assert_eq!(set.it_interval.tv_nsec, new.it_interval.tv_nsec);
 
     // Wait for the timer to expire again.
-    let mut buf = [0u8; 8usize];
+    let mut buf = [0_u8; 8];
     assert_eq!(rustix::io::read(&fd, &mut buf), Ok(8));
     assert!(u64::from_ne_bytes(buf) >= 1);
 

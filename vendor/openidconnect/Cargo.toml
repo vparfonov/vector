@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "openidconnect"
-version = "2.3.0"
+version = "2.3.2"
 authors = ["David A. Ramos <ramos@cs.stanford.edu>"]
 description = "OpenID Connect library"
 readme = "README.md"
@@ -37,7 +37,7 @@ default-features = false
 version = "0.2"
 
 [dependencies.itertools]
-version = "0.9"
+version = "0.10"
 
 [dependencies.log]
 version = "0.4"
@@ -46,7 +46,7 @@ version = "0.4"
 version = "0.4.3"
 
 [dependencies.oauth2]
-version = "4.1"
+version = "4.2.2"
 default-features = false
 
 [dependencies.rand]
@@ -59,7 +59,7 @@ version = "0.16"
 version = "1.0"
 
 [dependencies.serde-value]
-version = "0.6"
+version = "0.7"
 
 [dependencies.serde_derive]
 version = "1.0"
@@ -73,9 +73,6 @@ version = "0.1"
 [dependencies.thiserror]
 version = "1.0"
 
-[dependencies.untrusted]
-version = "0.7"
-
 [dependencies.url]
 version = "2.1"
 features = ["serde"]
@@ -84,13 +81,13 @@ features = ["serde"]
 version = "1.0"
 
 [dev-dependencies.color-backtrace]
-version = "0.4"
+version = "0.5"
 
 [dev-dependencies.env_logger]
-version = "0.7"
+version = "0.9"
 
 [dev-dependencies.pretty_assertions]
-version = "0.6"
+version = "1.0"
 
 [dev-dependencies.reqwest_]
 version = "0.11"

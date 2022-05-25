@@ -4,7 +4,7 @@ use wasm_bindgen::prelude::*;
 #[cfg(web_sys_unstable_apis)]
 #[wasm_bindgen]
 extern "C" {
-    # [wasm_bindgen (extends = :: js_sys :: Object , js_name = GPUOutOfMemoryError , typescript_type = "GPUOutOfMemoryError")]
+    # [wasm_bindgen (extends = GpuError , extends = :: js_sys :: Object , js_name = GPUOutOfMemoryError , typescript_type = "GPUOutOfMemoryError")]
     #[derive(Debug, Clone, PartialEq, Eq)]
     #[doc = "The `GpuOutOfMemoryError` class."]
     #[doc = ""]
@@ -25,5 +25,5 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
     #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    pub fn new() -> Result<GpuOutOfMemoryError, JsValue>;
+    pub fn new(message: &str) -> Result<GpuOutOfMemoryError, JsValue>;
 }

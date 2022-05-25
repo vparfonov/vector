@@ -8,10 +8,9 @@ use semver::VersionReq;
 use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use crate::{
-    error::ErrorKind,
+    error::{Error, ErrorKind},
     hello::{LEGACY_HELLO_COMMAND_NAME, LEGACY_HELLO_COMMAND_NAME_LOWERCASE},
     runtime,
-    sdam::ServerType,
     test::{
         log_uncaptured,
         CmapEvent,
@@ -44,16 +43,10 @@ async fn min_heartbeat_frequency() {
 
     let setup_client = TestClient::with_options(Some(setup_client_options.clone())).await;
 
-    if !setup_client.supports_fail_command() {
+    if !setup_client.supports_fail_command_appname_initial_handshake() {
         log_uncaptured(
-            "skipping min_heartbeat_frequency test due to server not supporting fail points",
-        );
-        return;
-    }
-
-    if setup_client.server_version_lt(4, 9) {
-        log_uncaptured(
-            "skipping min_heartbeat_frequency test due to server version being less than 4.9",
+            "skipping min_heartbeat_frequency test due to server not supporting failcommand \
+             appname",
         );
         return;
     }
@@ -308,6 +301,11 @@ async fn auth_error() {
         return;
     }
 
+    if setup_client.is_load_balanced() {
+        log_uncaptured("skipping auth_error test due to load balanced topology");
+        return;
+    }
+
     setup_client
         .init_db_and_coll("auth_error", "auth_error")
         .await
@@ -344,24 +342,31 @@ async fn auth_error() {
         .expect_err("insert should fail");
     assert!(matches!(*auth_err.kind, ErrorKind::Authentication { .. }));
 
-    if !setup_client.is_load_balanced() {
-        subscriber
-            .wait_for_event(Duration::from_millis(2000), |event| match event {
-                Event::Sdam(SdamEvent::ServerDescriptionChanged(event)) => {
-                    event.new_description.description.server_type == ServerType::Unknown
-                }
-                _ => false,
-            })
-            .await
-            .expect("should see server marked unknown");
-    }
-
-    subscriber
-        .wait_for_event(Duration::from_millis(2000), |event| {
-            matches!(event, Event::Cmap(CmapEvent::PoolCleared(_)))
+    // collect the events as the order is non-deterministic
+    let mut seen_clear = false;
+    let mut seen_mark_unknown = false;
+    let events = subscriber
+        .collect_events(Duration::from_secs(1), |event| match event {
+            Event::Sdam(SdamEvent::ServerDescriptionChanged(event))
+                if event.is_marked_unknown_event() =>
+            {
+                seen_mark_unknown = true;
+                true
+            }
+            Event::Cmap(CmapEvent::PoolCleared(_)) => {
+                seen_clear = true;
+                true
+            }
+            _ => false,
         })
-        .await
-        .expect("should see pool cleared event");
+        .await;
+
+    // verify we saw exactly one of both types of events
+    assert!(
+        seen_clear && seen_mark_unknown && events.len() == 2,
+        "expected one marked unknown event, one pool cleared event, instead got {:#?}",
+        events
+    );
 
     coll.insert_many(vec![doc! { "_id": 5 }, doc! { "_id": 6 }], None)
         .await
@@ -450,4 +455,33 @@ async fn hello_ok_true() {
             .await
             .expect("subsequent heartbeats should use hello");
     }
+}
+
+#[cfg_attr(feature = "tokio-runtime", tokio::test)]
+#[cfg_attr(feature = "async-std-runtime", async_std::test)]
+async fn repl_set_name_mismatch() -> crate::error::Result<()> {
+    let _guard = LOCK.run_concurrently().await;
+
+    let client = TestClient::new().await;
+    if !client.is_replica_set() {
+        log_uncaptured("skipping repl_set_name_mismatch due to non-replica set topology");
+        return Ok(());
+    }
+
+    let mut options = CLIENT_OPTIONS.get().await.clone();
+    options.hosts.drain(1..);
+    options.direct_connection = Some(true);
+    options.repl_set_name = Some("invalid".to_string());
+    let client = Client::with_options(options)?;
+    let result = client.list_database_names(None, None).await;
+    assert!(
+        match result {
+            Err(Error { ref kind, .. }) => matches!(**kind, ErrorKind::ServerSelection { .. }),
+            _ => false,
+        },
+        "Unexpected result {:?}",
+        result
+    );
+
+    Ok(())
 }

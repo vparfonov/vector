@@ -12,17 +12,46 @@
 [package]
 edition = "2018"
 name = "mongodb"
-version = "2.2.2"
-authors = ["Saghm Rossi <saghmrossi@gmail.com>", "Patrick Freed <patrick.freed@mongodb.com>", "Isabel Atkinson <isabel.atkinson@mongodb.com>", "Abraham Egnor <abraham.egnor@mongodb.com>", "Kaitlin Mahar <kaitlin.mahar@mongodb.com>"]
-exclude = ["etc/**", "rustfmt.toml", ".evergreen/**", ".gitignore", "src/test/**", "tests/**"]
+version = "2.3.0"
+authors = [
+    "Saghm Rossi <saghmrossi@gmail.com>",
+    "Patrick Freed <patrick.freed@mongodb.com>",
+    "Isabel Atkinson <isabel.atkinson@mongodb.com>",
+    "Abraham Egnor <abraham.egnor@mongodb.com>",
+    "Kaitlin Mahar <kaitlin.mahar@mongodb.com>",
+]
+exclude = [
+    "etc/**",
+    "rustfmt.toml",
+    ".evergreen/**",
+    ".gitignore",
+    "src/test/**",
+    "tests/**",
+]
 description = "The official MongoDB driver for Rust"
+homepage = "https://www.mongodb.com/docs/drivers/rust/"
 readme = "README.md"
-keywords = ["mongo", "mongodb", "database", "bson", "nosql"]
-categories = ["asynchronous", "database", "web-programming"]
+keywords = [
+    "mongo",
+    "mongodb",
+    "database",
+    "bson",
+    "nosql",
+]
+categories = [
+    "asynchronous",
+    "database",
+    "web-programming",
+]
 license = "Apache-2.0"
 repository = "https://github.com/mongodb/mongo-rust-driver"
+
 [package.metadata.docs.rs]
-rustdoc-args = ["--cfg", "docsrs"]
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+]
+
 [dependencies.async-std]
 version = "1.9.0"
 optional = true
@@ -41,7 +70,7 @@ version = "0.13.0"
 version = "1.1.0"
 
 [dependencies.bson]
-version = "2.2.0"
+version = "2.3.0"
 
 [dependencies.chrono]
 version = "0.4.7"
@@ -100,7 +129,10 @@ features = ["small_rng"]
 
 [dependencies.reqwest]
 version = "0.11.2"
-features = ["json", "rustls-tls"]
+features = [
+    "json",
+    "rustls-tls",
+]
 optional = true
 default-features = false
 
@@ -151,8 +183,12 @@ version = "0.2.2"
 version = "1.0.24"
 
 [dependencies.tokio]
-version = "1.4.0"
-features = ["io-util", "sync", "macros"]
+version = "1.17.0"
+features = [
+    "io-util",
+    "sync",
+    "macros",
+]
 
 [dependencies.tokio-openssl]
 version = "0.6.3"
@@ -185,17 +221,21 @@ version = "0.22.2"
 [dependencies.zstd]
 version = "0.11.0"
 optional = true
+
 [dev-dependencies.approx]
 version = "0.5.1"
 
 [dev-dependencies.async_once]
 version = "0.2.6"
 
+[dev-dependencies.ctrlc]
+version = "3.2.2"
+
 [dev-dependencies.derive_more]
 version = "0.99.13"
 
 [dev-dependencies.function_name]
-version = "0.2.0"
+version = "0.2.1"
 
 [dev-dependencies.futures]
 version = "0.3"
@@ -212,17 +252,35 @@ version = "1.0.0"
 [dev-dependencies.serde_json]
 version = "1.0.64"
 
+[dev-dependencies.time]
+version = "0.3.9"
+
 [features]
-async-std-runtime = ["async-std", "async-std/attributes", "async-std-resolver", "tokio-util/compat"]
+async-std-runtime = [
+    "async-std",
+    "async-std/attributes",
+    "async-std-resolver",
+    "tokio-util/compat",
+]
 aws-auth = ["reqwest"]
 bson-chrono-0_4 = ["bson/chrono-0_4"]
 bson-serde_with = ["bson/serde_with"]
 bson-uuid-0_8 = ["bson/uuid-0_8"]
 default = ["tokio-runtime"]
-openssl-tls = ["openssl", "openssl-probe", "tokio-openssl"]
+openssl-tls = [
+    "openssl",
+    "openssl-probe",
+    "tokio-openssl",
+]
 snappy-compression = ["snap"]
 sync = ["async-std-runtime"]
-tokio-runtime = ["tokio/macros", "tokio/net", "tokio/rt", "tokio/time", "serde_bytes"]
+tokio-runtime = [
+    "tokio/macros",
+    "tokio/net",
+    "tokio/rt",
+    "tokio/time",
+    "serde_bytes",
+]
 tokio-sync = ["tokio-runtime"]
 zlib-compression = ["flate2"]
 zstd-compression = ["zstd"]

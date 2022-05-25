@@ -5,13 +5,12 @@
 #[cfg(any(unix, windows))]
 use io_lifetimes::example_ffi::*;
 #[cfg(windows)]
-use io_lifetimes::OwnedHandle;
+use io_lifetimes::{InvalidHandleError, OwnedHandle};
 #[cfg(windows)]
-use std::{convert::TryInto, ptr::null_mut};
+use std::{convert::TryInto, os::windows::io::RawHandle, ptr::null_mut};
 #[cfg(windows)]
-use winapi::{
-    um::fileapi::OPEN_EXISTING,
-    um::winnt::{FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ},
+use windows_sys::Win32::Storage::FileSystem::{
+    FILE_ATTRIBUTE_NORMAL, FILE_GENERIC_READ, OPEN_EXISTING,
 };
 
 #[cfg(all(rustc_attrs, unix))]
@@ -29,7 +28,7 @@ fn test_file_not_found() {
 #[cfg(windows)]
 #[test]
 fn test_file_not_found() {
-    let handle: Result<OwnedHandle, ()> = unsafe {
+    let handle: Result<OwnedHandle, InvalidHandleError> = unsafe {
         CreateFileW(
             [
                 'C' as u16, ':' as _, '/' as _, 'n' as _, 'o' as _, '/' as _, 's' as _, 'u' as _,
@@ -41,7 +40,7 @@ fn test_file_not_found() {
             null_mut(),
             OPEN_EXISTING,
             FILE_ATTRIBUTE_NORMAL,
-            null_mut(),
+            null_mut() as RawHandle as HANDLE,
         )
     }
     .try_into();
@@ -61,7 +60,7 @@ fn test_file_found() {
 #[cfg(windows)]
 #[test]
 fn test_file_found() {
-    let handle: Result<OwnedHandle, ()> = unsafe {
+    let handle: Result<OwnedHandle, InvalidHandleError> = unsafe {
         CreateFileW(
             [
                 'C' as u16, 'a' as _, 'r' as _, 'g' as _, 'o' as _, '.' as _, 't' as _, 'o' as _,
@@ -73,7 +72,7 @@ fn test_file_found() {
             null_mut(),
             OPEN_EXISTING,
             FILE_ATTRIBUTE_NORMAL,
-            null_mut(),
+            null_mut() as RawHandle as HANDLE,
         )
     }
     .try_into();

@@ -29,8 +29,7 @@
 // FIXME: Revise this documentation:
 /**
  * This file implements the consumer offset storage.
- * It currently supports local file storage and broker OffsetCommit storage,
- * not zookeeper.
+ * It currently supports local file storage and broker OffsetCommit storage.
  *
  * Regardless of commit method (file, broker, ..) this is how it works:
  *  - When rdkafka, or the application, depending on if auto.offset.commit
@@ -799,13 +798,28 @@ void rd_kafka_offset_reset (rd_kafka_toppar_t *rktp, int64_t err_offset,
                         rktp, RD_KAFKA_TOPPAR_FETCH_OFFSET_QUERY);
 	}
 
-	rd_kafka_dbg(rktp->rktp_rkt->rkt_rk, TOPIC, "OFFSET",
-		     "%s [%"PRId32"]: offset reset (at offset %s) "
-		     "to %s%s: %s: %s",
-		     rktp->rktp_rkt->rkt_topic->str, rktp->rktp_partition,
-		     rd_kafka_offset2str(err_offset),
-                     extra, rd_kafka_offset2str(offset),
-                     reason, rd_kafka_err2str(err));
+        /* Offset resets due to error are logged since they might have quite
+         * critical impact. For non-errors, or for auto.offset.reset=error,
+         * the reason is simply debug-logged. */
+        if (!err || err == RD_KAFKA_RESP_ERR__NO_OFFSET ||
+            offset == RD_KAFKA_OFFSET_INVALID)
+                rd_kafka_dbg(rktp->rktp_rkt->rkt_rk, TOPIC, "OFFSET",
+                             "%s [%"PRId32"]: offset reset (at offset %s) "
+                             "to %s%s: %s: %s",
+                             rktp->rktp_rkt->rkt_topic->str,
+                             rktp->rktp_partition,
+                             rd_kafka_offset2str(err_offset),
+                             extra, rd_kafka_offset2str(offset),
+                             reason, rd_kafka_err2str(err));
+        else
+                rd_kafka_log(rktp->rktp_rkt->rkt_rk, LOG_WARNING, "OFFSET",
+                             "%s [%"PRId32"]: offset reset (at offset %s) "
+                             "to %s%s: %s: %s",
+                             rktp->rktp_rkt->rkt_topic->str,
+                             rktp->rktp_partition,
+                             rd_kafka_offset2str(err_offset),
+                             extra, rd_kafka_offset2str(offset),
+                             reason, rd_kafka_err2str(err));
 
         /* Note: If rktp is not delegated to the leader, then low and high
            offsets will necessarily be cached from the last FETCH request,
@@ -964,7 +978,8 @@ static rd_kafka_resp_err_t rd_kafka_offset_broker_term (rd_kafka_toppar_t *rktp)
 static void rd_kafka_offset_broker_init (rd_kafka_toppar_t *rktp) {
         if (!rd_kafka_is_simple_consumer(rktp->rktp_rkt->rkt_rk))
                 return;
-        rd_kafka_offset_reset(rktp, RD_KAFKA_OFFSET_STORED, 0,
+        rd_kafka_offset_reset(rktp, RD_KAFKA_OFFSET_STORED,
+                              RD_KAFKA_RESP_ERR_NO_ERROR,
                               "query broker for offsets");
 }
 

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.2.1
+### Bugfixes
+* Ensure `test-case` depends on correct version of `test-case-macros`
+
+## 2.2.0
+### New features
+* Support `ignore["reason"]` syntax (#102)
+
 ## 2.1.0
 ### New features
 * Support `matches_regex` complex test-case (requires `with-regex` feature) (#98)

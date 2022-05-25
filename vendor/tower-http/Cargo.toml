@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.51"
 name = "tower-http"
-version = "0.3.3"
+version = "0.3.4"
 authors = ["Tower Maintainers <team@tower-rs.com>"]
 description = "Tower middleware and utilities for HTTP clients and servers"
 homepage = "https://github.com/tower-rs/tower-http"
@@ -70,7 +70,7 @@ default_features = false
 version = "0.2.2"
 
 [dependencies.http-body]
-version = "0.4.1"
+version = "0.4.5"
 
 [dependencies.http-range-header]
 version = "0.3.0"
@@ -247,6 +247,7 @@ full = [
     "decompression-full",
     "follow-redirect",
     "fs",
+    "limit",
     "map-request-body",
     "map-response-body",
     "metrics",
@@ -256,9 +257,11 @@ full = [
     "sensitive-headers",
     "set-header",
     "set-status",
+    "timeout",
     "trace",
     "util",
 ]
+limit = []
 map-request-body = []
 map-response-body = []
 metrics = ["tokio/time"]
@@ -268,5 +271,6 @@ request-id = ["uuid"]
 sensitive-headers = []
 set-header = []
 set-status = []
+timeout = ["tokio/time"]
 trace = ["tracing"]
 util = ["tower"]

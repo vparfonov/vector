@@ -31,7 +31,7 @@ portable APIs built on this functionality, see the [`system-interface`],
 
 `rustix` currently has two backends available:
 
- * linux-raw, which uses raw Linux system calls and vDSO calls, and is
+ * linux_raw, which uses raw Linux system calls and vDSO calls, and is
    supported on Linux on x86-64, x86, aarch64, riscv64gc, powerpc64le,
    arm (v5 onwards), mipsel, and mips64el, with stable, nightly, and 1.48 Rust.
     - By being implemented entirely in Rust, avoiding `libc`, `errno`, and pthread
@@ -40,22 +40,50 @@ portable APIs built on this functionality, see the [`system-interface`],
       fully inlined into user code.
     - Most functions in `linux_raw` preserve memory, I/O safety, and pointer
       provenance all the way down to the syscalls.
-    - `linux_raw` uses a 64-bit `time_t` type on all platforms, avoiding the
-      [y2038 bug].
 
  * libc, which uses the [`libc`] crate which provides bindings to native `libc`
-   libraries on Unix-family platforms, and [`winapi`] for Winsock2 on Windows,
-   and is portable to many OS's.
+   libraries on Unix-family platforms, and [`windows-sys`] for Winsock2 on
+   Windows, and is portable to many OS's.
 
-The linux-raw backend is enabled by default on platforms which support it. To
-enable the libc backend instead, either enable the "use-libc" cargo feature:
-
-```toml
-rustix = { version = "...", features = ["use-libc"] }
-````
-
+The linux_raw backend is enabled by default on platforms which support it. To
+enable the libc backend instead, either enable the "use-libc" cargo feature,
 or set the `RUSTFLAGS` environment variable to `--cfg=rustix_use_libc` when
 building.
+
+## Cargo features
+
+The modules [`rustix::io`], [`rustix::fd`], and [`rustix::ffi`] are enabled
+by default. The rest of the API is conditional with cargo feature flags:
+
+| Name       | Description
+| ---------- | ---------------------
+| `fs`       | [`rustix::fs`] and [`rustix::path`]—Filesystem operations.
+| `io_uring` | [`rustix::io_uring`]—Linux io_uring.
+| `mm`       | [`rustix::mm`]—Memory map operations.
+| `net`      | [`rustix::net`] and [`rustix::path`]—Network-related operations.
+| `param`    | [`rustix::param`]—Process parameters.
+| `process`  | [`rustix::process`]—Process-associated operations.
+| `rand`     | [`rustix::rand`]—Random-related operations.
+| `termios`  | [`rustix::termios`]—Terminal I/O stream operations.
+| `thread`   | [`rustix::thread`]—Thread-associated operations.
+| `time`     | [`rustix::time`]—Time-related operations.
+|            |
+| `use-libc` | Enable the libc backend.
+
+[`rustix::fs`]: https://docs.rs/rustix/latest/rustix/fs/index.html
+[`rustix::io_uring`]: https://docs.rs/rustix/latest/rustix/io_uring/index.html
+[`rustix::mm`]: https://docs.rs/rustix/latest/rustix/mm/index.html
+[`rustix::net`]: https://docs.rs/rustix/latest/rustix/net/index.html
+[`rustix::param`]: https://docs.rs/rustix/latest/rustix/param/index.html
+[`rustix::process`]: https://docs.rs/rustix/latest/rustix/process/index.html
+[`rustix::rand`]: https://docs.rs/rustix/latest/rustix/rand/index.html
+[`rustix::termios`]: https://docs.rs/rustix/latest/rustix/termios/index.html
+[`rustix::thread`]: https://docs.rs/rustix/latest/rustix/thread/index.html
+[`rustix::time`]: https://docs.rs/rustix/latest/rustix/time/index.html
+[`rustix::io`]: https://docs.rs/rustix/latest/rustix/io/index.html
+[`rustix::fd`]: https://docs.rs/rustix/latest/rustix/fd/index.html
+[`rustix::ffi`]: https://docs.rs/rustix/latest/rustix/ffi/index.html
+[`rustix::path`]: https://docs.rs/rustix/latest/rustix/path/index.html
 
 ## Similar crates
 
@@ -71,15 +99,15 @@ users to use a variety of string types, including non-UTF-8 string types.
 C-compatible interfaces and higher-level C/POSIX standard-library
 functionality; `rustix` just aims to provide safe and idiomatic Rust interfaces
 to low-level syscalls. `relibc` also doesn't tend to support features not
-supported on Redox, such as `*at` functions like `openat`, which are
-important features for `rustix`.
+supported on Redox, such as `*at` functions like `openat`, which are important
+features for `rustix`.
 
-`rustix` has its own code for making direct syscalls, similar to the [`sc`]
-and [`scall`] crates, though `rustix` can use either the unstable Rust `asm!`
-macro or out-of-line `.s` files so it supports both Stable and Nightly Rust.
+`rustix` has its own code for making direct syscalls, similar to the [`sc`] and
+[`scall`] crates, though `rustix` can use either the Rust `asm!` macro or
+out-of-line `.s` files so it supports Rust versions from 1.48 though Nightly.
 `rustix` can also use Linux's vDSO mechanism to optimize Linux `clock_gettime`
 on all architectures, and all Linux system calls on x86. And `rustix`'s
-syscalls report errors using an optimized `Error` type.
+syscalls report errors using an optimized `Errno` type.
 
 `rustix`'s `*at` functions are similar to the [`openat`] crate, but `rustix`
 provides them as free functions rather than associated functions of a `Dir`
@@ -90,7 +118,12 @@ way, so users don't need to open `.` to get a current-directory handle.
 I/O safety types rather than `RawFd`. `rustix` does not provide dynamic feature
 detection, so users must handle the [`NOSYS`] error themselves.
 
-# Minimum Supported Rust Version (MSRV)
+`rustix`'s `termios` module is similar to the [`termios`] crate, but uses
+I/O safety types rather than `RawFd`, and the flags parameters to functions
+such as `tcsetattr` are `enum`s rather than bare integers. And, rustix calls
+its `tcgetattr` function `tcgetattr`, rather than `Termios::from_fd`.
+
+## Minimum Supported Rust Version (MSRV)
 
 This crate currently works on the version of [Rust on Debian stable], which is
 currently Rust 1.48. This policy may change in the future, in minor version
@@ -112,15 +145,15 @@ version of this crate.
 [`openat2`]: https://crates.io/crates/openat2
 [`fs-set-times`]: https://crates.io/crates/fs-set-times
 [`io-lifetimes`]: https://crates.io/crates/io-lifetimes
+[`termios`]: https://crates.io/crates/termios
 [`libc`]: https://crates.io/crates/libc
-[`winapi`]: https://crates.io/crates/winapi
+[`windows-sys`]: https://crates.io/crates/windows-sys
 [`cap-std`]: https://crates.io/crates/cap-std
 [`bitflags`]: https://crates.io/crates/bitflags
 [`Arg`]: https://docs.rs/rustix/latest/rustix/path/trait.Arg.html
 [I/O-safe]: https://github.com/rust-lang/rfcs/blob/master/text/3128-io-safety.md
 [I/O safety]: https://github.com/rust-lang/rfcs/blob/master/text/3128-io-safety.md
 [provenance]: https://github.com/rust-lang/rust/issues/95228
-[y2038 bug]: https://en.wikipedia.org/wiki/Year_2038_problem
 [`OwnedFd`]: https://docs.rs/io-lifetimes/latest/io_lifetimes/struct.OwnedFd.html
 [`AsFd`]: https://docs.rs/io-lifetimes/latest/io_lifetimes/trait.AsFd.html
-[`NOSYS`]: https://docs.rs/rustix/latest/rustix/io/struct.Error.html#associatedconstant.NOSYS
+[`NOSYS`]: https://docs.rs/rustix/latest/rustix/io/struct.Errno.html#associatedconstant.NOSYS

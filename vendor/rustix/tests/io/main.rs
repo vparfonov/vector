@@ -5,29 +5,24 @@
 
 #[cfg(not(feature = "rustc-dep-of-std"))]
 #[cfg(not(windows))]
+#[cfg(not(target_os = "wasi"))]
 mod dup2_to_replace_stdio;
-#[cfg(not(windows))]
-mod dup3;
 #[cfg(not(feature = "rustc-dep-of-std"))] // TODO
 #[cfg(not(windows))]
+#[cfg(feature = "net")]
+#[cfg(not(target_os = "wasi"))]
 mod epoll;
 mod error;
 #[cfg(not(windows))]
+#[cfg(not(target_os = "wasi"))]
 mod eventfd;
 #[cfg(not(windows))]
 mod from_into;
-#[cfg(not(windows))]
-mod isatty;
-#[cfg(not(windows))]
-#[cfg(not(target_os = "wasi"))]
-mod mlock;
-#[cfg(not(windows))]
-mod mmap;
+#[cfg(not(target_os = "redox"))]
+mod ioctl;
 mod poll;
 #[cfg(all(feature = "procfs", any(target_os = "android", target_os = "linux")))]
 mod procfs;
-#[cfg(not(windows))]
-mod prot;
 #[cfg(not(windows))]
 #[cfg(not(target_os = "redox"))] // redox doesn't have cwd/openat
 #[cfg(not(target_os = "wasi"))] // wasi support for S_IRUSR etc. submitted to libc in #2264

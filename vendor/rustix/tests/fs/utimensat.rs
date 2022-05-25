@@ -1,12 +1,11 @@
 #[cfg(not(any(target_os = "redox", target_os = "wasi")))]
 #[test]
 fn test_utimensat() {
-    use rustix::fs::{cwd, openat, statat, utimensat, AtFlags, Mode, OFlags, Timestamps};
-    use rustix::time::Timespec;
+    use rustix::fs::{cwd, openat, statat, utimensat, AtFlags, Mode, OFlags, Timespec, Timestamps};
 
     let tmp = tempfile::tempdir().unwrap();
     let dir = openat(
-        &cwd(),
+        cwd(),
         tmp.path(),
         OFlags::RDONLY | OFlags::CLOEXEC,
         Mode::empty(),
@@ -36,21 +35,37 @@ fn test_utimensat() {
     let after = statat(&dir, "foo", AtFlags::empty()).unwrap();
 
     assert_eq!(times.last_modification.tv_sec as u64, after.st_mtime as u64);
+    #[cfg(not(target_os = "netbsd"))]
     assert_eq!(
         times.last_modification.tv_nsec as u64,
         after.st_mtime_nsec as u64
+    );
+    #[cfg(target_os = "netbsd")]
+    assert_eq!(
+        times.last_modification.tv_nsec as u64,
+        after.st_mtimensec as u64
+    );
+    assert!(times.last_access.tv_sec as u64 >= after.st_atime as u64);
+    #[cfg(not(target_os = "netbsd"))]
+    assert!(
+        times.last_access.tv_sec as u64 > after.st_atime as u64
+            || times.last_access.tv_nsec as u64 >= after.st_atime_nsec as u64
+    );
+    #[cfg(target_os = "netbsd")]
+    assert!(
+        times.last_access.tv_sec as u64 > after.st_atime as u64
+            || times.last_access.tv_nsec as u64 >= after.st_atimensec as u64
     );
 }
 
 #[cfg(not(any(target_os = "redox", target_os = "wasi")))]
 #[test]
 fn test_utimensat_noent() {
-    use rustix::fs::{cwd, openat, utimensat, AtFlags, Mode, OFlags, Timestamps};
-    use rustix::time::Timespec;
+    use rustix::fs::{cwd, openat, utimensat, AtFlags, Mode, OFlags, Timespec, Timestamps};
 
     let tmp = tempfile::tempdir().unwrap();
     let dir = openat(
-        &cwd(),
+        cwd(),
         tmp.path(),
         OFlags::RDONLY | OFlags::CLOEXEC,
         Mode::empty(),
@@ -69,19 +84,18 @@ fn test_utimensat_noent() {
     };
     assert_eq!(
         utimensat(&dir, "foo", &times, AtFlags::empty()).unwrap_err(),
-        rustix::io::Error::NOENT
+        rustix::io::Errno::NOENT
     );
 }
 
 #[cfg(not(any(target_os = "redox", target_os = "wasi")))]
 #[test]
 fn test_utimensat_notdir() {
-    use rustix::fs::{cwd, openat, utimensat, AtFlags, Mode, OFlags, Timestamps};
-    use rustix::time::Timespec;
+    use rustix::fs::{cwd, openat, utimensat, AtFlags, Mode, OFlags, Timespec, Timestamps};
 
     let tmp = tempfile::tempdir().unwrap();
     let dir = openat(
-        &cwd(),
+        cwd(),
         tmp.path(),
         OFlags::RDONLY | OFlags::CLOEXEC,
         Mode::empty(),
@@ -108,6 +122,6 @@ fn test_utimensat_notdir() {
     };
     assert_eq!(
         utimensat(&foo, "bar", &times, AtFlags::empty()).unwrap_err(),
-        rustix::io::Error::NOTDIR
+        rustix::io::Errno::NOTDIR
     );
 }

@@ -1,6 +1,6 @@
 //! Hello world, via plain syscalls.
 
-#[cfg(not(windows))]
+#[cfg(all(feature = "std", not(windows)))]
 fn main() -> std::io::Result<()> {
     // The message to print. It includes an explicit newline because we're
     // not using `println!`, so we have to include the newline manually.
@@ -11,10 +11,8 @@ fn main() -> std::io::Result<()> {
     // need the ability to compute substrings at arbitrary byte offsets.
     let mut bytes = message.as_bytes();
 
-    // # Safety
-    //
-    // See [here] for the safety conditions for calling `stdout`. In this
-    // example, the code is inside `main` itself so we know how `stdout`
+    // Safety: See [here] for the safety conditions for calling `stdout`. In
+    // this example, the code is inside `main` itself so we know how `stdout`
     // is being used and we know that it's not dropped.
     //
     // [here]: https://docs.rs/rustix/*/rustix/io/fn.stdout.html#safety
@@ -28,7 +26,7 @@ fn main() -> std::io::Result<()> {
 
             // `write` can be interrupted before doing any work; if that
             // happens, retry it.
-            Err(rustix::io::Error::INTR) => (),
+            Err(rustix::io::Errno::INTR) => (),
 
             // `write` can also fail for external reasons, such as running out
             // of storage space.
@@ -39,7 +37,7 @@ fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-#[cfg(windows)]
+#[cfg(any(not(feature = "std"), windows))]
 fn main() {
     unimplemented!()
 }

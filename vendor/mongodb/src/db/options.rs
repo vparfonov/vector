@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use bson::doc;
 use serde::{Deserialize, Serialize};
 use serde_with::skip_serializing_none;
 use typed_builder::TypedBuilder;
@@ -87,15 +88,15 @@ pub struct CreateCollectionOptions {
     pub index_option_defaults: Option<IndexOptionDefaults>,
 
     /// An object containing options for creating time series collections. See the [`create`
-    /// command documentation](https://docs.mongodb.com/manual/reference/command/create/) for
+    /// command documentation](https://www.mongodb.com/docs/manual/reference/command/create/) for
     /// supported options, and the [Time Series Collections documentation](
-    /// https://docs.mongodb.com/manual/core/timeseries-collections/) for more information.
+    /// https://www.mongodb.com/docs/manual/core/timeseries-collections/) for more information.
     ///
     /// This feature is only available on server versions 5.0 and above.
     pub timeseries: Option<TimeseriesOptions>,
 
     /// Used to automatically delete documents in time series collections. See the [`create`
-    /// command documentation](https://docs.mongodb.com/manual/reference/command/create/) for more
+    /// command documentation](https://www.mongodb.com/docs/manual/reference/command/create/) for more
     /// information.
     #[serde(
         default,
@@ -103,6 +104,12 @@ pub struct CreateCollectionOptions {
         serialize_with = "bson_util::serialize_duration_option_as_int_secs"
     )]
     pub expire_after_seconds: Option<Duration>,
+
+    /// Options for supporting change stream pre- and post-images.
+    pub change_stream_pre_and_post_images: Option<ChangeStreamPreAndPostImages>,
+
+    /// Options for clustered collections.
+    pub clustered_index: Option<ClusteredIndex>,
 }
 
 /// Specifies how strictly the database should apply validation rules to existing documents during
@@ -130,6 +137,37 @@ pub enum ValidationAction {
     Error,
     /// Raise a warning if inserted documents do not pass the validation.
     Warn,
+}
+
+/// Specifies options for a clustered collection.  Some fields have required values; the `Default`
+/// impl uses those values.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub struct ClusteredIndex {
+    /// Key pattern; currently required to be `{_id: 1}`.
+    pub key: Document,
+
+    /// Currently required to be `true`.
+    pub unique: bool,
+
+    /// Optional; will be automatically generated if not provided.
+    pub name: Option<String>,
+
+    /// Optional; currently must be `2` if provided.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub v: Option<i32>,
+}
+
+impl Default for ClusteredIndex {
+    fn default() -> Self {
+        Self {
+            key: doc! { "_id": 1 },
+            unique: true,
+            name: None,
+            v: None,
+        }
+    }
 }
 
 /// Specifies default configuration for indexes created on a collection, including the _id index.
@@ -216,4 +254,14 @@ pub struct ListDatabasesOptions {
     /// Determines which databases to return based on the user's access privileges. This option is
     /// only supported on server versions 4.0.5+.
     pub authorized_databases: Option<bool>,
+}
+
+/// Specifies how change stream pre- and post-images should be supported.
+#[derive(Clone, Debug, Default, Deserialize, TypedBuilder, Serialize)]
+#[serde(rename_all = "camelCase")]
+#[builder(field_defaults(default, setter(into)))]
+#[non_exhaustive]
+pub struct ChangeStreamPreAndPostImages {
+    /// If `true`, change streams will be able to include pre- and post-images.
+    pub enabled: bool,
 }

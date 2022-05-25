@@ -7,18 +7,18 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
-use std::fmt;
-use std::hash::{Hash, Hasher};
-use std::ptr;
-use std::str;
+use core::fmt;
+use core::hash::{Hash, Hasher};
+use core::ptr;
+use core::str;
 
-use position;
+use crate::position;
 
 /// A span over a `&str`. It is created from either [two `Position`s] or from a [`Pair`].
 ///
 /// [two `Position`s]: struct.Position.html#method.span
 /// [`Pair`]: ../iterators/struct.Pair.html#method.span
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Span<'i> {
     input: &'i str,
     /// # Safety
@@ -53,7 +53,6 @@ impl<'i> Span<'i> {
     /// assert_eq!(None, Span::new(input, 100, 0));
     /// assert!(Span::new(input, 0, input.len()).is_some());
     /// ```
-    #[allow(clippy::new_ret_no_self)]
     pub fn new(input: &str, start: usize, end: usize) -> Option<Span> {
         if input.get(start..end).is_some() {
             Some(Span { input, start, end })
@@ -262,12 +261,24 @@ impl<'i> Iterator for Lines<'i> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::borrow::ToOwned;
+    use alloc::vec::Vec;
+
+    #[test]
+    fn span_comp() {
+        let input = "abc\ndef\nghi";
+        let span = Span::new(input, 1, 7).unwrap();
+        let span2 = Span::new(input, 50, 51);
+        assert!(span2.is_none());
+        let span3 = Span::new(input, 0, 8).unwrap();
+        assert!(span != span3);
+    }
 
     #[test]
     fn split() {
         let input = "a";
         let start = position::Position::from_start(input);
-        let mut end = start.clone();
+        let mut end = start;
 
         assert!(end.skip(1));
 
@@ -281,7 +292,7 @@ mod tests {
         let input = "abc\ndef\nghi";
         let span = Span::new(input, 1, 7).unwrap();
         let lines: Vec<_> = span.lines().collect();
-        println!("{:?}", lines);
+        //println!("{:?}", lines);
         assert_eq!(lines.len(), 2);
         assert_eq!(lines[0], "abc\n".to_owned());
         assert_eq!(lines[1], "def\n".to_owned());
@@ -292,8 +303,9 @@ mod tests {
         let input = "abc\ndef\nghi";
         let span = Span::new(input, 5, 11).unwrap();
         assert!(span.end_pos().at_end());
+        assert_eq!(span.end(), 11);
         let lines: Vec<_> = span.lines().collect();
-        println!("{:?}", lines);
+        //println!("{:?}", lines);
         assert_eq!(lines.len(), 2);
         assert_eq!(lines[0], "def\n".to_owned());
         assert_eq!(lines[1], "ghi".to_owned());

@@ -129,7 +129,7 @@ fn generate_request(mut request: Request) -> Result<(Vec<u8>, String)> {
     //
     // See similar problem in `hyper`: https://github.com/hyperium/hyper/issues/1492
     let headers = request.headers_mut();
-    for header in WEBSOCKET_HEADERS {
+    for &header in &WEBSOCKET_HEADERS {
         let value = headers.remove(header).ok_or_else(|| {
             Error::Protocol(ProtocolError::InvalidHeader(
                 HeaderName::from_bytes(header.as_bytes()).unwrap(),
@@ -156,6 +156,10 @@ fn generate_request(mut request: Request) -> Result<(Vec<u8>, String)> {
         // https://github.com/snapview/tungstenite-rs/pull/119 (original fix of the problem)
         if name == "sec-websocket-protocol" {
             name = "Sec-WebSocket-Protocol";
+        }
+
+        if name == "origin" {
+            name = "Origin";
         }
 
         writeln!(req, "{}: {}\r", name, v.to_str()?).unwrap();

@@ -88,13 +88,7 @@
 #![cfg_attr(feature = "std-pattern", feature(pattern))]
 #![deny(missing_docs)]
 
-#[macro_use]
-extern crate bitflags;
-#[macro_use]
-extern crate lazy_static;
-#[cfg(windows)]
-extern crate libc;
-extern crate onig_sys;
+use once_cell::sync::Lazy;
 
 mod buffers;
 mod find;
@@ -111,17 +105,17 @@ mod utils;
 mod pattern;
 
 // re-export the onig types publically
-pub use buffers::{EncodedBytes, EncodedChars};
-pub use find::{
+pub use crate::buffers::{EncodedBytes, EncodedChars};
+pub use crate::find::{
     Captures, FindCaptures, FindMatches, RegexSplits, RegexSplitsN, SubCaptures, SubCapturesPos,
 };
-pub use flags::*;
-pub use match_param::MatchParam;
-pub use region::Region;
-pub use replace::Replacer;
-pub use syntax::{MetaChar, Syntax};
-pub use tree::{CaptureTreeNode, CaptureTreeNodeIter};
-pub use utils::{copyright, define_user_property, version};
+pub use crate::flags::*;
+pub use crate::match_param::MatchParam;
+pub use crate::region::Region;
+pub use crate::replace::Replacer;
+pub use crate::syntax::{MetaChar, Syntax};
+pub use crate::tree::{CaptureTreeNode, CaptureTreeNodeIter};
+pub use crate::utils::{copyright, define_user_property, version};
 
 use std::os::raw::c_int;
 use std::ptr::{null, null_mut};
@@ -213,9 +207,7 @@ impl fmt::Debug for Error {
     }
 }
 
-lazy_static! {
-    static ref REGEX_NEW_MUTEX: Mutex<()> = Mutex::new(());
-}
+static REGEX_NEW_MUTEX: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
 impl Regex {
     /// Create a Regex

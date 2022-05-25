@@ -61,8 +61,10 @@ impl<T: Color> Color for &'_ T {
 
 /// The RGBA representation of the color, Plotters use RGBA as the internal representation
 /// of color
+///
+/// If you want to directly create a RGB color with transparency use [RGBColor::mix]
 #[derive(Copy, Clone, PartialEq, Debug, Default)]
-pub struct RGBAColor(pub(crate) u8, pub(crate) u8, pub(crate) u8, pub(crate) f64);
+pub struct RGBAColor(pub u8, pub u8, pub u8, pub f64);
 
 impl Color for RGBAColor {
     #[inline(always)]
@@ -75,6 +77,7 @@ impl Color for RGBAColor {
 }
 
 /// A color in the given palette
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct PaletteColor<P: Palette>(usize, PhantomData<P>);
 
 impl<P: Palette> PaletteColor<P> {
@@ -120,6 +123,7 @@ impl BackendStyle for RGBColor {
 }
 
 /// The color described by HSL color space
+#[derive(Copy, Clone, PartialEq, Debug, Default)]
 pub struct HSLColor(pub f64, pub f64, pub f64);
 
 impl Color for HSLColor {

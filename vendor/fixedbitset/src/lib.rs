@@ -11,7 +11,7 @@
 //!
 //! This version of fixedbitset requires Rust 1.39 or later.
 //!
-#![doc(html_root_url = "https://docs.rs/fixedbitset/0.4.1/")]
+#![doc(html_root_url = "https://docs.rs/fixedbitset/0.4.2/")]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(not(feature = "std"))]
@@ -50,7 +50,7 @@ fn div_rem(x: usize, d: usize) -> (usize, usize) {
 ///
 /// The bit set has a fixed capacity in terms of enabling bits (and the
 /// capacity can grow using the `grow` method).
-/// 
+///
 /// Derived traits depend on both the zeros and ones, so [0,1] is not equal to
 /// [0,1,0].
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
@@ -122,16 +122,59 @@ impl FixedBitSet {
         }
     }
 
-    /// Return the length of the [`FixedBitSet`] in bits.
+    /// The length of the [`FixedBitSet`] in bits.
+    ///
+    /// Note: `len` includes both set and unset bits.
+    /// ```
+    /// # use fixedbitset::FixedBitSet;
+    /// let bitset = FixedBitSet::with_capacity(10);
+    /// // there are 0 set bits, but 10 unset bits
+    /// assert_eq!(bitset.len(), 10);
+    /// ```
+    /// `len` does not return the count of set bits. For that, use
+    /// [`bitset.count_ones(..)`](FixedBitSet::count_ones) instead.
     #[inline]
     pub fn len(&self) -> usize {
         self.length
     }
 
-    /// Return if the [`FixedBitSet`] is empty.
+    /// `true` if the [`FixedBitSet`] is empty.
+    ///
+    /// Note that an "empty" `FixedBitSet` is a `FixedBitSet` with
+    /// no bits (meaning: it's length is zero). If you want to check
+    /// if all bits are unset, use [`FixedBitSet::is_clear`].
+    ///
+    /// ```
+    /// # use fixedbitset::FixedBitSet;
+    /// let bitset = FixedBitSet::with_capacity(10);
+    /// assert!(!bitset.is_empty());
+    ///
+    /// let bitset = FixedBitSet::with_capacity(0);
+    /// assert!(bitset.is_empty());
+    /// ```
     #[inline]
     pub fn is_empty(&self) -> bool {
         self.len() == 0
+    }
+
+    /// `true` if all bits in the [`FixedBitSet`] are unset.
+    ///
+    /// As opposed to [`FixedBitSet::is_empty`], which is `true` only for
+    /// sets without any bits, set or unset.
+    ///
+    /// ```
+    /// # use fixedbitset::FixedBitSet;
+    /// let mut bitset = FixedBitSet::with_capacity(10);
+    /// assert!(bitset.is_clear());
+    ///
+    /// bitset.insert(2);
+    /// assert!(!bitset.is_clear());
+    /// ```
+    ///
+    /// This is equivalent to [`bitset.count_ones(..) == 0`](FixedBitSet::count_ones).
+    #[inline]
+    pub fn is_clear(&self) -> bool {
+        self.data.iter().all(|block| *block == 0)
     }
 
     /// Return **true** if the bit is enabled in the **FixedBitSet**,
@@ -1607,4 +1650,24 @@ fn test_serialize() {
     fb.put(8);
     let serialized = serde_json::to_string(&fb).unwrap();
     assert_eq!(r#"{"data":[332],"length":10}"#, serialized);
+}
+
+#[test]
+fn test_is_clear() {
+    let mut fb = FixedBitSet::with_capacity(0);
+    assert!(fb.is_clear());
+
+    fb.grow(1);
+    assert!(fb.is_clear());
+
+    fb.put(0);
+    assert!(!fb.is_clear());
+
+    fb.grow(42);
+    fb.clear();
+    assert!(fb.is_clear());
+
+    fb.put(17);
+    fb.put(19);
+    assert!(!fb.is_clear());
 }

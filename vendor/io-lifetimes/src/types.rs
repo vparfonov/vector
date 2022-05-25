@@ -14,31 +14,24 @@ use std::{
     },
 };
 #[cfg(all(windows, feature = "close"))]
-use winapi::{
-    shared::minwindef::{BOOL, DWORD},
-    shared::ntdef::HANDLE,
-    um::handleapi::DuplicateHandle,
-    um::handleapi::SetHandleInformation,
-    um::handleapi::INVALID_HANDLE_VALUE,
-    um::processthreadsapi::GetCurrentProcess,
-    um::processthreadsapi::GetCurrentProcessId,
-    um::winbase::HANDLE_FLAG_INHERIT,
-    um::winnt::DUPLICATE_SAME_ACCESS,
-    um::winsock2::WSADuplicateSocketW,
-    um::winsock2::WSAGetLastError,
-    um::winsock2::WSASocketW,
-    um::winsock2::INVALID_SOCKET,
-    um::winsock2::SOCKET_ERROR,
-    um::winsock2::WSAEINVAL,
-    um::winsock2::WSAEPROTOTYPE,
-    um::winsock2::WSAPROTOCOL_INFOW,
-    um::winsock2::WSA_FLAG_NO_HANDLE_INHERIT,
-    um::winsock2::WSA_FLAG_OVERLAPPED,
+use {
+    windows_sys::Win32::Foundation::{
+        CloseHandle, DuplicateHandle, SetHandleInformation, BOOL, DUPLICATE_HANDLE_OPTIONS,
+        DUPLICATE_SAME_ACCESS, HANDLE, HANDLE_FLAG_INHERIT, INVALID_HANDLE_VALUE,
+    },
+    windows_sys::Win32::Networking::WinSock::{
+        closesocket, WSADuplicateSocketW, WSAGetLastError, WSASocketW, INVALID_SOCKET, SOCKET,
+        SOCKET_ERROR, WSAEINVAL, WSAEPROTOTYPE, WSAPROTOCOL_INFOW, WSA_FLAG_NO_HANDLE_INHERIT,
+        WSA_FLAG_OVERLAPPED,
+    },
+    windows_sys::Win32::System::Threading::{GetCurrentProcess, GetCurrentProcessId},
 };
 
-#[cfg(all(windows, not(feature = "winapi")))]
-const INVALID_HANDLE_VALUE: *mut core::ffi::c_void = !0 as _;
-#[cfg(all(windows, not(feature = "winapi")))]
+#[cfg(all(windows, not(feature = "close")))]
+type HANDLE = isize;
+#[cfg(all(windows, not(feature = "close")))]
+const INVALID_HANDLE_VALUE: HANDLE = !0 as _;
+#[cfg(all(windows, not(feature = "close")))]
 const INVALID_SOCKET: usize = !0 as _;
 
 /// A borrowed file descriptor.
@@ -77,14 +70,17 @@ pub struct BorrowedFd<'fd> {
 /// so it can be used in FFI in places where a handle is passed as an argument,
 /// it is not captured or consumed, and it is never null.
 ///
-/// Note that it *may* have the value [`INVALID_HANDLE_VALUE`]. See [here] for
-/// the full story.
+/// Note that it *may* have the value `-1`, which in `BorrowedHandle` always
+/// represents a valid handle value, such as [the current process handle], and
+/// not `INVALID_HANDLE_VALUE`, despite the two having the same value. See
+/// [here] for the full story.
 ///
 /// This type's `.to_owned()` implementation returns another `BorrowedHandle`
 /// rather than an `OwnedHandle`. It just makes a trivial copy of the raw
 /// handle, which is then borrowed under the same lifetime.
 ///
 /// [here]: https://devblogs.microsoft.com/oldnewthing/20040302-00/?p=40443
+/// [the current process handle]: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentprocess#remarks
 #[cfg(windows)]
 #[derive(Copy, Clone)]
 #[repr(transparent)]
@@ -147,9 +143,18 @@ pub struct OwnedFd {
 
 #[cfg(any(unix, target_os = "wasi"))]
 impl OwnedFd {
-    /// Creates a new `OwnedFd` instance that shares the same underlying file handle
-    /// as the existing `OwnedFd` instance.
+    /// Creates a new `OwnedFd` instance that shares the same underlying file
+    /// description as the existing `OwnedFd` instance.
     pub fn try_clone(&self) -> std::io::Result<Self> {
+        crate::AsFd::as_fd(self).try_clone_to_owned()
+    }
+}
+
+#[cfg(any(unix, target_os = "wasi"))]
+impl BorrowedFd<'_> {
+    /// Creates a new `OwnedFd` instance that shares the same underlying file
+    /// description as the existing `BorrowedFd` instance.
+    pub fn try_clone_to_owned(&self) -> std::io::Result<OwnedFd> {
         #[cfg(feature = "close")]
         {
             #[cfg(unix)]
@@ -172,7 +177,7 @@ impl OwnedFd {
                     fd => fd,
                 };
 
-                Ok(unsafe { Self::from_raw_fd(fd) })
+                Ok(unsafe { OwnedFd::from_raw_fd(fd) })
             }
 
             #[cfg(target_os = "wasi")]
@@ -194,8 +199,10 @@ impl OwnedFd {
 ///
 /// This closes the handle on drop.
 ///
-/// Note that it *may* have the value `INVALID_HANDLE_VALUE` (-1), which is
-/// sometimes a valid handle value. See [here] for the full story.
+/// Note that it *may* have the value `-1`, which in `OwnedHandle` always
+/// represents a valid handle value, such as [the current process handle], and
+/// not `INVALID_HANDLE_VALUE`, despite the two having the same value. See
+/// [here] for the full story.
 ///
 /// And, it *may* have the value `NULL` (0), which can occur when consoles are
 /// detached from processes, or when `windows_subsystem` is used.
@@ -208,6 +215,7 @@ impl OwnedFd {
 /// [`RegCloseKey`]: https://docs.microsoft.com/en-us/windows/win32/api/winreg/nf-winreg-regclosekey
 ///
 /// [here]: https://devblogs.microsoft.com/oldnewthing/20040302-00/?p=40443
+/// [the current process handle]: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentprocess#remarks
 #[cfg(windows)]
 #[repr(transparent)]
 pub struct OwnedHandle {
@@ -216,9 +224,18 @@ pub struct OwnedHandle {
 
 #[cfg(windows)]
 impl OwnedHandle {
-    /// Creates a new `OwnedHandle` instance that shares the same underlying file handle
-    /// as the existing `OwnedHandle` instance.
-    pub fn try_clone(&self) -> std::io::Result<OwnedHandle> {
+    /// Creates a new `OwnedHandle` instance that shares the same underlying
+    /// object as the existing `OwnedHandle` instance.
+    pub fn try_clone(&self) -> std::io::Result<Self> {
+        crate::AsHandle::as_handle(self).try_clone_to_owned()
+    }
+}
+
+#[cfg(windows)]
+impl BorrowedHandle<'_> {
+    /// Creates a new `OwnedHandle` instance that shares the same underlying
+    /// object as the existing `BorrowedHandle` instance.
+    pub fn try_clone_to_owned(&self) -> std::io::Result<OwnedHandle> {
         #[cfg(feature = "close")]
         {
             self.duplicate(0, false, DUPLICATE_SAME_ACCESS)
@@ -235,16 +252,16 @@ impl OwnedHandle {
     #[cfg(feature = "close")]
     pub(crate) fn duplicate(
         &self,
-        access: DWORD,
+        access: u32,
         inherit: bool,
-        options: DWORD,
-    ) -> std::io::Result<Self> {
+        options: DUPLICATE_HANDLE_OPTIONS,
+    ) -> std::io::Result<OwnedHandle> {
         let mut ret = 0 as HANDLE;
         match unsafe {
             let cur_proc = GetCurrentProcess();
             DuplicateHandle(
                 cur_proc,
-                self.as_raw_handle(),
+                self.as_raw_handle() as HANDLE,
                 cur_proc,
                 &mut ret,
                 access,
@@ -255,7 +272,7 @@ impl OwnedHandle {
             0 => return Err(std::io::Error::last_os_error()),
             _ => (),
         }
-        unsafe { Ok(Self::from_raw_handle(ret)) }
+        unsafe { Ok(OwnedHandle::from_raw_handle(ret as RawHandle)) }
     }
 }
 
@@ -286,9 +303,38 @@ pub struct OwnedSocket {
 
 #[cfg(windows)]
 impl OwnedSocket {
-    /// Creates a new `OwnedSocket` instance that shares the same underlying socket
-    /// as the existing `OwnedSocket` instance.
+    /// Creates a new `OwnedSocket` instance that shares the same underlying
+    /// object as the existing `OwnedSocket` instance.
     pub fn try_clone(&self) -> std::io::Result<Self> {
+        crate::AsSocket::as_socket(self).try_clone_to_owned()
+    }
+
+    #[cfg(feature = "close")]
+    #[cfg(not(target_vendor = "uwp"))]
+    fn set_no_inherit(&self) -> std::io::Result<()> {
+        match unsafe {
+            SetHandleInformation(self.as_raw_socket() as HANDLE, HANDLE_FLAG_INHERIT, 0)
+        } {
+            0 => return Err(std::io::Error::last_os_error()),
+            _ => Ok(()),
+        }
+    }
+
+    #[cfg(feature = "close")]
+    #[cfg(target_vendor = "uwp")]
+    fn set_no_inherit(&self) -> std::io::Result<()> {
+        Err(io::Error::new_const(
+            std::io::ErrorKind::Unsupported,
+            &"Unavailable on UWP",
+        ))
+    }
+}
+
+#[cfg(windows)]
+impl BorrowedSocket<'_> {
+    /// Creates a new `OwnedSocket` instance that shares the same underlying
+    /// object as the existing `BorrowedSocket` instance.
+    pub fn try_clone_to_owned(&self) -> std::io::Result<OwnedSocket> {
         #[cfg(feature = "close")]
         {
             let mut info = unsafe { std::mem::zeroed::<WSAPROTOCOL_INFOW>() };
@@ -350,26 +396,6 @@ impl OwnedSocket {
             unreachable!("try_clone called without the \"close\" feature in io-lifetimes");
         }
     }
-
-    #[cfg(feature = "close")]
-    #[cfg(not(target_vendor = "uwp"))]
-    fn set_no_inherit(&self) -> std::io::Result<()> {
-        match unsafe {
-            SetHandleInformation(self.as_raw_socket() as HANDLE, HANDLE_FLAG_INHERIT, 0)
-        } {
-            0 => return Err(std::io::Error::last_os_error()),
-            _ => Ok(()),
-        }
-    }
-
-    #[cfg(feature = "close")]
-    #[cfg(target_vendor = "uwp")]
-    fn set_no_inherit(&self) -> std::io::Result<()> {
-        Err(io::Error::new_const(
-            std::io::ErrorKind::Unsupported,
-            &"Unavailable on UWP",
-        ))
-    }
 }
 
 /// FFI type for handles in return values or out parameters, where `INVALID_HANDLE_VALUE` is used
@@ -382,11 +408,10 @@ impl OwnedSocket {
 /// `INVALID_HANDLE_VALUE`. This ensures that such FFI calls cannot start using the handle without
 /// checking for `INVALID_HANDLE_VALUE` first.
 ///
-/// This type concerns any value other than `INVALID_HANDLE_VALUE` to be valid, including `NULL`.
-/// This is because APIs that use `INVALID_HANDLE_VALUE` as their sentry value may return `NULL`
-/// under `windows_subsystem = "windows"` or other situations where I/O devices are detached.
+/// This type may hold any handle value that [`OwnedHandle`] may hold, except that when it holds
+/// `-1`, that value is interpreted to mean `INVALID_HANDLE_VALUE`.
 ///
-/// If this holds a valid handle, it will close the handle on drop.
+/// If holds a handle other than `INVALID_HANDLE_VALUE`, it will close the handle on drop.
 #[cfg(windows)]
 #[repr(transparent)]
 #[derive(Debug)]
@@ -402,11 +427,13 @@ pub struct HandleOrInvalid(RawHandle);
 /// `NULL`. This ensures that such FFI calls cannot start using the handle without
 /// checking for `NULL` first.
 ///
-/// This type concerns any value other than `NULL` to be valid, including `INVALID_HANDLE_VALUE`.
-/// This is because APIs that use `NULL` as their sentry value don't treat `INVALID_HANDLE_VALUE`
-/// as special.
+/// This type may hold any handle value that [`OwnedHandle`] may hold. As with `OwnedHandle`, when
+/// it holds `-1`, that value is interpreted as a valid handle value, such as
+/// [the current process handle], and not `INVALID_HANDLE_VALUE`.
 ///
-/// If this holds a valid handle, it will close the handle on drop.
+/// If this holds a non-null handle, it will close the handle on drop.
+///
+/// [the current process handle]: https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getcurrentprocess#remarks
 #[cfg(windows)]
 #[repr(transparent)]
 #[derive(Debug)]
@@ -443,8 +470,10 @@ impl BorrowedFd<'_> {
     /// The resource pointed to by `raw` must remain open for the duration of
     /// the returned `BorrowedFd`, and it must not have the value `-1`.
     #[inline]
-    pub unsafe fn borrow_raw(fd: RawFd) -> Self {
-        debug_assert_ne!(fd, -1_i32 as RawFd);
+    pub const unsafe fn borrow_raw(fd: RawFd) -> Self {
+        #[cfg(panic_in_const_fn)]
+        debug_assert!(fd != -1_i32 as RawFd);
+
         Self {
             fd,
             _phantom: PhantomData,
@@ -458,11 +487,18 @@ impl BorrowedHandle<'_> {
     ///
     /// # Safety
     ///
-    /// The resource pointed to by `raw` must remain open for the duration of
-    /// the returned `BorrowedHandle`, and it must not be null.
+    /// The resource pointed to by `handle` must be a valid open handle, it
+    /// must remain open for the duration of the returned `BorrowedHandle`.
+    ///
+    /// Note that it *may* have the value `INVALID_HANDLE_VALUE` (-1), which is
+    /// sometimes a valid handle value. See [here] for the full story.
+    ///
+    /// And, it *may* have the value `NULL` (0), which can occur when consoles are
+    /// detached from processes, or when `windows_subsystem` is used.
+    ///
+    /// [here]: https://devblogs.microsoft.com/oldnewthing/20040302-00/?p=40443
     #[inline]
-    pub unsafe fn borrow_raw(handle: RawHandle) -> Self {
-        debug_assert!(!handle.is_null());
+    pub const unsafe fn borrow_raw(handle: RawHandle) -> Self {
         Self {
             handle,
             _phantom: PhantomData,
@@ -480,8 +516,9 @@ impl BorrowedSocket<'_> {
     /// the returned `BorrowedSocket`, and it must not have the value
     /// [`INVALID_SOCKET`].
     #[inline]
-    pub unsafe fn borrow_raw(socket: RawSocket) -> Self {
-        debug_assert_ne!(socket, INVALID_SOCKET as RawSocket);
+    pub const unsafe fn borrow_raw(socket: RawSocket) -> Self {
+        #[cfg(panic_in_const_fn)]
+        debug_assert!(socket != INVALID_SOCKET as RawSocket);
         Self {
             socket,
             _phantom: PhantomData,
@@ -491,17 +528,17 @@ impl BorrowedSocket<'_> {
 
 #[cfg(windows)]
 impl TryFrom<HandleOrInvalid> for OwnedHandle {
-    type Error = ();
+    type Error = InvalidHandleError;
 
     #[inline]
-    fn try_from(handle_or_invalid: HandleOrInvalid) -> Result<Self, ()> {
+    fn try_from(handle_or_invalid: HandleOrInvalid) -> Result<Self, InvalidHandleError> {
         let raw = handle_or_invalid.0;
-        if raw == INVALID_HANDLE_VALUE {
+        if raw as HANDLE == INVALID_HANDLE_VALUE {
             // Don't call `CloseHandle`; it'd be harmless, except that it could
             // overwrite the `GetLastError` error.
             forget(handle_or_invalid);
 
-            Err(())
+            Err(InvalidHandleError(()))
         } else {
             Ok(OwnedHandle { handle: raw })
         }
@@ -510,22 +547,50 @@ impl TryFrom<HandleOrInvalid> for OwnedHandle {
 
 #[cfg(windows)]
 impl TryFrom<HandleOrNull> for OwnedHandle {
-    type Error = ();
+    type Error = NullHandleError;
 
     #[inline]
-    fn try_from(handle_or_null: HandleOrNull) -> Result<Self, ()> {
+    fn try_from(handle_or_null: HandleOrNull) -> Result<Self, NullHandleError> {
         let raw = handle_or_null.0;
         if raw.is_null() {
             // Don't call `CloseHandle`; it'd be harmless, except that it could
             // overwrite the `GetLastError` error.
             forget(handle_or_null);
 
-            Err(())
+            Err(NullHandleError(()))
         } else {
             Ok(OwnedHandle { handle: raw })
         }
     }
 }
+
+/// This is the error type used by [`HandleOrNull`] when attempting to convert
+/// into a handle, to indicate that the value is null.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NullHandleError(());
+
+impl fmt::Display for NullHandleError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        "A HandleOrNull could not be converted to a handle because it was null".fmt(fmt)
+    }
+}
+
+impl std::error::Error for NullHandleError {}
+
+/// This is the error type used by [`HandleOrInvalid`] when attempting to
+/// convert into a handle, to indicate that the value is
+/// `INVALID_HANDLE_VALUE`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InvalidHandleError(());
+
+impl fmt::Display for InvalidHandleError {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        "A HandleOrInvalid could not be converted to a handle because it was INVALID_HANDLE_VALUE"
+            .fmt(fmt)
+    }
+}
+
+impl std::error::Error for InvalidHandleError {}
 
 #[cfg(any(unix, target_os = "wasi"))]
 impl AsRawFd for BorrowedFd<'_> {
@@ -706,7 +771,7 @@ impl Drop for OwnedHandle {
     fn drop(&mut self) {
         #[cfg(feature = "close")]
         unsafe {
-            let _ = winapi::um::handleapi::CloseHandle(self.handle);
+            let _ = CloseHandle(self.handle as HANDLE);
         }
 
         // If the `close` feature is disabled, we expect users to avoid letting
@@ -724,7 +789,7 @@ impl Drop for HandleOrInvalid {
     fn drop(&mut self) {
         #[cfg(feature = "close")]
         unsafe {
-            let _ = winapi::um::handleapi::CloseHandle(self.0);
+            let _ = CloseHandle(self.0 as HANDLE);
         }
 
         // If the `close` feature is disabled, we expect users to avoid letting
@@ -742,7 +807,7 @@ impl Drop for HandleOrNull {
     fn drop(&mut self) {
         #[cfg(feature = "close")]
         unsafe {
-            let _ = winapi::um::handleapi::CloseHandle(self.0);
+            let _ = CloseHandle(self.0 as HANDLE);
         }
 
         // If the `close` feature is disabled, we expect users to avoid letting
@@ -760,7 +825,7 @@ impl Drop for OwnedSocket {
     fn drop(&mut self) {
         #[cfg(feature = "close")]
         unsafe {
-            let _ = winapi::um::winsock2::closesocket(self.socket as winapi::um::winsock2::SOCKET);
+            let _ = closesocket(self.socket as SOCKET);
         }
 
         // If the `close` feature is disabled, we expect users to avoid letting

@@ -64,16 +64,19 @@ struct InnerConnection {
     socket: TcpStream,
     receive_buffer: Vec<u8>,
     send_buffer: Vec<u8>,
-    runner_version: [u8; 3],
+    // runner_version: [u8; 3],
 }
 impl InnerConnection {
     pub fn new(mut socket: TcpStream) -> Result<Self, std::io::Error> {
         // read the runner-hello
         let mut hello_buf = [0u8; RUNNER_HELLO_SIZE];
         socket.read_exact(&mut hello_buf)?;
-        if &hello_buf[0..RUNNER_MAGIC_NUMBER.len()] != RUNNER_MAGIC_NUMBER.as_bytes() {
-            panic!("Not connected to cargo-criterion.");
-        }
+        assert_eq!(
+            &hello_buf[0..RUNNER_MAGIC_NUMBER.len()],
+            RUNNER_MAGIC_NUMBER.as_bytes(),
+            "Not connected to cargo-criterion."
+        );
+
         let i = RUNNER_MAGIC_NUMBER.len();
         let runner_version = [hello_buf[i], hello_buf[i + 1], hello_buf[i + 2]];
 
@@ -98,7 +101,7 @@ impl InnerConnection {
             socket,
             receive_buffer: vec![],
             send_buffer: vec![],
-            runner_version,
+            // runner_version,
         })
     }
 
@@ -355,7 +358,7 @@ impl From<&crate::benchmark::BenchmarkConfig> for BenchmarkConfig {
 }
 
 /// Currently not used; defined for forwards compatibility with cargo-criterion.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SamplingMethod {
     Linear,
     Flat,

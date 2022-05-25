@@ -1,8 +1,9 @@
 #[cfg(not(target_os = "redox"))]
 #[test]
 fn test_file() {
+    #[cfg(not(target_os = "illumos"))]
     rustix::fs::accessat(
-        &rustix::fs::cwd(),
+        rustix::fs::cwd(),
         "Cargo.toml",
         rustix::fs::Access::READ_OK,
         rustix::fs::AtFlags::empty(),
@@ -11,17 +12,17 @@ fn test_file() {
 
     assert_eq!(
         rustix::fs::openat(
-            &rustix::fs::cwd(),
+            rustix::fs::cwd(),
             "Cagro.motl",
             rustix::fs::OFlags::RDONLY,
             rustix::fs::Mode::empty(),
         )
         .unwrap_err(),
-        rustix::io::Error::NOENT
+        rustix::io::Errno::NOENT
     );
 
     let file = rustix::fs::openat(
-        &rustix::fs::cwd(),
+        rustix::fs::cwd(),
         "Cargo.toml",
         rustix::fs::OFlags::RDONLY,
         rustix::fs::Mode::empty(),
@@ -36,14 +37,17 @@ fn test_file() {
             rustix::fs::Mode::empty(),
         )
         .unwrap_err(),
-        rustix::io::Error::NOTDIR
+        rustix::io::Errno::NOTDIR
     );
 
     #[cfg(not(any(
+        target_os = "dragonfly",
+        target_os = "illumos",
         target_os = "ios",
         target_os = "macos",
         target_os = "netbsd",
-        target_os = "openbsd"
+        target_os = "openbsd",
+        target_os = "redox",
     )))]
     rustix::fs::fadvise(&file, 0, 10, rustix::fs::Advice::Normal).unwrap();
 
@@ -60,13 +64,24 @@ fn test_file() {
     assert!(stat.st_size > 0);
     assert!(stat.st_blocks > 0);
 
-    #[cfg(not(any(target_os = "netbsd", target_os = "wasi")))]
-    // not implemented in libc for netbsd yet
+    #[cfg(not(any(
+        target_os = "illumos",
+        target_os = "netbsd",
+        target_os = "redox",
+        target_os = "wasi",
+    )))]
     {
         let statfs = rustix::fs::fstatfs(&file).unwrap();
         assert!(statfs.f_blocks > 0);
     }
 
+    #[cfg(not(any(target_os = "illumos", target_os = "redox", target_os = "wasi")))]
+    {
+        let statvfs = rustix::fs::fstatvfs(&file).unwrap();
+        assert!(statvfs.f_frsize > 0);
+    }
+
+    #[cfg(feature = "net")]
     assert_eq!(rustix::io::is_read_write(&file).unwrap(), (true, false));
 
     assert_ne!(rustix::io::ioctl_fionread(&file).unwrap(), 0);

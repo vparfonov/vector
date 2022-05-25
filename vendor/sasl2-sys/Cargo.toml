@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "sasl2-sys"
-version = "0.1.19+2.1.27"
+version = "0.1.20+2.1.28"
 authors = ["Materialize, Inc."]
 links = "sasl2"
 description = "Bindings for Cyrus SASL."
@@ -21,6 +21,7 @@ readme = "../README.md"
 categories = ["external-ffi-bindings"]
 license = "Apache-2.0"
 repository = "https://github.com/MaterializeInc/rust-sasl"
+
 [package.metadata.docs.rs]
 features = ["vendored"]
 
@@ -29,6 +30,7 @@ features = ["vendored"]
 [[test]]
 name = "plugins"
 required-features = ["vendored"]
+
 [dependencies.krb5-src]
 version = "0.3.0"
 optional = true
@@ -39,8 +41,10 @@ version = "0.2.68"
 [dependencies.openssl-sys]
 version = "0.9.55"
 optional = true
+
 [dev-dependencies.version-sync]
 version = "0.9"
+
 [build-dependencies.cc]
 version = "1.0.50"
 
@@ -53,8 +57,14 @@ optional = true
 
 [features]
 default = ["pkg-config"]
-gssapi-vendored = ["krb5-src", "vendored"]
+gssapi-vendored = [
+    "krb5-src",
+    "vendored",
+]
 openssl-vendored = ["openssl-sys/vendored"]
 plain = ["vendored"]
-scram = ["openssl-sys", "vendored"]
+scram = [
+    "openssl-sys",
+    "vendored",
+]
 vendored = []

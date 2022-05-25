@@ -1,8 +1,3 @@
-#[cfg(feature = "generate")]
-extern crate bindgen;
-extern crate cc;
-extern crate pkg_config;
-
 use pkg_config::Config;
 use std::env;
 use std::fmt;
@@ -37,6 +32,9 @@ impl fmt::Display for LinkType {
 }
 
 fn env_var_bool(name: &str) -> Option<bool> {
+    if name.starts_with("RUSTONIG") {
+        println!("cargo:rerun-if-env-changed={}", name);
+    }
     env::var(name)
         .ok()
         .map(|s| match &s.to_string().to_lowercase()[..] {

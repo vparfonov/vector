@@ -28,15 +28,25 @@ pub enum Type {
     Fedora,
     /// FreeBSD (<https://en.wikipedia.org/wiki/FreeBSD>).
     FreeBSD,
+    /// Garuda Linux (<https://en.wikipedia.org/wiki/Garuda_Linux>)
+    Garuda,
+    /// Gentoo Linux (<https://en.wikipedia.org/wiki/Gentoo_Linux>).
+    Gentoo,
+    /// HardenedBSD (https://hardenedbsd.org/).
+    HardenedBSD,
+    /// Illumos (https://en.wikipedia.org/wiki/Illumos).
+    Illumos,
     /// Linux based operating system (<https://en.wikipedia.org/wiki/Linux>).
     Linux,
     /// Mac OS X/OS X/macOS (<https://en.wikipedia.org/wiki/MacOS>).
     Macos,
     /// Manjaro (<https://en.wikipedia.org/wiki/Manjaro>).
     Manjaro,
-    /// Mint (<https://en.wikipedia.org/wiki/Linux_Mint>).
+    /// Mariner (<https://en.wikipedia.org/wiki/CBL-Mariner>).
+    Mariner,
+    /// MidnightBSD (<https://en.wikipedia.org/wiki/MidnightBSD>).
     MidnightBSD,
-    /// MidnightBSD(<https://en.wikipedia.org/wiki/MidnightBSD>).
+    /// Mint (<https://en.wikipedia.org/wiki/Linux_Mint>).
     Mint,
     /// NetBSD (<https://en.wikipedia.org/wiki/NetBSD>).
     NetBSD,
@@ -83,6 +93,9 @@ impl Display for Type {
             Type::Amazon => write!(f, "Amazon Linux AMI"),
             Type::Arch => write!(f, "Arch Linux"),
             Type::DragonFly => write!(f, "DragonFly BSD"),
+            Type::Garuda => write!(f, "Garuda Linux"),
+            Type::Gentoo => write!(f, "Gentoo Linux"),
+            Type::Illumos => write!(f, "illumos"),
             Type::Macos => write!(f, "Mac OS"),
             Type::MidnightBSD => write!(f, "Midnight BSD"),
             Type::Mint => write!(f, "Linux Mint"),
@@ -118,6 +131,8 @@ mod tests {
             (Type::Emscripten, "Emscripten"),
             (Type::EndeavourOS, "EndeavourOS"),
             (Type::Fedora, "Fedora"),
+            (Type::Garuda, "Garuda Linux"),
+            (Type::Gentoo, "Gentoo Linux"),
             (Type::FreeBSD, "FreeBSD"),
             (Type::Linux, "Linux"),
             (Type::Macos, "Mac OS"),

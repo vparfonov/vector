@@ -1,4 +1,6 @@
-#[allow(unused_imports)]
+#![cfg(feature = "fs")]
+
+#[cfg(not(any(target_os = "fuchsia", target_os = "macos")))]
 use rustix::fs::{Mode, OFlags};
 use tempfile::{tempdir, TempDir};
 
@@ -7,15 +9,17 @@ fn tmpdir() -> TempDir {
     tempdir().expect("expected to be able to create a temporary directory")
 }
 
-// Disable this test on macos because GHA has a weird system folder structure
-// that makes this test fail.
+/// Disable this test on macos because GHA has a weird system folder structure
+/// that makes this test fail.
 #[cfg(not(target_os = "macos"))]
 #[test]
 fn test_changing_working_directory() {
     let tmpdir = tmpdir();
 
     let orig_cwd = rustix::process::getcwd(Vec::new()).expect("get the cwd");
-    let orig_fd_cwd = rustix::fs::openat(&rustix::fs::cwd(), ".", OFlags::RDONLY, Mode::empty())
+
+    #[cfg(not(target_os = "fuchsia"))]
+    let orig_fd_cwd = rustix::fs::openat(rustix::fs::cwd(), ".", OFlags::RDONLY, Mode::empty())
         .expect("get a fd for the current directory");
 
     rustix::process::chdir(tmpdir.path()).expect("changing dir to the tmp");

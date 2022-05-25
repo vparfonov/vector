@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "axum"
-version = "0.5.9"
+version = "0.5.15"
 description = "Web framework that focuses on ergonomics and modularity"
 homepage = "https://github.com/tokio-rs/axum"
 readme = "README.md"
@@ -24,7 +24,7 @@ keywords = [
 categories = [
     "asynchronous",
     "network-programming",
-    "web-programming",
+    "web-programming::http-server",
 ]
 license = "MIT"
 repository = "https://github.com/tokio-rs/axum"
@@ -49,7 +49,11 @@ features = [
 version = "0.1.43"
 
 [dependencies.axum-core]
-version = "0.2.6"
+version = "0.2.7"
+
+[dependencies.axum-macros]
+version = "0.2.3"
+optional = true
 
 [dependencies.base64]
 version = "0.13"
@@ -67,7 +71,7 @@ features = ["alloc"]
 default-features = false
 
 [dependencies.headers]
-version = "0.3"
+version = "0.3.7"
 optional = true
 
 [dependencies.http]
@@ -167,7 +171,7 @@ version = "1.0"
 version = "1.0"
 
 [dev-dependencies.reqwest]
-version = "0.11"
+version = "0.11.11"
 features = [
     "json",
     "stream",
@@ -235,6 +239,7 @@ form = ["serde_urlencoded"]
 http1 = ["hyper/http1"]
 http2 = ["hyper/http2"]
 json = ["serde_json"]
+macros = ["axum-macros"]
 matched-path = []
 multipart = ["multer"]
 original-uri = []

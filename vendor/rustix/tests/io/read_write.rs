@@ -1,12 +1,14 @@
+#[cfg(feature = "fs")]
 use std::io::{IoSlice, IoSliceMut};
 
+#[cfg(feature = "fs")]
 #[test]
 fn test_readwrite_pv() {
     use rustix::fs::{cwd, openat, Mode, OFlags};
     use rustix::io::{preadv, pwritev};
 
     let tmp = tempfile::tempdir().unwrap();
-    let dir = openat(&cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
+    let dir = openat(cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
     let foo = openat(
         &dir,
         "foo",
@@ -25,7 +27,7 @@ fn test_readwrite_pv() {
     {
         match pwritev(&foo, &[IoSlice::new(b"hello")], 200) {
             Ok(_) => (),
-            Err(rustix::io::Error::NOSYS) => return,
+            Err(rustix::io::Errno::NOSYS) => return,
             Err(err) => Err(err).unwrap(),
         }
     }
@@ -37,13 +39,14 @@ fn test_readwrite_pv() {
     assert_eq!(&buf, b"world");
 }
 
+#[cfg(feature = "fs")]
 #[test]
 fn test_readwrite_p() {
     use rustix::fs::{cwd, openat, Mode, OFlags};
     use rustix::io::{pread, pwrite};
 
     let tmp = tempfile::tempdir().unwrap();
-    let dir = openat(&cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
+    let dir = openat(cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
     let foo = openat(
         &dir,
         "foo",
@@ -61,13 +64,14 @@ fn test_readwrite_p() {
     assert_eq!(&buf, b"world");
 }
 
+#[cfg(feature = "fs")]
 #[test]
 fn test_readwrite_v() {
     use rustix::fs::{cwd, openat, seek, Mode, OFlags};
     use rustix::io::{readv, writev, SeekFrom};
 
     let tmp = tempfile::tempdir().unwrap();
-    let dir = openat(&cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
+    let dir = openat(cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
     let foo = openat(
         &dir,
         "foo",
@@ -86,6 +90,7 @@ fn test_readwrite_v() {
     assert_eq!(&buf, b"world");
 }
 
+#[cfg(feature = "fs")]
 #[test]
 fn test_readwrite() {
     use rustix::fs::{cwd, openat, seek, Mode, OFlags};
@@ -93,7 +98,7 @@ fn test_readwrite() {
     use std::io::SeekFrom;
 
     let tmp = tempfile::tempdir().unwrap();
-    let dir = openat(&cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
+    let dir = openat(cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
     let foo = openat(
         &dir,
         "foo",

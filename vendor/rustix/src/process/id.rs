@@ -7,21 +7,21 @@
 //! integer values.
 #![allow(unsafe_code)]
 
-use crate::{imp, io};
+use crate::{backend, io};
 #[cfg(any(target_os = "android", target_os = "linux"))]
-use imp::process::RawCpuid;
+use backend::process::types::RawCpuid;
 
 /// The raw integer value of a Unix user ID.
-pub use imp::process::RawUid;
+pub use backend::process::types::RawUid;
 
 /// The raw integer value of a Unix group ID.
-pub use imp::process::RawGid;
+pub use backend::process::types::RawGid;
 
 /// The raw integer value of a Unix process ID.
-pub use imp::process::RawPid;
+pub use backend::process::types::RawPid;
 
 /// The raw integer value of a Unix process ID.
-pub use imp::process::RawNonZeroPid;
+pub use backend::process::types::RawNonZeroPid;
 
 /// `uid_t`—A Unix user ID.
 #[repr(transparent)]
@@ -35,9 +35,9 @@ pub struct Gid(RawGid);
 
 /// `pid_t`—A non-zero Unix process ID.
 ///
-/// Note that this is a pid, and not a pidfd. It is not a file descriptor,
-/// and the process it refers to could disappear at any time and be replaced
-/// by another, unrelated, process.
+/// This is a pid, and not a pidfd. It is not a file descriptor, and the
+/// process it refers to could disappear at any time and be replaced by
+/// another, unrelated, process.
 #[repr(transparent)]
 #[derive(Copy, Clone, Eq, PartialEq, Debug, Hash)]
 pub struct Pid(RawNonZeroPid);
@@ -104,7 +104,10 @@ impl Gid {
 
 impl Pid {
     /// A `Pid` corresponding to the init process (pid 1).
-    pub const INIT: Self = Self(unsafe { RawNonZeroPid::new_unchecked(1) });
+    pub const INIT: Self = Self(
+        // Safety: The init process' pid is always valid.
+        unsafe { RawNonZeroPid::new_unchecked(1) },
+    );
 
     /// Converts a `RawPid` into a `Pid`.
     ///
@@ -134,12 +137,11 @@ impl Pid {
     #[cfg(feature = "std")]
     #[inline]
     pub fn from_child(child: &std::process::Child) -> Self {
-        // Safety
-        //
-        // We know the returned ID is valid because it came directly from
-        // an OS API.
         let id = child.id();
         debug_assert_ne!(id, 0);
+
+        // Safety: We know the returned ID is valid because it came directly
+        // from an OS API.
         unsafe { Self::from_raw_nonzero(RawNonZeroPid::new_unchecked(id as _)) }
     }
 
@@ -192,7 +194,7 @@ impl Cpuid {
 #[inline]
 #[must_use]
 pub fn getuid() -> Uid {
-    imp::process::syscalls::getuid()
+    backend::process::syscalls::getuid()
 }
 
 /// `geteuid()`—Returns the process' effective user ID.
@@ -206,7 +208,7 @@ pub fn getuid() -> Uid {
 #[inline]
 #[must_use]
 pub fn geteuid() -> Uid {
-    imp::process::syscalls::geteuid()
+    backend::process::syscalls::geteuid()
 }
 
 /// `getgid()`—Returns the process' real group ID.
@@ -220,7 +222,7 @@ pub fn geteuid() -> Uid {
 #[inline]
 #[must_use]
 pub fn getgid() -> Gid {
-    imp::process::syscalls::getgid()
+    backend::process::syscalls::getgid()
 }
 
 /// `getegid()`—Returns the process' effective group ID.
@@ -234,7 +236,7 @@ pub fn getgid() -> Gid {
 #[inline]
 #[must_use]
 pub fn getegid() -> Gid {
-    imp::process::syscalls::getegid()
+    backend::process::syscalls::getegid()
 }
 
 /// `getpid()`—Returns the process' ID.
@@ -248,7 +250,7 @@ pub fn getegid() -> Gid {
 #[inline]
 #[must_use]
 pub fn getpid() -> Pid {
-    imp::process::syscalls::getpid()
+    backend::process::syscalls::getpid()
 }
 
 /// `getppid()`—Returns the parent process' ID.
@@ -262,7 +264,7 @@ pub fn getpid() -> Pid {
 #[inline]
 #[must_use]
 pub fn getppid() -> Option<Pid> {
-    imp::process::syscalls::getppid()
+    backend::process::syscalls::getppid()
 }
 
 /// `setsid()`—Create a new session.
@@ -275,5 +277,22 @@ pub fn getppid() -> Option<Pid> {
 /// [Linux]: https://man7.org/linux/man-pages/man2/setsid.2.html
 #[inline]
 pub fn setsid() -> io::Result<Pid> {
-    imp::process::syscalls::setsid()
+    backend::process::syscalls::setsid()
+}
+
+// translate_fchown_args returns the raw value of the IDs. In case of `None`
+// it returns `u32::MAX` since it has the same bit pattern as `-1` indicating
+// no change to the owner/group ID.
+pub(crate) fn translate_fchown_args(owner: Option<Uid>, group: Option<Gid>) -> (u32, u32) {
+    let ow = match owner {
+        Some(o) => o.as_raw(),
+        None => u32::MAX,
+    };
+
+    let gr = match group {
+        Some(g) => g.as_raw(),
+        None => u32::MAX,
+    };
+
+    (ow, gr)
 }

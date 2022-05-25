@@ -3,6 +3,8 @@
 
 This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flag.
 
+For more detailed documentation, see [the manual](https://mongodb.github.io/mongo-rust-driver/manual/).
+
 ## Index
 - [Installation](#installation)
     - [Requirements](#requirements)
@@ -17,8 +19,9 @@ This repository contains the officially supported MongoDB Rust driver, a client 
         - [Inserting documents into a collection](#inserting-documents-into-a-collection)
         - [Finding documents in a collection](#finding-documents-in-a-collection)
     - [Using the sync API](#using-the-sync-api)
+- [Web Framework Examples](#web-framework-examples)
 - [Platforms](#platforms)
-- [Atlas note](#atlas-note)
+- [Note on connecting to Atlas deployments](#note-on-connecting-to-atlas-deployments)
 - [Windows DNS note](#windows-dns-note)
 - [Warning about timeouts / cancellation](#warning-about-timeouts--cancellation)
 - [Bug Reporting / Feature Requests](#bug-reporting--feature-requests)
@@ -29,14 +32,14 @@ This repository contains the officially supported MongoDB Rust driver, a client 
 
 ## Installation
 ### Requirements
-- Rust 1.51+
+- Rust 1.53+
 - MongoDB 3.6+
 
 ### Importing
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`.
 ```toml
 [dependencies]
-mongodb = "2.2.2"
+mongodb = "2.3.0"
 ```
 
 #### Configuring the async runtime
@@ -45,20 +48,20 @@ The driver supports both of the most popular async runtime crates, namely [`toki
 For example, to instruct the driver to work with [`async-std`](https://crates.io/crates/async-std), add the following to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.2.2"
+version = "2.3.0"
 default-features = false
 features = ["async-std-runtime"]
 ```
 
 #### Enabling the sync API
-The driver also provides a blocking sync API. To enable this, add the `"sync"` feature to your `Cargo.toml`:
+The driver also provides a blocking sync API. To enable this, add the `"sync"` or `"tokio-sync"` feature to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.2.2"
-default-features = false
-features = ["sync"]
+version = "2.3.0"
+features = ["tokio-sync"]
 ```
-**Note:** if the sync API is enabled, the async-specific types will be privatized (e.g. `mongodb::Client`). The sync-specific types can be imported from `mongodb::sync` (e.g. `mongodb::sync::Client`).
+Using the `"sync"` feature also requires using `default-features = false`.
+**Note:** The sync-specific types can be imported from `mongodb::sync` (e.g. `mongodb::sync::Client`).
 
 ### All Feature Flags
 
@@ -233,13 +236,20 @@ for result in cursor {
 }
 ```
 
+## Web Framework Examples
+### Actix
+The driver can be used easily with the Actix web framework by storing a `Client` in Actix application data. A full example application for using MongoDB with Actix can be found [here](https://github.com/actix/examples/tree/master/databases/mongodb).
+
+### Rocket
+The Rocket web framework provides built-in support for MongoDB via the Rust driver. The documentation for the [`rocket_db_pools`](https://api.rocket.rs/v0.5-rc/rocket_db_pools/index.html) crate contains instructions for using MongoDB with your Rocket application.
+
 ## Platforms
 
 The driver tests against Linux, MacOS, and Windows in CI.
 
-## Atlas note
+## Note on connecting to Atlas deployments
 
-Currently, the driver has issues connecting to Atlas tiers above M2 unless the server version is at least 4.2. We're working on fixing this, but in the meantime, a workaround is to upgrade your cluster to 4.2. The driver has no known issues with either M0 or M2 instances.
+In order to connect to a pre-4.2 Atlas instance that's M2 or bigger, the `openssl-tls` feature flag must be enabled. The flag is not required for clusters smaller than M2 or running server versions 4.2 or newer.
 
 ## Windows DNS note
 
@@ -300,7 +310,7 @@ We encourage and would happily accept contributions in the form of GitHub pull r
 
 ## Running the tests
 ### Integration and unit tests
-In order to run the tests (which are mostly integration tests), you must have access to a MongoDB deployment. You may specify a [MongoDB connection string](https://docs.mongodb.com/manual/reference/connection-string/) in the `MONGODB_URI` environment variable, and the tests will use it to connect to the deployment. If `MONGODB_URI` is unset, the tests will attempt to connect to a local deployment on port 27017.
+In order to run the tests (which are mostly integration tests), you must have access to a MongoDB deployment. You may specify a [MongoDB connection string](https://www.mongodb.com/docs/manual/reference/connection-string/) in the `MONGODB_URI` environment variable, and the tests will use it to connect to the deployment. If `MONGODB_URI` is unset, the tests will attempt to connect to a local deployment on port 27017.
 
 **Note:** The integration tests will clear out the databases/collections they need to use, but they do not clean up after themselves.
 
@@ -354,13 +364,15 @@ bash .evergreen/check-all.sh
 ```
 
 ## Continuous Integration
-Commits to master are run automatically on [evergreen](https://evergreen.mongodb.com/waterfall/mongo-rust-driver-stable).
+Commits to main are run automatically on [evergreen](https://evergreen.mongodb.com/waterfall/mongo-rust-driver).
 
 ## Minimum supported Rust version (MSRV)
 
-The MSRV for this crate is currently 1.51.0. This will be rarely be increased, and if it ever is,
+The MSRV for this crate is currently 1.53.0. This will be rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.
 
 ## License
 
-This project is licensed under the [Apache License 2.0](https://github.com/10gen/mongo-rust-driver/blob/master/LICENSE).
+This project is licensed under the [Apache License 2.0](https://github.com/10gen/mongo-rust-driver/blob/main/LICENSE).
+
+This product includes software developed by the OpenSSL Project for use in the OpenSSL Toolkit (http://www.openssl.org/).

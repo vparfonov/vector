@@ -46,9 +46,6 @@ static const char *rd_kafka_feature_names[] = {
         "IdempotentProducer",
         "ZSTD",
         "SaslAuthReq",
-#ifdef RD_KAFKA_FEATURE_KIP360
-        "KIP-360",
-#endif
         "UnitTest",
         NULL
 };
@@ -174,7 +171,7 @@ static const struct rd_kafka_feature_map {
                  * Time-based offset requests */
                 .feature = RD_KAFKA_FEATURE_OFFSET_TIME,
                 .depends = {
-                        { RD_KAFKAP_Offset, 1, 1 },
+                        { RD_KAFKAP_ListOffsets, 1, 1 },
                         { -1 },
                 }
         },
@@ -204,17 +201,6 @@ static const struct rd_kafka_feature_map {
                         { -1 },
                 },
         },
-#ifdef RD_KAFKA_FEATURE_KIP360
-        {
-                /* @brief >=2.4.0: KIP-360 */
-                .feature = RD_KAFKA_FEATURE_KIP360,
-                .depends = {
-                        { RD_KAFKAP_InitProducerId, 2, 2 },
-                        { -1 },
-                },
-
-        },
-#endif
         { .feature = 0 }, /* sentinel */
 };
 
@@ -235,7 +221,7 @@ static struct rd_kafka_ApiVersion rd_kafka_ApiVersion_Queryable[] = {
 static struct rd_kafka_ApiVersion rd_kafka_ApiVersion_0_9_0[] = {
 	{ RD_KAFKAP_Produce, 0, 1 },
 	{ RD_KAFKAP_Fetch, 0, 1 },
-	{ RD_KAFKAP_Offset, 0, 0 },
+	{ RD_KAFKAP_ListOffsets, 0, 0 },
 	{ RD_KAFKAP_Metadata, 0, 0 },
 	{ RD_KAFKAP_OffsetCommit, 0, 2 },
 	{ RD_KAFKAP_OffsetFetch, 0, 1 },
@@ -252,7 +238,7 @@ static struct rd_kafka_ApiVersion rd_kafka_ApiVersion_0_9_0[] = {
 static struct rd_kafka_ApiVersion rd_kafka_ApiVersion_0_8_2[] = {
 	{ RD_KAFKAP_Produce, 0, 0 },
 	{ RD_KAFKAP_Fetch, 0, 0 },
-	{ RD_KAFKAP_Offset, 0, 0 },
+	{ RD_KAFKAP_ListOffsets, 0, 0 },
 	{ RD_KAFKAP_Metadata, 0, 0 },
 	{ RD_KAFKAP_OffsetCommit, 0, 1 },
 	{ RD_KAFKAP_OffsetFetch, 0, 1 },
@@ -263,7 +249,7 @@ static struct rd_kafka_ApiVersion rd_kafka_ApiVersion_0_8_2[] = {
 static struct rd_kafka_ApiVersion rd_kafka_ApiVersion_0_8_1[] = {
 	{ RD_KAFKAP_Produce, 0, 0 },
 	{ RD_KAFKAP_Fetch, 0, 0 },
-	{ RD_KAFKAP_Offset, 0, 0 },
+	{ RD_KAFKAP_ListOffsets, 0, 0 },
 	{ RD_KAFKAP_Metadata, 0, 0 },
 	{ RD_KAFKAP_OffsetCommit, 0, 1 },
 	{ RD_KAFKAP_OffsetFetch, 0, 0 }
@@ -273,7 +259,7 @@ static struct rd_kafka_ApiVersion rd_kafka_ApiVersion_0_8_1[] = {
 static struct rd_kafka_ApiVersion rd_kafka_ApiVersion_0_8_0[] = {
 	{ RD_KAFKAP_Produce, 0, 0 },
 	{ RD_KAFKAP_Fetch, 0, 0 },
-	{ RD_KAFKAP_Offset, 0, 0 },
+	{ RD_KAFKAP_ListOffsets, 0, 0 },
 	{ RD_KAFKAP_Metadata, 0, 0 }
 };
 

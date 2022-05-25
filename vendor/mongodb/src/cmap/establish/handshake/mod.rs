@@ -156,6 +156,7 @@ impl Handshaker {
 
         let mut command = hello_command(
             options.as_ref().and_then(|opts| opts.server_api.as_ref()),
+            options.as_ref().and_then(|opts| opts.load_balanced.into()),
             None,
         );
 
@@ -247,7 +248,7 @@ impl Handshaker {
                 .map(|server_first| client_first.into_first_round(server_first))
         });
 
-        // Check that master reply has a compressor list and unpack it
+        // Check that the hello reply has a compressor list and unpack it
         if let (Some(server_compressors), Some(client_compressors)) = (
             hello_reply.command_response.compressors.as_ref(),
             self.compressors.as_ref(),
@@ -267,6 +268,8 @@ impl Handshaker {
                 }
             }
         }
+
+        conn.server_id = hello_reply.command_response.connection_id;
 
         Ok(HandshakeResult {
             hello_reply,

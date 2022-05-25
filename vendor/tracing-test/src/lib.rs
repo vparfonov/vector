@@ -1,8 +1,20 @@
 //! Helper functions and macros that allow for easier testing of crates that use `tracing`.
 //!
-//! This crate should mainly be used through the [`#[traced_test]`](attr.traced_test.html) macro.
+//! The focus is on testing the logging, not on debugging the tests. That's why the
+//! library ensures that the logs do not depend on external state. For example, the
+//! `RUST_LOG` env variable is not used for log filtering.
+//!
+//! Similar crates:
+//!
+//! - [test-log](https://crates.io/crates/test-log): Initialize loggers before
+//!   running tests
+//! - [tracing-fluent-assertions](https://crates.io/crates/tracing-fluent-assertions):
+//!   More powerful assertions that also allow analyzing spans
 //!
 //! ## Usage
+//!
+//! This crate should mainly be used through the
+//! [`#[traced_test]`](attr.traced_test.html) macro.
 //!
 //! First, add a dependency on `tracing-test` in `Cargo.toml`:
 //!
@@ -101,6 +113,23 @@
 //! annotated test. It filters the logs in the buffer to include only lines
 //! containing ` {span_name}: ` and then searches the value in the matching log
 //! lines. This can be used to assert that a message was logged during a test.
+//!
+//! ## Per-crate Filtering
+//!
+//! By default, `tracing-test` sets an env filter that filters out all logs
+//! except the ones from your crate (equivalent to
+//! `RUST_LOG=<your_crate>=trace`). If you need to capture logs from other crates
+//! as well, you can turn off this log filtering globally by enabling the
+//! `no-env-filter` Cargo feature:
+//!
+//! ```toml
+//! tracing-test = { version = "0.1", features = ["no-env-filter"] }
+//! ```
+//!
+//! Note that this will result in _all_ logs from _all_ your dependencies being
+//! captured! This means that the `logs_contain` function may become less
+//! useful, and you might need to use `logs_assert` instead, with your own
+//! custom filtering logic.
 
 pub mod internal;
 mod subscriber;

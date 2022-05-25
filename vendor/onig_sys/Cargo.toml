@@ -3,27 +3,39 @@
 # When uploading crates to the registry Cargo will automatically
 # "normalize" Cargo.toml files for maximal compatibility
 # with all versions of Cargo and also rewrite `path` dependencies
-# to registry (e.g., crates.io) dependencies
+# to registry (e.g., crates.io) dependencies.
 #
-# If you believe there's an error in this file please file an
-# issue against the rust-lang/cargo repository. If you're
-# editing this file be aware that the upstream Cargo.toml
-# will likely look very different (and much more reasonable)
+# If you are reading this file be aware that the original Cargo.toml
+# will likely look very different (and much more reasonable).
+# See Cargo.toml.orig for the original contents.
 
 [package]
+edition = "2018"
 name = "onig_sys"
-version = "69.7.1"
-authors = ["Will Speak <will@willspeak.me>", "Ivan Ivashchenko <defuz@me.com>"]
+version = "69.8.1"
+authors = [
+    "Will Speak <will@willspeak.me>",
+    "Ivan Ivashchenko <defuz@me.com>",
+]
 build = "build.rs"
 links = "onig"
-description = "The `onig_sys` crate contains raw rust bindings to the\noniguruma library. This crate exposes a set of unsafe\nfunctions which can then be used by other crates to\ncreate safe wrappers around Oniguruma.\n\nYou probably don't want to link to this crate directly;\ninstead check out the `onig` crate.\n"
+description = """
+The `onig_sys` crate contains raw rust bindings to the
+oniguruma library. This crate exposes a set of unsafe
+functions which can then be used by other crates to
+create safe wrappers around Oniguruma.
+
+You probably don't want to link to this crate directly;
+instead check out the `onig` crate.
+"""
 documentation = "http://rust-onig.github.io/rust-onig/onig_sys/"
-readme = "../README.md"
+readme = "README.md"
 categories = ["external-ffi-bindings"]
 license = "MIT"
 repository = "http://github.com/iwillspeak/rust-onig"
+
 [build-dependencies.bindgen]
-version = "0.56"
+version = "0.59"
 features = ["runtime"]
 optional = true
 

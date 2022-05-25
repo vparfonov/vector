@@ -11,23 +11,38 @@
 
 [package]
 edition = "2018"
+rust-version = "1.49"
 name = "ndarray"
-version = "0.15.4"
-authors = ["Ulrik Sverdrup \"bluss\"", "Jim Turner"]
+version = "0.15.6"
+authors = [
+    "Ulrik Sverdrup \"bluss\"",
+    "Jim Turner",
+]
 exclude = ["docgen/images/*"]
 description = "An n-dimensional array for general elements and for numerics. Lightweight array views and slicing; views support chunking and splitting."
 documentation = "https://docs.rs/ndarray/"
 readme = "README-crates.io.md"
-keywords = ["array", "data-structure", "multidimensional", "matrix", "blas"]
-categories = ["data-structures", "science"]
+keywords = [
+    "array",
+    "data-structure",
+    "multidimensional",
+    "matrix",
+    "blas",
+]
+categories = [
+    "data-structures",
+    "science",
+]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/rust-ndarray/ndarray"
-[package.metadata.docs.rs]
-features = ["docs"]
 
 [package.metadata.release]
 no-dev-version = true
 tag-name = "{{version}}"
+
+[package.metadata.docs.rs]
+features = ["docs"]
+
 [profile.bench]
 debug = true
 
@@ -37,6 +52,7 @@ debug = true
 name = "ndarray"
 test = true
 bench = false
+
 [dependencies.approx]
 version = "0.4"
 optional = true
@@ -87,6 +103,7 @@ version = "1.0"
 features = ["alloc"]
 optional = true
 default-features = false
+
 [dev-dependencies.approx]
 version = "0.4"
 
@@ -103,11 +120,25 @@ version = "1.0"
 default-features = false
 
 [features]
-blas = ["cblas-sys", "libc"]
+blas = [
+    "cblas-sys",
+    "libc",
+]
 default = ["std"]
-docs = ["approx", "approx-0_5", "serde", "rayon"]
+docs = [
+    "approx",
+    "approx-0_5",
+    "serde",
+    "rayon",
+]
 matrixmultiply-threading = ["matrixmultiply/threading"]
-rayon = ["rayon_", "std"]
+rayon = [
+    "rayon_",
+    "std",
+]
 serde-1 = ["serde"]
-std = ["num-traits/std", "matrixmultiply/std"]
+std = [
+    "num-traits/std",
+    "matrixmultiply/std",
+]
 test = []

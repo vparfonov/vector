@@ -6,9 +6,9 @@
 //! `__attribute__((constructor))` in C/C++) for Linux, OSX, and Windows via
 //! the `#[ctor]` and `#[dtor]` macros.
 //!
-//! This library works and has been tested for Linux, OSX and Windows. This
-//! library will also work as expected in both `bin` and `cdylib` outputs,
-//! ie: the `ctor` and `dtor` will run at executable or library
+//! This library works and is regularly tested on Linux, OSX and Windows, with both `+crt-static` and `-crt-static`.
+//! Other platforms are supported but not tested as part of the automatic builds. This library will also work as expected in both
+//! `bin` and `cdylib` outputs, ie: the `ctor` and `dtor` will run at executable or library 
 //! startup/shutdown respectively.
 //!
 //! This library currently requires Rust > `1.31.0` at a minimum for the
@@ -38,11 +38,13 @@ use proc_macro::TokenStream;
 ///
 /// # Examples
 ///
-/// Print a startup message:
+/// Print a startup message (using `libc_print` for safety):
 ///
 /// ```rust
 /// # extern crate ctor;
 /// # use ctor::*;
+/// use libc_print::std_name::println;
+///
 /// #[ctor]
 /// fn foo() {
 ///   println!("Hello, world!");

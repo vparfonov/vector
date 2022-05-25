@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "deadpool"
-version = "0.9.4"
+version = "0.9.5"
 authors = ["Michael P. Jung <michael.jung@terreon.de>"]
 description = "Dead simple async pool"
 readme = "README.md"
@@ -31,6 +31,10 @@ rustdoc-args = [
     "--cfg",
     "docsrs",
 ]
+
+[[bench]]
+name = "managed"
+harness = false
 
 [[bench]]
 name = "unmanaged"
@@ -63,11 +67,15 @@ version = "1.0"
 features = ["attributes"]
 
 [dev-dependencies.config]
-version = "0.12"
+version = "0.13"
 features = ["json"]
 
 [dev-dependencies.criterion]
 version = "0.3"
+features = ["html_reports"]
+
+[dev-dependencies.itertools]
+version = "0.10.3"
 
 [dev-dependencies.tokio]
 version = "1.5.0"

@@ -2,7 +2,7 @@
 //!
 //! [github]: https://img.shields.io/badge/github-8da0cb?style=for-the-badge&labelColor=555555&logo=github
 //! [crates-io]: https://img.shields.io/badge/crates.io-fc8d62?style=for-the-badge&labelColor=555555&logo=rust
-//! [docs-rs]: https://img.shields.io/badge/docs.rs-66c2a5?style=for-the-badge&labelColor=555555&logoColor=white&logo=data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmNWY1ZjUiIGQ9Ik00ODguNiAyNTAuMkwzOTIgMjE0VjEwNS41YzAtMTUtOS4zLTI4LjQtMjMuNC0zMy43bC0xMDAtMzcuNWMtOC4xLTMuMS0xNy4xLTMuMS0yNS4zIDBsLTEwMCAzNy41Yy0xNC4xIDUuMy0yMy40IDE4LjctMjMuNCAzMy43VjIxNGwtOTYuNiAzNi4yQzkuMyAyNTUuNSAwIDI2OC45IDAgMjgzLjlWMzk0YzAgMTMuNiA3LjcgMjYuMSAxOS45IDMyLjJsMTAwIDUwYzEwLjEgNS4xIDIyLjEgNS4xIDMyLjIgMGwxMDMuOS01MiAxMDMuOSA1MmMxMC4xIDUuMSAyMi4xIDUuMSAzMi4yIDBsMTAwLTUwYzEyLjItNi4xIDE5LjktMTguNiAxOS45LTMyLjJWMjgzLjljMC0xNS05LjMtMjguNC0yMy40LTMzLjd6TTM1OCAyMTQuOGwtODUgMzEuOXYtNjguMmw4NS0zN3Y3My4zek0xNTQgMTA0LjFsMTAyLTM4LjIgMTAyIDM4LjJ2LjZsLTEwMiA0MS40LTEwMi00MS40di0uNnptODQgMjkxLjFsLTg1IDQyLjV2LTc5LjFsODUtMzguOHY3NS40em0wLTExMmwtMTAyIDQxLjQtMTAyLTQxLjR2LS42bDEwMi0zOC4yIDEwMiAzOC4ydi42em0yNDAgMTEybC04NSA0Mi41di03OS4xbDg1LTM4Ljh2NzUuNHptMC0xMTJsLTEwMiA0MS40LTEwMi00MS40di0uNmwxMDItMzguMiAxMDIgMzguMnYuNnoiPjwvcGF0aD48L3N2Zz4K
+//! [docs-rs]: https://img.shields.io/badge/docs.rs-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs
 //!
 //! <br>
 //!
@@ -170,7 +170,8 @@
     // https://github.com/rust-lang/rust-clippy/issues/8538
     clippy::iter_with_drain,
     clippy::needless_doctest_main,
-    clippy::needless_pass_by_value
+    clippy::needless_pass_by_value,
+    clippy::too_many_lines
 )]
 
 extern crate proc_macro;
@@ -210,6 +211,20 @@ pub fn phantom(args: TokenStream, input: TokenStream) -> TokenStream {
         Err(err) => return err.to_compile_error().into(),
     };
 
+    let void = Ident::new(
+        if ident == "Void" { "__Void" } else { "Void" },
+        Span::call_site(),
+    );
+
+    let type_param = Ident::new(
+        if ident == "TypeParam" {
+            "__TypeParam"
+        } else {
+            "TypeParam"
+        },
+        Span::call_site(),
+    );
+
     let mut generics = input.generics;
     let where_clause = generics.where_clause.take();
     let mut impl_generics = Vec::new();
@@ -220,16 +235,16 @@ pub fn phantom(args: TokenStream, input: TokenStream) -> TokenStream {
             GenericParam::Type(param) => {
                 let ident = &param.ident;
                 let elem = quote!(#ident);
-                impl_generics.push(quote!(#ident: ?Sized));
+                impl_generics.push(quote!(#ident: ?::core::marker::Sized));
                 ty_generics.push(quote!(#ident));
-                phantoms.push(variance::apply(param, elem));
+                phantoms.push(variance::apply(param, elem, &type_param));
             }
             GenericParam::Lifetime(param) => {
                 let lifetime = &param.lifetime;
                 let elem = quote!(&#lifetime ());
                 impl_generics.push(quote!(#lifetime));
                 ty_generics.push(quote!(#lifetime));
-                phantoms.push(variance::apply(param, elem));
+                phantoms.push(variance::apply(param, elem, &type_param));
             }
             GenericParam::Const(param) => {
                 let msg = "const generics are not supported";
@@ -238,6 +253,7 @@ pub fn phantom(args: TokenStream, input: TokenStream) -> TokenStream {
             }
         }
     }
+
     let impl_generics = &impl_generics;
     let ty_generics = &ty_generics;
     let enum_token = Token![enum](input.struct_token.span);
@@ -246,26 +262,40 @@ pub fn phantom(args: TokenStream, input: TokenStream) -> TokenStream {
     TokenStream::from(quote! {
         #[cfg(not(doc))]
         mod #void_namespace {
-            enum __Void {}
-            impl core::marker::Copy for __Void {}
-            impl core::clone::Clone for __Void {
+            enum #void {}
+            impl ::core::marker::Copy for #void {}
+            #[allow(clippy::expl_impl_clone_on_copy)]
+            impl ::core::clone::Clone for #void {
                 fn clone(&self) -> Self {
                     match *self {}
                 }
             }
 
+            #[repr(C, packed)]
+            struct #type_param<T: ?::core::marker::Sized>([*const T; 0]);
+            impl<T: ?::core::marker::Sized> ::core::marker::Copy for #type_param<T> {}
+            #[allow(clippy::expl_impl_clone_on_copy)]
+            impl<T: ?::core::marker::Sized> ::core::clone::Clone for #type_param<T> {
+                fn clone(&self) -> Self {
+                    *self
+                }
+            }
+            unsafe impl<T: ?::core::marker::Sized + ::core::marker::Send> ::core::marker::Send for #type_param<T> {}
+            unsafe impl<T: ?::core::marker::Sized + ::core::marker::Sync> ::core::marker::Sync for #type_param<T> {}
+
             #[allow(non_camel_case_types)]
             #vis_super struct #ident <#(#impl_generics),*> (
                 #(
-                    core::marker::PhantomData<#phantoms>,
+                    self::#type_param<#phantoms>,
                 )*
-                __Void,
+                self::#void,
             );
 
-            impl <#(#impl_generics),*> core::marker::Copy
+            impl <#(#impl_generics),*> ::core::marker::Copy
             for #ident <#(#ty_generics),*> {}
 
-            impl <#(#impl_generics),*> core::clone::Clone
+            #[allow(clippy::expl_impl_clone_on_copy)]
+            impl <#(#impl_generics),*> ::core::clone::Clone
             for #ident <#(#ty_generics),*> {
                 fn clone(&self) -> Self {
                     *self

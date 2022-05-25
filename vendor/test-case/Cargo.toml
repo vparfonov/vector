@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "test-case"
-version = "2.1.0"
+version = "2.2.1"
 authors = [
     "Marcin Sas-Szymanski <marcin.sas-szymanski@anixe.pl>",
     "Wojciech Polak <frondeus@gmail.com>",
@@ -49,11 +49,11 @@ version = "1.5"
 optional = true
 
 [dependencies.test-case-macros]
-version = "2.1.0"
+version = "2.2.1"
 default-features = false
 
 [dev-dependencies.indexmap]
-version = "1.8"
+version = "=1.8.2"
 
 [dev-dependencies.insta]
 version = "1.12"
@@ -61,8 +61,14 @@ version = "1.12"
 [dev-dependencies.itertools]
 version = "0.10"
 
+[dev-dependencies.linked-hash-map]
+version = "=0.5.4"
+
 [dev-dependencies.regex]
 version = "1.5"
+
+[dev-dependencies.serde_yaml]
+version = "=0.8.25"
 
 [features]
 with-regex = [

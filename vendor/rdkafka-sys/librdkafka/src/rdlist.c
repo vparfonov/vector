@@ -78,7 +78,7 @@ rd_list_t *rd_list_init_copy (rd_list_t *dst, const rd_list_t *src) {
 }
 
 static RD_INLINE rd_list_t *rd_list_alloc (void) {
-        return malloc(sizeof(rd_list_t));
+        return rd_malloc(sizeof(rd_list_t));
 }
 
 rd_list_t *rd_list_new (int initial_size, void (*free_cb) (void *)) {
@@ -489,6 +489,22 @@ static rd_list_t *rd_list_copy_preallocated0 (rd_list_t *dst,
 void *rd_list_copy_preallocated (const void *elem, void *opaque) {
         return rd_list_copy_preallocated0(rd_list_new(0, NULL),
                                           (const rd_list_t *)elem);
+}
+
+
+
+void rd_list_move (rd_list_t *dst, rd_list_t *src) {
+        rd_list_init_copy(dst, src);
+
+        if (src->rl_flags & RD_LIST_F_FIXED_SIZE) {
+                rd_list_copy_preallocated0(dst, src);
+        } else {
+                memcpy(dst->rl_elems, src->rl_elems,
+                       src->rl_cnt * sizeof(*src->rl_elems));
+                dst->rl_cnt = src->rl_cnt;
+        }
+
+        src->rl_cnt = 0;
 }
 
 

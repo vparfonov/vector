@@ -26,7 +26,6 @@ use std::{
     fmt::{self, Debug, Display, Formatter},
 };
 
-use chrono::Datelike;
 use serde_json::{json, Value};
 
 pub use crate::document::Document;
@@ -311,6 +310,14 @@ impl From<oid::ObjectId> for Bson {
     }
 }
 
+#[cfg(feature = "time-0_3")]
+#[cfg_attr(docsrs, doc(cfg(feature = "time-0_3")))]
+impl From<time::OffsetDateTime> for Bson {
+    fn from(a: time::OffsetDateTime) -> Bson {
+        Bson::DateTime(crate::DateTime::from(a))
+    }
+}
+
 #[cfg(feature = "chrono-0_4")]
 #[cfg_attr(docsrs, doc(cfg(feature = "chrono-0_4")))]
 impl<T: chrono::TimeZone> From<chrono::DateTime<T>> for Bson {
@@ -321,6 +328,14 @@ impl<T: chrono::TimeZone> From<chrono::DateTime<T>> for Bson {
 
 #[cfg(feature = "uuid-0_8")]
 #[cfg_attr(docsrs, doc(cfg(feature = "uuid-0_8")))]
+impl From<uuid_0_8::Uuid> for Bson {
+    fn from(uuid: uuid_0_8::Uuid) -> Self {
+        Bson::Binary(uuid.into())
+    }
+}
+
+#[cfg(feature = "uuid-1")]
+#[cfg_attr(docsrs, doc(cfg(feature = "uuid-1")))]
 impl From<uuid::Uuid> for Bson {
     fn from(uuid: uuid::Uuid) -> Self {
         Bson::Binary(uuid.into())
@@ -357,7 +372,7 @@ where
     }
 }
 
-/// This will create the [relaxed Extended JSON v2](https://docs.mongodb.com/manual/reference/mongodb-extended-json/) representation of the provided [`Bson`](../enum.Bson.html).
+/// This will create the [relaxed Extended JSON v2](https://www.mongodb.com/docs/manual/reference/mongodb-extended-json/) representation of the provided [`Bson`](../enum.Bson.html).
 impl From<Bson> for Value {
     fn from(bson: Bson) -> Self {
         bson.into_relaxed_extjson()
@@ -365,7 +380,7 @@ impl From<Bson> for Value {
 }
 
 impl Bson {
-    /// Converts the Bson value into its [relaxed extended JSON representation](https://docs.mongodb.com/manual/reference/mongodb-extended-json/).
+    /// Converts the Bson value into its [relaxed extended JSON representation](https://www.mongodb.com/docs/manual/reference/mongodb-extended-json/).
     ///
     /// Note: If this method is called on a case which contains a `Decimal128` value, it will panic.
     pub fn into_relaxed_extjson(self) -> Value {
@@ -430,9 +445,10 @@ impl Bson {
                 })
             }
             Bson::ObjectId(v) => json!({"$oid": v.to_hex()}),
-            Bson::DateTime(v) if v.timestamp_millis() >= 0 && v.to_chrono().year() <= 99999 => {
+            Bson::DateTime(v) if v.timestamp_millis() >= 0 && v.to_time_0_3().year() <= 9999 => {
                 json!({
-                    "$date": v.to_rfc3339_string(),
+                    // Unwrap safety: timestamps in the guarded range can always be formatted.
+                    "$date": v.try_to_rfc3339_string().unwrap(),
                 })
             }
             Bson::DateTime(v) => json!({
@@ -457,7 +473,7 @@ impl Bson {
         }
     }
 
-    /// Converts the Bson value into its [canonical extended JSON representation](https://docs.mongodb.com/manual/reference/mongodb-extended-json/).
+    /// Converts the Bson value into its [canonical extended JSON representation](https://www.mongodb.com/docs/manual/reference/mongodb-extended-json/).
     ///
     /// Note: extended json encoding for `Decimal128` values is not supported. If this method is
     /// called on a case which contains a `Decimal128` value, it will panic.
@@ -526,7 +542,7 @@ impl Bson {
     }
 
     /// Converts to extended format.
-    /// This function mainly used for [extended JSON format](https://docs.mongodb.com/manual/reference/mongodb-extended-json/).
+    /// This function mainly used for [extended JSON format](https://www.mongodb.com/docs/manual/reference/mongodb-extended-json/).
     // TODO RUST-426: Investigate either removing this from the serde implementation or unifying
     // with the extended JSON implementation.
     pub(crate) fn into_extended_document(self, rawbson: bool) -> Document {
@@ -592,9 +608,10 @@ impl Bson {
             Bson::DateTime(v) if rawbson => doc! {
                 "$date": v.timestamp_millis(),
             },
-            Bson::DateTime(v) if v.timestamp_millis() >= 0 && v.to_chrono().year() <= 9999 => {
+            Bson::DateTime(v) if v.timestamp_millis() >= 0 && v.to_time_0_3().year() <= 9999 => {
                 doc! {
-                    "$date": v.to_rfc3339_string(),
+                    // Unwrap safety: timestamps in the guarded range can always be formatted.
+                    "$date": v.try_to_rfc3339_string().unwrap(),
                 }
             }
             Bson::DateTime(v) => doc! {
@@ -776,8 +793,8 @@ impl Bson {
                 }
 
                 if let Ok(date) = doc.get_str("$date") {
-                    if let Ok(date) = chrono::DateTime::parse_from_rfc3339(date) {
-                        return Bson::DateTime(crate::DateTime::from_chrono(date));
+                    if let Ok(dt) = crate::DateTime::parse_rfc3339_str(date) {
+                        return Bson::DateTime(dt);
                     }
                 }
             }

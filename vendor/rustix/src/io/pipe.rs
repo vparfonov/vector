@@ -1,13 +1,12 @@
-use crate::imp;
+use crate::backend;
 use crate::io::{self, OwnedFd};
 
 #[cfg(not(any(target_os = "ios", target_os = "macos")))]
-pub use imp::io::PipeFlags;
+pub use backend::io::types::PipeFlags;
 
 /// `PIPE_BUF`—The maximum length at which writes to a pipe are atomic.
 ///
 /// # References
-///
 ///  - [Linux]
 ///  - [POSIX]
 ///
@@ -17,9 +16,9 @@ pub use imp::io::PipeFlags;
     windows,
     target_os = "illumos",
     target_os = "redox",
-    target_os = "wasi"
+    target_os = "wasi",
 )))]
-pub const PIPE_BUF: usize = imp::io::PIPE_BUF;
+pub const PIPE_BUF: usize = backend::io::types::PIPE_BUF;
 
 /// `pipe()`—Creates a pipe.
 ///
@@ -34,7 +33,7 @@ pub const PIPE_BUF: usize = imp::io::PIPE_BUF;
 /// [Linux]: https://man7.org/linux/man-pages/man2/pipe.2.html
 #[inline]
 pub fn pipe() -> io::Result<(OwnedFd, OwnedFd)> {
-    imp::io::syscalls::pipe()
+    backend::io::syscalls::pipe()
 }
 
 /// `pipe2(flags)`—Creates a pipe, with flags.
@@ -50,5 +49,5 @@ pub fn pipe() -> io::Result<(OwnedFd, OwnedFd)> {
 #[inline]
 #[doc(alias = "pipe2")]
 pub fn pipe_with(flags: PipeFlags) -> io::Result<(OwnedFd, OwnedFd)> {
-    imp::io::syscalls::pipe_with(flags)
+    backend::io::syscalls::pipe_with(flags)
 }

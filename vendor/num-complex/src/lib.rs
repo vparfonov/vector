@@ -32,12 +32,17 @@ use std::error::Error;
 
 use num_traits::{Inv, MulAdd, Num, One, Pow, Signed, Zero};
 
-#[cfg(any(feature = "std", feature = "libm"))]
-use num_traits::float::Float;
 use num_traits::float::FloatCore;
+#[cfg(any(feature = "std", feature = "libm"))]
+use num_traits::float::{Float, FloatConst};
 
 mod cast;
 mod pow;
+
+#[cfg(any(feature = "std", feature = "libm"))]
+mod complex_float;
+#[cfg(any(feature = "std", feature = "libm"))]
+pub use crate::complex_float::ComplexFloat;
 
 #[cfg(feature = "rand")]
 mod crand;
@@ -161,6 +166,13 @@ impl<T: Clone + Signed> Complex<T> {
 
 #[cfg(any(feature = "std", feature = "libm"))]
 impl<T: Float> Complex<T> {
+    /// Create a new Complex with a given phase: `exp(i * phase)`.
+    /// See [cis (mathematics)](https://en.wikipedia.org/wiki/Cis_(mathematics)).
+    #[inline]
+    pub fn cis(phase: T) -> Self {
+        Self::new(phase.cos(), phase.sin())
+    }
+
     /// Calculate |self|
     #[inline]
     pub fn norm(self) -> T {
@@ -186,9 +198,28 @@ impl<T: Float> Complex<T> {
     /// Computes `e^(self)`, where `e` is the base of the natural logarithm.
     #[inline]
     pub fn exp(self) -> Self {
-        // formula: e^(a + bi) = e^a (cos(b) + i*sin(b))
-        // = from_polar(e^a, b)
-        Self::from_polar(self.re.exp(), self.im)
+        // formula: e^(a + bi) = e^a (cos(b) + i*sin(b)) = from_polar(e^a, b)
+
+        let Complex { re, mut im } = self;
+        // Treat the corner cases +∞, -∞, and NaN
+        if re.is_infinite() {
+            if re < T::zero() {
+                if !im.is_finite() {
+                    return Self::new(T::zero(), T::zero());
+                }
+            } else {
+                if im == T::zero() || !im.is_finite() {
+                    if im.is_infinite() {
+                        im = T::nan();
+                    }
+                    return Self::new(re, im);
+                }
+            }
+        } else if re.is_nan() && im == T::zero() {
+            return self;
+        }
+
+        Self::from_polar(re.exp(), im)
     }
 
     /// Computes the principal value of natural logarithm of `self`.
@@ -566,6 +597,29 @@ impl<T: Float> Complex<T> {
     }
 }
 
+#[cfg(any(feature = "std", feature = "libm"))]
+impl<T: Float + FloatConst> Complex<T> {
+    /// Computes `2^(self)`.
+    #[inline]
+    pub fn exp2(self) -> Self {
+        // formula: 2^(a + bi) = 2^a (cos(b*log2) + i*sin(b*log2))
+        // = from_polar(2^a, b*log2)
+        Self::from_polar(self.re.exp2(), self.im * T::LN_2())
+    }
+
+    /// Computes the principal value of log base 2 of `self`.
+    #[inline]
+    pub fn log2(self) -> Self {
+        Self::ln(self) / T::LN_2()
+    }
+
+    /// Computes the principal value of log base 10 of `self`.
+    #[inline]
+    pub fn log10(self) -> Self {
+        Self::ln(self) / T::LN_10()
+    }
+}
+
 impl<T: FloatCore> Complex<T> {
     /// Checks if the given complex number is NaN
     #[inline]
@@ -591,6 +645,18 @@ impl<T: FloatCore> Complex<T> {
         self.re.is_normal() && self.im.is_normal()
     }
 }
+
+// Safety: `Complex<T>` is `repr(C)` and contains only instances of `T`, so we
+// can guarantee it contains no *added* padding. Thus, if `T: Zeroable`,
+// `Complex<T>` is also `Zeroable`
+#[cfg(feature = "bytemuck")]
+unsafe impl<T: bytemuck::Zeroable> bytemuck::Zeroable for Complex<T> {}
+
+// Safety: `Complex<T>` is `repr(C)` and contains only instances of `T`, so we
+// can guarantee it contains no *added* padding. Thus, if `T: Pod`,
+// `Complex<T>` is also `Pod`
+#[cfg(feature = "bytemuck")]
+unsafe impl<T: bytemuck::Pod> bytemuck::Pod for Complex<T> {}
 
 impl<T: Clone + Num> From<T> for Complex<T> {
     #[inline]
@@ -1301,7 +1367,7 @@ where
             neg_b = c == b'-';
 
             if b.is_empty() || (neg_b && b.starts_with('-')) {
-                return Err(ParseComplexError::new());
+                return Err(ParseComplexError::expr_error());
             }
             break;
         }
@@ -1328,7 +1394,7 @@ where
         im = b;
         neg_im = neg_b;
     } else {
-        return Err(ParseComplexError::new());
+        return Err(ParseComplexError::expr_error());
     }
 
     // parse re
@@ -1367,7 +1433,25 @@ impl<T: Num + Clone> Num for Complex<T> {
     type FromStrRadixErr = ParseComplexError<T::FromStrRadixErr>;
 
     /// Parses `a +/- bi`; `ai +/- b`; `a`; or `bi` where `a` and `b` are of type `T`
+    ///
+    /// `radix` must be <= 18; larger radix would include *i* and *j* as digits,
+    /// which cannot be supported.
+    ///
+    /// The conversion returns an error if 18 <= radix <= 36; it panics if radix > 36.
+    ///
+    /// The elements of `T` are parsed using `Num::from_str_radix` too, and errors
+    /// (or panics) from that are reflected here as well.
     fn from_str_radix(s: &str, radix: u32) -> Result<Self, Self::FromStrRadixErr> {
+        assert!(
+            radix <= 36,
+            "from_str_radix: radix is too high (maximum 36)"
+        );
+
+        // larger radix would include 'i' and 'j' as digits, which cannot be supported
+        if radix > 18 {
+            return Err(ParseComplexError::unsupported_radix());
+        }
+
         from_str_generic(s, |x| -> Result<T, T::FromStrRadixErr> {
             T::from_str_radix(x, radix)
         })
@@ -1446,12 +1530,19 @@ pub struct ParseComplexError<E> {
 enum ComplexErrorKind<E> {
     ParseError(E),
     ExprError,
+    UnsupportedRadix,
 }
 
 impl<E> ParseComplexError<E> {
-    fn new() -> Self {
+    fn expr_error() -> Self {
         ParseComplexError {
             kind: ComplexErrorKind::ExprError,
+        }
+    }
+
+    fn unsupported_radix() -> Self {
+        ParseComplexError {
+            kind: ComplexErrorKind::UnsupportedRadix,
         }
     }
 
@@ -1469,6 +1560,7 @@ impl<E: Error> Error for ParseComplexError<E> {
         match self.kind {
             ComplexErrorKind::ParseError(ref e) => e.description(),
             ComplexErrorKind::ExprError => "invalid or unsupported complex expression",
+            ComplexErrorKind::UnsupportedRadix => "unsupported radix for conversion",
         }
     }
 }
@@ -1478,6 +1570,7 @@ impl<E: fmt::Display> fmt::Display for ParseComplexError<E> {
         match self.kind {
             ComplexErrorKind::ParseError(ref e) => e.fmt(f),
             ComplexErrorKind::ExprError => "invalid or unsupported complex expression".fmt(f),
+            ComplexErrorKind::UnsupportedRadix => "unsupported radix for conversion".fmt(f),
         }
     }
 }
@@ -1492,10 +1585,11 @@ fn hash<T: hash::Hash>(x: &T) -> u64 {
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     #![allow(non_upper_case_globals)]
 
     use super::{Complex, Complex64};
+    use super::{ComplexErrorKind, ParseComplexError};
     use core::f64;
     use core::str::FromStr;
 
@@ -1503,14 +1597,31 @@ mod test {
 
     use num_traits::{Num, One, Zero};
 
-    pub const _0_0i: Complex64 = Complex { re: 0.0, im: 0.0 };
-    pub const _1_0i: Complex64 = Complex { re: 1.0, im: 0.0 };
-    pub const _1_1i: Complex64 = Complex { re: 1.0, im: 1.0 };
-    pub const _0_1i: Complex64 = Complex { re: 0.0, im: 1.0 };
-    pub const _neg1_1i: Complex64 = Complex { re: -1.0, im: 1.0 };
-    pub const _05_05i: Complex64 = Complex { re: 0.5, im: 0.5 };
+    pub const _0_0i: Complex64 = Complex::new(0.0, 0.0);
+    pub const _1_0i: Complex64 = Complex::new(1.0, 0.0);
+    pub const _1_1i: Complex64 = Complex::new(1.0, 1.0);
+    pub const _0_1i: Complex64 = Complex::new(0.0, 1.0);
+    pub const _neg1_1i: Complex64 = Complex::new(-1.0, 1.0);
+    pub const _05_05i: Complex64 = Complex::new(0.5, 0.5);
     pub const all_consts: [Complex64; 5] = [_0_0i, _1_0i, _1_1i, _neg1_1i, _05_05i];
-    pub const _4_2i: Complex64 = Complex { re: 4.0, im: 2.0 };
+    pub const _4_2i: Complex64 = Complex::new(4.0, 2.0);
+    pub const _1_infi: Complex64 = Complex::new(1.0, f64::INFINITY);
+    pub const _neg1_infi: Complex64 = Complex::new(-1.0, f64::INFINITY);
+    pub const _1_nani: Complex64 = Complex::new(1.0, f64::NAN);
+    pub const _neg1_nani: Complex64 = Complex::new(-1.0, f64::NAN);
+    pub const _inf_0i: Complex64 = Complex::new(f64::INFINITY, 0.0);
+    pub const _neginf_1i: Complex64 = Complex::new(f64::NEG_INFINITY, 1.0);
+    pub const _neginf_neg1i: Complex64 = Complex::new(f64::NEG_INFINITY, -1.0);
+    pub const _inf_1i: Complex64 = Complex::new(f64::INFINITY, 1.0);
+    pub const _inf_neg1i: Complex64 = Complex::new(f64::INFINITY, -1.0);
+    pub const _neginf_infi: Complex64 = Complex::new(f64::NEG_INFINITY, f64::INFINITY);
+    pub const _inf_infi: Complex64 = Complex::new(f64::INFINITY, f64::INFINITY);
+    pub const _neginf_nani: Complex64 = Complex::new(f64::NEG_INFINITY, f64::NAN);
+    pub const _inf_nani: Complex64 = Complex::new(f64::INFINITY, f64::NAN);
+    pub const _nan_0i: Complex64 = Complex::new(f64::NAN, 0.0);
+    pub const _nan_1i: Complex64 = Complex::new(f64::NAN, 1.0);
+    pub const _nan_neg1i: Complex64 = Complex::new(f64::NAN, -1.0);
+    pub const _nan_nani: Complex64 = Complex::new(f64::NAN, f64::NAN);
 
     #[test]
     fn test_consts() {
@@ -1597,9 +1708,18 @@ mod test {
     }
 
     #[cfg(any(feature = "std", feature = "libm"))]
-    mod float {
+    pub(crate) mod float {
         use super::*;
         use num_traits::{Float, Pow};
+
+        #[test]
+        fn test_cis() {
+            assert!(close(Complex::cis(0.0 * f64::consts::PI), _1_0i));
+            assert!(close(Complex::cis(0.5 * f64::consts::PI), _0_1i));
+            assert!(close(Complex::cis(1.0 * f64::consts::PI), -_1_0i));
+            assert!(close(Complex::cis(1.5 * f64::consts::PI), -_0_1i));
+            assert!(close(Complex::cis(2.0 * f64::consts::PI), _1_0i));
+        }
 
         #[test]
         #[cfg_attr(target_arch = "x86", ignore)]
@@ -1639,7 +1759,7 @@ mod test {
             }
         }
 
-        fn close(a: Complex64, b: Complex64) -> bool {
+        pub(crate) fn close(a: Complex64, b: Complex64) -> bool {
             close_to_tol(a, b, 1e-10)
         }
 
@@ -1650,6 +1770,61 @@ mod test {
                 println!("{:?} != {:?}", a, b);
             }
             close
+        }
+
+        // Version that also works if re or im are +inf, -inf, or nan
+        fn close_naninf(a: Complex64, b: Complex64) -> bool {
+            close_naninf_to_tol(a, b, 1.0e-10)
+        }
+
+        fn close_naninf_to_tol(a: Complex64, b: Complex64, tol: f64) -> bool {
+            let mut close = true;
+
+            // Compare the real parts
+            if a.re.is_finite() {
+                if b.re.is_finite() {
+                    close = (a.re == b.re) || (a.re - b.re).abs() < tol;
+                } else {
+                    close = false;
+                }
+            } else if (a.re.is_nan() && !b.re.is_nan())
+                || (a.re.is_infinite()
+                    && a.re.is_sign_positive()
+                    && !(b.re.is_infinite() && b.re.is_sign_positive()))
+                || (a.re.is_infinite()
+                    && a.re.is_sign_negative()
+                    && !(b.re.is_infinite() && b.re.is_sign_negative()))
+            {
+                close = false;
+            }
+
+            // Compare the imaginary parts
+            if a.im.is_finite() {
+                if b.im.is_finite() {
+                    close &= (a.im == b.im) || (a.im - b.im).abs() < tol;
+                } else {
+                    close = false;
+                }
+            } else if (a.im.is_nan() && !b.im.is_nan())
+                || (a.im.is_infinite()
+                    && a.im.is_sign_positive()
+                    && !(b.im.is_infinite() && b.im.is_sign_positive()))
+                || (a.im.is_infinite()
+                    && a.im.is_sign_negative()
+                    && !(b.im.is_infinite() && b.im.is_sign_negative()))
+            {
+                close = false;
+            }
+
+            if close == false {
+                println!("{:?} != {:?}", a, b);
+            }
+            close
+        }
+
+        #[test]
+        fn test_exp2() {
+            assert!(close(_0_0i.exp2(), _1_0i));
         }
 
         #[test]
@@ -1671,6 +1846,31 @@ mod test {
                     (c + _0_1i.scale(f64::consts::PI * 2.0)).exp()
                 ));
             }
+
+            // The test values below were taken from https://en.cppreference.com/w/cpp/numeric/complex/exp
+            assert!(close_naninf(_1_infi.exp(), _nan_nani));
+            assert!(close_naninf(_neg1_infi.exp(), _nan_nani));
+            assert!(close_naninf(_1_nani.exp(), _nan_nani));
+            assert!(close_naninf(_neg1_nani.exp(), _nan_nani));
+            assert!(close_naninf(_inf_0i.exp(), _inf_0i));
+            assert!(close_naninf(_neginf_1i.exp(), 0.0 * Complex::cis(1.0)));
+            assert!(close_naninf(_neginf_neg1i.exp(), 0.0 * Complex::cis(-1.0)));
+            assert!(close_naninf(
+                _inf_1i.exp(),
+                f64::INFINITY * Complex::cis(1.0)
+            ));
+            assert!(close_naninf(
+                _inf_neg1i.exp(),
+                f64::INFINITY * Complex::cis(-1.0)
+            ));
+            assert!(close_naninf(_neginf_infi.exp(), _0_0i)); // Note: ±0±0i: signs of zeros are unspecified
+            assert!(close_naninf(_inf_infi.exp(), _inf_nani)); // Note: ±∞+NaN*i: sign of the real part is unspecified
+            assert!(close_naninf(_neginf_nani.exp(), _0_0i)); // Note: ±0±0i: signs of zeros are unspecified
+            assert!(close_naninf(_inf_nani.exp(), _inf_nani)); // Note: ±∞+NaN*i: sign of the real part is unspecified
+            assert!(close_naninf(_nan_0i.exp(), _nan_0i));
+            assert!(close_naninf(_nan_1i.exp(), _nan_nani));
+            assert!(close_naninf(_nan_neg1i.exp(), _nan_nani));
+            assert!(close_naninf(_nan_nani.exp(), _nan_nani));
         }
 
         #[test]
@@ -1718,6 +1918,16 @@ mod test {
             let c = Complex::new(2.0, -1.0);
             let r = c.log(10.0);
             assert!(close_to_tol(r, Complex::new(0.349485, -0.20135958), 1e-5));
+        }
+
+        #[test]
+        fn test_log2() {
+            assert!(close(_1_0i.log2(), _0_0i));
+        }
+
+        #[test]
+        fn test_log10() {
+            assert!(close(_1_0i.log10(), _0_0i));
         }
 
         #[test]
@@ -2063,6 +2273,14 @@ mod test {
             for &c in all_consts.iter() {
                 // e^ln(z) = z
                 assert!(close(c.ln().exp(), c));
+            }
+        }
+
+        #[test]
+        fn test_exp2_log() {
+            for &c in all_consts.iter() {
+                // 2^log2(z) = z
+                assert!(close(c.log2().exp2(), c));
             }
         }
 
@@ -2560,6 +2778,33 @@ mod test {
         test(Complex::new(15.0, 32.0), "1111+100000i", 2);
         test(Complex::new(-15.0, -32.0), "-F-20i", 16);
         test(Complex::new(-15.0, -32.0), "-1111-100000i", 2);
+
+        fn test_error(s: &str, radix: u32) -> ParseComplexError<<f64 as Num>::FromStrRadixErr> {
+            let res = Complex64::from_str_radix(s, radix);
+
+            res.expect_err(&format!("Expected failure on input {:?}", s))
+        }
+
+        let err = test_error("1ii", 19);
+        if let ComplexErrorKind::UnsupportedRadix = err.kind {
+            /* pass */
+        } else {
+            panic!("Expected failure on invalid radix, got {:?}", err);
+        }
+
+        let err = test_error("1 + 0", 16);
+        if let ComplexErrorKind::ExprError = err.kind {
+            /* pass */
+        } else {
+            panic!("Expected failure on expr error, got {:?}", err);
+        }
+    }
+
+    #[test]
+    #[should_panic(expected = "radix is too high")]
+    fn test_from_str_radix_fail() {
+        // ensure we preserve the underlying panic on radix > 36
+        let _complex = Complex64::from_str_radix("1", 37);
     }
 
     #[test]

@@ -12,14 +12,21 @@
 [package]
 edition = "2018"
 name = "io-lifetimes"
-version = "0.6.1"
+version = "0.7.2"
 authors = ["Dan Gohman <dev@sunfishcode.online>"]
 exclude = ["/.github"]
 description = "A low-level I/O ownership and borrowing library"
-keywords = ["api", "io"]
-categories = ["os", "rust-patterns"]
+keywords = [
+    "api",
+    "io",
+]
+categories = [
+    "os",
+    "rust-patterns",
+]
 license = "Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT"
 repository = "https://github.com/sunfishcode/io-lifetimes"
+
 [dependencies.async-std]
 version = "1.9.0"
 features = ["unstable"]
@@ -31,7 +38,10 @@ optional = true
 
 [dependencies.mio]
 version = "0.8.0"
-features = ["net", "os-ext"]
+features = [
+    "net",
+    "os-ext",
+]
 optional = true
 
 [dependencies.socket2]
@@ -40,19 +50,37 @@ optional = true
 
 [dependencies.tokio]
 version = "1.6.0"
-features = ["io-std", "fs", "net", "process"]
+features = [
+    "io-std",
+    "fs",
+    "net",
+    "process",
+]
 optional = true
 
 [features]
-close = ["libc", "winapi"]
+close = [
+    "libc",
+    "windows-sys",
+]
 default = ["close"]
+
 [target."cfg(not(target_os = \"wasi\"))".dependencies.os_pipe]
 version = "1.0.0"
 optional = true
+
 [target."cfg(not(windows))".dependencies.libc]
 version = "0.2.96"
 optional = true
-[target."cfg(windows)".dependencies.winapi]
-version = "0.3.9"
-features = ["handleapi", "std", "winsock2"]
+
+[target."cfg(windows)".dependencies.windows-sys]
+version = "0.36.0"
+features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_Networking_WinSock",
+    "Win32_Security",
+    "Win32_System_IO",
+    "Win32_System_Threading",
+]
 optional = true

@@ -32,6 +32,9 @@
 #include "rdlist.h"
 #include "rdkafka_cert.h"
 
+#if WITH_SSL && OPENSSL_VERSION_NUMBER >= 0x10100000
+#include <openssl/engine.h>
+#endif /* WITH_SSL && OPENSSL_VERSION_NUMBER >= 0x10100000 */
 
 /**
  * Forward declarations
@@ -156,7 +159,7 @@ typedef enum {
 
 /* Increase in steps of 64 as needed.
  * This must be larger than sizeof(rd_kafka_[topic_]conf_t) */
-#define RD_KAFKA_CONF_PROPS_IDX_MAX (64*28)
+#define RD_KAFKA_CONF_PROPS_IDX_MAX (64*29)
 
 /**
  * @struct rd_kafka_anyconf_t
@@ -211,6 +214,7 @@ struct rd_kafka_conf_s {
         int     reconnect_backoff_ms;
         int     reconnect_backoff_max_ms;
         int     reconnect_jitter_ms;
+        int     connections_max_idle_ms;
         int     sparse_connections;
         int     sparse_connect_intvl;
 	int     api_version_request;
@@ -234,10 +238,17 @@ struct rd_kafka_conf_s {
                 char *cert_pem;
                 rd_kafka_cert_t *cert;
                 char *ca_location;
+                char *ca_pem;
                 rd_kafka_cert_t *ca;
                 /** CSV list of Windows certificate stores */
                 char *ca_cert_stores;
                 char *crl_location;
+#if WITH_SSL && OPENSSL_VERSION_NUMBER >= 0x10100000
+                ENGINE *engine;
+#endif
+                char *engine_location;
+                char *engine_id;
+                void *engine_callback_data;
                 char *keystore_location;
                 char *keystore_password;
                 int   endpoint_identification;
@@ -502,6 +513,12 @@ struct rd_kafka_conf_s {
 
         char *sw_name;    /**< Software/client name */
         char *sw_version; /**< Software/client version */
+
+        struct {
+                /** Properties on (implicit pass-thru) default_topic_conf were
+                 *  overwritten by passing an explicit default_topic_conf. */
+                rd_bool_t default_topic_conf_overwritten;
+        } warn;
 };
 
 int rd_kafka_socket_cb_linux (int domain, int type, int protocol, void *opaque);

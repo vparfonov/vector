@@ -12,21 +12,31 @@
 [package]
 edition = "2018"
 name = "clipboard-win"
-version = "4.4.1"
+version = "4.4.2"
 authors = ["Douman <douman@gmx.se>"]
-include = ["**/*.rs", "Cargo.toml", "README.md"]
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md",
+]
 description = "Provides simple way to interact with Windows clipboard."
 documentation = "https://docs.rs/crate/clipboard-win"
 readme = "README.md"
-keywords = ["Windows", "winapi", "clipboard"]
+keywords = [
+    "Windows",
+    "winapi",
+    "clipboard",
+]
 categories = ["os::windows-apis"]
 license = "BSL-1.0"
 repository = "https://github.com/DoumanAsh/clipboard-win"
+
 [package.metadata.docs.rs]
 default-target = "x86_64-pc-windows-msvc"
 
 [features]
 std = ["error-code/std"]
+
 [target."cfg(windows)".dependencies.error-code]
 version = "2.1"
 
@@ -35,5 +45,14 @@ version = "1"
 
 [target."cfg(windows)".dependencies.winapi]
 version = "0.3"
-features = ["basetsd", "shellapi", "winbase", "winuser", "winerror", "stringapiset", "errhandlingapi", "synchapi"]
+features = [
+    "basetsd",
+    "shellapi",
+    "winbase",
+    "winuser",
+    "winerror",
+    "stringapiset",
+    "errhandlingapi",
+    "synchapi",
+]
 default-features = false

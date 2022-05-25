@@ -1,4 +1,5 @@
 use std::iter::{self, FromIterator};
+use std::ops::Index;
 use std::os::raw::c_void;
 use std::{ptr, slice, str, vec};
 
@@ -103,13 +104,14 @@ impl<'lua> Value<'lua> {
     /// There is no way to convert the pointer back to its original value.
     ///
     /// Typically this function is used only for hashing and debug information.
+    #[inline]
     pub fn to_pointer(&self) -> *const c_void {
         unsafe {
             match self {
                 Value::LightUserData(ud) => ud.0,
-                Value::String(String(v))
-                | Value::Table(Table(v))
-                | Value::Function(Function(v))
+                Value::Table(t) => t.to_pointer(),
+                Value::String(s) => s.to_pointer(),
+                Value::Function(Function(v))
                 | Value::Thread(Thread(v))
                 | Value::UserData(AnyUserData(v)) => v
                     .lua
@@ -237,7 +239,24 @@ impl<'a, 'lua> IntoIterator for &'a MultiValue<'lua> {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        (&self.0).iter().rev()
+        self.0.iter().rev()
+    }
+}
+
+impl<'lua> Index<usize> for MultiValue<'lua> {
+    type Output = Value<'lua>;
+
+    #[inline]
+    fn index(&self, index: usize) -> &Self::Output {
+        if let Some(result) = self.get(index) {
+            result
+        } else {
+            panic!(
+                "index out of bounds: the len is {} but the index is {}",
+                self.len(),
+                index
+            )
+        }
     }
 }
 
@@ -256,18 +275,23 @@ impl<'lua> MultiValue<'lua> {
     }
 
     #[inline]
+    pub fn get(&self, index: usize) -> Option<&Value<'lua>> {
+        self.0.get(self.0.len() - index - 1)
+    }
+
+    #[inline]
     pub(crate) fn reserve(&mut self, size: usize) {
         self.0.reserve(size);
     }
 
     #[inline]
-    pub(crate) fn push_front(&mut self, value: Value<'lua>) {
-        self.0.push(value);
+    pub fn pop_front(&mut self) -> Option<Value<'lua>> {
+        self.0.pop()
     }
 
     #[inline]
-    pub(crate) fn pop_front(&mut self) -> Option<Value<'lua>> {
-        self.0.pop()
+    pub fn push_front(&mut self, value: Value<'lua>) {
+        self.0.push(value);
     }
 
     #[inline]

@@ -1,17 +1,21 @@
 //! A command which prints out information about the process it runs in.
 
-#[cfg(not(windows))]
 use rustix::io;
-#[cfg(not(windows))]
-use rustix::process::*;
 
+#[cfg(all(feature = "process", feature = "param"))]
 #[cfg(not(windows))]
 fn main() -> io::Result<()> {
+    use rustix::param::*;
+    use rustix::process::*;
+
     println!("Pid: {}", getpid().as_raw_nonzero());
     println!("Parent Pid: {}", Pid::as_raw(getppid()));
     println!("Uid: {}", getuid().as_raw());
     println!("Gid: {}", getgid().as_raw());
-    #[cfg(any(target_os = "android", target_os = "linux"))]
+    #[cfg(any(
+        all(target_os = "android", target_pointer_width = "64"),
+        target_os = "linux",
+    ))]
     {
         let (a, b) = linux_hwcap();
         println!("Linux hwcap: {:#x}, {:#x}", a, b);
@@ -78,21 +82,24 @@ fn main() -> io::Result<()> {
     )))]
     println!("Rtprio Limit: {:?}", getrlimit(Resource::Rtprio));
     #[cfg(not(any(
+        target_os = "android",
         target_os = "emscripten",
         target_os = "freebsd",
-        target_os = "android",
         target_os = "ios",
         target_os = "macos",
         target_os = "netbsd",
         target_os = "openbsd",
     )))]
     println!("Rttime Limit: {:?}", getrlimit(Resource::Rttime));
-    #[cfg(any(target_os = "android", target_os = "linux"))]
+    #[cfg(any(
+        all(target_os = "android", target_pointer_width = "64"),
+        target_os = "linux"
+    ))]
     println!("Execfn: {:?}", linux_execfn());
     Ok(())
 }
 
-#[cfg(windows)]
-fn main() {
+#[cfg(any(windows, not(all(feature = "process", feature = "param"))))]
+fn main() -> io::Result<()> {
     unimplemented!()
 }

@@ -32,8 +32,11 @@ mod tests {
             | Type::Debian
             | Type::EndeavourOS
             | Type::Fedora
+            | Type::Garuda
+            | Type::Gentoo
             | Type::Linux
             | Type::Manjaro
+            | Type::Mariner
             | Type::NixOS
             | Type::openSUSE
             | Type::OracleLinux

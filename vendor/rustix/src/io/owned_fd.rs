@@ -1,7 +1,7 @@
-//! A wrapper around `io_lifetimes::OwnedFd`.
+//! A wrapper around [`io_lifetimes::OwnedFd`].
 //!
-//! rustix needs to wrap `OwnedFd` so that it can call its own [`close`]
-//! function when the `OwnedFd` is dropped.
+//! rustix needs to wrap io-lifetimes' `OwnedFd` type so that it can call its
+//! own [`close`] function when the `OwnedFd` is dropped.
 //!
 //! [`close`]: crate::io::close
 //!
@@ -11,20 +11,20 @@
 //! file descriptor and close it ourselves.
 #![allow(unsafe_code)]
 
-use crate::imp::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
+use crate::backend::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(all(not(io_lifetimes_use_std), feature = "std"))]
-use crate::imp::fd::{FromFd, IntoFd};
+use crate::backend::fd::{FromFd, IntoFd};
 use crate::io::close;
 use core::fmt;
 use core::mem::{forget, ManuallyDrop};
 
-/// A wrapper around `io_lifetimes::OwnedFd` which closes the file descriptor
-/// using `rustix`'s own [`close`] rather than libc's `close`.
+/// A wrapper around [`io_lifetimes::OwnedFd`] which closes the file descriptor
+/// using rustix's own [`close`] rather than libc's `close`.
 ///
 /// [`close`]: crate::io::close
 #[repr(transparent)]
 pub struct OwnedFd {
-    inner: ManuallyDrop<crate::imp::fd::OwnedFd>,
+    inner: ManuallyDrop<crate::backend::fd::OwnedFd>,
 }
 
 impl OwnedFd {
@@ -62,12 +62,12 @@ impl OwnedFd {
     /// handle as the existing `OwnedFd` instance.
     #[cfg(target_os = "windows")]
     pub fn try_clone(&self) -> std::io::Result<Self> {
-        use winapi::um::processthreadsapi::GetCurrentProcessId;
-        use winapi::um::winsock2::{
+        use windows_sys::Win32::Networking::WinSock::{
             WSADuplicateSocketW, WSAGetLastError, WSASocketW, INVALID_SOCKET, SOCKET_ERROR,
             WSAEINVAL, WSAEPROTOTYPE, WSAPROTOCOL_INFOW, WSA_FLAG_NO_HANDLE_INHERIT,
             WSA_FLAG_OVERLAPPED,
         };
+        use windows_sys::Win32::System::Threading::GetCurrentProcessId;
 
         let mut info = unsafe { std::mem::zeroed::<WSAPROTOCOL_INFOW>() };
         let result =
@@ -123,9 +123,7 @@ impl OwnedFd {
     #[cfg(windows)]
     #[cfg(not(target_vendor = "uwp"))]
     fn set_no_inherit(&self) -> std::io::Result<()> {
-        use winapi::um::handleapi::SetHandleInformation;
-        use winapi::um::winbase::HANDLE_FLAG_INHERIT;
-        use winapi::um::winnt::HANDLE;
+        use windows_sys::Win32::Foundation::{SetHandleInformation, HANDLE, HANDLE_FLAG_INHERIT};
         match unsafe { SetHandleInformation(self.as_raw_fd() as HANDLE, HANDLE_FLAG_INHERIT, 0) } {
             0 => return Err(std::io::Error::last_os_error()),
             _ => Ok(()),
@@ -159,35 +157,37 @@ impl io_lifetimes::AsSocket for OwnedFd {
 }
 
 #[cfg(any(io_lifetimes_use_std, not(feature = "std")))]
-impl From<OwnedFd> for crate::imp::fd::OwnedFd {
+impl From<OwnedFd> for crate::backend::fd::OwnedFd {
     #[inline]
     fn from(owned_fd: OwnedFd) -> Self {
+        let raw_fd = owned_fd.inner.as_fd().as_raw_fd();
+        forget(owned_fd);
+
         // Safety: We use `as_fd().as_raw_fd()` to extract the raw file
         // descriptor from `self.inner`, and then `forget` `self` so
         // that they remain valid until the new `OwnedFd` acquires them.
-        let raw_fd = owned_fd.inner.as_fd().as_raw_fd();
-        forget(owned_fd);
-        unsafe { crate::imp::fd::OwnedFd::from_raw_fd(raw_fd) }
+        unsafe { crate::backend::fd::OwnedFd::from_raw_fd(raw_fd) }
     }
 }
 
 #[cfg(not(any(io_lifetimes_use_std, not(feature = "std"))))]
 impl IntoFd for OwnedFd {
     #[inline]
-    fn into_fd(self) -> crate::imp::fd::OwnedFd {
+    fn into_fd(self) -> crate::backend::fd::OwnedFd {
+        let raw_fd = self.inner.as_fd().as_raw_fd();
+        forget(self);
+
         // Safety: We use `as_fd().as_raw_fd()` to extract the raw file
         // descriptor from `self.inner`, and then `forget` `self` so
         // that they remain valid until the new `OwnedFd` acquires them.
-        let raw_fd = self.inner.as_fd().as_raw_fd();
-        forget(self);
-        unsafe { crate::imp::fd::OwnedFd::from_raw_fd(raw_fd) }
+        unsafe { crate::backend::fd::OwnedFd::from_raw_fd(raw_fd) }
     }
 }
 
 #[cfg(any(io_lifetimes_use_std, not(feature = "std")))]
-impl From<crate::imp::fd::OwnedFd> for OwnedFd {
+impl From<crate::backend::fd::OwnedFd> for OwnedFd {
     #[inline]
-    fn from(owned_fd: crate::imp::fd::OwnedFd) -> Self {
+    fn from(owned_fd: crate::backend::fd::OwnedFd) -> Self {
         Self {
             inner: ManuallyDrop::new(owned_fd),
         }
@@ -197,7 +197,7 @@ impl From<crate::imp::fd::OwnedFd> for OwnedFd {
 #[cfg(all(not(io_lifetimes_use_std), feature = "std"))]
 impl FromFd for OwnedFd {
     #[inline]
-    fn from_fd(owned_fd: crate::imp::fd::OwnedFd) -> Self {
+    fn from_fd(owned_fd: crate::backend::fd::OwnedFd) -> Self {
         Self {
             inner: ManuallyDrop::new(owned_fd),
         }
@@ -205,9 +205,9 @@ impl FromFd for OwnedFd {
 }
 
 #[cfg(not(any(io_lifetimes_use_std, not(feature = "std"))))]
-impl From<crate::imp::fd::OwnedFd> for OwnedFd {
+impl From<crate::backend::fd::OwnedFd> for OwnedFd {
     #[inline]
-    fn from(fd: crate::imp::fd::OwnedFd) -> Self {
+    fn from(fd: crate::backend::fd::OwnedFd) -> Self {
         Self {
             inner: ManuallyDrop::new(fd),
         }
@@ -215,15 +215,16 @@ impl From<crate::imp::fd::OwnedFd> for OwnedFd {
 }
 
 #[cfg(not(any(io_lifetimes_use_std, not(feature = "std"))))]
-impl From<OwnedFd> for crate::imp::fd::OwnedFd {
+impl From<OwnedFd> for crate::backend::fd::OwnedFd {
     #[inline]
     fn from(fd: OwnedFd) -> Self {
+        let raw_fd = fd.inner.as_fd().as_raw_fd();
+        forget(fd);
+
         // Safety: We use `as_fd().as_raw_fd()` to extract the raw file
         // descriptor from `self.inner`, and then `forget` `self` so
         // that they remain valid until the new `OwnedFd` acquires them.
-        let raw_fd = fd.inner.as_fd().as_raw_fd();
-        forget(fd);
-        unsafe { crate::imp::fd::OwnedFd::from_raw_fd(raw_fd) }
+        unsafe { Self::from_raw_fd(raw_fd) }
     }
 }
 
@@ -247,7 +248,7 @@ impl FromRawFd for OwnedFd {
     #[inline]
     unsafe fn from_raw_fd(raw_fd: RawFd) -> Self {
         Self {
-            inner: ManuallyDrop::new(crate::imp::fd::OwnedFd::from_raw_fd(raw_fd)),
+            inner: ManuallyDrop::new(crate::backend::fd::OwnedFd::from_raw_fd(raw_fd)),
         }
     }
 }

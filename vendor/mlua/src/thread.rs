@@ -4,7 +4,7 @@ use std::os::raw::c_int;
 use crate::error::{Error, Result};
 use crate::ffi;
 use crate::types::LuaRef;
-use crate::util::{check_stack, error_traceback, pop_error, StackGuard};
+use crate::util::{check_stack, error_traceback_thread, pop_error, StackGuard};
 use crate::value::{FromLuaMulti, ToLuaMulti};
 
 #[cfg(any(
@@ -136,8 +136,12 @@ impl<'lua> Thread<'lua> {
 
             let ret = ffi::lua_resume(thread_state, lua.state, nargs, &mut nresults as *mut c_int);
             if ret != ffi::LUA_OK && ret != ffi::LUA_YIELD {
-                protect_lua!(lua.state, 0, 0, |_| error_traceback(thread_state))?;
-                return Err(pop_error(thread_state, ret));
+                check_stack(lua.state, 3)?;
+                protect_lua!(lua.state, 0, 1, |state| error_traceback_thread(
+                    state,
+                    thread_state
+                ))?;
+                return Err(pop_error(lua.state, ret));
             }
 
             let mut results = args; // Reuse MultiValue container
@@ -357,7 +361,16 @@ impl<'lua, R> Drop for AsyncThread<'lua, R> {
     fn drop(&mut self) {
         if self.recycle {
             unsafe {
-                self.thread.0.lua.recycle_thread(&mut self.thread);
+                let lua = self.thread.0.lua;
+                // For Lua 5.4 this also closes all pending to-be-closed variables
+                if !lua.recycle_thread(&mut self.thread) {
+                    #[cfg(feature = "lua54")]
+                    if self.thread.status() == ThreadStatus::Error {
+                        let thread_state =
+                            lua.ref_thread_exec(|t| ffi::lua_tothread(t, self.thread.0.index));
+                        ffi::lua_resetthread(thread_state);
+                    }
+                }
             }
         }
     }

@@ -26,7 +26,7 @@ pub struct BenchmarkConfig {
 }
 
 /// Struct representing a partially-complete per-benchmark configuration.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub(crate) struct PartialBenchmarkConfig {
     pub(crate) confidence_level: Option<f64>,
     pub(crate) measurement_time: Option<Duration>,
@@ -37,22 +37,6 @@ pub(crate) struct PartialBenchmarkConfig {
     pub(crate) warm_up_time: Option<Duration>,
     pub(crate) sampling_mode: Option<SamplingMode>,
     pub(crate) plot_config: PlotConfiguration,
-}
-
-impl Default for PartialBenchmarkConfig {
-    fn default() -> Self {
-        PartialBenchmarkConfig {
-            confidence_level: None,
-            measurement_time: None,
-            noise_threshold: None,
-            nresamples: None,
-            sample_size: None,
-            significance_level: None,
-            warm_up_time: None,
-            plot_config: PlotConfiguration::default(),
-            sampling_mode: None,
-        }
-    }
 }
 
 impl PartialBenchmarkConfig {
@@ -80,6 +64,7 @@ pub(crate) struct NamedRoutine<T, M: Measurement = WallTime> {
 /// Structure representing a benchmark (or group of benchmarks)
 /// which take one parameter.
 #[doc(hidden)]
+#[allow(clippy::type_complexity)]
 #[deprecated(since = "0.3.4", note = "Please use BenchmarkGroups instead.")]
 pub struct ParameterizedBenchmark<T: Debug, M: Measurement = WallTime> {
     config: PartialBenchmarkConfig,
@@ -569,7 +554,7 @@ fn execute_benchmark<T, M>(
     T: Debug,
     M: Measurement,
 {
-    match c.mode {
+    match &c.mode {
         Mode::Benchmark => {
             if let Some(conn) = &c.connection {
                 if do_run {
@@ -606,7 +591,7 @@ fn execute_benchmark<T, M>(
                 c.report.test_pass(id, report_context);
             }
         }
-        Mode::Profile(duration) => {
+        &Mode::Profile(duration) => {
             if do_run {
                 routine.profile(&c.measurement, id, c, report_context, duration, parameter);
             }

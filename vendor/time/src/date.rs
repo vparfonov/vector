@@ -14,18 +14,17 @@ use crate::util::{days_in_year, days_in_year_month, is_leap_year, weeks_in_year}
 use crate::{error, Duration, Month, PrimitiveDateTime, Time, Weekday};
 
 /// The minimum valid year.
-#[cfg(feature = "large-dates")]
-pub(crate) const MIN_YEAR: i32 = -999_999;
+pub(crate) const MIN_YEAR: i32 = if cfg!(feature = "large-dates") {
+    -999_999
+} else {
+    -9999
+};
 /// The maximum valid year.
-#[cfg(feature = "large-dates")]
-pub(crate) const MAX_YEAR: i32 = 999_999;
-
-/// The minimum valid year.
-#[cfg(not(feature = "large-dates"))]
-pub(crate) const MIN_YEAR: i32 = -9999;
-/// The maximum valid year.
-#[cfg(not(feature = "large-dates"))]
-pub(crate) const MAX_YEAR: i32 = 9999;
+pub(crate) const MAX_YEAR: i32 = if cfg!(feature = "large-dates") {
+    999_999
+} else {
+    9999
+};
 
 /// Date in the proleptic Gregorian calendar.
 ///
@@ -39,7 +38,7 @@ pub struct Date {
     // |   2 bits   |        21 bits        |  9 bits   |
     // | unassigned |         year          |  ordinal  |
     // The year is 15 bits when `large-dates` is not enabled.
-    pub(crate) value: i32,
+    value: i32,
 }
 
 impl fmt::Debug for Date {
@@ -67,6 +66,11 @@ impl Date {
     /// guaranteed by the caller.
     #[doc(hidden)]
     pub const fn __from_ordinal_date_unchecked(year: i32, ordinal: u16) -> Self {
+        debug_assert!(year >= MIN_YEAR);
+        debug_assert!(year <= MAX_YEAR);
+        debug_assert!(ordinal != 0);
+        debug_assert!(ordinal <= days_in_year(year));
+
         Self {
             value: (year << 9) | ordinal as i32,
         }
@@ -196,24 +200,27 @@ impl Date {
     /// internally invalid value.
     #[doc(alias = "from_julian_date_unchecked")]
     pub(crate) const fn from_julian_day_unchecked(julian_day: i32) -> Self {
-        #![allow(trivial_numeric_casts)] // cast depends on type alias
-
-        /// A type that is either `i32` or `i64`. This subtle difference allows for optimization
-        /// based on the valid values.
-        #[cfg(feature = "large-dates")]
-        type MaybeWidened = i64;
-        #[allow(clippy::missing_docs_in_private_items)]
-        #[cfg(not(feature = "large-dates"))]
-        type MaybeWidened = i32;
+        debug_assert!(julian_day >= Self::MIN.to_julian_day());
+        debug_assert!(julian_day <= Self::MAX.to_julian_day());
 
         // To avoid a potential overflow, the value may need to be widened for some arithmetic.
 
         let z = julian_day - 1_721_119;
-        let g = 100 * z as MaybeWidened - 25;
-        let a = (g / 3_652_425) as i32;
-        let b = a - a / 4;
-        let mut year = div_floor!(100 * b as MaybeWidened + g, 36525) as i32;
-        let mut ordinal = (b + z - div_floor!(36525 * year as MaybeWidened, 100) as i32) as _;
+        let (mut year, mut ordinal) = if julian_day < -19_752_948 || julian_day > 23_195_514 {
+            let g = 100 * z as i64 - 25;
+            let a = (g / 3_652_425) as i32;
+            let b = a - a / 4;
+            let year = div_floor!(100 * b as i64 + g, 36525) as i32;
+            let ordinal = (b + z - div_floor!(36525 * year as i64, 100) as i32) as _;
+            (year, ordinal)
+        } else {
+            let g = 100 * z - 25;
+            let a = g / 3_652_425;
+            let b = a - a / 4;
+            let year = div_floor!(100 * b + g, 36525);
+            let ordinal = (b + z - div_floor!(36525 * year, 100)) as _;
+            (year, ordinal)
+        };
 
         if is_leap_year(year) {
             ordinal += 60;
@@ -451,7 +458,10 @@ impl Date {
             -3 | 4 => Weekday::Friday,
             -2 | 5 => Weekday::Saturday,
             -1 | 6 => Weekday::Sunday,
-            _ => Weekday::Monday,
+            val => {
+                debug_assert!(val == 0);
+                Weekday::Monday
+            }
         }
     }
 
@@ -664,6 +674,7 @@ impl Date {
         } else if duration.is_negative() {
             Self::MIN
         } else {
+            debug_assert!(duration.is_positive());
             Self::MAX
         }
     }
@@ -701,6 +712,7 @@ impl Date {
         } else if duration.is_negative() {
             Self::MAX
         } else {
+            debug_assert!(duration.is_positive());
             Self::MIN
         }
     }
@@ -726,15 +738,11 @@ impl Date {
 
         // Dates in January and February are unaffected by leap years.
         if ordinal <= 59 {
-            return Ok(Self {
-                value: year << 9 | ordinal as i32,
-            });
+            return Ok(Self::__from_ordinal_date_unchecked(year, ordinal));
         }
 
         match (is_leap_year(self.year()), is_leap_year(year)) {
-            (false, false) | (true, true) => Ok(Self {
-                value: year << 9 | ordinal as i32,
-            }),
+            (false, false) | (true, true) => Ok(Self::__from_ordinal_date_unchecked(year, ordinal)),
             // February 29 does not exist in common years.
             (true, false) if ordinal == 60 => Err(error::ComponentRange {
                 name: "day",
@@ -745,14 +753,10 @@ impl Date {
             }),
             // We're going from a common year to a leap year. Shift dates in March and later by
             // one day.
-            (false, true) => Ok(Self {
-                value: year << 9 | (ordinal + 1) as i32,
-            }),
+            (false, true) => Ok(Self::__from_ordinal_date_unchecked(year, ordinal + 1)),
             // We're going from a leap year to a common year. Shift dates in January and
             // February by one day.
-            (true, false) => Ok(Self {
-                value: year << 9 | (ordinal - 1) as i32,
-            }),
+            (true, false) => Ok(Self::__from_ordinal_date_unchecked(year, ordinal - 1)),
         }
     }
 

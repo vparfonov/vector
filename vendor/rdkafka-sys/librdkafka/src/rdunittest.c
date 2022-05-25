@@ -437,6 +437,7 @@ static int unittest_rdclock (void) {
 
 /**@}*/
 
+extern int unittest_string (void);
 extern int unittest_cgrp (void);
 #if WITH_SASL_SCRAM
 extern int unittest_scram (void);
@@ -451,10 +452,11 @@ int rd_unittest (void) {
                 int (*call) (void);
         } unittests[] = {
                 { "sysqueue",   unittest_sysqueue },
+                { "string",     unittest_string },
                 { "map",        unittest_map },
                 { "rdbuf",      unittest_rdbuf },
                 { "rdvarint",   unittest_rdvarint },
-                { "crc32c",     unittest_crc32c },
+                { "crc32c",     unittest_rd_crc32c },
                 { "msg",        unittest_msg },
                 { "murmurhash", unittest_murmur2 },
                 { "fnv1a",      unittest_fnv1a },

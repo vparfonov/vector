@@ -12,12 +12,16 @@
 [package]
 edition = "2018"
 name = "tracing-test"
-version = "0.2.1"
+version = "0.2.3"
 authors = ["Danilo Bargen <mail@dbrgn.ch>"]
-description = "Helper functions and macros that allow for easier testing of crates that use `tracing`.\n"
+description = """
+Helper functions and macros that allow for easier testing of crates that use `tracing`.
+"""
+readme = "../README.md"
 categories = ["development-tools::testing"]
 license = "MIT"
 repository = "https://github.com/dbrgn/tracing-test"
+
 [dependencies.lazy_static]
 version = "1.4"
 
@@ -30,13 +34,21 @@ features = ["env-filter"]
 
 [dependencies.tracing-test-macro]
 version = "0.2.1"
+
 [dev-dependencies.tokio]
 version = "1"
-features = ["rt-multi-thread", "macros"]
+features = [
+    "rt-multi-thread",
+    "macros",
+]
 
 [dev-dependencies.tracing]
 version = "0.1"
 features = ["std"]
 default-features = false
+
+[features]
+no-env-filter = ["tracing-test-macro/no-env-filter"]
+
 [badges.maintenance]
 status = "experimental"

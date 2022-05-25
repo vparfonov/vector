@@ -1,5 +1,14 @@
-use crate::imp;
-use imp::fd::{BorrowedFd, RawFd};
+//! The `cwd` function, representing the current working directory.
+//!
+//! # Safety
+//!
+//! This file uses `AT_FDCWD`, which is a raw file descriptor, but which is
+//! always valid.
+
+#![allow(unsafe_code)]
+
+use crate::backend;
+use backend::fd::{BorrowedFd, RawFd};
 
 /// `AT_FDCWD`—Returns a handle representing the current working directory.
 ///
@@ -14,15 +23,10 @@ use imp::fd::{BorrowedFd, RawFd};
 /// [POSIX]: https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/fcntl.h.html
 #[inline]
 #[doc(alias = "AT_FDCWD")]
-pub fn cwd() -> BorrowedFd<'static> {
-    let at_fdcwd = imp::io::AT_FDCWD as RawFd;
+pub const fn cwd() -> BorrowedFd<'static> {
+    let at_fdcwd = backend::io::types::AT_FDCWD as RawFd;
 
-    // # Safety
-    //
-    // `AT_FDCWD` is a reserved value that is never dynamically allocated, so
-    // it'll remain valid for the duration of `'static`.
-    #[allow(unsafe_code)]
-    unsafe {
-        BorrowedFd::<'static>::borrow_raw(at_fdcwd)
-    }
+    // Safety: `AT_FDCWD` is a reserved value that is never dynamically
+    // allocated, so it'll remain valid for the duration of `'static`.
+    unsafe { BorrowedFd::<'static>::borrow_raw(at_fdcwd) }
 }

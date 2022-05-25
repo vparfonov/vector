@@ -12,17 +12,23 @@
 [package]
 edition = "2018"
 name = "bytecheck"
-version = "0.6.8"
+version = "0.6.9"
 authors = ["David Koloski <djkoloski@gmail.com>"]
 description = "Derive macro for bytecheck"
 documentation = "https://docs.rs/bytecheck"
 readme = "crates-io.md"
-keywords = ["bytecheck", "validation", "zero-copy", "rkyv"]
+keywords = [
+    "bytecheck",
+    "validation",
+    "zero-copy",
+    "rkyv",
+]
 categories = ["encoding"]
 license = "MIT"
 repository = "https://github.com/djkoloski/bytecheck"
+
 [dependencies.bytecheck_derive]
-version = "=0.6.8"
+version = "=0.6.9"
 default-features = false
 
 [dependencies.ptr_meta]
@@ -41,5 +47,8 @@ optional = true
 [features]
 default = ["std"]
 simdutf8_std = ["simdutf8/std"]
-std = ["ptr_meta/std", "bytecheck_derive/std"]
+std = [
+    "ptr_meta/std",
+    "bytecheck_derive/std",
+]
 verbose = []

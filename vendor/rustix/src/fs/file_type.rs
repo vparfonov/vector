@@ -1,4 +1,4 @@
-use crate::imp;
+use crate::backend;
 
 /// `S_IF*` constants.
-pub use imp::fs::FileType;
+pub use backend::fs::types::FileType;

@@ -12,16 +12,25 @@
 [package]
 edition = "2018"
 name = "os_info"
-version = "3.2.0"
-authors = ["Jan Schulte <hello@unexpected-co.de>", "Stanislav Tkach <stanislav.tkach@gmail.com>"]
+version = "3.5.0"
+authors = [
+    "Jan Schulte <hello@unexpected-co.de>",
+    "Stanislav Tkach <stanislav.tkach@gmail.com>",
+]
 description = "Detect the operating system type and version."
 homepage = "https://github.com/stanislav-tkach/os_info"
 documentation = "https://docs.rs/os_info"
 readme = "README.md"
-keywords = ["os", "os_type", "os_version", "os_info"]
+keywords = [
+    "os",
+    "os_type",
+    "os_version",
+    "os_info",
+]
 categories = ["os"]
 license = "MIT"
 repository = "https://github.com/stanislav-tkach/os_info"
+
 [dependencies.log]
 version = "0.4.5"
 
@@ -29,6 +38,7 @@ version = "0.4.5"
 version = "1"
 features = ["derive"]
 optional = true
+
 [dev-dependencies.doc-comment]
 version = "0.3.1"
 
@@ -37,6 +47,18 @@ version = "1"
 
 [features]
 default = ["serde"]
+
 [target."cfg(windows)".dependencies.winapi]
 version = "0.3.8"
-features = ["minwindef", "ntdef", "ntstatus", "sysinfoapi", "winnt", "winuser", "libloaderapi", "processthreadsapi", "winerror", "winreg"]
+features = [
+    "minwindef",
+    "ntdef",
+    "ntstatus",
+    "sysinfoapi",
+    "winnt",
+    "winuser",
+    "libloaderapi",
+    "processthreadsapi",
+    "winerror",
+    "winreg",
+]

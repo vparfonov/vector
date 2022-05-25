@@ -1,3 +1,27 @@
+# Release 0.4.2 (2022-06-17)
+
+- [The new `ComplexFloat` trait][95] provides a generic abstraction between
+  floating-point `T` and `Complex<T>`.
+- [`Complex::exp` now handles edge cases with NaN and infinite parts][104].
+
+**Contributors**: @cuviper, @JorisDeRidder, @obsgolem, @YakoYakoYokuYoku
+
+[95]: https://github.com/rust-num/num-complex/pull/95
+[104]: https://github.com/rust-num/num-complex/pull/104
+
+# Release 0.4.1 (2022-04-29)
+
+- [`Complex::from_str_radix` now returns an error for radix > 18][90], because
+  'i' and 'j' as digits are ambiguous with _i_ or _j_ imaginary parts.
+- [`Complex<T>` now implements `bytemuck` traits when `T` does][100].
+- [`Complex::cis` creates a complex with the given phase][101], _e_<sup>_i_ θ</sup>.
+
+**Contributors**: @bluss, @bradleyharden, @cuviper, @rayhem
+
+[90]: https://github.com/rust-num/num-complex/pull/90
+[100]: https://github.com/rust-num/num-complex/pull/100
+[101]: https://github.com/rust-num/num-complex/pull/101
+
 # Release 0.4.0 (2021-03-05)
 
 - `rand` support has been updated to 0.8, requiring Rust 1.36.

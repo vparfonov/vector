@@ -13,12 +13,16 @@
 edition = "2021"
 rust-version = "1.56"
 name = "prettyplease"
-version = "0.1.10"
+version = "0.1.18"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
+links = "prettyplease01"
+exclude = ["cargo-expand"]
 autoexamples = false
 description = "A minimal `syn` syntax tree pretty-printer"
 documentation = "https://docs.rs/prettyplease"
 readme = "README.md"
+keywords = ["rustfmt"]
+categories = ["development-tools"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/dtolnay/prettyplease"
 resolver = "2"
@@ -36,3 +40,6 @@ default-features = false
 version = "1.0.90"
 features = ["parsing"]
 default-features = false
+
+[features]
+verbatim = ["syn/parsing"]

@@ -1,3 +1,4 @@
+
 <p align="center">
   <img src="https://raw.github.com/pest-parser/pest/master/pest-logo.svg?sanitize=true" width="80%"/>
 </p>
@@ -8,7 +9,7 @@
 [![Book](https://img.shields.io/badge/book-WIP-4d76ae.svg)](https://pest-parser.github.io/book)
 [![Docs](https://docs.rs/pest/badge.svg)](https://docs.rs/pest)
 
-[![Build Status](https://travis-ci.org/pest-parser/pest.svg?branch=master)](https://travis-ci.org/pest-parser/pest)
+[![pest Continuous Integration](https://github.com/pest-parser/pest/actions/workflows/ci.yml/badge.svg)](https://github.com/pest-parser/pest/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/pest-parser/pest/branch/master/graph/badge.svg)](https://codecov.io/gh/pest-parser/pest)
 [![Fuzzit Status](https://app.fuzzit.dev/badge?org_id=pest-parser)](https://app.fuzzit.dev/orgs/pest-parser/dashboard)
 [![Crates.io](https://img.shields.io/crates/d/pest.svg)](https://crates.io/crates/pest)
@@ -143,16 +144,18 @@ Digit:   2
 * [pest_meta](https://github.com/pest-parser/pest/blob/master/meta/src/grammar.pest) (bootstrapped)
 * [AshPaper](https://github.com/shnewto/ashpaper)
 * [brain](https://github.com/brain-lang/brain)
-* [Chelone](https://github.com/Aaronepower/chelone)
+* [cicada](https://github.com/mitnk/cicada)
 * [comrak](https://github.com/kivikakk/comrak)
 * [elastic-rs](https://github.com/cch123/elastic-rs)
 * [graphql-parser](https://github.com/Keats/graphql-parser)
 * [handlebars-rust](https://github.com/sunng87/handlebars-rust)
 * [hexdino](https://github.com/Luz/hexdino)
 * [Huia](https://gitlab.com/jimsy/huia/)
+* [insta](https://github.com/mitsuhiko/insta)
 * [jql](https://github.com/yamafaktory/jql)
 * [json5-rs](https://github.com/callum-oakley/json5-rs)
 * [mt940](https://github.com/svenstaro/mt940-rs)
+* [Myoxine](https://github.com/d3bate/myoxine)
 * [py_literal](https://github.com/jturner314/py_literal)
 * [rouler](https://github.com/jarcane/rouler)
 * [RuSh](https://github.com/lwandrebeck/RuSh)
@@ -162,6 +165,12 @@ Digit:   2
 * [ui_gen](https://github.com/emoon/ui_gen)
 * [ukhasnet-parser](https://github.com/adamgreig/ukhasnet-parser)
 * [ZoKrates](https://github.com/ZoKrates/ZoKrates)
+* [Vector](https://github.com/timberio/vector)
+* [AutoCorrect](https://github.com/huacnlee/autocorrect)
+* [yaml-peg](https://github.com/aofdev/yaml-peg)
+* [qubit](https://github.com/abhimanyu003/qubit)
+* [caith](https://github.com/Geobert/caith) (a dice roller crate)
+* [Melody](https://github.com/yoav-lavi/melody)
 
 ## Special thanks
 

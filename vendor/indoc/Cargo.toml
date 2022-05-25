@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.42"
 name = "indoc"
-version = "1.0.6"
+version = "1.0.7"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 description = "Indented document literals"
 documentation = "https://docs.rs/indoc"
@@ -24,6 +24,11 @@ keywords = [
     "multiline",
     "string",
     "literal",
+]
+categories = [
+    "rust-patterns",
+    "text-processing",
+    "no-std",
 ]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/dtolnay/indoc"

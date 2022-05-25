@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.31"
 name = "erased-serde"
-version = "0.3.20"
+version = "0.3.22"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 description = "Type-erased Serialize and Serializer traits"
 documentation = "https://docs.rs/erased-serde"
@@ -21,6 +21,11 @@ readme = "README.md"
 keywords = [
     "serde",
     "erasure",
+]
+categories = [
+    "encoding",
+    "rust-patterns",
+    "no-std",
 ]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/dtolnay/erased-serde"

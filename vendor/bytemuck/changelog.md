@@ -1,5 +1,20 @@
 # `bytemuck` changelog
 
+## 1.11
+
+* [WaffleLapkin](https://github.com/WaffleLapkin) added `wrap_box` and `peel_box`
+  to the `TransparentWrapperAlloc` trait. Default impls of these functions are
+  provided, and (as usual with the transparent trait stuff) you should not override
+  the default versions.
+
+## 1.10
+
+* [TheEdward162](https://github.com/TheEdward162) added the `ZeroableInOption`
+  and `PodInOption` traits. These are for types that are `Zeroable` or `Pod`
+  *when in an option*, but not on their own. We provide impls for the various
+  "NonZeroINTEGER" types in `core`, and if you need to newtype a NonZero value
+  then you can impl these traits when you use `repr(transparent)`.
+
 ## 1.9.1
 
 * Bumped the minimum `bytemuck_derive` dependency version from `1.0` to `1.1`.

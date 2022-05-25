@@ -1,3 +1,5 @@
+//! Tests for extreme `u64` file offsets.
+//!
 //! POSIX-ish interfaces tend to use signed integers for file offsets, while
 //! Rust APIs tend to use `u64`. Test that extreme `u64` values in APIs that
 //! take file offsets are properly diagnosed.
@@ -13,7 +15,7 @@ use rustix::io::SeekFrom;
 fn invalid_offset_seek() {
     use rustix::fs::{cwd, openat, seek, Mode, OFlags};
     let tmp = tempfile::tempdir().unwrap();
-    let dir = openat(&cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
+    let dir = openat(cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
     let file = openat(
         &dir,
         "foo",
@@ -31,16 +33,17 @@ fn invalid_offset_seek() {
 }
 
 #[cfg(not(any(
+    target_os = "dragonfly",
+    target_os = "illumos",
     target_os = "netbsd",
     target_os = "openbsd",
-    target_os = "ios",
-    target_os = "macos"
+    target_os = "redox",
 )))]
 #[test]
 fn invalid_offset_fallocate() {
     use rustix::fs::{cwd, fallocate, openat, FallocateFlags, Mode, OFlags};
     let tmp = tempfile::tempdir().unwrap();
-    let dir = openat(&cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
+    let dir = openat(cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
     let file = openat(
         &dir,
         "foo",
@@ -56,16 +59,19 @@ fn invalid_offset_fallocate() {
 }
 
 #[cfg(not(any(
-    target_os = "netbsd",
-    target_os = "openbsd",
+    target_os = "dragonfly",
+    target_os = "illumos",
     target_os = "ios",
     target_os = "macos",
+    target_os = "netbsd",
+    target_os = "openbsd",
+    target_os = "redox",
 )))]
 #[test]
 fn invalid_offset_fadvise() {
     use rustix::fs::{cwd, fadvise, openat, Advice, Mode, OFlags};
     let tmp = tempfile::tempdir().unwrap();
-    let dir = openat(&cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
+    let dir = openat(cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
     let file = openat(
         &dir,
         "foo",
@@ -97,7 +103,7 @@ fn invalid_offset_pread() {
     use rustix::fs::{cwd, openat, Mode, OFlags};
     use rustix::io::pread;
     let tmp = tempfile::tempdir().unwrap();
-    let dir = openat(&cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
+    let dir = openat(cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
     let file = openat(
         &dir,
         "foo",
@@ -106,7 +112,7 @@ fn invalid_offset_pread() {
     )
     .unwrap();
 
-    let mut buf = [0_u8; 1_usize];
+    let mut buf = [0_u8; 1];
     pread(&file, &mut buf, u64::MAX).unwrap_err();
     pread(&file, &mut buf, i64::MAX as u64 + 1).unwrap_err();
 }
@@ -117,7 +123,7 @@ fn invalid_offset_pwrite() {
     use rustix::fs::{cwd, openat, Mode, OFlags};
     use rustix::io::pwrite;
     let tmp = tempfile::tempdir().unwrap();
-    let dir = openat(&cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
+    let dir = openat(cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
     let file = openat(
         &dir,
         "foo",
@@ -126,7 +132,7 @@ fn invalid_offset_pwrite() {
     )
     .unwrap();
 
-    let buf = [0_u8; 1_usize];
+    let buf = [0_u8; 1];
     pwrite(&file, &buf, u64::MAX).unwrap_err();
     pwrite(&file, &buf, i64::MAX as u64 + 1).unwrap_err();
 }
@@ -137,7 +143,7 @@ fn invalid_offset_copy_file_range() {
     use rustix::fs::{copy_file_range, cwd, openat, Mode, OFlags};
     use rustix::io::write;
     let tmp = tempfile::tempdir().unwrap();
-    let dir = openat(&cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
+    let dir = openat(cwd(), tmp.path(), OFlags::RDONLY, Mode::empty()).unwrap();
     let foo = openat(
         &dir,
         "foo",

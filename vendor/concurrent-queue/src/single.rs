@@ -29,7 +29,8 @@ impl<T> Single<T> {
         // Lock and fill the slot.
         let state = self
             .state
-            .compare_and_swap(0, LOCKED | PUSHED, Ordering::SeqCst);
+            .compare_exchange(0, LOCKED | PUSHED, Ordering::SeqCst, Ordering::SeqCst)
+            .unwrap_or_else(|x| x);
 
         if state == 0 {
             // Write the value and unlock.
@@ -48,9 +49,15 @@ impl<T> Single<T> {
         let mut state = PUSHED;
         loop {
             // Lock and empty the slot.
-            let prev =
-                self.state
-                    .compare_and_swap(state, (state | LOCKED) & !PUSHED, Ordering::SeqCst);
+            let prev = self
+                .state
+                .compare_exchange(
+                    state,
+                    (state | LOCKED) & !PUSHED,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                )
+                .unwrap_or_else(|x| x);
 
             if prev == state {
                 // Read the value and unlock.
@@ -113,8 +120,10 @@ impl<T> Drop for Single<T> {
     fn drop(&mut self) {
         // Drop the value in the slot.
         if *self.state.get_mut() & PUSHED != 0 {
-            let value = unsafe { self.slot.get().read().assume_init() };
-            drop(value);
+            unsafe {
+                let value = &mut *self.slot.get();
+                value.as_mut_ptr().drop_in_place();
+            }
         }
     }
 }

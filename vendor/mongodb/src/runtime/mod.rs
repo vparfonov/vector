@@ -10,6 +10,7 @@ mod sync_read_ext;
 mod tls_openssl;
 #[cfg_attr(feature = "openssl-tls", allow(unused))]
 mod tls_rustls;
+mod worker_handle;
 
 use std::{future::Future, net::SocketAddr, time::Duration};
 
@@ -19,6 +20,7 @@ pub(crate) use self::{
     resolver::AsyncResolver,
     stream::AsyncStream,
     sync_read_ext::SyncLittleEndianRead,
+    worker_handle::{WorkerHandle, WorkerHandleListener},
 };
 use crate::{error::Result, options::ServerAddress};
 pub(crate) use http::HttpClient;
@@ -90,17 +92,6 @@ where
     {
         async_std::task::block_on(fut)
     }
-}
-
-/// Run a future in the foreground, blocking on it completing.
-/// This does not notify the runtime that it will be blocking and should only be used for
-/// operations that will immediately (or quickly) succeed.
-pub(crate) fn block_in_place<F, T>(fut: F) -> T
-where
-    F: Future<Output = T> + Send,
-    T: Send,
-{
-    futures_executor::block_on(fut)
 }
 
 /// Delay for the specified duration.

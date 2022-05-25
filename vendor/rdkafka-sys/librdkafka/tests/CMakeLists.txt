@@ -113,6 +113,10 @@ set(
     0119-consumer_auth.cpp
     0120-asymmetric_subscription.c
     0121-clusterid.c
+    0122-buffer_cleaning_after_rebalance.c
+    0123-connections_max_idle.c
+    0124-openssl_invalid_engine.c
+    0125-immediate_flush.c
     8000-idle.cpp
     test.c
     testcpp.cpp

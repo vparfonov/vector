@@ -8,7 +8,6 @@
 #![no_std]
 #![allow(coherence_leak_check)]
 #![doc(html_root_url = "https://docs.rs/wasm-bindgen/0.2")]
-#![cfg_attr(feature = "nightly", feature(unsize))]
 
 use core::convert::TryFrom;
 use core::fmt;
@@ -352,7 +351,7 @@ impl JsValue {
 
     /// Applies the binary `in` JS operator on the two `JsValue`s.
     ///
-    /// [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/typeof)
+    /// [MDN documentation](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/in)
     #[inline]
     pub fn js_in(&self, obj: &JsValue) -> bool {
         unsafe { __wbindgen_in(self.idx, obj.idx) == 1 }
@@ -868,7 +867,38 @@ macro_rules! big_numbers {
     )*)
 }
 
-big_numbers! { i64 u64 i128 u128 isize usize }
+big_numbers! { i64 u64 i128 u128 }
+
+// `usize` and `isize` have to be treated a bit specially, because we know that
+// they're 32-bit but the compiler conservatively assumes they might be bigger.
+// So, we have to manually forward to the `u32`/`i32` versions.
+impl PartialEq<usize> for JsValue {
+    #[inline]
+    fn eq(&self, other: &usize) -> bool {
+        *self == (*other as u32)
+    }
+}
+
+impl From<usize> for JsValue {
+    #[inline]
+    fn from(n: usize) -> Self {
+        Self::from(n as u32)
+    }
+}
+
+impl PartialEq<isize> for JsValue {
+    #[inline]
+    fn eq(&self, other: &isize) -> bool {
+        *self == (*other as i32)
+    }
+}
+
+impl From<isize> for JsValue {
+    #[inline]
+    fn from(n: isize) -> Self {
+        Self::from(n as i32)
+    }
+}
 
 externs! {
     #[link(wasm_import_module = "__wbindgen_placeholder__")]

@@ -11,7 +11,7 @@
 
 [package]
 name = "fixedbitset"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["bluss"]
 description = "FixedBitSet is a simple bitset collection"
 documentation = "https://docs.rs/fixedbitset/"

@@ -1,6 +1,6 @@
 use crate::io;
 use core::mem::MaybeUninit;
-use winapi::um::winsock2::{WSACleanup, WSAGetLastError, WSAStartup, WSADATA};
+use windows_sys::Win32::Networking::WinSock::{WSACleanup, WSAData, WSAGetLastError, WSAStartup};
 
 /// `WSAStartup()`—Initialize process-wide Windows support for sockets.
 ///
@@ -11,7 +11,7 @@ use winapi::um::winsock2::{WSACleanup, WSAGetLastError, WSAStartup, WSADATA};
 ///  - [Winsock2]
 ///
 /// [Winsock2]: https://docs.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsastartup
-pub fn wsa_startup() -> io::Result<WSADATA> {
+pub fn wsa_startup() -> io::Result<WSAData> {
     // Request version 2.2, which has been the latest version since far older
     // versions of Windows than we support here. For more information about
     // the version, see [here].
@@ -24,7 +24,7 @@ pub fn wsa_startup() -> io::Result<WSADATA> {
         if ret == 0 {
             Ok(data.assume_init())
         } else {
-            Err(io::Error::from_raw_os_error(WSAGetLastError()))
+            Err(io::Errno::from_raw_os_error(WSAGetLastError()))
         }
     }
 }
@@ -43,7 +43,7 @@ pub fn wsa_cleanup() -> io::Result<()> {
         if WSACleanup() == 0 {
             Ok(())
         } else {
-            Err(io::Error::from_raw_os_error(WSAGetLastError()))
+            Err(io::Errno::from_raw_os_error(WSAGetLastError()))
         }
     }
 }

@@ -386,9 +386,9 @@ impl Client {
                 self.inner
                     .topology
                     .handle_application_error(
+                        server.address.clone(),
                         err.clone(),
                         HandshakePhase::after_completion(&conn),
-                        &server,
                     )
                     .await;
                 // release the connection to be processed by the connection pool
@@ -448,9 +448,9 @@ impl Client {
                 self.inner
                     .topology
                     .handle_application_error(
+                        server.address.clone(),
                         err.clone(),
                         HandshakePhase::after_completion(&conn),
-                        &server,
                     )
                     .await;
                 drop(server);
@@ -480,10 +480,11 @@ impl Client {
         let stream_description = connection.stream_description()?;
         let is_sharded = stream_description.initial_server_type == ServerType::Mongos;
         let mut cmd = op.build(stream_description)?;
-        self.inner
-            .topology
-            .update_command_with_read_pref(connection.address(), &mut cmd, op.selection_criteria())
-            .await;
+        self.inner.topology.update_command_with_read_pref(
+            connection.address(),
+            &mut cmd,
+            op.selection_criteria(),
+        );
 
         match session {
             Some(ref mut session) if op.supports_sessions() && op.is_acknowledged() => {
@@ -577,7 +578,7 @@ impl Client {
         }
 
         let session_cluster_time = session.as_ref().and_then(|session| session.cluster_time());
-        let client_cluster_time = self.inner.topology.cluster_time().await;
+        let client_cluster_time = self.inner.topology.cluster_time();
         let max_cluster_time = std::cmp::max(session_cluster_time, client_cluster_time.as_ref());
         if let Some(cluster_time) = max_cluster_time {
             cmd.set_cluster_time(cluster_time);
@@ -778,7 +779,7 @@ impl Client {
     }
 
     async fn select_data_bearing_server(&self) -> Result<()> {
-        let topology_type = self.inner.topology.topology_type().await;
+        let topology_type = self.inner.topology.topology_type();
         let criteria = SelectionCriteria::Predicate(Arc::new(move |server_info| {
             let server_type = server_info.server_type();
             (matches!(topology_type, TopologyType::Single) && server_type.is_available())
@@ -792,14 +793,14 @@ impl Client {
     /// session timeout. If it has yet to be determined if the topology supports sessions, this
     /// method will perform a server selection that will force that determination to be made.
     pub(crate) async fn get_session_support_status(&self) -> Result<SessionSupportStatus> {
-        let initial_status = self.inner.topology.session_support_status().await;
+        let initial_status = self.inner.topology.session_support_status();
 
         // Need to guarantee that we're connected to at least one server that can determine if
         // sessions are supported or not.
         match initial_status {
             SessionSupportStatus::Undetermined => {
                 self.select_data_bearing_server().await?;
-                Ok(self.inner.topology.session_support_status().await)
+                Ok(self.inner.topology.session_support_status())
             }
             _ => Ok(initial_status),
         }
@@ -809,14 +810,14 @@ impl Client {
     /// topology supports transactions, this method will perform a server selection that will force
     /// that determination to be made.
     pub(crate) async fn transaction_support_status(&self) -> Result<TransactionSupportStatus> {
-        let initial_status = self.inner.topology.transaction_support_status().await;
+        let initial_status = self.inner.topology.transaction_support_status();
 
         // Need to guarantee that we're connected to at least one server that can determine if
         // sessions are supported or not.
         match initial_status {
             TransactionSupportStatus::Undetermined => {
                 self.select_data_bearing_server().await?;
-                Ok(self.inner.topology.transaction_support_status().await)
+                Ok(self.inner.topology.transaction_support_status())
             }
             _ => Ok(initial_status),
         }
@@ -875,7 +876,10 @@ impl Client {
         session: &mut Option<&mut ClientSession>,
     ) {
         if let Some(ref cluster_time) = cluster_time {
-            self.inner.topology.advance_cluster_time(cluster_time).await;
+            self.inner
+                .topology
+                .advance_cluster_time(cluster_time.clone())
+                .await;
             if let Some(ref mut session) = session {
                 session.advance_cluster_time(cluster_time)
             }

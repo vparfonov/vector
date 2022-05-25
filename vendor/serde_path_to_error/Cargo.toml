@@ -13,10 +13,15 @@
 edition = "2018"
 rust-version = "1.31"
 name = "serde_path_to_error"
-version = "0.1.7"
+version = "0.1.8"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 description = "Path to the element that failed to deserialize"
 readme = "README.md"
+keywords = [
+    "serde",
+    "serialization",
+]
+categories = ["encoding"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/dtolnay/path-to-error"
 

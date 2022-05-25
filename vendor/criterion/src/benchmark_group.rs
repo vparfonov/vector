@@ -304,7 +304,7 @@ impl<'a, M: Measurement> BenchmarkGroup<'a, M> {
         self.any_matched |= do_run;
         let mut func = Function::new(f);
 
-        match self.criterion.mode {
+        match &self.criterion.mode {
             Mode::Benchmark => {
                 if let Some(conn) = &self.criterion.connection {
                     if do_run {
@@ -340,7 +340,7 @@ impl<'a, M: Measurement> BenchmarkGroup<'a, M> {
                     self.criterion.report.test_pass(&id, &report_context);
                 }
             }
-            Mode::Profile(duration) => {
+            &Mode::Profile(duration) => {
                 if do_run {
                     func.profile(
                         &self.criterion.measurement,
@@ -486,9 +486,10 @@ impl IntoBenchmarkId for BenchmarkId {
 impl<S: Into<String>> IntoBenchmarkId for S {
     fn into_benchmark_id(self) -> BenchmarkId {
         let function_name = self.into();
-        if function_name.is_empty() {
-            panic!("Function name must not be empty.");
-        }
+        assert!(
+            !function_name.is_empty(),
+            "Function name must not be empty."
+        );
 
         BenchmarkId {
             function_name: Some(function_name),

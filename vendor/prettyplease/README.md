@@ -3,7 +3,7 @@ prettyplease::unparse
 
 [<img alt="github" src="https://img.shields.io/badge/github-dtolnay/prettyplease-8da0cb?style=for-the-badge&labelColor=555555&logo=github" height="20">](https://github.com/dtolnay/prettyplease)
 [<img alt="crates.io" src="https://img.shields.io/crates/v/prettyplease.svg?style=for-the-badge&color=fc8d62&logo=rust" height="20">](https://crates.io/crates/prettyplease)
-[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-prettyplease-66c2a5?style=for-the-badge&labelColor=555555&logoColor=white&logo=data:image/svg+xml;base64,PHN2ZyByb2xlPSJpbWciIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgdmlld0JveD0iMCAwIDUxMiA1MTIiPjxwYXRoIGZpbGw9IiNmNWY1ZjUiIGQ9Ik00ODguNiAyNTAuMkwzOTIgMjE0VjEwNS41YzAtMTUtOS4zLTI4LjQtMjMuNC0zMy43bC0xMDAtMzcuNWMtOC4xLTMuMS0xNy4xLTMuMS0yNS4zIDBsLTEwMCAzNy41Yy0xNC4xIDUuMy0yMy40IDE4LjctMjMuNCAzMy43VjIxNGwtOTYuNiAzNi4yQzkuMyAyNTUuNSAwIDI2OC45IDAgMjgzLjlWMzk0YzAgMTMuNiA3LjcgMjYuMSAxOS45IDMyLjJsMTAwIDUwYzEwLjEgNS4xIDIyLjEgNS4xIDMyLjIgMGwxMDMuOS01MiAxMDMuOSA1MmMxMC4xIDUuMSAyMi4xIDUuMSAzMi4yIDBsMTAwLTUwYzEyLjItNi4xIDE5LjktMTguNiAxOS45LTMyLjJWMjgzLjljMC0xNS05LjMtMjguNC0yMy40LTMzLjd6TTM1OCAyMTQuOGwtODUgMzEuOXYtNjguMmw4NS0zN3Y3My4zek0xNTQgMTA0LjFsMTAyLTM4LjIgMTAyIDM4LjJ2LjZsLTEwMiA0MS40LTEwMi00MS40di0uNnptODQgMjkxLjFsLTg1IDQyLjV2LTc5LjFsODUtMzguOHY3NS40em0wLTExMmwtMTAyIDQxLjQtMTAyLTQxLjR2LS42bDEwMi0zOC4yIDEwMiAzOC4ydi42em0yNDAgMTEybC04NSA0Mi41di03OS4xbDg1LTM4Ljh2NzUuNHptMC0xMTJsLTEwMiA0MS40LTEwMi00MS40di0uNmwxMDItMzguMiAxMDIgMzguMnYuNnoiPjwvcGF0aD48L3N2Zz4K" height="20">](https://docs.rs/prettyplease)
+[<img alt="docs.rs" src="https://img.shields.io/badge/docs.rs-prettyplease-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs" height="20">](https://docs.rs/prettyplease)
 [<img alt="build status" src="https://img.shields.io/github/workflow/status/dtolnay/prettyplease/CI/master?style=for-the-badge" height="20">](https://github.com/dtolnay/prettyplease/actions?query=branch%3Amaster)
 
 A minimal `syn` syntax tree pretty-printer.
@@ -48,16 +48,16 @@ pretty-printer built into rustc, and rustfmt. The sections below go into more
 detail comparing the output of each of these libraries.
 
 | | prettyplease | rustc | rustfmt |
-| --- | --- | --- | --- |
-| non-pathological behavior on big or generated code | ✔️ | ❌ | ❌ |
-| idiomatic modern formatting ("locally indistinguishable from rustfmt") | ✔️ | ❌ | ✔️ |
+|:---|:---:|:---:|:---:|
+| non-pathological behavior on big or generated code | 💚 | ❌ | ❌ |
+| idiomatic modern formatting ("locally indistinguishable from rustfmt") | 💚 | ❌ | 💚 |
 | throughput | 60 MB/s | 39 MB/s | 2.8 MB/s |
 | number of dependencies | 3 | 72 | 66 |
 | compile time including dependencies | 2.4 sec | 23.1 sec | 29.8 sec |
-| buildable using a stable Rust compiler | ✔️ | ❌ | ❌ |
-| published to crates.io | ✔️ | ❌ | ❌ |
-| extensively configurable output | ❌ | ❌ | ✔️ |
-| intended to accommodate hand-maintained source code | ❌ | ❌ | ✔️ |
+| buildable using a stable Rust compiler | 💚 | ❌ | ❌ |
+| published to crates.io | 💚 | ❌ | ❌ |
+| extensively configurable output | ❌ | ❌ | 💚 |
+| intended to accommodate hand-maintained source code | ❌ | ❌ | 💚 |
 
 <br>
 

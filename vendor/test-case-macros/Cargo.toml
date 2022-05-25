@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "test-case-macros"
-version = "2.1.0"
+version = "2.2.1"
 authors = [
     "Marcin Sas-Szymanski <marcin.sas-szymanski@anixe.pl>",
     "Wojciech Polak <frondeus@gmail.com>",

@@ -6,6 +6,7 @@
 // license <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
+#![no_std]
 
 //! # pest. The Elegant Parser
 //!
@@ -63,6 +64,9 @@
 
 #![doc(html_root_url = "https://docs.rs/pest")]
 
+extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std;
 extern crate ucd_trie;
 
 #[cfg(feature = "pretty-print")]
@@ -70,13 +74,13 @@ extern crate serde;
 #[cfg(feature = "pretty-print")]
 extern crate serde_json;
 
-pub use parser::Parser;
-pub use parser_state::{state, Atomicity, Lookahead, MatchDir, ParseResult, ParserState};
-pub use position::Position;
-pub use span::{Lines, Span};
-use std::fmt::Debug;
-use std::hash::Hash;
-pub use token::Token;
+pub use crate::parser::Parser;
+pub use crate::parser_state::{state, Atomicity, Lookahead, MatchDir, ParseResult, ParserState};
+pub use crate::position::Position;
+pub use crate::span::{Lines, Span};
+pub use crate::token::Token;
+use core::fmt::Debug;
+use core::hash::Hash;
 
 pub mod error;
 pub mod iterators;

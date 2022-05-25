@@ -1,11 +1,11 @@
 //! Low-level implementation details for libc-like runtime libraries such as
 //! [origin].
 //!
-//! These functions are for implementing thread-local storage (TLS),
-//! managing threads, loaded libraries, and other process-wide resources.
-//! Most of `rustix` doesn't care about what other libraries are linked into
-//! the program or what they're doing, but the features in this module
-//! generally can only be used by one entity within a process.
+//! These functions are for implementing thread-local storage (TLS), managing
+//! threads, loaded libraries, and other process-wide resources. Most of
+//! `rustix` doesn't care about what other libraries are linked into the
+//! program or what they're doing, but the features in this module generally
+//! can only be used by one entity within a process.
 //!
 //! The API for these functions is not stable, and this module is
 //! `doc(hidden)`.
@@ -14,51 +14,50 @@
 //!
 //! # Safety
 //!
-//! This module is intended to be used for implementing a runtime library
-//! such as libc. Use of these features for any other purpose is likely
-//! to create serious problems.
-
+//! This module is intended to be used for implementing a runtime library such
+//! as libc. Use of these features for any other purpose is likely to create
+//! serious problems.
 #![allow(unsafe_code)]
 
+use crate::backend;
 #[cfg(linux_raw)]
-use crate::ffi::ZStr;
+use crate::ffi::CStr;
 #[cfg(linux_raw)]
 use crate::fs::AtFlags;
-use crate::imp;
 #[cfg(linux_raw)]
 use crate::io;
 #[cfg(linux_raw)]
 use crate::process::Pid;
 #[cfg(linux_raw)]
-use core::ffi::c_void;
+use backend::fd::AsFd;
 #[cfg(linux_raw)]
-use imp::fd::AsFd;
+use core::ffi::c_void;
 
 #[cfg(linux_raw)]
 #[cfg(target_arch = "x86")]
 #[inline]
 pub unsafe fn set_thread_area(u_info: &mut UserDesc) -> io::Result<()> {
-    imp::syscalls::tls::set_thread_area(u_info)
+    backend::runtime::syscalls::tls::set_thread_area(u_info)
 }
 
 #[cfg(linux_raw)]
 #[cfg(target_arch = "arm")]
 #[inline]
 pub unsafe fn arm_set_tls(data: *mut c_void) -> io::Result<()> {
-    imp::syscalls::tls::arm_set_tls(data)
+    backend::runtime::syscalls::tls::arm_set_tls(data)
 }
 
 #[cfg(linux_raw)]
 #[cfg(target_arch = "x86_64")]
 #[inline]
 pub unsafe fn set_fs(data: *mut c_void) {
-    imp::syscalls::tls::set_fs(data)
+    backend::runtime::syscalls::tls::set_fs(data)
 }
 
 #[cfg(linux_raw)]
 #[inline]
 pub unsafe fn set_tid_address(data: *mut c_void) -> Pid {
-    imp::syscalls::tls::set_tid_address(data)
+    backend::runtime::syscalls::tls::set_tid_address(data)
 }
 
 /// `prctl(PR_SET_NAME, name)`
@@ -74,13 +73,13 @@ pub unsafe fn set_tid_address(data: *mut c_void) -> Pid {
 /// [Linux]: https://man7.org/linux/man-pages/man2/prctl.2.html
 #[cfg(linux_raw)]
 #[inline]
-pub unsafe fn set_thread_name(name: &ZStr) -> io::Result<()> {
-    imp::syscalls::tls::set_thread_name(name)
+pub unsafe fn set_thread_name(name: &CStr) -> io::Result<()> {
+    backend::runtime::syscalls::tls::set_thread_name(name)
 }
 
 #[cfg(linux_raw)]
 #[cfg(target_arch = "x86")]
-pub use imp::thread::tls::UserDesc;
+pub use backend::runtime::tls::UserDesc;
 
 /// `syscall(SYS_exit, status)`—Exit the current thread.
 ///
@@ -90,16 +89,16 @@ pub use imp::thread::tls::UserDesc;
 #[cfg(linux_raw)]
 #[inline]
 pub unsafe fn exit_thread(status: i32) -> ! {
-    imp::syscalls::tls::exit_thread(status)
+    backend::runtime::syscalls::tls::exit_thread(status)
 }
 
 /// Exit all the threads in the current process' thread group.
 ///
 /// This is equivalent to `_exit` and `_Exit` in libc.
 ///
-/// Note that this does not all any `__cxa_atexit`, `atexit`, or any other
-/// destructors. Most programs should use [`std::process::exit`] instead
-/// of calling this directly.
+/// This does not all any `__cxa_atexit`, `atexit`, or any other destructors.
+/// Most programs should use [`std::process::exit`] instead of calling this
+/// directly.
 ///
 /// # References
 ///  - [POSIX `_Exit`]
@@ -113,7 +112,7 @@ pub unsafe fn exit_thread(status: i32) -> ! {
 #[doc(alias = "_Exit")]
 #[inline]
 pub fn exit_group(status: i32) -> ! {
-    imp::process::syscalls::exit_group(status)
+    backend::process::syscalls::exit_group(status)
 }
 
 /// Return fields from the main executable segment headers ("phdrs") relevant
@@ -121,7 +120,7 @@ pub fn exit_group(status: i32) -> ! {
 #[cfg(linux_raw)]
 #[inline]
 pub fn startup_tls_info() -> StartupTlsInfo {
-    imp::thread::tls::startup_tls_info()
+    backend::runtime::tls::startup_tls_info()
 }
 
 /// `(getauxval(AT_PHDR), getauxval(AT_PHNUM))`—Returns the address and
@@ -135,11 +134,11 @@ pub fn startup_tls_info() -> StartupTlsInfo {
 #[cfg(any(target_os = "android", target_os = "linux"))]
 #[inline]
 pub fn exe_phdrs() -> (*const c_void, usize) {
-    imp::process::exe_phdrs()
+    backend::param::auxv::exe_phdrs()
 }
 
 #[cfg(linux_raw)]
-pub use imp::thread::tls::StartupTlsInfo;
+pub use backend::runtime::tls::StartupTlsInfo;
 
 /// `fork()`—Creates a new process by duplicating the calling process.
 ///
@@ -220,10 +219,10 @@ pub use imp::thread::tls::StartupTlsInfo;
 /// [async-signal-safe]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tag_15_04_03
 #[cfg(linux_raw)]
 pub unsafe fn fork() -> io::Result<Option<Pid>> {
-    imp::syscalls::fork()
+    backend::runtime::syscalls::fork()
 }
 
-/// `execveat(dirfd, path.as_z_str(), argv, envp, flags)`—Execute a new
+/// `execveat(dirfd, path.as_c_str(), argv, envp, flags)`—Execute a new
 /// command using the current process.
 ///
 /// # Safety
@@ -235,19 +234,19 @@ pub unsafe fn fork() -> io::Result<Option<Pid>> {
 ///  - [Linux]
 ///
 /// [Linux]: https://man7.org/linux/man-pages/man2/execveat.2.html
-#[inline]
 #[cfg(linux_raw)]
+#[inline]
 pub unsafe fn execveat<Fd: AsFd>(
     dirfd: Fd,
-    path: &ZStr,
+    path: &CStr,
     argv: *const *const u8,
     envp: *const *const u8,
     flags: AtFlags,
-) -> io::Error {
-    imp::syscalls::execveat(dirfd.as_fd(), path, argv, envp, flags)
+) -> io::Errno {
+    backend::runtime::syscalls::execveat(dirfd.as_fd(), path, argv, envp, flags)
 }
 
-/// `execve(path.as_z_str(), argv, envp)`—Execute a new command using the
+/// `execve(path.as_c_str(), argv, envp)`—Execute a new command using the
 /// current process.
 ///
 /// # Safety
@@ -259,8 +258,8 @@ pub unsafe fn execveat<Fd: AsFd>(
 ///  - [Linux]
 ///
 /// [Linux]: https://man7.org/linux/man-pages/man2/execve.2.html
-#[inline]
 #[cfg(linux_raw)]
-pub unsafe fn execve(path: &ZStr, argv: *const *const u8, envp: *const *const u8) -> io::Error {
-    imp::syscalls::execve(path, argv, envp)
+#[inline]
+pub unsafe fn execve(path: &CStr, argv: *const *const u8, envp: *const *const u8) -> io::Errno {
+    backend::runtime::syscalls::execve(path, argv, envp)
 }

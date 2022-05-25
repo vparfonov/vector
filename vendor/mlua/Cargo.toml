@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "mlua"
-version = "0.8.0"
+version = "0.8.3"
 authors = [
     "Aleksandr Orlenko <zxteam@pm.me>",
     "kyren <catherine@chucklefish.org>",
@@ -171,7 +171,7 @@ version = "0.11"
 features = ["json"]
 
 [dev-dependencies.rustyline]
-version = "9.0"
+version = "10.0"
 
 [dev-dependencies.serde]
 version = "1.0"
@@ -202,7 +202,7 @@ version = ">= 210.4.0, < 220.0.0"
 optional = true
 
 [build-dependencies.luau0-src]
-version = "0.3.2"
+version = "0.3.6"
 optional = true
 
 [build-dependencies.pkg-config]

@@ -4,6 +4,7 @@ mod test;
 mod resolver_config;
 
 use std::{
+    cmp::Ordering,
     collections::HashSet,
     convert::TryFrom,
     fmt::{self, Display, Formatter},
@@ -16,12 +17,7 @@ use std::{
 
 use derivative::Derivative;
 use lazy_static::lazy_static;
-use serde::{
-    de::{Error, Unexpected},
-    Deserialize,
-    Deserializer,
-    Serialize,
-};
+use serde::{de::Unexpected, Deserialize, Deserializer, Serialize};
 use serde_with::skip_serializing_none;
 use strsim::jaro_winkler;
 use typed_builder::TypedBuilder;
@@ -34,10 +30,10 @@ use crate::{
     client::auth::{AuthMechanism, Credential},
     compression::Compressor,
     concern::{Acknowledgment, ReadConcern, WriteConcern},
-    error::{ErrorKind, Result},
+    error::{Error, ErrorKind, Result},
     event::{cmap::CmapEventHandler, command::CommandEventHandler, sdam::SdamEventHandler},
     options::ReadConcernLevel,
-    sdam::MIN_HEARTBEAT_FREQUENCY,
+    sdam::{DEFAULT_HEARTBEAT_FREQUENCY, IDLE_WRITE_PERIOD, MIN_HEARTBEAT_FREQUENCY},
     selection_criteria::{ReadPreference, SelectionCriteria, TagSet},
     srv::{OriginalSrvInfo, SrvResolver},
 };
@@ -122,7 +118,8 @@ impl<'de> Deserialize<'de> for ServerAddress {
         D: Deserializer<'de>,
     {
         let s: String = Deserialize::deserialize(deserializer)?;
-        Self::parse(s.as_str()).map_err(|e| D::Error::custom(format!("{}", e)))
+        Self::parse(s.as_str())
+            .map_err(|e| <D::Error as serde::de::Error>::custom(format!("{}", e)))
     }
 }
 
@@ -164,7 +161,7 @@ impl Hash for ServerAddress {
 }
 
 impl FromStr for ServerAddress {
-    type Err = crate::error::Error;
+    type Err = Error;
     fn from_str(address: &str) -> Result<Self> {
         ServerAddress::parse(address)
     }
@@ -280,7 +277,7 @@ pub enum ServerApiVersion {
 }
 
 impl FromStr for ServerApiVersion {
-    type Err = crate::error::Error;
+    type Err = Error;
 
     fn from_str(str: &str) -> Result<Self> {
         match str {
@@ -308,13 +305,14 @@ impl<'de> Deserialize<'de> for ServerApiVersion {
     {
         let s = String::deserialize(deserializer)?;
 
-        ServerApiVersion::from_str(&s)
-            .map_err(|_| Error::invalid_value(Unexpected::Str(&s), &"a valid version number"))
+        ServerApiVersion::from_str(&s).map_err(|_| {
+            serde::de::Error::invalid_value(Unexpected::Str(&s), &"a valid version number")
+        })
     }
 }
 
 /// Options used to declare a stable server API.  For more information, see the [Stable API](
-/// https://docs.mongodb.com/v5.0/reference/stable-api/) manual page.
+/// https://www.mongodb.com/docs/v5.0/reference/stable-api/) manual page.
 #[serde_with::skip_serializing_none]
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, TypedBuilder)]
 #[builder(field_defaults(setter(into)))]
@@ -502,7 +500,7 @@ pub struct ClientOptions {
     /// a separate client that declares the appropriate API version.
     ///
     /// For more information, see the [Stable API](
-    /// https://docs.mongodb.com/v5.0/reference/stable-api/) manual page.
+    /// https://www.mongodb.com/docs/v5.0/reference/stable-api/) manual page.
     #[builder(default)]
     pub server_api: Option<ServerApi>,
 
@@ -540,6 +538,7 @@ pub struct ClientOptions {
     #[derivative(Debug = "ignore")]
     pub(crate) original_srv_info: Option<OriginalSrvInfo>,
 
+    #[cfg(test)]
     #[builder(default, setter(skip))]
     #[derivative(Debug = "ignore")]
     pub(crate) original_uri: Option<String>,
@@ -675,41 +674,186 @@ impl Serialize for ClientOptions {
     }
 }
 
+/// Contains the options that can be set via a MongoDB connection string.
+///
+/// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
 #[derive(Debug, Default, PartialEq)]
-struct ClientOptionsParser {
-    pub hosts: Vec<ServerAddress>,
-    pub srv: bool,
+#[non_exhaustive]
+pub struct ConnectionString {
+    /// The initial list of seeds that the Client should connect to, or a DNS name used for SRV
+    /// lookup of the initial seed list.
+    ///
+    /// Note that by default, the driver will autodiscover other nodes in the cluster. To connect
+    /// directly to a single server (rather than autodiscovering the rest of the cluster), set the
+    /// `direct_connection` field to `true`.
+    pub host_info: HostInfo,
+
+    /// The application name that the Client will send to the server as part of the handshake. This
+    /// can be used in combination with the server logs to determine which Client is connected to a
+    /// server.
     pub app_name: Option<String>,
+
+    /// The TLS configuration for the Client to use in its connections with the server.
+    ///
+    /// By default, TLS is disabled.
     pub tls: Option<Tls>,
-    pub heartbeat_freq: Option<Duration>,
+
+    /// The amount of time each monitoring thread should wait between performing server checks.
+    ///
+    /// The default value is 10 seconds.
+    pub heartbeat_frequency: Option<Duration>,
+
+    /// When running a read operation with a ReadPreference that allows selecting secondaries,
+    /// `local_threshold` is used to determine how much longer the average round trip time between
+    /// the driver and server is allowed compared to the least round trip time of all the suitable
+    /// servers. For example, if the average round trip times of the suitable servers are 5 ms, 10
+    /// ms, and 15 ms, and the local threshold is 8 ms, then the first two servers are within the
+    /// latency window and could be chosen for the operation, but the last one is not.
+    ///
+    /// A value of zero indicates that there is no latency window, so only the server with the
+    /// lowest average round trip time is eligible.
+    ///
+    /// The default value is 15 ms.
     pub local_threshold: Option<Duration>,
+
+    /// Specifies the default read concern for operations performed on the Client. See the
+    /// ReadConcern type documentation for more details.
     pub read_concern: Option<ReadConcern>,
-    pub selection_criteria: Option<SelectionCriteria>,
-    pub repl_set_name: Option<String>,
+
+    /// The name of the replica set that the Client should connect to.
+    pub replica_set: Option<String>,
+
+    /// Specifies the default write concern for operations performed on the Client. See the
+    /// WriteConcern type documentation for more details.
     pub write_concern: Option<WriteConcern>,
+
+    /// The amount of time the Client should attempt to select a server for an operation before
+    /// timing outs
+    ///
+    /// The default value is 30 seconds.
     pub server_selection_timeout: Option<Duration>,
+
+    /// The maximum amount of connections that the Client should allow to be created in a
+    /// connection pool for a given server. If an operation is attempted on a server while
+    /// `max_pool_size` connections are checked out, the operation will block until an in-progress
+    /// operation finishes and its connection is checked back into the pool.
+    ///
+    /// The default value is 100.
     pub max_pool_size: Option<u32>,
+
+    /// The minimum number of connections that should be available in a server's connection pool at
+    /// a given time. If fewer than `min_pool_size` connections are in the pool, connections will
+    /// be added to the pool in the background until `min_pool_size` is reached.
+    ///
+    /// The default value is 0.
     pub min_pool_size: Option<u32>,
+
+    /// The amount of time that a connection can remain idle in a connection pool before being
+    /// closed. A value of zero indicates that connections should not be closed due to being idle.
+    ///
+    /// By default, connections will not be closed due to being idle.
     pub max_idle_time: Option<Duration>,
-    pub wait_queue_timeout: Option<Duration>,
+
+    /// The compressors that the Client is willing to use in the order they are specified
+    /// in the configuration.  The Client sends this list of compressors to the server.
+    /// The server responds with the intersection of its supported list of compressors.
+    /// The order of compressors indicates preference of compressors.
     pub compressors: Option<Vec<Compressor>>,
+
+    /// The connect timeout passed to each underlying TcpStream when attempting to connect to the
+    /// server.
+    ///
+    /// The default value is 10 seconds.
     pub connect_timeout: Option<Duration>,
+
+    /// Whether or not the client should retry a read operation if the operation fails.
+    ///
+    /// The default value is true.
     pub retry_reads: Option<bool>,
+
+    /// Whether or not the client should retry a write operation if the operation fails.
+    ///
+    /// The default value is true.
     pub retry_writes: Option<bool>,
-    pub socket_timeout: Option<Duration>,
-    pub zlib_compression: Option<i32>,
+
+    /// Specifies whether the Client should directly connect to a single host rather than
+    /// autodiscover all servers in the cluster.
+    ///
+    /// The default value is false.
     pub direct_connection: Option<bool>,
+
+    /// The credential to use for authenticating connections made by this client.
     pub credential: Option<Credential>,
+
+    /// Default database for this client.
+    ///
+    /// By default, no default database is specified.
     pub default_database: Option<String>,
-    max_staleness: Option<Duration>,
+
+    /// Whether or not the client is connecting to a MongoDB cluster through a load balancer.
+    pub load_balanced: Option<bool>,
+
+    /// Amount of time spent attempting to send or receive on a socket before timing out; note that
+    /// this only applies to application operations, not server discovery and monitoring.
+    pub socket_timeout: Option<Duration>,
+
+    /// Default read preference for the client.
+    pub read_preference: Option<ReadPreference>,
+
+    wait_queue_timeout: Option<Duration>,
     tls_insecure: Option<bool>,
-    auth_mechanism: Option<AuthMechanism>,
-    auth_source: Option<String>,
-    auth_mechanism_properties: Option<Document>,
-    read_preference: Option<ReadPreference>,
-    read_preference_tags: Option<Vec<TagSet>>,
-    load_balanced: Option<bool>,
+
+    #[cfg(test)]
     original_uri: String,
+}
+
+/// Elements from the connection string that are not top-level fields in `ConnectionString`.
+#[derive(Default)]
+struct ConnectionStringParts {
+    read_preference_tags: Option<Vec<TagSet>>,
+    max_staleness: Option<Duration>,
+    auth_mechanism: Option<AuthMechanism>,
+    auth_mechanism_properties: Option<Document>,
+    zlib_compression: Option<i32>,
+    auth_source: Option<String>,
+}
+
+/// Specification for mongodb server connections.
+#[derive(Debug, PartialEq, Clone)]
+#[non_exhaustive]
+pub enum HostInfo {
+    /// A set of addresses.
+    HostIdentifiers(Vec<ServerAddress>),
+    /// A DNS record for SRV lookup.
+    DnsRecord(String),
+}
+
+impl Default for HostInfo {
+    fn default() -> Self {
+        Self::HostIdentifiers(vec![])
+    }
+}
+
+impl HostInfo {
+    async fn resolve(self, resolver_config: Option<ResolverConfig>) -> Result<ResolvedHostInfo> {
+        Ok(match self {
+            Self::HostIdentifiers(hosts) => ResolvedHostInfo::HostIdentifiers(hosts),
+            Self::DnsRecord(hostname) => {
+                let mut resolver =
+                    SrvResolver::new(resolver_config.clone().map(|config| config.inner)).await?;
+                let config = resolver.resolve_client_options(&hostname).await?;
+                ResolvedHostInfo::DnsRecord { hostname, config }
+            }
+        })
+    }
+}
+
+enum ResolvedHostInfo {
+    HostIdentifiers(Vec<ServerAddress>),
+    DnsRecord {
+        hostname: String,
+        config: crate::srv::ResolvedConfig,
+    },
 }
 
 /// Specifies whether TLS configuration should be used with the operations that the
@@ -836,45 +980,6 @@ pub struct DriverInfo {
     pub platform: Option<String>,
 }
 
-impl From<ClientOptionsParser> for ClientOptions {
-    fn from(parser: ClientOptionsParser) -> Self {
-        Self {
-            hosts: parser.hosts,
-            app_name: parser.app_name,
-            tls: parser.tls,
-            heartbeat_freq: parser.heartbeat_freq,
-            local_threshold: parser.local_threshold,
-            read_concern: parser.read_concern,
-            selection_criteria: parser.selection_criteria,
-            repl_set_name: parser.repl_set_name,
-            write_concern: parser.write_concern,
-            max_pool_size: parser.max_pool_size,
-            min_pool_size: parser.min_pool_size,
-            max_idle_time: parser.max_idle_time,
-            server_selection_timeout: parser.server_selection_timeout,
-            compressors: parser.compressors,
-            connect_timeout: parser.connect_timeout,
-            retry_reads: parser.retry_reads,
-            retry_writes: parser.retry_writes,
-            socket_timeout: parser.socket_timeout,
-            direct_connection: parser.direct_connection,
-            default_database: parser.default_database,
-            driver_info: None,
-            credential: parser.credential,
-            cmap_event_handler: None,
-            command_event_handler: None,
-            original_srv_info: None,
-            original_uri: Some(parser.original_uri),
-            resolver_config: None,
-            server_api: None,
-            load_balanced: parser.load_balanced,
-            sdam_event_handler: None,
-            #[cfg(test)]
-            test_options: None,
-        }
-    }
-}
-
 impl ClientOptions {
     /// Creates a new ClientOptions with the `original_srv_hostname` field set to the testing value
     /// used in the SRV tests.
@@ -895,7 +1000,7 @@ impl ClientOptions {
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done as
     /// part of this method.
     ///
-    /// The format of a MongoDB connection string is described [here](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-formats).
+    /// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
     ///
     /// Note that [default_database](ClientOptions::default_database) will be set from
     /// `/defaultauthdb` in connection string.
@@ -966,7 +1071,7 @@ impl ClientOptions {
     /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
     /// provided `ResolverConfig` as part of this method.
     ///
-    /// The format of a MongoDB connection string is described [here](https://docs.mongodb.com/manual/reference/connection-string/#connection-string-formats).
+    /// The format of a MongoDB connection string is described [here](https://www.mongodb.com/docs/manual/reference/connection-string/#connection-string-formats).
     ///
     /// See the docstring on `ClientOptions::parse` for information on how the various URI options
     /// map to fields on `ClientOptions`.
@@ -995,59 +1100,163 @@ impl ClientOptions {
         uri: impl AsRef<str>,
         resolver_config: Option<ResolverConfig>,
     ) -> Result<Self> {
-        let parser = ClientOptionsParser::parse(uri.as_ref())?;
-        let srv = parser.srv;
-        let auth_source_present = parser.auth_source.is_some();
-        let mut options: Self = parser.into();
+        Self::parse_connection_string_internal(ConnectionString::parse(uri)?, resolver_config).await
+    }
+
+    /// Creates a `ClientOptions` from the given `ConnectionString`.
+    ///
+    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
+    /// provided `ResolverConfig` as part of this method.
+    pub async fn parse_connection_string_with_resolver_config(
+        conn_str: ConnectionString,
+        resolver_config: ResolverConfig,
+    ) -> Result<Self> {
+        Self::parse_connection_string_internal(conn_str, Some(resolver_config)).await
+    }
+
+    /// Creates a `ClientOptions` from the given `ConnectionString`.
+    pub async fn parse_connection_string(conn_str: ConnectionString) -> Result<Self> {
+        Self::parse_connection_string_internal(conn_str, None).await
+    }
+
+    async fn parse_connection_string_internal(
+        mut conn_str: ConnectionString,
+        resolver_config: Option<ResolverConfig>,
+    ) -> Result<Self> {
+        let auth_source_present = conn_str
+            .credential
+            .as_ref()
+            .and_then(|cred| cred.source.as_ref())
+            .is_some();
+        let host_info = std::mem::take(&mut conn_str.host_info);
+        let mut options = Self::from_connection_string(conn_str);
         options.resolver_config = resolver_config.clone();
 
-        if srv {
-            let mut resolver = SrvResolver::new(resolver_config.map(|config| config.inner)).await?;
-            let mut config = resolver
-                .resolve_client_options(options.hosts[0].host())
-                .await?;
+        let resolved = host_info.resolve(resolver_config).await?;
+        options.hosts = match resolved {
+            ResolvedHostInfo::HostIdentifiers(hosts) => hosts,
+            ResolvedHostInfo::DnsRecord {
+                hostname,
+                mut config,
+            } => {
+                // Save the original SRV info to allow mongos polling.
+                options.original_srv_info = OriginalSrvInfo {
+                    hostname,
+                    min_ttl: config.min_ttl,
+                }
+                .into();
 
-            // Save the original SRV info to allow mongos polling.
-            options.original_srv_info = OriginalSrvInfo {
-                hostname: options.hosts[0].host().to_string(),
-                min_ttl: config.min_ttl,
-            }
-            .into();
+                // Enable TLS unless the user explicitly disabled it.
+                if options.tls.is_none() {
+                    options.tls = Some(Tls::Enabled(Default::default()));
+                }
 
-            // Set the ClientOptions hosts to those found during the SRV lookup.
-            options.hosts = config.hosts;
-
-            // Enable TLS unless the user explicitly disabled it.
-            if options.tls.is_none() {
-                options.tls = Some(Tls::Enabled(Default::default()));
-            }
-
-            // Set the authSource TXT option found during SRV lookup unless the user already set it.
-            // Note that this _does_ override the default database specified in the URI, since it is
-            // supposed to be overriden by authSource.
-            if !auth_source_present {
-                if let Some(auth_source) = config.auth_source.take() {
-                    if let Some(ref mut credential) = options.credential {
-                        credential.source = Some(auth_source);
+                // Set the authSource TXT option found during SRV lookup unless the user already set
+                // it. Note that this _does_ override the default database specified
+                // in the URI, since it is supposed to be overriden by authSource.
+                if !auth_source_present {
+                    if let Some(auth_source) = config.auth_source.take() {
+                        if let Some(ref mut credential) = options.credential {
+                            credential.source = Some(auth_source);
+                        }
                     }
                 }
-            }
 
-            // Set the replica set name TXT option found during SRV lookup unless the user already
-            // set it.
-            if options.repl_set_name.is_none() {
-                if let Some(replica_set) = config.replica_set.take() {
-                    options.repl_set_name = Some(replica_set);
+                // Set the replica set name TXT option found during SRV lookup unless the user
+                // already set it.
+                if options.repl_set_name.is_none() {
+                    if let Some(replica_set) = config.replica_set.take() {
+                        options.repl_set_name = Some(replica_set);
+                    }
                 }
-            }
 
-            if options.load_balanced.is_none() {
-                options.load_balanced = config.load_balanced;
+                if options.load_balanced.is_none() {
+                    options.load_balanced = config.load_balanced;
+                }
+
+                // Set the ClientOptions hosts to those found during the SRV lookup.
+                config.hosts
             }
-        }
+        };
 
         options.validate()?;
         Ok(options)
+    }
+
+    /// Creates a `ClientOptions` from the given `ConnectionString`.
+    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+    pub fn parse_connection_string_sync(conn_str: ConnectionString) -> Result<Self> {
+        crate::runtime::block_on(Self::parse_connection_string_internal(conn_str, None))
+    }
+
+    /// Creates a `ClientOptions` from the given `ConnectionString`.
+    ///
+    /// In the case that "mongodb+srv" is used, SRV and TXT record lookups will be done using the
+    /// provided `ResolverConfig` as part of this method.
+    #[cfg(any(feature = "sync", feature = "tokio-sync"))]
+    pub fn parse_connection_string_with_resolver_config_sync(
+        conn_str: ConnectionString,
+        resolver_config: ResolverConfig,
+    ) -> Result<Self> {
+        crate::runtime::block_on(Self::parse_connection_string_internal(
+            conn_str,
+            Some(resolver_config),
+        ))
+    }
+
+    fn from_connection_string(conn_str: ConnectionString) -> Self {
+        let mut credential = conn_str.credential;
+        // Populate default auth source, if needed.
+        let db = &conn_str.default_database;
+        if let Some(credential) = credential.as_mut() {
+            if credential.source.is_none() {
+                credential.source = match &credential.mechanism {
+                    Some(mechanism) => Some(mechanism.default_source(db.as_deref()).into()),
+                    None => {
+                        // If credentials exist (i.e. username is specified) but no mechanism, the
+                        // default source is chosen from the following list in
+                        // order (skipping null ones): authSource option, connection string db,
+                        // SCRAM default (i.e. "admin").
+                        db.clone().or_else(|| Some("admin".into()))
+                    }
+                };
+            }
+        }
+        Self {
+            hosts: vec![],
+            app_name: conn_str.app_name,
+            tls: conn_str.tls,
+            heartbeat_freq: conn_str.heartbeat_frequency,
+            local_threshold: conn_str.local_threshold,
+            read_concern: conn_str.read_concern,
+            selection_criteria: conn_str.read_preference.map(Into::into),
+            repl_set_name: conn_str.replica_set,
+            write_concern: conn_str.write_concern,
+            max_pool_size: conn_str.max_pool_size,
+            min_pool_size: conn_str.min_pool_size,
+            max_idle_time: conn_str.max_idle_time,
+            server_selection_timeout: conn_str.server_selection_timeout,
+            compressors: conn_str.compressors,
+            connect_timeout: conn_str.connect_timeout,
+            retry_reads: conn_str.retry_reads,
+            retry_writes: conn_str.retry_writes,
+            socket_timeout: conn_str.socket_timeout,
+            direct_connection: conn_str.direct_connection,
+            default_database: conn_str.default_database,
+            driver_info: None,
+            credential,
+            cmap_event_handler: None,
+            command_event_handler: None,
+            original_srv_info: None,
+            #[cfg(test)]
+            original_uri: Some(conn_str.original_uri),
+            resolver_config: None,
+            server_api: None,
+            load_balanced: conn_str.load_balanced,
+            sdam_event_handler: None,
+            #[cfg(test)]
+            test_options: None,
+        }
     }
 
     pub(crate) fn tls_options(&self) -> Option<TlsOptions> {
@@ -1101,9 +1310,23 @@ impl ClientOptions {
         }
 
         if let Some(0) = self.max_pool_size {
-            return Err(crate::error::Error::invalid_argument(
-                "cannot specify maxPoolSize=0",
-            ));
+            return Err(Error::invalid_argument("cannot specify maxPoolSize=0"));
+        }
+
+        if let Some(SelectionCriteria::ReadPreference(ref rp)) = self.selection_criteria {
+            if let Some(max_staleness) = rp.max_staleness() {
+                let smallest_max_staleness = std::cmp::max(
+                    Duration::from_secs(90),
+                    self.heartbeat_freq.unwrap_or(DEFAULT_HEARTBEAT_FREQUENCY) + IDLE_WRITE_PERIOD,
+                );
+
+                if max_staleness < smallest_max_staleness {
+                    return Err(Error::invalid_argument(format!(
+                        "invalid maxStaleness value: must be at least {} seconds",
+                        smallest_max_staleness.as_secs()
+                    )));
+                }
+            }
         }
 
         Ok(())
@@ -1200,8 +1423,11 @@ fn validate_userinfo(s: &str, userinfo_type: &str) -> Result<()> {
     Ok(())
 }
 
-impl ClientOptionsParser {
-    fn parse(s: &str) -> Result<Self> {
+impl ConnectionString {
+    /// Parses a MongoDB connection string into a [`ConnectionString`] struct. If the string is
+    /// malformed or one of the options has an invalid value, an error will be returned.
+    pub fn parse(s: impl AsRef<str>) -> Result<Self> {
+        let s = s.as_ref();
         let end_of_scheme = match s.find("://") {
             Some(index) => index,
             None => {
@@ -1300,40 +1526,48 @@ impl ClientOptionsParser {
             None => (None, None),
         };
 
-        let hosts: Result<Vec<_>> = hosts_section.split(',').map(ServerAddress::parse).collect();
+        let host_list: Result<Vec<_>> =
+            hosts_section.split(',').map(ServerAddress::parse).collect();
 
-        let hosts = hosts?;
+        let host_list = host_list?;
 
-        if srv {
-            if hosts.len() != 1 {
+        let hosts = if srv {
+            if host_list.len() != 1 {
                 return Err(ErrorKind::InvalidArgument {
                     message: "exactly one host must be specified with 'mongodb+srv'".into(),
                 }
                 .into());
             }
+            // Unwrap safety: the `len` check above guarantees this can't fail.
+            let ServerAddress::Tcp { host, port } = host_list.into_iter().next().unwrap();
 
-            if hosts[0].port().is_some() {
+            if port.is_some() {
                 return Err(ErrorKind::InvalidArgument {
                     message: "a port cannot be specified with 'mongodb+srv'".into(),
                 }
                 .into());
             }
-        }
+            HostInfo::DnsRecord(host)
+        } else {
+            HostInfo::HostIdentifiers(host_list)
+        };
 
-        let mut options = ClientOptionsParser {
-            hosts,
-            srv,
+        let mut conn_str = ConnectionString {
+            host_info: hosts,
+            #[cfg(test)]
             original_uri: s.into(),
             ..Default::default()
         };
 
-        if let Some(opts) = options_section {
-            options.parse_options(opts)?;
-        }
+        let mut parts = if let Some(opts) = options_section {
+            conn_str.parse_options(opts)?
+        } else {
+            ConnectionStringParts::default()
+        };
 
         // Set username and password.
         if let Some(u) = username {
-            let mut credential = options.credential.get_or_insert_with(Default::default);
+            let mut credential = conn_str.credential.get_or_insert_with(Default::default);
             validate_userinfo(u, "username")?;
             let decoded_u = percent_decode(u, "username must be URL encoded")?;
 
@@ -1346,25 +1580,19 @@ impl ClientOptionsParser {
             }
         }
 
-        if options.auth_source.as_deref() == Some("") {
+        if parts.auth_source.as_deref() == Some("") {
             return Err(ErrorKind::InvalidArgument {
                 message: "empty authSource provided".to_string(),
             }
             .into());
         }
 
-        let db_str = db.as_deref();
-
-        match options.auth_mechanism {
+        match parts.auth_mechanism {
             Some(ref mechanism) => {
-                let mut credential = options.credential.get_or_insert_with(Default::default);
+                let mut credential = conn_str.credential.get_or_insert_with(Default::default);
+                credential.source = parts.auth_source;
 
-                credential.source = options
-                    .auth_source
-                    .clone()
-                    .or_else(|| Some(mechanism.default_source(db_str).into()));
-
-                if let Some(mut doc) = options.auth_mechanism_properties.take() {
+                if let Some(mut doc) = parts.auth_mechanism_properties.take() {
                     match doc.remove("CANONICALIZE_HOST_NAME") {
                         Some(Bson::String(s)) => {
                             let val = match &s.to_lowercase()[..] {
@@ -1384,19 +1612,11 @@ impl ClientOptionsParser {
                 }
 
                 mechanism.validate_credential(credential)?;
-                credential.mechanism = options.auth_mechanism.take();
+                credential.mechanism = parts.auth_mechanism.take();
             }
             None => {
-                if let Some(ref mut credential) = options.credential {
-                    // If credentials exist (i.e. username is specified) but no mechanism, the
-                    // default source is chosen from the following list in
-                    // order (skipping null ones): authSource option, connection string db,
-                    // SCRAM default (i.e. "admin").
-                    credential.source = options
-                        .auth_source
-                        .clone()
-                        .or_else(|| db.clone())
-                        .or_else(|| Some("admin".into()));
+                if let Some(ref mut credential) = conn_str.credential {
+                    credential.source = parts.auth_source;
                 } else if authentication_requested {
                     return Err(ErrorKind::InvalidArgument {
                         message: "username and mechanism both not provided, but authentication \
@@ -1409,18 +1629,35 @@ impl ClientOptionsParser {
         };
 
         // set default database.
-        options.default_database = db;
+        conn_str.default_database = db;
 
-        if options.tls.is_none() && options.srv {
-            options.tls = Some(Tls::Enabled(Default::default()));
+        if conn_str.tls.is_none() && conn_str.is_srv() {
+            conn_str.tls = Some(Tls::Enabled(Default::default()));
         }
 
-        Ok(options)
+        Ok(conn_str)
     }
 
-    fn parse_options(&mut self, options: &str) -> Result<()> {
+    /// Amount of time spent attempting to check out a connection from a server's connection pool
+    /// before timing out.  Not supported by the Rust driver.
+    pub fn wait_queue_timeout(&self) -> Option<Duration> {
+        self.wait_queue_timeout
+    }
+
+    /// Relax TLS constraints as much as possible (e.g. allowing invalid certificates or hostname
+    /// mismatches).  Not supported by the Rust driver.
+    pub fn tls_insecure(&self) -> Option<bool> {
+        self.tls_insecure
+    }
+
+    fn is_srv(&self) -> bool {
+        matches!(self.host_info, HostInfo::DnsRecord(_))
+    }
+
+    fn parse_options(&mut self, options: &str) -> Result<ConnectionStringParts> {
+        let mut parts = ConnectionStringParts::default();
         if options.is_empty() {
-            return Ok(());
+            return Ok(parts);
         }
 
         let mut keys: Vec<&str> = Vec::new();
@@ -1451,6 +1688,7 @@ impl ClientOptionsParser {
 
             // Skip leading '=' in value.
             self.parse_option_pair(
+                &mut parts,
                 &key.to_lowercase(),
                 percent_encoding::percent_decode(&value.as_bytes()[1..])
                     .decode_utf8_lossy()
@@ -1458,7 +1696,7 @@ impl ClientOptionsParser {
             )?;
         }
 
-        if let Some(tags) = self.read_preference_tags.take() {
+        if let Some(tags) = parts.read_preference_tags.take() {
             self.read_preference = match self.read_preference.take() {
                 Some(read_pref) => Some(read_pref.with_tags(tags)?),
                 None => {
@@ -1472,7 +1710,7 @@ impl ClientOptionsParser {
             };
         }
 
-        if let Some(max_staleness) = self.max_staleness.take() {
+        if let Some(max_staleness) = parts.max_staleness.take() {
             self.read_preference = match self.read_preference.take() {
                 Some(read_pref) => Some(read_pref.with_max_staleness(max_staleness)?),
                 None => {
@@ -1486,10 +1724,8 @@ impl ClientOptionsParser {
             };
         }
 
-        self.selection_criteria = self.read_preference.take().map(Into::into);
-
         if let Some(true) = self.direct_connection {
-            if self.srv {
+            if self.is_srv() {
                 return Err(ErrorKind::InvalidArgument {
                     message: "cannot use SRV-style URI with directConnection=true".to_string(),
                 }
@@ -1500,17 +1736,22 @@ impl ClientOptionsParser {
         // If zlib and zlib_compression_level are specified then write zlib_compression_level into
         // zlib enum
         if let (Some(compressors), Some(zlib_compression_level)) =
-            (self.compressors.as_mut(), self.zlib_compression)
+            (self.compressors.as_mut(), parts.zlib_compression)
         {
             for compressor in compressors {
                 compressor.write_zlib_level(zlib_compression_level)
             }
         }
 
-        Ok(())
+        Ok(parts)
     }
 
-    fn parse_option_pair(&mut self, key: &str, value: &str) -> Result<()> {
+    fn parse_option_pair(
+        &mut self,
+        parts: &mut ConnectionStringParts,
+        key: &str,
+        value: &str,
+    ) -> Result<()> {
         macro_rules! get_bool {
             ($value:expr, $option:expr) => {
                 match $value {
@@ -1585,9 +1826,9 @@ impl ClientOptionsParser {
                 self.app_name = Some(value.into());
             }
             "authmechanism" => {
-                self.auth_mechanism = Some(AuthMechanism::from_str(value)?);
+                parts.auth_mechanism = Some(AuthMechanism::from_str(value)?);
             }
-            "authsource" => self.auth_source = Some(value.to_string()),
+            "authsource" => parts.auth_source = Some(value.to_string()),
             "authmechanismproperties" => {
                 let mut doc = Document::new();
                 let err_func = || {
@@ -1608,7 +1849,7 @@ impl ClientOptionsParser {
                         None => return Err(err_func()),
                     };
                 }
-                self.auth_mechanism_properties = Some(doc);
+                parts.auth_mechanism_properties = Some(doc);
             }
             "compressors" => {
                 let compressors = value
@@ -1640,7 +1881,7 @@ impl ClientOptionsParser {
                     .into());
                 }
 
-                self.heartbeat_freq = Some(Duration::from_millis(duration));
+                self.heartbeat_frequency = Some(Duration::from_millis(duration));
             }
             k @ "journal" => {
                 let mut write_concern = self.write_concern.get_or_insert_with(Default::default);
@@ -1655,19 +1896,26 @@ impl ClientOptionsParser {
             k @ "maxidletimems" => {
                 self.max_idle_time = Some(Duration::from_millis(get_duration!(value, k)));
             }
-            k @ "maxstalenessseconds" => {
-                let max_staleness = Duration::from_secs(get_duration!(value, k));
+            "maxstalenessseconds" => {
+                let max_staleness_seconds = value.parse::<i64>().map_err(|e| {
+                    Error::invalid_argument(format!("invalid maxStalenessSeconds value: {}", e))
+                })?;
 
-                if max_staleness > Duration::from_secs(0) && max_staleness < Duration::from_secs(90)
-                {
-                    return Err(ErrorKind::InvalidArgument {
-                        message: "'maxStalenessSeconds' cannot be both positive and below 90"
-                            .into(),
+                let max_staleness = match max_staleness_seconds.cmp(&-1) {
+                    Ordering::Less => {
+                        return Err(Error::invalid_argument(format!(
+                            "maxStalenessSeconds must be -1 or positive, instead got {}",
+                            max_staleness_seconds
+                        )));
                     }
-                    .into());
-                }
+                    Ordering::Equal => {
+                        // -1 maxStaleness means no maxStaleness, which is the default
+                        return Ok(());
+                    }
+                    Ordering::Greater => Duration::from_secs(max_staleness_seconds as u64),
+                };
 
-                self.max_staleness = Some(max_staleness);
+                parts.max_staleness = Some(max_staleness);
             }
             k @ "maxpoolsize" => {
                 self.max_pool_size = Some(get_u32!(value, k));
@@ -1727,12 +1975,13 @@ impl ClientOptionsParser {
                         .collect()
                 };
 
-                self.read_preference_tags
+                parts
+                    .read_preference_tags
                     .get_or_insert_with(Vec::new)
                     .push(tags?);
             }
             "replicaset" => {
-                self.repl_set_name = Some(value.to_string());
+                self.replica_set = Some(value.to_string());
             }
             k @ "retrywrites" => {
                 self.retry_writes = Some(get_bool!(value, k));
@@ -1888,7 +2137,7 @@ impl ClientOptionsParser {
                     .into());
                 }
 
-                self.zlib_compression = Some(i);
+                parts.zlib_compression = Some(i);
             }
 
             other => {
@@ -1911,6 +2160,39 @@ impl ClientOptionsParser {
         }
 
         Ok(())
+    }
+}
+
+impl FromStr for ConnectionString {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self> {
+        ConnectionString::parse(s)
+    }
+}
+
+impl<'de> Deserialize<'de> for ConnectionString {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_str(ConnectionStringVisitor)
+    }
+}
+
+struct ConnectionStringVisitor;
+
+impl<'de> serde::de::Visitor<'de> for ConnectionStringVisitor {
+    type Value = ConnectionString;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "a MongoDB connection string")
+    }
+
+    fn visit_str<E>(self, v: &str) -> std::result::Result<Self::Value, E>
+    where
+        E: serde::de::Error,
+    {
+        ConnectionString::parse(v).map_err(serde::de::Error::custom)
     }
 }
 
@@ -2304,7 +2586,7 @@ pub struct SessionOptions {
     pub default_transaction_options: Option<TransactionOptions>,
 
     /// If true, all operations performed in the context of this session
-    /// will be [causally consistent](https://docs.mongodb.com/manual/core/causal-consistency-read-write-concerns/).
+    /// will be [causally consistent](https://www.mongodb.com/docs/manual/core/causal-consistency-read-write-concerns/).
     ///
     /// Defaults to true if [`SessionOptions::snapshot`] is unspecified.
     pub causal_consistency: Option<bool>,

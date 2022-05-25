@@ -4,7 +4,7 @@ use std::env::var;
 use std::io::Write;
 
 /// The directory for out-of-line ("outline") libraries.
-const OUTLINE_PATH: &str = "src/imp/linux_raw/arch/outline";
+const OUTLINE_PATH: &str = "src/backend/linux_raw/arch/outline";
 
 fn main() {
     // Don't rerun this on changes other than build.rs, as we only depend on
@@ -16,11 +16,10 @@ fn main() {
     // Features only used in no-std configurations.
     #[cfg(not(feature = "std"))]
     {
-        use_feature_or_nothing("vec_into_raw_parts");
-        use_feature_or_nothing("toowned_clone_into");
-        use_feature_or_nothing("specialization");
-        use_feature_or_nothing("slice_internals");
         use_feature_or_nothing("const_raw_ptr_deref");
+        use_feature_or_nothing("core_ffi_c");
+        use_feature_or_nothing("core_c_str");
+        use_feature_or_nothing("alloc_c_string");
     }
 
     // Gather target information.
@@ -43,13 +42,19 @@ fn main() {
     // libc backend.
     let feature_use_libc = var("CARGO_FEATURE_USE_LIBC").is_ok();
 
+    // Check for `--features=rustc-dep-of-std`. This is used when rustix is
+    // being used to build std, in which case `can_compile` doesn't work
+    // because `core` isn't available yet, but also, we can assume we have a
+    // recent compiler.
+    let feature_rustc_dep_of_std = var("CARGO_FEATURE_RUSTC_DEP_OF_STD").is_ok();
+
     // Check for `RUSTFLAGS=--cfg=rustix_use_libc`. This allows end users to
     // enable the libc backend even if rustix is depended on transitively.
     let cfg_use_libc = var("CARGO_CFG_RUSTIX_USE_LIBC").is_ok();
 
     // Check for eg. `RUSTFLAGS=--cfg=rustix_use_experimental_asm`. This is a
     // rustc flag rather than a cargo feature flag because it's experimental
-    // and not something we want accidentally enabled via --all-features.
+    // and not something we want accidentally enabled via `--all-features`.
     let rustix_use_experimental_asm = var("CARGO_CFG_RUSTIX_USE_EXPERIMENTAL_ASM").is_ok();
 
     // Miri doesn't support inline asm, and has builtin support for recognizing
@@ -57,10 +62,10 @@ fn main() {
     let miri = var("CARGO_CFG_MIRI").is_ok();
 
     // If the libc backend is requested, or if we're not on a platform for
-    // which we have linux-raw support, use the libc backend.
+    // which we have linux_raw support, use the libc backend.
     //
     // For now Android uses the libc backend; in theory it could use the
-    // linux-raw backend, but to do that we'll need to figure out how to
+    // linux_raw backend, but to do that we'll need to figure out how to
     // install the toolchain for it.
     if feature_use_libc
         || cfg_use_libc
@@ -72,14 +77,14 @@ fn main() {
         // Use the libc backend.
         use_feature("libc");
     } else {
-        // Use the linux-raw backend.
+        // Use the linux_raw backend.
         use_feature("linux_raw");
         use_feature_or_nothing("core_intrinsics");
 
         // Use inline asm if we have it, or outline asm otherwise. On PowerPC
         // and MIPS, Rust's inline asm is considered experimental, so only use
         // it if `--cfg=rustix_use_experimental_asm` is given.
-        if can_compile("use std::arch::asm;")
+        if (feature_rustc_dep_of_std || can_compile("use std::arch::asm;"))
             && (arch != "x86" || has_feature("naked_functions"))
             && ((arch != "powerpc64" && arch != "mips" && arch != "mips64")
                 || rustix_use_experimental_asm)
@@ -99,6 +104,8 @@ fn main() {
     println!("cargo:rerun-if-env-changed=CARGO_CFG_RUSTIX_USE_EXPERIMENTAL_ASM");
 }
 
+/// Link in the desired version of librustix_outline_{arch}.a, containing the
+/// outline assembly code for making syscalls.
 fn link_in_librustix_outline(arch: &str, asm_name: &str) {
     let name = format!("rustix_outline_{}", arch);
     let profile = var("PROFILE").unwrap();

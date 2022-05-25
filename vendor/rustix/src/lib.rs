@@ -5,6 +5,7 @@
 //! With rustix, you can write code like this:
 //!
 //! ```rust
+//! # #[cfg(feature = "net")]
 //! # fn read(sock: std::net::TcpStream, buf: &mut [u8]) -> std::io::Result<()> {
 //! # use rustix::net::RecvFlags;
 //! let nread: usize = rustix::net::recv(&sock, buf, RecvFlags::PEEK)?;
@@ -16,15 +17,25 @@
 //! instead of like this:
 //!
 //! ```rust
+//! # #[cfg(feature = "net")]
 //! # fn read(sock: std::net::TcpStream, buf: &mut [u8]) -> std::io::Result<()> {
 //! # use std::convert::TryInto;
-//! # use rustix::fd::AsRawFd;
+//! # #[cfg(unix)]
+//! # use std::os::unix::io::AsRawFd;
+//! # #[cfg(target_os = "wasi")]
+//! # use std::os::wasi::io::AsRawFd;
 //! # #[cfg(windows)]
-//! # use winapi::um::winsock2 as libc;
+//! # use windows_sys::Win32::Networking::WinSock as libc;
+//! # #[cfg(windows)]
+//! # use std::os::windows::io::AsRawSocket;
 //! # const MSG_PEEK: i32 = libc::MSG_PEEK;
 //! let nread: usize = unsafe {
+//!     #[cfg(any(unix, target_os = "wasi"))]
+//!     let raw = sock.as_raw_fd();
+//!     #[cfg(windows)]
+//!     let raw = sock.as_raw_socket();
 //!     match libc::recv(
-//!         sock.as_raw_fd() as _,
+//!         raw as _,
 //!         buf.as_mut_ptr().cast(),
 //!         buf.len().try_into().unwrap_or(i32::MAX as _),
 //!         MSG_PEEK,
@@ -50,11 +61,14 @@
 //!  - Variadic functions (eg. `openat`, etc.) are presented as non-variadic.
 //!  - Functions and types which need `l` prefixes or `64` suffixes to enable
 //!    large-file support are used automatically, and file sizes and offsets
-//!    are presented as `i64` and `u64`.
+//!    are presented as `u64` and `i64`.
 //!  - Behaviors that depend on the sizes of C types like `long` are hidden.
 //!  - In some places, more human-friendly and less historical-accident names
 //!    are used (and documentation aliases are used so that the original names
 //!    can still be searched for).
+//!  - Provide y2038 compatibility, on platforms which support this.
+//!  - Correct selected platform bugs, such as behavioral differences when
+//!    running under seccomp.
 //!
 //! Things they don't do include:
 //!  - Detecting whether functions are supported at runtime.
@@ -90,18 +104,11 @@
     feature(naked_functions)
 )]
 #![cfg_attr(io_lifetimes_use_std, feature(io_safety))]
+#![cfg_attr(core_ffi_c, feature(core_ffi_c))]
+#![cfg_attr(core_c_str, feature(core_c_str))]
+#![cfg_attr(alloc_c_string, feature(alloc_ffi))]
+#![cfg_attr(alloc_c_string, feature(alloc_c_string))]
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(all(not(feature = "std"), specialization), allow(incomplete_features))]
-#![cfg_attr(all(not(feature = "std"), specialization), feature(specialization))]
-#![cfg_attr(all(not(feature = "std"), slice_internals), feature(slice_internals))]
-#![cfg_attr(
-    all(not(feature = "std"), toowned_clone_into),
-    feature(toowned_clone_into)
-)]
-#![cfg_attr(
-    all(not(feature = "std"), vec_into_raw_parts),
-    feature(vec_into_raw_parts)
-)]
 #![cfg_attr(feature = "rustc-dep-of-std", feature(core_intrinsics))]
 #![cfg_attr(feature = "rustc-dep-of-std", feature(ip))]
 #![cfg_attr(
@@ -109,71 +116,115 @@
     feature(core_intrinsics)
 )]
 #![cfg_attr(asm_experimental_arch, feature(asm_experimental_arch))]
+#![cfg_attr(not(feature = "all-apis"), allow(dead_code))]
 
 #[cfg(not(feature = "rustc-dep-of-std"))]
 extern crate alloc;
 
-/// Export `*Fd*` types and traits that used in rustix's public API.
+// Internal utilities.
+#[cfg(not(windows))]
+#[macro_use]
+pub(crate) mod cstr;
+#[macro_use]
+pub(crate) mod const_assert;
+pub(crate) mod utils;
+
+// Pick the backend implementation to use.
+#[cfg_attr(libc, path = "backend/libc/mod.rs")]
+#[cfg_attr(linux_raw, path = "backend/linux_raw/mod.rs")]
+#[cfg_attr(wasi, path = "backend/wasi/mod.rs")]
+mod backend;
+
+/// Export the `*Fd` types and traits that are used in rustix's public API.
 ///
 /// Users can use this to avoid needing to import anything else to use the same
 /// versions of these types and traits.
 ///
-/// Note that rustix APIs that use `OwnedFd` use [`rustix::io::OwnedFd`]
-/// instead, which allows rustix to implement `close` for them.
+/// Rustix APIs that use `OwnedFd` use [`rustix::io::OwnedFd`] instead, which
+/// allows rustix to implement `close` for them.
 ///
 /// [`rustix::io::OwnedFd`]: crate::io::OwnedFd
 pub mod fd {
-    use super::imp;
-    pub use imp::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
+    use super::backend;
+    pub use backend::fd::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, OwnedFd, RawFd};
     #[cfg(windows)]
-    pub use imp::fd::{AsSocket, FromSocket, IntoSocket};
+    pub use backend::fd::{AsSocket, FromSocket, IntoSocket};
     #[cfg(feature = "std")]
-    pub use imp::fd::{FromFd, IntoFd};
+    pub use backend::fd::{FromFd, IntoFd};
 }
 
-#[cfg(not(windows))]
-#[macro_use]
-pub(crate) mod zstr;
-#[macro_use]
-pub(crate) mod const_assert;
-
-#[cfg_attr(libc, path = "imp/libc/mod.rs")]
-#[cfg_attr(linux_raw, path = "imp/linux_raw/mod.rs")]
-#[cfg_attr(wasi, path = "imp/wasi/mod.rs")]
-mod imp;
-
+// The public API modules.
 #[cfg(not(windows))]
 pub mod ffi;
 #[cfg(not(windows))]
+#[cfg(feature = "fs")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "fs")))]
 pub mod fs;
 pub mod io;
-#[cfg(not(any(target_os = "redox", target_os = "wasi")))] // WASI doesn't support `net` yet.
+#[cfg(any(target_os = "android", target_os = "linux"))]
+#[cfg(feature = "io_uring")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "io_uring")))]
+pub mod io_uring;
+#[cfg(not(any(windows, target_os = "wasi")))]
+#[cfg(feature = "mm")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "mm")))]
+pub mod mm;
+#[cfg(not(any(target_os = "redox", target_os = "wasi")))]
+#[cfg(feature = "net")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "net")))]
 pub mod net;
 #[cfg(not(windows))]
+#[cfg(feature = "param")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "param")))]
+pub mod param;
+#[cfg(not(windows))]
+#[cfg(any(feature = "fs", feature = "net"))]
+#[cfg_attr(doc_cfg, doc(cfg(any(feature = "fs", feature = "net"))))]
 pub mod path;
 #[cfg(not(windows))]
+#[cfg(feature = "process")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "process")))]
 pub mod process;
 #[cfg(not(windows))]
+#[cfg(feature = "rand")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "rand")))]
 pub mod rand;
+#[cfg(not(any(windows, target_os = "wasi")))]
+#[cfg(feature = "termios")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "termios")))]
+pub mod termios;
 #[cfg(not(windows))]
+#[cfg(feature = "thread")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "thread")))]
 pub mod thread;
 #[cfg(not(windows))]
+#[cfg(feature = "time")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "time")))]
 pub mod time;
 
+// "runtime" is also a public API module, but it's only for libc-like users.
 #[cfg(not(windows))]
+#[cfg(feature = "runtime")]
 #[doc(hidden)]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "runtime")))]
 pub mod runtime;
 
-/// Convert a `&T` into a `*const T` without using an `as`.
-#[inline]
-#[allow(dead_code)]
-const fn as_ptr<T>(t: &T) -> *const T {
-    t
-}
+// We have some internal interdependencies in the API features, so for now,
+// for API features that aren't enabled, declare them as `pub(crate)` so
+// that they're not public, but still available for internal use.
 
-/// Convert a `&mut T` into a `*mut T` without using an `as`.
-#[inline]
-#[allow(dead_code)]
-fn as_mut_ptr<T>(t: &mut T) -> *mut T {
-    t
-}
+#[cfg(not(windows))]
+#[cfg(not(feature = "fs"))]
+pub(crate) mod fs;
+#[cfg(not(windows))]
+#[cfg(all(
+    not(feature = "param"),
+    any(feature = "runtime", feature = "time", target_arch = "x86"),
+))]
+pub(crate) mod param;
+#[cfg(not(windows))]
+#[cfg(not(any(feature = "fs", feature = "net")))]
+pub(crate) mod path;
+#[cfg(not(windows))]
+#[cfg(not(feature = "process"))]
+pub(crate) mod process;

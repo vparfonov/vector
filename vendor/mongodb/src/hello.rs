@@ -3,6 +3,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use bson::RawDocumentBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -31,12 +32,19 @@ pub(crate) const LEGACY_HELLO_COMMAND_NAME_LOWERCASE: &str = "ismaster";
 
 /// Construct a hello or legacy hello command, depending on the circumstances.
 ///
-/// If an API version is provided, `hello` will be used.
+/// If an API version is provided or `load_balanced` is true, `hello` will be used.
 /// If the server indicated `helloOk: true`, then `hello` will also be used.
 /// Otherwise, legacy hello will be used, and if it's unknown whether the server supports hello,
 /// the command also will contain `helloOk: true`.
-pub(crate) fn hello_command(api: Option<&ServerApi>, hello_ok: Option<bool>) -> Command {
-    let (command, command_name) = if api.is_some() || matches!(hello_ok, Some(true)) {
+pub(crate) fn hello_command(
+    server_api: Option<&ServerApi>,
+    load_balanced: Option<bool>,
+    hello_ok: Option<bool>,
+) -> Command {
+    let (command, command_name) = if server_api.is_some()
+        || matches!(load_balanced, Some(true))
+        || matches!(hello_ok, Some(true))
+    {
         (doc! { "hello": 1 }, "hello")
     } else {
         let mut cmd = doc! { LEGACY_HELLO_COMMAND_NAME: 1 };
@@ -46,7 +54,7 @@ pub(crate) fn hello_command(api: Option<&ServerApi>, hello_ok: Option<bool>) -> 
         (cmd, LEGACY_HELLO_COMMAND_NAME)
     };
     let mut command = Command::new(command_name.into(), "admin".into(), command);
-    if let Some(server_api) = api {
+    if let Some(server_api) = server_api {
         command.set_server_api(server_api);
     }
     command
@@ -77,13 +85,14 @@ pub(crate) async fn run_hello(
     let round_trip_time = end_time.duration_since(start_time);
 
     match response_result.and_then(|raw_response| {
-        let hello_reply = raw_response.to_hello_reply(round_trip_time)?;
-        Ok((raw_response, hello_reply))
+        let hello_reply = raw_response.into_hello_reply(round_trip_time)?;
+        Ok(hello_reply)
     }) {
-        Ok((raw_response, hello_reply)) => {
+        Ok(hello_reply) => {
             emit_event(topology, handler, |handler| {
-                let mut reply = raw_response
-                    .body::<Document>()
+                let mut reply = hello_reply
+                    .raw_command_response
+                    .to_document()
                     .unwrap_or_else(|e| doc! { "deserialization error": e.to_string() });
                 // if this hello call is part of a handshake, remove speculative authentication
                 // information before publishing an event
@@ -122,17 +131,18 @@ where
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub(crate) struct HelloReply {
     pub server_address: ServerAddress,
     pub command_response: HelloCommandResponse,
+    pub raw_command_response: RawDocumentBuf,
     pub round_trip_time: Duration,
     pub cluster_time: Option<ClusterTime>,
 }
 
 /// The response to a `hello` command.
 ///
-/// See the documentation [here](https://docs.mongodb.com/manual/reference/command/hello/) for more details.
+/// See the documentation [here](https://www.mongodb.com/docs/manual/reference/command/hello/) for more details.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct HelloCommandResponse {
@@ -224,6 +234,13 @@ pub(crate) struct HelloCommandResponse {
 
     /// For internal use.
     pub topology_version: Option<Document>,
+
+    /// The maximum permitted size of a BSON wire protocol message.
+    pub max_message_size_bytes: i32,
+
+    /// The server-generated ID for the connection the "hello" command was run on.
+    /// Present on server versions 4.2+.
+    pub connection_id: Option<i32>,
 }
 
 impl PartialEq for HelloCommandResponse {
@@ -244,6 +261,7 @@ impl PartialEq for HelloCommandResponse {
             && self.max_bson_object_size == other.max_bson_object_size
             && self.max_write_batch_size == other.max_write_batch_size
             && self.service_id == other.service_id
+            && self.max_message_size_bytes == other.max_message_size_bytes
     }
 }
 

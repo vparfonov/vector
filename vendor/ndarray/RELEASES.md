@@ -1,3 +1,51 @@
+Version 0.15.6 (2022-07-30)
+===========================
+
+New features
+------------
+
+- Add `get_ptr` and `get_mut_ptr` methods for getting an element's pointer from
+  an index, by [@adamreichold].
+
+  https://github.com/rust-ndarray/ndarray/pull/1151
+
+Other changes
+-------------
+
+- Various fixes to resolve compiler and Clippy warnings/errors, by [@aganders3]
+  and [@jturner314].
+
+  https://github.com/rust-ndarray/ndarray/pull/1171
+
+- Fix description of `stack!` in quick start docs, by [@jturner314]. Thanks to
+  [@HyeokSuLee] for pointing out the issue.
+
+  https://github.com/rust-ndarray/ndarray/pull/1156
+
+- Add MSRV to `Cargo.toml`.
+
+  https://github.com/rust-ndarray/ndarray/pull/1191
+
+
+Version 0.15.5 (2022-07-30)
+===========================
+
+Enhancements
+------------
+
+- The `s!` macro now works in `no_std` environments, by [@makotokato].
+
+  https://github.com/rust-ndarray/ndarray/pull/1154
+
+Other changes
+-------------
+
+- Improve docs and fix typos, by [@steffahn] and [@Rikorose].
+
+  https://github.com/rust-ndarray/ndarray/pull/1134 <br>
+  https://github.com/rust-ndarray/ndarray/pull/1164
+
+
 Version 0.15.4 (2021-11-23)
 ===========================
 
@@ -366,7 +414,7 @@ API changes
 -----------
 
 - New constructors `Array::from_iter` and `Array::from_vec` by [@bluss].
-  No new functionality, just that these constructors are avaiable without trait
+  No new functionality, just that these constructors are available without trait
   imports.
 
   https://github.com/rust-ndarray/ndarray/pull/921
@@ -545,7 +593,7 @@ New features
 Enhancements
 ------------
 
-- Handle inhomogenous shape inputs better in Zip, in practice: guess better whether
+- Handle inhomogeneous shape inputs better in Zip, in practice: guess better whether
   to prefer c- or f-order for the inner loop by [@bluss]
   https://github.com/rust-ndarray/ndarray/pull/809
 
@@ -978,7 +1026,7 @@ Earlier releases
 
   - Add `Zip::indexed`
   - New methods `genrows/_mut, gencolumns/_mut, lanes/_mut` that
-    return iterable producers (producer means `Zip` compatibile).
+    return iterable producers (producer means `Zip` compatible).
   - New method `.windows()` by @Robbepop, returns an iterable producer
   - New function `general_mat_vec_mul` (with fast default and blas acceleration)
   - `Zip::apply` and `fold_while` now take `self` as the first argument
@@ -1542,6 +1590,8 @@ Earlier releases
   - Starting point for evolution to come
  
 
+[@adamreichold]: https://github.com/adamreichold
+[@aganders3]: https://github.com/aganders3
 [@bluss]: https://github.com/bluss
 [@jturner314]: https://github.com/jturner314
 [@LukeMathWalker]: https://github.com/LukeMathWalker
@@ -1556,20 +1606,24 @@ Earlier releases
 [@ethanhs]: https://github.com/ethanhs
 [@d-dorazio]: https://github.com/d-dorazio
 [@Eijebong]: https://github.com/Eijebong
+[@HyeokSuLee]: https://github.com/HyeokSuLee
 [@insideoutclub]: https://github.com/insideoutclub
 [@JP-Ellis]: https://github.com/JP-Ellis
 [@jimblandy]: https://github.com/jimblandy
 [@LeSeulArtichaut]: https://github.com/LeSeulArtichaut
 [@lifuyang]: https://github.com/liufuyang
 [@kdubovikov]: https://github.com/kdubovikov
+[@makotokato]: https://github.com/makotokato
 [@max-sixty]: https://github.com/max-sixty
 [@mneumann]: https://github.com/mneumann
 [@mockersf]: https://github.com/mockersf
 [@nilgoyette]: https://github.com/nilgoyette
 [@nitsky]: https://github.com/nitsky
+[@Rikorose]: https://github.com/Rikorose
 [@rth]: https://github.com/rth
 [@sebasv]: https://github.com/sebasv
 [@SparrowLii]: https://github.com/SparrowLii
+[@steffahn]: https://github.com/steffahn
 [@stokhos]: https://github.com/stokhos
 [@termoshtt]: https://github.com/termoshtt
 [@TheLortex]: https://github.com/TheLortex

@@ -9,6 +9,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - None.
 
+# 0.5.15 (9. August, 2022)
+
+- **fixed:** Don't expose internal type names in `QueryRejection` response. ([#1171])
+- **fixed:** Improve performance of JSON serialization ([#1178])
+- **fixed:** Improve build times by generating less IR ([#1192])
+
+[#1171]: https://github.com/tokio-rs/axum/pull/1171
+[#1178]: https://github.com/tokio-rs/axum/pull/1178
+[#1192]: https://github.com/tokio-rs/axum/pull/1192
+
+# 0.5.14 (25. July, 2022)
+
+Yanked, as it contained an accidental breaking change.
+
+# 0.5.13 (15. July, 2022)
+
+- **fixed:** If `WebSocketUpgrade` cannot upgrade the connection it will return a
+  `WebSocketUpgradeRejection::ConnectionNotUpgradable` rejection ([#1135])
+- **changed:** `WebSocketUpgradeRejection` has a new variant `ConnectionNotUpgradable`
+  variant ([#1135])
+
+[#1135]: https://github.com/tokio-rs/axum/pull/1135
+
+# 0.5.12 (10. July, 2022)
+
+- **added:** Added `debug_handler` which is an attribute macro that improves
+  type errors when applied to handler function. It is re-exported from
+  `axum-macros` ([#1144])
+
+[#1144]: https://github.com/tokio-rs/axum/pull/1144
+
+# 0.5.11 (02. July, 2022)
+
+- **added:** Implement `TryFrom<http:: Method>` for `MethodFilter` and use new
+  `NoMatchingMethodFilter` error in case of failure ([#1130])
+- **added:** Document how to run extractors from middleware ([#1140])
+
+[#1130]: https://github.com/tokio-rs/axum/pull/1130
+[#1140]: https://github.com/tokio-rs/axum/pull/1140
+
+# 0.5.10 (28. June, 2022)
+
+- **fixed:** Make `Router` cheaper to clone ([#1123])
+- **fixed:** Fix possible panic when doing trailing slash redirect ([#1124])
+
+[#1123]: https://github.com/tokio-rs/axum/pull/1123
+[#1124]: https://github.com/tokio-rs/axum/pull/1124
+
 # 0.5.9 (20. June, 2022)
 
 - **fixed:** Fix compile error when the `headers` is enabled and the `form`

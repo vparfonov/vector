@@ -1487,6 +1487,14 @@ impl SockaddrStorage {
     accessors!{as_alg_addr, as_alg_addr_mut, AlgAddr,
         AddressFamily::Alg, libc::sockaddr_alg, alg}
 
+    #[cfg(any(target_os = "android",
+              target_os = "fuchsia",
+              target_os = "linux"))]
+    #[cfg(feature = "net")]
+    accessors!{
+        as_link_addr, as_link_addr_mut, LinkAddr,
+        AddressFamily::Packet, libc::sockaddr_ll, dl}
+
     #[cfg(any(target_os = "dragonfly",
               target_os = "freebsd",
               target_os = "ios",
@@ -2224,7 +2232,7 @@ pub mod sys_control {
                     return None;
                 }
             }
-            if (*addr).sa_family as i32 != libc::AF_INET6 as i32 {
+            if (*addr).sa_family as i32 != libc::AF_SYSTEM as i32 {
                 return None;
             }
             Some(SysControlAddr(*(addr as *const libc::sockaddr_ctl)))
@@ -2527,7 +2535,7 @@ pub mod vsock {
                     return None;
                 }
             }
-            if (*addr).sa_family as i32 != libc::AF_INET6 as i32 {
+            if (*addr).sa_family as i32 != libc::AF_VSOCK as i32 {
                 return None;
             }
             Some(VsockAddr(*(addr as *const libc::sockaddr_vm)))
@@ -2649,6 +2657,25 @@ mod tests {
                 .. unsafe{mem::zeroed()}
             });
             format!("{}", la);
+        }
+
+        #[cfg(all(
+                any(target_os = "android",
+                    target_os = "fuchsia",
+                    target_os = "linux"),
+                target_endian = "little"
+        ))]
+        #[test]
+        fn linux_loopback() {
+            let bytes = [17u8, 0, 0, 0, 1, 0, 0, 0, 4, 3, 0, 6, 1, 2, 3, 4, 5, 6, 0, 0];
+            let sa = bytes.as_ptr() as *const libc::sockaddr;
+            let len = None;
+            let sock_addr = unsafe { SockaddrStorage::from_raw(sa, len) }.unwrap();
+            assert_eq!(sock_addr.family(), Some(AddressFamily::Packet));
+            match sock_addr.as_link_addr() {
+                Some(dl) => assert_eq!(dl.addr(), Some([1, 2, 3, 4, 5, 6])),
+                None => panic!("Can't unwrap sockaddr storage")
+            }
         }
 
         #[cfg(any(target_os = "ios",

@@ -1,3 +1,5 @@
+#![allow(clippy::bool_assert_comparison)]
+
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread::sleep;
 use std::time::Duration;
@@ -19,6 +21,22 @@ fn smoke() {
 
     future::block_on(s.send(8)).unwrap();
     assert_eq!(future::block_on(r.recv()), Ok(8));
+
+    assert_eq!(r.try_recv(), Err(TryRecvError::Empty));
+}
+
+#[test]
+fn smoke_blocking() {
+    let (s, r) = bounded(1);
+
+    s.send_blocking(7).unwrap();
+    assert_eq!(r.try_recv(), Ok(7));
+
+    s.send_blocking(8).unwrap();
+    assert_eq!(future::block_on(r.recv()), Ok(8));
+
+    future::block_on(s.send(9)).unwrap();
+    assert_eq!(r.recv_blocking(), Ok(9));
 
     assert_eq!(r.try_recv(), Err(TryRecvError::Empty));
 }

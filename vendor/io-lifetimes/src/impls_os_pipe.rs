@@ -2,6 +2,7 @@
 //! future, we'll prefer to have crates provide their own impls; this is
 //! just a temporary measure.
 
+use crate::views::FilelikeViewType;
 #[cfg(any(unix, target_os = "wasi"))]
 use crate::{AsFd, BorrowedFd, FromFd, IntoFd, OwnedFd};
 #[cfg(windows)]
@@ -12,6 +13,8 @@ use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd};
 use std::os::wasi::io::{AsRawFd, FromRawFd, IntoRawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawHandle, FromRawHandle, IntoRawHandle};
+
+unsafe impl FilelikeViewType for os_pipe::PipeReader {}
 
 #[cfg(any(unix, target_os = "wasi"))]
 impl AsFd for os_pipe::PipeReader {
@@ -37,11 +40,27 @@ impl IntoFd for os_pipe::PipeReader {
     }
 }
 
+#[cfg(any(unix, target_os = "wasi"))]
+impl From<os_pipe::PipeReader> for OwnedFd {
+    #[inline]
+    fn from(owned: os_pipe::PipeReader) -> Self {
+        unsafe { Self::from_raw_fd(owned.into_raw_fd()) }
+    }
+}
+
 #[cfg(windows)]
 impl IntoHandle for os_pipe::PipeReader {
     #[inline]
     fn into_handle(self) -> OwnedHandle {
         unsafe { OwnedHandle::from_raw_handle(self.into_raw_handle()) }
+    }
+}
+
+#[cfg(windows)]
+impl From<os_pipe::PipeReader> for OwnedHandle {
+    #[inline]
+    fn from(owned: os_pipe::PipeReader) -> Self {
+        unsafe { Self::from_raw_handle(owned.into_raw_handle()) }
     }
 }
 
@@ -53,6 +72,14 @@ impl FromFd for os_pipe::PipeReader {
     }
 }
 
+#[cfg(any(unix, target_os = "wasi"))]
+impl From<OwnedFd> for os_pipe::PipeReader {
+    #[inline]
+    fn from(owned: OwnedFd) -> Self {
+        unsafe { Self::from_raw_fd(owned.into_raw_fd()) }
+    }
+}
+
 #[cfg(windows)]
 impl FromHandle for os_pipe::PipeReader {
     #[inline]
@@ -60,6 +87,16 @@ impl FromHandle for os_pipe::PipeReader {
         unsafe { Self::from_raw_handle(owned.into_raw_handle()) }
     }
 }
+
+#[cfg(windows)]
+impl From<OwnedHandle> for os_pipe::PipeReader {
+    #[inline]
+    fn from(owned: OwnedHandle) -> Self {
+        unsafe { Self::from_raw_handle(owned.into_raw_handle()) }
+    }
+}
+
+unsafe impl FilelikeViewType for os_pipe::PipeWriter {}
 
 #[cfg(any(unix, target_os = "wasi"))]
 impl AsFd for os_pipe::PipeWriter {
@@ -85,11 +122,27 @@ impl IntoFd for os_pipe::PipeWriter {
     }
 }
 
+#[cfg(any(unix, target_os = "wasi"))]
+impl From<os_pipe::PipeWriter> for OwnedFd {
+    #[inline]
+    fn from(owned: os_pipe::PipeWriter) -> Self {
+        unsafe { Self::from_raw_fd(owned.into_raw_fd()) }
+    }
+}
+
 #[cfg(windows)]
 impl IntoHandle for os_pipe::PipeWriter {
     #[inline]
     fn into_handle(self) -> OwnedHandle {
         unsafe { OwnedHandle::from_raw_handle(self.into_raw_handle()) }
+    }
+}
+
+#[cfg(windows)]
+impl From<os_pipe::PipeWriter> for OwnedHandle {
+    #[inline]
+    fn from(owned: os_pipe::PipeWriter) -> Self {
+        unsafe { Self::from_raw_handle(owned.into_raw_handle()) }
     }
 }
 
@@ -101,10 +154,26 @@ impl FromFd for os_pipe::PipeWriter {
     }
 }
 
+#[cfg(any(unix, target_os = "wasi"))]
+impl From<OwnedFd> for os_pipe::PipeWriter {
+    #[inline]
+    fn from(owned: OwnedFd) -> Self {
+        unsafe { Self::from_raw_fd(owned.into_raw_fd()) }
+    }
+}
+
 #[cfg(windows)]
 impl FromHandle for os_pipe::PipeWriter {
     #[inline]
     fn from_handle(owned: OwnedHandle) -> Self {
+        unsafe { Self::from_raw_handle(owned.into_raw_handle()) }
+    }
+}
+
+#[cfg(windows)]
+impl From<OwnedHandle> for os_pipe::PipeWriter {
+    #[inline]
+    fn from(owned: OwnedHandle) -> Self {
         unsafe { Self::from_raw_handle(owned.into_raw_handle()) }
     }
 }

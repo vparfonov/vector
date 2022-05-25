@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+## [0.5.5] - 2022-07-09
+### Fixed
+- Limit mapping length to `isize::MAX` to prevent undefined behavior
+  on calling `std::slice::from_raw_parts`. Technically affects only 32-bit systems.
+  [@adamreichold](https://github.com/adamreichold)
+
 ## [0.5.4] - 2022-06-04
 ### Added
 - Add madvice operations specific to Darwin. [@turbocool3r](https://github.com/turbocool3r)
@@ -100,7 +106,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 - `winapi` dependency. [memmap-rs/pull/89](https://github.com/danburkert/memmap-rs/pull/89)
 
-[Unreleased]: https://github.com/RazrFalcon/memmap2-rs/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/RazrFalcon/memmap2-rs/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/RazrFalcon/memmap2-rs/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/RazrFalcon/memmap2-rs/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/RazrFalcon/memmap2-rs/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/RazrFalcon/memmap2-rs/compare/v0.5.1...v0.5.2

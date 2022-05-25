@@ -51,13 +51,14 @@ use std::fmt;
 #[cfg(not(any(unix, windows)))]
 use std::fs::File;
 use std::io::{Error, ErrorKind, Result};
+use std::isize;
+use std::mem;
 use std::ops::{Deref, DerefMut};
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawHandle, RawHandle};
 use std::slice;
-use std::usize;
 
 #[cfg(not(any(unix, windows)))]
 pub struct MmapRawDescriptor<'a>(&'a File);
@@ -237,15 +238,20 @@ impl MmapOptions {
             }
             let len = file_len - self.offset;
 
-            // This check it not relevant on 64bit targets, because usize == u64
-            #[cfg(not(target_pointer_width = "64"))]
-            {
-                if len > (usize::MAX as u64) {
-                    return Err(Error::new(
-                        ErrorKind::InvalidData,
-                        "memory map length overflows usize",
-                    ));
-                }
+            // Rust's slice cannot be larger than isize::MAX.
+            // See https://doc.rust-lang.org/std/slice/fn.from_raw_parts.html
+            //
+            // This is not a problem on 64-bit targets, but on 32-bit one
+            // having a file or an anonymous mapping larger than 2GB is quite normal
+            // and we have to prevent it.
+            //
+            // The code below is essentially the same as in Rust's std:
+            // https://github.com/rust-lang/rust/blob/db78ab70a88a0a5e89031d7ee4eccec835dcdbde/library/alloc/src/raw_vec.rs#L495
+            if mem::size_of::<usize>() < 8 && len > isize::MAX as u64 {
+                return Err(Error::new(
+                    ErrorKind::InvalidData,
+                    "memory map length overflows isize",
+                ));
             }
 
             Ok(len as usize)
@@ -457,14 +463,26 @@ impl MmapOptions {
 
     /// Creates an anonymous memory map.
     ///
-    /// Note: the memory map length must be configured to be greater than 0 before creating an
-    /// anonymous memory map using `MmapOptions::len()`.
+    /// The memory map length should be configured using [`MmapOptions::len()`]
+    /// before creating an anonymous memory map, otherwise a zero-length mapping
+    /// will be crated.
     ///
     /// # Errors
     ///
-    /// This method returns an error when the underlying system call fails.
+    /// This method returns an error when the underlying system call fails or
+    /// when `len > isize::MAX`.
     pub fn map_anon(&self) -> Result<MmapMut> {
-        MmapInner::map_anon(self.len.unwrap_or(0), self.stack).map(|inner| MmapMut { inner })
+        let len = self.len.unwrap_or(0);
+
+        // See get_len() for details.
+        if mem::size_of::<usize>() < 8 && len > isize::MAX as usize {
+            return Err(Error::new(
+                ErrorKind::InvalidData,
+                "memory map length overflows isize",
+            ));
+        }
+
+        MmapInner::map_anon(len, self.stack).map(|inner| MmapMut { inner })
     }
 
     /// Creates a raw memory map.
@@ -856,7 +874,8 @@ impl MmapMut {
     ///
     /// # Errors
     ///
-    /// This method returns an error when the underlying system call fails.
+    /// This method returns an error when the underlying system call fails or
+    /// when `len > isize::MAX`.
     pub fn map_anon(length: usize) -> Result<MmapMut> {
         MmapOptions::new().len(length).map_anon()
     }
@@ -1158,6 +1177,17 @@ mod test {
     }
 
     #[test]
+    #[cfg(target_pointer_width = "32")]
+    fn map_anon_len_overflow() {
+        let res = MmapMut::map_anon(0x80000000);
+
+        assert_eq!(
+            res.unwrap_err().to_string(),
+            "memory map length overflows isize"
+        );
+    }
+
+    #[test]
     fn file_write() {
         let tempdir = tempfile::tempdir().unwrap();
         let path = tempdir.path().join("mmap");
@@ -1333,7 +1363,6 @@ mod test {
 
     #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
     fn jit_x86(mut mmap: MmapMut) {
-        use std::mem;
         mmap[0] = 0xB8; // mov eax, 0xAB
         mmap[1] = 0xAB;
         mmap[2] = 0x00;
@@ -1343,7 +1372,7 @@ mod test {
 
         let mmap = mmap.make_exec().expect("make_exec");
 
-        let jitfn: extern "C" fn() -> u8 = unsafe { mem::transmute(mmap.as_ptr()) };
+        let jitfn: extern "C" fn() -> u8 = unsafe { std::mem::transmute(mmap.as_ptr()) };
         assert_eq!(jitfn(), 0xab);
     }
 

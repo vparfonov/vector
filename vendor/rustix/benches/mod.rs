@@ -2,7 +2,7 @@
     windows,
     target_os = "emscripten",
     target_os = "redox",
-    target_os = "wasi"
+    target_os = "wasi",
 ))]
 fn main() {
     unimplemented!()
@@ -12,7 +12,7 @@ fn main() {
     windows,
     target_os = "emscripten",
     target_os = "redox",
-    target_os = "wasi"
+    target_os = "wasi",
 )))]
 use criterion::{criterion_group, criterion_main};
 
@@ -20,7 +20,7 @@ use criterion::{criterion_group, criterion_main};
     windows,
     target_os = "emscripten",
     target_os = "redox",
-    target_os = "wasi"
+    target_os = "wasi",
 )))]
 mod suite {
     use criterion::Criterion;
@@ -30,7 +30,7 @@ mod suite {
 
         c.bench_function("simple statat", |b| {
             b.iter(|| {
-                statat(&cwd(), "/", AtFlags::empty()).unwrap();
+                statat(cwd(), "/", AtFlags::empty()).unwrap();
             })
         });
     }
@@ -62,7 +62,7 @@ mod suite {
                     assert_eq!(
                         libc::fstatat(
                             libc::AT_FDCWD,
-                            rustix::zstr!("/").as_ptr() as _,
+                            rustix::cstr!("/").as_ptr() as _,
                             s.as_mut_ptr(),
                             0
                         ),
@@ -78,7 +78,7 @@ mod suite {
 
         c.bench_function("simple statat cstr", |b| {
             b.iter(|| {
-                statat(&cwd(), rustix::zstr!("/"), AtFlags::empty()).unwrap();
+                statat(cwd(), rustix::cstr!("/"), AtFlags::empty()).unwrap();
             })
         });
     }
@@ -135,7 +135,7 @@ mod suite {
     windows,
     target_os = "emscripten",
     target_os = "redox",
-    target_os = "wasi"
+    target_os = "wasi",
 )))]
 criterion_group!(
     benches,
@@ -152,6 +152,6 @@ criterion_group!(
     windows,
     target_os = "emscripten",
     target_os = "redox",
-    target_os = "wasi"
+    target_os = "wasi",
 )))]
 criterion_main!(benches);

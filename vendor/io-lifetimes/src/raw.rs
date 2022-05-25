@@ -3,8 +3,6 @@
 //! On Unix, "everything is a file descriptor". On Windows, file/pipe/process
 //! handles are distinct from socket descriptors. This file provides a minimal
 //! layer of portability over this difference.
-//!
-//! TODO: Should this layer be folded into types.rs/traits.rs?
 
 #[cfg(unix)]
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
@@ -148,6 +146,14 @@ impl<T: IntoRawHandle> IntoRawFilelike for T {
 pub trait IntoRawSocketlike: IntoRawFd {
     /// Returns the raw value.
     fn into_raw_socketlike(self) -> RawSocketlike;
+}
+
+#[cfg(any(unix, target_os = "wasi"))]
+impl<T: IntoRawFd> IntoRawSocketlike for T {
+    #[inline]
+    fn into_raw_socketlike(self) -> RawSocketlike {
+        self.into_raw_fd()
+    }
 }
 
 /// This is a portability abstraction over Unix-like `IntoRawFd` and Windows'

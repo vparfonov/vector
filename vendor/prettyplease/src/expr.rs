@@ -12,7 +12,7 @@ use syn::{
     ExprMacro, ExprMatch, ExprMethodCall, ExprParen, ExprPath, ExprRange, ExprReference,
     ExprRepeat, ExprReturn, ExprStruct, ExprTry, ExprTryBlock, ExprTuple, ExprType, ExprUnary,
     ExprUnsafe, ExprWhile, ExprYield, FieldValue, GenericMethodArgument, Index, Label, Member,
-    MethodTurbofish, PathArguments, RangeLimits, ReturnType, Stmt, Token, UnOp,
+    MethodTurbofish, PathArguments, QSelf, RangeLimits, ReturnType, Stmt, Token, UnOp,
 };
 
 impl Printer {
@@ -215,12 +215,16 @@ impl Printer {
     fn expr_call(&mut self, expr: &ExprCall, beginning_of_line: bool) {
         self.outer_attrs(&expr.attrs);
         self.expr_beginning_of_line(&expr.func, beginning_of_line);
+        self.word("(");
         self.call_args(&expr.args);
+        self.word(")");
     }
 
     fn subexpr_call(&mut self, expr: &ExprCall) {
         self.subexpr(&expr.func, false);
+        self.word("(");
         self.call_args(&expr.args);
+        self.word(")");
     }
 
     fn expr_cast(&mut self, expr: &ExprCast) {
@@ -265,6 +269,30 @@ impl Printer {
                 self.space();
                 self.offset(-INDENT);
                 self.end();
+                self.neverbreak();
+                let wrap_in_brace = match &*expr.body {
+                    Expr::Match(ExprMatch { attrs, .. }) | Expr::Call(ExprCall { attrs, .. }) => {
+                        attr::has_outer(attrs)
+                    }
+                    body => !is_blocklike(body),
+                };
+                if wrap_in_brace {
+                    self.cbox(INDENT);
+                    self.scan_break(BreakToken {
+                        pre_break: Some('{'),
+                        ..BreakToken::default()
+                    });
+                    self.expr(&expr.body);
+                    self.scan_break(BreakToken {
+                        offset: -INDENT,
+                        pre_break: stmt::add_semi(&expr.body).then(|| ';'),
+                        post_break: Some('}'),
+                        ..BreakToken::default()
+                    });
+                    self.end();
+                } else {
+                    self.expr(&expr.body);
+                }
             }
             ReturnType::Type(_arrow, ty) => {
                 if !expr.inputs.is_empty() {
@@ -276,10 +304,10 @@ impl Printer {
                 self.word(" -> ");
                 self.ty(ty);
                 self.nbsp();
+                self.neverbreak();
+                self.expr(&expr.body);
             }
         }
-        self.neverbreak();
-        self.expr(&expr.body);
         self.end();
     }
 
@@ -494,7 +522,9 @@ impl Printer {
             self.method_turbofish(turbofish);
         }
         self.cbox(if unindent_call_args { -INDENT } else { 0 });
+        self.word("(");
         self.call_args(&expr.args);
+        self.word(")");
         self.end();
     }
 
@@ -552,10 +582,14 @@ impl Printer {
     }
 
     fn expr_struct(&mut self, expr: &ExprStruct) {
+        self.expr_qualified_struct(&None, expr);
+    }
+
+    fn expr_qualified_struct(&mut self, qself: &Option<QSelf>, expr: &ExprStruct) {
         self.outer_attrs(&expr.attrs);
         self.cbox(INDENT);
         self.ibox(-INDENT);
-        self.path(&expr.path);
+        self.qpath(qself, &expr.path);
         self.end();
         self.word(" {");
         self.space_if_nonempty();
@@ -650,9 +684,150 @@ impl Printer {
         self.word("}");
     }
 
+    #[cfg(not(feature = "verbatim"))]
     fn expr_verbatim(&mut self, expr: &TokenStream) {
         if !expr.is_empty() {
             unimplemented!("Expr::Verbatim `{}`", expr);
+        }
+    }
+
+    #[cfg(feature = "verbatim")]
+    fn expr_verbatim(&mut self, tokens: &TokenStream) {
+        use syn::parse::{Parse, ParseStream, Result};
+        use syn::{braced, BoundLifetimes};
+
+        enum ExprVerbatim {
+            Empty,
+            Infer,
+            RawReference(RawReference),
+            ConstBlock(ConstBlock),
+            ClosureWithLifetimes(ClosureWithLifetimes),
+            QualifiedStruct(QualifiedStruct),
+        }
+
+        struct RawReference {
+            mutable: bool,
+            expr: Expr,
+        }
+
+        struct ConstBlock {
+            attrs: Vec<Attribute>,
+            block: Block,
+        }
+
+        struct ClosureWithLifetimes {
+            lifetimes: BoundLifetimes,
+            closure: ExprClosure,
+        }
+
+        struct QualifiedStruct {
+            qself: QSelf,
+            strct: ExprStruct,
+        }
+
+        mod kw {
+            syn::custom_keyword!(raw);
+        }
+
+        impl Parse for ExprVerbatim {
+            fn parse(input: ParseStream) -> Result<Self> {
+                let lookahead = input.lookahead1();
+                if input.is_empty() {
+                    Ok(ExprVerbatim::Empty)
+                } else if lookahead.peek(Token![_]) {
+                    input.parse::<Token![_]>()?;
+                    Ok(ExprVerbatim::Infer)
+                } else if lookahead.peek(Token![&]) {
+                    input.parse::<Token![&]>()?;
+                    input.parse::<kw::raw>()?;
+                    let mutable = input.parse::<Option<Token![mut]>>()?.is_some();
+                    if !mutable {
+                        input.parse::<Token![const]>()?;
+                    }
+                    let expr: Expr = input.parse()?;
+                    Ok(ExprVerbatim::RawReference(RawReference { mutable, expr }))
+                } else if lookahead.peek(Token![const]) {
+                    input.parse::<Token![const]>()?;
+                    let content;
+                    let brace_token = braced!(content in input);
+                    let attrs = content.call(Attribute::parse_inner)?;
+                    let stmts = content.call(Block::parse_within)?;
+                    Ok(ExprVerbatim::ConstBlock(ConstBlock {
+                        attrs,
+                        block: Block { brace_token, stmts },
+                    }))
+                } else if lookahead.peek(Token![for]) {
+                    let lifetimes = input.parse()?;
+                    let closure = input.parse()?;
+                    Ok(ExprVerbatim::ClosureWithLifetimes(ClosureWithLifetimes {
+                        lifetimes,
+                        closure,
+                    }))
+                } else if lookahead.peek(Token![<]) {
+                    let path: ExprPath = input.parse()?;
+                    let content;
+                    let mut expr = QualifiedStruct {
+                        qself: path.qself.unwrap(),
+                        strct: ExprStruct {
+                            attrs: Vec::new(),
+                            brace_token: braced!(content in input),
+                            path: path.path,
+                            fields: Punctuated::new(),
+                            dot2_token: None,
+                            rest: None,
+                        },
+                    };
+                    while !content.is_empty() {
+                        if content.peek(Token![..]) {
+                            expr.strct.dot2_token = Some(content.parse()?);
+                            if !content.is_empty() {
+                                expr.strct.rest = Some(Box::new(content.parse()?));
+                            }
+                            break;
+                        }
+                        expr.strct.fields.push(content.parse()?);
+                        if content.is_empty() {
+                            break;
+                        }
+                        let punct: Token![,] = content.parse()?;
+                        expr.strct.fields.push_punct(punct);
+                    }
+                    Ok(ExprVerbatim::QualifiedStruct(expr))
+                } else {
+                    Err(lookahead.error())
+                }
+            }
+        }
+
+        let expr: ExprVerbatim = match syn::parse2(tokens.clone()) {
+            Ok(expr) => expr,
+            Err(_) => unimplemented!("Expr::Verbatim `{}`", tokens),
+        };
+
+        match expr {
+            ExprVerbatim::Empty => {}
+            ExprVerbatim::Infer => {
+                self.word("_");
+            }
+            ExprVerbatim::RawReference(expr) => {
+                self.word("&raw ");
+                self.word(if expr.mutable { "mut " } else { "const " });
+                self.expr(&expr.expr);
+            }
+            ExprVerbatim::ConstBlock(expr) => {
+                self.outer_attrs(&expr.attrs);
+                self.cbox(INDENT);
+                self.word("const ");
+                self.small_block(&expr.block, &expr.attrs);
+                self.end();
+            }
+            ExprVerbatim::ClosureWithLifetimes(expr) => {
+                self.bound_lifetimes(&expr.lifetimes);
+                self.expr_closure(&expr.closure);
+            }
+            ExprVerbatim::QualifiedStruct(expr) => {
+                self.expr_qualified_struct(&Some(expr.qself), &expr.strct);
+            }
         }
     }
 
@@ -775,7 +950,7 @@ impl Printer {
 
     fn method_turbofish(&mut self, turbofish: &MethodTurbofish) {
         self.word("::<");
-        self.cbox(0);
+        self.cbox(INDENT);
         self.zerobreak();
         for arg in turbofish.args.iter().delimited() {
             self.generic_method_argument(&arg);
@@ -794,22 +969,9 @@ impl Printer {
     }
 
     fn call_args(&mut self, args: &Punctuated<Expr, Token![,]>) {
-        self.word("(");
         let mut iter = args.iter();
         match (iter.next(), iter.next()) {
-            (
-                Some(
-                    expr @ (Expr::Array(ExprArray { attrs, .. })
-                    | Expr::Async(ExprAsync { attrs, .. })
-                    | Expr::Block(ExprBlock { attrs, .. })
-                    | Expr::Closure(ExprClosure { attrs, .. })
-                    | Expr::Struct(ExprStruct { attrs, .. })
-                    | Expr::TryBlock(ExprTryBlock { attrs, .. })
-                    | Expr::Tuple(ExprTuple { attrs, .. })
-                    | Expr::Unsafe(ExprUnsafe { attrs, .. })),
-                ),
-                None,
-            ) if !attr::has_outer(attrs) => {
+            (Some(expr), None) if is_blocklike(expr) => {
                 self.expr(expr);
             }
             _ => {
@@ -823,7 +985,6 @@ impl Printer {
                 self.end();
             }
         }
-        self.word(")");
     }
 
     fn small_block(&mut self, block: &Block, attrs: &[Attribute]) {
@@ -1025,4 +1186,18 @@ fn is_short_ident(expr: &Expr) -> bool {
         }
     }
     false
+}
+
+fn is_blocklike(expr: &Expr) -> bool {
+    match expr {
+        Expr::Array(ExprArray { attrs, .. })
+        | Expr::Async(ExprAsync { attrs, .. })
+        | Expr::Block(ExprBlock { attrs, .. })
+        | Expr::Closure(ExprClosure { attrs, .. })
+        | Expr::Struct(ExprStruct { attrs, .. })
+        | Expr::TryBlock(ExprTryBlock { attrs, .. })
+        | Expr::Tuple(ExprTuple { attrs, .. })
+        | Expr::Unsafe(ExprUnsafe { attrs, .. }) => !attr::has_outer(attrs),
+        _ => false,
+    }
 }

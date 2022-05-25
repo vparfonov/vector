@@ -1,4 +1,4 @@
-#![allow(clippy::non_ascii_literal)]
+#![allow(clippy::assertions_on_result_states, clippy::non_ascii_literal)]
 
 use proc_macro2::{Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};
 use std::panic;
@@ -545,6 +545,13 @@ fn default_tokenstream_is_empty() {
     let default_token_stream = <TokenStream as Default>::default();
 
     assert!(default_token_stream.is_empty());
+}
+
+#[test]
+fn tokenstream_size_hint() {
+    let tokens = "a b (c d) e".parse::<TokenStream>().unwrap();
+
+    assert_eq!(tokens.into_iter().size_hint(), (4, Some(4)));
 }
 
 #[test]

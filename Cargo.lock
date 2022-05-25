@@ -840,8 +840,7 @@ dependencies = [
  "http",
  "http-body",
  "hyper",
- "hyper-rustls",
- "lazy_static",
+ "hyper-tls",
  "pin-project 1.0.10",
  "pin-project-lite",
  "tokio",
@@ -877,8 +876,6 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "pin-project 1.0.10",
- "tokio",
- "tokio-util 0.6.8",
  "tracing 0.1.32",
 ]
 

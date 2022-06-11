@@ -1,7 +1,4 @@
-FROM registry-proxy.engineering.redhat.com/rh-osbs/ubi8:8.6-547 as builder
-
-RUN rm /etc/yum.repos.d/*
-ADD 8.6-compose.repo /etc/yum.repos.d
+FROM registry.redhat.io/ubi8:8.6-754 as builder
 
 RUN INSTALL_PKGS=" \
       rust-toolset \

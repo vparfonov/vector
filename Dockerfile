@@ -21,7 +21,8 @@ RUN mkdir -p /src
 
 WORKDIR /src
 COPY . /src
-ENV PROTOC /src/protoc/protoc
+
+ENV PROTOC /src/thirdparty/protoc/protoc
 
 RUN make build
 

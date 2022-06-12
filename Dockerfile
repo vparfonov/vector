@@ -22,9 +22,7 @@ RUN mkdir -p /src
 WORKDIR /src
 COPY . /src
 
-ENV PROTOC /src/thirdparty/protoc/protoc
-
-RUN make build
+RUN PROTOC=/src/thirdparty/protoc/protoc-linux-$(arch)  make build
 
 
 FROM registry.redhat.io/ubi8:8.6-754

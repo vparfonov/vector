@@ -524,8 +524,6 @@ dependencies = [
 [[package]]
 name = "aws-config"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2da63196d2d0dd38667b404459a35d32562a8d83c1f46c5b789ab89ab176fd53"
 dependencies = [
  "aws-http",
  "aws-sdk-sso",
@@ -541,7 +539,7 @@ dependencies = [
  "hex",
  "http",
  "hyper",
- "ring",
+ "openssl",
  "tokio",
  "tower",
  "tracing 0.1.32",
@@ -796,8 +794,6 @@ dependencies = [
 [[package]]
 name = "aws-sigv4"
 version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea07a5a108ee538793d681d608057218df95c5575f6c0699a1973c27a09334b2"
 dependencies = [
  "aws-smithy-eventstream",
  "aws-smithy-http",
@@ -806,9 +802,9 @@ dependencies = [
  "hex",
  "http",
  "once_cell",
+ "openssl",
  "percent-encoding",
  "regex",
- "ring",
  "time 0.3.7",
  "tracing 0.1.32",
 ]
@@ -840,8 +836,7 @@ dependencies = [
  "http",
  "http-body",
  "hyper",
- "hyper-rustls",
- "lazy_static",
+ "hyper-tls",
  "pin-project 1.0.10",
  "pin-project-lite",
  "tokio",
@@ -877,8 +872,6 @@ dependencies = [
  "once_cell",
  "percent-encoding",
  "pin-project 1.0.10",
- "tokio",
- "tokio-util 0.6.8",
  "tracing 0.1.32",
 ]
 
@@ -5108,15 +5101,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
-name = "openssl-src"
-version = "111.18.0+1.1.1n"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7897a926e1e8d00219127dc020130eca4292e5ca666dd592480d72c3eca2ff6c"
-dependencies = [
- "cc",
-]
-
-[[package]]
 name = "openssl-sys"
 version = "0.9.72"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5125,7 +5109,6 @@ dependencies = [
  "autocfg",
  "cc",
  "libc",
- "openssl-src",
  "pkg-config",
  "vcpkg",
 ]

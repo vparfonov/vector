@@ -140,17 +140,17 @@ metrics = { version = "0.17.1", default-features = false, features = ["std"] }
 metrics-tracing-context = { version = "0.9.0", default-features = false }
 
 # AWS - Official SDK
-aws-config = { version = "0.9.0", optional = true }
+aws-config = { version = "0.9.0", optional = true, default-features = false, features = ["native-tls"] }
 aws-types = { version = "0.9.0", optional = true, features = ["hardcoded-credentials"]}
-aws-sdk-s3 = { version = "0.9.0", optional = true }
-aws-sdk-sqs = { version = "0.9.0", optional = true }
-aws-sdk-cloudwatch = { version = "0.9.0", optional = true }
-aws-sdk-cloudwatchlogs = { version = "0.9.0", optional = true }
-aws-sdk-elasticsearch = {version = "0.9.0", optional = true }
-aws-sdk-firehose = { version = "0.9.0", optional = true }
-aws-sdk-kinesis = { version = "0.9.0", optional = true }
-aws-sigv4 = { version = "0.9.0", optional = true }
-aws-smithy-client = { version = "0.39.0", optional = true }
+aws-sdk-s3 = { version = "0.9.0", optional = true, default-features = false, features = ["native-tls"] }
+aws-sdk-sqs = { version = "0.9.0", optional = true, default-features = false, features = ["native-tls"] }
+aws-sdk-cloudwatch = { version = "0.9.0", optional = true, default-features = false, features = ["native-tls"] }
+aws-sdk-cloudwatchlogs = { version = "0.9.0", optional = true, default-features = false, features = ["native-tls"] }
+aws-sdk-elasticsearch = {version = "0.9.0", optional = true, default-features = false, features = ["native-tls"] }
+aws-sdk-firehose = { version = "0.9.0", optional = true, default-features = false, features = ["native-tls"] }
+aws-sdk-kinesis = { version = "0.9.0", optional = true, default-features = false, features = ["native-tls"] }
+aws-sigv4 = { version = "0.9.0", optional = true, features = ["openssl"] }
+aws-smithy-client = { version = "0.39.0", optional = true, default-features = false, features = ["native-tls"] }
 aws-smithy-http = { version = "0.39.0", optional = true }
 
 # Azure
@@ -208,7 +208,7 @@ async-compression = { version = "0.3.12", default-features = false, features = [
 avro-rs = { version = "0.13.0", default-features = false, optional = true }
 base64 = { version = "0.13.0", default-features = false, optional = true }
 bloom = { version = "0.3.2", default-features = false, optional = true }
-bollard = { version = "0.11.1", default-features = false, features = ["ssl"] }
+bollard = { version = "0.11.1", default-features = false, features = ["ssl"], optional = true }
 bytes = { version = "1.1.0", default-features = false, features = ["serde"] }
 bytesize = { version = "1.1.0", default-features = false }
 chrono = { version = "0.4.19", default-features = false, features = ["serde"] }
@@ -251,7 +251,7 @@ nom = { version = "7.1.1", default-features = false, optional = true }
 notify = { version = "4.0.17", default-features = false }
 num_cpus = { version = "1.13.1", default-features = false }
 once_cell = { version = "1.10", default-features = false }
-openssl = { version = "0.10.38", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.38", default-features = false}
 openssl-probe = { version = "0.1.5", default-features = false }
 ordered-float = { version = "2.10.0", default-features = false }
 percent-encoding = { version = "2.1.0", default-features = false }
@@ -334,6 +334,8 @@ leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch 
 # Removes dependency on `time` v0.1
 # https://github.com/chronotope/chrono/pull/578
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
+aws-config = { path = "patch/aws-config" }
+aws-sigv4 = { path = "patch/aws-sigv4" }
 
 [features]
 ocp-logging = [

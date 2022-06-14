@@ -21,3 +21,4 @@ RUN mkdir -p /src
 
 WORKDIR /src
 COPY . /src
+RUN mkdir -p ~/.cargo/bin && ln -s /src/thirdparty/cargo-nextest/cargo-nextest-linux-$(arch) ~/.cargo/bin/cargo-nextest

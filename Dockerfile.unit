@@ -17,7 +17,7 @@ RUN INSTALL_PKGS=" \
     rpm -V $INSTALL_PKGS && \
     yum clean all
 
-RUN mkdir -p /src
+RUN mkdir -p /src ~/.cargo/bin && curl -LsSf https://get.nexte.st/latest/linux | tar zxf - -C ~/.cargo/bin
 
 WORKDIR /src
 COPY . /src

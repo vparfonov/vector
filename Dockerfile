@@ -2,6 +2,7 @@ FROM registry.redhat.io/ubi8:8.6-754 as builder
 
 RUN INSTALL_PKGS=" \
       rust-toolset \
+      gcc-c++ \
       cmake \
       make \
       git \

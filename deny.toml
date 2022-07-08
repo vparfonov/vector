@@ -50,7 +50,7 @@ ignore = [
 ]
 
 [bans]
+multiple-versions = "allow"
 deny = [
-    # https://github.com/vectordotdev/vector/issues/11257
-    { name = "tokio-util", version = ">=0.6.9" },
+    { name = "ring", wrappers = ["azure_storage"] },
 ]

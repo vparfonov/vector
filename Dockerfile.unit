@@ -21,4 +21,7 @@ RUN mkdir -p /src
 
 WORKDIR /src
 COPY . /src
-RUN mkdir -p ~/.cargo/bin && ln -s /src/thirdparty/cargo-nextest/cargo-nextest-linux-$(arch) ~/.cargo/bin/cargo-nextest
+RUN mkdir -p ~/.cargo/bin && \
+    for plugin in nextest deny; do \
+        ln -s /src/thirdparty/cargo-${plugin}/cargo-${plugin}-linux-$(arch) ~/.cargo/bin/cargo-${plugin}; \
+	done

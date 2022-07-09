@@ -13,17 +13,39 @@
 edition = "2021"
 rust-version = "1.56"
 name = "kube-client"
-version = "0.70.0"
-authors = ["clux <sszynrae@gmail.com>", "Teo Klestrup Röijezon <teo@nullable.se>", "kazk <kazk.dev@gmail.com>"]
+version = "0.72.0"
+authors = [
+    "clux <sszynrae@gmail.com>",
+    "Teo Klestrup Röijezon <teo@nullable.se>",
+    "kazk <kazk.dev@gmail.com>",
+]
 description = "Kubernetes client"
 readme = "../README.md"
-keywords = ["kubernetes", "client"]
+keywords = [
+    "kubernetes",
+    "client",
+]
 categories = ["web-programming::http-client"]
 license = "Apache-2.0"
 repository = "https://github.com/kube-rs/kube-rs"
+
 [package.metadata.docs.rs]
-features = ["client", "native-tls", "rustls-tls", "openssl-tls", "ws", "oauth", "jsonpatch", "admission", "k8s-openapi/v1_22"]
-rustdoc-args = ["--cfg", "docsrs"]
+features = [
+    "client",
+    "native-tls",
+    "rustls-tls",
+    "openssl-tls",
+    "ws",
+    "oauth",
+    "jsonpatch",
+    "admission",
+    "k8s-openapi/v1_23",
+]
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+]
+
 [dependencies.base64]
 version = "0.13.0"
 optional = true
@@ -59,7 +81,12 @@ optional = true
 
 [dependencies.hyper]
 version = "0.14.13"
-features = ["client", "http1", "stream", "tcp"]
+features = [
+    "client",
+    "http1",
+    "stream",
+    "tcp",
+]
 optional = true
 
 [dependencies.hyper-openssl]
@@ -88,7 +115,7 @@ features = []
 default-features = false
 
 [dependencies.kube-core]
-version = "^0.70.0"
+version = "=0.72.0"
 
 [dependencies.openssl]
 version = "0.10.36"
@@ -112,12 +139,15 @@ features = ["dangerous_configuration"]
 optional = true
 
 [dependencies.rustls-pemfile]
-version = "0.3.0"
+version = "1.0.0"
 optional = true
 
 [dependencies.secrecy]
 version = "0.8.0"
-features = ["alloc", "serde"]
+features = [
+    "alloc",
+    "serde",
+]
 
 [dependencies.serde]
 version = "1.0.130"
@@ -140,7 +170,11 @@ version = "1.0.29"
 
 [dependencies.tokio]
 version = "1.14.0"
-features = ["time", "signal", "sync"]
+features = [
+    "time",
+    "signal",
+    "sync",
+]
 optional = true
 
 [dependencies.tokio-native-tls]
@@ -153,31 +187,47 @@ optional = true
 
 [dependencies.tokio-util]
 version = "0.7.0"
-features = ["io", "codec"]
+features = [
+    "io",
+    "codec",
+]
 optional = true
 
 [dependencies.tower]
 version = "0.4.6"
-features = ["buffer", "filter", "util"]
+features = [
+    "buffer",
+    "filter",
+    "util",
+]
 optional = true
 
 [dependencies.tower-http]
-version = "0.2.0"
-features = ["auth", "map-response-body", "trace"]
+version = "0.3.2"
+features = [
+    "auth",
+    "map-response-body",
+    "trace",
+]
 optional = true
 
 [dependencies.tracing]
 version = "0.1.29"
 features = ["log"]
 optional = true
+
 [dev-dependencies.k8s-openapi]
 version = "0.14.0"
-features = ["v1_22"]
+features = ["v1_23"]
 default-features = false
 
 [dev-dependencies.kube]
 version = "<1.0.0, >=0.61.0"
-features = ["derive", "client", "ws"]
+features = [
+    "derive",
+    "client",
+    "ws",
+]
 
 [dev-dependencies.schemars]
 version = "0.8.6"
@@ -196,16 +246,64 @@ version = "0.4.0"
 version = "0.4.0"
 
 [features]
-__non_core = ["tracing", "serde_yaml", "base64"]
+__non_core = [
+    "tracing",
+    "serde_yaml",
+    "base64",
+]
 admission = ["kube-core/admission"]
-client = ["config", "__non_core", "hyper", "http-body", "tower", "tower-http", "hyper-timeout", "pin-project", "chrono", "jsonpath_lib", "bytes", "futures", "tokio", "tokio-util", "either"]
-config = ["__non_core", "pem", "dirs"]
-default = ["client", "native-tls"]
-deprecated-crd-v1beta1 = ["kube-core/deprecated-crd-v1beta1"]
-gzip = ["client", "tower-http/decompression-gzip"]
+client = [
+    "config",
+    "__non_core",
+    "hyper",
+    "http-body",
+    "tower",
+    "tower-http",
+    "hyper-timeout",
+    "pin-project",
+    "chrono",
+    "jsonpath_lib",
+    "bytes",
+    "futures",
+    "tokio",
+    "tokio-util",
+    "either",
+]
+config = [
+    "__non_core",
+    "pem",
+    "dirs",
+]
+default = [
+    "client",
+    "openssl-tls",
+]
+gzip = [
+    "client",
+    "tower-http/decompression-gzip",
+]
 jsonpatch = ["kube-core/jsonpatch"]
-native-tls = ["openssl", "hyper-tls", "tokio-native-tls"]
-oauth = ["client", "tame-oauth"]
-openssl-tls = ["openssl", "hyper-openssl"]
-rustls-tls = ["rustls", "rustls-pemfile", "hyper-rustls"]
-ws = ["client", "tokio-tungstenite", "rand", "kube-core/ws"]
+native-tls = [
+    "openssl",
+    "hyper-tls",
+    "tokio-native-tls",
+]
+oauth = [
+    "client",
+    "tame-oauth",
+]
+openssl-tls = [
+    "openssl",
+    "hyper-openssl",
+]
+rustls-tls = [
+    "rustls",
+    "rustls-pemfile",
+    "hyper-rustls",
+]
+ws = [
+    "client",
+    "tokio-tungstenite",
+    "rand",
+    "kube-core/ws",
+]

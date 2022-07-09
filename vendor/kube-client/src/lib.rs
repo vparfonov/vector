@@ -174,6 +174,21 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore] // needs cluster (lists pods)
+    #[cfg(all(feature = "openssl-tls"))]
+    async fn custom_client_openssl_tls_configuration() -> Result<(), Box<dyn std::error::Error>> {
+        let config = Config::infer().await?;
+        let https = config.openssl_https_connector()?;
+        let service = ServiceBuilder::new()
+            .layer(config.base_uri_layer())
+            .service(hyper::Client::builder().build(https));
+        let client = Client::new(service, config.default_namespace);
+        let pods: Api<Pod> = Api::default_namespaced(client);
+        pods.list(&Default::default()).await?;
+        Ok(())
+    }
+
+    #[tokio::test]
     #[ignore] // needs cluster (lists api resources)
     #[cfg(all(feature = "discovery"))]
     async fn group_discovery_oneshot() -> Result<(), Box<dyn std::error::Error>> {
@@ -336,7 +351,7 @@ mod test {
                 .collect::<Vec<_>>()
                 .await
                 .join("");
-            attached.await;
+            attached.join().await.unwrap();
             assert_eq!(out.lines().count(), 3);
             assert_eq!(out, "1\n2\n3\n");
         }
@@ -354,15 +369,16 @@ mod test {
             let mut stdin_writer = attached.stdin().unwrap();
             let mut stdout_stream = tokio_util::io::ReaderStream::new(attached.stdout().unwrap());
             let next_stdout = stdout_stream.next();
-            stdin_writer.write(b"echo test string 1\n").await?;
+            stdin_writer.write_all(b"echo test string 1\n").await?;
             let stdout = String::from_utf8(next_stdout.await.unwrap().unwrap().to_vec()).unwrap();
             println!("{}", stdout);
             assert_eq!(stdout, "test string 1\n");
 
             // AttachedProcess resolves with status object.
             // Send `exit 1` to get a failure status.
-            stdin_writer.write(b"exit 1\n").await?;
-            if let Some(status) = attached.await {
+            stdin_writer.write_all(b"exit 1\n").await?;
+            let status = attached.take_status().unwrap();
+            if let Some(status) = status.await {
                 println!("{:?}", status);
                 assert_eq!(status.status, Some("Failure".to_owned()));
                 assert_eq!(status.reason, Some("NonZeroExitCode".to_owned()));

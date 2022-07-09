@@ -12,6 +12,7 @@ use tower_service::Service;
 /// Service that serves a file.
 #[derive(Clone, Debug)]
 pub struct ServeFile(ServeDir);
+
 // Note that this is just a special case of ServeDir
 impl ServeFile {
     /// Create a new [`ServeFile`].
@@ -21,7 +22,7 @@ impl ServeFile {
         let guess = mime_guess::from_path(path.as_ref());
         let mime = guess
             .first_raw()
-            .map(|mime| HeaderValue::from_static(mime))
+            .map(HeaderValue::from_static)
             .unwrap_or_else(|| {
                 HeaderValue::from_str(mime::APPLICATION_OCTET_STREAM.as_ref()).unwrap()
             });
@@ -91,7 +92,10 @@ impl ServeFile {
     }
 }
 
-impl<ReqBody> Service<Request<ReqBody>> for ServeFile {
+impl<ReqBody> Service<Request<ReqBody>> for ServeFile
+where
+    ReqBody: Send + 'static,
+{
     type Error = <ServeDir as Service<Request<ReqBody>>>::Error;
     type Response = <ServeDir as Service<Request<ReqBody>>>::Response;
     type Future = <ServeDir as Service<Request<ReqBody>>>::Future;
@@ -101,6 +105,7 @@ impl<ReqBody> Service<Request<ReqBody>> for ServeFile {
         Poll::Ready(Ok(()))
     }
 
+    #[inline]
     fn call(&mut self, req: Request<ReqBody>) -> Self::Future {
         self.0.call(req)
     }
@@ -108,11 +113,7 @@ impl<ReqBody> Service<Request<ReqBody>> for ServeFile {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read;
-    use std::str::FromStr;
-
-    #[allow(unused_imports)]
-    use super::*;
+    use crate::services::ServeFile;
     use brotli::BrotliDecompress;
     use flate2::bufread::DeflateDecoder;
     use flate2::bufread::GzDecoder;
@@ -121,6 +122,9 @@ mod tests {
     use http::{Request, StatusCode};
     use http_body::Body as _;
     use hyper::Body;
+    use mime::Mime;
+    use std::io::Read;
+    use std::str::FromStr;
     use tower::ServiceExt;
 
     #[tokio::test]
@@ -446,6 +450,7 @@ mod tests {
         assert_eq!(res.status(), StatusCode::NOT_FOUND);
         assert!(res.headers().get(header::CONTENT_TYPE).is_none());
     }
+
     #[tokio::test]
     async fn last_modified() {
         let svc = ServeFile::new("../README.md");

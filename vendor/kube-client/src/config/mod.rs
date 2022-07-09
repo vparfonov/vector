@@ -132,7 +132,7 @@ pub struct Config {
     ///
     /// A value of `None` means no timeout
     pub timeout: Option<std::time::Duration>,
-    /// Whether to accept invalid ceritifacts
+    /// Whether to accept invalid certificates
     pub accept_invalid_certs: bool,
     /// Stores information to tell the cluster who you are.
     pub(crate) auth_info: AuthInfo,
@@ -192,14 +192,7 @@ impl Config {
     /// and relies on you having the service account's token mounted,
     /// as well as having given the service account rbac access to do what you need.
     pub fn from_cluster_env() -> Result<Self, InClusterError> {
-        let cluster_url = if cfg!(feature = "rustls-tls") {
-            // try rolling out new method for rustls which does not support ip based urls anyway
-            // see https://github.com/kube-rs/kube-rs/issues/587
-            incluster_config::kube_dns()
-        } else {
-            incluster_config::kube_server()?
-        };
-
+        let cluster_url = incluster_config::kube_dns();
         let default_namespace = incluster_config::load_default_ns()?;
         let root_cert = incluster_config::load_cert()?;
 

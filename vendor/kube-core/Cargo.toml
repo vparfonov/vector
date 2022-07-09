@@ -13,15 +13,28 @@
 edition = "2021"
 rust-version = "1.56"
 name = "kube-core"
-version = "0.70.0"
-authors = ["clux <sszynrae@gmail.com>", "kazk <kazk.dev@gmail.com>"]
+version = "0.72.0"
+authors = [
+    "clux <sszynrae@gmail.com>",
+    "kazk <kazk.dev@gmail.com>",
+]
 description = "Kube shared types, traits and client-less behavior"
 readme = "../README.md"
 license = "Apache-2.0"
 repository = "https://github.com/kube-rs/kube-rs"
+
 [package.metadata.docs.rs]
-features = ["ws", "admission", "jsonpatch", "k8s-openapi/v1_22"]
-rustdoc-args = ["--cfg", "docsrs"]
+features = [
+    "ws",
+    "admission",
+    "jsonpatch",
+    "k8s-openapi/v1_23",
+]
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+]
+
 [dependencies.chrono]
 version = "0.4.19"
 features = ["clock"]
@@ -58,17 +71,23 @@ version = "1.0.68"
 
 [dependencies.thiserror]
 version = "1.0.29"
+
+[dev-dependencies.assert-json-diff]
+version = "2.0.1"
+
 [dev-dependencies.k8s-openapi]
 version = "0.14.0"
-features = ["v1_22"]
+features = ["v1_23"]
 default-features = false
 
 [dev-dependencies.kube]
 version = "<1.0.0, >=0.53.0"
 
+[dev-dependencies.serde_yaml]
+version = "0.8.23"
+
 [features]
 admission = ["json-patch"]
-deprecated-crd-v1beta1 = []
 jsonpatch = ["json-patch"]
 schema = ["schemars"]
 ws = []

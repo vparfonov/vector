@@ -147,7 +147,7 @@ mod tests {
 
         let _ = spawn_thread(&[file_path.parent().unwrap().to_path_buf()], delay).unwrap();
 
-        if !test(&mut file, delay * 5).await {
+        if !test(&mut file, delay * 12).await {
             panic!("Test timed out");
         }
     }

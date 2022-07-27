@@ -23,6 +23,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - None.
 
+# 0.3.3 (May 08, 2022)
+
+## Added
+
+- **serve_dir:** Add `ServeDir::call_fallback_on_method_not_allowed` to allow calling the fallback
+  for requests that aren't `GET` or `HEAD` ([#264])
+- **request_id:** Add `MakeRequestUuid` for generating request ids using UUIDs ([#266])
+
+[#264]: https://github.com/tower-rs/tower-http/pull/264
+[#266]: https://github.com/tower-rs/tower-http/pull/266
+
+## Fixed
+
+- **serve_dir:** Include `Allow` header for `405 Method Not Allowed` responses ([#263])
+
+[#263]: https://github.com/tower-rs/tower-http/pull/263
+
+# 0.3.2 (April 29, 2022)
+
+## Fixed
+
+- **serve_dir**: Fix empty request parts being passed to `ServeDir`'s fallback instead of the actual ones ([#258])
+
+[#258]: https://github.com/tower-rs/tower-http/pull/258
+
+# 0.3.1 (April 28, 2022)
+
+## Fixed
+
+- **cors**: Only send a single origin in `Access-Control-Allow-Origin` header when a list of
+  allowed origins is configured (the previous behavior of sending a comma-separated list like for
+  allowed methods and allowed headers is not allowed by any standard)
+
+# 0.3.0 (April 25, 2022)
+
+## Added
+
+- **fs**: Add `ServeDir::{fallback, not_found_service}` for calling another service if
+  the file cannot be found ([#243])
+- **fs**: Add `SetStatus` to override status codes ([#248])
+- `ServeDir` and `ServeFile` now respond with `405 Method Not Allowed` to requests where the
+  method isn't `GET` or `HEAD` ([#249])
+- **cors**: Added `CorsLayer::very_permissive` which is like
+  `CorsLayer::permissive` except it (truly) allows credentials. This is made
+  possible by mirroring the request's origin as well as method and headers
+  back as CORS-whitelisted ones ([#237])
+- **cors**: Allow customizing the value(s) for the `Vary` header ([#237])
+
+## Changed
+
+- **cors**: Removed `allow-credentials: true` from `CorsLayer::permissive`.
+  It never actually took effect in compliant browsers because it is mutually
+  exclusive with the `*` wildcard (`Any`) on origins, methods and headers ([#237])
+- **cors**: Rewrote the CORS middleware. Almost all existing usage patterns
+  will continue to work. (BREAKING) ([#237])
+- **cors**: The CORS middleware will now panic if you try to use `Any` in
+  combination with `.allow_credentials(true)`. This configuration worked
+  before, but resulted in browsers ignoring the `allow-credentials` header,
+  which defeats the purpose of setting it and can be very annoying to debug
+  ([#237])
+
+## Fixed
+
+- **fs**: Fix content-length calculation on range requests ([#228])
+
+[#228]: https://github.com/tower-rs/tower-http/pull/228
+[#237]: https://github.com/tower-rs/tower-http/pull/237
+[#243]: https://github.com/tower-rs/tower-http/pull/243
+[#248]: https://github.com/tower-rs/tower-http/pull/248
+[#249]: https://github.com/tower-rs/tower-http/pull/249
+
 # 0.2.4 (March 5, 2022)
 
 ## Added

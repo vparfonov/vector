@@ -354,6 +354,34 @@ chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-defa
 h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094ee1940751b5f4ec88e" }
 
 [features]
+ocp-logging = [
+  "sources-file",
+  "sources-journald",
+  "sources-kubernetes_logs",
+  "sources-prometheus",
+  "sources-internal_metrics",
+  "sources-demo_logs",
+
+  "transforms-remove_fields",
+  "transforms-rename_fields",
+  "transforms-route",
+  "transforms-concat",
+  "transforms-dedupe",
+  "transforms-field_filter",
+  "transforms-filter",
+  "transforms-remap",
+  "transforms-lua",
+
+  "vrl-cli",
+
+  "sinks-aws_cloudwatch_logs",
+  "sinks-elasticsearch",
+  "sinks-file",
+  "sinks-kafka",
+  "sinks-loki",
+  "sinks-console",
+  "sinks-prometheus"
+]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
 default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "vrl-cli", "enterprise"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies

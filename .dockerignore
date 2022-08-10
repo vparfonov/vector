@@ -9,3 +9,8 @@
 !Cargo.toml
 !rust-toolchain.toml
 !scripts
+!Makefile
+!vendor
+!thirdparty
+!.cargo
+!8.7-compose.repo

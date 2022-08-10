@@ -1,0 +1,17 @@
+fragment BirthdayFragment on Person {
+  birthday
+}
+
+query QueryOnInterface {
+  everything {
+    __typename
+    name
+    ... on Dog {
+      isGoodDog
+    }
+    ...BirthdayFragment
+    ... on Organization {
+      industry
+    }
+  }
+}

@@ -487,8 +487,6 @@ dependencies = [
 [[package]]
 name = "aws-config"
 version = "0.15.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a8c0628604c0a0afcd417548f085fd52e4ad54cacbf96437db4f45a27a47636"
 dependencies = [
  "aws-http",
  "aws-sdk-sso",
@@ -504,7 +502,7 @@ dependencies = [
  "hex",
  "http",
  "hyper",
- "ring",
+ "openssl",
  "tokio",
  "tower",
  "tracing 0.1.36",

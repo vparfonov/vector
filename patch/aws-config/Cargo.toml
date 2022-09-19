@@ -69,6 +69,11 @@ default-features = false
 
 [dependencies.ring]
 version = "0.16"
+optional = true
+
+[dependencies.openssl]
+version = "0.10.38"
+optional = true
 
 [dependencies.tokio]
 version = "1"
@@ -118,6 +123,6 @@ version = "0.2.1"
 
 [features]
 default = ["rustls", "rt-tokio"]
-native-tls = ["aws-smithy-client/native-tls"]
+native-tls = ["openssl", "aws-smithy-client/native-tls"]
 rt-tokio = ["aws-smithy-async/rt-tokio"]
-rustls = ["aws-smithy-client/rustls"]
+rustls = ["ring", "aws-smithy-client/rustls"]

@@ -56,6 +56,11 @@ version = "1.5"
 
 [dependencies.ring]
 version = "0.16"
+optional = true
+
+[dependencies.openssl]
+version = "0.10.38"
+optional = true
 
 [dependencies.time]
 version = "0.3.5"

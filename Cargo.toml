@@ -160,7 +160,7 @@ aws-sdk-cloudwatchlogs = { version = "0.15.0", default-features = false, feature
 aws-sdk-elasticsearch = {version = "0.15.0", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-firehose = { version = "0.15.0", default-features = false, features = ["native-tls"], optional = true }
 aws-sdk-kinesis = { version = "0.15.0", default-features = false, features = ["native-tls"], optional = true }
-aws-sigv4 = { version = "0.15.0", default-features = false, optional = true }
+aws-sigv4 = { version = "0.15.0", default-features = false, optional = true, features = ["openssl"] }
 aws-smithy-async = { version = "0.45.0", default-features = false, optional = true }
 aws-smithy-client = { version = "0.45.0", default-features = false, features = ["native-tls"], optional = true}
 aws-smithy-http = { version = "0.45.0", default-features = false, features = ["event-stream"], optional = true }
@@ -352,6 +352,8 @@ leveldb-sys = { git = "https://github.com/vectordotdev/leveldb-sys.git", branch 
 chrono = { git = "https://github.com/vectordotdev/chrono.git", branch = "no-default-time" }
 # Adds `Status::is_reset` test, remove after the next version is released.
 h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094ee1940751b5f4ec88e" }
+
+aws-sigv4 = { path = "patch/aws-sigv4" }
 
 [features]
 ocp-logging = [

@@ -88,7 +88,7 @@ dependencies = [
  "http",
  "hyper",
  "hyper-rustls 0.23.0",
- "ring",
+ "openssl",
  "serde",
  "serde_json",
  "tokio",

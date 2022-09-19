@@ -14,3 +14,5 @@
 !thirdparty
 !.cargo
 !8.7-compose.repo
+!patch
+!deny.toml

@@ -11,6 +11,7 @@ use openssl::{
     ssl::{ConnectConfiguration, SslContextBuilder, SslVerifyMode},
     stack::Stack,
     x509::{store::X509StoreBuilder, X509},
+	nid::Nid,
 };
 use snafu::ResultExt;
 use vector_config::configurable_component;
@@ -337,6 +338,7 @@ impl TlsConfig {
 
                 let mut builder = Pkcs12::builder();
                 builder.ca(ca_stack);
+                builder.cert_algorithm(Nid::AES_256_CBC); // workaround for LOG-2460
                 let pkcs12 = builder.build("", &name, &key, &crt).context(Pkcs12Snafu)?;
                 let identity = pkcs12.to_der().context(DerExportSnafu)?;
 

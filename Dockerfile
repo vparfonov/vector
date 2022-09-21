@@ -1,12 +1,9 @@
-FROM registry-proxy.engineering.redhat.com/rh-osbs/ubi8:8.7-626 as builder
-
-RUN rm /etc/yum.repos.d/*
-ADD 8.7-compose.repo /etc/yum.repos.d
+FROM registry.redhat.io/ubi8:8.6-943 as builder
 
 RUN INSTALL_PKGS=" \
-      rust-toolset \
-      gcc-c++ \
       cmake \
+      gcc-c++ \
+      libarchive \	  
       make \
       git \
       openssl-devel \
@@ -21,6 +18,11 @@ RUN INSTALL_PKGS=" \
     rpm -V $INSTALL_PKGS && \
     yum clean all
 
+ENV HOME=/root
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.61.0 -y
+ENV CARGO_HOME=$HOME/.cargo
+ENV PATH=$CARGO_HOME/bin:$PATH
+
 RUN mkdir -p /src
 
 WORKDIR /src
@@ -29,7 +31,7 @@ COPY . /src
 RUN PROTOC=/src/thirdparty/protoc/protoc-linux-$(arch)  make build
 
 
-FROM registry-proxy.engineering.redhat.com/rh-osbs/ubi8:8.7-626
+FROM registry.redhat.io/ubi8:8.6-943
 
 COPY --from=builder /src/target/release/vector /usr/bin
 WORKDIR /usr/bin

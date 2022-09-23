@@ -374,6 +374,7 @@ ocp-logging = [
   "transforms-filter",
   "transforms-remap",
   "transforms-lua",
+  "transforms-throttle",
 
   "vrl-cli",
 

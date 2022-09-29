@@ -48,6 +48,11 @@ version = "1.0"
 [dependencies.tokio-openssl]
 version = "0.6"
 
+[dependencies.tracing]
+version = "0.1"
+features = ["std"]
+default-features = false
+
 [dependencies.tower-layer]
 version = "0.3"
 [dev-dependencies.futures]

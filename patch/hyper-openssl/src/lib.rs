@@ -28,6 +28,7 @@ use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 use tokio_openssl::SslStream;
 use tower_layer::Layer;
+use tracing::trace;
 
 mod cache;
 #[cfg(test)]
@@ -233,7 +234,10 @@ where
             let mut stream = SslStream::new(ssl, conn)?;
 
             match Pin::new(&mut stream).connect().await {
-                Ok(()) => Ok(MaybeHttpsStream::Https(stream)),
+                Ok(()) => {
+                    trace!("TLS: current cipher: {}", stream.ssl().current_cipher().unwrap().name());
+                    Ok(MaybeHttpsStream::Https(stream))
+                },
                 Err(error) => Err(Box::new(ConnectError {
                     error,
                     verify_result: stream.ssl().verify_result(),

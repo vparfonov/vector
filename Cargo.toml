@@ -355,6 +355,7 @@ h2 = { git = "https://github.com/hyperium/h2.git", rev = "f6aa3be6719270cd7b4094
 aws-config = { path = "patch/aws-config" }
 
 aws-sigv4 = { path = "patch/aws-sigv4" }
+hyper-openssl = { path = "patch/hyper-openssl" }
 
 [features]
 ocp-logging = [

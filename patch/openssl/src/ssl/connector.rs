@@ -239,11 +239,18 @@ impl SslAcceptor {
         let dh = Dh::params_from_pem(FFDHE_2048.as_bytes())?;
         ctx.set_tmp_dh(&dh)?;
         setup_curves(&mut ctx)?;
-        ctx.set_cipher_list(ciphersuites.replace(",", ":").as_str())?;
-        #[cfg(ossl111)]
-        ctx.set_ciphersuites(
-            "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256",
-        )?;
+        if min_proto_version == SslVersion::TLS1_3 {
+            let tls13_ciphersuites: String;
+            if ciphersuites.is_empty() {
+                tls13_ciphersuites = "TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256".to_string();
+            } else {
+                tls13_ciphersuites = ciphersuites.clone();
+            }
+            #[cfg(ossl111)]
+            ctx.set_ciphersuites(&tls13_ciphersuites.replace(",", ":"))?;
+        } else if !ciphersuites.is_empty() {
+            ctx.set_cipher_list(ciphersuites.replace(",", ":").as_str())?;
+        }
         Ok(SslAcceptorBuilder(ctx))
     }
 

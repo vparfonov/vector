@@ -418,8 +418,6 @@ aws-sdk-kinesis = { path = "patch/aws-sdk-kinesis" }
 aws-sdk-s3 = { path = "patch/aws-sdk-s3" }
 aws-sdk-sns = { path = "patch/aws-sdk-sns" }
 aws-sdk-sqs = { path = "patch/aws-sdk-sqs" }
-#aws-sdk-sso = { path = "patch/aws-sdk-sso" }
-#aws-sdk-sts = { path = "patch/aws-sdk-sts" }
 aws-credential-types = { path = "patch/aws-credential-types" }
 aws-smithy-async = { path = "patch/aws-smithy-async" }
 aws-smithy-client = { path = "patch/aws-smithy-client" }

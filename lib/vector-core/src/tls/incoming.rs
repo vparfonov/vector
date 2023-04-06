@@ -30,6 +30,14 @@ impl TlsSettings {
         match self.identity {
             None => Err(TlsError::MissingRequiredIdentity),
             Some(_) => {
+                if let Some(min_tls_version) = &self.min_tls_version {
+                    if let Some (ciphersuites) = &self.ciphersuites {
+                        let mut acceptor = SslAcceptor::custom(SslMethod::tls(), min_tls_version, ciphersuites)
+                        .context(CreateAcceptorSnafu)?;
+                        self.apply_context(&mut acceptor)?;
+                        return Ok(acceptor.build())
+                    }
+                }
                 let mut acceptor = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls())
                     .context(CreateAcceptorSnafu)?;
                 self.apply_context_base(&mut acceptor, true)?;

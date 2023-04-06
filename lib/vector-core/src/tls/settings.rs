@@ -149,6 +149,12 @@ pub struct TlsConfig {
     #[configurable(metadata(docs::examples = "PassWord1"))]
     #[configurable(metadata(docs::human_name = "Key File Password"))]
     pub key_pass: Option<String>,
+
+    /// Minimal enabled TLS version.
+    pub min_tls_version: Option<String>,
+
+    /// TLS ciphersuites to enable.
+    pub ciphersuites: Option<String>,
 }
 
 impl TlsConfig {
@@ -170,6 +176,8 @@ pub struct TlsSettings {
     authorities: Vec<X509>,
     pub(super) identity: Option<IdentityStore>, // openssl::pkcs12::ParsedPkcs12 doesn't impl Clone yet
     alpn_protocols: Option<Vec<u8>>,
+    pub min_tls_version: Option<String>,
+    pub ciphersuites: Option<String>,
 }
 
 #[derive(Clone)]
@@ -204,6 +212,8 @@ impl TlsSettings {
             authorities: options.load_authorities()?,
             identity: options.load_identity()?,
             alpn_protocols: options.parse_alpn_protocols()?,
+            min_tls_version: options.min_tls_version.clone(),
+            ciphersuites: options.ciphersuites.clone(),
         })
     }
 

@@ -1,9 +1,9 @@
 use crate::codecs::Transformer;
-use vector_lib::codecs::{
+use codecs::{
     encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
     CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
 };
-use vector_lib::configurable::configurable_component;
+use vector_config::configurable_component;
 
 /// Encoding configuration.
 #[configurable_component]
@@ -101,21 +101,16 @@ impl EncodingConfigWithFraming {
         let framer = match (framer, &serializer) {
             (Some(framer), _) => framer,
             (None, Serializer::Json(_)) => match sink_type {
-                SinkType::StreamBased => NewlineDelimitedEncoder::default().into(),
+                SinkType::StreamBased => NewlineDelimitedEncoder::new().into(),
                 SinkType::MessageBased => CharacterDelimitedEncoder::new(b',').into(),
             },
             (None, Serializer::Avro(_) | Serializer::Native(_)) => {
-                LengthDelimitedEncoder::default().into()
+                LengthDelimitedEncoder::new().into()
             }
             (None, Serializer::Gelf(_)) => {
                 // Graylog/GELF always uses null byte delimiter on TCP, see
                 // https://github.com/Graylog2/graylog2-server/issues/1240
                 CharacterDelimitedEncoder::new(0).into()
-            }
-            (None, Serializer::Protobuf(_)) => {
-                // Protobuf uses length-delimited messages, see:
-                // https://developers.google.com/protocol-buffers/docs/techniques#streaming
-                LengthDelimitedEncoder::default().into()
             }
             (
                 None,
@@ -123,8 +118,9 @@ impl EncodingConfigWithFraming {
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
-                | Serializer::Text(_),
-            ) => NewlineDelimitedEncoder::default().into(),
+                | Serializer::Text(_)
+                | Serializer::Syslog(_)
+            ) => NewlineDelimitedEncoder::new().into(),
         };
 
         Ok((framer, serializer))
@@ -154,7 +150,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use vector_lib::lookup::lookup_v2::{parse_value_path, ConfigValuePath};
+    use lookup::lookup_v2::{parse_value_path, ConfigValuePath};
 
     use super::*;
     use crate::codecs::encoding::TimestampFormat;

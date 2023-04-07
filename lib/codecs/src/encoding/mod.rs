@@ -11,9 +11,9 @@ pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CsvSerializer,
     CsvSerializerConfig, GelfSerializer, GelfSerializerConfig, JsonSerializer,
     JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer,
-    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, ProtobufSerializer,
-    ProtobufSerializerConfig, ProtobufSerializerOptions, RawMessageSerializer,
+    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, RawMessageSerializer,
     RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
+    SyslogSerializer, SyslogSerializerConfig
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
@@ -67,7 +67,7 @@ pub enum FramingConfig {
     /// Event data is prefixed with its length in bytes.
     ///
     /// The prefix is a 32-bit unsigned integer, little endian.
-    LengthDelimited(LengthDelimitedEncoderConfig),
+    LengthDelimited,
 
     /// Event data is delimited by a newline (LF) character.
     NewlineDelimited,
@@ -86,8 +86,8 @@ impl From<CharacterDelimitedEncoderConfig> for FramingConfig {
 }
 
 impl From<LengthDelimitedEncoderConfig> for FramingConfig {
-    fn from(config: LengthDelimitedEncoderConfig) -> Self {
-        Self::LengthDelimited(config)
+    fn from(_: LengthDelimitedEncoderConfig) -> Self {
+        Self::LengthDelimited
     }
 }
 
@@ -103,7 +103,9 @@ impl FramingConfig {
         match self {
             FramingConfig::Bytes => Framer::Bytes(BytesEncoderConfig.build()),
             FramingConfig::CharacterDelimited(config) => Framer::CharacterDelimited(config.build()),
-            FramingConfig::LengthDelimited(config) => Framer::LengthDelimited(config.build()),
+            FramingConfig::LengthDelimited => {
+                Framer::LengthDelimited(LengthDelimitedEncoderConfig.build())
+            }
             FramingConfig::NewlineDelimited => {
                 Framer::NewlineDelimited(NewlineDelimitedEncoderConfig.build())
             }
@@ -192,20 +194,7 @@ pub enum SerializerConfig {
 
     /// Encodes an event as a [GELF][gelf] message.
     ///
-    /// This codec is experimental for the following reason:
-    ///
-    /// The GELF specification is more strict than the actual Graylog receiver.
-    /// Vector's encoder currently adheres more strictly to the GELF spec, with
-    /// the exception that some characters such as `@`  are allowed in field names.
-    ///
-    /// Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
-    /// by Graylog, and is much more relaxed than the GELF spec.
-    ///
-    /// Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
-    /// the codec may continue to relax the enforcement of specification.
-    ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
-    /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
     Gelf,
 
     /// Encodes an event as [JSON][json].
@@ -234,11 +223,6 @@ pub enum SerializerConfig {
     /// [experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
     NativeJson,
 
-    /// Encodes an event as a [Protobuf][protobuf] message.
-    ///
-    /// [protobuf]: https://protobuf.dev/
-    Protobuf(ProtobufSerializerConfig),
-
     /// No encoding.
     ///
     /// This encoding uses the `message` field of a log event.
@@ -257,6 +241,10 @@ pub enum SerializerConfig {
     /// transform) and removing the message field while doing additional parsing on it, as this
     /// could lead to the encoding emitting empty strings for the given event.
     Text(TextSerializerConfig),
+
+    /// Syslog encoding
+    /// RFC 3164 and 5424 are supported
+    Syslog (SyslogSerializerConfig)
 }
 
 impl From<AvroSerializerConfig> for SerializerConfig {
@@ -301,12 +289,6 @@ impl From<NativeJsonSerializerConfig> for SerializerConfig {
     }
 }
 
-impl From<ProtobufSerializerConfig> for SerializerConfig {
-    fn from(config: ProtobufSerializerConfig) -> Self {
-        Self::Protobuf(config)
-    }
-}
-
 impl From<RawMessageSerializerConfig> for SerializerConfig {
     fn from(_: RawMessageSerializerConfig) -> Self {
         Self::RawMessage
@@ -316,6 +298,12 @@ impl From<RawMessageSerializerConfig> for SerializerConfig {
 impl From<TextSerializerConfig> for SerializerConfig {
     fn from(config: TextSerializerConfig) -> Self {
         Self::Text(config)
+    }
+}
+
+impl From<SyslogSerializerConfig> for SerializerConfig {
+    fn from(config: SyslogSerializerConfig) -> Self {
+        Self::Syslog(config)
     }
 }
 
@@ -334,11 +322,11 @@ impl SerializerConfig {
             SerializerConfig::NativeJson => {
                 Ok(Serializer::NativeJson(NativeJsonSerializerConfig.build()))
             }
-            SerializerConfig::Protobuf(config) => Ok(Serializer::Protobuf(config.build()?)),
             SerializerConfig::RawMessage => {
                 Ok(Serializer::RawMessage(RawMessageSerializerConfig.build()))
             }
             SerializerConfig::Text(config) => Ok(Serializer::Text(config.build())),
+            SerializerConfig::Syslog(config) => Ok(Serializer::Syslog(config.build())),
         }
     }
 
@@ -356,20 +344,17 @@ impl SerializerConfig {
             // we should do so accurately, even if practically it doesn't need to be.
             //
             // [1]: https://avro.apache.org/docs/1.11.1/specification/_print/#message-framing
-            SerializerConfig::Avro { .. }
-            | SerializerConfig::Native
-            | SerializerConfig::Protobuf(_) => {
-                FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
+            SerializerConfig::Avro { .. } | SerializerConfig::Native => {
+                FramingConfig::LengthDelimited
             }
             SerializerConfig::Csv(_)
+            | SerializerConfig::Gelf
             | SerializerConfig::Json(_)
             | SerializerConfig::Logfmt
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
-            | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
-            SerializerConfig::Gelf => {
-                FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
-            }
+            | SerializerConfig::Text(_)
+            | SerializerConfig::Syslog(_) => FramingConfig::NewlineDelimited,
         }
     }
 
@@ -385,9 +370,9 @@ impl SerializerConfig {
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
-            SerializerConfig::Protobuf(config) => config.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
             SerializerConfig::Text(config) => config.input_type(),
+            SerializerConfig::Syslog(config) => config.input_type(),
         }
     }
 
@@ -403,9 +388,9 @@ impl SerializerConfig {
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
-            SerializerConfig::Protobuf(config) => config.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
             SerializerConfig::Text(config) => config.schema_requirement(),
+            SerializerConfig::Syslog(config) => config.schema_requirement(),
         }
     }
 }
@@ -427,12 +412,12 @@ pub enum Serializer {
     Native(NativeSerializer),
     /// Uses a `NativeJsonSerializer` for serialization.
     NativeJson(NativeJsonSerializer),
-    /// Uses a `ProtobufSerializer` for serialization.
-    Protobuf(ProtobufSerializer),
     /// Uses a `RawMessageSerializer` for serialization.
     RawMessage(RawMessageSerializer),
     /// Uses a `TextSerializer` for serialization.
     Text(TextSerializer),
+    /// Uses a `SyslogSerializer` for serialization.
+    Syslog(SyslogSerializer),
 }
 
 impl Serializer {
@@ -445,8 +430,8 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
-            | Serializer::Protobuf(_)
-            | Serializer::RawMessage(_) => false,
+            | Serializer::RawMessage(_)
+            | Serializer::Syslog(_) => false,
         }
     }
 
@@ -466,8 +451,8 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
-            | Serializer::Protobuf(_)
-            | Serializer::RawMessage(_) => {
+            | Serializer::RawMessage(_)
+            | Serializer::Syslog(_) => {
                 panic!("Serializer does not support JSON")
             }
         }
@@ -516,12 +501,6 @@ impl From<NativeJsonSerializer> for Serializer {
     }
 }
 
-impl From<ProtobufSerializer> for Serializer {
-    fn from(serializer: ProtobufSerializer) -> Self {
-        Self::Protobuf(serializer)
-    }
-}
-
 impl From<RawMessageSerializer> for Serializer {
     fn from(serializer: RawMessageSerializer) -> Self {
         Self::RawMessage(serializer)
@@ -531,6 +510,12 @@ impl From<RawMessageSerializer> for Serializer {
 impl From<TextSerializer> for Serializer {
     fn from(serializer: TextSerializer) -> Self {
         Self::Text(serializer)
+    }
+}
+
+impl From<SyslogSerializer> for Serializer {
+    fn from(serializer: SyslogSerializer) -> Self {
+        Self::Syslog(serializer)
     }
 }
 
@@ -546,9 +531,9 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
             Serializer::Logfmt(serializer) => serializer.encode(event, buffer),
             Serializer::Native(serializer) => serializer.encode(event, buffer),
             Serializer::NativeJson(serializer) => serializer.encode(event, buffer),
-            Serializer::Protobuf(serializer) => serializer.encode(event, buffer),
             Serializer::RawMessage(serializer) => serializer.encode(event, buffer),
             Serializer::Text(serializer) => serializer.encode(event, buffer),
+            Serializer::Syslog(serializer) => serializer.encode(event, buffer),
         }
     }
 }

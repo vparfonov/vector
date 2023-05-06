@@ -9,7 +9,7 @@ use std::{
 };
 
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
-use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
+use openssl::ssl::{Ssl, SslAcceptor, SslMethod, ErrorEx};
 use openssl::x509::X509;
 use snafu::ResultExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -30,18 +30,18 @@ impl TlsSettings {
         match self.identity {
             None => Err(TlsError::MissingRequiredIdentity),
             Some(_) => {
-                if let Some(min_tls_version) = &self.min_tls_version {
-                    if let Some (ciphersuites) = &self.ciphersuites {
-                        let mut acceptor = SslAcceptor::custom(SslMethod::tls(), min_tls_version, ciphersuites)
-                        .context(CreateAcceptorSnafu)?;
-                        self.apply_context(&mut acceptor)?;
-                        return Ok(acceptor.build())
-                    }
-                }
-                let mut acceptor = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls())
-                    .context(CreateAcceptorSnafu)?;
-                self.apply_context_base(&mut acceptor, true)?;
-                Ok(acceptor.build())
+                let mut acceptor = if self.min_tls_version.is_some() || self.ciphersuites.is_some() {
+                    SslAcceptor::custom(SslMethod::tls(), &self.min_tls_version, &self.ciphersuites)
+                    .map_err(|error_ex| match error_ex {
+                        ErrorEx::OpenSslError{error_stack: e} => TlsError::CreateAcceptor{source:e},
+                        ErrorEx::InvalidTlsVersion => TlsError::InvalidTlsVersion,
+                        ErrorEx::InvalidCiphersuite => TlsError::InvalidCiphersuite,
+                    })?
+                } else {
+                    SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).context(CreateAcceptorSnafu)?
+                };
+                self.apply_context(&mut acceptor)?;
+                return Ok(acceptor.build())
             }
         }
     }

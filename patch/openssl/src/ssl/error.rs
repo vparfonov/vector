@@ -183,3 +183,23 @@ impl<S> From<ErrorStack> for HandshakeError<S> {
         HandshakeError::SetupFailure(e)
     }
 }
+
+#[derive(Debug)]
+pub enum ErrorEx {
+    OpenSslError {
+        error_stack: ErrorStack
+    },
+    InvalidTlsVersion,
+    InvalidCiphersuite,
+}
+
+impl PartialEq for ErrorEx {
+    fn eq(&self, other: &ErrorEx) -> bool {
+        match (self, other) {
+            (ErrorEx::OpenSslError{..}, ErrorEx::OpenSslError{..}) => true,
+            (ErrorEx::InvalidTlsVersion, ErrorEx::InvalidTlsVersion) => true,
+            (ErrorEx::InvalidCiphersuite, ErrorEx::InvalidCiphersuite) => true,
+            _ => false,
+        }
+    }
+}

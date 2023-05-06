@@ -1,4 +1,3 @@
-use ipnet::IpNet;
 use std::{
     collections::HashMap,
     future::Future,
@@ -9,7 +8,7 @@ use std::{
 };
 
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
-use openssl::ssl::{Ssl, SslAcceptor, SslMethod};
+use openssl::ssl::{Ssl, SslAcceptor, SslMethod, ErrorEx};
 use openssl::x509::X509;
 use snafu::ResultExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -30,18 +29,18 @@ impl TlsSettings {
         match self.identity {
             None => Err(TlsError::MissingRequiredIdentity),
             Some(_) => {
-                if let Some(min_tls_version) = &self.min_tls_version {
-                    if let Some (ciphersuites) = &self.ciphersuites {
-                        let mut acceptor = SslAcceptor::custom(SslMethod::tls(), min_tls_version, ciphersuites)
-                        .context(CreateAcceptorSnafu)?;
-                        self.apply_context(&mut acceptor)?;
-                        return Ok(acceptor.build())
-                    }
-                }
-                let mut acceptor = SslAcceptor::mozilla_intermediate_v5(SslMethod::tls())
-                    .context(CreateAcceptorSnafu)?;
-                self.apply_context_base(&mut acceptor, true)?;
-                Ok(acceptor.build())
+                let mut acceptor = if self.min_tls_version.is_some() || self.ciphersuites.is_some() {
+                    SslAcceptor::custom(SslMethod::tls(), &self.min_tls_version, &self.ciphersuites)
+                    .map_err(|error_ex| match error_ex {
+                        ErrorEx::OpenSslError{error_stack: e} => TlsError::CreateAcceptor{source:e},
+                        ErrorEx::InvalidTlsVersion => TlsError::InvalidTlsVersion,
+                        ErrorEx::InvalidCiphersuite => TlsError::InvalidCiphersuite,
+                    })?
+                } else {
+                    SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).context(CreateAcceptorSnafu)?
+                };
+                self.apply_context(&mut acceptor)?;
+                return Ok(acceptor.build())
             }
         }
     }
@@ -56,64 +55,24 @@ impl MaybeTlsSettings {
             Self::Raw(()) => None,
         };
 
-        Ok(MaybeTlsListener {
-            listener,
-            acceptor,
-            origin_filter: None,
-        })
-    }
-
-    pub async fn bind_with_allowlist(
-        &self,
-        addr: &SocketAddr,
-        allow_origin: Vec<IpNet>,
-    ) -> crate::tls::Result<MaybeTlsListener> {
-        let listener = TcpListener::bind(addr).await.context(TcpBindSnafu)?;
-
-        let acceptor = match self {
-            Self::Tls(tls) => Some(tls.acceptor()?),
-            Self::Raw(()) => None,
-        };
-
-        Ok(MaybeTlsListener {
-            listener,
-            acceptor,
-            origin_filter: Some(allow_origin),
-        })
+        Ok(MaybeTlsListener { listener, acceptor })
     }
 }
 
 pub struct MaybeTlsListener {
     listener: TcpListener,
     acceptor: Option<SslAcceptor>,
-    origin_filter: Option<Vec<IpNet>>,
 }
 
 impl MaybeTlsListener {
     pub async fn accept(&mut self) -> crate::tls::Result<MaybeTlsIncomingStream<TcpStream>> {
-        let listener = self
-            .listener
+        self.listener
             .accept()
             .await
             .map(|(stream, peer_addr)| {
                 MaybeTlsIncomingStream::new(stream, peer_addr, self.acceptor.clone())
             })
-            .context(IncomingListenerSnafu)?;
-
-        if let Some(origin_filter) = &self.origin_filter {
-            if origin_filter
-                .iter()
-                .any(|net| net.contains(&listener.peer_addr().ip()))
-            {
-                Ok(listener)
-            } else {
-                Err(TlsError::Connect {
-                    source: std::io::ErrorKind::ConnectionRefused.into(),
-                })
-            }
-        } else {
-            Ok(listener)
-        }
+            .context(IncomingListenerSnafu)
     }
 
     async fn into_accept(
@@ -175,12 +134,6 @@ impl MaybeTlsListener {
     pub fn local_addr(&self) -> Result<SocketAddr, std::io::Error> {
         self.listener.local_addr()
     }
-
-    #[must_use]
-    pub fn with_allowlist(mut self, allowlist: Option<Vec<IpNet>>) -> Self {
-        self.origin_filter = allowlist;
-        self
-    }
 }
 
 impl From<TcpListener> for MaybeTlsListener {
@@ -188,7 +141,6 @@ impl From<TcpListener> for MaybeTlsListener {
         Self {
             listener,
             acceptor: None,
-            origin_filter: None,
         }
     }
 }

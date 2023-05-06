@@ -105,7 +105,7 @@ use std::sync::{Arc, Mutex};
 pub use crate::ssl::connector::{
     ConnectConfiguration, SslAcceptor, SslAcceptorBuilder, SslConnector, SslConnectorBuilder,
 };
-pub use crate::ssl::error::{Error, ErrorCode, HandshakeError};
+pub use crate::ssl::error::{Error, ErrorCode, HandshakeError, ErrorEx};
 
 mod bio;
 mod callbacks;
@@ -1721,6 +1721,35 @@ impl SslContextBuilder {
     /// Consumes the builder, returning a new `SslContext`.
     pub fn build(self) -> SslContext {
         self.0
+    }
+
+    /// Sets the context's minimal TLS version, specified as "VersionTLS1[0..3]", and a comma-separated list of ciphersuites.
+    ///
+    pub fn set_min_tls_version_and_ciphersuites(&mut self, min_tls_version: &Option<String>, ciphersuites: &Option<String>) -> Result<(), ErrorEx>{
+        let mut min_proto_version = SslVersion::TLS1;
+        if let Some(min_tls_version) = min_tls_version {
+            min_proto_version = match min_tls_version.as_str() {
+                "VersionTLS10" => SslVersion::TLS1,
+                "VersionTLS11" => SslVersion::TLS1_1,
+                "VersionTLS12" => SslVersion::TLS1_2,
+                "VersionTLS13" => SslVersion::TLS1_3,
+                _ => return Err(ErrorEx::InvalidTlsVersion),
+            };
+            self.set_min_proto_version(Some(min_proto_version)).map_err(|e| ErrorEx::OpenSslError { error_stack: e })?;
+        }
+        if let Some(ciphersuites) = ciphersuites {
+            if !ciphersuites.is_empty() {
+                let ciphersuites = &ciphersuites.replace(",", ":");
+                if min_proto_version == SslVersion::TLS1_3 {
+                    self.set_ciphersuites(&ciphersuites).map_err(|e| ErrorEx::OpenSslError { error_stack: e })?;
+                } else {
+                    self.set_cipher_list(&ciphersuites).map_err(|e| ErrorEx::OpenSslError { error_stack: e })?;
+                }
+            } else {
+                return Err(ErrorEx::InvalidCiphersuite);
+            }
+        }
+        Ok(())
     }
 }
 

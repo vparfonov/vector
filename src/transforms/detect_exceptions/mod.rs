@@ -38,8 +38,9 @@ pub enum ProgrammingLanguages {
     /// Python
     Py,
 
-    // /// Php
-    // Php,
+    /// Php
+    Php,
+
     /// Go
     Go,
 

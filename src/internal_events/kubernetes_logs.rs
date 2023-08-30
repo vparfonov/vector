@@ -1,11 +1,12 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::{
+use vector_core::internal_event::InternalEvent;
+
+use crate::emit;
+use crate::event::Event;
+use vector_common::{
     internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
     json_size::JsonSize,
 };
-
-use crate::event::Event;
 
 #[derive(Debug)]
 pub struct KubernetesLogsEventsReceived<'a> {
@@ -18,6 +19,7 @@ pub struct KubernetesLogsEventsReceived<'a> {
 pub struct KubernetesLogsPodInfo {
     pub name: String,
     pub namespace: String,
+    pub container_name: String
 }
 
 impl InternalEvent for KubernetesLogsEventsReceived<'_> {
@@ -32,24 +34,18 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
             Some(pod_info) => {
                 let pod_name = pod_info.name;
                 let pod_namespace = pod_info.namespace;
+                let container_name: String = pod_info.container_name;
 
-                counter!(
-                    "component_received_events_total",
-                    "pod_name" => pod_name.clone(),
-                    "pod_namespace" => pod_namespace.clone(),
-                )
-                .increment(1);
-                counter!(
-                    "component_received_event_bytes_total",
-                    "pod_name" => pod_name,
-                    "pod_namespace" => pod_namespace,
-                )
-                .increment(self.byte_size.get() as u64);
+                counter!("component_received_events_total", 1, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone(), "container_name" => container_name.clone());
+                counter!("component_received_event_bytes_total", self.byte_size.get() as u64, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone(), "container_name" => container_name.clone());
+                counter!("events_in_total", 1, "pod_name" => pod_name, "pod_namespace" => pod_namespace, "container_name" => container_name.clone());
             }
             None => {
-                counter!("component_received_events_total").increment(1);
-                counter!("component_received_event_bytes_total")
-                    .increment(self.byte_size.get() as u64);
+                counter!("component_received_events_total", 1);
+                counter!(
+                    "component_received_event_bytes_total",
+                    self.byte_size.get() as u64
+                );
             }
         }
     }
@@ -73,12 +69,12 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            "component_errors_total", 1,
             "error_code" => ANNOTATION_FAILED,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
-        )
-        .increment(1);
+        );
+        counter!("k8s_event_annotation_failures_total", 1);
     }
 }
 
@@ -98,13 +94,12 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            "component_errors_total", 1,
             "error_code" => ANNOTATION_FAILED,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
-        )
-        .increment(1);
-        counter!("k8s_event_namespace_annotation_failures_total").increment(1);
+        );
+        counter!("k8s_event_namespace_annotation_failures_total", 1);
     }
 }
 
@@ -124,13 +119,12 @@ impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            "component_errors_total", 1,
             "error_code" => ANNOTATION_FAILED,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
-        )
-        .increment(1);
-        counter!("k8s_event_node_annotation_failures_total").increment(1);
+        );
+        counter!("k8s_event_node_annotation_failures_total", 1);
     }
 }
 
@@ -145,7 +139,7 @@ impl InternalEvent for KubernetesLogsFormatPickerEdgeCase {
             message = "Encountered format picker edge case.",
             what = %self.what,
         );
-        counter!("k8s_format_picker_edge_cases_total").increment(1);
+        counter!("k8s_format_picker_edge_cases_total", 1);
     }
 }
 
@@ -164,12 +158,11 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            "component_errors_total", 1,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-        )
-        .increment(1);
-        counter!("k8s_docker_format_parse_failures_total").increment(1);
+        );
+        counter!("k8s_docker_format_parse_failures_total", 1);
     }
 }
 
@@ -193,12 +186,11 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             internal_log_rate_limit = true,
         );
         counter!(
-            "component_errors_total",
+            "component_errors_total", 1,
             "error_code" => KUBERNETES_LIFECYCLE,
             "error_type" => error_type::READER_FAILED,
             "stage" => error_stage::PROCESSING,
-        )
-        .increment(1);
+        );
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
             reason: self.message,

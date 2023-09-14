@@ -554,5 +554,7 @@ mod test {
         fn emit_files_open(&self, _: usize) {}
 
         fn emit_path_globbing_failed(&self, _: &Path, _: &Error) {}
+
+        fn emit_gave_up_on_deleted_file(&self, _: &Path) {}
     }
 }

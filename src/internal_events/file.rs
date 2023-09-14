@@ -496,6 +496,25 @@ mod source {
         }
     }
 
+    #[derive(Debug)]
+    pub struct GaveUpOnDeletedFile<'a> {
+        pub file: &'a Path,
+    }
+
+    impl<'a> InternalEvent for GaveUpOnDeletedFile<'a> {
+        fn emit(self) {
+            info!(
+                message = "Gave up on deleted file.",
+                file = %self.file.display(),
+            );
+            counter!(
+                "files_deleted_given_up_total", 1,
+                "file" => self.file.to_string_lossy().into_owned(),
+            );
+        }
+    }
+
+
     #[derive(Clone)]
     pub struct FileSourceInternalEventsEmitter {
         pub include_file_metric_tag: bool,
@@ -577,6 +596,10 @@ mod source {
 
         fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
             emit!(PathGlobbingError { path, error });
+        }
+
+        fn emit_gave_up_on_deleted_file(&self, file: &Path) {
+            emit!(GaveUpOnDeletedFile { file });
         }
     }
 }

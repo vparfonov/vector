@@ -26,4 +26,6 @@ pub trait FileSourceInternalEvents: Send + Sync + Clone + 'static {
     fn emit_files_open(&self, count: usize);
 
     fn emit_path_globbing_failed(&self, path: &Path, error: &Error);
+
+    fn emit_gave_up_on_deleted_file(&self, path: &Path);
 }

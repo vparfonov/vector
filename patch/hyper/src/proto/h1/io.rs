@@ -273,6 +273,7 @@ where
                     // @tokio pls give me back `poll_read_buf` thanks
                     self.read_buf.advance_mut(n);
                 }
+                trace!("{:?}\n>>>\n{}\n<<<", buf, std::str::from_utf8(buf.initialized()).unwrap_or("<not UTF-8>"));
                 self.read_buf_strategy.record(n);
                 Poll::Ready(Ok(n))
             }
@@ -316,6 +317,7 @@ where
                 // TODO(eliza): we have to do this manually because
                 // `poll_write_buf` doesn't exist in Tokio 0.3 yet...when
                 // `poll_write_buf` comes back, the manual advance will need to leave!
+                trace!("{:?}\n>>>\n{}\n<<<", self.write_buf, std::str::from_utf8(self.write_buf.chunk()).unwrap_or("<not UTF-8>"));
                 self.write_buf.advance(n);
                 debug!("flushed {} bytes", n);
                 if self.write_buf.remaining() == 0 {
@@ -340,6 +342,7 @@ where
         loop {
             let n = ready!(Pin::new(&mut self.io).poll_write(cx, self.write_buf.headers.chunk()))?;
             debug!("flushed {} bytes", n);
+            trace!("{:?}\n>>>\n{}\n<<<", self.write_buf, std::str::from_utf8(self.write_buf.chunk()).unwrap_or("<not UTF-8>"));
             self.write_buf.headers.advance(n);
             if self.write_buf.headers.remaining() == 0 {
                 self.write_buf.headers.reset();
@@ -619,11 +622,13 @@ where
     }
 }
 
+
 impl<B: Buf> fmt::Debug for WriteBuf<B> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("WriteBuf")
             .field("remaining", &self.remaining())
             .field("strategy", &self.strategy)
+            .field("headers", &self.headers)
             .finish()
     }
 }

@@ -1,0 +1,9 @@
+[book]
+authors = ["sunli"]
+description = "Async-graphql使用手册"
+src = "src"
+language = "zh-CN"
+title = "Async-graphql教程"
+
+[rust]
+edition = "2021"

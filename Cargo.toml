@@ -407,6 +407,44 @@ nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/mus
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
 
 [features]
+ocp-logging = [
+  "sources-stdin",
+  "sources-file-descriptor",
+  "sources-file",
+  "sources-journald",
+  "sources-kubernetes_logs",
+  "sources-prometheus",
+  "sources-internal_metrics",
+  "sources-demo_logs",
+  "sources-http_server",
+
+  "transforms-route",
+  "transforms-dedupe",
+  "transforms-filter",
+  "transforms-remap",
+  "transforms-lua",
+  "transforms-throttle",
+  "transforms-reduce",
+  #"transforms-detect_exceptions",
+
+  "sinks-aws_cloudwatch_logs",
+  "sinks-elasticsearch",
+  "sinks-file",
+  "sinks-kafka",
+  "sinks-loki",
+  "sinks-console",
+  "sinks-prometheus",
+  "sinks-gcp",
+  "sinks-splunk_hec",
+  "sinks-http",
+  "sinks-socket",
+
+  "api",
+  "api-client",
+
+  "unix"
+]
+
 # Default features for *-unknown-linux-gnu and *-apple-darwin
 default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 # Default features for `cargo docs`. The same as `default` but without `rdkafka?/gssapi-vendored` which would require installing libsasl in our doc build environment.

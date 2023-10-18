@@ -1,0 +1,15 @@
+query InterfaceQuery {
+  everything {
+    __typename
+    name
+    ... on Dog {
+      isGoodDog
+    }
+    ... on Person {
+      birthday
+    }
+    ... on Organization {
+      industry
+    }
+  }
+}

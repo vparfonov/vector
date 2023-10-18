@@ -13,7 +13,7 @@ ifeq ($(OS),Windows_NT) # is Windows_NT on XP, 2000, 7, Vista, 10...
 else
     export OPERATING_SYSTEM := $(shell uname)  # same as "uname -s"
     export RUST_TARGET ?= "x86_64-unknown-linux-gnu"
-    export FEATURES ?= default
+    export FEATURES ?= ocp-logging
     export DNSTAP_BENCHES := dnstap-benches
 endif
 
@@ -67,7 +67,7 @@ export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
 # Set version
-export VERSION ?= $(shell command -v cargo >/dev/null && cargo vdev version || echo unknown)
+export VERSION ?= "v0.33.0-rh"
 
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
@@ -192,12 +192,12 @@ environment-push: environment-prepare ## Publish a new version of the container 
 build: check-build-tools
 build: export CFLAGS += -g0 -O3
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${FEATURES} --offline
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: build-dev
 build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${FEATURES}
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${FEATURES} --offline
 
 .PHONY: build-x86_64-unknown-linux-gnu
 build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector ## Build a release binary for the x86_64-unknown-linux-gnu triple.
@@ -332,7 +332,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 # https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --workspace --no-fail-fast --no-default-features --features "${FEATURES}" ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run -v --workspace --no-fail-fast --no-default-features --features "${FEATURES}" --test-threads 1 ${SCOPE}
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite

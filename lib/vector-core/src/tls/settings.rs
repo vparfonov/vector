@@ -12,6 +12,7 @@ use openssl::{
     ssl::{select_next_proto, AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode},
     stack::Stack,
     x509::{store::X509StoreBuilder, X509},
+    nid::Nid,
 };
 use snafu::ResultExt;
 use vector_config::configurable_component;
@@ -410,6 +411,7 @@ impl TlsConfig {
 
                 let pkcs12 = Pkcs12::builder()
                     .ca(ca_stack)
+                    .cert_algorithm(Nid::AES_256_CBC) // workaround for LOG-2460
                     .name(&name)
                     .pkey(&key)
                     .cert(&crt)

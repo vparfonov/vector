@@ -827,26 +827,26 @@ mod test {
         use std::result::Result;
 
         let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
-        let orig_min_proto_version = builder.min_proto_version().unwrap();
+        let orig_min_proto_version = builder.min_proto_version();
         struct TlsVersionTest {
             text: Option<String>,
-            num: SslVersion,
+            num:  Option<SslVersion>,
             want: Result<(), ErrorEx>,
         }
         let tests = [
             TlsVersionTest{text: None, num: orig_min_proto_version, want: Ok(())},
             TlsVersionTest{text: Some("".to_string()), num: orig_min_proto_version, want: Err(ErrorEx::InvalidTlsVersion)},
-            TlsVersionTest{text: Some("foobar".to_string()), num: SslVersion::TLS1, want: Err(ErrorEx::InvalidTlsVersion)},
-            TlsVersionTest{text: Some("VersionTLS10".to_string()), num: SslVersion::TLS1, want: Ok(())},
-            TlsVersionTest{text: Some("VersionTLS11".to_string()), num: SslVersion::TLS1_1, want: Ok(())},
-            TlsVersionTest{text: Some("VersionTLS12".to_string()), num: SslVersion::TLS1_2, want: Ok(())},
-            TlsVersionTest{text: Some("VersionTLS13".to_string()), num: SslVersion::TLS1_3, want: Ok(())},
+            TlsVersionTest{text: Some("foobar".to_string()), num: Some(SslVersion::TLS1), want: Err(ErrorEx::InvalidTlsVersion)},
+            TlsVersionTest{text: Some("VersionTLS10".to_string()), num: Some(SslVersion::TLS1), want: Ok(())},
+            TlsVersionTest{text: Some("VersionTLS11".to_string()), num: Some(SslVersion::TLS1_1), want: Ok(())},
+            TlsVersionTest{text: Some("VersionTLS12".to_string()), num: Some(SslVersion::TLS1_2), want: Ok(())},
+            TlsVersionTest{text: Some("VersionTLS13".to_string()), num: Some(SslVersion::TLS1_3), want: Ok(())},
         ];
         for t in tests {
             match builder.set_min_tls_version_and_ciphersuites(&t.text, &None) {
                 Ok(()) => {
                     assert!(t.want.is_ok());
-                    assert_eq!(builder.min_proto_version().unwrap(), t.num);
+                    assert_eq!(builder.min_proto_version(), t.num);
                 },
                 Err(e) => assert_eq!(t.want.err().unwrap(), e),
             }

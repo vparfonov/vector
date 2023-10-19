@@ -446,6 +446,7 @@ ocp-logging = [
   "sources-internal_metrics",
   "sources-demo_logs",
   "sources-http_server",
+  "sources-syslog",
 
   "transforms-route",
   "transforms-dedupe",

@@ -39,7 +39,7 @@
 //!
 //! ```toml
 //! [dependencies.uuid]
-//! version = "1.4.1"
+//! version = "1.5.0"
 //! features = [
 //!     "v4",                # Lets you generate random UUIDs
 //!     "fast-rng",          # Use a faster (but still sufficiently random) RNG
@@ -108,6 +108,7 @@
 //! * `fast-rng` - uses a faster algorithm for generating random UUIDs.
 //!   This feature requires more dependencies to compile, but is just as suitable for
 //!   UUIDs as the default algorithm.
+//! * `bytemuck` - adds a `Pod` trait implementation to `Uuid` for byte manipulation
 //!
 //! # Unstable features
 //!
@@ -140,7 +141,7 @@
 //!
 //! ```toml
 //! [dependencies.uuid]
-//! version = "1.4.1"
+//! version = "1.5.0"
 //! features = [
 //!     "v4",
 //!     "v7",
@@ -155,7 +156,7 @@
 //!
 //! ```toml
 //! [dependencies.uuid]
-//! version = "1.4.1"
+//! version = "1.5.0"
 //! default-features = false
 //! ```
 //!
@@ -213,7 +214,7 @@
 #![doc(
     html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
     html_favicon_url = "https://www.rust-lang.org/favicon.ico",
-    html_root_url = "https://docs.rs/uuid/1.4.1"
+    html_root_url = "https://docs.rs/uuid/1.5.0"
 )]
 
 #[cfg(any(feature = "std", test))]
@@ -447,6 +448,10 @@ pub enum Variant {
     derive(borsh::BorshDeserialize, borsh::BorshSerialize)
 )]
 #[repr(transparent)]
+#[cfg_attr(
+    feature = "bytemuck",
+    derive(bytemuck::Zeroable, bytemuck::Pod, bytemuck::TransparentWrapper)
+)]
 pub struct Uuid(Bytes);
 
 impl Uuid {
@@ -942,6 +947,22 @@ impl AsRef<[u8]> for Uuid {
     #[inline]
     fn as_ref(&self) -> &[u8] {
         &self.0
+    }
+}
+
+#[cfg(feature = "std")]
+impl From<Uuid> for std::vec::Vec<u8> {
+    fn from(value: Uuid) -> Self {
+        value.0.to_vec()
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::convert::TryFrom<std::vec::Vec<u8>> for Uuid {
+    type Error = Error;
+
+    fn try_from(value: std::vec::Vec<u8>) -> Result<Self, Self::Error> {
+        Uuid::from_slice(&value)
     }
 }
 
@@ -1742,6 +1763,31 @@ mod tests {
         assert_eq!(ur.len(), 16);
         assert!(!ub.iter().all(|&b| b == 0));
         assert!(!ur.iter().all(|&b| b == 0));
+    }
+
+    #[test]
+    #[cfg(feature = "std")]
+    #[cfg_attr(
+        all(
+            target_arch = "wasm32",
+            target_vendor = "unknown",
+            target_os = "unknown"
+        ),
+        wasm_bindgen_test
+    )]
+    fn test_convert_vec() {
+        use crate::std::{convert::TryInto, vec::Vec};
+
+        let u = new();
+        let ub = u.as_ref();
+
+        let v: Vec<u8> = u.into();
+
+        assert_eq!(&v, ub);
+
+        let uv: Uuid = v.try_into().unwrap();
+
+        assert_eq!(uv, u);
     }
 
     #[test]

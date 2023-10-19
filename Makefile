@@ -187,6 +187,9 @@ environment-clean: ## Clean the Vector dev shell using $CONTAINER_TOOL.
 environment-push: environment-prepare ## Publish a new version of the container image.
 	$(CONTAINER_TOOL) push $(ENVIRONMENT_UPSTREAM)
 
+check-bans:
+	${MAYBE_ENVIRONMENT_EXEC} cargo deny --no-default-features --features ${FEATURES} --offline check bans
+
 ##@ Building
 .PHONY: build
 build: check-build-tools

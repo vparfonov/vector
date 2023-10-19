@@ -405,6 +405,37 @@ nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/mus
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
+openssl = { path = "patch/openssl" }
+hyper = { path = "patch/hyper" }
+
+[patch."https://github.com/vectordotdev/aws-sdk-rust"]
+aws-config = { path = "patch/aws-config" }
+aws-sdk-cloudwatch = { path = "patch/aws-sdk-cloudwatch" }
+aws-sdk-cloudwatchlogs = { path = "patch/aws-sdk-cloudwatchlogs" }
+aws-sdk-elasticsearch = { path = "patch/aws-sdk-elasticsearch" }
+aws-sdk-firehose = { path = "patch/aws-sdk-firehose" }
+aws-sdk-kinesis = { path = "patch/aws-sdk-kinesis" }
+aws-sdk-s3 = { path = "patch/aws-sdk-s3" }
+aws-sdk-sns = { path = "patch/aws-sdk-sns" }
+aws-sdk-sqs = { path = "patch/aws-sdk-sqs" }
+#aws-sdk-sso = { path = "patch/aws-sdk-sso" }
+#aws-sdk-sts = { path = "patch/aws-sdk-sts" }
+aws-credential-types = { path = "patch/aws-credential-types" }
+aws-smithy-async = { path = "patch/aws-smithy-async" }
+aws-smithy-client = { path = "patch/aws-smithy-client" }
+aws-smithy-http = { path = "patch/aws-smithy-http" }
+aws-smithy-http-tower = { path = "patch/aws-smithy-http-tower" }
+aws-smithy-json = { path = "patch/aws-smithy-json" }
+aws-smithy-types = { path = "patch/aws-smithy-types" }
+aws-smithy-query = { path = "patch/aws-smithy-query" }
+aws-smithy-xml = { path = "patch/aws-smithy-xml" }
+aws-smithy-checksums = { path = "patch/aws-smithy-checksums" }
+aws-smithy-eventstream = { path = "patch/aws-smithy-eventstream" }
+aws-smithy-protocol-test = { path = "patch/aws-smithy-protocol-test" }
+aws-types = { path = "patch/aws-types" }
+aws-endpoint = { path = "patch/aws-endpoint" }
+aws-sig-auth = { path = "patch/aws-sig-auth" }
+aws-sigv4 = { path = "patch/aws-sigv4" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin

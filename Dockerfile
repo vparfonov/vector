@@ -1,7 +1,6 @@
 FROM registry.redhat.io/ubi9/ubi:latest as builder
 
 RUN INSTALL_PKGS=" \
-      perl \
       gcc-c++ \
       cmake \
       make \

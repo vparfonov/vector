@@ -14,7 +14,7 @@ through the YUM package repository.
 Add the repo:
 
 ```shell
-bash -c "$(curl -L https://setup.vector.dev)"
+bash -c "$(curl -L https://s3.amazonaws.com/dd-agent/scripts/install_script_vector0.sh)"
 ```
 
 Then you can install Vector:

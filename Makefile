@@ -195,6 +195,7 @@ check-bans:
 build: check-build-tools
 build: export CFLAGS += -g0 -O3
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
+	if [ "$(shell arch)" = "ppc64le" ]; then export CARGO_PROFILE_RELEASE_OPT_LEVEL=2; fi
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${FEATURES} --offline
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 

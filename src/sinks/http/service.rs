@@ -64,6 +64,10 @@ impl HttpServiceRequestBuilder for HttpSinkRequestBuilder {
         for (header, value) in self.headers.iter() {
             headers.insert(header, value.clone());
         }
+        println!("===============================================");
+        println!("{}", std::str::from_utf8(&body).unwrap());
+        println!("===============================================");
+
 
         // The request building should not have errors at this point
         let mut request = builder

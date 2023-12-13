@@ -10,8 +10,7 @@ use std::{
 };
 
 use bytes::{Buf, Bytes};
-use chrono::format::ParseErrorKind;
-use chrono::format::ParseErrorKind::Invalid;
+
 use reqwest::blocking::Client;
 use futures::{future::BoxFuture, Sink};
 use headers::HeaderName;
@@ -22,7 +21,6 @@ use pin_project::pin_project;
 use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
-use vrl::parser::Error::ParseError;
 use vector_config::configurable_component;
 use vector_core::{
     stream::batcher::limiter::ItemBatchSize, ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -523,47 +521,59 @@ where
         let status = (self.func)(response);
 
         match status {
-            StatusCode::UNAUTHORIZED => {
-                println!("<<<<<<<<<<<<<---->>>>>>>>>>>>>>>>>>>");
-                // Implement token renewal logic here
-                // For example, assuming `self` contains necessary references to handle token renewal:
-                if let Some(token_renewal_func) = &self.token_renewal_func() {
-                    fn token_renewal_func(app_id: &str, app_secret: &str, tenant_id: &str) -> Result<String, reqwest::Error> {
-                        let scope = reqwest::Url::parse("https://monitor.azure.com//.default")?;
-                        let body = format!(
-                            "client_id={}&scope={}&client_secret={}&grant_type=client_credentials",
-                            app_id, scope, app_secret
-                        );
-
-                        let client = Client::new();
-                        let uri = format!("https://login.microsoftonline.com/{}/oauth2/v2.0/token", tenant_id);
-                        let response = client
-                            .post(&uri)
-                            .header(reqwest::header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-                            .body(body)
-                            .send()?;
-
-                        let json: Value = response.json()?;
-                        if let Some(access_token) = json.get("access_token") {
-                            if let Some(token) = access_token.as_str() {
-                                println!("<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>");
-                                println!("{}", token.to_string());
-                                println!("<<<<<<<<<<<<<1>>>>>>>>>>>>>>>>>>>");
-                                Ok(token.to_string())
-                            } else {
-                                println!("<<<<<<<<<<<<<0>>>>>>>>>>>>>>>>>>>")
-                            }
-                        } else {
-                           println!("<<<<<<<<<<<<<1>>>>>>>>>>>>>>>>>>>")
-                        }
-                    }
-                }
-
-                RetryAction::Retry("Unauthorized - Retrying with new token".into())
-            }
             StatusCode::TOO_MANY_REQUESTS => RetryAction::Retry("too many requests".into()),
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
+            }
+            StatusCode::UNAUTHORIZED => {
+                // Implement token renewal logic here
+                // For example, assuming `self` contains necessary references to handle token renewal:
+                let scope = match reqwest::Url::parse("https://monitor.azure.com//.default") {
+                    Ok(scope) => scope,
+                    Err(err) => {
+                        println!("Error parsing URL: {:?}", err);
+                        return RetryAction::DontRetry("Error parsing URL".into());
+                    }
+                };
+                let body = format!(
+                    "client_id={}&scope={}&client_secret={}&grant_type=client_credentials",
+                    "app_id", scope, "app_secret"
+                );
+
+                let client = Client::new();
+                let uri = format!("https://login.microsoftonline.com/{}/oauth2/v2.0/token", "tenant_id");
+                let response = match client
+                    .post(&uri)
+                    .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
+                    .body(body)
+                    .send() {
+                    Ok(response) => response,
+                    Err(err) => {
+                        println!("Error response {:?}", err);
+                        return RetryAction::DontRetry("Error response".into());
+                    }
+                };
+
+                let json: Value = match response.json() {
+                    Ok(json) => json,
+                    Err(err) => {
+                        println!("Error parse json {:?}", err);
+                        return RetryAction::DontRetry("Error parse json".into());
+                    }
+                };
+                if let Some(access_token) = json.get("access_token") {
+                    if let Some(token) = access_token.as_str() {
+                        println!("<<<<<<<<<<<<<>>>>>>>>>>>>>>>>>>>");
+                        println!("{}", token.to_string());
+                        println!("<<<<<<<<<<<<<1>>>>>>>>>>>>>>>>>>>");
+
+                    } else {
+                        println!("<<<<<<<<<<<<<0>>>>>>>>>>>>>>>>>>>")
+                    }
+                } else {
+                    println!("<<<<<<<<<<<<<1>>>>>>>>>>>>>>>>>>>")
+                }
+                RetryAction::Retry("Unauthorized - Retrying with new token".into())
             }
             _ if status.is_server_error() => {
                 RetryAction::Retry(format!("Http Status: {}", status).into())
@@ -573,6 +583,7 @@ where
         }
     }
 }
+
 
 impl<F, T> Clone for HttpStatusRetryLogic<F, T>
 where

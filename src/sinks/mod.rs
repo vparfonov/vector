@@ -30,6 +30,8 @@ pub mod azure_blob;
 pub mod azure_common;
 #[cfg(feature = "sinks-azure_monitor_logs")]
 pub mod azure_monitor_logs;
+#[cfg(feature = "sinks-azure_logs_ingestion")]
+pub mod azure_logs_ingestion;
 #[cfg(feature = "sinks-blackhole")]
 pub mod blackhole;
 #[cfg(feature = "sinks-clickhouse")]

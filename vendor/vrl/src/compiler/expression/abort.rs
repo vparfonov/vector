@@ -1,15 +1,15 @@
 use std::fmt;
 
-use crate::diagnostic::{DiagnosticMessage, Label, Note, Urls};
-use crate::parser::ast::Node;
-
-use super::Expr;
 use crate::compiler::{
     expression::{ExpressionError, Resolved},
     state::{TypeInfo, TypeState},
     value::{Kind, VrlValueConvert},
     Context, Expression, Span, TypeDef,
 };
+use crate::diagnostic::{DiagnosticMessage, Label, Note, Urls};
+use crate::parser::ast::Node;
+
+use super::Expr;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Abort {
@@ -65,7 +65,10 @@ impl Expression for Abort {
     }
 
     fn type_info(&self, state: &TypeState) -> TypeInfo {
-        TypeInfo::new(state, TypeDef::never())
+        let returns = self.message.as_ref().map_or(Kind::never(), |message| {
+            message.type_info(state).result.returns().to_owned()
+        });
+        TypeInfo::new(state, TypeDef::never().with_returns(returns))
     }
 }
 

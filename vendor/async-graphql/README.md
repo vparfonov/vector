@@ -116,7 +116,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 - Apollo Tracing extension
 - Apollo Federation(v2)
 
-> **Note**: Minimum supported Rust version: 1.68.0 or later
+> **Note**: Minimum supported Rust version: 1.75.0 or later
 
 ## Examples
 
@@ -126,6 +126,8 @@ All examples are in the [sub-repository](https://github.com/async-graphql/exampl
 git submodule update # update the examples repo
 cd examples && cargo run --bin [name]
 ```
+
+For more information, see the [sub-repository](https://github.com/async-graphql/examples) README.md.
 
 ## Integrations
 
@@ -155,7 +157,6 @@ This crate offers the following features. Most are not activated by default, exc
 | **`chrono-tz`**                | Integrate with the [`chrono-tz` crate](https://crates.io/crates/chrono-tz).                                                                                                                   |
 | **`url`**                      | Integrate with the [`url` crate](https://crates.io/crates/url).                                                                                                                               |
 | **`uuid`**                     | Integrate with the [`uuid` crate](https://crates.io/crates/uuid).                                                                                                                             |
-| **`uuid08`**                   | Integrate with the [`uuid 0.8` crate](https://crates.io/crates/uuid/0.8.2).                                                                                                                   |
 | **`string_number`**            | Enable the [StringNumber](types/struct.StringNumber.html).                                                                                                                                    |
 | **`dataloader`**               | Support [DataLoader](dataloader/struct.DataLoader.html).                                                                                                                                      |
 | **`secrecy`**                  | Integrate with the [`secrecy` crate](https://crates.io/crates/secrecy).                                                                                                                       |

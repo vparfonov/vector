@@ -24,7 +24,7 @@ use crate::lua::Lua;
 use crate::string::String;
 use crate::table::Table;
 use crate::thread::Thread;
-use crate::types::{Integer, LightUserData, Number};
+use crate::types::{Integer, LightUserData, Number, SubtypeId};
 use crate::userdata::AnyUserData;
 use crate::util::{check_stack, StackGuard};
 
@@ -88,7 +88,11 @@ impl<'lua> Value<'lua> {
             Value::Table(_) => "table",
             Value::Function(_) => "function",
             Value::Thread(_) => "thread",
-            Value::UserData(_) => "userdata",
+            Value::UserData(AnyUserData(_, SubtypeId::None)) => "userdata",
+            #[cfg(feature = "luau")]
+            Value::UserData(AnyUserData(_, SubtypeId::Buffer)) => "buffer",
+            #[cfg(feature = "luajit")]
+            Value::UserData(AnyUserData(_, SubtypeId::CData)) => "cdata",
             Value::Error(_) => "error",
         }
     }
@@ -126,7 +130,7 @@ impl<'lua> Value<'lua> {
             | Value::Table(Table(r))
             | Value::Function(Function(r))
             | Value::Thread(Thread(r, ..))
-            | Value::UserData(AnyUserData(r)) => r.to_pointer(),
+            | Value::UserData(AnyUserData(r, ..)) => r.to_pointer(),
             _ => ptr::null(),
         }
     }
@@ -148,7 +152,7 @@ impl<'lua> Value<'lua> {
             Value::Table(Table(r))
             | Value::Function(Function(r))
             | Value::Thread(Thread(r, ..))
-            | Value::UserData(AnyUserData(r)) => unsafe {
+            | Value::UserData(AnyUserData(r, ..)) => unsafe {
                 let state = r.lua.state();
                 let _guard = StackGuard::new(state);
                 check_stack(state, 3)?;
@@ -408,6 +412,28 @@ impl<'lua> Value<'lua> {
             Value::UserData(ud) => Some(ud),
             _ => None,
         }
+    }
+
+    /// Returns `true` if the value is a Buffer wrapped in [`AnyUserData`].
+    #[cfg(any(feature = "luau", doc))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "luau")))]
+    #[doc(hidden)]
+    #[inline]
+    pub fn is_buffer(&self) -> bool {
+        self.as_userdata()
+            .map(|ud| ud.1 == SubtypeId::Buffer)
+            .unwrap_or_default()
+    }
+
+    /// Returns `true` if the value is a CData wrapped in [`AnyUserData`].
+    #[cfg(any(feature = "luajit", doc))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "luajit")))]
+    #[doc(hidden)]
+    #[inline]
+    pub fn is_cdata(&self) -> bool {
+        self.as_userdata()
+            .map(|ud| ud.1 == SubtypeId::CData)
+            .unwrap_or_default()
     }
 
     /// Wrap reference to this Value into [`SerializableValue`].

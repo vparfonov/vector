@@ -4,7 +4,7 @@
 [![Documentation]][docs.rs] 
 ![License]
 
-Write-only references and slices.
+Out reference (`&'a out T`).
 
 [crates.io]: https://crates.io/crates/outref
 [Latest Version]: https://img.shields.io/crates/v/outref.svg

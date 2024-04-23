@@ -5,7 +5,7 @@
 
 use core::fmt;
 #[cfg(all(
-    feature = "clock",
+    feature = "now",
     not(all(
         target_arch = "wasm32",
         feature = "wasmbind",
@@ -14,12 +14,12 @@ use core::fmt;
 ))]
 use std::time::{SystemTime, UNIX_EPOCH};
 
-#[cfg(feature = "rkyv")]
+#[cfg(any(feature = "rkyv", feature = "rkyv-16", feature = "rkyv-32", feature = "rkyv-64"))]
 use rkyv::{Archive, Deserialize, Serialize};
 
 use super::{FixedOffset, LocalResult, Offset, TimeZone};
 use crate::naive::{NaiveDate, NaiveDateTime};
-#[cfg(feature = "clock")]
+#[cfg(feature = "now")]
 #[allow(deprecated)]
 use crate::{Date, DateTime};
 
@@ -41,12 +41,17 @@ use crate::{Date, DateTime};
 /// assert_eq!(Utc.with_ymd_and_hms(1970, 1, 1, 0, 1, 1).unwrap(), dt);
 /// ```
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-#[cfg_attr(feature = "rkyv", derive(Archive, Deserialize, Serialize))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
+#[cfg_attr(
+    any(feature = "rkyv", feature = "rkyv-16", feature = "rkyv-32", feature = "rkyv-64"),
+    derive(Archive, Deserialize, Serialize),
+    archive(compare(PartialEq)),
+    archive_attr(derive(Clone, Copy, PartialEq, Eq, Debug, Hash))
+)]
+#[cfg_attr(feature = "rkyv-validation", archive(check_bytes))]
+#[cfg_attr(all(feature = "arbitrary", feature = "std"), derive(arbitrary::Arbitrary))]
 pub struct Utc;
 
-#[cfg(feature = "clock")]
-#[cfg_attr(docsrs, doc(cfg(feature = "clock")))]
+#[cfg(feature = "now")]
 impl Utc {
     /// Returns a `Date` which corresponds to the current date.
     #[deprecated(

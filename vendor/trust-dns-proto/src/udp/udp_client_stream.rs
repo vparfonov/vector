@@ -15,13 +15,12 @@ use std::task::{Context, Poll};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures_util::{future::Future, stream::Stream};
-use tracing::{debug, trace, warn};
+use log::{debug, warn};
 
 use crate::error::ProtoError;
 use crate::op::message::NoopMessageFinalizer;
-use crate::op::{Message, MessageFinalizer, MessageVerifier};
-use crate::udp::udp_stream::{NextRandomUdpSocket, UdpCreator, UdpSocket};
-use crate::udp::{DnsUdpSocket, MAX_RECEIVE_BUFFER_SIZE};
+use crate::op::{MessageFinalizer, MessageVerifier};
+use crate::udp::udp_stream::{NextRandomUdpSocket, UdpSocket};
 use crate::xfer::{DnsRequest, DnsRequestSender, DnsResponse, DnsResponseStream, SerialMessage};
 use crate::Time;
 
@@ -36,14 +35,14 @@ where
     MF: MessageFinalizer,
 {
     name_server: SocketAddr,
+    bind_addr: Option<SocketAddr>,
     timeout: Duration,
     is_shutdown: bool,
     signer: Option<Arc<MF>>,
-    creator: UdpCreator<S>,
     marker: PhantomData<S>,
 }
 
-impl<S: UdpSocket + Send + 'static> UdpClientStream<S, NoopMessageFinalizer> {
+impl<S: Send> UdpClientStream<S, NoopMessageFinalizer> {
     /// it is expected that the resolver wrapper will be responsible for creating and managing
     ///  new UdpClients such that each new client would have a random port (reduce chance of cache
     ///  poisoning)
@@ -86,8 +85,8 @@ impl<S: UdpSocket + Send + 'static> UdpClientStream<S, NoopMessageFinalizer> {
     }
 }
 
-impl<S: UdpSocket + Send + 'static, MF: MessageFinalizer> UdpClientStream<S, MF> {
-    /// Constructs a new UdpStream for a client to the specified SocketAddr.
+impl<S: Send, MF: MessageFinalizer> UdpClientStream<S, MF> {
+    /// Constructs a new TcpStream for a client to the specified SocketAddr.
     ///
     /// # Arguments
     ///
@@ -100,19 +99,14 @@ impl<S: UdpSocket + Send + 'static, MF: MessageFinalizer> UdpClientStream<S, MF>
     ) -> UdpClientConnect<S, MF> {
         UdpClientConnect {
             name_server,
+            bind_addr: None,
             timeout,
             signer,
-            creator: Arc::new(|local_addr: _, server_addr: _| {
-                Box::pin(NextRandomUdpSocket::<S>::new(
-                    &server_addr,
-                    &Some(local_addr),
-                ))
-            }),
             marker: PhantomData::<S>,
         }
     }
 
-    /// Constructs a new UdpStream for a client to the specified SocketAddr.
+    /// Constructs a new TcpStream for a client to the specified SocketAddr.
     ///
     /// # Arguments
     ///
@@ -127,39 +121,9 @@ impl<S: UdpSocket + Send + 'static, MF: MessageFinalizer> UdpClientStream<S, MF>
     ) -> UdpClientConnect<S, MF> {
         UdpClientConnect {
             name_server,
+            bind_addr,
             timeout,
             signer,
-            creator: Arc::new(move |local_addr: _, server_addr: _| {
-                Box::pin(NextRandomUdpSocket::<S>::new(
-                    &server_addr,
-                    &Some(bind_addr.unwrap_or(local_addr)),
-                ))
-            }),
-            marker: PhantomData::<S>,
-        }
-    }
-}
-
-impl<S: DnsUdpSocket + Send, MF: MessageFinalizer> UdpClientStream<S, MF> {
-    /// Constructs a new UdpStream for a client to the specified SocketAddr.
-    ///
-    /// # Arguments
-    ///
-    /// * `name_server` - the IP and Port of the DNS server to connect to
-    /// * `signer` - optional final amendment
-    /// * `timeout` - connection timeout
-    /// * `creator` - function that binds a local address to a newly created UDP socket
-    pub fn with_creator(
-        name_server: SocketAddr,
-        signer: Option<Arc<MF>>,
-        timeout: Duration,
-        creator: UdpCreator<S>,
-    ) -> UdpClientConnect<S, MF> {
-        UdpClientConnect {
-            name_server,
-            timeout,
-            signer,
-            creator,
             marker: PhantomData::<S>,
         }
     }
@@ -179,7 +143,7 @@ fn random_query_id() -> u16 {
     Standard.sample(&mut rand)
 }
 
-impl<S: DnsUdpSocket + Send + 'static, MF: MessageFinalizer> DnsRequestSender
+impl<S: UdpSocket + Send + 'static, MF: MessageFinalizer> DnsRequestSender
     for UdpClientStream<S, MF>
 {
     fn send_message(&mut self, mut message: DnsRequest) -> DnsResponseStream {
@@ -212,9 +176,6 @@ impl<S: DnsUdpSocket + Send + 'static, MF: MessageFinalizer> DnsRequestSender
             }
         }
 
-        // Get an appropriate read buffer size.
-        let recv_buf_size = MAX_RECEIVE_BUFFER_SIZE.min(message.max_payload() as usize);
-
         let bytes = match message.to_vec() {
             Ok(bytes) => bytes,
             Err(err) => {
@@ -224,23 +185,13 @@ impl<S: DnsUdpSocket + Send + 'static, MF: MessageFinalizer> DnsRequestSender
 
         let message_id = message.id();
         let message = SerialMessage::new(bytes, self.name_server);
-
-        debug!(
-            "final message: {}",
-            message
-                .to_message()
-                .expect("bizarre we just made this message")
-        );
-        let creator = self.creator.clone();
-        let addr = message.addr();
+        let bind_addr = self.bind_addr;
 
         S::Time::timeout::<Pin<Box<dyn Future<Output = Result<DnsResponse, ProtoError>> + Send>>>(
             self.timeout,
-            Box::pin(async move {
-                let socket: S = NextRandomUdpSocket::new_with_closure(&addr, creator).await?;
-                send_serial_message_inner(message, message_id, verifier, socket, recv_buf_size)
-                    .await
-            }),
+            Box::pin(send_serial_message::<S>(
+                message, message_id, verifier, bind_addr,
+            )),
         )
         .into()
     }
@@ -275,9 +226,9 @@ where
     MF: MessageFinalizer,
 {
     name_server: SocketAddr,
+    bind_addr: Option<SocketAddr>,
     timeout: Duration,
     signer: Option<Arc<MF>>,
-    creator: UdpCreator<S>,
     marker: PhantomData<S>,
 }
 
@@ -288,22 +239,23 @@ impl<S: Send + Unpin, MF: MessageFinalizer> Future for UdpClientConnect<S, MF> {
         // TODO: this doesn't need to be a future?
         Poll::Ready(Ok(UdpClientStream::<S, MF> {
             name_server: self.name_server,
+            bind_addr: self.bind_addr,
             is_shutdown: false,
             timeout: self.timeout,
             signer: self.signer.take(),
-            creator: self.creator.clone(),
             marker: PhantomData,
         }))
     }
 }
 
-async fn send_serial_message_inner<S: DnsUdpSocket + Send>(
+async fn send_serial_message<S: UdpSocket + Send>(
     msg: SerialMessage,
     msg_id: u16,
     verifier: Option<MessageVerifier>,
-    socket: S,
-    recv_buf_size: usize,
+    bind_addr: Option<SocketAddr>,
 ) -> Result<DnsResponse, ProtoError> {
+    let name_server = msg.addr();
+    let socket: S = NextRandomUdpSocket::new(&name_server, &bind_addr).await?;
     let bytes = msg.bytes();
     let addr = msg.addr();
     let len_sent: usize = socket.send_to(bytes, addr).await?;
@@ -316,24 +268,22 @@ async fn send_serial_message_inner<S: DnsUdpSocket + Send>(
         )));
     }
 
-    // Create the receive buffer.
-    trace!("creating UDP receive buffer with size {recv_buf_size}");
-    let mut recv_buf = vec![0; recv_buf_size];
-
     // TODO: limit the max number of attempted messages? this relies on a timeout to die...
     loop {
-        let (len, src) = socket.recv_from(&mut recv_buf).await?;
+        // TODO: consider making this heap based? need to verify it matches EDNS settings
+        let mut recv_buf = [0u8; 2048];
 
-        // Copy the slice of read bytes.
-        let buffer: Vec<_> = Vec::from(&recv_buf[0..len]);
+        let (len, src) = socket.recv_from(&mut recv_buf).await?;
+        let response = SerialMessage::new(recv_buf.iter().take(len).cloned().collect(), src);
 
         // compare expected src to received packet
         let request_target = msg.addr();
 
-        if src != request_target {
+        if response.addr() != request_target {
             warn!(
                 "ignoring response from {} because it does not match name_server: {}.",
-                src, request_target,
+                response.addr(),
+                request_target,
             );
 
             // await an answer from the correct NameServer
@@ -342,14 +292,14 @@ async fn send_serial_message_inner<S: DnsUdpSocket + Send>(
 
         // TODO: match query strings from request and response?
 
-        match Message::from_vec(&buffer) {
+        match response.to_message() {
             Ok(message) => {
                 if msg_id == message.id() {
                     debug!("received message id: {}", message.id());
                     if let Some(mut verifier) = verifier {
-                        return verifier(&buffer);
+                        return verifier(response.bytes());
                     } else {
-                        return Ok(DnsResponse::new(message, buffer));
+                        return Ok(DnsResponse::from(message));
                     }
                 } else {
                     // on wrong id, attempted poison?
@@ -380,6 +330,7 @@ async fn send_serial_message_inner<S: DnsUdpSocket + Send>(
 mod tests {
     #![allow(clippy::dbg_macro, clippy::print_stdout)]
     use crate::tests::udp_client_stream_test;
+    use crate::TokioTime;
     #[cfg(not(target_os = "linux"))]
     use std::net::Ipv6Addr;
     use std::net::{IpAddr, Ipv4Addr};
@@ -388,7 +339,7 @@ mod tests {
     #[test]
     fn test_udp_client_stream_ipv4() {
         let io_loop = Runtime::new().expect("failed to create tokio runtime");
-        udp_client_stream_test::<TokioUdpSocket, Runtime>(
+        udp_client_stream_test::<TokioUdpSocket, Runtime, TokioTime>(
             IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             io_loop,
         )
@@ -398,7 +349,7 @@ mod tests {
     #[cfg(not(target_os = "linux"))] // ignored until Travis-CI fixes IPv6
     fn test_udp_client_stream_ipv6() {
         let io_loop = Runtime::new().expect("failed to create tokio runtime");
-        udp_client_stream_test::<TokioUdpSocket, Runtime>(
+        udp_client_stream_test::<TokioUdpSocket, Runtime, TokioTime>(
             IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
             io_loop,
         )

@@ -1,11 +1,3 @@
-#![allow(
-    // clippy is broken and shows wrong warnings
-    // clippy on stable does not know yet about the lint name
-    unknown_lints,
-    // https://github.com/rust-lang/rust-clippy/issues/8867
-    clippy::derive_partial_eq_without_eq,
-)]
-
 extern crate alloc;
 
 mod utils;
@@ -15,7 +7,7 @@ use crate::utils::{
 };
 use alloc::collections::BTreeMap;
 use chrono_0_4::{DateTime, Duration, Local, NaiveDateTime, TimeZone, Utc};
-use core::{iter::FromIterator, str::FromStr};
+use core::str::FromStr;
 use expect_test::expect;
 use serde::{Deserialize, Serialize};
 use serde_with::{
@@ -51,7 +43,7 @@ fn json_datetime_from_any_to_string_deserialization() {
         ]"#,
     );
 
-    // floats, shows precision errors in subsecond part
+    // floats, shows precision errors in sub-second part
     check_deserialization(
         vec![
             S(new_datetime(1_478_563_200, 122_999_906)),

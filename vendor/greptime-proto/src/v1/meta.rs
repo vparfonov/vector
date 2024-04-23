@@ -59,12 +59,17 @@ impl Eq for Peer {}
 
 impl RequestHeader {
     #[inline]
-    pub fn new((cluster_id, member_id): (u64, u64), role: Role) -> Self {
+    pub fn new(
+        (cluster_id, member_id): (u64, u64),
+        role: Role,
+        tracing_context: HashMap<String, String>,
+    ) -> Self {
         Self {
             protocol_version: PROTOCOL_VERSION,
             cluster_id,
             member_id,
             role: role.into(),
+            tracing_context,
         }
     }
 }
@@ -138,15 +143,25 @@ macro_rules! gen_set_header {
     ($req: ty) => {
         impl $req {
             #[inline]
-            pub fn set_header(&mut self, (cluster_id, member_id): (u64, u64), role: Role) {
+            pub fn set_header(
+                &mut self,
+                (cluster_id, member_id): (u64, u64),
+                role: Role,
+                tracing_context: HashMap<String, String>,
+            ) {
                 match self.header.as_mut() {
                     Some(header) => {
                         header.cluster_id = cluster_id;
                         header.member_id = member_id;
                         header.role = role.into();
+                        header.tracing_context = tracing_context;
                     }
                     None => {
-                        self.header = Some(RequestHeader::new((cluster_id, member_id), role));
+                        self.header = Some(RequestHeader::new(
+                            (cluster_id, member_id),
+                            role,
+                            tracing_context,
+                        ));
                     }
                 }
             }
@@ -155,19 +170,16 @@ macro_rules! gen_set_header {
 }
 
 gen_set_header!(HeartbeatRequest);
-gen_set_header!(RouteRequest);
-gen_set_header!(CreateRequest);
 gen_set_header!(RangeRequest);
-gen_set_header!(DeleteRequest);
 gen_set_header!(PutRequest);
 gen_set_header!(BatchGetRequest);
 gen_set_header!(BatchPutRequest);
 gen_set_header!(BatchDeleteRequest);
 gen_set_header!(CompareAndPutRequest);
 gen_set_header!(DeleteRangeRequest);
-gen_set_header!(MoveValueRequest);
 gen_set_header!(LockRequest);
 gen_set_header!(UnlockRequest);
+gen_set_header!(SubmitDdlTaskRequest);
 
 #[cfg(test)]
 mod tests {

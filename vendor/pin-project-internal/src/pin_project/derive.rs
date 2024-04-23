@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 use proc_macro2::{Delimiter, Group, Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned, ToTokens};
 use syn::{
@@ -134,18 +136,21 @@ fn proj_allowed_lints(cx: &Context<'_>) -> (TokenStream, TokenStream, TokenStrea
         #proj_mut_allowed_lints
         #[allow(dead_code)] // This lint warns unused fields/variants.
         #[allow(clippy::mut_mut)] // This lint warns `&mut &mut <ty>`.
+        #[allow(clippy::missing_docs_in_private_items)]
     };
     let proj_ref_allowed_lints = if cx.project_ref { Some(&global_allowed_lints) } else { None };
     let proj_ref = quote! {
         #proj_ref_allowed_lints
         #[allow(dead_code)] // This lint warns unused fields/variants.
         #[allow(clippy::ref_option_ref)] // This lint warns `&Option<&<ty>>`.
+        #[allow(clippy::missing_docs_in_private_items)]
     };
     let proj_own_allowed_lints =
         if cx.project_replace.ident().is_some() { Some(&global_allowed_lints) } else { None };
     let proj_own = quote! {
         #proj_own_allowed_lints
         #[allow(dead_code)] // This lint warns unused fields/variants.
+        #[allow(clippy::missing_docs_in_private_items)]
         #large_enum_variant
     };
     (proj_mut, proj_ref, proj_own)
@@ -230,7 +235,7 @@ impl<'a> Context<'a> {
                 where_clause,
             },
             orig: OriginalType { attrs, vis, ident, generics },
-            pinned_fields: Vec::new(),
+            pinned_fields: vec![],
         })
     }
 }
@@ -569,9 +574,7 @@ fn visit_fields<'a>(
     let mut proj_move = TokenStream::new();
     let mut pinned_bindings = Vec::with_capacity(fields.len());
 
-    for (i, Field { attrs, vis, ident, colon_token, ty, mutability: _ }) in
-        fields.iter().enumerate()
-    {
+    for (i, Field { attrs, vis, ident, colon_token, ty, .. }) in fields.iter().enumerate() {
         let binding = ident.clone().unwrap_or_else(|| format_ident!("_{}", i));
         proj_pat.extend(quote!(#binding,));
         let lifetime = &cx.proj.lifetime;
@@ -760,7 +763,7 @@ fn make_unpin_impl(cx: &Context<'_>) -> TokenStream {
             // and lifetime used in the original struct. For type parameters,
             // we generate code like this:
             //
-            // ```rust
+            // ```
             // struct AlwaysUnpin<T: ?Sized>(PhantomData<T>) {}
             // impl<T: ?Sized> Unpin for AlwaysUnpin<T> {}
             //
@@ -852,6 +855,7 @@ fn make_drop_impl(cx: &Context<'_>) -> TokenStream {
             impl #impl_generics _pin_project::__private::Drop for #ident #ty_generics
             #where_clause
             {
+                #[allow(clippy::missing_inline_in_public_items)]
                 fn drop(&mut self) {
                     #unsafety {
                         // Safety - we're in 'drop', so we know that 'self' will
@@ -1059,7 +1063,7 @@ fn ensure_not_packed(orig: &OriginalType<'_>, fields: Option<&Fields>) -> Result
     // To ensure that it's impossible to use pin projections on a `#[repr(packed)]`
     // struct, we generate code like this:
     //
-    // ```rust
+    // ```
     // #[forbid(unaligned_references)]
     // fn assert_not_repr_packed(val: &MyStruct) {
     //     let _field_1 = &val.field_1;

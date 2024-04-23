@@ -7,45 +7,44 @@
 
 use std::{
     ffi::{OsStr, OsString},
-    mem,
+    mem::{self, MaybeUninit},
     os::windows::ffi::{OsStrExt, OsStringExt},
     ptr,
 };
 
-use winapi::{
-    shared::{
-        minwindef::{DWORD, FARPROC, LPBYTE},
-        ntdef::{LPCSTR, NTSTATUS},
-        ntstatus::STATUS_SUCCESS,
-        winerror::ERROR_SUCCESS,
-    },
-    um::{
-        libloaderapi::{GetModuleHandleA, GetProcAddress},
-        sysinfoapi::{GetSystemInfo, SYSTEM_INFO},
-        winnt::{
-            KEY_READ, PROCESSOR_ARCHITECTURE_AMD64, REG_SZ, VER_NT_WORKSTATION,
-            VER_SUITE_WH_SERVER, WCHAR,
+use windows_sys::Win32::{
+    Foundation::{ERROR_SUCCESS, FARPROC, NTSTATUS, STATUS_SUCCESS},
+    System::{
+        LibraryLoader::{GetModuleHandleA, GetProcAddress},
+        Registry::{RegOpenKeyExW, RegQueryValueExW, HKEY_LOCAL_MACHINE, KEY_READ, REG_SZ},
+        SystemInformation::{
+            GetNativeSystemInfo, GetSystemInfo, PROCESSOR_ARCHITECTURE_AMD64,
+            PROCESSOR_ARCHITECTURE_ARM, PROCESSOR_ARCHITECTURE_IA64, PROCESSOR_ARCHITECTURE_INTEL,
+            SYSTEM_INFO,
         },
-        winreg::{RegOpenKeyExW, RegQueryValueExW, HKEY_LOCAL_MACHINE, LSTATUS},
-        winuser::{GetSystemMetrics, SM_SERVERR2},
+        SystemServices::{VER_NT_WORKSTATION, VER_SUITE_WH_SERVER},
     },
+    UI::WindowsAndMessaging::{GetSystemMetrics, SM_SERVERR2},
 };
 
 use crate::{Bitness, Info, Type, Version};
 
 #[cfg(target_arch = "x86")]
-type OSVERSIONINFOEX = winapi::um::winnt::OSVERSIONINFOEXA;
+type OSVERSIONINFOEX = windows_sys::Win32::System::SystemInformation::OSVERSIONINFOEXA;
 
 #[cfg(not(target_arch = "x86"))]
-type OSVERSIONINFOEX = winapi::um::winnt::OSVERSIONINFOEXW;
+type OSVERSIONINFOEX = windows_sys::Win32::System::SystemInformation::OSVERSIONINFOEXW;
 
 pub fn get() -> Info {
     let (version, edition) = version();
+    let native_system_info = native_system_info();
+
     Info {
         os_type: Type::Windows,
         version,
         edition,
         bitness: bitness(),
+        architecture: architecture(native_system_info),
         ..Default::default()
     }
 }
@@ -64,6 +63,33 @@ fn version() -> (Version, Option<String>) {
     }
 }
 
+// According to https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-system_info
+// there is a variant for AMD64 CPUs, but it's not defined in generated bindings.
+const PROCESSOR_ARCHITECTURE_ARM64: u16 = 12;
+
+fn native_system_info() -> SYSTEM_INFO {
+    let mut system_info: MaybeUninit<SYSTEM_INFO> = MaybeUninit::zeroed();
+    unsafe {
+        GetNativeSystemInfo(system_info.as_mut_ptr());
+    };
+
+    unsafe { system_info.assume_init() }
+}
+
+fn architecture(system_info: SYSTEM_INFO) -> Option<String> {
+    let cpu_architecture = unsafe { system_info.Anonymous.Anonymous.wProcessorArchitecture };
+
+    match cpu_architecture {
+        PROCESSOR_ARCHITECTURE_AMD64 => Some("x86_64"),
+        PROCESSOR_ARCHITECTURE_IA64 => Some("ia64"),
+        PROCESSOR_ARCHITECTURE_ARM => Some("arm"),
+        PROCESSOR_ARCHITECTURE_ARM64 => Some("aarch64"),
+        PROCESSOR_ARCHITECTURE_INTEL => Some("i386"),
+        _ => None,
+    }
+    .map(str::to_string)
+}
+
 #[cfg(target_pointer_width = "64")]
 fn bitness() -> Bitness {
     // x64 program can only run on x64 Windows.
@@ -72,13 +98,8 @@ fn bitness() -> Bitness {
 
 #[cfg(target_pointer_width = "32")]
 fn bitness() -> Bitness {
-    use winapi::{
-        shared::{
-            minwindef::{BOOL, FALSE, PBOOL},
-            ntdef::HANDLE,
-        },
-        um::processthreadsapi::GetCurrentProcess,
-    };
+    use windows_sys::Win32::Foundation::{BOOL, FALSE, HANDLE};
+    use windows_sys::Win32::System::Threading::GetCurrentProcess;
 
     // IsWow64Process is not available on all supported versions of Windows. Use GetModuleHandle to
     // get a handle to the DLL that contains the function and GetProcAddress to get a pointer to the
@@ -88,7 +109,7 @@ fn bitness() -> Bitness {
         Some(val) => val,
     };
 
-    type IsWow64 = unsafe extern "system" fn(HANDLE, PBOOL) -> BOOL;
+    type IsWow64 = unsafe extern "system" fn(HANDLE, *mut BOOL) -> BOOL;
     let is_wow_64: IsWow64 = unsafe { mem::transmute(is_wow_64) };
 
     let mut result = FALSE;
@@ -116,7 +137,7 @@ fn version_info() -> Option<OSVERSIONINFOEX> {
     let rtl_get_version: RtlGetVersion = unsafe { mem::transmute(rtl_get_version) };
 
     let mut info: OSVERSIONINFOEX = unsafe { mem::zeroed() };
-    info.dwOSVersionInfoSize = mem::size_of::<OSVERSIONINFOEX>() as DWORD;
+    info.dwOSVersionInfoSize = mem::size_of::<OSVERSIONINFOEX>() as u32;
 
     if unsafe { rtl_get_version(&mut info) } == STATUS_SUCCESS {
         Some(info)
@@ -126,13 +147,11 @@ fn version_info() -> Option<OSVERSIONINFOEX> {
 }
 
 fn product_name(info: &OSVERSIONINFOEX) -> Option<String> {
-    const REG_SUCCESS: LSTATUS = ERROR_SUCCESS as LSTATUS;
-
     let sub_key = to_wide("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion");
-    let mut key = ptr::null_mut();
+    let mut key = Default::default();
     if unsafe { RegOpenKeyExW(HKEY_LOCAL_MACHINE, sub_key.as_ptr(), 0, KEY_READ, &mut key) }
-        != REG_SUCCESS
-        || key.is_null()
+        != ERROR_SUCCESS
+        || key == 0
     {
         log::error!("RegOpenKeyExW(HKEY_LOCAL_MACHINE, ...) failed");
         return None;
@@ -146,8 +165,8 @@ fn product_name(info: &OSVERSIONINFOEX) -> Option<String> {
     } else {
         "ProductName"
     });
-    let mut data_type: DWORD = 0;
-    let mut data_size: DWORD = 0;
+    let mut data_type = 0;
+    let mut data_size = 0;
     if unsafe {
         RegQueryValueExW(
             key,
@@ -157,7 +176,7 @@ fn product_name(info: &OSVERSIONINFOEX) -> Option<String> {
             ptr::null_mut(),
             &mut data_size,
         )
-    } != REG_SUCCESS
+    } != ERROR_SUCCESS
         || data_type != REG_SZ
         || data_size == 0
         || data_size % 2 != 0
@@ -174,10 +193,10 @@ fn product_name(info: &OSVERSIONINFOEX) -> Option<String> {
             name.as_ptr(),
             ptr::null_mut(),
             ptr::null_mut(),
-            data.as_mut_ptr() as LPBYTE,
+            data.as_mut_ptr().cast(),
             &mut data_size,
         )
-    } != REG_SUCCESS
+    } != ERROR_SUCCESS
         || data_size as usize != data.len() * 2
     {
         return None;
@@ -203,7 +222,7 @@ fn product_name(info: &OSVERSIONINFOEX) -> Option<String> {
     }
 }
 
-fn to_wide(value: &str) -> Vec<WCHAR> {
+fn to_wide(value: &str) -> Vec<u16> {
     OsStr::new(value).encode_wide().chain(Some(0)).collect()
 }
 
@@ -213,7 +232,7 @@ fn edition(version_info: &OSVERSIONINFOEX) -> Option<String> {
     match (
         version_info.dwMajorVersion,
         version_info.dwMinorVersion,
-        version_info.wProductType,
+        version_info.wProductType as u32,
     ) {
         // Windows 10.
         (10, 0, VER_NT_WORKSTATION) => {
@@ -240,12 +259,13 @@ fn edition(version_info: &OSVERSIONINFOEX) -> Option<String> {
             let mut info: SYSTEM_INFO = unsafe { mem::zeroed() };
             unsafe { GetSystemInfo(&mut info) };
 
-            if Into::<DWORD>::into(version_info.wSuiteMask) & VER_SUITE_WH_SERVER
+            if Into::<u32>::into(version_info.wSuiteMask) & VER_SUITE_WH_SERVER
                 == VER_SUITE_WH_SERVER
             {
                 Some("Windows Home Server")
-            } else if version_info.wProductType == VER_NT_WORKSTATION
-                && unsafe { info.u.s().wProcessorArchitecture } == PROCESSOR_ARCHITECTURE_AMD64
+            } else if version_info.wProductType == VER_NT_WORKSTATION as u8
+                && unsafe { info.Anonymous.Anonymous.wProcessorArchitecture }
+                    == PROCESSOR_ARCHITECTURE_AMD64
             {
                 Some("Windows XP Professional x64 Edition")
             } else {
@@ -267,8 +287,8 @@ fn get_proc_address(module: &[u8], proc: &[u8]) -> Option<FARPROC> {
         "Procedure name should be zero-terminated"
     );
 
-    let handle = unsafe { GetModuleHandleA(module.as_ptr() as LPCSTR) };
-    if handle.is_null() {
+    let handle = unsafe { GetModuleHandleA(module.as_ptr()) };
+    if handle == 0 {
         log::error!(
             "GetModuleHandleA({}) failed",
             String::from_utf8_lossy(module)
@@ -276,7 +296,7 @@ fn get_proc_address(module: &[u8], proc: &[u8]) -> Option<FARPROC> {
         return None;
     }
 
-    unsafe { Some(GetProcAddress(handle, proc.as_ptr() as LPCSTR)) }
+    unsafe { Some(GetProcAddress(handle, proc.as_ptr())) }
 }
 
 #[cfg(test)]
@@ -321,7 +341,7 @@ mod tests {
         for &(major, minor, product_type, expected_edition) in &test_data {
             info.dwMajorVersion = major;
             info.dwMinorVersion = minor;
-            info.wProductType = product_type;
+            info.wProductType = product_type as u8;
 
             let edition = edition(&info).unwrap();
             assert_eq!(edition, expected_edition);
@@ -362,6 +382,25 @@ mod tests {
     fn proc_address() {
         let address = get_proc_address(b"ntdll\0", b"RtlGetVersion\0");
         assert!(address.is_some());
+    }
+
+    #[test]
+    fn get_architecture() {
+        let cpu_types: [(u16, Option<String>); 6] = [
+            (PROCESSOR_ARCHITECTURE_AMD64, Some("x86_64".to_owned())),
+            (PROCESSOR_ARCHITECTURE_ARM, Some("arm".to_owned())),
+            (PROCESSOR_ARCHITECTURE_ARM64, Some("aarch64".to_owned())),
+            (PROCESSOR_ARCHITECTURE_IA64, Some("ia64".to_owned())),
+            (PROCESSOR_ARCHITECTURE_INTEL, Some("i386".to_owned())),
+            (0xffff, None),
+        ];
+
+        let mut native_info = native_system_info();
+
+        for cpu_type in cpu_types {
+            native_info.Anonymous.Anonymous.wProcessorArchitecture = cpu_type.0;
+            assert_eq!(architecture(native_info), cpu_type.1);
+        }
     }
 
     #[test]

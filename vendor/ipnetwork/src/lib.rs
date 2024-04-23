@@ -1,15 +1,14 @@
 //! The `ipnetwork` crate provides a set of APIs to work with IP CIDRs in
 //! Rust.
 #![crate_type = "lib"]
-#![doc(html_root_url = "https://docs.rs/ipnetwork/0.18.0")]
-
 #![deny(
     missing_debug_implementations,
     unsafe_code,
     unused_extern_crates,
-    unused_import_braces)]
+    unused_import_braces
+)]
 
-use std::{fmt, net::IpAddr, str::FromStr, convert::TryFrom};
+use std::{convert::TryFrom, fmt, net::IpAddr, str::FromStr};
 
 mod common;
 mod ipv4;
@@ -46,7 +45,75 @@ impl serde::Serialize for IpNetwork {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&self.to_string())
+        serializer.collect_str(self)
+    }
+}
+
+#[cfg(feature = "schemars")]
+impl schemars::JsonSchema for IpNetwork {
+    fn schema_name() -> String {
+        "IpNetwork".to_string()
+    }
+
+    fn json_schema(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+        schemars::schema::SchemaObject {
+            metadata: Some(
+                schemars::schema::Metadata {
+                    ..Default::default()
+                }
+                .into(),
+            ),
+            subschemas: Some(
+                schemars::schema::SubschemaValidation {
+                    one_of: Some(vec![
+                        schemars::schema::SchemaObject {
+                            metadata: Some(
+                                schemars::schema::Metadata {
+                                    title: Some("v4".to_string()),
+                                    ..Default::default()
+                                }
+                                .into(),
+                            ),
+                            subschemas: Some(
+                                schemars::schema::SubschemaValidation {
+                                    all_of: Some(vec![gen.subschema_for::<Ipv4Network>()]),
+                                    ..Default::default()
+                                }
+                                .into(),
+                            ),
+                            ..Default::default()
+                        }
+                        .into(),
+                        schemars::schema::SchemaObject {
+                            metadata: Some(
+                                schemars::schema::Metadata {
+                                    title: Some("v6".to_string()),
+                                    ..Default::default()
+                                }
+                                .into(),
+                            ),
+                            subschemas: Some(
+                                schemars::schema::SubschemaValidation {
+                                    all_of: Some(vec![gen.subschema_for::<Ipv6Network>()]),
+                                    ..Default::default()
+                                }
+                                .into(),
+                            ),
+                            ..Default::default()
+                        }
+                        .into(),
+                    ]),
+                    ..Default::default()
+                }
+                .into(),
+            ),
+            extensions: [("x-rust-type".to_string(), "ipnetwork::IpNetwork".into())]
+                .iter()
+                .cloned()
+                .collect(),
+            ..Default::default()
+        }
+        .into()
     }
 }
 

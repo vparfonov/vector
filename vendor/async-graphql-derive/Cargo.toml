@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "async-graphql-derive"
-version = "6.0.7"
+version = "7.0.3"
 authors = [
     "sunli <scott_s829@163.com>",
     "Koxiaet",
@@ -39,7 +39,7 @@ proc-macro = true
 version = "0.11.4"
 
 [dependencies.async-graphql-parser]
-version = "6.0.7"
+version = "7.0.3"
 
 [dependencies.darling]
 version = "0.20.1"
@@ -54,7 +54,7 @@ version = "1.0.24"
 version = "1.0.9"
 
 [dependencies.strum]
-version = "0.25.0"
+version = "0.26.0"
 features = ["derive"]
 
 [dependencies.syn]

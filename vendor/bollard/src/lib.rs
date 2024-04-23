@@ -34,10 +34,11 @@
 //!
 //! ### Latest
 //!
-//! Version `0.15` enables more `buildkit` features, including [exporting builds to OCI
-//! tarballs](https://docs.docker.com/build/exporters/oci-docker/) with the
-//! [`image_export_oci`](https://docs.rs/bollard/latest/bollard/struct.Docker.html#method.image_export_oci)
-//! method. Please note: all `buildkit` API's are under *developer preview*, feedback is
+//! Version `0.16` enables more `buildkit` features, including using the Registry as a [cache
+//! storage for intermediate container build
+//! stages](https://docs.docker.com/build/cache/backends/registry/), syncs with [moby release
+//! 25.0.3](https://github.com/moby/moby/releases/tag/v25.0.3) and [API version 1.44.0](https://docs.docker.com/engine/api/v1.44/).
+//! Please note: all `buildkit` API's are under *developer preview*, feedback is
 //! encouraged.
 //!
 //! ## Feature flags
@@ -53,8 +54,8 @@
 //!
 //! ## Version
 //!
-//! The [Docker API](https://docs.docker.com/engine/api/v1.43/) used by Bollard is using the latest
-//! `1.43` documentation schema published by the [moby](https://github.com/moby/moby) project to
+//! The [Docker API](https://docs.docker.com/engine/api/v1.44/) used by Bollard is using the latest
+//! `1.44` documentation schema published by the [moby](https://github.com/moby/moby) project to
 //! generate its serialization interface.
 //!
 //! This library also supports [version
@@ -261,17 +262,16 @@
     missing_copy_implementations,
     trivial_casts,
     trivial_numeric_casts,
-    unstable_features,
+    //unstable_features,
     unused_import_braces,
     unused_qualifications
 )]
-#![allow(clippy::upper_case_acronyms, clippy::derive_partial_eq_without_eq)]
+#![allow(
+    clippy::upper_case_acronyms,
+    clippy::derive_partial_eq_without_eq,
+    async_fn_in_trait
+)]
 #![warn(rust_2018_idioms)]
-
-#[macro_use]
-extern crate serde_derive;
-#[macro_use]
-extern crate log;
 
 // declare modules
 pub mod auth;
@@ -280,7 +280,6 @@ mod docker;
 pub mod errors;
 pub mod exec;
 pub mod image;
-mod named_pipe;
 pub mod network;
 mod read;
 pub mod secret;

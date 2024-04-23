@@ -10,7 +10,7 @@ use std::{
 use crate::*;
 use futures_core::{stream::{Stream, FusedStream}, future::FusedFuture};
 use futures_sink::Sink;
-use pin_project::{pin_project, pinned_drop};
+use spin1::Mutex as Spinlock;
 
 struct AsyncSignal {
     waker: Spinlock<Waker>,
@@ -95,7 +95,7 @@ impl<T> Sender<T> {
     ///
     /// In the current implementation, the returned future will not yield to the async runtime if the
     /// channel is unbounded. This may change in later versions.
-    pub fn into_send_async(self, item: T) -> SendFut<'static, T> {
+    pub fn into_send_async<'a>(self, item: T) -> SendFut<'a, T> {
         SendFut {
             sender: OwnedOrRef::Owned(self),
             hook: Some(SendState::NotYetSent(item)),
@@ -118,7 +118,7 @@ impl<T> Sender<T> {
     ///
     /// In the current implementation, the returned sink will not yield to the async runtime if the
     /// channel is unbounded. This may change in later versions.
-    pub fn into_sink(self) -> SendSink<'static, T> {
+    pub fn into_sink<'a>(self) -> SendSink<'a, T> {
         SendSink(SendFut {
             sender: OwnedOrRef::Owned(self),
             hook: None,
@@ -135,12 +135,13 @@ enum SendState<T> {
 ///
 /// Can be created via [`Sender::send_async`] or [`Sender::into_send_async`].
 #[must_use = "futures/streams/sinks do nothing unless you `.await` or poll them"]
-#[pin_project(PinnedDrop)]
 pub struct SendFut<'a, T> {
     sender: OwnedOrRef<'a, Sender<T>>,
     // Only none after dropping
     hook: Option<SendState<T>>,
 }
+
+impl<T> std::marker::Unpin for SendFut<'_, T> {}
 
 impl<'a, T> SendFut<'a, T> {
     /// Reset the hook, clearing it and removing it from the waiting sender's queue. This is called
@@ -181,19 +182,12 @@ impl<'a, T> SendFut<'a, T> {
     }
 }
 
-#[allow(clippy::needless_lifetimes)] // False positive, see https://github.com/rust-lang/rust-clippy/issues/5787
-#[pinned_drop]
-impl<'a, T> PinnedDrop for SendFut<'a, T> {
-    fn drop(mut self: Pin<&mut Self>) {
+impl<'a, T> Drop for SendFut<'a, T> {
+    fn drop(&mut self) {
         self.reset_hook()
     }
 }
 
-// impl<'a, T> Drop for SendFut<'a, T> {
-//     fn drop(&mut self) {
-//         self.reset_hook()
-//     }
-// }
 
 impl<'a, T> Future for SendFut<'a, T> {
     type Output = Result<(), SendError<T>>;
@@ -203,34 +197,30 @@ impl<'a, T> Future for SendFut<'a, T> {
             if hook.is_empty() {
                 Poll::Ready(Ok(()))
             } else if self.sender.shared.is_disconnected() {
-                match self.hook.take().unwrap() {
-                    SendState::NotYetSent(item) => Poll::Ready(Err(SendError(item))),
-                    SendState::QueuedItem(hook) => match hook.try_take() {
-                        Some(item) => Poll::Ready(Err(SendError(item))),
-                        None => Poll::Ready(Ok(())),
-                    },
+                let item = hook.try_take();
+                self.hook = None;
+                match item {
+                    Some(item) => Poll::Ready(Err(SendError(item))),
+                    None => Poll::Ready(Ok(())),
                 }
             } else {
                 hook.update_waker(cx.waker());
                 Poll::Pending
             }
-        } else if let Some(SendState::NotYetSent(_)) = self.hook {
-            let mut mut_self = self.project();
-            let (shared, this_hook) = (&mut_self.sender.shared, &mut mut_self.hook);
+        } else if let Some(SendState::NotYetSent(item)) = self.hook.take() {
+            let this = self.get_mut();
+            let (shared, this_hook) = (&this.sender.shared, &mut this.hook);
 
             shared.send(
                 // item
-                match this_hook.take().unwrap() {
-                    SendState::NotYetSent(item) => item,
-                    SendState::QueuedItem(_) => return Poll::Ready(Ok(())),
-                },
+                item,
                 // should_block
                 true,
                 // make_signal
                 |msg| Hook::slot(Some(msg), AsyncSignal::new(cx, false)),
                 // do_block
                 |hook| {
-                    **this_hook = Some(SendState::QueuedItem(hook));
+                    *this_hook = Some(SendState::QueuedItem(hook));
                     Poll::Pending
                 },
             )
@@ -285,6 +275,11 @@ impl<'a, T> SendSink<'a, T> {
     pub fn capacity(&self) -> Option<usize> {
         self.0.capacity()
     }
+
+    /// Returns whether the SendSinks are belong to the same channel.
+    pub fn same_channel(&self, other: &Self) -> bool {
+        self.sender().same_channel(other.sender())
+    }
 }
 
 impl<'a, T> Sink<T> for SendSink<'a, T> {
@@ -329,7 +324,7 @@ impl<T> Receiver<T> {
     /// Convert this receiver into a future that asynchronously receives a single message from the
     /// channel, returning an error if all senders have been dropped. If the channel is empty, this
     /// future will yield to the async runtime.
-    pub fn into_recv_async(self) -> RecvFut<'static, T> {
+    pub fn into_recv_async<'a>(self) -> RecvFut<'a, T> {
         RecvFut::new(OwnedOrRef::Owned(self))
     }
 
@@ -340,7 +335,7 @@ impl<T> Receiver<T> {
     }
 
     /// Convert this receiver into a stream that allows asynchronously receiving messages from the channel.
-    pub fn into_stream(self) -> RecvStream<'static, T> {
+    pub fn into_stream<'a>(self) -> RecvStream<'a, T> {
         RecvStream(RecvFut::new(OwnedOrRef::Owned(self)))
     }
 }
@@ -385,29 +380,36 @@ impl<'a, T> RecvFut<'a, T> {
         stream: bool,
     ) -> Poll<Result<T, RecvError>> {
         if self.hook.is_some() {
-            if let Ok(msg) = self.receiver.shared.recv_sync(None) {
-                Poll::Ready(Ok(msg))
-            } else if self.receiver.shared.is_disconnected() {
-                Poll::Ready(Err(RecvError::Disconnected))
-            } else {
-                let hook = self.hook.as_ref().map(Arc::clone).unwrap();
-                if hook.update_waker(cx.waker()) {
-                    // If the previous hook was awakened, we need to insert it back to the
-                    // queue, otherwise, it remains valid.
-                    wait_lock(&self.receiver.shared.chan).waiting.push_back(hook);
+            match self.receiver.shared.recv_sync(None) {
+                Ok(msg) => return Poll::Ready(Ok(msg)),
+                Err(TryRecvTimeoutError::Disconnected) => {
+                    return Poll::Ready(Err(RecvError::Disconnected))
                 }
-                // To avoid a missed wakeup, re-check disconnect status here because the channel might have
-                // gotten shut down before we had a chance to push our hook
-                if self.receiver.shared.is_disconnected() {
-                    // And now, to avoid a race condition between the first recv attempt and the disconnect check we
-                    // just performed, attempt to recv again just in case we missed something.
-                    Poll::Ready(self.receiver.shared
+                _ => (),
+            }
+
+            let hook = self.hook.as_ref().map(Arc::clone).unwrap();
+            if hook.update_waker(cx.waker()) {
+                // If the previous hook was awakened, we need to insert it back to the
+                // queue, otherwise, it remains valid.
+                wait_lock(&self.receiver.shared.chan)
+                    .waiting
+                    .push_back(hook);
+            }
+            // To avoid a missed wakeup, re-check disconnect status here because the channel might have
+            // gotten shut down before we had a chance to push our hook
+            if self.receiver.shared.is_disconnected() {
+                // And now, to avoid a race condition between the first recv attempt and the disconnect check we
+                // just performed, attempt to recv again just in case we missed something.
+                Poll::Ready(
+                    self.receiver
+                        .shared
                         .recv_sync(None)
                         .map(Ok)
-                        .unwrap_or(Err(RecvError::Disconnected)))
-                } else {
-                    Poll::Pending
-                }
+                        .unwrap_or(Err(RecvError::Disconnected)),
+                )
+            } else {
+                Poll::Pending
             }
         } else {
             let mut_self = self.get_mut();
@@ -506,6 +508,11 @@ impl<'a, T> RecvStream<'a, T> {
     /// See [`Receiver::capacity`].
     pub fn capacity(&self) -> Option<usize> {
         self.0.capacity()
+    }
+
+    /// Returns whether the SendSinks are belong to the same channel.
+    pub fn same_channel(&self, other: &Self) -> bool {
+        self.0.receiver.same_channel(&*other.0.receiver)
     }
 }
 

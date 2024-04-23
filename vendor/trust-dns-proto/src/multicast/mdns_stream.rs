@@ -14,12 +14,12 @@ use std::task::{Context, Poll};
 
 use futures_util::stream::{Stream, StreamExt};
 use futures_util::{future, future::Future, ready, FutureExt, TryFutureExt};
-use once_cell::sync::Lazy;
+use lazy_static::lazy_static;
+use log::{debug, trace};
 use rand;
 use rand::distributions::{uniform::Uniform, Distribution};
 use socket2::{self, Socket};
 use tokio::net::UdpSocket;
-use tracing::{debug, trace};
 
 use crate::multicast::MdnsQueryType;
 use crate::udp::UdpStream;
@@ -27,16 +27,12 @@ use crate::xfer::SerialMessage;
 use crate::BufDnsStreamHandle;
 
 pub(crate) const MDNS_PORT: u16 = 5353;
-/// mDNS ipv4 address https://www.iana.org/assignments/multicast-addresses/multicast-addresses.xhtml
-pub static MDNS_IPV4: Lazy<SocketAddr> =
-    Lazy::new(|| SocketAddr::new(Ipv4Addr::new(224, 0, 0, 251).into(), MDNS_PORT));
-/// link-local mDNS ipv6 address https://www.iana.org/assignments/ipv6-multicast-addresses/ipv6-multicast-addresses.xhtml
-pub static MDNS_IPV6: Lazy<SocketAddr> = Lazy::new(|| {
-    SocketAddr::new(
-        Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 0x00FB).into(),
-        MDNS_PORT,
-    )
-});
+lazy_static! {
+    /// mDNS ipv4 address https://www.iana.org/assignments/multicast-addresses/multicast-addresses.xhtml
+    pub static ref MDNS_IPV4: SocketAddr = SocketAddr::new(Ipv4Addr::new(224,0,0,251).into(), MDNS_PORT);
+    /// link-local mDNS ipv6 address https://www.iana.org/assignments/ipv6-multicast-addresses/ipv6-multicast-addresses.xhtml
+    pub static ref MDNS_IPV6: SocketAddr = SocketAddr::new(Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 0x00FB).into(), MDNS_PORT);
+}
 
 /// A UDP stream of DNS binary packets
 #[must_use = "futures do nothing unless polled"]
@@ -201,7 +197,7 @@ impl MdnsStream {
         if !ip_addr.is_multicast() {
             return Err(io::Error::new(
                 io::ErrorKind::Other,
-                format!("expected multicast address for binding: {ip_addr}"),
+                format!("expected multicast address for binding: {}", ip_addr),
             ));
         }
 
@@ -237,7 +233,7 @@ impl MdnsStream {
         socket.set_reuse_port(true)?;
         Self::bind_multicast(&socket, multicast_addr)?;
 
-        debug!("joined {multicast_addr}");
+        debug!("joined {}", multicast_addr);
         Ok(Some(std::net::UdpSocket::from(socket)))
     }
 
@@ -326,7 +322,7 @@ struct NextRandomUdpSocket {
 impl NextRandomUdpSocket {
     fn prepare_sender(&self, socket: std::net::UdpSocket) -> io::Result<std::net::UdpSocket> {
         let addr = socket.local_addr()?;
-        debug!("preparing sender on: {addr}");
+        debug!("preparing sender on: {}", addr);
 
         let socket = Socket::from(socket);
 
@@ -361,7 +357,7 @@ impl NextRandomUdpSocket {
 }
 
 impl Future for NextRandomUdpSocket {
-    // TODO: clean this up, the RandomUdpSocket shouldn't care about the query type
+    // TODO: clean this up, the RandomUdpSocket shouldnt' care about the query type
     type Output = io::Result<Option<std::net::UdpSocket>>;
 
     /// polls until there is an available next random UDP port.
@@ -375,7 +371,7 @@ impl Future for NextRandomUdpSocket {
         } else if self.mdns_query_type.bind_on_5353() {
             let addr = SocketAddr::new(self.bind_address, MDNS_PORT);
             debug!("binding sending stream to {}", addr);
-            let socket = std::net::UdpSocket::bind(addr)?;
+            let socket = std::net::UdpSocket::bind(&addr)?;
             let socket = self.prepare_sender(socket)?;
 
             Poll::Ready(Ok(Some(socket)))
@@ -404,7 +400,7 @@ impl Future for NextRandomUdpSocket {
                 let addr = SocketAddr::new(self.bind_address, port);
                 debug!("binding sending stream to {}", addr);
 
-                match std::net::UdpSocket::bind(addr) {
+                match std::net::UdpSocket::bind(&addr) {
                     Ok(socket) => {
                         let socket = self.prepare_sender(socket)?;
                         return Poll::Ready(Ok(Some(socket)));
@@ -434,11 +430,12 @@ pub(crate) mod tests {
     // TODO: is there a better way?
     const BASE_TEST_PORT: u16 = 5379;
 
-    /// 250 appears to be unused/unregistered
-    static TEST_MDNS_IPV4: Lazy<IpAddr> = Lazy::new(|| Ipv4Addr::new(224, 0, 0, 250).into());
-    /// FA appears to be unused/unregistered
-    static TEST_MDNS_IPV6: Lazy<IpAddr> =
-        Lazy::new(|| Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 0x00FA).into());
+    lazy_static! {
+        /// 250 appears to be unused/unregistered
+        static ref TEST_MDNS_IPV4: IpAddr = Ipv4Addr::new(224,0,0,250).into();
+        /// FA appears to be unused/unregistered
+        static ref TEST_MDNS_IPV6: IpAddr = Ipv6Addr::new(0xFF02, 0, 0, 0, 0, 0, 0, 0x00FA).into();
+    }
 
     // one_shot tests are basically clones from the udp tests
     #[test]
@@ -457,7 +454,7 @@ pub(crate) mod tests {
         let result = io_loop.block_on(stream);
 
         if let Err(error) = result {
-            println!("Random address error: {error:#?}");
+            println!("Random address error: {:#?}", error);
             panic!("failed to get next random address");
         }
     }
@@ -600,7 +597,7 @@ pub(crate) mod tests {
         }
 
         client_done.store(true, std::sync::atomic::Ordering::Relaxed);
-        println!("successes: {successes}");
+        println!("successes: {}", successes);
         assert!(successes >= 1);
         server_handle.join().expect("server thread failed");
     }

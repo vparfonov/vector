@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.63"
+rust-version = "1.70"
 name = "colored"
-version = "2.0.4"
+version = "2.1.0"
 authors = ["Thomas Wickham <mackwic@gmail.com>"]
 description = "The most simple way to add colors in your terminal"
 homepage = "https://github.com/mackwic/colored"
@@ -27,9 +27,6 @@ keywords = [
 ]
 license = "MPL-2.0"
 repository = "https://github.com/mackwic/colored"
-
-[dependencies.is-terminal]
-version = "0.4"
 
 [dependencies.lazy_static]
 version = "1"

@@ -18,6 +18,7 @@ enum Enum<T, U> {
 #[allow(clippy::type_repetition_in_bounds)]
 #[allow(dead_code)]
 #[allow(clippy::mut_mut)]
+#[allow(clippy::missing_docs_in_private_items)]
 enum EnumProj<'pin, T, U>
 where
     Enum<T, U>: 'pin,
@@ -41,6 +42,7 @@ where
 #[allow(clippy::type_repetition_in_bounds)]
 #[allow(dead_code)]
 #[allow(clippy::ref_option_ref)]
+#[allow(clippy::missing_docs_in_private_items)]
 enum EnumProjRef<'pin, T, U>
 where
     Enum<T, U>: 'pin,
@@ -137,6 +139,7 @@ const _: () = {
         __Enum<'pin, T, U>: _pin_project::__private::Unpin,
     {}
     impl<T, U> _pin_project::__private::Drop for Enum<T, U> {
+        #[allow(clippy::missing_inline_in_public_items)]
         fn drop(&mut self) {
             unsafe {
                 let __pinned_self = _pin_project::__private::Pin::new_unchecked(self);
@@ -146,6 +149,7 @@ const _: () = {
     }
 };
 #[doc(hidden)]
+#[allow(unused_qualifications)]
 impl<T, U> ::pin_project::__private::PinnedDrop for Enum<T, U> {
     unsafe fn drop(self: Pin<&mut Self>) {
         #[allow(clippy::needless_pass_by_value)]

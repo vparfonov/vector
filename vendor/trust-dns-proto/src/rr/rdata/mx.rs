@@ -1,9 +1,18 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
+/*
+ * Copyright (C) 2015 Benjamin Fry <benjaminfry@me.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 //! mail exchange, email, record
 
@@ -12,11 +21,9 @@ use std::fmt;
 #[cfg(feature = "serde-config")]
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    error::ProtoResult,
-    rr::{domain::Name, RData, RecordData, RecordType},
-    serialize::binary::*,
-};
+use crate::error::*;
+use crate::rr::domain::Name;
+use crate::serialize::binary::*;
 
 /// [RFC 1035, DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION, November 1987](https://tools.ietf.org/html/rfc1035)
 ///
@@ -82,49 +89,36 @@ impl MX {
     }
 }
 
-impl BinEncodable for MX {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        let is_canonical_names = encoder.is_canonical_names();
-        encoder.emit_u16(self.preference())?;
-
-        // to_lowercase for rfc4034 and rfc6840
-        self.exchange()
-            .emit_with_lowercase(encoder, is_canonical_names)?;
-        Ok(())
-    }
+/// Read the RData from the given Decoder
+pub fn read(decoder: &mut BinDecoder<'_>) -> ProtoResult<MX> {
+    Ok(MX::new(
+        decoder.read_u16()?.unverified(/*any u16 is valid*/),
+        Name::read(decoder)?,
+    ))
 }
 
-impl<'r> BinDecodable<'r> for MX {
-    fn read(decoder: &mut BinDecoder<'r>) -> ProtoResult<Self> {
-        Ok(Self::new(
-            decoder.read_u16()?.unverified(/*any u16 is valid*/),
-            Name::read(decoder)?,
-        ))
-    }
-}
-
-impl RecordData for MX {
-    fn try_from_rdata(data: RData) -> Result<Self, RData> {
-        match data {
-            RData::MX(csync) => Ok(csync),
-            _ => Err(data),
-        }
-    }
-
-    fn try_borrow(data: &RData) -> Option<&Self> {
-        match data {
-            RData::MX(csync) => Some(csync),
-            _ => None,
-        }
-    }
-
-    fn record_type(&self) -> RecordType {
-        RecordType::MX
-    }
-
-    fn into_rdata(self) -> RData {
-        RData::MX(self)
-    }
+/// [RFC 4034](https://tools.ietf.org/html/rfc4034#section-6), DNSSEC Resource Records, March 2005
+///
+/// ```text
+/// 6.2.  Canonical RR Form
+///
+///    For the purposes of DNS security, the canonical form of an RR is the
+///    wire format of the RR where:
+///
+///    ...
+///
+///    3.  if the type of the RR is NS, MD, MF, CNAME, SOA, MB, MG, MR, PTR,
+///        HINFO, MINFO, MX, HINFO, RP, AFSDB, RT, SIG, PX, NXT, NAPTR, KX,
+///        SRV, DNAME, A6, RRSIG, or NSEC (rfc6840 removes NSEC), all uppercase
+///        US-ASCII letters in the DNS names contained within the RDATA are replaced
+///        by the corresponding lowercase US-ASCII letters;
+/// ```
+pub fn emit(encoder: &mut BinEncoder<'_>, mx: &MX) -> ProtoResult<()> {
+    let is_canonical_names = encoder.is_canonical_names();
+    encoder.emit_u16(mx.preference())?;
+    mx.exchange()
+        .emit_with_lowercase(encoder, is_canonical_names)?;
+    Ok(())
 }
 
 /// [RFC 1033](https://tools.ietf.org/html/rfc1033), DOMAIN OPERATIONS GUIDE, November 1987
@@ -182,13 +176,13 @@ mod tests {
 
         let mut bytes = Vec::new();
         let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        assert!(rdata.emit(&mut encoder).is_ok());
+        assert!(emit(&mut encoder, &rdata).is_ok());
         let bytes = encoder.into_bytes();
 
-        println!("bytes: {bytes:?}");
+        println!("bytes: {:?}", bytes);
 
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
-        let read_rdata = MX::read(&mut decoder).expect("Decoding error");
+        let read_rdata = read(&mut decoder).expect("Decoding error");
         assert_eq!(rdata, read_rdata);
     }
 }

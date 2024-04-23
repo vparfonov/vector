@@ -653,6 +653,64 @@ fn test_pubsub_unsubscribe() {
 }
 
 #[test]
+fn test_pubsub_subscribe_while_messages_are_sent() {
+    let ctx = TestContext::new();
+    let mut conn_external = ctx.connection();
+    let mut conn_internal = ctx.connection();
+    let received = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let received_clone = received.clone();
+    let (sender, receiver) = std::sync::mpsc::channel();
+    // receive message from foo channel
+    let thread = std::thread::spawn(move || {
+        let mut pubsub = conn_internal.as_pubsub();
+        pubsub.subscribe("foo").unwrap();
+        sender.send(()).unwrap();
+        loop {
+            let msg = pubsub.get_message().unwrap();
+            let channel = msg.get_channel_name();
+            let content: i32 = msg.get_payload().unwrap();
+            received
+                .lock()
+                .unwrap()
+                .push(format!("{channel}:{content}"));
+            if content == -1 {
+                return;
+            }
+            if content == 5 {
+                // subscribe bar channel using the same pubsub
+                pubsub.subscribe("bar").unwrap();
+                sender.send(()).unwrap();
+            }
+        }
+    });
+    receiver.recv().unwrap();
+
+    // send message to foo channel after channel is ready.
+    for index in 0..10 {
+        println!("publishing on foo {index}");
+        redis::cmd("PUBLISH")
+            .arg("foo")
+            .arg(index)
+            .query::<i32>(&mut conn_external)
+            .unwrap();
+    }
+    receiver.recv().unwrap();
+    redis::cmd("PUBLISH")
+        .arg("bar")
+        .arg(-1)
+        .query::<i32>(&mut conn_external)
+        .unwrap();
+    thread.join().unwrap();
+    assert_eq!(
+        *received_clone.lock().unwrap(),
+        (0..10)
+            .map(|index| format!("foo:{}", index))
+            .chain(std::iter::once("bar:-1".to_string()))
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn test_pubsub_unsubscribe_no_subs() {
     let ctx = TestContext::new();
     let mut con = ctx.connection();
@@ -1279,4 +1337,60 @@ fn test_set_options_options() {
     let opts = SetOptions::default().with_expiration(SetExpiry::EX(1000));
 
     assert_args!(&opts, "EX", "1000");
+}
+
+#[test]
+fn test_blocking_sorted_set_api() {
+    let ctx = TestContext::new();
+    let mut con = ctx.connection();
+
+    // setup version & input data followed by assertions that take into account Redis version
+    // BZPOPMIN & BZPOPMAX are available from Redis version 5.0.0
+    // BZMPOP is available from Redis version 7.0.0
+
+    let redis_version = ctx.get_version();
+    assert!(redis_version.0 >= 5);
+
+    assert_eq!(con.zadd("a", "1a", 1), Ok(()));
+    assert_eq!(con.zadd("b", "2b", 2), Ok(()));
+    assert_eq!(con.zadd("c", "3c", 3), Ok(()));
+    assert_eq!(con.zadd("d", "4d", 4), Ok(()));
+    assert_eq!(con.zadd("a", "5a", 5), Ok(()));
+    assert_eq!(con.zadd("b", "6b", 6), Ok(()));
+    assert_eq!(con.zadd("c", "7c", 7), Ok(()));
+    assert_eq!(con.zadd("d", "8d", 8), Ok(()));
+
+    let min = con.bzpopmin::<&str, (String, String, String)>("b", 0.0);
+    let max = con.bzpopmax::<&str, (String, String, String)>("b", 0.0);
+
+    assert_eq!(
+        min.unwrap(),
+        (String::from("b"), String::from("2b"), String::from("2"))
+    );
+    assert_eq!(
+        max.unwrap(),
+        (String::from("b"), String::from("6b"), String::from("6"))
+    );
+
+    if redis_version.0 >= 7 {
+        let min = con.bzmpop_min::<&str, (String, Vec<Vec<(String, String)>>)>(
+            0.0,
+            vec!["a", "b", "c", "d"].as_slice(),
+            1,
+        );
+        let max = con.bzmpop_max::<&str, (String, Vec<Vec<(String, String)>>)>(
+            0.0,
+            vec!["a", "b", "c", "d"].as_slice(),
+            1,
+        );
+
+        assert_eq!(
+            min.unwrap().1[0][0],
+            (String::from("1a"), String::from("1"))
+        );
+        assert_eq!(
+            max.unwrap().1[0][0],
+            (String::from("5a"), String::from("5"))
+        );
+    }
 }

@@ -5,8 +5,8 @@
 //! [docs-rs]: https://img.shields.io/badge/docs.rs-66c2a5?style=for-the-badge&labelColor=555555&logo=docs.rs
 
 #![no_std]
-#![doc(html_root_url = "https://docs.rs/unsafe-libyaml/0.2.9")]
-#![allow(non_camel_case_types, non_snake_case)]
+#![doc(html_root_url = "https://docs.rs/unsafe-libyaml/0.2.11")]
+#![allow(non_camel_case_types, non_snake_case, unsafe_op_in_unsafe_fn)]
 #![warn(clippy::pedantic)]
 #![allow(
     clippy::bool_to_int_with_if,
@@ -47,28 +47,42 @@ use core::mem::size_of;
 mod libc {
     pub use core::ffi::c_void;
     pub use core::primitive::{
-        i32 as c_int, i64 as c_long, i8 as c_char, i8 as c_schar, u16 as c_ushort, u32 as c_uint,
-        u64 as c_ulong, u8 as c_uchar,
+        i32 as c_int, i64 as c_long, i8 as c_char, u32 as c_uint, u64 as c_ulong, u8 as c_uchar,
     };
 }
 
 #[macro_use]
 mod externs {
     use crate::libc;
+    use crate::ops::{die, ForceAdd as _, ForceInto as _};
     use alloc::alloc::{self as rust, Layout};
     use core::mem::{self, MaybeUninit};
     use core::ptr;
     use core::slice;
 
-    const HEADER: usize = mem::size_of::<usize>();
+    const HEADER: usize = {
+        let need_len = mem::size_of::<usize>();
+        // Round up to multiple of MALLOC_ALIGN.
+        (need_len + MALLOC_ALIGN - 1) & !(MALLOC_ALIGN - 1)
+    };
 
     // `max_align_t` may be bigger than this, but libyaml does not use `long
     // double` or u128.
-    const MALLOC_ALIGN: usize = mem::align_of::<usize>();
+    const MALLOC_ALIGN: usize = {
+        let int_align = mem::align_of::<libc::c_ulong>();
+        let ptr_align = mem::align_of::<usize>();
+        if int_align >= ptr_align {
+            int_align
+        } else {
+            ptr_align
+        }
+    };
 
     pub unsafe fn malloc(size: libc::c_ulong) -> *mut libc::c_void {
-        let size = HEADER + size as usize;
-        let layout = Layout::from_size_align_unchecked(size, MALLOC_ALIGN);
+        let size = HEADER.force_add(size.force_into());
+        let layout = Layout::from_size_align(size, MALLOC_ALIGN)
+            .ok()
+            .unwrap_or_else(die);
         let memory = rust::alloc(layout);
         if memory.is_null() {
             rust::handle_alloc_error(layout);
@@ -81,11 +95,13 @@ mod externs {
         let mut memory = ptr.cast::<u8>().sub(HEADER);
         let size = memory.cast::<usize>().read();
         let layout = Layout::from_size_align_unchecked(size, MALLOC_ALIGN);
-        let new_size = HEADER + new_size as usize;
+        let new_size = HEADER.force_add(new_size.force_into());
+        let new_layout = Layout::from_size_align(new_size, MALLOC_ALIGN)
+            .ok()
+            .unwrap_or_else(die);
         memory = rust::realloc(memory, layout, new_size);
         if memory.is_null() {
-            let layout = Layout::from_size_align_unchecked(new_size, MALLOC_ALIGN);
-            rust::handle_alloc_error(layout);
+            rust::handle_alloc_error(new_layout);
         }
         memory.cast::<usize>().write(new_size);
         memory.add(HEADER).cast()
@@ -263,6 +279,7 @@ mod api;
 mod dumper;
 mod emitter;
 mod loader;
+mod ops;
 mod parser;
 mod reader;
 mod scanner;

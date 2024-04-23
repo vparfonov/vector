@@ -1,4 +1,3 @@
-use std::borrow::Cow;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::{Context, Poll};
@@ -282,15 +281,8 @@ impl<'r> Field<'r> {
             .unwrap_or(default_encoding);
 
         let encoding = Encoding::for_label(encoding_name.as_bytes()).unwrap_or(UTF_8);
-
         let bytes = self.bytes().await?;
-
-        let (text, ..) = encoding.decode(&bytes);
-
-        match text {
-            Cow::Owned(s) => Ok(s),
-            Cow::Borrowed(s) => Ok(String::from(s)),
-        }
+        Ok(encoding.decode(&bytes).0.into_owned())
     }
 
     /// Get the index of this field in order they appeared in the stream.
@@ -339,7 +331,7 @@ impl Stream for Field<'_> {
 
         let state = &mut *lock;
         if let Err(err) = state.buffer.poll_stream(cx) {
-            return Poll::Ready(Some(Err(crate::Error::StreamReadFailed(err.into()))));
+            return Poll::Ready(Some(Err(err)));
         }
 
         match state

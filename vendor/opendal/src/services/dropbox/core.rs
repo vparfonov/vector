@@ -19,7 +19,9 @@ use std::default::Default;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;
+use std::time::Duration;
 
+use backon::ExponentialBuilder;
 use bytes::Bytes;
 use chrono::DateTime;
 use chrono::Utc;
@@ -29,37 +31,37 @@ use http::header::CONTENT_TYPE;
 use http::Request;
 use http::Response;
 use http::StatusCode;
+use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde::Serialize;
 use tokio::sync::Mutex;
 
-use crate::raw::build_rooted_abs_path;
-use crate::raw::new_json_deserialize_error;
-use crate::raw::new_json_serialize_error;
-use crate::raw::new_request_build_error;
-use crate::raw::AsyncBody;
-use crate::raw::BatchedReply;
-use crate::raw::HttpClient;
-use crate::raw::IncomingAsyncBody;
-use crate::raw::RpBatch;
-use crate::raw::RpDelete;
-use crate::services::dropbox::backend::DropboxDeleteBatchResponse;
-use crate::services::dropbox::backend::DropboxDeleteBatchResponseEntry;
-use crate::services::dropbox::error::parse_error;
-use crate::types::Error;
-use crate::types::ErrorKind;
-use crate::types::Result;
+use super::error::parse_error;
+use super::error::DropboxErrorResponse;
+use crate::raw::*;
+use crate::*;
+
+/// BACKOFF is the backoff used inside dropbox to make sure dropbox async task succeed.
+pub static BACKOFF: Lazy<ExponentialBuilder> = Lazy::new(|| {
+    ExponentialBuilder::default()
+        .with_max_delay(Duration::from_secs(10))
+        .with_max_times(10)
+        .with_jitter()
+});
 
 pub struct DropboxCore {
-    pub signer: Arc<Mutex<DropboxSigner>>,
-    pub client: HttpClient,
     pub root: String,
+
+    pub client: HttpClient,
+
+    pub signer: Arc<Mutex<DropboxSigner>>,
 }
 
 impl Debug for DropboxCore {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut de = f.debug_struct("DropboxCore");
-        de.finish()
+        f.debug_struct("DropboxCore")
+            .field("root", &self.root)
+            .finish()
     }
 }
 
@@ -71,16 +73,76 @@ impl DropboxCore {
         path.trim_end_matches('/').to_string()
     }
 
-    pub async fn dropbox_get(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn sign<T>(&self, req: &mut Request<T>) -> Result<()> {
+        let mut signer = self.signer.lock().await;
+
+        // Access token is valid, use it directly.
+        if !signer.access_token.is_empty() && signer.expires_in > Utc::now() {
+            let value = format!("Bearer {}", signer.access_token)
+                .parse()
+                .expect("token must be valid header value");
+            req.headers_mut().insert(header::AUTHORIZATION, value);
+            return Ok(());
+        }
+
+        // Refresh invalid token.
+        let url = "https://api.dropboxapi.com/oauth2/token".to_string();
+
+        let content = format!(
+            "grant_type=refresh_token&refresh_token={}&client_id={}&client_secret={}",
+            signer.refresh_token, signer.client_id, signer.client_secret
+        );
+        let bs = Bytes::from(content);
+
+        let request = Request::post(&url)
+            .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
+            .header(CONTENT_LENGTH, bs.len())
+            .body(AsyncBody::Bytes(bs))
+            .map_err(new_request_build_error)?;
+
+        let resp = self.client.send(request).await?;
+        let body = resp.into_body().bytes().await?;
+
+        let token: DropboxTokenResponse =
+            serde_json::from_slice(&body).map_err(new_json_deserialize_error)?;
+
+        // Update signer after token refreshed.
+        signer.access_token = token.access_token.clone();
+
+        // Refresh it 2 minutes earlier.
+        signer.expires_in = Utc::now() + chrono::Duration::seconds(token.expires_in as i64)
+            - chrono::Duration::seconds(120);
+
+        let value = format!("Bearer {}", token.access_token)
+            .parse()
+            .expect("token must be valid header value");
+        req.headers_mut().insert(header::AUTHORIZATION, value);
+
+        Ok(())
+    }
+
+    pub async fn dropbox_get(
+        &self,
+        path: &str,
+        args: OpRead,
+    ) -> Result<Response<IncomingAsyncBody>> {
         let url: String = "https://content.dropboxapi.com/2/files/download".to_string();
         let download_args = DropboxDownloadArgs {
             path: build_rooted_abs_path(&self.root, path),
         };
         let request_payload =
             serde_json::to_string(&download_args).map_err(new_json_serialize_error)?;
-        let mut request = Request::post(&url)
+
+        let mut req = Request::post(&url)
             .header("Dropbox-API-Arg", request_payload)
-            .header(CONTENT_LENGTH, 0)
+            .header(CONTENT_LENGTH, 0);
+
+        let range = args.range();
+        if !range.is_full() {
+            req = req.header(header::RANGE, range.to_header());
+        }
+
+        let mut request = req
             .body(AsyncBody::Empty)
             .map_err(new_request_build_error)?;
 
@@ -92,11 +154,11 @@ impl DropboxCore {
         &self,
         path: &str,
         size: Option<usize>,
-        content_type: Option<&str>,
+        args: &OpWrite,
         body: AsyncBody,
     ) -> Result<Response<IncomingAsyncBody>> {
         let url = "https://content.dropboxapi.com/2/files/upload".to_string();
-        let args = DropboxUploadArgs {
+        let dropbox_update_args = DropboxUploadArgs {
             path: build_rooted_abs_path(&self.root, path),
             ..Default::default()
         };
@@ -106,13 +168,13 @@ impl DropboxCore {
         }
         request_builder = request_builder.header(
             CONTENT_TYPE,
-            content_type.unwrap_or("application/octet-stream"),
+            args.content_type().unwrap_or("application/octet-stream"),
         );
 
         let mut request = request_builder
             .header(
                 "Dropbox-API-Arg",
-                serde_json::to_string(&args).map_err(new_json_serialize_error)?,
+                serde_json::to_string(&dropbox_update_args).map_err(new_json_serialize_error)?,
             )
             .body(body)
             .map_err(new_request_build_error)?;
@@ -165,14 +227,11 @@ impl DropboxCore {
         self.client.send(request).await
     }
 
-    pub async fn dropbox_delete_batch_check_request(
-        &self,
-        async_job_id: String,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn dropbox_delete_batch_check(&self, async_job_id: String) -> Result<RpBatch> {
         let url = "https://api.dropboxapi.com/2/files/delete_batch/check".to_string();
         let args = DropboxDeleteBatchCheckArgs { async_job_id };
 
-        let bs = Bytes::from(serde_json::to_string(&args).map_err(new_json_serialize_error)?);
+        let bs = Bytes::from(serde_json::to_vec(&args).map_err(new_json_serialize_error)?);
 
         let mut request = Request::post(&url)
             .header(CONTENT_TYPE, "application/json")
@@ -181,45 +240,38 @@ impl DropboxCore {
             .map_err(new_request_build_error)?;
 
         self.sign(&mut request).await?;
-        self.client.send(request).await
-    }
 
-    pub async fn dropbox_delete_batch_check(&self, job_id: String) -> Result<RpBatch> {
-        let resp = self
-            .dropbox_delete_batch_check_request(job_id.clone())
-            .await?;
-        let status = resp.status();
-        match status {
-            StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
+        let resp = self.client.send(request).await?;
+        if resp.status() != StatusCode::OK {
+            return Err(parse_error(resp).await?);
+        }
 
-                let decoded_response = serde_json::from_slice::<DropboxDeleteBatchResponse>(&bs)
-                    .map_err(new_json_deserialize_error)?;
-                match decoded_response.tag.as_str() {
-                    "in_progress" => Err(Error::new(
-                        ErrorKind::Unexpected,
-                        "delete batch job still in progress",
-                    )
-                    .set_temporary()),
-                    "complete" => {
-                        let entries = decoded_response.entries.unwrap_or_default();
-                        let results = self.handle_batch_delete_complete_result(entries);
-                        Ok(RpBatch::new(results))
-                    }
-                    _ => Err(Error::new(
-                        ErrorKind::Unexpected,
-                        &format!(
-                            "delete batch check failed with unexpected tag {}",
-                            decoded_response.tag
-                        ),
-                    )),
-                }
+        let bs = resp.into_body().bytes().await?;
+
+        let decoded_response = serde_json::from_slice::<DropboxDeleteBatchResponse>(&bs)
+            .map_err(new_json_deserialize_error)?;
+        match decoded_response.tag.as_str() {
+            "in_progress" => Err(Error::new(
+                ErrorKind::Unexpected,
+                "delete batch job still in progress",
+            )
+            .set_temporary()),
+            "complete" => {
+                let entries = decoded_response.entries.unwrap_or_default();
+                let results = self.handle_batch_delete_complete_result(entries);
+                Ok(RpBatch::new(results))
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(Error::new(
+                ErrorKind::Unexpected,
+                &format!(
+                    "delete batch check failed with unexpected tag {}",
+                    decoded_response.tag
+                ),
+            )),
         }
     }
 
-    pub async fn dropbox_create_folder(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn dropbox_create_folder(&self, path: &str) -> Result<RpCreateDir> {
         let url = "https://api.dropboxapi.com/2/files/create_folder_v2".to_string();
         let args = DropboxCreateFolderArgs {
             path: self.build_path(path),
@@ -234,7 +286,18 @@ impl DropboxCore {
             .map_err(new_request_build_error)?;
 
         self.sign(&mut request).await?;
-        self.client.send(request).await
+        let resp = self.client.send(request).await?;
+        let status = resp.status();
+        match status {
+            StatusCode::OK => Ok(RpCreateDir::default()),
+            _ => {
+                let err = parse_error(resp).await?;
+                match err.kind() {
+                    ErrorKind::AlreadyExists => Ok(RpCreateDir::default()),
+                    _ => Err(err),
+                }
+            }
+        }
     }
 
     pub async fn dropbox_get_metadata(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
@@ -255,54 +318,6 @@ impl DropboxCore {
         self.sign(&mut request).await?;
 
         self.client.send(request).await
-    }
-
-    pub async fn sign<T>(&self, req: &mut Request<T>) -> Result<()> {
-        let mut signer = self.signer.lock().await;
-
-        // Access token is valid, use it directly.
-        if !signer.access_token.is_empty() && signer.expires_in > Utc::now() {
-            let value = format!("Bearer {}", signer.access_token)
-                .parse()
-                .expect("token must be valid header value");
-            req.headers_mut().insert(header::AUTHORIZATION, value);
-            return Ok(());
-        }
-
-        // Refresh invalid token.
-        let url = "https://api.dropboxapi.com/oauth2/token".to_string();
-
-        let content = format!(
-            "grant_type=refresh_token&refresh_token={}&client_id={}&client_secret={}",
-            signer.refresh_token, signer.client_id, signer.client_secret
-        );
-        let bs = Bytes::from(content);
-
-        let request = Request::post(&url)
-            .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
-            .header(CONTENT_LENGTH, bs.len())
-            .body(AsyncBody::Bytes(bs))
-            .map_err(new_request_build_error)?;
-
-        let resp = self.client.send(request).await?;
-        let body = resp.into_body().bytes().await?;
-
-        let token: DropboxTokenResponse =
-            serde_json::from_slice(&body).map_err(new_json_deserialize_error)?;
-
-        // Update signer after token refreshed.
-        signer.access_token = token.access_token.clone();
-
-        // Refresh it 2 minutes earlier.
-        signer.expires_in = Utc::now() + chrono::Duration::seconds(token.expires_in as i64)
-            - chrono::Duration::seconds(120);
-
-        let value = format!("Bearer {}", token.access_token)
-            .parse()
-            .expect("token must be valid header value");
-        req.headers_mut().insert(header::AUTHORIZATION, value);
-
-        Ok(())
     }
 
     pub fn handle_batch_delete_complete_result(
@@ -356,11 +371,11 @@ pub struct DropboxSigner {
 impl Default for DropboxSigner {
     fn default() -> Self {
         DropboxSigner {
-            refresh_token: "".to_string(),
+            refresh_token: String::new(),
             client_id: String::new(),
             client_secret: String::new(),
 
-            access_token: "".to_string(),
+            access_token: String::new(),
             expires_in: DateTime::<Utc>::MIN_UTC,
         }
     }
@@ -417,7 +432,7 @@ struct DropboxCreateFolderArgs {
     path: String,
 }
 
-#[derive(Clone, Debug, Deserialize, Serialize)]
+#[derive(Default, Clone, Debug, Deserialize, Serialize)]
 struct DropboxMetadataArgs {
     include_deleted: bool,
     include_has_explicit_shared_members: bool,
@@ -425,19 +440,80 @@ struct DropboxMetadataArgs {
     path: String,
 }
 
-impl Default for DropboxMetadataArgs {
-    fn default() -> Self {
-        DropboxMetadataArgs {
-            include_deleted: false,
-            include_has_explicit_shared_members: false,
-            include_media_info: false,
-            path: "".to_string(),
-        }
-    }
-}
-
 #[derive(Clone, Deserialize)]
 struct DropboxTokenResponse {
     access_token: String,
     expires_in: usize,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default)]
+pub struct DropboxMetadataResponse {
+    #[serde(rename(deserialize = ".tag"))]
+    pub tag: String,
+    pub client_modified: String,
+    pub content_hash: Option<String>,
+    pub file_lock_info: Option<DropboxMetadataFileLockInfo>,
+    pub has_explicit_shared_members: Option<bool>,
+    pub id: String,
+    pub is_downloadable: Option<bool>,
+    pub name: String,
+    pub path_display: String,
+    pub path_lower: String,
+    pub property_groups: Option<Vec<DropboxMetadataPropertyGroup>>,
+    pub rev: Option<String>,
+    pub server_modified: Option<String>,
+    pub sharing_info: Option<DropboxMetadataSharingInfo>,
+    pub size: Option<u64>,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default)]
+pub struct DropboxMetadataFileLockInfo {
+    pub created: Option<String>,
+    pub is_lockholder: bool,
+    pub lockholder_name: Option<String>,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default)]
+pub struct DropboxMetadataPropertyGroup {
+    pub fields: Vec<DropboxMetadataPropertyGroupField>,
+    pub template_id: String,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default)]
+pub struct DropboxMetadataPropertyGroupField {
+    pub name: String,
+    pub value: String,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default)]
+pub struct DropboxMetadataSharingInfo {
+    pub modified_by: Option<String>,
+    pub parent_shared_folder_id: Option<String>,
+    pub read_only: Option<bool>,
+    pub shared_folder_id: Option<String>,
+    pub traverse_only: Option<bool>,
+    pub no_access: Option<bool>,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default)]
+pub struct DropboxDeleteBatchResponse {
+    #[serde(rename(deserialize = ".tag"))]
+    pub tag: String,
+    pub async_job_id: Option<String>,
+    pub entries: Option<Vec<DropboxDeleteBatchResponseEntry>>,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default)]
+pub struct DropboxDeleteBatchResponseEntry {
+    #[serde(rename(deserialize = ".tag"))]
+    pub tag: String,
+    pub metadata: Option<DropboxMetadataResponse>,
+    pub error: Option<DropboxErrorResponse>,
 }

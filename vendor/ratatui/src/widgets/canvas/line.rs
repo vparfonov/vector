@@ -3,18 +3,23 @@ use crate::{
     widgets::canvas::{Painter, Shape},
 };
 
-/// Shape to draw a line from (x1, y1) to (x2, y2) with the given color
+/// A line from `(x1, y1)` to `(x2, y2)` with the given color
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct Line {
+    /// `x` of the starting point
     pub x1: f64,
+    /// `y` of the starting point
     pub y1: f64,
+    /// `x` of the ending point
     pub x2: f64,
+    /// `y` of the ending point
     pub y2: f64,
+    /// Color of the line
     pub color: Color,
 }
 
 impl Line {
-    /// Create a new line from (x1, y1) to (x2, y2) with the given color
+    /// Create a new line from `(x1, y1)` to `(x2, y2)` with the given color
     pub fn new(x1: f64, y1: f64, x2: f64, y2: f64, color: Color) -> Self {
         Self {
             x1,
@@ -108,11 +113,7 @@ fn draw_line_high(painter: &mut Painter, x1: usize, y1: usize, x2: usize, y2: us
 #[cfg(test)]
 mod tests {
     use super::Line;
-    use crate::{
-        assert_buffer_eq,
-        prelude::*,
-        widgets::{canvas::Canvas, Widget},
-    };
+    use crate::{assert_buffer_eq, prelude::*, widgets::canvas::Canvas};
 
     #[track_caller]
     fn test(line: Line, expected_lines: Vec<&str>) {
@@ -128,7 +129,7 @@ mod tests {
 
         let mut expected = Buffer::with_lines(expected_lines);
         for cell in expected.content.iter_mut() {
-            if cell.symbol == "•" {
+            if cell.symbol() == "•" {
                 cell.set_style(Style::new().red());
             }
         }

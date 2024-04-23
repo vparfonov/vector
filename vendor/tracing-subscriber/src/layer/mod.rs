@@ -468,6 +468,24 @@
 //! function pointer. In addition, when more control is required, the [`Filter`]
 //! trait may also be implemented for user-defined types.
 //!
+//! //! [`Option<Filter>`] also implements [`Filter`], which allows for an optional
+//! filter. [`None`](Option::None) filters out _nothing_ (that is, allows
+//! everything through). For example:
+//!
+//! ```rust
+//! # use tracing_subscriber::{filter::filter_fn, Layer};
+//! # use tracing_core::{Metadata, subscriber::Subscriber};
+//! # struct MyLayer<S>(std::marker::PhantomData<S>);
+//! # impl<S> MyLayer<S> { fn new() -> Self { Self(std::marker::PhantomData)} }
+//! # impl<S: Subscriber> Layer<S> for MyLayer<S> {}
+//! # fn my_filter(_: &str) -> impl Fn(&Metadata) -> bool { |_| true  }
+//! fn setup_tracing<S: Subscriber>(filter_config: Option<&str>) {
+//!     let layer = MyLayer::<S>::new()
+//!         .with_filter(filter_config.map(|config| filter_fn(my_filter(config))));
+//! //...
+//! }
+//! ```
+//!
 //! <pre class="compile_fail" style="white-space:normal;font:inherit;">
 //!     <strong>Warning</strong>: Currently, the <a href="../struct.Registry.html">
 //!     <code>Registry</code></a> type defined in this crate is the only root
@@ -732,8 +750,8 @@ where
     /// [`WeakDispatch`]: tracing_core::dispatcher::WeakDispatch
     /// [upgraded]: tracing_core::dispatcher::WeakDispatch::upgrade
     /// [`Subscriber`]: tracing_core::Subscriber
-    fn on_register_dispatch(&self, collector: &Dispatch) {
-        let _ = collector;
+    fn on_register_dispatch(&self, subscriber: &Dispatch) {
+        let _ = subscriber;
     }
 
     /// Performs late initialization when attaching a `Layer` to a

@@ -83,8 +83,12 @@ impl Finder {
             }
             _ => {
                 // Search binary in PATHs(defined in environment variable).
-                let p = paths.ok_or(Error::CannotFindBinaryPath)?;
-                let paths: Vec<_> = env::split_paths(&p).collect();
+                let paths =
+                    env::split_paths(&paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?)
+                        .collect::<Vec<_>>();
+                if paths.is_empty() {
+                    return Err(Error::CannotGetCurrentDirAndPathListEmpty);
+                }
 
                 Either::Right(Self::path_search_candidates(path, paths).into_iter())
             }
@@ -105,7 +109,7 @@ impl Finder {
     where
         T: AsRef<OsStr>,
     {
-        let p = paths.ok_or(Error::CannotFindBinaryPath)?;
+        let p = paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?;
         // Collect needs to happen in order to not have to
         // change the API to borrow on `paths`.
         #[allow(clippy::needless_collect)]
@@ -198,7 +202,6 @@ impl Finder {
                 if has_executable_extension(&p, &PATH_EXTENSIONS) {
                     Box::new(iter::once(p))
                 } else {
-                    let bare_file = p.extension().map(|_| p.clone());
                     // Appended paths with windows executable extensions.
                     // e.g. path `c:/windows/bin[.ext]` will expand to:
                     // [c:/windows/bin.ext]
@@ -207,15 +210,13 @@ impl Finder {
                     // c:/windows/bin[.ext].CMD
                     // ...
                     Box::new(
-                        bare_file
-                            .into_iter()
-                            .chain(PATH_EXTENSIONS.iter().map(move |e| {
-                                // Append the extension.
-                                let mut p = p.clone().into_os_string();
-                                p.push(e);
+                        iter::once(p.clone()).chain(PATH_EXTENSIONS.iter().map(move |e| {
+                            // Append the extension.
+                            let mut p = p.clone().into_os_string();
+                            p.push(e);
 
-                                PathBuf::from(p)
-                            })),
+                            PathBuf::from(p)
+                        })),
                     )
                 }
             })

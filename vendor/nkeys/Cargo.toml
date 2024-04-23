@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "nkeys"
-version = "0.3.2"
+version = "0.4.0"
 authors = ["wasmCloud Team"]
 description = "Rust implementation of the NATS nkeys library"
 homepage = "https://github.com/wasmcloud/nkeys"
@@ -37,6 +37,10 @@ required-features = ["cli"]
 
 [dependencies.byteorder]
 version = "1.3.4"
+
+[dependencies.crypto_box]
+version = "0.9.1"
+optional = true
 
 [dependencies.data-encoding]
 version = "2.3.0"
@@ -92,6 +96,7 @@ cli = [
     "env_logger",
     "serde_json",
 ]
+xkeys = ["dep:crypto_box"]
 
 [target."cfg(target_arch = \"wasm32\")".dependencies.getrandom]
 version = "0.2"

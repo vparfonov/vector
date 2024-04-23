@@ -47,11 +47,11 @@
 //!     let client = async_nats::connect("demo.nats.io").await?;
 //!
 //!     // Subscribe to the "messages" subject
-//!     let mut subscriber = client.subscribe("messages".into()).await?;
+//!     let mut subscriber = client.subscribe("messages").await?;
 //!
 //!     // Publish messages to the "messages" subject
 //!     for _ in 0..10 {
-//!         client.publish("messages".into(), "data".into()).await?;
+//!         client.publish("messages", "data".into()).await?;
 //!     }
 //!
 //!     // Receive and process messages
@@ -77,12 +77,12 @@
 //! let client = async_nats::connect("demo.nats.io").await?;
 //!
 //! // Prepare the subject and data
-//! let subject = String::from("foo");
+//! let subject = "foo";
 //! let data = Bytes::from("bar");
 //!
 //! // Publish messages to the NATS server
 //! for _ in 0..10 {
-//!     client.publish(subject.clone(), data.clone()).await?;
+//!     client.publish(subject, data.clone()).await?;
 //! }
 //! #    Ok(())
 //! # }
@@ -103,13 +103,83 @@
 //! let client = async_nats::connect("demo.nats.io").await?;
 //!
 //! // Subscribe to the "foo" subject
-//! let mut subscriber = client.subscribe("foo".into()).await.unwrap();
+//! let mut subscriber = client.subscribe("foo").await.unwrap();
 //!
 //! // Receive and process messages
 //! while let Some(message) = subscriber.next().await {
 //!     println!("Received message {:?}", message);
 //! }
 //! #     Ok(())
+//! # }
+//! ```
+//!
+//! ### JetStream
+//!
+//! To access JetStream API, create a JetStream [jetstream::Context].
+//!
+//! ```no_run
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), async_nats::Error> {
+//! // Connect to the NATS server
+//! let client = async_nats::connect("demo.nats.io").await?;
+//! // Create a JetStream context.
+//! let jetstream = async_nats::jetstream::new(client);
+//!
+//! // Publish JetStream messages, manage streams, consumers, etc.
+//! jetstream.publish("foo", "bar".into()).await?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ### Key-value Store
+//!
+//! Key-value [Store][jetstream::kv::Store] is accessed through [jetstream::Context].
+//!
+//! ```no_run
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), async_nats::Error> {
+//! // Connect to the NATS server
+//! let client = async_nats::connect("demo.nats.io").await?;
+//! // Create a JetStream context.
+//! let jetstream = async_nats::jetstream::new(client);
+//! // Access an existing key-value.
+//! let kv = jetstream.get_key_value("store").await?;
+//! # Ok(())
+//! # }
+//! ```
+//! ### Object Store store
+//!
+//! Object [Store][jetstream::object_store::ObjectStore] is accessed through [jetstream::Context].
+//!
+//! ```no_run
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), async_nats::Error> {
+//! // Connect to the NATS server
+//! let client = async_nats::connect("demo.nats.io").await?;
+//! // Create a JetStream context.
+//! let jetstream = async_nats::jetstream::new(client);
+//! // Access an existing key-value.
+//! let kv = jetstream.get_object_store("store").await?;
+//! # Ok(())
+//! # }
+//! ```
+//! ### Service API
+//!
+//! [Service API][service::Service] is accessible through [Client] after importing its trait.
+//!
+//! ```no_run
+//! # #[tokio::main]
+//! # async fn main() -> Result<(), async_nats::Error> {
+//! use async_nats::service::ServiceExt;
+//! // Connect to the NATS server
+//! let client = async_nats::connect("demo.nats.io").await?;
+//! let mut service = client
+//!     .service_builder()
+//!     .description("some service")
+//!     .stats_handler(|endpoint, stats| serde_json::json!({ "endpoint": endpoint }))
+//!     .start("products", "1.0.0")
+//!     .await?;
+//! # Ok(())
 //! # }
 //! ```
 
@@ -164,6 +234,7 @@ pub use tokio_rustls::rustls;
 use connection::{Connection, State};
 use connector::{Connector, ConnectorOptions};
 pub use header::{HeaderMap, HeaderName, HeaderValue};
+pub use subject::Subject;
 
 mod auth;
 pub(crate) mod auth_utils;
@@ -183,6 +254,7 @@ pub mod message;
 #[cfg(feature = "service")]
 pub mod service;
 pub mod status;
+pub mod subject;
 mod tls;
 
 pub use message::Message;
@@ -252,8 +324,8 @@ pub(crate) enum ServerOp {
     Error(ServerError),
     Message {
         sid: u64,
-        subject: String,
-        reply: Option<String>,
+        subject: Subject,
+        reply: Option<Subject>,
         payload: Bytes,
         headers: Option<HeaderMap>,
         status: Option<StatusCode>,
@@ -265,21 +337,21 @@ pub(crate) enum ServerOp {
 #[derive(Debug)]
 pub(crate) enum Command {
     Publish {
-        subject: String,
+        subject: Subject,
         payload: Bytes,
-        respond: Option<String>,
+        respond: Option<Subject>,
         headers: Option<HeaderMap>,
     },
     Request {
-        subject: String,
+        subject: Subject,
         payload: Bytes,
-        respond: String,
+        respond: Subject,
         headers: Option<HeaderMap>,
         sender: oneshot::Sender<Message>,
     },
     Subscribe {
         sid: u64,
-        subject: String,
+        subject: Subject,
         queue_group: Option<String>,
         sender: mpsc::Sender<Message>,
     },
@@ -296,14 +368,14 @@ pub(crate) enum Command {
 #[derive(Debug)]
 pub(crate) enum ClientOp {
     Publish {
-        subject: String,
+        subject: Subject,
         payload: Bytes,
-        respond: Option<String>,
+        respond: Option<Subject>,
         headers: Option<HeaderMap>,
     },
     Subscribe {
         sid: u64,
-        subject: String,
+        subject: Subject,
         queue_group: Option<String>,
     },
     Unsubscribe {
@@ -317,7 +389,7 @@ pub(crate) enum ClientOp {
 
 #[derive(Debug)]
 struct Subscription {
-    subject: String,
+    subject: Subject,
     sender: mpsc::Sender<Message>,
     queue_group: Option<String>,
     delivered: u64,
@@ -326,8 +398,8 @@ struct Subscription {
 
 #[derive(Debug)]
 struct Multiplexer {
-    subject: String,
-    prefix: String,
+    subject: Subject,
+    prefix: Subject,
     senders: HashMap<String, oneshot::Sender<Message>>,
 }
 
@@ -392,7 +464,6 @@ impl ConnectionHandler {
                     Poll::Ready(ExitReason::Disconnected(None))
                 } else {
                     self.handler.connection.enqueue_write_op(&ClientOp::Ping);
-                    self.handler.is_flushing = true;
 
                     Poll::Pending
                 }
@@ -484,11 +555,7 @@ impl ConnectionHandler {
                     }
                 }
 
-                if !self.handler.is_flushing && self.handler.connection.should_flush() {
-                    self.handler.is_flushing = true;
-                }
-
-                if self.handler.is_flushing {
+                if self.handler.is_flushing || self.handler.connection.should_flush() {
                     match self.handler.connection.poll_flush(cx) {
                         Poll::Pending => {}
                         Poll::Ready(Ok(())) => {
@@ -553,7 +620,7 @@ impl ConnectionHandler {
                 length,
             } => {
                 if let Some(subscription) = self.subscriptions.get_mut(&sid) {
-                    let message = Message {
+                    let message: Message = Message {
                         subject,
                         reply,
                         payload,
@@ -591,7 +658,8 @@ impl ConnectionHandler {
                     }
                 } else if sid == MULTIPLEXER_SID {
                     if let Some(multiplexer) = self.multiplexer.as_mut() {
-                        let maybe_token = subject.strip_prefix(&multiplexer.prefix).to_owned();
+                        let maybe_token =
+                            subject.strip_prefix(multiplexer.prefix.as_ref()).to_owned();
 
                         if let Some(token) = maybe_token {
                             if let Some(sender) = multiplexer.senders.remove(token) {
@@ -684,8 +752,8 @@ impl ConnectionHandler {
                 let multiplexer = if let Some(multiplexer) = self.multiplexer.as_mut() {
                     multiplexer
                 } else {
-                    let prefix = format!("{}.{}.", prefix, nuid::next());
-                    let subject = format!("{}*", prefix);
+                    let prefix = Subject::from(format!("{}.{}.", prefix, nuid::next()));
+                    let subject = Subject::from(format!("{}*", prefix));
 
                     self.connection.enqueue_write_op(&ClientOp::Subscribe {
                         sid: MULTIPLEXER_SID,
@@ -705,7 +773,7 @@ impl ConnectionHandler {
                 let pub_op = ClientOp::Publish {
                     subject,
                     payload,
-                    respond: Some(format!("{}{}", multiplexer.prefix, token)),
+                    respond: Some(format!("{}{}", multiplexer.prefix, token).into()),
                     headers,
                 };
 
@@ -775,7 +843,7 @@ impl ConnectionHandler {
 /// # async fn main() ->  Result<(), async_nats::Error> {
 /// let mut nc =
 ///     async_nats::connect_with_options("demo.nats.io", async_nats::ConnectOptions::new()).await?;
-/// nc.publish("test".into(), "data".into()).await?;
+/// nc.publish("test", "data".into()).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -796,6 +864,7 @@ pub async fn connect_with_options<A: ToServerAddrs>(
             client_key: options.client_key,
             client_cert: options.client_cert,
             tls_client_config: options.tls_client_config,
+            tls_first: options.tls_first,
             auth: options.auth,
             no_echo: options.no_echo,
             connection_timeout: options.connection_timeout,
@@ -889,7 +958,7 @@ impl fmt::Display for Event {
 /// # #[tokio::main]
 /// # async fn main() ->  Result<(), async_nats::Error> {
 /// let mut nc = async_nats::connect("demo.nats.io").await?;
-/// nc.publish("test".into(), "data".into()).await?;
+/// nc.publish("test", "data".into()).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -997,7 +1066,7 @@ impl From<io::Error> for ConnectError {
 /// # #[tokio::main]
 /// # async fn main() ->  Result<(), async_nats::Error> {
 /// let mut nc = async_nats::connect("demo.nats.io").await?;
-/// # nc.publish("test".into(), "data".into()).await?;
+/// # nc.publish("test", "data".into()).await?;
 /// # Ok(())
 /// # }
 /// ```
@@ -1029,7 +1098,7 @@ impl Subscriber {
     /// # async fn main() -> Result<(), async_nats::Error> {
     /// let client = async_nats::connect("demo.nats.io").await?;
     ///
-    /// let mut subscriber = client.subscribe("foo".into()).await?;
+    /// let mut subscriber = client.subscribe("foo").await?;
     ///
     /// subscriber.unsubscribe().await?;
     /// # Ok(())
@@ -1057,11 +1126,11 @@ impl Subscriber {
     /// # async fn main() -> Result<(), async_nats::Error> {
     /// let client = async_nats::connect("demo.nats.io").await?;
     ///
-    /// let mut subscriber = client.subscribe("test".into()).await?;
+    /// let mut subscriber = client.subscribe("test").await?;
     /// subscriber.unsubscribe_after(3).await?;
     ///
     /// for _ in 0..3 {
-    ///     client.publish("test".into(), "data".into()).await?;
+    ///     client.publish("test", "data".into()).await?;
     /// }
     ///
     /// while let Some(message) = subscriber.next().await {

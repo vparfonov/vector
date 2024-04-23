@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.64.0"
+rust-version = "1.70.0"
 name = "prost-reflect"
-version = "0.12.0"
+version = "0.13.0"
 authors = ["Andrew Hickman <andrew.hickman1@sky.com>"]
 exclude = [
     "**/tests.rs",
@@ -103,7 +103,7 @@ required-features = [
 ]
 
 [dependencies.base64]
-version = "0.21.0"
+version = "0.21.4"
 optional = true
 
 [dependencies.logos]
@@ -111,7 +111,7 @@ version = "0.13.0"
 optional = true
 
 [dependencies.miette]
-version = "5.3.0"
+version = "7.0.0"
 optional = true
 
 [dependencies.once_cell]
@@ -121,7 +121,7 @@ version = "1.9.0"
 version = "0.12.0"
 
 [dependencies.prost-reflect-derive]
-version = "0.12.0"
+version = "0.13.0"
 optional = true
 
 [dependencies.prost-types]
@@ -149,11 +149,8 @@ version = "1.0.0"
 [dev-dependencies.prost-build]
 version = "0.12.0"
 
-[dev-dependencies.protox]
-version = "0.4.0"
-
 [dev-dependencies.serde_json]
-version = "1.0.82"
+version = "1.0.106"
 
 [dev-dependencies.serde_yaml]
 version = "0.9.25"

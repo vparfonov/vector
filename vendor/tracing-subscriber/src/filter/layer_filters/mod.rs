@@ -351,10 +351,10 @@ pub trait FilterExt<S>: layer::Filter<S> {
     //  globally applied to events where it doesn't today, since we can't know
     //  what `event_enabled` will say until we have the event to call it with.
     ///
-    /// [`Filter`]: crate::subscribe::Filter
-    /// [`enabled`]: crate::subscribe::Filter::enabled
-    /// [`event_enabled`]: crate::subscribe::Filter::event_enabled
-    /// [`callsite_enabled`]: crate::subscribe::Filter::callsite_enabled
+    /// [`Filter`]: crate::layer::Filter
+    /// [`enabled`]: crate::layer::Filter::enabled
+    /// [`event_enabled`]: crate::layer::Filter::event_enabled
+    /// [`callsite_enabled`]: crate::layer::Filter::callsite_enabled
     fn not(self) -> combinator::Not<Self, S>
     where
         Self: Sized,
@@ -478,6 +478,36 @@ macro_rules! filter_impl_body {
         fn max_level_hint(&self) -> Option<LevelFilter> {
             self.deref().max_level_hint()
         }
+
+        #[inline]
+        fn event_enabled(&self, event: &Event<'_>, cx: &Context<'_, S>) -> bool {
+            self.deref().event_enabled(event, cx)
+        }
+
+        #[inline]
+        fn on_new_span(&self, attrs: &span::Attributes<'_>, id: &span::Id, ctx: Context<'_, S>) {
+            self.deref().on_new_span(attrs, id, ctx)
+        }
+
+        #[inline]
+        fn on_record(&self, id: &span::Id, values: &span::Record<'_>, ctx: Context<'_, S>) {
+            self.deref().on_record(id, values, ctx)
+        }
+
+        #[inline]
+        fn on_enter(&self, id: &span::Id, ctx: Context<'_, S>) {
+            self.deref().on_enter(id, ctx)
+        }
+
+        #[inline]
+        fn on_exit(&self, id: &span::Id, ctx: Context<'_, S>) {
+            self.deref().on_exit(id, ctx)
+        }
+
+        #[inline]
+        fn on_close(&self, id: span::Id, ctx: Context<'_, S>) {
+            self.deref().on_close(id, ctx)
+        }
     };
 }
 
@@ -491,6 +521,75 @@ impl<S> layer::Filter<S> for Arc<dyn layer::Filter<S> + Send + Sync + 'static> {
 #[cfg_attr(docsrs, doc(cfg(feature = "registry")))]
 impl<S> layer::Filter<S> for Box<dyn layer::Filter<S> + Send + Sync + 'static> {
     filter_impl_body!();
+}
+
+// Implement Filter for Option<Filter> where None => allow
+#[cfg(feature = "registry")]
+#[cfg_attr(docsrs, doc(cfg(feature = "registry")))]
+impl<F, S> layer::Filter<S> for Option<F>
+where
+    F: layer::Filter<S>,
+{
+    #[inline]
+    fn enabled(&self, meta: &Metadata<'_>, ctx: &Context<'_, S>) -> bool {
+        self.as_ref()
+            .map(|inner| inner.enabled(meta, ctx))
+            .unwrap_or(true)
+    }
+
+    #[inline]
+    fn callsite_enabled(&self, meta: &'static Metadata<'static>) -> Interest {
+        self.as_ref()
+            .map(|inner| inner.callsite_enabled(meta))
+            .unwrap_or_else(Interest::always)
+    }
+
+    #[inline]
+    fn max_level_hint(&self) -> Option<LevelFilter> {
+        self.as_ref().and_then(|inner| inner.max_level_hint())
+    }
+
+    #[inline]
+    fn event_enabled(&self, event: &Event<'_>, ctx: &Context<'_, S>) -> bool {
+        self.as_ref()
+            .map(|inner| inner.event_enabled(event, ctx))
+            .unwrap_or(true)
+    }
+
+    #[inline]
+    fn on_new_span(&self, attrs: &span::Attributes<'_>, id: &span::Id, ctx: Context<'_, S>) {
+        if let Some(inner) = self {
+            inner.on_new_span(attrs, id, ctx)
+        }
+    }
+
+    #[inline]
+    fn on_record(&self, id: &span::Id, values: &span::Record<'_>, ctx: Context<'_, S>) {
+        if let Some(inner) = self {
+            inner.on_record(id, values, ctx)
+        }
+    }
+
+    #[inline]
+    fn on_enter(&self, id: &span::Id, ctx: Context<'_, S>) {
+        if let Some(inner) = self {
+            inner.on_enter(id, ctx)
+        }
+    }
+
+    #[inline]
+    fn on_exit(&self, id: &span::Id, ctx: Context<'_, S>) {
+        if let Some(inner) = self {
+            inner.on_exit(id, ctx)
+        }
+    }
+
+    #[inline]
+    fn on_close(&self, id: span::Id, ctx: Context<'_, S>) {
+        if let Some(inner) = self {
+            inner.on_close(id, ctx)
+        }
+    }
 }
 
 // === impl Filtered ===
@@ -595,7 +694,7 @@ impl<L, F, S> Filtered<L, F, S> {
     /// # }
     /// ```
     ///
-    /// [subscriber]: Subscribe
+    /// [`Layer`]: crate::layer::Layer
     pub fn inner_mut(&mut self) -> &mut L {
         &mut self.layer
     }
@@ -607,8 +706,8 @@ where
     F: layer::Filter<S> + 'static,
     L: Layer<S>,
 {
-    fn on_register_dispatch(&self, collector: &Dispatch) {
-        self.layer.on_register_dispatch(collector);
+    fn on_register_dispatch(&self, subscriber: &Dispatch) {
+        self.layer.on_register_dispatch(subscriber);
     }
 
     fn on_layer(&mut self, subscriber: &mut S) {
@@ -1091,7 +1190,7 @@ impl FilterState {
         }
     }
 
-    /// Run a second filtering pass, e.g. for Subscribe::event_enabled.
+    /// Run a second filtering pass, e.g. for Layer::event_enabled.
     fn and(&self, filter: FilterId, f: impl FnOnce() -> bool) -> bool {
         let map = self.enabled.get();
         let enabled = map.is_enabled(filter) && f();

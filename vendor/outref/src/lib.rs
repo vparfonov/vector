@@ -1,150 +1,279 @@
-//! Write-only references and slices.
+//! Out reference ([`&'a out T`](Out)).
 #![deny(
     missing_docs,
     clippy::all,
     clippy::cargo,
     clippy::missing_const_for_fn,
-    clippy::missing_inline_in_public_items
+    clippy::missing_inline_in_public_items,
+    clippy::must_use_candidate
 )]
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
-use core::ptr::NonNull;
+use core::ptr::{self, NonNull};
+use core::slice;
 
-/// A write-only reference of `T`.
-pub struct OutRef<'a, T> {
+/// Out reference ([`&'a out T`](Out)).
+///
+/// An out reference is similar to a mutable reference, but it may point to uninitialized memory.
+/// An out reference may be used to initialize the pointee or represent a data buffer.
+///
+/// [`&'a out T`](Out) can be converted from:
+/// + [`&'a mut MaybeUninit<T>`](core::mem::MaybeUninit)
+///     and [`&'a mut [MaybeUninit<T>]`](core::mem::MaybeUninit),
+///     where the `T` may be uninitialized.
+/// + [`&'a mut T`](reference) and [`&'a mut [T]`](prim@slice),
+///     where the `T` is initialized and [Copy].
+///
+/// It is not allowed to corrupt or de-initialize the pointee, which may cause unsoundness.
+/// It is the main difference between [`&'a out T`](Out)
+/// and [`&'a mut MaybeUninit<T>`](core::mem::MaybeUninit)
+/// /[`&'a mut [MaybeUninit<T>]`](core::mem::MaybeUninit).
+///
+/// Any reads through an out reference may read uninitialized value(s).
+#[repr(transparent)]
+pub struct Out<'a, T: 'a + ?Sized> {
     data: NonNull<T>,
-    _marker: PhantomData<&'a mut MaybeUninit<T>>,
+    _marker: PhantomData<&'a mut T>,
 }
 
-unsafe impl<T: Send> Send for OutRef<'_, T> {}
-unsafe impl<T: Sync> Sync for OutRef<'_, T> {}
+unsafe impl<T: Send> Send for Out<'_, T> {}
+unsafe impl<T: Sync> Sync for Out<'_, T> {}
+impl<T: Unpin> Unpin for Out<'_, T> {}
 
-impl<'a, T> OutRef<'a, T> {
-    /// Forms an `OutRef<'a, T>`.
+impl<'a, T: ?Sized> Out<'a, T> {
+    /// Forms an [`Out<'a, T>`](Out)
     ///
     /// # Safety
     ///
-    /// Behavior is undefined if any of the following conditions are violated:
-    ///
     /// * `data` must be valid for writes.
-    ///
     /// * `data` must be properly aligned.
     #[inline(always)]
-    pub unsafe fn from_raw(data: *mut T) -> Self {
+    #[must_use]
+    pub unsafe fn new(data: *mut T) -> Self {
         Self {
             data: NonNull::new_unchecked(data),
             _marker: PhantomData,
         }
     }
 
-    /// Forms an `OutBuf` from an initialized value.
+    /// Converts to a mutable (unique) reference to the value.
+    ///
+    /// # Safety
+    /// The referenced value must be initialized when calling this function.
     #[inline(always)]
-    pub fn new(val: &'a mut T) -> Self {
-        let data: *mut T = val;
-        unsafe { Self::from_raw(data) }
+    #[must_use]
+    pub unsafe fn assume_init(mut self) -> &'a mut T {
+        self.data.as_mut()
     }
 
-    /// Forms an `OutBuf` from an uninitialized value.
+    /// Reborrows the out reference for a shorter lifetime.
     #[inline(always)]
-    pub fn uninit(val: &'a mut MaybeUninit<T>) -> Self {
-        let data: *mut T = MaybeUninit::as_mut_ptr(val);
-        unsafe { Self::from_raw(data.cast()) }
+    #[must_use]
+    pub fn reborrow<'s>(&'s mut self) -> Out<'s, T>
+    where
+        'a: 's,
+    {
+        Self {
+            data: self.data,
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'a, T> Out<'a, T> {
+    /// Forms an [`Out<'a, T>`](Out).
+    #[inline(always)]
+    #[must_use]
+    pub fn from_mut(data: &'a mut T) -> Self
+    where
+        T: Copy,
+    {
+        unsafe { Self::new(data) }
+    }
+
+    /// Forms an [`Out<'a, T>`](Out) from an uninitialized value.
+    #[inline(always)]
+    #[must_use]
+    pub fn from_uninit(data: &'a mut MaybeUninit<T>) -> Self {
+        let data: *mut T = MaybeUninit::as_mut_ptr(data);
+        unsafe { Self::new(data.cast()) }
+    }
+
+    /// Converts to [`&'a mut MaybeUninit<T>`](core::mem::MaybeUninit)
+    /// # Safety
+    /// It is not allowed to corrupt or de-initialize the pointee.
+    #[inline(always)]
+    #[must_use]
+    pub unsafe fn into_uninit(self) -> &'a mut MaybeUninit<T> {
+        &mut *self.data.as_ptr().cast()
     }
 
     /// Returns an unsafe mutable pointer to the value.
     #[inline(always)]
+    #[must_use]
     pub fn as_mut_ptr(&mut self) -> *mut T {
         self.data.as_ptr().cast()
     }
+}
 
-    /// Sets the value of the `OutRef`.
+impl<'a, T> Out<'a, [T]> {
+    /// Forms an [`Out<'a, [T]>`](Out).
     #[inline(always)]
-    pub fn write(mut self, val: T) -> &'a mut T {
-        unsafe {
-            self.data.as_ptr().write(val);
-            self.data.as_mut()
-        }
+    #[must_use]
+    pub fn from_slice(slice: &'a mut [T]) -> Self
+    where
+        T: Copy,
+    {
+        unsafe { Self::new(slice) }
     }
-}
 
-/// A write-only slice of `T`.
-pub struct OutBuf<'a, T> {
-    data: NonNull<MaybeUninit<T>>,
-    len: usize,
-    _marker: PhantomData<&'a mut [MaybeUninit<T>]>,
-}
+    /// Forms an [`Out<'a, [T]>`](Out) from an uninitialized slice.
+    #[inline(always)]
+    #[must_use]
+    pub fn from_uninit_slice(slice: &'a mut [MaybeUninit<T>]) -> Self {
+        let slice: *mut [T] = {
+            let len = slice.len();
+            let data = slice.as_mut_ptr().cast();
+            ptr::slice_from_raw_parts_mut(data, len)
+        };
+        unsafe { Self::new(slice) }
+    }
 
-unsafe impl<T: Send> Send for OutBuf<'_, T> {}
-unsafe impl<T: Sync> Sync for OutBuf<'_, T> {}
-
-impl<'a, T> OutBuf<'a, T> {
-    /// Forms an `OutBuf<'a, T>`
-    ///
+    /// Converts to [`&'a mut [MaybeUninit<T>]`](core::mem::MaybeUninit)
     /// # Safety
-    ///
-    /// Behavior is undefined if any of the following conditions are violated:
-    ///
-    /// * `data` must be `valid` for writes for `len * mem::size_of::<T>()` many bytes,
-    ///   and it must be properly aligned. This means in particular:
-    ///
-    ///     * The entire memory range of this slice must be contained within a single allocated object!
-    ///       Slices can never span across multiple allocated objects.
-    ///     * `data` must be non-null and aligned even for zero-length slices. One
-    ///       reason for this is that enum layout optimizations may rely on references
-    ///       (including slices of any length) being aligned and non-null to distinguish
-    ///       them from other data. You can obtain a pointer that is usable as `data`
-    ///       for zero-length slices using `NonNull::dangling()`.
-    ///
-    /// * `data` must point to `len` consecutive places for type `T`.
-    ///
-    /// * The memory referenced by the returned slice must not be accessed through any other pointer
-    ///   (not derived from the return value) for the duration of lifetime `'a`.
-    ///   Both read and write accesses are forbidden.
-    ///
-    /// * The total size `len * mem::size_of::<T>()` of the slice must be no larger than `isize::MAX`.
-    ///   See the safety documentation of `pointer::offset`.
+    /// It is not allowed to corrupt or de-initialize the pointee.
     #[inline(always)]
-    pub unsafe fn from_raw(data: *mut T, len: usize) -> Self {
-        Self {
-            data: NonNull::new_unchecked(data as *mut MaybeUninit<T>),
-            len,
-            _marker: PhantomData,
+    #[must_use]
+    pub unsafe fn into_uninit_slice(self) -> &'a mut [MaybeUninit<T>] {
+        let len = self.len();
+        let data = self.data.as_ptr().cast();
+        unsafe { slice::from_raw_parts_mut(data, len) }
+    }
+
+    /// Returns true if the slice has a length of 0.
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Returns the number of elements in the slice.
+    #[inline(always)]
+    #[must_use]
+    pub const fn len(&self) -> usize {
+        NonNull::len(self.data)
+    }
+
+    /// Returns an unsafe mutable pointer to the slice's buffer.
+    #[inline(always)]
+    #[must_use]
+    pub fn as_mut_ptr(&mut self) -> *mut T {
+        self.data.as_ptr().cast()
+    }
+}
+
+/// Extension trait for converting a mutable reference to an out reference.
+///
+/// # Safety
+/// This trait can be trusted to be implemented correctly for all types.
+pub unsafe trait AsOut<T: ?Sized> {
+    /// Returns an out reference to self.
+    fn as_out(&mut self) -> Out<'_, T>;
+}
+
+unsafe impl<T> AsOut<T> for T
+where
+    T: Copy,
+{
+    #[inline(always)]
+    #[must_use]
+    fn as_out(&mut self) -> Out<'_, T> {
+        Out::from_mut(self)
+    }
+}
+
+unsafe impl<T> AsOut<T> for MaybeUninit<T> {
+    #[inline(always)]
+    #[must_use]
+    fn as_out(&mut self) -> Out<'_, T> {
+        Out::from_uninit(self)
+    }
+}
+
+unsafe impl<T> AsOut<[T]> for [T]
+where
+    T: Copy,
+{
+    #[inline(always)]
+    #[must_use]
+    fn as_out(&mut self) -> Out<'_, [T]> {
+        Out::from_slice(self)
+    }
+}
+
+unsafe impl<T> AsOut<[T]> for [MaybeUninit<T>] {
+    #[inline(always)]
+    #[must_use]
+    fn as_out(&mut self) -> Out<'_, [T]> {
+        Out::from_uninit_slice(self)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use core::{mem, ptr};
+
+    unsafe fn raw_fill_copied<T: Copy>(dst: *mut T, len: usize, val: T) {
+        if mem::size_of::<T>() == 0 {
+            return;
+        }
+
+        if len == 0 {
+            return;
+        }
+
+        if mem::size_of::<T>() == 1 {
+            let val: u8 = mem::transmute_copy(&val);
+            dst.write_bytes(val, len);
+        } else {
+            dst.write(val);
+
+            let mut n = 1;
+            while n <= len / 2 {
+                ptr::copy_nonoverlapping(dst, dst.add(n), n);
+                n *= 2;
+            }
+
+            let count = len - n;
+            if count > 0 {
+                ptr::copy_nonoverlapping(dst, dst.add(n), count);
+            }
         }
     }
 
-    /// Forms an `OutBuf` from an initialized slice.
-    #[inline(always)]
-    pub fn new(slice: &'a mut [T]) -> Self {
-        let len = slice.len();
-        let data = slice.as_mut_ptr();
-        unsafe { Self::from_raw(data, len) }
+    fn fill<T: Copy>(mut buf: Out<'_, [T]>, val: T) -> &'_ mut [T] {
+        unsafe {
+            let len = buf.len();
+            let dst = buf.as_mut_ptr();
+            raw_fill_copied(dst, len, val);
+            buf.assume_init()
+        }
     }
 
-    /// Forms an `OutBuf` from an uninitialized slice.
-    #[inline(always)]
-    pub fn uninit(slice: &'a mut [MaybeUninit<T>]) -> Self {
-        let len = slice.len();
-        let data = slice.as_mut_ptr();
-        unsafe { Self::from_raw(data.cast(), len) }
-    }
-
-    /// Returns true if the buffer has a length of 0.
-    #[inline(always)]
-    pub const fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-
-    /// Returns the number of elements in the buffer.
-    #[inline(always)]
-    pub const fn len(&self) -> usize {
-        self.len
-    }
-
-    /// Returns an unsafe mutable pointer to the buffer.
-    #[inline(always)]
-    pub fn as_mut_ptr(&mut self) -> *mut T {
-        self.data.as_ptr().cast()
+    #[test]
+    fn fill_vec() {
+        for n in 0..128 {
+            let mut v: Vec<u32> = Vec::with_capacity(n);
+            fill(v.spare_capacity_mut().as_out(), 0x12345678);
+            unsafe { v.set_len(n) };
+            for &x in &v {
+                assert_eq!(x, 0x12345678);
+            }
+            drop(v);
+        }
     }
 }

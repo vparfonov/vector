@@ -73,7 +73,6 @@ impl<T: DeserializeOwned + Serialize + Send + Sync> InputType for Json<T> {
     }
 }
 
-#[async_trait::async_trait]
 impl<T: Serialize + Send + Sync> OutputType for Json<T> {
     fn type_name() -> Cow<'static, str> {
         Cow::Borrowed("JSON")
@@ -134,7 +133,6 @@ impl InputType for serde_json::Value {
     }
 }
 
-#[async_trait::async_trait]
 impl OutputType for serde_json::Value {
     fn type_name() -> Cow<'static, str> {
         Cow::Borrowed("JSON")
@@ -159,7 +157,7 @@ impl OutputType for serde_json::Value {
         _ctx: &ContextSelectionSet<'_>,
         _field: &Positioned<Field>,
     ) -> ServerResult<Value> {
-        Ok(to_value(&self).ok().unwrap_or_default())
+        Ok(to_value(self).ok().unwrap_or_default())
     }
 }
 

@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "rkyv"
-version = "0.7.42"
+version = "0.7.44"
 authors = ["David Koloski <djkoloski@gmail.com>"]
 description = "Zero-copy deserialization framework for Rust"
 readme = "crates-io.md"
@@ -29,7 +29,6 @@ categories = [
 ]
 license = "MIT"
 repository = "https://github.com/rkyv/rkyv"
-resolver = "1"
 
 [package.metadata.docs.rs]
 features = ["validation"]
@@ -45,7 +44,12 @@ optional = true
 default-features = false
 
 [dependencies.bytecheck]
-version = "=0.6.11"
+version = "0.6.11"
+optional = true
+default-features = false
+
+[dependencies.bytes]
+version = "1.4.0"
 optional = true
 default-features = false
 
@@ -68,13 +72,18 @@ optional = true
 default-features = false
 
 [dependencies.rkyv_derive]
-version = "0.7.41"
+version = "=0.7.44"
 
 [dependencies.seahash]
 version = "4.0"
 
 [dependencies.smallvec]
 version = "1.7"
+optional = true
+default-features = false
+
+[dependencies.smol_str]
+version = "0.2"
 optional = true
 default-features = false
 
@@ -118,6 +127,7 @@ std = [
     "ptr_meta/std",
     "rend?/std",
     "uuid?/std",
+    "bytes?/std",
 ]
 strict = ["rkyv_derive/strict"]
 uuid = [

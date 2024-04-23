@@ -27,7 +27,7 @@ impl Function for Float {
         &[
             Example {
                 title: "valid",
-                source: r#"float(3.1415)"#,
+                source: "float(3.1415)",
                 result: Ok("3.1415"),
             },
             Example {
@@ -65,6 +65,6 @@ impl FunctionExpression for FloatFn {
     fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let non_float = !self.value.type_def(state).is_float();
 
-        TypeDef::float().with_fallibility(non_float)
+        TypeDef::float().maybe_fallible(non_float)
     }
 }

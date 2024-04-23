@@ -320,7 +320,7 @@ fn test_tuple_array_as_map() {
     );
 }
 
-// Test that the `Seq` conversion works when the inner type is explicity specified.
+// Test that the `Seq` conversion works when the inner type is explicitly specified.
 #[test]
 fn test_map_as_tuple_with_nested_complex_type() {
     #[serde_as]
@@ -353,6 +353,8 @@ fn test_map_as_tuple_with_nested_complex_type() {
     );
 }
 
+// Problematic handling around fundamental types: https://github.com/rust-lang/rust/issues/121621
+#[allow(unknown_lints, non_local_definitions)]
 #[test]
 fn test_map_as_tuple_list_works_with_serializer_that_needs_length_to_serialize_sequence() {
     use serde::{

@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "serde-wasm-bindgen"
-version = "0.6.0"
+version = "0.6.5"
 authors = ["Ingvar Stepanyan <me@rreverser.com>"]
 description = "Native Serde adapter for wasm-bindgen"
 readme = "README.md"
@@ -29,18 +29,21 @@ categories = [
     "encoding",
 ]
 license = "MIT"
-repository = "https://github.com/cloudflare/serde-wasm-bindgen"
+repository = "https://github.com/RReverser/serde-wasm-bindgen"
+
+[package.metadata.docs.rs]
+targets = ["wasm32-unknown-unknown"]
 
 [profile.release]
 lto = true
 codegen-units = 1
-debug = true
+debug = 2
 
 [dependencies.js-sys]
 version = "^0.3"
 
 [dependencies.serde]
-version = "^1.0"
+version = "1.0.193"
 features = ["derive"]
 
 [dependencies.wasm-bindgen]

@@ -7,8 +7,8 @@
 [crates.io]: https://crates.io/crates/mlua
 [API Documentation]: https://docs.rs/mlua/badge.svg
 [docs.rs]: https://docs.rs/mlua
-[Coverage Status]: https://codecov.io/gh/khvzak/mlua/branch/master/graph/badge.svg?token=99339FS1CG
-[codecov.io]: https://codecov.io/gh/khvzak/mlua
+[Coverage Status]: https://codecov.io/gh/mlua-rs/mlua/branch/master/graph/badge.svg?token=99339FS1CG
+[codecov.io]: https://codecov.io/gh/mlua-rs/mlua
 [MSRV]: https://img.shields.io/badge/rust-1.71+-brightgreen.svg?&logo=rust
 
 [Guided Tour] | [Benchmarks] | [FAQ]
@@ -27,6 +27,8 @@ _safe_ (as far as it's possible), high level, easy to use, practical and flexibl
 Started as `rlua` fork, `mlua` supports Lua 5.4, 5.3, 5.2, 5.1 (including LuaJIT) and [Roblox Luau] and allows to write native Lua modules in Rust as well as use Lua in a standalone mode.
 
 `mlua` tested on Windows/macOS/Linux including module mode in [GitHub Actions] on `x86_64` platform and cross-compilation to `aarch64` (other targets are also supported).
+
+WebAssembly (WASM) is supported through `wasm32-unknown-emscripten` target for all Lua versions excluding JIT.
 
 [GitHub Actions]: https://github.com/khvzak/mlua/actions
 [Roblox Luau]: https://luau-lang.org

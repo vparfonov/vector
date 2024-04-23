@@ -15,7 +15,7 @@ use std::path::Path;
 use crate::error::{ProtoError, ProtoResult};
 use openssl::ssl::{SslAcceptor, SslMethod, SslOptions, SslVerifyMode};
 
-pub use openssl::pkcs12::Pkcs12;
+pub use openssl::pkcs12::{ParsedPkcs12, Pkcs12};
 pub use openssl::pkey::{PKey, Private};
 pub use openssl::stack::Stack;
 pub use openssl::x509::X509;
@@ -27,8 +27,8 @@ pub use openssl::x509::X509;
 pub fn read_cert_pkcs12(
     path: &Path,
     password: Option<&str>,
-) -> ProtoResult<((Option<X509>, Option<Stack<X509>>), Option<PKey<Private>>)> {
-    let mut file = File::open(path).map_err(|e| {
+) -> ProtoResult<((X509, Option<Stack<X509>>), PKey<Private>)> {
+    let mut file = File::open(&path).map_err(|e| {
         ProtoError::from(format!(
             "error opening pkcs12 cert file: {}: {}",
             path.display(),
@@ -51,7 +51,7 @@ pub fn read_cert_pkcs12(
             e
         ))
     })?;
-    let parsed = pkcs12.parse2(password.unwrap_or("")).map_err(|e| {
+    let parsed = pkcs12.parse(password.unwrap_or("")).map_err(|e| {
         ProtoError::from(format!(
             "failed to open pkcs12 from: {}: {}",
             path.display(),
@@ -59,14 +59,14 @@ pub fn read_cert_pkcs12(
         ))
     })?;
 
-    Ok(((parsed.cert, parsed.ca), parsed.pkey))
+    Ok(((parsed.cert, parsed.chain), parsed.pkey))
 }
 
 /// Read the certificate from the specified path.
 ///
 /// If the password is specified, then it will be used to decode the Certificate
 pub fn read_cert_pem(path: &Path) -> ProtoResult<(X509, Option<Stack<X509>>)> {
-    let mut file = File::open(path).map_err(|e| {
+    let mut file = File::open(&path).map_err(|e| {
         ProtoError::from(format!(
             "error opening cert file: {}: {}",
             path.display(),

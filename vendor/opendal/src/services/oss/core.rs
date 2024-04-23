@@ -17,6 +17,7 @@
 
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::fmt::Write;
 use std::time::Duration;
 
 use bytes::Bytes;
@@ -57,6 +58,7 @@ pub struct OssCore {
     pub host: String,
     pub endpoint: String,
     pub presign_endpoint: String,
+    pub allow_anonymous: bool,
 
     pub server_side_encryption: Option<HeaderValue>,
     pub server_side_encryption_key_id: Option<HeaderValue>,
@@ -89,8 +91,16 @@ impl OssCore {
 
         if let Some(cred) = cred {
             Ok(Some(cred))
-        } else {
+        } else if self.allow_anonymous {
+            // If allow_anonymous has been set, we will not sign the request.
             Ok(None)
+        } else {
+            // Mark this error as temporary since it could be caused by Aliyun STS.
+            Err(Error::new(
+                ErrorKind::PermissionDenied,
+                "no valid credential found, please check configuration or try again",
+            )
+            .set_temporary())
         }
     }
 
@@ -318,22 +328,40 @@ impl OssCore {
     pub fn oss_list_object_request(
         &self,
         path: &str,
-        token: Option<&str>,
+        token: &str,
         delimiter: &str,
         limit: Option<usize>,
+        start_after: Option<String>,
     ) -> Result<Request<AsyncBody>> {
         let p = build_abs_path(&self.root, path);
 
         let endpoint = self.get_endpoint(false);
-        let url = format!(
-            "{}/?list-type=2&delimiter={delimiter}&prefix={}{}{}",
-            endpoint,
-            percent_encode_path(&p),
-            limit.map(|t| format!("&max-keys={t}")).unwrap_or_default(),
-            token
-                .map(|t| format!("&continuation-token={}", percent_encode_path(t)))
-                .unwrap_or_default(),
-        );
+        let mut url = format!("{}/?list-type=2", endpoint);
+
+        write!(url, "&delimiter={delimiter}").expect("write into string must succeed");
+        // prefix
+        if !p.is_empty() {
+            write!(url, "&prefix={}", percent_encode_path(&p))
+                .expect("write into string must succeed");
+        }
+
+        // max-key
+        if let Some(limit) = limit {
+            write!(url, "&max-keys={limit}").expect("write into string must succeed");
+        }
+
+        // continuation_token
+        if !token.is_empty() {
+            write!(url, "&continuation-token={}", percent_encode_path(token))
+                .expect("write into string must succeed");
+        }
+
+        // start-after
+        if let Some(start_after) = start_after {
+            let start_after = build_abs_path(&self.root, &start_after);
+            write!(url, "&start-after={}", percent_encode_path(&start_after))
+                .expect("write into string must succeed");
+        }
 
         let req = Request::get(&url)
             .body(AsyncBody::Empty)
@@ -428,11 +456,12 @@ impl OssCore {
     pub async fn oss_list_object(
         &self,
         path: &str,
-        token: Option<&str>,
+        token: &str,
         delimiter: &str,
         limit: Option<usize>,
+        start_after: Option<String>,
     ) -> Result<Response<IncomingAsyncBody>> {
-        let mut req = self.oss_list_object_request(path, token, delimiter, limit)?;
+        let mut req = self.oss_list_object_request(path, token, delimiter, limit, start_after)?;
 
         self.sign(&mut req).await?;
         self.send(req).await
@@ -663,6 +692,36 @@ pub struct CompleteMultipartUploadResult {
     pub etag: String,
 }
 
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct ListObjectsOutput {
+    pub prefix: String,
+    pub max_keys: u64,
+    pub encoding_type: String,
+    pub is_truncated: bool,
+    pub common_prefixes: Vec<CommonPrefix>,
+    pub contents: Vec<ListObjectsOutputContent>,
+    pub key_count: u64,
+
+    pub next_continuation_token: Option<String>,
+}
+
+#[derive(Default, Debug, Deserialize, PartialEq, Eq)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct ListObjectsOutputContent {
+    pub key: String,
+    pub last_modified: String,
+    #[serde(rename = "ETag")]
+    pub etag: String,
+    pub size: u64,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct CommonPrefix {
+    pub prefix: String,
+}
+
 #[cfg(test)]
 mod tests {
     use bytes::Buf;
@@ -817,5 +876,85 @@ mod tests {
         );
         assert_eq!("oss-example", result.bucket);
         assert_eq!("multipart.data", result.key);
+    }
+
+    #[test]
+    fn test_parse_list_output() {
+        let bs = bytes::Bytes::from(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<ListBucketResult xmlns="https://doc.oss-cn-hangzhou.aliyuncs.com">
+    <Name>examplebucket</Name>
+    <Prefix></Prefix>
+    <StartAfter>b</StartAfter>
+    <MaxKeys>3</MaxKeys>
+    <EncodingType>url</EncodingType>
+    <IsTruncated>true</IsTruncated>
+    <NextContinuationToken>CgJiYw--</NextContinuationToken>
+    <Contents>
+        <Key>b/c</Key>
+        <LastModified>2020-05-18T05:45:54.000Z</LastModified>
+        <ETag>"35A27C2B9EAEEB6F48FD7FB5861D****"</ETag>
+        <Size>25</Size>
+        <StorageClass>STANDARD</StorageClass>
+        <Owner>
+            <ID>1686240967192623</ID>
+            <DisplayName>1686240967192623</DisplayName>
+        </Owner>
+    </Contents>
+    <Contents>
+        <Key>ba</Key>
+        <LastModified>2020-05-18T11:17:58.000Z</LastModified>
+        <ETag>"35A27C2B9EAEEB6F48FD7FB5861D****"</ETag>
+        <Size>25</Size>
+        <StorageClass>STANDARD</StorageClass>
+        <Owner>
+            <ID>1686240967192623</ID>
+            <DisplayName>1686240967192623</DisplayName>
+        </Owner>
+    </Contents>
+    <Contents>
+        <Key>bc</Key>
+        <LastModified>2020-05-18T05:45:59.000Z</LastModified>
+        <ETag>"35A27C2B9EAEEB6F48FD7FB5861D****"</ETag>
+        <Size>25</Size>
+        <StorageClass>STANDARD</StorageClass>
+        <Owner>
+            <ID>1686240967192623</ID>
+            <DisplayName>1686240967192623</DisplayName>
+        </Owner>
+    </Contents>
+    <KeyCount>3</KeyCount>
+</ListBucketResult>"#,
+        );
+
+        let out: ListObjectsOutput = quick_xml::de::from_reader(bs.reader()).expect("must_success");
+
+        assert!(out.is_truncated);
+        assert_eq!(out.next_continuation_token, Some("CgJiYw--".to_string()));
+        assert!(out.common_prefixes.is_empty());
+
+        assert_eq!(
+            out.contents,
+            vec![
+                ListObjectsOutputContent {
+                    key: "b/c".to_string(),
+                    last_modified: "2020-05-18T05:45:54.000Z".to_string(),
+                    etag: "\"35A27C2B9EAEEB6F48FD7FB5861D****\"".to_string(),
+                    size: 25,
+                },
+                ListObjectsOutputContent {
+                    key: "ba".to_string(),
+                    last_modified: "2020-05-18T11:17:58.000Z".to_string(),
+                    etag: "\"35A27C2B9EAEEB6F48FD7FB5861D****\"".to_string(),
+                    size: 25,
+                },
+                ListObjectsOutputContent {
+                    key: "bc".to_string(),
+                    last_modified: "2020-05-18T05:45:59.000Z".to_string(),
+                    etag: "\"35A27C2B9EAEEB6F48FD7FB5861D****\"".to_string(),
+                    size: 25,
+                }
+            ]
+        )
     }
 }

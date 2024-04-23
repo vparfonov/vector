@@ -166,11 +166,10 @@ fn transform_sig(
     has_default: bool,
     is_local: bool,
 ) {
-    let default_span = sig.asyncness.take().unwrap().span;
-    sig.fn_token.span = default_span;
+    sig.fn_token.span = sig.asyncness.take().unwrap().span;
 
     let (ret_arrow, ret) = match &sig.output {
-        ReturnType::Default => (Token![->](default_span), quote_spanned!(default_span=> ())),
+        ReturnType::Default => (Token![->](Span::call_site()), quote!(())),
         ReturnType::Type(arrow, ret) => (*arrow, quote!(#ret)),
     };
 
@@ -232,12 +231,12 @@ fn transform_sig(
             .push(parse_quote_spanned!(elided.span()=> #elided: 'async_trait));
     }
 
-    sig.generics
-        .params
-        .push(parse_quote_spanned!(default_span=> 'async_trait));
+    sig.generics.params.push(parse_quote!('async_trait));
 
     if has_self {
-        let bounds: &[InferredBound] = if let Some(receiver) = sig.receiver() {
+        let bounds: &[InferredBound] = if is_local {
+            &[]
+        } else if let Some(receiver) = sig.receiver() {
             match receiver.ty.as_ref() {
                 // self: &Self
                 Type::Reference(ty) if ty.mutability.is_none() => &[InferredBound::Sync],
@@ -268,21 +267,14 @@ fn transform_sig(
             &[InferredBound::Send]
         };
 
-        let bounds = bounds.iter().filter_map(|bound| {
-            let assume_bound = match context {
-                Context::Trait { supertraits, .. } => !has_default || has_bound(supertraits, bound),
-                Context::Impl { .. } => true,
-            };
-            if assume_bound || is_local {
-                None
-            } else {
-                Some(bound.spanned_path(default_span))
-            }
+        let bounds = bounds.iter().filter(|bound| match context {
+            Context::Trait { supertraits, .. } => has_default && !has_bound(supertraits, bound),
+            Context::Impl { .. } => false,
         });
 
         where_clause_or_default(&mut sig.generics.where_clause)
             .predicates
-            .push(parse_quote_spanned! {default_span=>
+            .push(parse_quote! {
                 Self: #(#bounds +)* 'async_trait
             });
     }
@@ -314,11 +306,11 @@ fn transform_sig(
     }
 
     let bounds = if is_local {
-        quote_spanned!(default_span=> 'async_trait)
+        quote!('async_trait)
     } else {
-        quote_spanned!(default_span=> ::core::marker::Send + 'async_trait)
+        quote!(::core::marker::Send + 'async_trait)
     };
-    sig.output = parse_quote_spanned! {default_span=>
+    sig.output = parse_quote! {
         #ret_arrow ::core::pin::Pin<Box<
             dyn ::core::future::Future<Output = #ret> + #bounds
         >>
@@ -416,7 +408,7 @@ fn transform_block(context: Context, sig: &mut Signature, block: &mut Block) {
                     quote!(#(#decls)* { #(#stmts)* })
                 }
             } else {
-                quote_spanned! {block.brace_token.span=>
+                quote! {
                     if let ::core::option::Option::Some(__ret) = ::core::option::Option::None::<#ret> {
                         return __ret;
                     }

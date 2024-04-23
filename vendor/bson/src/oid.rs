@@ -14,7 +14,7 @@ use std::{convert::TryInto, time::SystemTime};
 
 use hex::{self, FromHexError};
 use once_cell::sync::Lazy;
-use rand::{thread_rng, Rng};
+use rand::{random, thread_rng, Rng};
 
 const TIMESTAMP_SIZE: usize = 4;
 const PROCESS_ID_SIZE: usize = 5;
@@ -239,9 +239,9 @@ impl ObjectId {
     /// Generates a new timestamp representing the current seconds since epoch.
     /// Represented in Big Endian.
     fn gen_timestamp() -> [u8; 4] {
-        #[cfg(target_arch = "wasm32")]
+        #[cfg(all(target_arch = "wasm32", target_os = "unknown"))]
         let timestamp: u32 = (js_sys::Date::now() / 1000.0) as u32;
-        #[cfg(not(target_arch = "wasm32"))]
+        #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
         let timestamp: u32 = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .expect("system clock is before 1970")
@@ -253,7 +253,7 @@ impl ObjectId {
 
     /// Generate a random 5-byte array.
     fn gen_process_id() -> [u8; 5] {
-        static BUF: Lazy<[u8; 5]> = Lazy::new(|| thread_rng().gen());
+        static BUF: Lazy<[u8; 5]> = Lazy::new(random);
 
         *BUF
     }

@@ -1,6 +1,6 @@
 mod command;
 mod stream_description;
-mod wire;
+pub(crate) mod wire;
 
 use std::{
     sync::Arc,
@@ -33,9 +33,8 @@ use crate::{
     options::ServerAddress,
     runtime::AsyncStream,
 };
-pub(crate) use command::{Command, RawCommand, RawCommandResponse};
+pub(crate) use command::{Command, RawCommandResponse};
 pub(crate) use stream_description::StreamDescription;
-pub(crate) use wire::next_request_id;
 
 /// User-facing information about a connection to the database.
 #[derive(Clone, Debug, Serialize)]
@@ -73,6 +72,8 @@ pub(crate) struct Connection {
     pub(crate) address: ServerAddress,
 
     pub(crate) generation: ConnectionGeneration,
+
+    pub(crate) time_created: Instant,
 
     /// The cached StreamDescription from the connection's handshake.
     pub(super) stream_description: Option<StreamDescription>,
@@ -127,11 +128,13 @@ impl Connection {
         stream: AsyncStream,
         id: u32,
         generation: ConnectionGeneration,
+        time_created: Instant,
     ) -> Self {
         Self {
             id,
             server_id: None,
             generation,
+            time_created,
             pool_manager: None,
             command_executing: false,
             ready_and_available_time: None,
@@ -159,6 +162,7 @@ impl Connection {
             stream,
             pending_connection.id,
             generation,
+            pending_connection.time_created,
         );
         conn.event_emitter = Some(pending_connection.event_emitter);
         conn
@@ -167,9 +171,16 @@ impl Connection {
     /// Create a connection intended for monitoring purposes.
     /// TODO: RUST-1454 Rename this to just `new`, drop the pooling-specific data.
     pub(crate) fn new_monitoring(address: ServerAddress, stream: AsyncStream, id: u32) -> Self {
-        Self::new(address, stream, id, ConnectionGeneration::Monitoring)
+        Self::new(
+            address,
+            stream,
+            id,
+            ConnectionGeneration::Monitoring,
+            Instant::now(),
+        )
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     pub(crate) fn info(&self) -> ConnectionInfo {
         ConnectionInfo {
             id: self.id,
@@ -226,10 +237,11 @@ impl Connection {
     }
 
     /// Helper to create a `ConnectionCheckedOutEvent` for the connection.
-    pub(super) fn checked_out_event(&self) -> ConnectionCheckedOutEvent {
+    pub(super) fn checked_out_event(&self, time_started: Instant) -> ConnectionCheckedOutEvent {
         ConnectionCheckedOutEvent {
             address: self.address.clone(),
             connection_id: self.id,
+            duration: Instant::now() - time_started,
         }
     }
 
@@ -246,6 +258,7 @@ impl Connection {
         ConnectionReadyEvent {
             address: self.address.clone(),
             connection_id: self.id,
+            duration: Instant::now() - self.time_created,
         }
     }
 
@@ -260,7 +273,7 @@ impl Connection {
         }
     }
 
-    async fn send_message(
+    pub(crate) async fn send_message(
         &mut self,
         message: Message,
         to_compress: bool,
@@ -305,7 +318,10 @@ impl Connection {
         let response_message = response_message_result?;
         self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
 
-        RawCommandResponse::new(self.address.clone(), response_message)
+        Ok(RawCommandResponse::new(
+            self.address.clone(),
+            response_message,
+        ))
     }
 
     /// Executes a `Command` and returns a `CommandResponse` containing the result from the server.
@@ -319,23 +335,7 @@ impl Connection {
         request_id: impl Into<Option<i32>>,
     ) -> Result<RawCommandResponse> {
         let to_compress = command.should_compress();
-        let message = Message::with_command(command, request_id.into())?;
-        self.send_message(message, to_compress).await
-    }
-
-    /// Executes a `RawCommand` and returns a `CommandResponse` containing the result from the
-    /// server.
-    ///
-    /// An `Ok(...)` result simply means the server received the command and that the driver
-    /// received the response; it does not imply anything about the success of the command
-    /// itself.
-    pub(crate) async fn send_raw_command(
-        &mut self,
-        command: RawCommand,
-        request_id: impl Into<Option<i32>>,
-    ) -> Result<RawCommandResponse> {
-        let to_compress = command.should_compress();
-        let message = Message::with_raw_command(command, request_id.into());
+        let message = Message::from_command(command, request_id.into())?;
         self.send_message(message, to_compress).await
     }
 
@@ -366,7 +366,10 @@ impl Connection {
         let response_message = response_message_result?;
         self.more_to_come = response_message.flags.contains(MessageFlags::MORE_TO_COME);
 
-        RawCommandResponse::new(self.address.clone(), response_message)
+        Ok(RawCommandResponse::new(
+            self.address.clone(),
+            response_message,
+        ))
     }
 
     /// Gets the connection's StreamDescription.
@@ -422,6 +425,7 @@ impl Connection {
             server_id: self.server_id,
             address: self.address.clone(),
             generation: self.generation,
+            time_created: self.time_created,
             stream: std::mem::replace(&mut self.stream, BufStream::new(AsyncStream::Null)),
             event_emitter: self.event_emitter.take(),
             stream_description: self.stream_description.take(),
@@ -599,6 +603,7 @@ pub(crate) struct PendingConnection {
     pub(crate) address: ServerAddress,
     pub(crate) generation: PoolGeneration,
     pub(crate) event_emitter: CmapEventEmitter,
+    pub(crate) time_created: Instant,
 }
 
 impl PendingConnection {

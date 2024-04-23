@@ -5,6 +5,7 @@
 // http://opensource.org/licenses/MIT>, at your option. This file may not be
 // copied, modified, or distributed except according to those terms.
 
+use std::convert::TryInto;
 use std::fmt::{self, Display};
 use std::future::Future;
 use std::io;
@@ -21,17 +22,16 @@ use futures_util::ready;
 use futures_util::stream::Stream;
 use h2::client::{Connection, SendRequest};
 use http::header::{self, CONTENT_LENGTH};
+use log::{debug, warn};
 use rustls::ClientConfig;
 use tokio_rustls::{
     client::TlsStream as TokioTlsClientStream, Connect as TokioTlsConnect, TlsConnector,
 };
-use tracing::{debug, warn};
 
 use crate::error::ProtoError;
 use crate::iocompat::AsyncIoStdAsTokio;
-use crate::op::Message;
-use crate::tcp::{Connect, DnsTcpStream};
-use crate::xfer::{DnsRequest, DnsRequestSender, DnsResponse, DnsResponseStream};
+use crate::tcp::Connect;
+use crate::xfer::{DnsRequest, DnsRequestSender, DnsResponse, DnsResponseStream, SerialMessage};
 
 const ALPN_H2: &[u8] = b"h2";
 
@@ -61,12 +61,13 @@ impl HttpsClientStream {
         h2: SendRequest<Bytes>,
         message: Bytes,
         name_server_name: Arc<str>,
+        name_server: SocketAddr,
     ) -> Result<DnsResponse, ProtoError> {
         let mut h2 = match h2.ready().await {
             Ok(h2) => h2,
             Err(err) => {
                 // TODO: make specific error
-                return Err(ProtoError::from(format!("h2 send_request error: {err}")));
+                return Err(ProtoError::from(format!("h2 send_request error: {}", err)));
             }
         };
 
@@ -74,22 +75,22 @@ impl HttpsClientStream {
         let request = crate::https::request::new(&name_server_name, message.remaining());
 
         let request =
-            request.map_err(|err| ProtoError::from(format!("bad http request: {err}")))?;
+            request.map_err(|err| ProtoError::from(format!("bad http request: {}", err)))?;
 
         debug!("request: {:#?}", request);
 
         // Send the request
         let (response_future, mut send_stream) = h2
             .send_request(request, false)
-            .map_err(|err| ProtoError::from(format!("h2 send_request error: {err}")))?;
+            .map_err(|err| ProtoError::from(format!("h2 send_request error: {}", err)))?;
 
         send_stream
             .send_data(message, true)
-            .map_err(|e| ProtoError::from(format!("h2 send_data error: {e}")))?;
+            .map_err(|e| ProtoError::from(format!("h2 send_data error: {}", e)))?;
 
         let mut response_stream = response_future
             .await
-            .map_err(|err| ProtoError::from(format!("received a stream error: {err}")))?;
+            .map_err(|err| ProtoError::from(format!("received a stream error: {}", err)))?;
 
         debug!("got response: {:#?}", response_stream);
 
@@ -99,10 +100,10 @@ impl HttpsClientStream {
             .get(CONTENT_LENGTH)
             .map(|v| v.to_str())
             .transpose()
-            .map_err(|e| ProtoError::from(format!("bad headers received: {e}")))?
+            .map_err(|e| ProtoError::from(format!("bad headers received: {}", e)))?
             .map(usize::from_str)
             .transpose()
-            .map_err(|e| ProtoError::from(format!("bad headers received: {e}")))?;
+            .map_err(|e| ProtoError::from(format!("bad headers received: {}", e)))?;
 
         // TODO: what is a good max here?
         // clamp(512, 4096) says make sure it is at least 512 bytes, and min 4096 says it is at most 4k
@@ -112,7 +113,7 @@ impl HttpsClientStream {
 
         while let Some(partial_bytes) = response_stream.body_mut().data().await {
             let partial_bytes =
-                partial_bytes.map_err(|e| ProtoError::from(format!("bad http request: {e}")))?;
+                partial_bytes.map_err(|e| ProtoError::from(format!("bad http request: {}", e)))?;
 
             debug!("got bytes: {}", partial_bytes.len());
             response_bytes.extend(partial_bytes);
@@ -157,7 +158,7 @@ impl HttpsClientStream {
                     .map(|h| {
                         h.to_str().map_err(|err| {
                             // TODO: make explicit error type
-                            ProtoError::from(format!("ContentType header not a string: {err}"))
+                            ProtoError::from(format!("ContentType header not a string: {}", err))
                         })
                     })
                     .unwrap_or(Ok(crate::https::MIME_APPLICATION_DNS))?;
@@ -173,8 +174,8 @@ impl HttpsClientStream {
         };
 
         // and finally convert the bytes into a DNS message
-        let message = Message::from_vec(&response_bytes)?;
-        Ok(DnsResponse::new(message, response_bytes.to_vec()))
+        let message = SerialMessage::new(response_bytes.to_vec(), name_server).to_message()?;
+        Ok(message.into())
     }
 }
 
@@ -243,6 +244,7 @@ impl DnsRequestSender for HttpsClientStream {
             self.h2.clone(),
             Bytes::from(bytes),
             Arc::clone(&self.name_server_name),
+            self.name_server,
         ))
         .into()
     }
@@ -269,7 +271,8 @@ impl Stream for HttpsClientStream {
             Poll::Ready(Ok(())) => Poll::Ready(Some(Ok(()))),
             Poll::Pending => Poll::Pending,
             Poll::Ready(Err(e)) => Poll::Ready(Some(Err(ProtoError::from(format!(
-                "h2 stream errored: {e}",
+                "h2 stream errored: {}",
+                e
             ))))),
         }
     }
@@ -303,59 +306,24 @@ impl HttpsClientStreamBuilder {
     /// * `name_server` - IP and Port for the remote DNS resolver
     /// * `dns_name` - The DNS name, Subject Public Key Info (SPKI) name, as associated to a certificate
     pub fn build<S: Connect>(
-        mut self,
+        self,
         name_server: SocketAddr,
         dns_name: String,
     ) -> HttpsClientConnect<S> {
-        // ensure the ALPN protocol is set correctly
-        if self.client_config.alpn_protocols.is_empty() {
-            let mut client_config = (*self.client_config).clone();
-            client_config.alpn_protocols = vec![ALPN_H2.to_vec()];
-
-            self.client_config = Arc::new(client_config);
-        }
+        assert!(self
+            .client_config
+            .alpn_protocols
+            .iter()
+            .any(|protocol| *protocol == ALPN_H2.to_vec()));
 
         let tls = TlsConfig {
             client_config: self.client_config,
             dns_name: Arc::from(dns_name),
         };
 
-        let connect = S::connect_with_bind(name_server, self.bind_addr);
-
-        HttpsClientConnect::<S>(HttpsClientConnectState::TcpConnecting {
-            connect,
+        HttpsClientConnect::<S>(HttpsClientConnectState::ConnectTcp {
             name_server,
-            tls: Some(tls),
-        })
-    }
-
-    /// Creates a new HttpsStream with existing connection
-    pub fn build_with_future<S, F>(
-        future: F,
-        mut client_config: Arc<ClientConfig>,
-        name_server: SocketAddr,
-        dns_name: String,
-    ) -> HttpsClientConnect<S>
-    where
-        S: DnsTcpStream,
-        F: Future<Output = std::io::Result<S>> + Send + Unpin + 'static,
-    {
-        // ensure the ALPN protocol is set correctly
-        if client_config.alpn_protocols.is_empty() {
-            let mut client_cfg = (*client_config).clone();
-            client_cfg.alpn_protocols = vec![ALPN_H2.to_vec()];
-
-            client_config = Arc::new(client_cfg);
-        }
-
-        let tls = TlsConfig {
-            client_config,
-            dns_name: Arc::from(dns_name),
-        };
-
-        HttpsClientConnect::<S>(HttpsClientConnectState::TcpConnecting {
-            connect: Box::pin(future),
-            name_server,
+            bind_addr: self.bind_addr,
             tls: Some(tls),
         })
     }
@@ -364,11 +332,11 @@ impl HttpsClientStreamBuilder {
 /// A future that resolves to an HttpsClientStream
 pub struct HttpsClientConnect<S>(HttpsClientConnectState<S>)
 where
-    S: DnsTcpStream;
+    S: Connect;
 
 impl<S> Future for HttpsClientConnect<S>
 where
-    S: DnsTcpStream,
+    S: Connect,
 {
     type Output = Result<HttpsClientStream, ProtoError>;
 
@@ -386,8 +354,13 @@ struct TlsConfig {
 #[allow(clippy::type_complexity)]
 enum HttpsClientConnectState<S>
 where
-    S: DnsTcpStream,
+    S: Connect,
 {
+    ConnectTcp {
+        name_server: SocketAddr,
+        bind_addr: Option<SocketAddr>,
+        tls: Option<TlsConfig>,
+    },
     TcpConnecting {
         connect: Pin<Box<dyn Future<Output = io::Result<S>> + Send>>,
         name_server: SocketAddr,
@@ -422,14 +395,27 @@ where
 
 impl<S> Future for HttpsClientConnectState<S>
 where
-    S: DnsTcpStream,
+    S: Connect,
 {
     type Output = Result<HttpsClientStream, ProtoError>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         loop {
             let next = match *self {
-                Self::TcpConnecting {
+                HttpsClientConnectState::ConnectTcp {
+                    name_server,
+                    bind_addr,
+                    ref mut tls,
+                } => {
+                    debug!("tcp connecting to: {}", name_server);
+                    let connect = S::connect_with_bind(name_server, bind_addr);
+                    Self::TcpConnecting {
+                        connect,
+                        name_server,
+                        tls: tls.take(),
+                    }
+                }
+                HttpsClientConnectState::TcpConnecting {
                     ref mut connect,
                     name_server,
                     ref mut tls,
@@ -458,7 +444,7 @@ where
                         )))),
                     }
                 }
-                Self::TlsConnecting {
+                HttpsClientConnectState::TlsConnecting {
                     ref name_server_name,
                     name_server,
                     ref mut tls,
@@ -475,20 +461,20 @@ where
                         handshake: Box::pin(handshake),
                     }
                 }
-                Self::H2Handshake {
+                HttpsClientConnectState::H2Handshake {
                     ref name_server_name,
                     name_server,
                     ref mut handshake,
                 } => {
                     let (send_request, connection) = ready!(handshake
                         .poll_unpin(cx)
-                        .map_err(|e| ProtoError::from(format!("h2 handshake error: {e}"))))?;
+                        .map_err(|e| ProtoError::from(format!("h2 handshake error: {}", e))))?;
 
                     // TODO: hand this back for others to run rather than spawning here?
                     debug!("h2 connection established to: {}", name_server);
                     tokio::spawn(
                         connection
-                            .map_err(|e| warn!("h2 connection failed: {e}"))
+                            .map_err(|e| warn!("h2 connection failed: {}", e))
                             .map(|_: Result<(), ()>| ()),
                     );
 
@@ -499,10 +485,10 @@ where
                         is_shutdown: false,
                     }))
                 }
-                Self::Connected(ref mut conn) => {
+                HttpsClientConnectState::Connected(ref mut conn) => {
                     return Poll::Ready(Ok(conn.take().expect("cannot poll after complete")))
                 }
-                Self::Errored(ref mut err) => {
+                HttpsClientConnectState::Errored(ref mut err) => {
                     return Poll::Ready(Err(err.take().expect("cannot poll after complete")))
                 }
             };
@@ -527,7 +513,7 @@ impl Future for HttpsClientResponse {
 
 #[cfg(test)]
 mod tests {
-    use std::net::SocketAddr;
+    use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
     use std::str::FromStr;
 
     use rustls::KeyLogFile;
@@ -536,7 +522,6 @@ mod tests {
 
     use crate::iocompat::AsyncIoTokioAsStd;
     use crate::op::{Message, Query, ResponseCode};
-    use crate::rr::rdata::{A, AAAA};
     use crate::rr::{Name, RData, RecordType};
     use crate::xfer::{DnsRequestOptions, FirstAnswer};
 
@@ -574,7 +559,7 @@ mod tests {
             .and_then(RData::as_a)
             .expect("Expected A record");
 
-        assert_eq!(addr, &A::new(93, 184, 216, 34));
+        assert_eq!(addr, &Ipv4Addr::new(93, 184, 216, 34));
 
         //
         // assert that the connection works for a second query
@@ -602,72 +587,7 @@ mod tests {
 
             assert_eq!(
                 addr,
-                &AAAA::new(0x2606, 0x2800, 0x0220, 0x0001, 0x0248, 0x1893, 0x25c8, 0x1946)
-            );
-        }
-    }
-
-    #[test]
-    fn test_https_google_with_pure_ip_address_server() {
-        //env_logger::try_init().ok();
-
-        let google = SocketAddr::from(([8, 8, 8, 8], 443));
-        let mut request = Message::new();
-        let query = Query::query(Name::from_str("www.example.com.").unwrap(), RecordType::A);
-        request.add_query(query);
-
-        let request = DnsRequest::new(request, DnsRequestOptions::default());
-
-        let mut client_config = client_config_tls12_webpki_roots();
-        client_config.key_log = Arc::new(KeyLogFile::new());
-
-        let https_builder = HttpsClientStreamBuilder::with_client_config(Arc::new(client_config));
-        let connect = https_builder
-            .build::<AsyncIoTokioAsStd<TokioTcpStream>>(google, google.ip().to_string());
-
-        // tokio runtime stuff...
-        let runtime = Runtime::new().expect("could not start runtime");
-        let mut https = runtime.block_on(connect).expect("https connect failed");
-
-        let response = runtime
-            .block_on(https.send_message(request).first_answer())
-            .expect("send_message failed");
-
-        let record = &response.answers()[0];
-        let addr = record
-            .data()
-            .and_then(RData::as_a)
-            .expect("Expected A record");
-
-        assert_eq!(addr, &A::new(93, 184, 216, 34));
-
-        //
-        // assert that the connection works for a second query
-        let mut request = Message::new();
-        let query = Query::query(
-            Name::from_str("www.example.com.").unwrap(),
-            RecordType::AAAA,
-        );
-        request.add_query(query);
-        let request = DnsRequest::new(request, DnsRequestOptions::default());
-
-        for _ in 0..3 {
-            let response = runtime
-                .block_on(https.send_message(request.clone()).first_answer())
-                .expect("send_message failed");
-            if response.response_code() == ResponseCode::ServFail {
-                continue;
-            }
-
-            let record = &response.answers()[0];
-            let addr = record
-                .data()
-                .and_then(RData::as_aaaa)
-                .expect("invalid response, expected A record");
-
-            assert_eq!(
-                addr,
-                &AAAA::new(0x2606, 0x2800, 0x0220, 0x0001, 0x0248, 0x1893, 0x25c8, 0x1946)
+                &Ipv6Addr::new(0x2606, 0x2800, 0x0220, 0x0001, 0x0248, 0x1893, 0x25c8, 0x1946)
             );
         }
     }
@@ -705,7 +625,7 @@ mod tests {
             .and_then(RData::as_a)
             .expect("invalid response, expected A record");
 
-        assert_eq!(addr, &A::new(93, 184, 216, 34));
+        assert_eq!(addr, &Ipv4Addr::new(93, 184, 216, 34));
 
         //
         // assert that the connection works for a second query
@@ -729,14 +649,14 @@ mod tests {
 
         assert_eq!(
             addr,
-            &AAAA::new(0x2606, 0x2800, 0x0220, 0x0001, 0x0248, 0x1893, 0x25c8, 0x1946)
+            &Ipv6Addr::new(0x2606, 0x2800, 0x0220, 0x0001, 0x0248, 0x1893, 0x25c8, 0x1946)
         );
     }
 
     fn client_config_tls12_webpki_roots() -> ClientConfig {
         use rustls::{OwnedTrustAnchor, RootCertStore};
         let mut root_store = RootCertStore::empty();
-        root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
+        root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.0.iter().map(|ta| {
             OwnedTrustAnchor::from_subject_spki_name_constraints(
                 ta.subject,
                 ta.spki,
@@ -747,7 +667,7 @@ mod tests {
         let mut client_config = ClientConfig::builder()
             .with_safe_default_cipher_suites()
             .with_safe_default_kx_groups()
-            .with_safe_default_protocol_versions()
+            .with_protocol_versions(&[&rustls::version::TLS12])
             .unwrap()
             .with_root_certificates(root_store)
             .with_no_client_auth();

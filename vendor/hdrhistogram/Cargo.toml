@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "hdrhistogram"
-version = "7.5.2"
+version = "7.5.4"
 authors = [
     "Jon Gjengset <jon@thesquareplanet.com>",
     "Marshall Pierce <marshall@mpierce.org>",
@@ -34,10 +34,10 @@ license = "MIT/Apache-2.0"
 repository = "https://github.com/HdrHistogram/HdrHistogram_rust.git"
 
 [profile.bench]
-debug = true
+debug = 2
 
 [profile.release]
-debug = true
+debug = 2
 
 [lib]
 path = "src/lib.rs"
@@ -47,7 +47,7 @@ name = "cli"
 required-features = ["serialization"]
 
 [dependencies.base64]
-version = "0.13"
+version = "0.21"
 optional = true
 
 [dependencies.byteorder]
@@ -69,7 +69,8 @@ optional = true
 version = "0.2"
 
 [dev-dependencies.clap]
-version = "3"
+version = "4"
+features = ["string"]
 
 [dev-dependencies.ieee754]
 version = "0.2.2"

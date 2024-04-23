@@ -11,6 +11,7 @@ unique situations.
 - [`module`](#placing-context-selectors-in-modules)
 - [`provide`](#providing-data-beyond-the-error-trait)
 - [`source`](#controlling-error-sources)
+- [`transparent`](#delegating-to-the-underlying-error)
 - [`visibility`](#controlling-visibility)
 - [`whatever`](#controlling-stringly-typed-errors)
 
@@ -31,16 +32,17 @@ it is valid. Detailed information on each attribute is below.
 
 ### Enum variant or struct
 
-| Option (inside `#[snafu(...)]`) | Description                                                                                                                                                                                     |
-|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `display("{field:?}: {}", foo)` | Sets the display implementation for this error variant using `format_args!` syntax. If this is omitted, the default is `"VariantName: {source}"` if there is a source or `"VariantName"` if not |
-| `context(false)`                | Skips creation of the context selector, implements `From` for the mandatory source error                                                                                                        |
-| `context(suffix(N))`            | Changes the suffix of the generated context selector to `N`                                                                                                                                     |
-| `context(suffix(false))`        | No suffix for the generated context selector                                                                                                                                                    |
-| `visibility(v)`                 | Sets the visibility of the generated context selector to `v` (e.g. `pub`)                                                                                                                       |
-| `visibility`                    | Resets visibility back to private                                                                                                                                                               |
-| `provide(flags, type => expr)`  | Provides the type using the `expr` with the optional flags                                                                                                                                      |
-| `whatever`                      | Stringly-typed error. Message field must be called `message`. Source optional, but if present must be of a specific [format](#controlling-stringly-typed-errors)                                |
+| Option (inside `#[snafu(...)]`) | Description                                                                                                                                                      |
+|---------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `display("{field:?}: {}", foo)` | Sets the display implementation for this error variant using `format_args!` syntax. If this is omitted, the default is `"VariantName"                            |
+| `context(false)`                | Skips creation of the context selector, implements `From` for the mandatory source error                                                                         |
+| `context(suffix(N))`            | Changes the suffix of the generated context selector to `N`                                                                                                      |
+| `context(suffix(false))`        | No suffix for the generated context selector                                                                                                                     |
+| `transparent`                   | Delegates `Display` and `Error::source` to this error's source, implies `context(false)`                                                                         |
+| `visibility(v)`                 | Sets the visibility of the generated context selector to `v` (e.g. `pub`)                                                                                        |
+| `visibility`                    | Resets visibility back to private                                                                                                                                |
+| `provide(flags, type => expr)`  | Provides the type using the `expr` with the optional flags                                                                                                       |
+| `whatever`                      | Stringly-typed error. Message field must be called `message`. Source optional, but if present must be of a specific [format](#controlling-stringly-typed-errors) |
 
 ### Context fields
 
@@ -187,6 +189,79 @@ fn do_something_unique() -> Result<i32, VeryUniqueError> {
     // ...
 #    Ok(42)
 }
+```
+
+### Delegating to the underlying error
+
+When creating a contextful error you might want to reuse it in
+multiple places - composing different error types is idiomatic, after
+all. This can lead to unwanted nesting as both the enum variant and
+the source error are visible in the source chain and in autogenerated
+`Display` implementations.
+
+You can use `#[snafu(transparent)]` to delegate the `Display` and
+`Error::source` implementations to the underlying error instead,
+effectively removing the wrapping error variant from the logical error
+chain. That way you get both the maintenance and logical benefits of
+composing errors, without the redundant nesting.
+
+`#[snafu(transparent)]` implies `#[snafu(context(false))]`. Because
+`#[snafu(transparent)]` errors delegate `Display` to the source error,
+you cannot use `#[snafu(display(...))]` on them.
+
+**Example**
+
+This example allows adding or removing users from groups. The group ID
+is passed as a raw integer which needs to be validated first.
+
+Since adding and removing users have distinct error types, there's
+nothing useful to say in addition to the validation error message, so
+this is a good time to use `#[snafu(transparent)]`.
+
+```rust
+# use snafu::prelude::*;
+#
+fn add_to_group(group: u32, user: &str) -> Result<(), AddToGroupError> {
+    let group = GroupId::validate(group)?;
+    // ... do useful operation
+    Ok(())
+}
+
+fn remove_from_group(group: u32, user: &str) -> Result<(), RemoveFromGroupError> {
+    let group = GroupId::validate(group)?;
+    // ... do useful operation
+    Ok(())
+}
+
+#[derive(Debug, Snafu)]
+enum AddToGroupError {
+    #[snafu(transparent)]
+    Group { source: GroupIdError },
+
+    // ... other failure conditions
+}
+
+#[derive(Debug, Snafu)]
+enum RemoveFromGroupError {
+    #[snafu(transparent)]
+    Group { source: GroupIdError },
+
+    // ... other failure conditions
+}
+
+#[derive(Debug)]
+struct GroupId(u32);
+
+impl GroupId {
+    fn validate(id: u32) -> Result<Self, GroupIdError> {
+        // ... perform validation
+#       GroupIdSnafu { id }.fail()
+    }
+}
+
+#[derive(Debug, Snafu)]
+#[snafu(display("Group ID {id} does not exist"))]
+struct GroupIdError { id: u32 };
 ```
 
 ## Controlling visibility
@@ -414,9 +489,9 @@ enum Error {
 ## Providing data beyond the `Error` trait
 
 When the [`unstable-provider-api` feature flag][] is enabled, errors
-will implement the standard library's [`Provider` API][provider
-API]. This allows arbitrary data to be associated with an error
-instance, expanding the abilities of the receiver of the error:
+will implement the [`Error::provide` method][Error::provide]. This
+allows arbitrary data to be associated with an error instance,
+expanding the abilities of the receiver of the error:
 
 ```rust,ignore
 use snafu::prelude::*;
@@ -442,8 +517,7 @@ enum ApiError {
 }
 
 let e = LoginSnafu { user_id: UserId(0) }.build();
-let e = &e as &dyn std::error::Error;
-match e.request_ref::<UserId>() {
+match error::request_ref::<UserId>(&e) {
     // Present when ApiError::Login or ApiError::Logout
     Some(user_id) => {
         println!("{user_id:?} experienced an error");
@@ -488,20 +562,15 @@ struct OuterError {
 }
 
 let outer = OuterSnafu.into_error(InnerSnafu { user_id: UserId(0) }.build());
-let outer = &outer as &dyn std::error::Error;
 
 // We can get the source error and downcast it at once
-outer
-    .request_ref::<InnerError>()
-    .expect("Must have a source");
+error::request_ref::<InnerError>(&outer).expect("Must have a source");
 
 // We can get the deepest backtrace
-outer
-    .request_ref::<snafu::Backtrace>()
-    .expect("Must have a backtrace");
+error::request_ref::<snafu::Backtrace>(&outer).expect("Must have a backtrace");
 
 // We can get arbitrary values from sources as well
-outer.request_ref::<UserId>().expect("Must have a user id");
+error::request_ref::<UserId>(&outer).expect("Must have a user id");
 ```
 
 By default, SNAFU will gather the provided data from the source first,
@@ -529,8 +598,7 @@ const HTTP_NOT_FOUND: HttpCode = HttpCode(404);
 struct WebserverError;
 
 let e = WebserverError;
-let e = &e as &dyn std::error::Error;
-assert_eq!(Some(HTTP_NOT_FOUND), e.request_value::<HttpCode>());
+assert_eq!(Some(HTTP_NOT_FOUND), error::request_value::<HttpCode>(&e));
 ```
 
 The expression may access any field of the error as well as `self`:
@@ -553,8 +621,7 @@ let e = AdditionSnafu {
     right_side: 2,
 }
 .build();
-let e = &e as &dyn std::error::Error;
-assert_eq!(Some(Summation(3)), e.request_value::<Summation>());
+assert_eq!(Some(Summation(3)), error::request_value::<Summation>(&e));
 ```
 
 ### Configuring how data is provided
@@ -580,9 +647,8 @@ struct RefFlagExampleError {
 }
 
 let e = RefFlagExampleSnafu { name: "alice" }.build();
-let e = &e as &dyn std::error::Error;
 
-assert_eq!(Some("alice"), e.request_ref::<str>());
+assert_eq!(Some("alice"), error::request_ref::<str>(&e));
 ```
 
 #### `provide(opt, ...`
@@ -602,16 +668,15 @@ struct OptFlagExampleError {
 }
 
 let e = OptFlagExampleSnafu { char_code: b'x' }.build();
-let e = &e as &dyn std::error::Error;
 
-assert_eq!(Some('x'), e.request_value::<char>());
+assert_eq!(Some('x'), error::request_value::<char>(&e));
 ```
 
 #### `provide(priority, ...`
 
 [provide-flag-priority]: #providepriority-
 
-The [Provider API][] works by types and can only return one piece of
+[`Error::provide`][] works by types and can only return one piece of
 data for a type. When there are multiple pieces of data for the same
 type, the one that is provided *first* will be used.
 
@@ -640,44 +705,39 @@ struct PriorityFlagExampleError {
 }
 
 let e = PriorityFlagExampleSnafu.into_error(InnerError);
-let e = &e as &dyn std::error::Error;
 
-assert_eq!(Some(Fatal(false)), e.request_value::<Fatal>());
+assert_eq!(Some(Fatal(false)), error::request_value::<Fatal>(&e));
 ```
 
 #### `provide(chain, ...`
 
 [provide-flag-chain]: #providechain-
 
-If a member of your error implements the [Provider API][] and you'd
-like for its data to be included when providing data for your error,
-but it isn't automatically provided because it's not a source error,
-you may add the `chain` flag. This flag must always be combined with
-the [`ref` flag][provide-flag-ref].
+If a member of your error implements [`Error`][] and you'd like for
+its data to be included when providing data for your error, but it
+isn't automatically provided because it's not a source error, you may
+add the `chain` flag. This flag must always be combined with the
+[`ref` flag][provide-flag-ref].
 
 ```rust,ignore
 use snafu::prelude::*;
-use std::any;
-
-#[derive(Debug)]
-struct BlobOfData;
-
-impl any::Provider for BlobOfData {
-    fn provide<'a>(&'a self, demand: &mut any::Demand<'a>) {
-        demand.provide_value::<u8>(1);
-    }
-}
 
 #[derive(Debug, Snafu)]
-#[snafu(provide(ref, chain, BlobOfData => data))]
+#[snafu(provide(u8 => 1))]
+struct NotTheSourceError;
+
+#[derive(Debug, Snafu)]
+#[snafu(provide(ref, chain, NotTheSourceError => data))]
 struct ChainFlagExampleError {
-    data: BlobOfData,
+    data: NotTheSourceError,
 }
 
-let e = ChainFlagExampleSnafu { data: BlobOfData }.build();
-let e = &e as &dyn std::error::Error;
+let e = ChainFlagExampleSnafu {
+    data: NotTheSourceError,
+}
+.build();
 
-assert_eq!(Some(1), e.request_value::<u8>());
+assert_eq!(Some(1), error::request_value::<u8>(&e));
 ```
 
 ### API stability concerns
@@ -692,8 +752,8 @@ refactor your code.
 Stating your guarantees is especially useful for opaque errors, which
 will expose all the provided data from the inner error type.
 
-[provider API]: https://doc.rust-lang.org/nightly/std/any/index.html#provider-and-demand
-[`request_ref`]: https://doc.rust-lang.org/nightly/std/error/trait.Error.html#method.request_ref
+[`Error::provide`]: https://doc.rust-lang.org/nightly/core/error/trait.Error.html#method.provide
+[`request_ref`]: https://doc.rust-lang.org/nightly/std/error/fn.request_ref.html
 
 ## Controlling implicitly generated data
 

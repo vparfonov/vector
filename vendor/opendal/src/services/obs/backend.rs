@@ -27,71 +27,16 @@ use reqsign::HuaweicloudObsConfig;
 use reqsign::HuaweicloudObsCredentialLoader;
 use reqsign::HuaweicloudObsSigner;
 
-use super::appender::ObsAppender;
 use super::core::ObsCore;
 use super::error::parse_error;
-use super::pager::ObsPager;
+use super::lister::ObsLister;
 use super::writer::ObsWriter;
 use crate::raw::*;
+use crate::services::obs::writer::ObsWriters;
 use crate::*;
 
-/// Huawei Cloud OBS services support.
-///
-/// # Capabilities
-///
-/// This service can be used to:
-///
-/// - [x] stat
-/// - [x] read
-/// - [x] write
-/// - [x] create_dir
-/// - [x] delete
-/// - [x] copy
-/// - [ ] rename
-/// - [x] list
-/// - [x] scan
-/// - [x] presign
-/// - [ ] blocking
-///
-/// # Configuration
-///
-/// - `root`: Set the work directory for backend
-/// - `bucket`: Set the container name for backend
-/// - `endpoint`: Customizable endpoint setting
-/// - `access_key_id`: Set the access_key_id for backend.
-/// - `secret_access_key`: Set the secret_access_key for backend.
-///
-/// You can refer to [`ObsBuilder`]'s docs for more information
-///
-/// # Example
-///
-/// ## Via Builder
-///
-/// ```no_run
-/// use anyhow::Result;
-/// use opendal::services::Obs;
-/// use opendal::Operator;
-///
-/// #[tokio::main]
-/// async fn main() -> Result<()> {
-///     // create backend builder
-///     let mut builder = Obs::default();
-///
-///     // set the storage bucket for OpenDAL
-///     builder.bucket("test");
-///     // Set the access_key_id and secret_access_key.
-///     //
-///     // OpenDAL will try load credential from the env.
-///     // If credential not set and no valid credential in env, OpenDAL will
-///     // send request without signing like anonymous user.
-///     builder.access_key_id("access_key_id");
-///     builder.secret_access_key("secret_access_key");
-///
-///     let op: Operator = Operator::new(builder)?.finish();
-///
-///     Ok(())
-/// }
-/// ```
+/// Huawei-Cloud Object Storage Service (OBS) support
+#[doc = include_str!("docs.md")]
 #[derive(Default, Clone)]
 pub struct ObsBuilder {
     root: Option<String>,
@@ -252,13 +197,19 @@ impl Builder for ObsBuilder {
             })?
         };
 
-        let config = HuaweicloudObsConfig {
-            access_key_id: self.access_key_id.take(),
-            secret_access_key: self.secret_access_key.take(),
-            security_token: None,
-        };
+        let mut cfg = HuaweicloudObsConfig::default();
+        // Load cfg from env first.
+        cfg = cfg.from_env();
 
-        let cred_loader = HuaweicloudObsCredentialLoader::new(config);
+        if let Some(v) = self.access_key_id.take() {
+            cfg.access_key_id = Some(v);
+        }
+
+        if let Some(v) = self.secret_access_key.take() {
+            cfg.secret_access_key = Some(v);
+        }
+
+        let loader = HuaweicloudObsCredentialLoader::new(cfg);
 
         // Set the bucket name in CanonicalizedResource.
         // 1. If the bucket is bound to a user domain name, use the user domain name as the bucket name,
@@ -282,7 +233,7 @@ impl Builder for ObsBuilder {
                 root,
                 endpoint: format!("{}://{}", &scheme, &endpoint),
                 signer,
-                loader: cred_loader,
+                loader,
                 client,
             }),
         })
@@ -298,19 +249,18 @@ pub struct ObsBackend {
 #[async_trait]
 impl Accessor for ObsBackend {
     type Reader = IncomingAsyncBody;
+    type Writer = ObsWriters;
+    type Lister = oio::PageLister<ObsLister>;
     type BlockingReader = ();
-    type Writer = ObsWriter;
     type BlockingWriter = ();
-    type Appender = ObsAppender;
-    type Pager = ObsPager;
-    type BlockingPager = ();
+    type BlockingLister = ();
 
     fn info(&self) -> AccessorInfo {
         let mut am = AccessorInfo::default();
         am.set_scheme(Scheme::Obs)
             .set_root(&self.core.root)
             .set_name(&self.core.bucket)
-            .set_capability(Capability {
+            .set_native_capability(Capability {
                 stat: true,
                 stat_with_if_match: true,
                 stat_with_if_none_match: true,
@@ -322,22 +272,29 @@ impl Accessor for ObsBackend {
                 read_with_if_none_match: true,
 
                 write: true,
-                write_can_sink: true,
+                write_can_empty: true,
+                write_can_append: true,
+                write_can_multi: true,
                 write_with_content_type: true,
                 write_with_cache_control: true,
-
-                append: true,
-                append_with_cache_control: true,
-                append_with_content_type: true,
-                append_with_content_disposition: true,
+                // The min multipart size of OBS is 5 MiB.
+                //
+                // ref: <https://support.huaweicloud.com/intl/en-us/ugobs-obs/obs_41_0021.html>
+                write_multi_min_size: Some(5 * 1024 * 1024),
+                // The max multipart size of OBS is 5 GiB.
+                //
+                // ref: <https://support.huaweicloud.com/intl/en-us/ugobs-obs/obs_41_0021.html>
+                write_multi_max_size: if cfg!(target_pointer_width = "64") {
+                    Some(5 * 1024 * 1024 * 1024)
+                } else {
+                    Some(usize::MAX)
+                },
 
                 delete: true,
-                create_dir: true,
                 copy: true,
 
                 list: true,
-                list_with_delimiter_slash: true,
-                list_without_delimiter: true,
+                list_with_recursive: true,
 
                 presign: true,
                 presign_stat: true,
@@ -350,94 +307,71 @@ impl Accessor for ObsBackend {
         am
     }
 
-    async fn presign(&self, path: &str, args: OpPresign) -> Result<RpPresign> {
-        let mut req = match args.operation() {
-            PresignOperation::Stat(v) => {
-                self.core
-                    .obs_head_object_request(path, v.if_match(), v.if_none_match())?
-            }
-            PresignOperation::Read(v) => self.core.obs_get_object_request(
-                path,
-                v.range(),
-                v.if_match(),
-                v.if_none_match(),
-            )?,
-            PresignOperation::Write(v) => self.core.obs_put_object_request(
-                path,
-                None,
-                v.content_type(),
-                v.cache_control(),
-                AsyncBody::Empty,
-            )?,
-        };
-        self.core.sign_query(&mut req, args.expire()).await?;
-
-        // We don't need this request anymore, consume it directly.
-        let (parts, _) = req.into_parts();
-
-        Ok(RpPresign::new(PresignedRequest::new(
-            parts.method,
-            parts.uri,
-            parts.headers,
-        )))
-    }
-
-    async fn create_dir(&self, path: &str, _: OpCreateDir) -> Result<RpCreateDir> {
-        let mut req =
-            self.core
-                .obs_put_object_request(path, Some(0), None, None, AsyncBody::Empty)?;
-
-        self.core.sign(&mut req).await?;
-
-        let resp = self.core.send(req).await?;
+    async fn stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
+        let resp = self.core.obs_head_object(path, &args).await?;
 
         let status = resp.status();
 
+        // The response is very similar to azblob.
         match status {
-            StatusCode::CREATED | StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(RpCreateDir::default())
+            StatusCode::OK => parse_into_metadata(path, resp.headers()).map(RpStat::new),
+            StatusCode::NOT_FOUND if path.ends_with('/') => {
+                Ok(RpStat::new(Metadata::new(EntryMode::DIR)))
             }
             _ => Err(parse_error(resp).await?),
         }
     }
 
     async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
-        let resp = self
-            .core
-            .obs_get_object(path, args.range(), args.if_match(), args.if_none_match())
-            .await?;
+        let resp = self.core.obs_get_object(path, &args).await?;
 
         let status = resp.status();
 
         match status {
             StatusCode::OK | StatusCode::PARTIAL_CONTENT => {
-                let meta = parse_into_metadata(path, resp.headers())?;
-                Ok((RpRead::with_metadata(meta), resp.into_body()))
+                let size = parse_content_length(resp.headers())?;
+                let range = parse_content_range(resp.headers())?;
+                Ok((
+                    RpRead::new().with_size(size).with_range(range),
+                    resp.into_body(),
+                ))
+            }
+            StatusCode::RANGE_NOT_SATISFIABLE => {
+                resp.into_body().consume().await?;
+                Ok((RpRead::new().with_size(Some(0)), IncomingAsyncBody::empty()))
             }
             _ => Err(parse_error(resp).await?),
         }
     }
 
     async fn write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::Writer)> {
-        if args.content_length().is_none() {
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                "write without content length is not supported",
-            ));
-        }
+        let writer = ObsWriter::new(self.core.clone(), path, args.clone());
 
-        Ok((
-            RpWrite::default(),
-            ObsWriter::new(self.core.clone(), args, path.to_string()),
-        ))
+        let w = if args.append() {
+            ObsWriters::Two(oio::AppendWriter::new(writer))
+        } else {
+            ObsWriters::One(oio::MultipartWriter::new(writer, args.concurrent()))
+        };
+
+        Ok((RpWrite::default(), w))
     }
 
-    async fn append(&self, path: &str, args: OpAppend) -> Result<(RpAppend, Self::Appender)> {
-        Ok((
-            RpAppend::default(),
-            ObsAppender::new(self.core.clone(), path, args),
-        ))
+    async fn delete(&self, path: &str, _: OpDelete) -> Result<RpDelete> {
+        let resp = self.core.obs_delete_object(path).await?;
+
+        let status = resp.status();
+
+        match status {
+            StatusCode::NO_CONTENT | StatusCode::ACCEPTED | StatusCode::NOT_FOUND => {
+                Ok(RpDelete::default())
+            }
+            _ => Err(parse_error(resp).await?),
+        }
+    }
+
+    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
+        let l = ObsLister::new(self.core.clone(), path, args.recursive(), args.limit());
+        Ok((RpList::default(), oio::PageLister::new(l)))
     }
 
     async fn copy(&self, from: &str, to: &str, _args: OpCopy) -> Result<RpCopy> {
@@ -454,46 +388,24 @@ impl Accessor for ObsBackend {
         }
     }
 
-    async fn stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
-        // Stat root always returns a DIR.
-        if path == "/" {
-            return Ok(RpStat::new(Metadata::new(EntryMode::DIR)));
-        }
-
-        let resp = self
-            .core
-            .obs_head_object(path, args.if_match(), args.if_none_match())
-            .await?;
-
-        let status = resp.status();
-
-        // The response is very similar to azblob.
-        match status {
-            StatusCode::OK => parse_into_metadata(path, resp.headers()).map(RpStat::new),
-            StatusCode::NOT_FOUND if path.ends_with('/') => {
-                Ok(RpStat::new(Metadata::new(EntryMode::DIR)))
+    async fn presign(&self, path: &str, args: OpPresign) -> Result<RpPresign> {
+        let mut req = match args.operation() {
+            PresignOperation::Stat(v) => self.core.obs_head_object_request(path, v)?,
+            PresignOperation::Read(v) => self.core.obs_get_object_request(path, v)?,
+            PresignOperation::Write(v) => {
+                self.core
+                    .obs_put_object_request(path, None, v, AsyncBody::Empty)?
             }
-            _ => Err(parse_error(resp).await?),
-        }
-    }
+        };
+        self.core.sign_query(&mut req, args.expire()).await?;
 
-    async fn delete(&self, path: &str, _: OpDelete) -> Result<RpDelete> {
-        let resp = self.core.obs_delete_object(path).await?;
+        // We don't need this request anymore, consume it directly.
+        let (parts, _) = req.into_parts();
 
-        let status = resp.status();
-
-        match status {
-            StatusCode::NO_CONTENT | StatusCode::ACCEPTED | StatusCode::NOT_FOUND => {
-                Ok(RpDelete::default())
-            }
-            _ => Err(parse_error(resp).await?),
-        }
-    }
-
-    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Pager)> {
-        Ok((
-            RpList::default(),
-            ObsPager::new(self.core.clone(), path, args.delimiter(), args.limit()),
-        ))
+        Ok(RpPresign::new(PresignedRequest::new(
+            parts.method,
+            parts.uri,
+            parts.headers,
+        )))
     }
 }

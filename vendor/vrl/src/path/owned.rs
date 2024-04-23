@@ -1,9 +1,15 @@
-use super::PathPrefix;
-use super::{parse_target_path, parse_value_path, BorrowedSegment, PathParseError, ValuePath};
+use std::fmt::{self, Debug, Display, Formatter, Write};
+use std::str::FromStr;
+
 use once_cell::sync::Lazy;
+#[cfg(any(test, feature = "proptest"))]
+use proptest::prelude::*;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Display, Formatter};
+
+use super::PathPrefix;
+use super::{parse_target_path, parse_value_path, BorrowedSegment, PathParseError, ValuePath};
+use crate::value::KeyString;
 
 /// A lookup path.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -115,8 +121,22 @@ impl OwnedValuePath {
     }
 }
 
+// OwnedValuePath values must have at least one segment.
+#[cfg(any(test, feature = "proptest"))]
+impl Arbitrary for OwnedValuePath {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        prop::collection::vec(any::<OwnedSegment>(), 1..10)
+            .prop_map(|segments| OwnedValuePath { segments })
+            .boxed()
+    }
+}
+
 /// An owned path that contains a target (pointing to either an Event or Metadata)
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[cfg_attr(any(test, feature = "proptest"), derive(proptest_derive::Arbitrary))]
 #[serde(try_from = "String", into = "String")]
 pub struct OwnedTargetPath {
     pub prefix: PathPrefix,
@@ -179,29 +199,46 @@ impl OwnedTargetPath {
 }
 
 impl Display for OwnedTargetPath {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", String::from(self.to_owned()))
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self.prefix {
+            PathPrefix::Event => write!(f, ".")?,
+            PathPrefix::Metadata => write!(f, "%")?,
+        }
+        Display::fmt(&self.path, f)
     }
 }
 
 impl Debug for OwnedTargetPath {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
     }
 }
 
 impl From<OwnedTargetPath> for String {
     fn from(target_path: OwnedTargetPath) -> Self {
-        match target_path.prefix {
-            PathPrefix::Event => format!(".{}", target_path.path),
-            PathPrefix::Metadata => format!("%{}", target_path.path),
-        }
+        Self::from(&target_path)
+    }
+}
+
+impl From<&OwnedTargetPath> for String {
+    fn from(target_path: &OwnedTargetPath) -> Self {
+        target_path.to_string()
     }
 }
 
 impl Display for OwnedValuePath {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", String::from(self.clone()))
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", String::from(self))
+    }
+}
+
+impl FromStr for OwnedValuePath {
+    type Err = PathParseError;
+
+    fn from_str(src: &str) -> Result<Self, Self::Err> {
+        parse_value_path(src).map_err(|_| PathParseError::InvalidPathSyntax {
+            path: src.to_owned(),
+        })
     }
 }
 
@@ -209,7 +246,15 @@ impl TryFrom<String> for OwnedValuePath {
     type Error = PathParseError;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
-        parse_value_path(&src).map_err(|_| PathParseError::InvalidPathSyntax {
+        src.parse()
+    }
+}
+
+impl FromStr for OwnedTargetPath {
+    type Err = PathParseError;
+
+    fn from_str(src: &str) -> Result<Self, Self::Err> {
+        parse_target_path(src).map_err(|_| PathParseError::InvalidPathSyntax {
             path: src.to_owned(),
         })
     }
@@ -219,63 +264,80 @@ impl TryFrom<String> for OwnedTargetPath {
     type Error = PathParseError;
 
     fn try_from(src: String) -> Result<Self, Self::Error> {
-        parse_target_path(&src).map_err(|_| PathParseError::InvalidPathSyntax {
-            path: src.to_owned(),
-        })
+        src.parse()
+    }
+}
+
+impl TryFrom<KeyString> for OwnedValuePath {
+    type Error = PathParseError;
+
+    fn try_from(src: KeyString) -> Result<Self, Self::Error> {
+        src.parse()
+    }
+}
+
+impl TryFrom<KeyString> for OwnedTargetPath {
+    type Error = PathParseError;
+
+    fn try_from(src: KeyString) -> Result<Self, Self::Error> {
+        src.parse()
     }
 }
 
 impl From<OwnedValuePath> for String {
     fn from(owned: OwnedValuePath) -> Self {
-        let mut coalesce_i = 0;
-        owned
-            .segments
-            .iter()
-            .enumerate()
-            .map(|(i, segment)| match segment {
-                OwnedSegment::Field(field) => {
-                    serialize_field(field.as_ref(), (i != 0).then_some("."))
-                }
-                OwnedSegment::Index(index) => format!("[{}]", index),
-                OwnedSegment::Coalesce(fields) => {
-                    let mut output = String::new();
-                    let (last, fields) = fields.split_last().expect("coalesce must not be empty");
-                    for field in fields {
-                        let field_output = serialize_field(
-                            field.as_ref(),
-                            Some(if coalesce_i == 0 {
-                                if i == 0 {
-                                    "("
-                                } else {
-                                    ".("
-                                }
-                            } else {
-                                "|"
-                            }),
-                        );
-                        coalesce_i += 1;
-                        output.push_str(&field_output);
-                    }
-                    output += &serialize_field(last.as_ref(), (coalesce_i != 0).then_some("|"));
-                    output += ")";
-                    output
-                }
-            })
-            .collect::<Vec<_>>()
-            .join("")
+        Self::from(&owned)
     }
 }
 
-fn serialize_field(field: &str, separator: Option<&str>) -> String {
-    // These characters should match the ones from the parser, implemented in `JitLookup`
-    let needs_quotes = field
-        .chars()
-        .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
+impl From<&OwnedValuePath> for String {
+    fn from(owned: &OwnedValuePath) -> Self {
+        let mut output = String::new();
+        for (i, segment) in owned.segments.iter().enumerate() {
+            match segment {
+                OwnedSegment::Field(field) => {
+                    serialize_field(&mut output, field.as_ref(), (i != 0).then_some("."))
+                }
+                OwnedSegment::Index(index) => {
+                    write!(output, "[{index}]").expect("Could not write to string")
+                }
+                OwnedSegment::Coalesce(fields) => {
+                    let mut coalesce_i = 0;
+                    let (last, fields) = fields.split_last().expect("coalesce must not be empty");
+                    for field in fields {
+                        serialize_field(
+                            &mut output,
+                            field.as_ref(),
+                            Some(if coalesce_i != 0 {
+                                "|"
+                            } else if i == 0 {
+                                "("
+                            } else {
+                                ".("
+                            }),
+                        );
+                        coalesce_i = 1;
+                    }
+                    serialize_field(&mut output, last.as_ref(), (coalesce_i != 0).then_some("|"));
+                    output.push(')');
+                }
+            }
+        }
+        output
+    }
+}
 
-    // Allocate enough to fit the field, a `.` and two `"` characters. This
+fn serialize_field(string: &mut String, field: &str, separator: Option<&str>) {
+    // These characters should match the ones from the parser, implemented in `JitLookup`
+    let needs_quotes = field.is_empty()
+        || field
+            .chars()
+            .any(|c| !matches!(c, 'A'..='Z' | 'a'..='z' | '_' | '0'..='9' | '@'));
+
+    // Reserve enough to fit the field, a `.` and two `"` characters. This
     // should suffice for the majority of cases when no escape sequence is used.
-    let separator_len = separator.map(|x| x.len()).unwrap_or(0);
-    let mut string = String::with_capacity(field.as_bytes().len() + 2 + separator_len);
+    let separator_len = separator.map_or(0, |x| x.len());
+    string.reserve(field.as_bytes().len() + 2 + separator_len);
     if let Some(separator) = separator {
         string.push_str(separator);
     }
@@ -288,10 +350,8 @@ fn serialize_field(field: &str, separator: Option<&str>) -> String {
             string.push(c);
         }
         string.push('"');
-        string
     } else {
         string.push_str(field);
-        string
     }
 }
 
@@ -303,20 +363,20 @@ impl From<Vec<OwnedSegment>> for OwnedValuePath {
 
 #[derive(Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum OwnedSegment {
-    Field(String),
+    Field(KeyString),
     Index(isize),
-    Coalesce(Vec<String>),
+    Coalesce(Vec<KeyString>),
 }
 
 impl OwnedSegment {
     pub fn field(value: &str) -> OwnedSegment {
-        OwnedSegment::Field(value.to_string())
+        OwnedSegment::Field(value.into())
     }
     pub fn index(value: isize) -> OwnedSegment {
         OwnedSegment::Index(value)
     }
 
-    pub fn coalesce(fields: Vec<String>) -> OwnedSegment {
+    pub fn coalesce(fields: Vec<KeyString>) -> OwnedSegment {
         OwnedSegment::Coalesce(fields)
     }
 
@@ -343,18 +403,36 @@ impl OwnedSegment {
     }
 }
 
+// This is almost the same as the automatically-derived implementation, except that we explictly
+// restrict the length of the `Coalesce` variant to at least two elements, which is a constraint of
+// the textual representation.
+#[cfg(any(test, feature = "proptest"))]
+impl Arbitrary for OwnedSegment {
+    type Parameters = ();
+    type Strategy = BoxedStrategy<Self>;
+
+    fn arbitrary_with((): Self::Parameters) -> Self::Strategy {
+        prop_oneof![
+            any::<KeyString>().prop_map(OwnedSegment::Field),
+            any::<isize>().prop_map(OwnedSegment::Index),
+            prop::collection::vec(any::<KeyString>(), 2..10).prop_map(OwnedSegment::Coalesce),
+        ]
+        .boxed()
+    }
+}
+
 impl From<Vec<&'static str>> for OwnedSegment {
     fn from(fields: Vec<&'static str>) -> Self {
         fields
             .into_iter()
-            .map(ToString::to_string)
+            .map(KeyString::from)
             .collect::<Vec<_>>()
             .into()
     }
 }
 
-impl From<Vec<String>> for OwnedSegment {
-    fn from(fields: Vec<String>) -> Self {
+impl From<Vec<KeyString>> for OwnedSegment {
+    fn from(fields: Vec<KeyString>) -> Self {
         OwnedSegment::Coalesce(fields)
     }
 }
@@ -412,31 +490,33 @@ impl<'a> ValuePath<'a> for &'a OwnedValuePath {
 static VALID_FIELD: Lazy<Regex> =
     Lazy::new(|| Regex::new("^[0-9]*[a-zA-Z_@][0-9a-zA-Z_@]*$").unwrap());
 
-fn field_to_string(field: &str) -> String {
+fn format_field(f: &mut Formatter<'_>, field: &str) -> fmt::Result {
     // This can eventually just parse the field and see if it's valid, but the
     // parser is currently lenient in what it accepts so it doesn't catch all cases that
     // should be quoted
     let needs_quotes = !VALID_FIELD.is_match(field);
     if needs_quotes {
-        format!("\"{}\"", field)
+        write!(f, "\"{field}\"")
     } else {
-        field.to_string()
+        write!(f, "{field}")
     }
 }
 
 impl Display for OwnedSegment {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            OwnedSegment::Index(i) => write!(f, "[{}]", i),
-            OwnedSegment::Field(field) => write!(f, "{}", field_to_string(field)),
-            OwnedSegment::Coalesce(v) => write!(
-                f,
-                "({})",
-                v.iter()
-                    .map(|field| field_to_string(field))
-                    .collect::<Vec<_>>()
-                    .join(" | ")
-            ),
+            OwnedSegment::Index(i) => write!(f, "[{i}]"),
+            OwnedSegment::Field(field) => format_field(f, field),
+            OwnedSegment::Coalesce(v) => {
+                write!(f, "(")?;
+                for (i, field) in v.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, " | ")?;
+                    }
+                    format_field(f, field)?;
+                }
+                write!(f, ")")
+            }
         }
     }
 }
@@ -478,6 +558,7 @@ impl<'a> Iterator for OwnedSegmentSliceIter<'a> {
 
 #[cfg(test)]
 mod test {
+    use super::*;
     use crate::path::parse_value_path;
 
     #[test]
@@ -526,6 +607,27 @@ mod test {
             let path = parse_value_path(path).map(String::from).ok();
 
             assert_eq!(path, expected.map(|x| x.to_owned()));
+        }
+    }
+
+    fn reparse_thing<T: std::fmt::Debug + std::fmt::Display + Eq + FromStr>(thing: T)
+    where
+        <T as FromStr>::Err: std::fmt::Debug,
+    {
+        let text = thing.to_string();
+        let thing2: T = text.parse().unwrap();
+        assert_eq!(thing, thing2);
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn reparses_valid_value_path(path: OwnedValuePath) {
+            reparse_thing(path);
+        }
+
+        #[test]
+        fn reparses_valid_target_path(path: OwnedTargetPath) {
+            reparse_thing(path);
         }
     }
 }

@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "clipboard-win"
-version = "4.5.0"
+version = "5.0.0"
 authors = ["Douman <douman@gmx.se>"]
 include = [
     "**/*.rs",
@@ -38,21 +38,4 @@ default-target = "x86_64-pc-windows-msvc"
 std = ["error-code/std"]
 
 [target."cfg(windows)".dependencies.error-code]
-version = "2.1"
-
-[target."cfg(windows)".dependencies.str-buf]
-version = "1"
-
-[target."cfg(windows)".dependencies.winapi]
-version = "0.3"
-features = [
-    "basetsd",
-    "shellapi",
-    "winbase",
-    "winuser",
-    "winerror",
-    "stringapiset",
-    "errhandlingapi",
-    "synchapi",
-]
-default-features = false
+version = "3"

@@ -1,3 +1,18 @@
+//! # [Ratatui] Modifiers example
+//!
+//! The latest version of this example is available in the [examples] folder in the repository.
+//!
+//! Please note that the examples are designed to be run against the `main` branch of the Github
+//! repository. This means that you may not be able to compile with the latest release version on
+//! crates.io, or the one that you have installed locally.
+//!
+//! See the [examples readme] for more information on finding examples that match the version of the
+//! library you are using.
+//!
+//! [Ratatui]: https://github.com/ratatui-org/ratatui
+//! [examples]: https://github.com/ratatui-org/ratatui/blob/main/examples
+//! [examples readme]: https://github.com/ratatui-org/ratatui/blob/main/examples/README.md
+
 /// This example is useful for testing how your terminal emulator handles different modifiers.
 /// It will render a grid of combinations of foreground and background colors with all
 /// modifiers applied to them.
@@ -43,25 +58,19 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
     }
 }
 
-fn ui<B: Backend>(frame: &mut Frame<B>) {
-    let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(vec![Constraint::Length(1), Constraint::Min(0)])
-        .split(frame.size());
+fn ui(frame: &mut Frame) {
+    let vertical = Layout::vertical([Constraint::Length(1), Constraint::Min(0)]);
+    let [text_area, main_area] = vertical.areas(frame.size());
     frame.render_widget(
         Paragraph::new("Note: not all terminals support all modifiers")
             .style(Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
-        layout[0],
+        text_area,
     );
-    let layout = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(vec![Constraint::Length(1); 50])
-        .split(layout[1])
+    let layout = Layout::vertical([Constraint::Length(1); 50])
+        .split(main_area)
         .iter()
         .flat_map(|area| {
-            Layout::default()
-                .direction(Direction::Horizontal)
-                .constraints(vec![Constraint::Percentage(20); 5])
+            Layout::horizontal([Constraint::Percentage(20); 5])
                 .split(*area)
                 .to_vec()
         })

@@ -8,20 +8,18 @@
 //! If the SSL_CERT_FILE environment variable is set, certificates (in PEM
 //! format) are read from that file instead.
 //!
-//! [`Certificate`] here is just a marker newtype that denotes a DER-encoded
-//! X.509 certificate encoded as a `Vec<u8>`.
-//!
 //! If you want to load these certificates into a `rustls::RootCertStore`,
 //! you'll likely want to do something like this:
 //!
 //! ```no_run
 //! let mut roots = rustls::RootCertStore::empty();
 //! for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs") {
-//!     roots
-//!         .add(&rustls::Certificate(cert.0))
-//!         .unwrap();
+//!     roots.add(cert).unwrap();
 //! }
 //! ```
+
+// Enable documentation for all features on docs.rs
+#![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
 
 #[cfg(all(unix, not(target_os = "macos")))]
 mod unix;
@@ -44,6 +42,8 @@ use std::io::BufReader;
 use std::io::{Error, ErrorKind};
 use std::path::{Path, PathBuf};
 
+use pki_types::CertificateDer;
+
 /// Load root certificates found in the platform's native certificate store.
 ///
 /// If the SSL_CERT_FILE environment variable is set, certificates (in PEM
@@ -54,17 +54,8 @@ use std::path::{Path, PathBuf};
 /// This function can be expensive: on some platforms it involves loading
 /// and parsing a ~300KB disk file.  It's therefore prudent to call
 /// this sparingly.
-pub fn load_native_certs() -> Result<Vec<Certificate>, Error> {
+pub fn load_native_certs() -> Result<Vec<CertificateDer<'static>>, Error> {
     load_certs_from_env().unwrap_or_else(platform::load_native_certs)
-}
-
-/// A newtype representing a single DER-encoded X.509 certificate encoded as a `Vec<u8>`.
-pub struct Certificate(pub Vec<u8>);
-
-impl AsRef<[u8]> for Certificate {
-    fn as_ref(&self) -> &[u8] {
-        &self.0
-    }
 }
 
 const ENV_CERT_FILE: &str = "SSL_CERT_FILE";
@@ -73,24 +64,21 @@ const ENV_CERT_FILE: &str = "SSL_CERT_FILE";
 ///
 /// If it is defined, it is always used, so it must be a path to a real
 /// file from which certificates can be loaded successfully.
-fn load_certs_from_env() -> Option<Result<Vec<Certificate>, Error>> {
+fn load_certs_from_env() -> Option<Result<Vec<CertificateDer<'static>>, Error>> {
     let cert_var_path = PathBuf::from(env::var_os(ENV_CERT_FILE)?);
 
     Some(load_pem_certs(&cert_var_path))
 }
 
-fn load_pem_certs(path: &Path) -> Result<Vec<Certificate>, Error> {
-    let f = File::open(path)?;
-    let mut f = BufReader::new(f);
-
-    match rustls_pemfile::certs(&mut f) {
-        Ok(contents) => Ok(contents
-            .into_iter()
-            .map(Certificate)
-            .collect()),
-        Err(err) => Err(Error::new(
-            ErrorKind::InvalidData,
-            format!("Could not load PEM file {path:?}: {err}"),
-        )),
-    }
+fn load_pem_certs(path: &Path) -> Result<Vec<CertificateDer<'static>>, Error> {
+    let mut f = BufReader::new(File::open(path)?);
+    rustls_pemfile::certs(&mut f)
+        .map(|result| match result {
+            Ok(der) => Ok(der),
+            Err(err) => Err(Error::new(
+                ErrorKind::InvalidData,
+                format!("could not load PEM file {path:?}: {err}"),
+            )),
+        })
+        .collect()
 }

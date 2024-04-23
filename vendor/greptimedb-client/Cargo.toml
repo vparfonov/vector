@@ -23,14 +23,14 @@ enum_dispatch = "0.3"
 futures = "0.3"
 futures-util = "0.3"
 parking_lot = "0.12"
-prost = "0.11"
+prost = "0.12"
 rand = "0.8"
 snafu = "0.7"
 tower = "0.4"
 
 [dependencies.greptime-proto]
 git = "https://github.com/GreptimeTeam/greptime-proto.git"
-tag = "0.2.1"
+tag = "v0.4.1"
 
 [dependencies.tokio]
 version = "1"
@@ -44,8 +44,11 @@ version = "0.1"
 features = ["net"]
 
 [dependencies.tonic]
-version = "0.9"
-features = ["tls"]
+version = "0.10"
+features = [
+    "tls",
+    "tls-roots",
+]
 
 [dev-dependencies]
 derive-new = "0.5"

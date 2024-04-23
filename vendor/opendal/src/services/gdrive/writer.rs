@@ -18,62 +18,66 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use http::StatusCode;
 
 use super::core::GdriveCore;
+use super::core::GdriveFile;
 use super::error::parse_error;
+use crate::raw::oio::WriteBuf;
 use crate::raw::*;
 use crate::*;
 
 pub struct GdriveWriter {
     core: Arc<GdriveCore>,
-    op: OpWrite,
+
     path: String,
+
+    file_id: Option<String>,
 }
 
 impl GdriveWriter {
-    pub fn new(core: Arc<GdriveCore>, op: OpWrite, path: String) -> Self {
-        GdriveWriter { core, op, path }
+    pub fn new(core: Arc<GdriveCore>, path: String, file_id: Option<String>) -> Self {
+        GdriveWriter {
+            core,
+            path,
+
+            file_id,
+        }
     }
 }
 
-#[async_trait]
-impl oio::Write for GdriveWriter {
-    async fn write(&mut self, bs: Bytes) -> Result<()> {
-        let resp = self
-            .core
-            .gdrive_update(
-                &self.path,
-                Some(bs.len()),
-                self.op.content_type(),
-                AsyncBody::Bytes(bs),
-            )
-            .await?;
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
+impl oio::OneShotWrite for GdriveWriter {
+    async fn write_once(&self, bs: &dyn WriteBuf) -> Result<()> {
+        let bs = bs.bytes(bs.remaining());
+        let size = bs.len();
+
+        let resp = if let Some(file_id) = &self.file_id {
+            self.core
+                .gdrive_upload_overwrite_simple_request(file_id, size as u64, bs)
+                .await
+        } else {
+            self.core
+                .gdrive_upload_simple_request(&self.path, size as u64, bs)
+                .await
+        }?;
 
         let status = resp.status();
-
         match status {
-            StatusCode::OK => {
-                resp.into_body().consume().await?;
+            StatusCode::OK | StatusCode::CREATED => {
+                // If we don't have the file id before, let's update the cache to avoid re-fetching.
+                if self.file_id.is_none() {
+                    let bs = resp.into_body().bytes().await?;
+                    let file: GdriveFile =
+                        serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+                    self.core.path_cache.insert(&self.path, &file.id).await;
+                } else {
+                    resp.into_body().consume().await?;
+                }
                 Ok(())
             }
             _ => Err(parse_error(resp).await?),
         }
-    }
-
-    async fn sink(&mut self, _size: u64, _s: oio::Streamer) -> Result<()> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "Write::sink is not supported",
-        ))
-    }
-
-    async fn abort(&mut self) -> Result<()> {
-        Ok(())
-    }
-
-    async fn close(&mut self) -> Result<()> {
-        Ok(())
     }
 }

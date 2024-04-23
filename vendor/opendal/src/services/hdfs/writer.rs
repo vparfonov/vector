@@ -16,81 +16,112 @@
 // under the License.
 
 use std::io::Write;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::ready;
+use std::task::Context;
+use std::task::Poll;
 
 use async_trait::async_trait;
-use bytes::Bytes;
+use futures::future::BoxFuture;
+use futures::AsyncWrite;
 use futures::AsyncWriteExt;
+use futures::FutureExt;
 
-use super::error::parse_io_error;
 use crate::raw::*;
 use crate::*;
 
 pub struct HdfsWriter<F> {
-    f: F,
-    /// The position of current written bytes in the buffer.
-    ///
-    /// We will maintain the posstion in pos to make sure the buffer is written correctly.
-    pos: usize,
+    target_path: String,
+    tmp_path: Option<String>,
+    f: Option<F>,
+    client: Arc<hdrs::Client>,
+    fut: Option<BoxFuture<'static, Result<()>>>,
 }
 
+/// # Safety
+///
+/// We will only take `&mut Self` reference for HdfsWriter.
+unsafe impl<F> Sync for HdfsWriter<F> {}
+
 impl<F> HdfsWriter<F> {
-    pub fn new(f: F) -> Self {
-        Self { f, pos: 0 }
+    pub fn new(
+        target_path: String,
+        tmp_path: Option<String>,
+        f: F,
+        client: Arc<hdrs::Client>,
+    ) -> Self {
+        Self {
+            target_path,
+            tmp_path,
+            f: Some(f),
+            client,
+            fut: None,
+        }
     }
 }
 
 #[async_trait]
 impl oio::Write for HdfsWriter<hdrs::AsyncFile> {
-    async fn write(&mut self, bs: Bytes) -> Result<()> {
-        while self.pos < bs.len() {
-            let n = self
-                .f
-                .write(&bs[self.pos..])
-                .await
-                .map_err(parse_io_error)?;
-            self.pos += n;
+    fn poll_write(&mut self, cx: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
+        let f = self.f.as_mut().expect("HdfsWriter must be initialized");
+
+        Pin::new(f)
+            .poll_write(cx, bs.chunk())
+            .map_err(new_std_io_error)
+    }
+
+    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
+        loop {
+            if let Some(fut) = self.fut.as_mut() {
+                let res = ready!(fut.poll_unpin(cx));
+                self.fut = None;
+                return Poll::Ready(res);
+            }
+
+            let mut f = self.f.take().expect("HdfsWriter must be initialized");
+            let tmp_path = self.tmp_path.clone();
+            let target_path = self.target_path.clone();
+            // Clone client to allow move into the future.
+            let client = self.client.clone();
+
+            self.fut = Some(Box::pin(async move {
+                f.close().await.map_err(new_std_io_error)?;
+
+                if let Some(tmp_path) = tmp_path {
+                    client
+                        .rename_file(&tmp_path, &target_path)
+                        .map_err(new_std_io_error)?;
+                }
+
+                Ok(())
+            }));
         }
-        // Reset pos to 0 for next write.
-        self.pos = 0;
-
-        Ok(())
     }
 
-    async fn sink(&mut self, _size: u64, _s: oio::Streamer) -> Result<()> {
-        Err(Error::new(
+    fn poll_abort(&mut self, _: &mut Context<'_>) -> Poll<Result<()>> {
+        Poll::Ready(Err(Error::new(
             ErrorKind::Unsupported,
-            "Write::sink is not supported",
-        ))
-    }
-
-    async fn abort(&mut self) -> Result<()> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "output writer doesn't support abort",
-        ))
-    }
-
-    async fn close(&mut self) -> Result<()> {
-        self.f.close().await.map_err(parse_io_error)?;
-
-        Ok(())
+            "HdfsWriter doesn't support abort",
+        )))
     }
 }
 
 impl oio::BlockingWrite for HdfsWriter<hdrs::File> {
-    fn write(&mut self, bs: Bytes) -> Result<()> {
-        while self.pos < bs.len() {
-            let n = self.f.write(&bs[self.pos..]).map_err(parse_io_error)?;
-            self.pos += n;
-        }
-        // Reset pos to 0 for next write.
-        self.pos = 0;
-
-        Ok(())
+    fn write(&mut self, bs: &dyn oio::WriteBuf) -> Result<usize> {
+        let f = self.f.as_mut().expect("HdfsWriter must be initialized");
+        f.write(bs.chunk()).map_err(new_std_io_error)
     }
 
     fn close(&mut self) -> Result<()> {
-        self.f.flush().map_err(parse_io_error)?;
+        let f = self.f.as_mut().expect("HdfsWriter must be initialized");
+        f.flush().map_err(new_std_io_error)?;
+
+        if let Some(tmp_path) = &self.tmp_path {
+            self.client
+                .rename_file(tmp_path, &self.target_path)
+                .map_err(new_std_io_error)?;
+        }
 
         Ok(())
     }

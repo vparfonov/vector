@@ -1,6 +1,6 @@
-![Logo](https://raw.githubusercontent.com/ctz/rustls/main/admin/rustls-logo-web.png)
+![Logo](https://raw.githubusercontent.com/rustls/rustls/main/admin/rustls-logo-web.png)
 
-**rustls-native-certs** allows [rustls](https://github.com/ctz/rustls) to use the
+**rustls-native-certs** allows [rustls](https://github.com/rustls/rustls) to use the
 platform's native certificate store when operating as a TLS client.
 
 This is supported on Windows, macOS and Linux:
@@ -26,10 +26,15 @@ rustls-native-certs is currently in development.
 If you'd like to help out, please see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 [![rustls](https://github.com/rustls/rustls-native-certs/actions/workflows/rust.yml/badge.svg)](https://github.com/rustls/rustls-native-certs/actions/workflows/rust.yml)
-[![Documentation](https://docs.rs/rustls-native-certs/badge.svg)](https://docs.rs/rustls-native-certs/)
+[![Documentation](https://docs.rs/rustls-native-certs/badge.svg)](https://docs.rs/rustls-native-certs)
 
 ## Release history:
 
+* 0.7.0 (2023-12-03)
+  - Switched to using the [pki-types](https://github.com/rustls/pki-types) crate.
+    - `load_native_certs` now returns `Vec<pki_types::CertificateDer<'static>>` instead of `Vec<Certificate>`
+    - the `Certificate` newtype has been removed.
+  - Update dependencies.
 * 0.6.3 (2023-06-14)
   - Bump MSRV to 1.60.
   - Windows: avoid storing certificates which are currently invalid.
@@ -59,10 +64,10 @@ If you'd like to help out, please see [CONTRIBUTING.md](CONTRIBUTING.md).
 This library exposes a single function with this signature:
 
 ```rust
-pub fn load_native_certs() -> Result<Vec<Certificate>, std::io::Error>
+pub fn load_native_certs() -> Result<Vec<pki_types::CertificateDer<'static>>, std::io::Error>
 ```
 
-On success, this returns a `Vec<Certificate>` loaded with a
+On success, this returns a `Vec<pki_types::CertificateDer<'static>>` loaded with a
 snapshot of the root certificates found on this platform.  This
 function fails in a platform-specific way, expressed in a `std::io::Error`.
 

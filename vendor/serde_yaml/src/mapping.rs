@@ -7,7 +7,6 @@ use std::cmp::Ordering;
 use std::collections::hash_map::DefaultHasher;
 use std::fmt::{self, Display};
 use std::hash::{Hash, Hasher};
-use std::iter::FromIterator;
 use std::mem;
 
 /// A YAML mapping in which the keys and values are both `serde_yaml::Value`.
@@ -76,7 +75,7 @@ impl Mapping {
         index.index_into_mut(self)
     }
 
-    /// Gets the given key’s corresponding entry in the map for insertion and/or
+    /// Gets the given key's corresponding entry in the map for insertion and/or
     /// in-place manipulation.
     #[inline]
     pub fn entry(&mut self, k: Value) -> Entry {
@@ -87,15 +86,65 @@ impl Mapping {
     }
 
     /// Removes and returns the value corresponding to the key from the map.
+    ///
+    /// This is equivalent to [`.swap_remove(index)`][Self::swap_remove],
+    /// replacing this entry's position with the last element. If you need to
+    /// preserve the relative order of the keys in the map, use
+    /// [`.shift_remove(key)`][Self::shift_remove] instead.
     #[inline]
     pub fn remove<I: Index>(&mut self, index: I) -> Option<Value> {
-        index.remove_from(self)
+        self.swap_remove(index)
     }
 
     /// Remove and return the key-value pair.
+    ///
+    /// This is equivalent to [`.swap_remove_entry(index)`][Self::swap_remove_entry],
+    /// replacing this entry's position with the last element. If you need to
+    /// preserve the relative order of the keys in the map, use
+    /// [`.shift_remove_entry(key)`][Self::shift_remove_entry] instead.
     #[inline]
     pub fn remove_entry<I: Index>(&mut self, index: I) -> Option<(Value, Value)> {
-        index.remove_entry_from(self)
+        self.swap_remove_entry(index)
+    }
+
+    /// Removes and returns the value corresponding to the key from the map.
+    ///
+    /// Like [`Vec::swap_remove`], the entry is removed by swapping it with the
+    /// last element of the map and popping it off. This perturbs the position
+    /// of what used to be the last element!
+    #[inline]
+    pub fn swap_remove<I: Index>(&mut self, index: I) -> Option<Value> {
+        index.swap_remove_from(self)
+    }
+
+    /// Remove and return the key-value pair.
+    ///
+    /// Like [`Vec::swap_remove`], the entry is removed by swapping it with the
+    /// last element of the map and popping it off. This perturbs the position
+    /// of what used to be the last element!
+    #[inline]
+    pub fn swap_remove_entry<I: Index>(&mut self, index: I) -> Option<(Value, Value)> {
+        index.swap_remove_entry_from(self)
+    }
+
+    /// Removes and returns the value corresponding to the key from the map.
+    ///
+    /// Like [`Vec::remove`], the entry is removed by shifting all of the
+    /// elements that follow it, preserving their relative order. This perturbs
+    /// the index of all of those elements!
+    #[inline]
+    pub fn shift_remove<I: Index>(&mut self, index: I) -> Option<Value> {
+        index.shift_remove_from(self)
+    }
+
+    /// Remove and return the key-value pair.
+    ///
+    /// Like [`Vec::remove`], the entry is removed by shifting all of the
+    /// elements that follow it, preserving their relative order. This perturbs
+    /// the index of all of those elements!
+    #[inline]
+    pub fn shift_remove_entry<I: Index>(&mut self, index: I) -> Option<(Value, Value)> {
+        index.shift_remove_entry_from(self)
     }
 
     /// Scan through each key-value pair in the map and keep those where the
@@ -203,10 +252,16 @@ pub trait Index: private::Sealed {
     fn index_into_mut<'a>(&self, v: &'a mut Mapping) -> Option<&'a mut Value>;
 
     #[doc(hidden)]
-    fn remove_from(&self, v: &mut Mapping) -> Option<Value>;
+    fn swap_remove_from(&self, v: &mut Mapping) -> Option<Value>;
 
     #[doc(hidden)]
-    fn remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)>;
+    fn swap_remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)>;
+
+    #[doc(hidden)]
+    fn shift_remove_from(&self, v: &mut Mapping) -> Option<Value>;
+
+    #[doc(hidden)]
+    fn shift_remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)>;
 }
 
 struct HashLikeValue<'a>(&'a str);
@@ -239,11 +294,17 @@ impl Index for Value {
     fn index_into_mut<'a>(&self, v: &'a mut Mapping) -> Option<&'a mut Value> {
         v.map.get_mut(self)
     }
-    fn remove_from(&self, v: &mut Mapping) -> Option<Value> {
-        v.map.remove(self)
+    fn swap_remove_from(&self, v: &mut Mapping) -> Option<Value> {
+        v.map.swap_remove(self)
     }
-    fn remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)> {
-        v.map.remove_entry(self)
+    fn swap_remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)> {
+        v.map.swap_remove_entry(self)
+    }
+    fn shift_remove_from(&self, v: &mut Mapping) -> Option<Value> {
+        v.map.shift_remove(self)
+    }
+    fn shift_remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)> {
+        v.map.shift_remove_entry(self)
     }
 }
 
@@ -257,11 +318,17 @@ impl Index for str {
     fn index_into_mut<'a>(&self, v: &'a mut Mapping) -> Option<&'a mut Value> {
         v.map.get_mut(&HashLikeValue(self))
     }
-    fn remove_from(&self, v: &mut Mapping) -> Option<Value> {
-        v.map.remove(&HashLikeValue(self))
+    fn swap_remove_from(&self, v: &mut Mapping) -> Option<Value> {
+        v.map.swap_remove(&HashLikeValue(self))
     }
-    fn remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)> {
-        v.map.remove_entry(&HashLikeValue(self))
+    fn swap_remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)> {
+        v.map.swap_remove_entry(&HashLikeValue(self))
+    }
+    fn shift_remove_from(&self, v: &mut Mapping) -> Option<Value> {
+        v.map.shift_remove(&HashLikeValue(self))
+    }
+    fn shift_remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)> {
+        v.map.shift_remove_entry(&HashLikeValue(self))
     }
 }
 
@@ -275,11 +342,17 @@ impl Index for String {
     fn index_into_mut<'a>(&self, v: &'a mut Mapping) -> Option<&'a mut Value> {
         self.as_str().index_into_mut(v)
     }
-    fn remove_from(&self, v: &mut Mapping) -> Option<Value> {
-        self.as_str().remove_from(v)
+    fn swap_remove_from(&self, v: &mut Mapping) -> Option<Value> {
+        self.as_str().swap_remove_from(v)
     }
-    fn remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)> {
-        self.as_str().remove_entry_from(v)
+    fn swap_remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)> {
+        self.as_str().swap_remove_entry_from(v)
+    }
+    fn shift_remove_from(&self, v: &mut Mapping) -> Option<Value> {
+        self.as_str().shift_remove_from(v)
+    }
+    fn shift_remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)> {
+        self.as_str().shift_remove_entry_from(v)
     }
 }
 
@@ -296,11 +369,17 @@ where
     fn index_into_mut<'a>(&self, v: &'a mut Mapping) -> Option<&'a mut Value> {
         (**self).index_into_mut(v)
     }
-    fn remove_from(&self, v: &mut Mapping) -> Option<Value> {
-        (**self).remove_from(v)
+    fn swap_remove_from(&self, v: &mut Mapping) -> Option<Value> {
+        (**self).swap_remove_from(v)
     }
-    fn remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)> {
-        (**self).remove_entry_from(v)
+    fn swap_remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)> {
+        (**self).swap_remove_entry_from(v)
+    }
+    fn shift_remove_from(&self, v: &mut Mapping) -> Option<Value> {
+        (**self).shift_remove_from(v)
+    }
+    fn shift_remove_entry_from(&self, v: &mut Mapping) -> Option<(Value, Value)> {
+        (**self).shift_remove_entry_from(v)
     }
 }
 

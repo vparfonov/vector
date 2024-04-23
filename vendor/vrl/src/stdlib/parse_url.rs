@@ -130,8 +130,8 @@ fn url_to_value(url: Url, default_known_ports: bool) -> Value {
         "query",
         url.query_pairs()
             .into_owned()
-            .map(|(k, v)| (k, v.into()))
-            .collect::<BTreeMap<String, Value>>()
+            .map(|(k, v)| (k.into(), v.into()))
+            .collect::<ObjectMap>()
             .into(),
     );
 
@@ -202,6 +202,36 @@ mod tests {
                 password: "",
                 path: "/",
                 port: 443_i64,
+                query: {},
+                scheme: "https",
+                username: "",
+            })),
+            tdef: TypeDef::object(inner_kind()).fallible(),
+        }
+
+        punycode {
+            args: func_args![value: value!("https://www.café.com")],
+            want: Ok(value!({
+                fragment: (),
+                host: "www.xn--caf-dma.com",
+                password: "",
+                path: "/",
+                port: (),
+                query: {},
+                scheme: "https",
+                username: "",
+            })),
+            tdef: TypeDef::object(inner_kind()).fallible(),
+        }
+
+        punycode_mixed_case {
+            args: func_args![value: value!("https://www.CAFé.com")],
+            want: Ok(value!({
+                fragment: (),
+                host: "www.xn--caf-dma.com",
+                password: "",
+                path: "/",
+                port: (),
                 query: {},
                 scheme: "https",
                 username: "",

@@ -1,4 +1,4 @@
-// Copyright 2023 Greptime Team
+// Copyright 2024 Greptime Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,9 +17,11 @@ pub mod channel_manager;
 mod client;
 mod database;
 mod error;
+pub mod helpers;
 pub mod load_balance;
 mod stream_insert;
 
+pub use self::channel_manager::{ChannelConfig, ChannelManager, ClientTlsOption};
 pub use self::client::Client;
 pub use self::database::Database;
 pub use self::error::{Error, Result};

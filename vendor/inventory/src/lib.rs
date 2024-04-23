@@ -102,8 +102,9 @@
 //! There is no guarantee about the order that plugins of the same type are
 //! visited by the iterator. They may be visited in any order.
 
-#![doc(html_root_url = "https://docs.rs/inventory/0.3.12")]
+#![doc(html_root_url = "https://docs.rs/inventory/0.3.15")]
 #![no_std]
+#![deny(unsafe_op_in_unsafe_fn)]
 #![allow(
     clippy::doc_markdown,
     clippy::empty_enum,
@@ -150,7 +151,9 @@ pub trait ErasedNode: Sync {
 
 impl<T: Collect> ErasedNode for T {
     unsafe fn submit(&self, node: &'static Node) {
-        T::registry().submit(node);
+        unsafe {
+            T::registry().submit(node);
+        }
     }
 }
 
@@ -186,7 +189,9 @@ impl Registry {
     unsafe fn submit(&'static self, new: &'static Node) {
         let mut head = self.head.load(Ordering::Relaxed);
         loop {
-            *new.next.get() = head.as_ref();
+            unsafe {
+                *new.next.get() = head.as_ref();
+            }
             let new_ptr = new as *const Node as *mut Node;
             match self
                 .head
@@ -199,50 +204,40 @@ impl Registry {
     }
 }
 
-macro_rules! document_iter {
-    ($iter:item) => {
-        /// An iterator over plugins registered of a given type.
-        ///
-        /// The value `inventory::iter::<T>` is an iterator with element type `&'static
-        /// T`.
-        ///
-        /// There is no guarantee about the order that plugins of the same type are
-        /// visited by the iterator. They may be visited in any order.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// # struct Flag {
-        /// #     short: char,
-        /// #     name: &'static str,
-        /// # }
-        /// #
-        /// # inventory::collect!(Flag);
-        /// #
-        /// # const IGNORE: &str = stringify! {
-        /// use my_flags::Flag;
-        /// # };
-        ///
-        /// fn main() {
-        ///     for flag in inventory::iter::<Flag> {
-        ///         println!("-{}, --{}", flag.short, flag.name);
-        ///     }
-        /// }
-        /// ```
-        ///
-        /// Refer to the [crate level documentation](index.html) for a complete example
-        /// of instantiating a plugin registry and submitting plugins.
-        $iter
-    };
-}
+/// An iterator over plugins registered of a given type.
+///
+/// The value `inventory::iter::<T>` is an iterator with element type `&'static
+/// T`.
+///
+/// There is no guarantee about the order that plugins of the same type are
+/// visited by the iterator. They may be visited in any order.
+///
+/// # Examples
+///
+/// ```
+/// # struct Flag {
+/// #     short: char,
+/// #     name: &'static str,
+/// # }
+/// #
+/// # inventory::collect!(Flag);
+/// #
+/// # const IGNORE: &str = stringify! {
+/// use my_flags::Flag;
+/// # };
+///
+/// fn main() {
+///     for flag in inventory::iter::<Flag> {
+///         println!("-{}, --{}", flag.short, flag.name);
+///     }
+/// }
+/// ```
+///
+/// Refer to the [crate level documentation](index.html) for a complete example
+/// of instantiating a plugin registry and submitting plugins.
+#[allow(non_camel_case_types)]
+pub type iter<T> = private::iter<T>;
 
-#[cfg(doc)]
-document_iter! {
-    #[allow(non_camel_case_types)]
-    pub struct iter<T>;
-}
-
-#[cfg(not(doc))]
 mod void_iter {
     enum Void {}
 
@@ -253,26 +248,27 @@ mod void_iter {
     unsafe impl<T> Sync for Iter<T> {}
 }
 
-#[cfg(not(doc))]
 mod value_iter {
-    pub use crate::iter::iter;
+    #[doc(hidden)]
+    pub use crate::private::iter::iter;
 }
 
-#[cfg(not(doc))]
-document_iter! {
+mod private {
     // Based on https://github.com/dtolnay/ghost
     #[allow(non_camel_case_types)]
     pub enum iter<T> {
-        __Phantom(void_iter::Iter<T>),
+        __Phantom(crate::void_iter::Iter<T>),
         iter,
     }
+
+    #[doc(hidden)]
+    pub use crate::value_iter::*;
 }
 
-#[cfg(not(doc))]
 #[doc(hidden)]
-pub use crate::value_iter::*;
+pub use crate::private::*;
 
-const ITER: () = {
+const _: () = {
     fn into_iter<T: Collect>() -> Iter<T> {
         let head = T::registry().head.load(Ordering::Acquire);
         Iter {
@@ -454,6 +450,7 @@ macro_rules! __do_submit {
                     target_os = "illumos",
                     target_os = "netbsd",
                     target_os = "openbsd",
+                    target_os = "none",
                 ),
                 link_section = ".init_array",
             )]
@@ -476,9 +473,4 @@ macro_rules! __do_submit {
             $($value)*
         }
     };
-}
-
-#[allow(dead_code)]
-fn unused() {
-    let () = ITER;
 }

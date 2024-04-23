@@ -1,36 +1,38 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
+/*
+ * Copyright (C) 2015 Benjamin Fry <benjaminfry@me.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 //! Extended DNS options
 
-use std::fmt;
+use crate::error::*;
+use crate::rr::rdata::opt::{self, EdnsCode, EdnsOption};
+use crate::rr::rdata::OPT;
+use crate::rr::{DNSClass, Name, RData, Record, RecordType};
 
-use crate::{
-    error::*,
-    rr::{
-        rdata::{
-            opt::{EdnsCode, EdnsOption},
-            OPT,
-        },
-        DNSClass, Name, RData, Record, RecordType,
-    },
-    serialize::binary::{BinEncodable, BinEncoder},
-};
+use crate::serialize::binary::{BinEncodable, BinEncoder};
 
 /// Edns implements the higher level concepts for working with extended dns as it is used to create or be
 /// created from OPT record data.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub struct Edns {
     // high 8 bits that make up the 12 bit total field when included with the 4bit rcode from the
     //  header (from TTL)
     rcode_high: u8,
     // Indicates the implementation level of the setter. (from TTL)
     version: u8,
-    // Is DNSSEC supported (from TTL)
+    // Is DNSSec supported (from TTL)
     dnssec_ok: bool,
     // max payload size, minimum of 512, (from RR CLASS)
     max_payload: u16,
@@ -66,7 +68,7 @@ impl Edns {
         self.version
     }
 
-    /// Specifies that DNSSEC is supported for this Client or Server
+    /// Specifies that DNSSec is supported for this Client or Server
     pub fn dnssec_ok(&self) -> bool {
         self.dnssec_ok
     }
@@ -103,7 +105,7 @@ impl Edns {
         self
     }
 
-    /// Set to true if DNSSEC is supported
+    /// Set to true if DNSSec is supported
     pub fn set_dnssec_ok(&mut self, dnssec_ok: bool) -> &mut Self {
         self.dnssec_ok = dnssec_ok;
         self
@@ -126,7 +128,7 @@ impl Edns {
 // FIXME: this should be a TryFrom
 impl<'a> From<&'a Record> for Edns {
     fn from(value: &'a Record) -> Self {
-        assert!(value.record_type() == RecordType::OPT);
+        assert!(value.rr_type() == RecordType::OPT);
 
         let rcode_high: u8 = ((value.ttl() & 0xFF00_0000u32) >> 24) as u8;
         let version: u8 = ((value.ttl() & 0x00FF_0000u32) >> 16) as u8;
@@ -204,29 +206,12 @@ impl BinEncodable for Edns {
 
         // write the opts as rdata...
         let place = encoder.place::<u16>()?;
-        self.options.emit(encoder)?;
+        opt::emit(encoder, &self.options)?;
         let len = encoder.len_since_place(&place);
         assert!(len <= u16::max_value() as usize);
 
         place.replace(encoder, len as u16)?;
         Ok(())
-    }
-}
-
-impl fmt::Display for Edns {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        let version = self.version;
-        let dnssec_ok = self.dnssec_ok;
-        let max_payload = self.max_payload;
-
-        write!(
-            f,
-            "version: {version} dnssec_ok: {dnssec_ok} max_payload: {max_payload} opts: {opts_len}",
-            version = version,
-            dnssec_ok = dnssec_ok,
-            max_payload = max_payload,
-            opts_len = self.options().as_ref().len()
-        )
     }
 }
 

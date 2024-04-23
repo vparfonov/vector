@@ -227,10 +227,10 @@ fn rendezvous() {
             tx.send(()).unwrap();
             let now = Instant::now();
 
-            assert!(now.duration_since(then) > Duration::from_millis(50), "iter = {}", i);
+            assert!(now.duration_since(then) > Duration::from_millis(100), "iter = {}", i);
         });
 
-        std::thread::sleep(Duration::from_millis(500));
+        std::thread::sleep(Duration::from_millis(1000));
         rx.recv().unwrap();
 
         t.join().unwrap();
@@ -404,4 +404,25 @@ fn std_error_without_debug() {
             let _std_err: &dyn std::error::Error = &e;
         }
     }
+}
+
+#[test]
+fn weak_close() {
+    let (tx, rx) = unbounded::<()>();
+    let weak = tx.downgrade();
+    drop(tx);
+    assert!(weak.upgrade().is_none());
+    assert!(rx.is_disconnected());
+    assert!(rx.try_recv().is_err());
+}
+
+#[test]
+fn weak_upgrade() {
+    let (tx, rx) = unbounded();
+    let weak = tx.downgrade();
+    let tx2 = weak.upgrade().unwrap();
+    drop(tx);
+    assert!(!rx.is_disconnected());
+    tx2.send(()).unwrap();
+    assert!(rx.try_recv().is_ok());
 }

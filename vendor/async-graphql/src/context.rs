@@ -10,10 +10,6 @@ use std::{
 
 use async_graphql_value::{Value as InputValue, Variables};
 use fnv::FnvHashMap;
-use http::{
-    header::{AsHeaderName, HeaderMap, IntoHeaderName},
-    HeaderValue,
-};
 use serde::{
     ser::{SerializeSeq, Serializer},
     Serialize,
@@ -244,6 +240,8 @@ pub struct ContextBase<'a, T> {
     pub schema_env: &'a SchemaEnv,
     #[doc(hidden)]
     pub query_env: &'a QueryEnv,
+    #[doc(hidden)]
+    pub execute_data: Option<&'a Data>,
 }
 
 #[doc(hidden)]
@@ -255,9 +253,8 @@ pub struct QueryEnvInner {
     pub fragments: HashMap<Name, Positioned<FragmentDefinition>>,
     pub uploads: Vec<UploadValue>,
     pub session_data: Arc<Data>,
-    pub ctx_data: Arc<Data>,
-    pub extension_data: Arc<Data>,
-    pub http_headers: Mutex<HeaderMap>,
+    pub query_data: Arc<Data>,
+    pub http_headers: Mutex<http::HeaderMap>,
     pub introspection_mode: IntrospectionMode,
     pub errors: Mutex<Vec<ServerError>>,
 }
@@ -286,6 +283,7 @@ impl QueryEnv {
         schema_env: &'a SchemaEnv,
         path_node: Option<QueryPathNode<'a>>,
         item: T,
+        execute_data: Option<&'a Data>,
     ) -> ContextBase<'a, T> {
         ContextBase {
             path_node,
@@ -293,6 +291,7 @@ impl QueryEnv {
             item,
             schema_env,
             query_env: self,
+            execute_data,
         }
     }
 }
@@ -326,6 +325,7 @@ impl<'a, T> ContextBase<'a, T> {
             item: field,
             schema_env: self.schema_env,
             query_env: self.query_env,
+            execute_data: self.execute_data,
         }
     }
 
@@ -340,6 +340,7 @@ impl<'a, T> ContextBase<'a, T> {
             item: selection_set,
             schema_env: self.schema_env,
             query_env: self.query_env,
+            execute_data: self.execute_data,
         }
     }
 
@@ -397,11 +398,10 @@ impl<'a, T> ContextBase<'a, T> {
     /// Gets the global data defined in the `Context` or `Schema` or `None` if
     /// the specified type data does not exist.
     pub fn data_opt<D: Any + Send + Sync>(&self) -> Option<&'a D> {
-        self.query_env
-            .extension_data
-            .0
-            .get(&TypeId::of::<D>())
-            .or_else(|| self.query_env.ctx_data.0.get(&TypeId::of::<D>()))
+        self.execute_data
+            .as_ref()
+            .and_then(|execute_data| execute_data.get(&TypeId::of::<D>()))
+            .or_else(|| self.query_env.query_data.0.get(&TypeId::of::<D>()))
             .or_else(|| self.query_env.session_data.0.get(&TypeId::of::<D>()))
             .or_else(|| self.schema_env.data.0.get(&TypeId::of::<D>()))
             .and_then(|d| d.downcast_ref::<D>())
@@ -432,7 +432,7 @@ impl<'a, T> ContextBase<'a, T> {
     ///     }
     /// }
     /// ```
-    pub fn http_header_contains(&self, key: impl AsHeaderName) -> bool {
+    pub fn http_header_contains(&self, key: impl http::header::AsHeaderName) -> bool {
         self.query_env
             .http_headers
             .lock()
@@ -483,9 +483,9 @@ impl<'a, T> ContextBase<'a, T> {
     /// ```
     pub fn insert_http_header(
         &self,
-        name: impl IntoHeaderName,
-        value: impl TryInto<HeaderValue>,
-    ) -> Option<HeaderValue> {
+        name: impl http::header::IntoHeaderName,
+        value: impl TryInto<http::HeaderValue>,
+    ) -> Option<http::HeaderValue> {
         if let Ok(value) = value.try_into() {
             self.query_env
                 .http_headers
@@ -534,8 +534,8 @@ impl<'a, T> ContextBase<'a, T> {
     /// ```
     pub fn append_http_header(
         &self,
-        name: impl IntoHeaderName,
-        value: impl TryInto<HeaderValue>,
+        name: impl http::header::IntoHeaderName,
+        value: impl TryInto<http::HeaderValue>,
     ) -> bool {
         if let Ok(value) = value.try_into() {
             self.query_env
@@ -615,6 +615,7 @@ impl<'a, T> ContextBase<'a, T> {
             item: self.item,
             schema_env: self.schema_env,
             query_env: self.query_env,
+            execute_data: self.execute_data,
         }
     }
 }

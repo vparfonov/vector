@@ -7,6 +7,8 @@
 // option. All files in the project carrying such notice may not be copied,
 // modified, or distributed except according to those terms.
 
+//! Helpers to generate the code for the Parser `derive``.
+
 use std::path::PathBuf;
 
 use proc_macro2::TokenStream;
@@ -18,9 +20,12 @@ use pest_meta::ast::*;
 use pest_meta::optimizer::*;
 
 use crate::docs::DocComment;
-use crate::ParsedDerive;
+use crate::parse_derive::ParsedDerive;
 
-pub(crate) fn generate(
+/// Generates the corresponding parser based based on the processed macro input. If `include_grammar`
+/// is set to true, it'll generate an explicit "include_str" statement (done in pest_derive, but
+/// turned off in the local bootstrap).
+pub fn generate(
     parsed_derive: ParsedDerive,
     paths: Vec<PathBuf>,
     rules: Vec<OptimizedRule>,
@@ -568,14 +573,8 @@ fn generate_expr(expr: OptimizedExpr) -> TokenStream {
         #[cfg(feature = "grammar-extras")]
         OptimizedExpr::NodeTag(expr, tag) => {
             let expr = generate_expr(*expr);
-            let tag_cow = {
-                #[cfg(feature = "std")]
-                quote! { ::std::borrow::Cow::Borrowed(#tag) }
-                #[cfg(not(feature = "std"))]
-                quote! { ::alloc::borrow::Cow::Borrowed(#tag) }
-            };
             quote! {
-                #expr.and_then(|state| state.tag_node(#tag_cow))
+                #expr.and_then(|state| state.tag_node(#tag))
             }
         }
     }
@@ -729,14 +728,8 @@ fn generate_expr_atomic(expr: OptimizedExpr) -> TokenStream {
         #[cfg(feature = "grammar-extras")]
         OptimizedExpr::NodeTag(expr, tag) => {
             let expr = generate_expr_atomic(*expr);
-            let tag_cow = {
-                #[cfg(feature = "std")]
-                quote! { ::std::borrow::Cow::Borrowed(#tag) }
-                #[cfg(not(feature = "std"))]
-                quote! { ::alloc::borrow::Cow::Borrowed(#tag) }
-            };
             quote! {
-                #expr.and_then(|state| state.tag_node(#tag_cow))
+                #expr.and_then(|state| state.tag_node(#tag))
             }
         }
     }

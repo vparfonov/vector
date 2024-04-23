@@ -1,12 +1,11 @@
-use std::{
-    borrow::Cow,
+use core::{
     cmp::Reverse,
     convert::Infallible,
     mem,
     ops::{BitOrAssign, BitXorAssign},
 };
 
-use retain_mut::RetainMut;
+use alloc::{borrow::Cow, vec::Vec};
 
 use crate::{MultiOps, RoaringBitmap};
 
@@ -229,7 +228,7 @@ fn try_multi_or_owned<E>(
         merge_container_owned(&mut containers, bitmap?.containers, BitOrAssign::bitor_assign);
     }
 
-    RetainMut::retain_mut(&mut containers, |container| {
+    containers.retain_mut(|container| {
         if container.len() > 0 {
             container.ensure_correct_store();
             true
@@ -255,7 +254,7 @@ fn try_multi_xor_owned<E>(
         merge_container_owned(&mut containers, bitmap?.containers, BitXorAssign::bitxor_assign);
     }
 
-    RetainMut::retain_mut(&mut containers, |container| {
+    containers.retain_mut(|container| {
         if container.len() > 0 {
             container.ensure_correct_store();
             true

@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.56.0"
 name = "num_enum"
-version = "0.7.0"
+version = "0.7.2"
 authors = [
     "Daniel Wagner-Hall <dawagner@gmail.com>",
     "Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>",
@@ -36,7 +36,7 @@ repository = "https://github.com/illicitonion/num_enum"
 features = ["external_doc"]
 
 [dependencies.num_enum_derive]
-version = "=0.7.0"
+version = "=0.7.2"
 default-features = false
 
 [dev-dependencies.anyhow]

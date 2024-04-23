@@ -6,6 +6,10 @@ use std::fmt::{self, Display, Formatter};
 #[allow(non_camel_case_types, clippy::upper_case_acronyms)]
 #[non_exhaustive]
 pub enum Type {
+    /// IBM AIX (<https://en.wikipedia.org/wiki/IBM_AIX>).
+    AIX,
+    /// AlmaLinux (<https://en.wikipedia.org/wiki/AlmaLinux>).
+    AlmaLinux,
     /// Alpaquita Linux (<https://bell-sw.com/alpaquita-linux/>).
     Alpaquita,
     /// Alpine Linux (<https://en.wikipedia.org/wiki/Alpine_Linux>).
@@ -40,6 +44,8 @@ pub enum Type {
     HardenedBSD,
     /// Illumos (https://en.wikipedia.org/wiki/Illumos).
     Illumos,
+    /// Kali Linux (https://en.wikipedia.org/wiki/Kali_Linux).
+    Kali,
     /// Linux based operating system (<https://en.wikipedia.org/wiki/Linux>).
     Linux,
     /// Mabox (<https://maboxlinux.org/>).
@@ -78,12 +84,18 @@ pub enum Type {
     RedHatEnterprise,
     /// Redox (<https://en.wikipedia.org/wiki/Redox_(operating_system)>).
     Redox,
+    /// Rocky Linux (<https://en.wikipedia.org/wiki/Rocky_Linux>).
+    RockyLinux,
     /// Solus (<https://en.wikipedia.org/wiki/Solus_(operating_system)>).
     Solus,
     /// SUSE Linux Enterprise Server (<https://en.wikipedia.org/wiki/SUSE_Linux_Enterprise>).
     SUSE,
     /// Ubuntu (<https://en.wikipedia.org/wiki/Ubuntu_(operating_system)>).
     Ubuntu,
+    /// Ultramarine (<https://ultramarine-linux.org/>).
+    Ultramarine,
+    /// Void Linux (<https://en.wikipedia.org/wiki/Void_Linux>).
+    Void,
     /// Unknown operating system.
     Unknown,
     /// Windows (<https://en.wikipedia.org/wiki/Microsoft_Windows>).
@@ -101,6 +113,7 @@ impl Display for Type {
         match *self {
             Type::Alpaquita => write!(f, "Alpaquita Linux"),
             Type::Alpine => write!(f, "Alpine Linux"),
+            Type::AlmaLinux => write!(f, "AlmaLinux"),
             Type::Amazon => write!(f, "Amazon Linux AMI"),
             Type::Arch => write!(f, "Arch Linux"),
             Type::Artix => write!(f, "Artix Linux"),
@@ -108,14 +121,20 @@ impl Display for Type {
             Type::Garuda => write!(f, "Garuda Linux"),
             Type::Gentoo => write!(f, "Gentoo Linux"),
             Type::Illumos => write!(f, "illumos"),
+            Type::Kali => write!(f, "Kali Linux"),
             Type::Macos => write!(f, "Mac OS"),
             Type::MidnightBSD => write!(f, "Midnight BSD"),
             Type::Mint => write!(f, "Linux Mint"),
+            Type::openEuler => write!(f, "EulerOS"),
+            Type::OracleLinux => write!(f, "Oracle Linux"),
             Type::Pop => write!(f, "Pop!_OS"),
             Type::Raspbian => write!(f, "Raspberry Pi OS"),
             Type::Redhat => write!(f, "Red Hat Linux"),
             Type::RedHatEnterprise => write!(f, "Red Hat Enterprise Linux"),
+            Type::RockyLinux => write!(f, "Rocky Linux"),
             Type::SUSE => write!(f, "SUSE Linux Enterprise Server"),
+            Type::Ultramarine => write!(f, "Ultramarine Linux"),
+            Type::Void => write!(f, "Void Linux"),
             _ => write!(f, "{self:?}"),
         }
     }
@@ -133,6 +152,8 @@ mod tests {
     #[test]
     fn display() {
         let data = [
+            (Type::AIX, "AIX"),
+            (Type::AlmaLinux, "AlmaLinux"),
             (Type::Alpaquita, "Alpaquita Linux"),
             (Type::Alpine, "Alpine Linux"),
             (Type::Amazon, "Amazon Linux AMI"),
@@ -145,27 +166,38 @@ mod tests {
             (Type::Emscripten, "Emscripten"),
             (Type::EndeavourOS, "EndeavourOS"),
             (Type::Fedora, "Fedora"),
+            (Type::FreeBSD, "FreeBSD"),
             (Type::Garuda, "Garuda Linux"),
             (Type::Gentoo, "Gentoo Linux"),
-            (Type::FreeBSD, "FreeBSD"),
+            (Type::HardenedBSD, "HardenedBSD"),
+            (Type::Illumos, "illumos"),
+            (Type::Kali, "Kali Linux"),
             (Type::Linux, "Linux"),
+            (Type::Mabox, "Mabox"),
             (Type::Macos, "Mac OS"),
             (Type::Manjaro, "Manjaro"),
+            (Type::Mariner, "Mariner"),
+            (Type::MidnightBSD, "Midnight BSD"),
             (Type::Mint, "Linux Mint"),
             (Type::NetBSD, "NetBSD"),
             (Type::NixOS, "NixOS"),
+            (Type::OpenCloudOS, "OpenCloudOS"),
             (Type::OpenBSD, "OpenBSD"),
+            (Type::openEuler, "EulerOS"),
             (Type::openSUSE, "openSUSE"),
-            (Type::OracleLinux, "OracleLinux"),
+            (Type::OracleLinux, "Oracle Linux"),
             (Type::Pop, "Pop!_OS"),
             (Type::Raspbian, "Raspberry Pi OS"),
             (Type::Redhat, "Red Hat Linux"),
             (Type::RedHatEnterprise, "Red Hat Enterprise Linux"),
             (Type::Redox, "Redox"),
+            (Type::RockyLinux, "Rocky Linux"),
             (Type::Solus, "Solus"),
             (Type::SUSE, "SUSE Linux Enterprise Server"),
             (Type::Ubuntu, "Ubuntu"),
+            (Type::Ultramarine, "Ultramarine Linux"),
             (Type::Unknown, "Unknown"),
+            (Type::Void, "Void Linux"),
             (Type::Windows, "Windows"),
         ];
 

@@ -170,15 +170,16 @@ impl Builder {
         self.parse_lossy(var)
     }
 
-    /// Returns a new [`EnvFilter`] from the directives in the in the configured
-    /// environment variable, or an error if the environment variable is not set
-    /// or contains invalid directives.
+    /// Returns a new [`EnvFilter`] from the directives in the configured
+    /// environment variable. If the environment variable is unset, no directive is added.
+    ///
+    /// An error is returned if the environment contains invalid directives.
     pub fn from_env(&self) -> Result<EnvFilter, FromEnvError> {
         let var = env::var(self.env_var_name()).unwrap_or_default();
         self.parse(var).map_err(Into::into)
     }
 
-    /// Returns a new [`EnvFilter`] from the directives in the in the configured
+    /// Returns a new [`EnvFilter`] from the directives in the configured
     /// environment variable, or an error if the environment variable is not set
     /// or contains invalid directives.
     pub fn try_from_env(&self) -> Result<EnvFilter, FromEnvError> {
@@ -212,7 +213,7 @@ impl Builder {
             #[cfg(feature = "nu_ansi_term")]
             use nu_ansi_term::{Color, Style};
             // NOTE: We can't use a configured `MakeWriter` because the EnvFilter
-            // has no knowledge of any underlying subscriber or collector, which
+            // has no knowledge of any underlying subscriber or subscriber, which
             // may or may not use a `MakeWriter`.
             let warn = |msg: &str| {
                 #[cfg(not(feature = "nu_ansi_term"))]

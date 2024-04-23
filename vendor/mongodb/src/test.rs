@@ -1,3 +1,6 @@
+#![allow(clippy::cast_possible_truncation)]
+#![allow(clippy::cast_possible_wrap)]
+
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod atlas_connectivity;
 mod atlas_planned_maintenance_testing;
@@ -12,6 +15,7 @@ mod cursor;
 mod db;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod documentation_examples;
+mod hello;
 mod index_management;
 #[cfg(all(not(feature = "sync"), not(feature = "tokio-sync")))]
 mod lambda_examples;
@@ -41,11 +45,10 @@ pub(crate) use self::{
     },
 };
 
-use async_once::AsyncOnce;
 use home::home_dir;
 use lazy_static::lazy_static;
+use tokio::sync::OnceCell;
 
-use self::util::TestLock;
 #[cfg(feature = "tracing-unstable")]
 use self::util::TracingHandler;
 use crate::{
@@ -57,15 +60,18 @@ use crate::{
 };
 use std::{fs::read_to_string, str::FromStr};
 
-const MAX_POOL_SIZE: u32 = 100;
+static CLIENT_OPTIONS: OnceCell<ClientOptions> = OnceCell::const_new();
+pub(crate) async fn get_client_options() -> &'static ClientOptions {
+    CLIENT_OPTIONS
+        .get_or_init(|| async {
+            let mut options = ClientOptions::parse_uri(&*DEFAULT_URI, None).await.unwrap();
+            update_options_for_testing(&mut options);
+            options
+        })
+        .await
+}
 
 lazy_static! {
-    pub(crate) static ref CLIENT_OPTIONS: AsyncOnce<ClientOptions> = AsyncOnce::new(async {
-        let mut options = ClientOptions::parse_uri(&*DEFAULT_URI, None).await.unwrap();
-        update_options_for_testing(&mut options);
-        options
-    });
-    pub(crate) static ref LOCK: TestLock = TestLock::new();
     pub(crate) static ref DEFAULT_URI: String = get_default_uri();
     pub(crate) static ref SERVER_API: Option<ServerApi> = match std::env::var("MONGODB_API_VERSION")
     {
@@ -115,9 +121,6 @@ lazy_static! {
 }
 
 pub(crate) fn update_options_for_testing(options: &mut ClientOptions) {
-    if options.max_pool_size.is_none() {
-        options.max_pool_size = Some(MAX_POOL_SIZE);
-    }
     if options.server_api.is_none() {
         options.server_api = SERVER_API.clone();
     }

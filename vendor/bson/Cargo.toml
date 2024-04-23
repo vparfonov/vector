@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "bson"
-version = "2.7.0"
+version = "2.8.0"
 authors = [
     "Y. T. Chung <zonyitoo@gmail.com>",
     "Kevin Yeh <kevinyeah@utexas.edu>",
@@ -157,5 +157,5 @@ default = []
 time-0_3 = []
 uuid-1 = []
 
-[target."cfg(target_arch = \"wasm32\")".dependencies.js-sys]
+[target."cfg(all(target_arch = \"wasm32\", target_os = \"unknown\"))".dependencies.js-sys]
 version = "0.3"

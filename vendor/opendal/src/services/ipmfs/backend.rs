@@ -21,14 +21,13 @@ use std::str;
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use http::Request;
 use http::Response;
 use http::StatusCode;
 use serde::Deserialize;
 
 use super::error::parse_error;
-use super::pager::IpmfsPager;
+use super::lister::IpmfsLister;
 use super::writer::IpmfsWriter;
 use crate::raw::*;
 use crate::*;
@@ -64,18 +63,17 @@ impl IpmfsBackend {
 #[async_trait]
 impl Accessor for IpmfsBackend {
     type Reader = IncomingAsyncBody;
+    type Writer = oio::OneShotWriter<IpmfsWriter>;
+    type Lister = oio::PageLister<IpmfsLister>;
     type BlockingReader = ();
-    type Writer = IpmfsWriter;
     type BlockingWriter = ();
-    type Appender = ();
-    type Pager = IpmfsPager;
-    type BlockingPager = ();
+    type BlockingLister = ();
 
     fn info(&self) -> AccessorInfo {
         let mut am = AccessorInfo::default();
         am.set_scheme(Scheme::Ipmfs)
             .set_root(&self.root)
-            .set_capability(Capability {
+            .set_native_capability(Capability {
                 stat: true,
 
                 read: true,
@@ -86,7 +84,6 @@ impl Accessor for IpmfsBackend {
                 delete: true,
 
                 list: true,
-                list_with_delimiter_slash: true,
 
                 ..Default::default()
             });
@@ -106,34 +103,6 @@ impl Accessor for IpmfsBackend {
             }
             _ => Err(parse_error(resp).await?),
         }
-    }
-
-    async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
-        let resp = self.ipmfs_read(path, args.range()).await?;
-
-        let status = resp.status();
-
-        match status {
-            StatusCode::OK => {
-                let meta = parse_into_metadata(path, resp.headers())?;
-                Ok((RpRead::with_metadata(meta), resp.into_body()))
-            }
-            _ => Err(parse_error(resp).await?),
-        }
-    }
-
-    async fn write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::Writer)> {
-        if args.content_length().is_none() {
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                "write without content length is not supported",
-            ));
-        }
-
-        Ok((
-            RpWrite::default(),
-            IpmfsWriter::new(self.clone(), path.to_string()),
-        ))
     }
 
     async fn stat(&self, path: &str, _: OpStat) -> Result<RpStat> {
@@ -168,6 +137,24 @@ impl Accessor for IpmfsBackend {
         }
     }
 
+    async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
+        let resp = self.ipmfs_read(path, args.range()).await?;
+
+        let status = resp.status();
+
+        match status {
+            StatusCode::OK => Ok((RpRead::new(), resp.into_body())),
+            _ => Err(parse_error(resp).await?),
+        }
+    }
+
+    async fn write(&self, path: &str, _: OpWrite) -> Result<(RpWrite, Self::Writer)> {
+        Ok((
+            RpWrite::default(),
+            oio::OneShotWriter::new(IpmfsWriter::new(self.clone(), path.to_string())),
+        ))
+    }
+
     async fn delete(&self, path: &str, _: OpDelete) -> Result<RpDelete> {
         let resp = self.ipmfs_rm(path).await?;
 
@@ -182,11 +169,9 @@ impl Accessor for IpmfsBackend {
         }
     }
 
-    async fn list(&self, path: &str, _: OpList) -> Result<(RpList, Self::Pager)> {
-        Ok((
-            RpList::default(),
-            IpmfsPager::new(Arc::new(self.clone()), &self.root, path),
-        ))
+    async fn list(&self, path: &str, _: OpList) -> Result<(RpList, Self::Lister)> {
+        let l = IpmfsLister::new(Arc::new(self.clone()), &self.root, path);
+        Ok((RpList::default(), oio::PageLister::new(l)))
     }
 }
 
@@ -291,7 +276,7 @@ impl IpmfsBackend {
     pub async fn ipmfs_write(
         &self,
         path: &str,
-        body: Bytes,
+        body: oio::ChunkedBytes,
     ) -> Result<Response<IncomingAsyncBody>> {
         let p = build_rooted_abs_path(&self.root, path);
 
@@ -301,7 +286,8 @@ impl IpmfsBackend {
             percent_encode_path(&p)
         );
 
-        let multipart = Multipart::new().part(FormDataPart::new("data").content(body));
+        let multipart = Multipart::new()
+            .part(FormDataPart::new("data").stream(body.len() as u64, Box::new(body)));
 
         let req: http::request::Builder = Request::post(url);
         let req = multipart.apply(req)?;

@@ -7,8 +7,8 @@
 [![Chat][discord-image]][discord]
 [![codecov.io][codecov-img]][codecov-link]
 
-[gh-image]: https://github.com/chronotope/chrono/actions/workflows/test.yml/badge.svg
-[gh-checks]: https://github.com/chronotope/chrono/actions?query=workflow%3Atest
+[gh-image]: https://github.com/chronotope/chrono/actions/workflows/test.yml/badge.svg?branch=main
+[gh-checks]: https://github.com/chronotope/chrono/actions/workflows/test.yml?query=branch%3Amain
 [cratesio-image]: https://img.shields.io/crates/v/chrono.svg
 [cratesio]: https://crates.io/crates/chrono
 [docsrs-image]: https://docs.rs/chrono/badge.svg
@@ -53,7 +53,8 @@ Default features:
 * `alloc`: Enable features that depend on allocation (primarily string formatting)
 * `std`: Enables functionality that depends on the standard library. This is a superset of `alloc`
   and adds interoperation with standard library types and traits.
-* `clock`: Enables reading the system time (`now`) and local timezone (`Local`).
+* `clock`: Enables reading the local timezone (`Local`). This is a superset of `now`.
+* `now`: Enables reading the system time (`now`)
 * `wasmbind`: Interface with the JS Date API for the `wasm32` target.
 
 Optional features:
@@ -67,7 +68,7 @@ Optional features:
 
 ## Rust version requirements
 
-The Minimum Supported Rust Version (MSRV) is currently **Rust 1.57.0**.
+The Minimum Supported Rust Version (MSRV) is currently **Rust 1.61.0**.
 
 The MSRV is explicitly tested in CI. It may be bumped in minor releases, but this is not done
 lightly.

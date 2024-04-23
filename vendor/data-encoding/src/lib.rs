@@ -77,8 +77,8 @@
 //! - They are deterministic: their output only depends on their input
 //! - They have no side-effects: they do not modify any hidden mutable state
 //! - They are correct: encoding followed by decoding gives the initial data
-//! - They are canonical (unless [`is_canonical`] returns false): decoding followed by encoding gives the
-//!   initial data
+//! - They are canonical (unless [`is_canonical`] returns false): decoding followed by encoding
+//!   gives the initial data
 //!
 //! This last property is usually not satisfied by base64 implementations. This is a matter of
 //! choice and this crate has made the choice to let the user choose. Support for canonical encoding
@@ -144,7 +144,20 @@
 //! [wrapping]: struct.Specification.html#structfield.wrap
 
 #![no_std]
-#![warn(unused_results, missing_docs)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
+// TODO: This list up to warn(clippy::pedantic) should ideally use a lint group.
+#![warn(elided_lifetimes_in_paths)]
+// TODO(msrv): #![warn(let_underscore_drop)]
+#![warn(missing_debug_implementations)]
+#![warn(missing_docs)]
+#![warn(unreachable_pub)]
+// TODO(msrv): #![warn(unsafe_op_in_unsafe_fn)]
+#![warn(unused_results)]
+#![allow(unused_unsafe)] // TODO(msrv)
+#![warn(clippy::pedantic)]
+#![allow(clippy::enum_glob_use)]
+#![allow(clippy::similar_names)]
+#![allow(clippy::uninlined_format_args)] // TODO(msrv)
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -242,14 +255,12 @@ macro_rules! dispatch {
 
 unsafe fn chunk_unchecked(x: &[u8], n: usize, i: usize) -> &[u8] {
     debug_assert!((i + 1) * n <= x.len());
-    let ptr = x.as_ptr().add(n * i);
-    core::slice::from_raw_parts(ptr, n)
+    unsafe { core::slice::from_raw_parts(x.as_ptr().add(n * i), n) }
 }
 
 unsafe fn chunk_mut_unchecked(x: &mut [u8], n: usize, i: usize) -> &mut [u8] {
     debug_assert!((i + 1) * n <= x.len());
-    let ptr = x.as_mut_ptr().add(n * i);
-    core::slice::from_raw_parts_mut(ptr, n)
+    unsafe { core::slice::from_raw_parts_mut(x.as_mut_ptr().add(n * i), n) }
 }
 
 fn div_ceil(x: usize, m: usize) -> usize {
@@ -288,7 +299,7 @@ pub enum DecodeKind {
 }
 
 impl core::fmt::Display for DecodeKind {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let description = match self {
             DecodeKind::Length => "invalid length",
             DecodeKind::Symbol => "invalid symbol",
@@ -315,7 +326,7 @@ pub struct DecodeError {
 impl std::error::Error for DecodeError {}
 
 impl core::fmt::Display for DecodeError {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{} at {}", self.kind, self.position)
     }
 }
@@ -379,7 +390,7 @@ fn encode_block<B: Static<usize>, M: Static<bool>>(
     }
     for (i, output) in output.iter_mut().enumerate() {
         let y = x >> (bit * order(msb, dec(bit), i));
-        *output = symbols[y as usize % 256];
+        *output = symbols[(y & 0xff) as usize];
     }
 }
 
@@ -419,7 +430,7 @@ fn decode_block<B: Static<usize>, M: Static<bool>>(
         x |= u64::from(y) << (bit * order(msb, dec(bit), j));
     }
     for (j, output) in output.iter_mut().enumerate() {
-        *output = (x >> (8 * order(msb, enc(bit), j))) as u8;
+        *output = (x >> (8 * order(msb, enc(bit), j)) & 0xff) as u8;
     }
     Ok(())
 }
@@ -805,10 +816,6 @@ fn decode_wrap_mut<B: Static<usize>, M: Static<bool>, P: Static<bool>, I: Static
 /// assert_eq!(msb.encode(&[0b01010011]), "01010011");
 /// assert_eq!(lsb.encode(&[0b01010011]), "11001010");
 /// ```
-///
-/// # Features
-///
-/// Requires the `alloc` feature.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[cfg(feature = "alloc")]
 pub enum BitOrder {
@@ -871,7 +878,7 @@ pub type InternalEncoding = &'static [u8];
 // - width % dec(bit) == 0
 // - for all x in separator values[x] is IGNORE
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Encoding(pub InternalEncoding);
+pub struct Encoding(#[doc(hidden)] pub InternalEncoding);
 
 /// How to translate characters when decoding
 ///
@@ -879,10 +886,6 @@ pub struct Encoding(pub InternalEncoding);
 /// of the `to` field. The second to the second. Etc.
 ///
 /// See [Specification](struct.Specification.html) for more information.
-///
-/// # Features
-///
-/// Requires the `alloc` feature.
 #[derive(Debug, Clone)]
 #[cfg(feature = "alloc")]
 pub struct Translate {
@@ -896,10 +899,6 @@ pub struct Translate {
 /// How to wrap the output when encoding
 ///
 /// See [Specification](struct.Specification.html) for more information.
-///
-/// # Features
-///
-/// Requires the `alloc` feature.
 #[derive(Debug, Clone)]
 #[cfg(feature = "alloc")]
 pub struct Wrap {
@@ -1154,10 +1153,6 @@ pub struct Wrap {
 /// assert_eq!(base.decode(b"BOIl"), base.decode(b"b011"));
 /// ```
 ///
-/// # Features
-///
-/// Requires the `alloc` feature.
-///
 /// [base-conversion]: https://en.wikipedia.org/wiki/Positional_notation#Base_conversion
 /// [canonical]: https://tools.ietf.org/html/rfc4648#section-3.5
 #[derive(Debug, Clone)]
@@ -1243,6 +1238,15 @@ impl Encoding {
         (self.0[513] & 0x7) as usize
     }
 
+    /// Minimum number of input and output blocks when encoding
+    fn block_len(&self) -> (usize, usize) {
+        let bit = self.bit();
+        match self.wrap() {
+            Some((col, end)) => (col / dec(bit) * enc(bit), col + end.len()),
+            None => (enc(bit), dec(bit)),
+        }
+    }
+
     fn wrap(&self) -> Option<(usize, &[u8])> {
         if self.0.len() <= 515 {
             return None;
@@ -1259,6 +1263,7 @@ impl Encoding {
     /// See [`encode_mut`] for when to use it.
     ///
     /// [`encode_mut`]: struct.Encoding.html#method.encode_mut
+    #[must_use]
     pub fn encode_len(&self, len: usize) -> usize {
         dispatch! {
             let bit: usize = self.bit();
@@ -1311,16 +1316,56 @@ impl Encoding {
     /// BASE64.encode_append(input, &mut output);
     /// assert_eq!(output, "Result: SGVsbG8gd29ybGQ=");
     /// ```
-    ///
-    /// # Features
-    ///
-    /// Requires the `alloc` feature.
     #[cfg(feature = "alloc")]
     pub fn encode_append(&self, input: &[u8], output: &mut String) {
         let output = unsafe { output.as_mut_vec() };
         let output_len = output.len();
         output.resize(output_len + self.encode_len(input.len()), 0u8);
         self.encode_mut(input, &mut output[output_len ..]);
+    }
+
+    /// Returns an object to encode a fragmented input and append it to `output`
+    ///
+    /// See the documentation of [`Encoder`] for more details and examples.
+    #[cfg(feature = "alloc")]
+    pub fn new_encoder<'a>(&'a self, output: &'a mut String) -> Encoder<'a> {
+        Encoder::new(self, output)
+    }
+
+    /// Writes the encoding of `input` to `output`
+    ///
+    /// This allocates a buffer of 1024 bytes on the stack. If you want to control the buffer size
+    /// and location, use [`Encoding::encode_write_buffer()`] instead.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when writing to the output fails.
+    pub fn encode_write(
+        &self, input: &[u8], output: &mut impl core::fmt::Write,
+    ) -> core::fmt::Result {
+        self.encode_write_buffer(input, output, &mut [0; 1024])
+    }
+
+    /// Writes the encoding of `input` to `output` using a temporary `buffer`
+    ///
+    /// # Panics
+    ///
+    /// Panics if the buffer is shorter than 510 bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when writing to the output fails.
+    pub fn encode_write_buffer(
+        &self, input: &[u8], output: &mut impl core::fmt::Write, buffer: &mut [u8],
+    ) -> core::fmt::Result {
+        assert!(510 <= buffer.len());
+        let (enc, dec) = self.block_len();
+        for input in input.chunks(buffer.len() / dec * enc) {
+            let buffer = &mut buffer[.. self.encode_len(input.len())];
+            self.encode_mut(input, buffer);
+            output.write_str(unsafe { core::str::from_utf8_unchecked(buffer) })?;
+        }
+        Ok(())
     }
 
     /// Returns encoded `input`
@@ -1331,11 +1376,8 @@ impl Encoding {
     /// use data_encoding::BASE64;
     /// assert_eq!(BASE64.encode(b"Hello world"), "SGVsbG8gd29ybGQ=");
     /// ```
-    ///
-    /// # Features
-    ///
-    /// Requires the `alloc` feature.
     #[cfg(feature = "alloc")]
+    #[must_use]
     pub fn encode(&self, input: &[u8]) -> String {
         let mut output = vec![0u8; self.encode_len(input.len())];
         self.encode_mut(input, &mut output);
@@ -1441,10 +1483,6 @@ impl Encoding {
     /// assert_eq!(BASE64.decode(b"SGVsbA==byB3b3JsZA==").unwrap(), b"Hello world");
     /// ```
     ///
-    /// # Features
-    ///
-    /// Requires the `alloc` feature.
-    ///
     /// [`Length`]: enum.DecodeKind.html#variant.Length
     /// [`Symbol`]: enum.DecodeKind.html#variant.Symbol
     /// [`Trailing`]: enum.DecodeKind.html#variant.Trailing
@@ -1459,6 +1497,7 @@ impl Encoding {
     }
 
     /// Returns the bit-width
+    #[must_use]
     pub fn bit_width(&self) -> usize {
         self.bit()
     }
@@ -1471,6 +1510,7 @@ impl Encoding {
     /// - padding is used
     /// - characters are ignored
     /// - characters are translated
+    #[must_use]
     pub fn is_canonical(&self) -> bool {
         if !self.ctb() {
             return false;
@@ -1485,7 +1525,7 @@ impl Encoding {
             if val[i] >= 1 << bit {
                 return false;
             }
-            if sym[val[i] as usize] != i as u8 {
+            if sym[val[i] as usize] as usize != i {
                 return false;
             }
         }
@@ -1493,11 +1533,9 @@ impl Encoding {
     }
 
     /// Returns the encoding specification
-    ///
-    /// # Features
-    ///
-    /// Requires the `alloc` feature.
+    #[allow(clippy::missing_panics_doc)] // no panic
     #[cfg(feature = "alloc")]
+    #[must_use]
     pub fn specification(&self) -> Specification {
         let mut specification = Specification::new();
         specification
@@ -1537,6 +1575,7 @@ impl Encoding {
     }
 
     #[doc(hidden)]
+    #[must_use]
     pub const fn internal_new(implementation: &'static [u8]) -> Encoding {
         #[cfg(feature = "alloc")]
         let encoding = Encoding(Cow::Borrowed(implementation));
@@ -1546,9 +1585,87 @@ impl Encoding {
     }
 
     #[doc(hidden)]
+    #[must_use]
     pub fn internal_implementation(&self) -> &[u8] {
         &self.0
     }
+}
+
+/// Encodes fragmented input to an output
+///
+/// It is equivalent to use an [`Encoder`] with multiple calls to [`Encoder::append()`] than to
+/// first concatenate all the input and then use [`Encoding::encode_append()`]. In particular, this
+/// function will not introduce padding or wrapping between inputs.
+///
+/// # Examples
+///
+/// ```rust
+/// // This is a bit inconvenient but we can't take a long-term reference to data_encoding::BASE64
+/// // because it's a constant. We need to use a static which has an address instead. This will be
+/// // fixed in version 3 of the library.
+/// static BASE64: data_encoding::Encoding = data_encoding::BASE64;
+/// let mut output = String::new();
+/// let mut encoder = BASE64.new_encoder(&mut output);
+/// encoder.append(b"hello");
+/// encoder.append(b"world");
+/// encoder.finalize();
+/// assert_eq!(output, BASE64.encode(b"helloworld"));
+/// ```
+#[derive(Debug)]
+#[cfg(feature = "alloc")]
+pub struct Encoder<'a> {
+    encoding: &'a Encoding,
+    output: &'a mut String,
+    buffer: [u8; 255],
+    length: u8,
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> Drop for Encoder<'a> {
+    fn drop(&mut self) {
+        self.encoding.encode_append(&self.buffer[.. self.length as usize], self.output);
+    }
+}
+
+#[cfg(feature = "alloc")]
+impl<'a> Encoder<'a> {
+    fn new(encoding: &'a Encoding, output: &'a mut String) -> Self {
+        Encoder { encoding, output, buffer: [0; 255], length: 0 }
+    }
+
+    /// Encodes the provided input fragment and appends the result to the output
+    pub fn append(&mut self, mut input: &[u8]) {
+        #[allow(clippy::cast_possible_truncation)] // no truncation
+        let max = self.encoding.block_len().0 as u8;
+        if self.length != 0 {
+            let len = self.length;
+            #[allow(clippy::cast_possible_truncation)] // no truncation
+            let add = core::cmp::min((max - len) as usize, input.len()) as u8;
+            self.buffer[len as usize ..][.. add as usize].copy_from_slice(&input[.. add as usize]);
+            self.length += add;
+            input = &input[add as usize ..];
+            if self.length != max {
+                debug_assert!(self.length < max);
+                debug_assert!(input.is_empty());
+                return;
+            }
+            self.encoding.encode_append(&self.buffer[.. max as usize], self.output);
+            self.length = 0;
+        }
+        let len = floor(input.len(), max as usize);
+        self.encoding.encode_append(&input[.. len], self.output);
+        input = &input[len ..];
+        #[allow(clippy::cast_possible_truncation)] // no truncation
+        let len = input.len() as u8;
+        self.buffer[.. len as usize].copy_from_slice(input);
+        self.length = len;
+    }
+
+    /// Makes sure all inputs have been encoded and appended to the output
+    ///
+    /// This is equivalent to dropping the encoder and required for correctness, otherwise some
+    /// encoded data may be missing at the end.
+    pub fn finalize(self) {}
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -1567,17 +1684,13 @@ enum SpecificationErrorImpl {
 use crate::SpecificationErrorImpl::*;
 
 /// Specification error
-///
-/// # Features
-///
-/// Requires the `alloc` feature.
 #[derive(Debug, Copy, Clone)]
 #[cfg(feature = "alloc")]
 pub struct SpecificationError(SpecificationErrorImpl);
 
 #[cfg(feature = "alloc")]
 impl core::fmt::Display for SpecificationError {
-    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self.0 {
             BadSize => write!(f, "invalid number of symbols"),
             NotAscii => write!(f, "non-ascii character"),
@@ -1610,6 +1723,7 @@ impl std::error::Error for SpecificationError {
 #[cfg(feature = "alloc")]
 impl Specification {
     /// Returns a default specification
+    #[must_use]
     pub fn new() -> Specification {
         Specification {
             symbols: String::new(),
@@ -1629,7 +1743,7 @@ impl Specification {
     /// Returns an error if the specification is invalid.
     pub fn encoding(&self) -> Result<Encoding, SpecificationError> {
         let symbols = self.symbols.as_bytes();
-        let bit: usize = match symbols.len() {
+        let bit: u8 = match symbols.len() {
             2 => 1,
             4 => 2,
             8 => 3,
@@ -1649,6 +1763,7 @@ impl Specification {
             Ok(())
         };
         for (v, symbols) in symbols.iter().enumerate() {
+            #[allow(clippy::cast_possible_truncation)] // no truncation
             set(&mut values, *symbols, v as u8)?;
         }
         let msb = self.bit_order == MostSignificantFirst;
@@ -1668,15 +1783,19 @@ impl Specification {
         let wrap = if self.wrap.separator.is_empty() || self.wrap.width == 0 {
             None
         } else {
-            Some((self.wrap.width, self.wrap.separator.as_bytes()))
-        };
-        if let Some((col, end)) = wrap {
+            let col = self.wrap.width;
+            let end = self.wrap.separator.as_bytes();
             check!(SpecificationError(WrapLength), col < 256 && end.len() < 256);
-            check!(SpecificationError(WrapWidth(dec(bit) as u8)), col % dec(bit) == 0);
-            for i in end.iter() {
-                set(&mut values, *i, IGNORE)?;
+            #[allow(clippy::cast_possible_truncation)] // no truncation
+            let col = col as u8;
+            #[allow(clippy::cast_possible_truncation)] // no truncation
+            let dec = dec(bit as usize) as u8;
+            check!(SpecificationError(WrapWidth(dec)), col % dec == 0);
+            for &i in end {
+                set(&mut values, i, IGNORE)?;
             }
-        }
+            Some((col, end))
+        };
         let from = self.translate.from.as_bytes();
         let to = self.translate.to.as_bytes();
         check!(SpecificationError(FromTo), from.len() == to.len());
@@ -1696,7 +1815,7 @@ impl Specification {
             None => encoding.push(INVALID),
             Some(pad) => encoding.push(pad),
         }
-        encoding.push(bit as u8);
+        encoding.push(bit);
         if msb {
             encoding[513] |= 0x08;
         }
@@ -1704,7 +1823,7 @@ impl Specification {
             encoding[513] |= 0x10;
         }
         if let Some((col, end)) = wrap {
-            encoding.push(col as u8);
+            encoding.push(col);
             encoding.extend_from_slice(end);
         } else if values.contains(&IGNORE) {
             encoding.push(0);
@@ -2130,6 +2249,7 @@ const BASE32_DNSSEC_IMPL: &[u8] = &[
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 29,
 ];
 
+#[allow(clippy::doc_markdown)]
 /// DNSCurve base32 encoding
 ///
 /// This encoding is a static version of:

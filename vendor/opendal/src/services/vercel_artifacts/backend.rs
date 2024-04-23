@@ -28,6 +28,7 @@ use super::writer::VercelArtifactsWriter;
 use crate::raw::*;
 use crate::*;
 
+#[doc = include_str!("docs.md")]
 #[derive(Clone)]
 pub struct VercelArtifactsBackend {
     pub(crate) access_token: String,
@@ -45,17 +46,18 @@ impl Debug for VercelArtifactsBackend {
 #[async_trait]
 impl Accessor for VercelArtifactsBackend {
     type Reader = IncomingAsyncBody;
+    type Writer = oio::OneShotWriter<VercelArtifactsWriter>;
+    type Lister = ();
     type BlockingReader = ();
-    type Writer = VercelArtifactsWriter;
     type BlockingWriter = ();
-    type Appender = ();
-    type Pager = ();
-    type BlockingPager = ();
+    type BlockingLister = ();
 
     fn info(&self) -> AccessorInfo {
         let mut ma = AccessorInfo::default();
         ma.set_scheme(Scheme::VercelArtifacts)
-            .set_capability(Capability {
+            .set_native_capability(Capability {
+                stat: true,
+
                 read: true,
                 read_can_next: true,
 
@@ -67,32 +69,41 @@ impl Accessor for VercelArtifactsBackend {
         ma
     }
 
+    async fn stat(&self, path: &str, _args: OpStat) -> Result<RpStat> {
+        let res = self.vercel_artifacts_stat(path).await?;
+
+        let status = res.status();
+
+        match status {
+            StatusCode::OK => {
+                let meta = parse_into_metadata(path, res.headers())?;
+                Ok(RpStat::new(meta))
+            }
+
+            _ => Err(parse_error(res).await?),
+        }
+    }
+
     async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
         let resp = self.vercel_artifacts_get(path, args).await?;
 
         let status = resp.status();
 
         match status {
-            StatusCode::OK | StatusCode::PARTIAL_CONTENT => {
-                let meta = parse_into_metadata(path, resp.headers())?;
-                Ok((RpRead::with_metadata(meta), resp.into_body()))
-            }
+            StatusCode::OK | StatusCode::PARTIAL_CONTENT => Ok((RpRead::new(), resp.into_body())),
 
             _ => Err(parse_error(resp).await?),
         }
     }
 
     async fn write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::Writer)> {
-        if args.content_length().is_none() {
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                "write without content length is not supported",
-            ));
-        }
-
         Ok((
             RpWrite::default(),
-            VercelArtifactsWriter::new(self.clone(), args, path.to_string()),
+            oio::OneShotWriter::new(VercelArtifactsWriter::new(
+                self.clone(),
+                args,
+                path.to_string(),
+            )),
         ))
     }
 }
@@ -100,10 +111,13 @@ impl Accessor for VercelArtifactsBackend {
 impl VercelArtifactsBackend {
     async fn vercel_artifacts_get(
         &self,
-        path: &str,
+        hash: &str,
         args: OpRead,
     ) -> Result<Response<IncomingAsyncBody>> {
-        let url: String = format!("https://api.vercel.com/v8/artifacts/{}", path);
+        let url: String = format!(
+            "https://api.vercel.com/v8/artifacts/{}",
+            percent_encode_path(hash)
+        );
 
         let mut req = Request::get(&url);
 
@@ -127,17 +141,38 @@ impl VercelArtifactsBackend {
         size: u64,
         body: AsyncBody,
     ) -> Result<Response<IncomingAsyncBody>> {
-        let url = format!("https://api.vercel.com/v8/artifacts/{}", hash);
+        let url = format!(
+            "https://api.vercel.com/v8/artifacts/{}",
+            percent_encode_path(hash)
+        );
 
         let mut req = Request::put(&url);
 
         let auth_header_content = format!("Bearer {}", self.access_token);
-        // Borrowed from [vercel/remote-cache](https://github.com/vercel/remote-cache/blob/46cbc71346c84ec6c3022ec660ade52a25a20013/packages/remote/src/artifact-request.ts#LL41C34-L41C58)
         req = req.header(header::CONTENT_TYPE, "application/octet-stream");
         req = req.header(header::AUTHORIZATION, auth_header_content);
         req = req.header(header::CONTENT_LENGTH, size);
 
         let req = req.body(body).map_err(new_request_build_error)?;
+
+        self.client.send(req).await
+    }
+
+    pub async fn vercel_artifacts_stat(&self, hash: &str) -> Result<Response<IncomingAsyncBody>> {
+        let url = format!(
+            "https://api.vercel.com/v8/artifacts/{}",
+            percent_encode_path(hash)
+        );
+
+        let mut req = Request::head(&url);
+
+        let auth_header_content = format!("Bearer {}", self.access_token);
+        req = req.header(header::AUTHORIZATION, auth_header_content);
+        req = req.header(header::CONTENT_LENGTH, 0);
+
+        let req = req
+            .body(AsyncBody::Empty)
+            .map_err(new_request_build_error)?;
 
         self.client.send(req).await
     }

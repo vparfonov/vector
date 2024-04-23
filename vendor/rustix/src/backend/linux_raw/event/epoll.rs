@@ -1,8 +1,4 @@
-//! epoll support.
-//!
-//! This is an experiment, and it isn't yet clear whether epoll is the right
-//! level of abstraction at which to introduce safety. But it works fairly well
-//! in simple examples 🙂.
+//! Linux `epoll` support.
 //!
 //! # Examples
 //!
@@ -94,7 +90,7 @@ bitflags! {
         /// `EPOLL_CLOEXEC`
         const CLOEXEC = linux_raw_sys::general::EPOLL_CLOEXEC;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -149,7 +145,7 @@ bitflags! {
         /// `EPOLLEXCLUSIVE`
         const EXCLUSIVE = linux_raw_sys::general::EPOLLEXCLUSIVE as u32;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -164,8 +160,8 @@ pub fn create(flags: CreateFlags) -> io::Result<OwnedFd> {
     syscalls::epoll_create(flags)
 }
 
-/// `epoll_ctl(self, EPOLL_CTL_ADD, data, event)`—Adds an element to an
-/// epoll object.
+/// `epoll_ctl(self, EPOLL_CTL_ADD, data, event)`—Adds an element to an epoll
+/// object.
 ///
 /// This registers interest in any of the events set in `events` occurring on
 /// the file descriptor associated with `data`.
@@ -266,8 +262,8 @@ pub fn wait(epoll: impl AsFd, event_list: &mut EventVec, timeout: c::c_int) -> i
 /// An iterator over the `Event`s in an `EventVec`.
 pub struct Iter<'a> {
     /// Use `Copied` to copy the struct, since `Event` is `packed` on some
-    /// platforms, and it's common for users to directly destructure it,
-    /// which would lead to errors about forming references to packed fields.
+    /// platforms, and it's common for users to directly destructure it, which
+    /// would lead to errors about forming references to packed fields.
     iter: core::iter::Copied<slice::Iter<'a, Event>>,
 }
 

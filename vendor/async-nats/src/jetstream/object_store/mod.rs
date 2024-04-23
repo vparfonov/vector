@@ -16,6 +16,7 @@ use std::collections::VecDeque;
 use std::fmt::Display;
 use std::{cmp, str::FromStr, task::Poll, time::Duration};
 
+use crate::subject::Subject;
 use crate::{HeaderMap, HeaderValue};
 use base64::engine::general_purpose::{STANDARD, URL_SAFE};
 use base64::engine::Engine;
@@ -129,9 +130,11 @@ impl ObjectStore {
                             let bucket = self
                                 .stream
                                 .context
-                                .get_object_store(&link_name)
+                                .get_object_store(&link.bucket)
                                 .await
-                                .map_err(|err| GetError::with_source(GetErrorKind::Other, err))?;
+                                .map_err(|err| {
+                                GetError::with_source(GetErrorKind::Other, err)
+                            })?;
                             let object = bucket.get(&link_name).await?;
                             return Ok(object);
                         }
@@ -291,7 +294,7 @@ impl ObjectStore {
         };
 
         let object_nuid = nuid::next();
-        let chunk_subject = format!("$O.{}.C.{}", &self.name, &object_nuid);
+        let chunk_subject = Subject::from(format!("$O.{}.C.{}", &self.name, &object_nuid));
 
         let mut object_chunks = 0;
         let mut object_size = 0;
@@ -348,7 +351,7 @@ impl ObjectStore {
             chunks: object_chunks,
             size: object_size,
             digest: Some(format!("SHA-256={}", URL_SAFE.encode(digest))),
-            modified: OffsetDateTime::now_utc(),
+            modified: Some(OffsetDateTime::now_utc()),
             deleted: false,
         };
 
@@ -711,7 +714,7 @@ impl ObjectStore {
             nuid: nuid::next().to_string(),
             size: 0,
             chunks: 0,
-            modified: OffsetDateTime::now_utc(),
+            modified: Some(OffsetDateTime::now_utc()),
             digest: None,
             deleted: false,
         };
@@ -774,7 +777,7 @@ impl ObjectStore {
             nuid: nuid::next().to_string(),
             size: 0,
             chunks: 0,
-            modified: OffsetDateTime::now_utc(),
+            modified: Some(OffsetDateTime::now_utc()),
             digest: None,
             deleted: false,
         };
@@ -1062,21 +1065,26 @@ pub struct ObjectInfo {
     /// Name of the object
     pub name: String,
     /// A short human readable description of the object.
+    #[serde(default)]
     pub description: Option<String>,
     /// Link this object points to, if any.
+    #[serde(default)]
     pub options: Option<ObjectOptions>,
     /// Name of the bucket the object is stored in.
     pub bucket: String,
     /// Unique identifier used to uniquely identify this version of the object.
+    #[serde(default)]
     pub nuid: String,
     /// Size in bytes of the object.
+    #[serde(default)]
     pub size: usize,
     /// Number of chunks the object is stored in.
+    #[serde(default)]
     pub chunks: usize,
     /// Date and time the object was last modified.
-    #[serde(with = "rfc3339")]
+    #[serde(default, with = "rfc3339::option")]
     #[serde(rename = "mtime")]
-    pub modified: time::OffsetDateTime,
+    pub modified: Option<time::OffsetDateTime>,
     /// Digest of the object stream.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub digest: Option<String>,

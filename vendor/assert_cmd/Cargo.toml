@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.66.0"
+rust-version = "1.73"
 name = "assert_cmd"
-version = "2.0.12"
+version = "2.0.14"
 authors = [
     "Pascal Hertleif <killercup@gmail.com>",
     "Ed Page <eopage@gmail.com>",
@@ -89,7 +89,7 @@ search = "<!-- next-url -->"
 name = "bin_fixture"
 
 [dependencies.anstream]
-version = "0.3.0"
+version = "0.6.7"
 optional = true
 
 [dependencies.anstyle]

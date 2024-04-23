@@ -1,7 +1,7 @@
 #[cfg(feature = "async-std-comp")]
 use super::async_std;
 use super::ConnectionLike;
-use super::{authenticate, AsyncStream, RedisRuntime};
+use super::{setup_connection, AsyncStream, RedisRuntime};
 use crate::cmd::{cmd, Cmd};
 use crate::connection::{ConnectionAddr, ConnectionInfo, Msg, RedisConnectionInfo};
 #[cfg(any(feature = "tokio-comp", feature = "async-std-comp"))]
@@ -78,7 +78,7 @@ where
             db: connection_info.db,
             pubsub: false,
         };
-        authenticate(connection_info, &mut rv).await?;
+        setup_connection(connection_info, &mut rv).await?;
         Ok(rv)
     }
 
@@ -395,10 +395,13 @@ pub(crate) async fn connect_simple<T: RedisRuntime>(
             ref host,
             port,
             insecure,
+            ref tls_params,
         } => {
             let socket_addrs = get_socket_addrs(host, port).await?;
             select_ok(
-                socket_addrs.map(|socket_addr| <T>::connect_tcp_tls(host, socket_addr, insecure)),
+                socket_addrs.map(|socket_addr| {
+                    <T>::connect_tcp_tls(host, socket_addr, insecure, tls_params)
+                }),
             )
             .await?
             .0

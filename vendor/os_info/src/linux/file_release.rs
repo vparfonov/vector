@@ -43,6 +43,7 @@ fn retrieve(distributions: &[ReleaseInfo], root: &str) -> Option<Info> {
         let version = (release_info.version)(&file_content);
 
         return Some(Info {
+            // Unwrap is OK here because of the `os_type.is_none()` check above.
             os_type: os_type.unwrap(),
             version: version.unwrap_or(Version::Unknown),
             bitness: Bitness::Unknown,
@@ -89,8 +90,7 @@ static DISTRIBUTIONS: [ReleaseInfo; 6] = [
                 .and_then(|id| match id.as_str() {
                     // os-release information collected from
                     // https://github.com/chef/os_release
-
-                    //"almalinux" => Alma
+                    "almalinux" => Some(Type::AlmaLinux),
                     "alpaquita" => Some(Type::Alpaquita),
                     "alpine" => Some(Type::Alpine),
                     "amzn" => Some(Type::Amazon),
@@ -110,7 +110,7 @@ static DISTRIBUTIONS: [ReleaseInfo; 6] = [
                     "fedora" => Some(Type::Fedora),
                     //"gentoo" => Gentoo
                     //"ios_xr" => ios_xr
-                    //"kali" => Kali
+                    "kali" => Some(Type::Kali),
                     //"mageia" => Mageia
                     //"manjaro" => Manjaro
                     "linuxmint" => Some(Type::Mint),
@@ -122,11 +122,12 @@ static DISTRIBUTIONS: [ReleaseInfo; 6] = [
                     "ol" => Some(Type::OracleLinux),
                     "opensuse" => Some(Type::openSUSE),
                     "opensuse-leap" => Some(Type::openSUSE),
+                    "opensuse-tumbleweed" => Some(Type::openSUSE),
                     //"rancheros" => RancherOS
                     //"raspbian" => Raspbian
                     // note XBian also uses "raspbian"
                     "rhel" => Some(Type::RedHatEnterprise),
-                    //"rocky" => Rocky
+                    "rocky" => Some(Type::RockyLinux),
                     //"sabayon" => Sabayon
                     //"scientific" => Scientific
                     //"slackware" => Slackware
@@ -134,8 +135,9 @@ static DISTRIBUTIONS: [ReleaseInfo; 6] = [
                     "sles" => Some(Type::SUSE),
                     "sles_sap" => Some(Type::SUSE), // SUSE SAP
                     "ubuntu" => Some(Type::Ubuntu),
+                    "ultramarine" => Some(Type::Ultramarine),
                     //"virtuozzo" => Virtuozzo
-                    //"void" => Void
+                    "void" => Some(Type::Void),
                     //"XCP-ng" => xcp-ng
                     //"xenenterprise" => xcp-ng
                     //"xenserver" => xcp-ng
@@ -198,6 +200,17 @@ static DISTRIBUTIONS: [ReleaseInfo; 6] = [
 mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
+
+    #[test]
+    fn almalinux_9_0_release() {
+        let root = "src/linux/tests/AlmaLinux-9.0";
+
+        let info = retrieve(&DISTRIBUTIONS, root).unwrap();
+        assert_eq!(info.os_type(), Type::AlmaLinux);
+        assert_eq!(info.version, Version::Semantic(9, 0, 0));
+        assert_eq!(info.edition, None);
+        assert_eq!(info.codename, None);
+    }
 
     #[test]
     fn alpaquita_os_release() {
@@ -387,6 +400,17 @@ mod tests {
     }
 
     #[test]
+    fn kali_2023_2_os_release() {
+        let root = "src/linux/tests/Kali_2023_2";
+
+        let info = retrieve(&DISTRIBUTIONS, root).unwrap();
+        assert_eq!(info.os_type(), Type::Kali);
+        assert_eq!(info.version, Version::Semantic(2023, 2, 0));
+        assert_eq!(info.edition, None);
+        assert_eq!(info.codename, None);
+    }
+
+    #[test]
     fn mariner_release() {
         let root = "src/linux/tests/Mariner";
 
@@ -480,6 +504,17 @@ mod tests {
     }
 
     #[test]
+    fn opensuse_tumbleweed_os_release() {
+        let root = "src/linux/tests/openSUSE_Tumbleweed";
+
+        let info = retrieve(&DISTRIBUTIONS, root).unwrap();
+        assert_eq!(info.os_type(), Type::openSUSE);
+        assert_eq!(info.version, Version::Semantic(20230816, 0, 0));
+        assert_eq!(info.edition, None);
+        assert_eq!(info.codename, None);
+    }
+
+    #[test]
     fn oracle_linux_os_release() {
         let root = "src/linux/tests/OracleLinux";
 
@@ -535,6 +570,17 @@ mod tests {
     }
 
     #[test]
+    fn rocky_9_2_release() {
+        let root = "src/linux/tests/RockyLinux-9.2";
+
+        let info = retrieve(&DISTRIBUTIONS, root).unwrap();
+        assert_eq!(info.os_type(), Type::RockyLinux);
+        assert_eq!(info.version, Version::Semantic(9, 2, 0));
+        assert_eq!(info.edition, None);
+        assert_eq!(info.codename, None);
+    }
+
+    #[test]
     fn suse_12_os_release() {
         let root = "src/linux/tests/SUSE_12";
 
@@ -563,6 +609,28 @@ mod tests {
         let info = retrieve(&DISTRIBUTIONS, root).unwrap();
         assert_eq!(info.os_type(), Type::Ubuntu);
         assert_eq!(info.version, Version::Semantic(18, 10, 0));
+        assert_eq!(info.edition, None);
+        assert_eq!(info.codename, None);
+    }
+
+    #[test]
+    fn ultramarine_os_release() {
+        let root = "src/linux/tests/Ultramarine";
+
+        let info = retrieve(&DISTRIBUTIONS, root).unwrap();
+        assert_eq!(info.os_type(), Type::Ultramarine);
+        assert_eq!(info.version, Version::Semantic(39, 0, 0));
+        assert_eq!(info.edition, None);
+        assert_eq!(info.codename, None);
+    }
+
+    #[test]
+    fn void_os_release() {
+        let root = "src/linux/tests/Void";
+
+        let info = retrieve(&DISTRIBUTIONS, root).unwrap();
+        assert_eq!(info.os_type(), Type::Void);
+        assert_eq!(info.version, Version::Unknown);
         assert_eq!(info.edition, None);
         assert_eq!(info.codename, None);
     }

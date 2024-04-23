@@ -1,3 +1,218 @@
+# Upgrade to v0.45
+
+## Public API
+
+### BlockingLayer is not enabled by default
+
+To further enhance the optionality of `tokio`, we have introduced a new feature called `layers-blocking`. The default usage of the blocking layer has been disabled. To utilize the `BlockingLayer`, please enable the `layers-blocking` feature.
+
+### TimeoutLayer deprecated `with_speed`
+
+The `with_speed` API has been deprecated. Please use `with_io_timeout` instead.
+
+## Raw API
+
+No raw API changes.
+
+# Upgrade to v0.44
+
+## Public API
+
+### Moka Service Configuration
+
+- The `thread_pool_enabled` option has been removed.
+
+### List Prefix Supported
+
+After [RFC: List Prefix](crate::docs::rfcs::rfc_3243_list_prefix) landed, we have changed the behavior of `list` a path without `/`. OpenDAL used to return `NotADirectory` error, but now we will return the list of entries that start with given prefix instead.
+
+# Upgrade to v0.43
+
+## Public API
+
+### List Recursive
+
+After [RFC-3526: List Recursive](crate::docs::rfcs::rfc_3526_list_recursive) landed, we have changed the `list` API to accept `recursive` instead of `delimiter`:
+
+Users will need to change the following usage:
+
+- `op.list_with(path).delimiter("")` -> `op.list_with(path).recursive(true)`
+- `op.list_with(path).delimiter("/")` -> `op.list_with(path).recursive(false)`
+
+`delimiter` other than `""` and `"/"` is not supported anymore.
+
+### Stat a dir path
+
+After [RFC: List Prefix](crate::docs::rfcs::rfc_3243_list_prefix) landed, we have changed the behavior of `stat` a dir path:
+
+Here are the behavior list:
+
+| Case                   | Path            | Result                                     |
+|------------------------|-----------------|--------------------------------------------|
+| stat existing dir      | `abc/`          | Metadata with dir mode                     |
+| stat existing file     | `abc/def_file`  | Metadata with file mode                    |
+| stat dir without `/`   | `abc/def_dir`   | Error `NotFound` or metadata with dir mode |
+| stat file with `/`     | `abc/def_file/` | Error `NotFound`                           |
+| stat not existing path | `xyz`           | Error `NotFound`                           |
+
+Services like s3, azblob can handle `stat("abc/")` correctly by check if there are objects with prefix `abc/`.
+
+## Raw API
+
+### Lister Align
+
+We changed our internal `lister` implementation to align with the `list` public API for better performance and readability.
+
+- trait `Page` => `List`
+- struct `Pager` => `Lister`
+- trait `BlockingPage` => `BlockingList`
+- struct `BlockingPager` => `BlockingLister`
+
+Every call to `next` will return an entry instead a page of entries. Also, we changed our async list api into poll based instead of `async_trait`.
+
+# Upgrade to v0.42
+
+## Public API
+
+### MSRV Changed
+
+OpenDAL bumps it's MSRV to 1.67.0.
+
+### S3 Service Configuration
+
+- The `enable_exact_buf_write` option has been deprecated and is superseded by `BufferedWriter`, introduced in version 0.40.
+
+### Oss Service Configuration
+
+- The `write_min_size` option has been deprecated and replaced by `BufferedWriter`, also introduced in version 0.40.
+- A new setting, `allow_anonymous`, has been added. Since v0.41, OSS will now return an error if credential loading fails. Enabling `allow_anonymous` to fallback to request without credentials.
+
+### Ghac Service Configuration
+
+- The `enable_create_simulation` option has been removed. We add this option to allow ghac simulate create empty file, but it could result in unexpected behavior when users create a file with content length `1`. So we remove it.
+
+### Wasabi Service Removed
+
+`wasabi` service native support has been removed. Users who want to access wasabi can use our `s3` service instead.
+
+# Upgrade to v0.41
+
+There is no public API and raw API changes.
+
+# Upgrade to v0.40
+
+## Public API
+
+### RFC-2578 Merge Append Into Write
+
+[RFC-2578](crate::docs::rfcs::rfc_2578_merge_append_into_write) merges `append` into `write` and removes `append` API.
+
+- For writing a file at once, please use `op.write()` for convenience.
+- For appending a file, please use `op.write_with().append(true)` instead of `op.append()`.
+
+The same rule applies to `writer()` and `writer_with()`.
+
+### RFC-2774 Lister API
+
+[RFC-2774](crate::docs::rfcs::rfc_2774_lister_api) proposes a new `lister` API to replace current `list` and `scan`. And we add a new API `list` to return entries directly.
+
+- For listing a directory at once, please use `list()` for convenience.
+- For listing a directory recursively, please use `list_with().delimiter("")` or `lister_with().delimiter("")` instead of `scan()`.
+- For listing in streaming, please use `lister()` or `lister_with()` instead.
+
+### RFC-2779 List With Metakey
+
+[RFC-2779](crate::docs::rfcs::rfc_2779_list_with_metakey) proposes a new `op.list_with().metakey()` API to allow list with metakey and removes `op.metadata(&entry)` API.
+
+Please use `op.list_with().metakey()` instead of `op.metadata(&entry)`, for example:
+
+```rust
+// Before
+let entries: Vec<Entry> = op.list("dir/").await?;
+for entry in entris {
+  let meta = op.metadata(&entry, Metakey::ContentLength | Metakey::ContentType).await?;
+  println!("{} {}", entry.name(), entry.metadata().content_length());
+}
+
+// After
+let entries: Vec<Entry> = op
+  .list_with("dir/")
+  .metakey(Metakey::ContentLength | Metakey::ContentType).await?;
+for entry in entris {
+  println!("{} {}", entry.name(), entry.metadata().content_length());
+}
+```
+
+### RFC-2852: Native Capability
+
+[RFC-2852](crate::docs::rfcs::rfc_2852_native_capability) proposes new `native_capability` and `full_capability` API to allow users to check if the underlying service supports a capability natively.
+
+- `native_capability` returns `true` if the capability is supported natively.
+- `full_capability` returns `true` if the capability is supported, maybe via a layer.
+
+Most of time, you can use `full_capability` to replace `capability` call. But to check if the capability is supported natively for better performance design, please use `native_capability` instead.
+
+### Buffered Writer
+
+OpenDAL v0.40 added buffered writer support!
+
+Users don't need to specify the `content_length()` for writer anymore!
+
+```diff
+- let mut w = op.writer_with("path/to/file").content_length(1024).await?;
++ let mut w = op.writer_with("path/to/file").await?;
+```
+
+Users can specify the `buffer()` to control the size we call underlying storage:
+
+```rust
+let mut w = op.writer_with("path/to/file").buffer(8 * 1024 * 1024).await?;
+```
+
+If buffer is not specified, we will call underlying storage everytime we call `write`. Otherwise, we will make sure to call underlying storage when buffer is full or `close` is called.
+
+### RangeRead and RangeReader
+
+OpenDAL v0.40 removed the origin `range_read` and `range_reader` interfaces, please use `read_with().range()` or `reader_with().range()`.
+
+```diff
+- op.range_read(path, range_start..range_end).await?;
++ op.read_with(path).range(range_start..range_end).await?;
+```
+
+```diff
+- let reader = op.range_reader(path, range_start..range_end).await?;
++ let reader = op.reader_with(path).range(range_start..range_end).await?;
+```
+
+
+
+## Raw API
+
+### RFC-3017 Remove Write Copy From
+
+[RFC-3017](opendal::docs::rfcs::rfc_3017_remove_write_copy_from) removes `copy_from` API from the `oio::Write` trait. Users who implements services and layers by hand should remove this API.
+
+# Upgrade to v0.39
+
+## Public API
+
+### Service S3 Role Arn Behavior
+
+In PR #2687, OpenDAL changed the behavior when `role_arn` has been specified.
+
+OpenDAL used to override role_arn simply. But since this version, OpenDAL will make sure to use assume_role with specified `role_arn` and `external_id` (if supplied).
+
+### RetryLayer supports RetryInterceptor
+
+In PR #2666, `RetryLayer` supports `RetryInterceptor`. To implement this change, `RetryLayer` changed it's in-memory layout by adding a new generic parameter `I` to `RetryLayer<I>`.
+
+Users who stores `RetryLayer` in struct or enum will need to change the type if they don't want to use default behavior.
+
+## Raw API
+
+In PR #2698, OpenDAL re-org the internal structure of `opendal::raw::oio` and changed some APIs name.
+
 # Upgrade to v0.38
 
 There are no public API changes.
@@ -8,7 +223,7 @@ OpenDAL add the `Write::sink` API to enable streaming writing. This is a breakin
 
 For a quick fix, users who have implemented `opendal::raw::oio::Write` can return an `Unsupported` error for `Write::sink()`. 
 
-More detailes could be found at [RFC: Writer `sink` API][crate::docs::rfcs::rfc_2083_writer_sink_api].
+More details could be found at [RFC: Writer `sink` API][crate::docs::rfcs::rfc_2083_writer_sink_api].
 
 # Upgrade to v0.37
 
@@ -62,7 +277,7 @@ let bs = bop.read_with("path/to/file")
 
 Along with this change, users don't need to call `OpXxx` anymore so we moved it to `raw` API.
 
-More detailes could be found at [RFC: Chain Based Operator API][crate::docs::rfcs::rfc_2299_chain_based_operator_api].
+More details could be found at [RFC: Chain Based Operator API][crate::docs::rfcs::rfc_2299_chain_based_operator_api].
 
 ## Raw API
 
@@ -84,7 +299,7 @@ Migrated `opendal::ops` to `opendal::raw::ops`.
 
 ## Public API
 
-- OpenDAL raises it's MSRV to 1.65 for dependences changes
+- OpenDAL raises it's MSRV to 1.65 for dependencies changes
 - `OperatorInfo::can_scan` has been removed, to check if underlying services support scan a dir natively, please use `Capability::list_without_delimiter` instead.
 
 ## Raw API
@@ -154,12 +369,12 @@ opendal = {
 
 In version 0.30, we made significant breaking changes by removing objects. Our goal in doing so was to provide our users with APIs that are easier to understand and maintain.
 
-More detailes could be found at [RFC: Remove Object Concept][crate::docs::rfcs::rfc_1477_remove_object_concept].
+More details could be found at [RFC: Remove Object Concept][crate::docs::rfcs::rfc_1477_remove_object_concept].
 
 To upgrade to OpenDAL v0.30, users need to make the following changes:
 
 - regex replace `object\((.*)\).reader\(\)` to `reader($1)`
-	- replace the function on your case, it's recomanded to do it one by one
+	- replace the function on your case, it's recommended to do it one by one
 - rename `ObjectMetakey` => `Metakey`
 - rename `ObjectMode` => `EntryMode`
 - replace `ErrorKind::ObjectXxx` to `ErrorKind::Xxx`
@@ -213,7 +428,7 @@ pub trait Accessor: Send + Sync + Debug + Unpin + 'static {
 
 ## User defined layers
 
-Due to this change, all layers implementation should be changed. If there is not changed over pager, they can by changed like the following:
+Due to this change, all layers implementation should be changed. If there is not changed over pager, they can be changed like the following:
 
 ```diff
 impl<A: Accessor> LayeredAccessor for MyAccessor<A> {
@@ -270,7 +485,7 @@ Due to this change, we have to refactor the logic of `Operator`'s init logic. In
 + let op = Operator::new(builder.build()?).finish();
 ```
 
-By adding a `finish()` call, we will erase all generic types so that `Operator` can still be easily to used everywhere as before.
+By adding a `finish()` call, we will erase all generic types so that `Operator` can still be easily used everywhere as before.
 
 ## Accessor
 
@@ -285,7 +500,7 @@ pub trait Accessor: Send + Sync + Debug + Unpin + 'static {
 }
 ```
 
-If your service doesn't support `read` or `blocking_read`, we can use `()` to represent an dummy reader:
+If your service doesn't support `read` or `blocking_read`, we can use `()` to represent a dummy reader:
 
 ```rust
 impl Accessor for MyDummyAccessor {
@@ -370,7 +585,7 @@ Thus, we removed the `seekable_reader` API. They can be replaced by `range_reade
 
 Most changes only happen inside. Users not using `opendal::raw::*` will not be affected.
 
-Sorry for the inconvenience. I think those changes are required and make OpenDAL better! Welcome any comments at [Discussion](https://github.com/apache/incubator-opendal/discussions).
+Sorry for the inconvenience. I think those changes are required and make OpenDAL better! Welcome any comments at [Discussion](https://github.com/apache/opendal/discussions).
 
 # Upgrade to v0.21
 

@@ -1,7 +1,7 @@
 use crate::{Mode, TraitArgs};
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{parse_quote, Error, Ident, ItemTrait, LitStr, TraitBoundModifier, TypeParamBound};
+use syn::{parse_quote, Error, ItemTrait, LitStr, TraitBoundModifier, TypeParamBound};
 
 pub(crate) fn expand(args: TraitArgs, mut input: ItemTrait, mode: Mode) -> TokenStream {
     if mode.de && !input.generics.params.is_empty() {
@@ -85,6 +85,7 @@ pub(crate) fn expand(args: TraitArgs, mut input: ItemTrait, mode: Mode) -> Token
                 type Object = dyn #object + #strictest;
             }
 
+            #[allow(unknown_lints, non_local_definitions)] // false positive: https://github.com/rust-lang/rust/issues/121621
             impl<'de> typetag::__private::serde::Deserialize<'de> for typetag::__private::Box<dyn #object + #strictest> {
                 fn deserialize<D>(deserializer: D) -> typetag::__private::Result<Self, D::Error>
                 where
@@ -97,6 +98,7 @@ pub(crate) fn expand(args: TraitArgs, mut input: ItemTrait, mode: Mode) -> Token
 
         for marker_traits in others {
             expanded.extend(quote! {
+                #[allow(unknown_lints, non_local_definitions)] // false positive: https://github.com/rust-lang/rust/issues/121621
                 impl<'de> typetag::__private::serde::Deserialize<'de> for typetag::__private::Box<dyn #object + #marker_traits> {
                     fn deserialize<D>(deserializer: D) -> typetag::__private::Result<Self, D::Error>
                     where
@@ -112,7 +114,14 @@ pub(crate) fn expand(args: TraitArgs, mut input: ItemTrait, mode: Mode) -> Token
         }
     }
 
-    wrap_in_dummy_const(input, expanded)
+    quote! {
+        #input
+
+        #[allow(non_upper_case_globals)]
+        const _: () = {
+            #expanded
+        };
+    }
 }
 
 fn augment_trait(input: &mut ItemTrait, mode: Mode) {
@@ -276,18 +285,4 @@ fn has_supertrait(input: &ItemTrait, find: &str) -> bool {
         }
     }
     false
-}
-
-fn wrap_in_dummy_const(input: ItemTrait, expanded: TokenStream) -> TokenStream {
-    let dummy_const_name = format!("_{}_registry", input.ident);
-    let dummy_const = Ident::new(&dummy_const_name, Span::call_site());
-
-    quote! {
-        #input
-
-        #[allow(non_upper_case_globals)]
-        const #dummy_const: () = {
-            #expanded
-        };
-    }
 }

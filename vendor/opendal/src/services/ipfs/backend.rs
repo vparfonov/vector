@@ -162,18 +162,17 @@ impl Debug for IpfsBackend {
 #[async_trait]
 impl Accessor for IpfsBackend {
     type Reader = IncomingAsyncBody;
-    type BlockingReader = ();
     type Writer = ();
+    type Lister = oio::PageLister<DirStream>;
+    type BlockingReader = ();
     type BlockingWriter = ();
-    type Appender = ();
-    type Pager = DirStream;
-    type BlockingPager = ();
+    type BlockingLister = ();
 
     fn info(&self) -> AccessorInfo {
         let mut ma = AccessorInfo::default();
         ma.set_scheme(Scheme::Ipfs)
             .set_root(&self.root)
-            .set_capability(Capability {
+            .set_native_capability(Capability {
                 stat: true,
 
                 read: true,
@@ -181,26 +180,11 @@ impl Accessor for IpfsBackend {
                 read_with_range: true,
 
                 list: true,
-                list_with_delimiter_slash: true,
 
                 ..Default::default()
             });
 
         ma
-    }
-
-    async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
-        let resp = self.ipfs_get(path, args.range()).await?;
-
-        let status = resp.status();
-
-        match status {
-            StatusCode::OK | StatusCode::PARTIAL_CONTENT => {
-                let meta = parse_into_metadata(path, resp.headers())?;
-                Ok((RpRead::with_metadata(meta), resp.into_body()))
-            }
-            _ => Err(parse_error(resp).await?),
-        }
     }
 
     /// IPFS's stat behavior highly depends on its implementation.
@@ -354,11 +338,20 @@ impl Accessor for IpfsBackend {
         }
     }
 
-    async fn list(&self, path: &str, _: OpList) -> Result<(RpList, Self::Pager)> {
-        Ok((
-            RpList::default(),
-            DirStream::new(Arc::new(self.clone()), path),
-        ))
+    async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
+        let resp = self.ipfs_get(path, args.range()).await?;
+
+        let status = resp.status();
+
+        match status {
+            StatusCode::OK | StatusCode::PARTIAL_CONTENT => Ok((RpRead::new(), resp.into_body())),
+            _ => Err(parse_error(resp).await?),
+        }
+    }
+
+    async fn list(&self, path: &str, _: OpList) -> Result<(RpList, Self::Lister)> {
+        let l = DirStream::new(Arc::new(self.clone()), path);
+        Ok((RpList::default(), oio::PageLister::new(l)))
     }
 }
 
@@ -419,7 +412,6 @@ impl IpfsBackend {
 pub struct DirStream {
     backend: Arc<IpfsBackend>,
     path: String,
-    consumed: bool,
 }
 
 impl DirStream {
@@ -427,18 +419,13 @@ impl DirStream {
         Self {
             backend,
             path: path.to_string(),
-            consumed: false,
         }
     }
 }
 
 #[async_trait]
-impl oio::Page for DirStream {
-    async fn next(&mut self) -> Result<Option<Vec<oio::Entry>>> {
-        if self.consumed {
-            return Ok(None);
-        }
-
+impl oio::PageList for DirStream {
+    async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let resp = self.backend.ipfs_list(&self.path).await?;
 
         if resp.status() != StatusCode::OK {
@@ -456,8 +443,6 @@ impl oio::Page for DirStream {
             .map(|v| v.name.unwrap())
             .collect::<Vec<String>>();
 
-        let mut oes = Vec::with_capacity(names.len());
-
         for mut name in names {
             let meta = self
                 .backend
@@ -469,10 +454,10 @@ impl oio::Page for DirStream {
                 name += "/";
             }
 
-            oes.push(oio::Entry::new(&name, meta))
+            ctx.entries.push_back(oio::Entry::new(&name, meta))
         }
 
-        self.consumed = true;
-        Ok(Some(oes))
+        ctx.done = true;
+        Ok(())
     }
 }

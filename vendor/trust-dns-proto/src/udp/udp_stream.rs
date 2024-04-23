@@ -9,37 +9,29 @@ use std::io;
 use std::marker::PhantomData;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::pin::Pin;
-use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use async_trait::async_trait;
 use futures_util::stream::Stream;
 use futures_util::{future::Future, ready, TryFutureExt};
+use log::debug;
 use rand;
 use rand::distributions::{uniform::Uniform, Distribution};
-use tracing::{debug, warn};
 
-use crate::udp::MAX_RECEIVE_BUFFER_SIZE;
 use crate::xfer::{BufDnsStreamHandle, SerialMessage, StreamReceiver};
 use crate::Time;
 
-pub(crate) type UdpCreator<S> = Arc<
-    dyn Send
-        + Sync
-        + (Fn(
-            SocketAddr, // local addr
-            SocketAddr, // server addr
-        ) -> Pin<Box<dyn Send + (Future<Output = Result<S, std::io::Error>>)>>),
->;
-
-/// Trait for DnsUdpSocket
+/// Trait for UdpSocket
 #[async_trait]
-pub trait DnsUdpSocket
+pub trait UdpSocket
 where
     Self: Send + Sync + Sized + Unpin,
 {
     /// Time implementation used for this type
     type Time: Time;
+
+    /// UdpSocket
+    async fn bind(addr: SocketAddr) -> io::Result<Self>;
 
     /// Poll once Receive data from the socket and returns the number of bytes read and the address from
     /// where the data came on success.
@@ -69,42 +61,11 @@ where
     }
 }
 
-/// Trait for UdpSocket
-#[async_trait]
-pub trait UdpSocket: DnsUdpSocket {
-    /// setups up a "client" udp connection that will only receive packets from the associated address
-    async fn connect(addr: SocketAddr) -> io::Result<Self>;
-
-    /// same as connect, but binds to the specified local address for sending address
-    async fn connect_with_bind(addr: SocketAddr, bind_addr: SocketAddr) -> io::Result<Self>;
-
-    /// a "server" UDP socket, that bind to the local listening address, and unbound remote address (can receive from anything)
-    async fn bind(addr: SocketAddr) -> io::Result<Self>;
-}
-
 /// A UDP stream of DNS binary packets
 #[must_use = "futures do nothing unless polled"]
 pub struct UdpStream<S: Send> {
     socket: S,
     outbound_messages: StreamReceiver,
-}
-
-/// To implement quinn::AsyncUdpSocket, we need our custom socket capable of getting local address.
-pub trait QuicLocalAddr {
-    /// Get local address
-    fn local_addr(&self) -> std::io::Result<std::net::SocketAddr>;
-}
-
-#[cfg(feature = "tokio-runtime")]
-use tokio::net::UdpSocket as TokioUdpSocket;
-
-#[cfg(feature = "tokio-runtime")]
-#[cfg_attr(docsrs, doc(cfg(feature = "tokio-runtime")))]
-#[allow(unreachable_pub)]
-impl QuicLocalAddr for TokioUdpSocket {
-    fn local_addr(&self) -> std::io::Result<SocketAddr> {
-        self.local_addr()
-    }
 }
 
 impl<S: UdpSocket + Send + 'static> UdpStream<S> {
@@ -144,9 +105,7 @@ impl<S: UdpSocket + Send + 'static> UdpStream<S> {
 
         (stream, message_sender)
     }
-}
 
-impl<S: DnsUdpSocket + Send + 'static> UdpStream<S> {
     /// Initialize the Stream with an already bound socket. Generally this should be only used for
     ///  server listening sockets. See `new` for a client oriented socket. Specifically, this there
     ///  is already a bound socket in this context, whereas `new` makes sure to randomize ports
@@ -159,7 +118,7 @@ impl<S: DnsUdpSocket + Send + 'static> UdpStream<S> {
     ///
     /// # Return
     ///
-    /// a tuple of a Future Stream which will handle sending and receiving messages, and a
+    /// a tuple of a Future Stream which will handle sending and receiving messsages, and a
     ///  handle which can be used to send messages into the stream.
     pub fn with_bound(socket: S, remote_addr: SocketAddr) -> (Self, BufDnsStreamHandle) {
         let (message_sender, outbound_messages) = BufDnsStreamHandle::new(remote_addr);
@@ -187,7 +146,7 @@ impl<S: Send> UdpStream<S> {
     }
 }
 
-impl<S: DnsUdpSocket + Send + 'static> Stream for UdpStream<S> {
+impl<S: UdpSocket + Send + 'static> Stream for UdpStream<S> {
     type Item = Result<SerialMessage, io::Error>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
@@ -201,17 +160,11 @@ impl<S: DnsUdpSocket + Send + 'static> Stream for UdpStream<S> {
             // first try to send
             let addr = message.addr();
 
-            // this will return if not ready,
-            //   meaning that sending will be preferred over receiving...
+            // this wiil return if not ready,
+            //   meaning that sending will be prefered over receiving...
 
             // TODO: shouldn't this return the error to send to the sender?
-            if let Err(e) = ready!(socket.poll_send_to(cx, message.bytes(), addr)) {
-                // Drop the UDP packet and continue
-                warn!(
-                    "error sending message to {} on udp_socket, dropping response: {}",
-                    addr, e
-                );
-            }
+            ready!(socket.poll_send_to(cx, message.bytes(), addr))?;
 
             // message sent, need to pop the message
             assert!(outbound_messages.as_mut().poll_next(cx).is_ready());
@@ -221,7 +174,7 @@ impl<S: DnsUdpSocket + Send + 'static> Stream for UdpStream<S> {
         // receive all inbound messages
 
         // TODO: this should match edns settings
-        let mut buf = [0u8; MAX_RECEIVE_BUFFER_SIZE];
+        let mut buf = [0u8; 4096];
         let (len, src) = ready!(socket.poll_recv_from(cx, &mut buf))?;
 
         let serial_message = SerialMessage::new(buf.iter().take(len).cloned().collect(), src);
@@ -231,13 +184,11 @@ impl<S: DnsUdpSocket + Send + 'static> Stream for UdpStream<S> {
 
 #[must_use = "futures do nothing unless polled"]
 pub(crate) struct NextRandomUdpSocket<S> {
-    name_server: SocketAddr,
     bind_address: SocketAddr,
-    closure: UdpCreator<S>,
     marker: PhantomData<S>,
 }
 
-impl<S: UdpSocket + 'static> NextRandomUdpSocket<S> {
+impl<S: UdpSocket> NextRandomUdpSocket<S> {
     /// Creates a future for randomly binding to a local socket address for client connections,
     /// if no port is specified.
     ///
@@ -254,33 +205,17 @@ impl<S: UdpSocket + 'static> NextRandomUdpSocket<S> {
         };
 
         Self {
-            name_server: *name_server,
             bind_address,
-            closure: Arc::new(|local_addr: _, _server_addr: _| S::bind(local_addr)),
             marker: PhantomData,
         }
     }
-}
 
-impl<S: DnsUdpSocket> NextRandomUdpSocket<S> {
-    /// Create a future with generator
-    pub(crate) fn new_with_closure(name_server: &SocketAddr, func: UdpCreator<S>) -> Self {
-        let bind_address = match *name_server {
-            SocketAddr::V4(..) => SocketAddr::new(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0)), 0),
-            SocketAddr::V6(..) => {
-                SocketAddr::new(IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 0)), 0)
-            }
-        };
-        Self {
-            name_server: *name_server,
-            bind_address,
-            closure: func,
-            marker: PhantomData,
-        }
+    async fn bind(addr: SocketAddr) -> Result<S, io::Error> {
+        S::bind(addr).await
     }
 }
 
-impl<S: DnsUdpSocket + Send> Future for NextRandomUdpSocket<S> {
+impl<S: UdpSocket> Future for NextRandomUdpSocket<S> {
     type Output = Result<S, io::Error>;
 
     /// polls until there is an available next random UDP port,
@@ -302,23 +237,14 @@ impl<S: DnsUdpSocket + Send> Future for NextRandomUdpSocket<S> {
 
                 // TODO: allow TTL to be adjusted...
                 // TODO: this immediate poll might be wrong in some cases...
-                match (*self.closure)(bind_addr, self.name_server)
-                    .as_mut()
-                    .poll(cx)
-                {
+                match Box::pin(Self::bind(bind_addr)).as_mut().poll(cx) {
                     Poll::Ready(Ok(socket)) => {
                         debug!("created socket successfully");
                         return Poll::Ready(Ok(socket));
                     }
-                    Poll::Ready(Err(err)) => match err.kind() {
-                        io::ErrorKind::AddrInUse => {
-                            debug!("unable to bind port, attempt: {}: {}", attempt, err);
-                        }
-                        _ => {
-                            debug!("failed to bind port: {}", err);
-                            return Poll::Ready(Err(err));
-                        }
-                    },
+                    Poll::Ready(Err(err)) => {
+                        debug!("unable to bind port, attempt: {}: {}", attempt, err)
+                    }
                     Poll::Pending => debug!("unable to bind port, attempt: {}", attempt),
                 }
             }
@@ -332,9 +258,7 @@ impl<S: DnsUdpSocket + Send> Future for NextRandomUdpSocket<S> {
             Poll::Pending
         } else {
             // Use port that was specified in bind address.
-            (*self.closure)(self.bind_address, self.name_server)
-                .as_mut()
-                .poll(cx)
+            Box::pin(Self::bind(self.bind_address)).as_mut().poll(cx)
         }
     }
 }
@@ -342,37 +266,11 @@ impl<S: DnsUdpSocket + Send> Future for NextRandomUdpSocket<S> {
 #[cfg(feature = "tokio-runtime")]
 #[async_trait]
 impl UdpSocket for tokio::net::UdpSocket {
-    /// setups up a "client" udp connection that will only receive packets from the associated address
-    ///
-    /// if the addr is ipv4 then it will bind local addr to 0.0.0.0:0, ipv6 \[::\]0
-    async fn connect(addr: SocketAddr) -> io::Result<Self> {
-        let bind_addr: SocketAddr = match addr {
-            SocketAddr::V4(_addr) => (Ipv4Addr::UNSPECIFIED, 0).into(),
-            SocketAddr::V6(_addr) => (Ipv6Addr::UNSPECIFIED, 0).into(),
-        };
-
-        Self::connect_with_bind(addr, bind_addr).await
-    }
-
-    /// same as connect, but binds to the specified local address for sending address
-    async fn connect_with_bind(_addr: SocketAddr, bind_addr: SocketAddr) -> io::Result<Self> {
-        let socket = Self::bind(bind_addr).await?;
-
-        // TODO: research connect more, it appears to break UDP receiving tests, etc...
-        // socket.connect(addr).await?;
-
-        Ok(socket)
-    }
+    type Time = crate::TokioTime;
 
     async fn bind(addr: SocketAddr) -> io::Result<Self> {
         Self::bind(addr).await
     }
-}
-
-#[cfg(feature = "tokio-runtime")]
-#[async_trait]
-impl DnsUdpSocket for tokio::net::UdpSocket {
-    type Time = crate::TokioTime;
 
     fn poll_recv_from(
         &self,

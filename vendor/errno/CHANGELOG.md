@@ -1,5 +1,26 @@
 # [Unreleased]
 
+# [0.3.8] - 2023-11-27
+
+- Update to windows-sys 0.52.
+  [#91](https://github.com/lambda-fairy/rust-errno/pull/91)
+
+- Update minimum Rust version to 1.56
+  [#91](https://github.com/lambda-fairy/rust-errno/pull/91)
+
+# [0.3.7] - 2023-11-15
+
+- Fix `to_string()` handling for unknown error codes
+  [#88](https://github.com/lambda-fairy/rust-errno/pull/88)
+
+# [0.3.6] - 2023-11-07
+
+- Add support for tvOS and watchOS
+  [#84](https://github.com/lambda-fairy/rust-errno/pull/84)
+
+- Added support for vita target
+  [#86](https://github.com/lambda-fairy/rust-errno/pull/86)
+
 # [0.3.5] - 2023-10-08
 
 - Use __errno_location on DragonFly BSD
@@ -62,7 +83,10 @@
 - Optionally support no_std
   [#31](https://github.com/lambda-fairy/rust-errno/pull/31)
 
-[Unreleased]: https://github.com/lambda-fairy/rust-errno/compare/v0.3.5...HEAD
+[Unreleased]: https://github.com/lambda-fairy/rust-errno/compare/v0.3.8...HEAD
+[0.3.8]: https://github.com/lambda-fairy/rust-errno/compare/v0.3.7...v0.3.8
+[0.3.7]: https://github.com/lambda-fairy/rust-errno/compare/v0.3.6...v0.3.7
+[0.3.6]: https://github.com/lambda-fairy/rust-errno/compare/v0.3.5...v0.3.6
 [0.3.5]: https://github.com/lambda-fairy/rust-errno/compare/v0.3.4...v0.3.5
 [0.3.4]: https://github.com/lambda-fairy/rust-errno/compare/v0.3.3...v0.3.4
 [0.3.3]: https://github.com/lambda-fairy/rust-errno/compare/v0.3.2...v0.3.3

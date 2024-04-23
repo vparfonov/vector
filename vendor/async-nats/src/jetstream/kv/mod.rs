@@ -120,6 +120,9 @@ pub struct Config {
     pub sources: Option<Vec<Source>>,
     /// Allow mirrors using direct API.
     pub mirror_direct: bool,
+    /// Compression
+    #[cfg(feature = "server_2_10")]
+    pub compression: bool,
 }
 
 /// Describes what kind of operation and entry represents

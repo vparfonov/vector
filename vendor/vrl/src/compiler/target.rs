@@ -278,7 +278,10 @@ mod value_target_impl {
 mod tests {
     #![allow(clippy::print_stdout)] // tests
 
-    use crate::owned_value_path;
+    use crate::{
+        compiler::{parser::Ident, state::LocalEnv, type_def::Details, TypeDef},
+        owned_value_path,
+    };
 
     use super::*;
     use crate::value;
@@ -312,7 +315,7 @@ mod tests {
             ),
             (
                 value!({foo: {"bar baz": {baz: 2}}}),
-                owned_value_path!("foo", vec!["qux", r#"bar baz"#], "baz"),
+                owned_value_path!("foo", vec!["qux", "bar baz"], "baz"),
                 Ok(Some(value!(2))),
             ),
         ];
@@ -374,7 +377,7 @@ mod tests {
             ),
             (
                 value!({foo: "bar"}),
-                owned_value_path!("foo", 2, r#"bar baz"#, "a", "b"),
+                owned_value_path!("foo", 2, "bar baz", "a", "b"),
                 true.into(),
                 value!({foo: [null, null, {"bar baz": {"a": {"b": true}}}]}),
                 Ok(()),
@@ -462,7 +465,7 @@ mod tests {
             ),
             (
                 value!({foo: "bar"}),
-                owned_value_path!(vec![r#"foo bar"#, "foo"]),
+                owned_value_path!(vec!["foo bar", "foo"]),
                 false,
                 Some(value!("bar")),
                 Some(value!({})),
@@ -497,14 +500,14 @@ mod tests {
             ),
             (
                 value!({foo: {"bar baz": [0]}, bar: "baz"}),
-                owned_value_path!("foo", r#"bar baz"#, 0),
+                owned_value_path!("foo", "bar baz", 0),
                 false,
                 Some(value!(0)),
                 Some(value!({foo: {"bar baz": []}, bar: "baz"})),
             ),
             (
                 value!({foo: {"bar baz": [0]}, bar: "baz"}),
-                owned_value_path!("foo", r#"bar baz"#, 0),
+                owned_value_path!("foo", "bar baz", 0),
                 true,
                 Some(value!(0)),
                 Some(value!({bar: "baz"})),
@@ -529,5 +532,29 @@ mod tests {
                 Ok(expect)
             );
         }
+    }
+
+    #[test]
+    fn merge_multiple_local_env() {
+        let mut a = LocalEnv::default();
+        a.insert_variable(
+            Ident("foo".into()),
+            Details {
+                type_def: TypeDef::any(),
+                value: None,
+            },
+        );
+
+        let mut b = LocalEnv::default();
+        b.insert_variable(
+            Ident("bar".into()),
+            Details {
+                type_def: TypeDef::any(),
+                value: None,
+            },
+        );
+
+        let merged = a.merge(b);
+        assert_eq!(merged.bindings.len(), 2);
     }
 }

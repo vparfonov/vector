@@ -3,7 +3,7 @@
 ** AA: Alias Analysis using high-level semantic disambiguation.
 ** FWD: Load Forwarding (L2L) + Store Forwarding (S2L).
 ** DSE: Dead-Store Elimination.
-** Copyright (C) 2005-2022 Mike Pall. See Copyright Notice in luajit.h
+** Copyright (C) 2005-2023 Mike Pall. See Copyright Notice in luajit.h
 */
 
 #define lj_opt_mem_c
@@ -376,9 +376,7 @@ TRef LJ_FASTCALL lj_opt_dse_ahstore(jit_State *J)
 	** since they are followed by at least one guarded VLOAD.
 	*/
 	for (ir = IR(J->cur.nins-1); ir > store; ir--)
-	  if (irt_isguard(ir->t) || ir->o == IR_ALEN ||
-              (ir->o == IR_CALLL && ir->op2 == IRCALL_lj_tab_nkeys) ||
-              (ir->o == IR_CALLS && ir->op2 == IRCALL_lj_tab_clone))
+	  if (irt_isguard(ir->t) || ir->o == IR_ALEN)
 	    goto doemit;  /* No elimination possible. */
 	/* Remove redundant store from chain and replace with NOP. */
 	*refp = store->prev;
@@ -466,18 +464,23 @@ doemit:
 */
 static AliasRet aa_uref(IRIns *refa, IRIns *refb)
 {
-  if (refa->o != refb->o)
-    return ALIAS_NO;  /* Different UREFx type. */
   if (refa->op1 == refb->op1) {  /* Same function. */
     if (refa->op2 == refb->op2)
       return ALIAS_MUST;  /* Same function, same upvalue idx. */
     else
       return ALIAS_NO;  /* Same function, different upvalue idx. */
   } else {  /* Different functions, check disambiguation hash values. */
-    if (((refa->op2 ^ refb->op2) & 0xff))
+    if (((refa->op2 ^ refb->op2) & 0xff)) {
       return ALIAS_NO;  /* Upvalues with different hash values cannot alias. */
-    else
-      return ALIAS_MAY;  /* No conclusion can be drawn for same hash value. */
+    } else if (refa->o != refb->o) {
+      /* Different UREFx type, but need to confirm the UREFO really is open. */
+      if (irt_type(refa->t) == IRT_IGC) refa->t.irt += IRT_PGC-IRT_IGC;
+      else if (irt_type(refb->t) == IRT_IGC) refb->t.irt += IRT_PGC-IRT_IGC;
+      return ALIAS_NO;
+    } else {
+      /* No conclusion can be drawn for same hash value and same UREFx type. */
+      return ALIAS_MAY;
+    }
   }
 }
 

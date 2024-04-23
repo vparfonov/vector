@@ -20,5 +20,5 @@ pub use backend::AzdfsBuilder as Azdfs;
 
 mod core;
 mod error;
-mod pager;
+mod lister;
 mod writer;

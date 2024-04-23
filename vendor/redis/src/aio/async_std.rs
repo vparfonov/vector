@@ -31,6 +31,8 @@ use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 #[inline(always)]
 async fn connect_tcp(addr: &SocketAddr) -> io::Result<TcpStream> {
     let socket = TcpStream::connect(addr).await?;
+    #[cfg(feature = "tcp_nodelay")]
+    socket.set_nodelay(true)?;
     #[cfg(feature = "keep-alive")]
     {
         //For now rely on system defaults
@@ -47,6 +49,11 @@ async fn connect_tcp(addr: &SocketAddr) -> io::Result<TcpStream> {
         Ok(socket)
     }
 }
+#[cfg(feature = "tls-rustls")]
+use crate::tls::TlsConnParams;
+
+#[cfg(all(feature = "tls-native-tls", not(feature = "tls-rustls")))]
+use crate::connection::TlsConnParams;
 
 pin_project_lite::pin_project! {
     /// Wraps the async_std `AsyncRead/AsyncWrite` in order to implement the required the tokio traits
@@ -198,6 +205,7 @@ impl RedisRuntime for AsyncStd {
         hostname: &str,
         socket_addr: SocketAddr,
         insecure: bool,
+        tls_params: &Option<TlsConnParams>,
     ) -> RedisResult<Self> {
         let tcp_stream = connect_tcp(&socket_addr).await?;
         let tls_connector = if insecure {
@@ -219,10 +227,11 @@ impl RedisRuntime for AsyncStd {
         hostname: &str,
         socket_addr: SocketAddr,
         insecure: bool,
+        tls_params: &Option<TlsConnParams>,
     ) -> RedisResult<Self> {
         let tcp_stream = connect_tcp(&socket_addr).await?;
 
-        let config = create_rustls_config(insecure)?;
+        let config = create_rustls_config(insecure, tls_params.clone())?;
         let tls_connector = TlsConnector::from(Arc::new(config));
 
         Ok(tls_connector

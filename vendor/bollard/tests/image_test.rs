@@ -1,5 +1,6 @@
 #![type_length_limit = "2097152"]
 
+use bytes::BufMut;
 use futures_util::future::ready;
 use futures_util::stream::{StreamExt, TryStreamExt};
 use tokio::runtime::Runtime;
@@ -23,6 +24,47 @@ use crate::common::*;
 
 async fn create_image_test(docker: Docker) -> Result<(), Error> {
     create_image_hello_world(&docker).await?;
+
+    Ok(())
+}
+
+async fn create_image_wasm_test(docker: Docker) -> Result<(), Error> {
+    let image = "empty-wasm:latest";
+
+    let options = CreateImageOptions {
+        from_src: "-", // from_src must be "-" when sending the archive in the request body
+        repo: image,
+        ..Default::default()
+    };
+
+    let req_body = bytes::Bytes::from({
+        let mut buffer = Vec::new();
+
+        {
+            let mut builder = tar::Builder::new(&mut buffer);
+            let mut header = tar::Header::new_gnu();
+            header.set_path("entrypoint.wasm")?;
+            header.set_size(0);
+            header.set_cksum();
+
+            builder.append_data(&mut header, "entrypoint.wasm", [].as_slice())?;
+            builder.finish()?;
+        }
+
+        buffer
+    });
+
+    docker
+        .create_image(Some(options), Some(req_body), None)
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .collect::<Result<Vec<_>, bollard::errors::Error>>()
+        .unwrap();
+
+    let result = &docker.inspect_image(image).await?;
+
+    assert!(result.repo_tags.as_ref().unwrap() == [image.to_owned()].as_slice());
 
     Ok(())
 }
@@ -242,7 +284,7 @@ async fn commit_container_test(docker: Docker) -> Result<(), Error> {
         .try_collect::<Vec<_>>()
         .await?;
 
-    let first = vec.get(0).unwrap();
+    let first = vec.first().unwrap();
     if let Some(error) = &first.error {
         println!("{}", error.message.as_ref().unwrap());
     }
@@ -360,7 +402,7 @@ RUN touch bollard.txt
         .try_collect::<Vec<_>>()
         .await?;
 
-    let first = vec.get(0).unwrap();
+    let first = vec.first().unwrap();
     if let Some(error) = &first.error {
         println!("{}", error.message.as_ref().unwrap());
     }
@@ -387,9 +429,9 @@ RUN touch bollard.txt
 #[cfg(feature = "buildkit")]
 async fn build_buildkit_image_test(docker: Docker) -> Result<(), Error> {
     let dockerfile = String::from(
-        "FROM alpine as builder1
+        "FROM localhost:5000/alpine as builder1
 RUN touch bollard.txt
-FROM alpine as builder2
+FROM localhost:5000/alpine as builder2
 RUN --mount=type=bind,from=builder1,target=mnt cp mnt/bollard.txt buildkit-bollard.txt
 ENTRYPOINT ls buildkit-bollard.txt
 ",
@@ -407,6 +449,14 @@ ENTRYPOINT ls buildkit-bollard.txt
     c.write_all(&uncompressed).unwrap();
     let compressed = c.finish().unwrap();
 
+    let credentials = bollard::auth::DockerCredentials {
+        username: Some("bollard".to_string()),
+        password: std::env::var("REGISTRY_PASSWORD").ok(),
+        ..Default::default()
+    };
+    let mut creds_hsh = std::collections::HashMap::new();
+    creds_hsh.insert("localhost:5000".to_string(), credentials);
+
     let id = "build_buildkit_image_test";
     let build = &docker
         .build_image(
@@ -420,14 +470,14 @@ ENTRYPOINT ls buildkit-bollard.txt
                 session: Some(String::from(id)),
                 ..Default::default()
             },
-            None,
+            Some(creds_hsh),
             Some(compressed.into()),
         )
         .try_collect::<Vec<bollard::models::BuildInfo>>()
         .await?;
 
     assert!(build
-        .into_iter()
+        .iter()
         .flat_map(|build_info| {
             if let Some(aux) = &build_info.aux {
                 match aux {
@@ -439,7 +489,7 @@ ENTRYPOINT ls buildkit-bollard.txt
             }
         })
         .any(|status| status.id
-            == "naming to docker.io/library/integration_test_build_buildkit_image"));
+            == "naming to docker.io/library/integration_test_build_buildkit_image:latest"));
 
     let _ = &docker
         .create_container(
@@ -470,7 +520,7 @@ ENTRYPOINT ls buildkit-bollard.txt
         .try_collect::<Vec<_>>()
         .await?;
 
-    let first = vec.get(0).unwrap();
+    let first = vec.first().unwrap();
     if let Some(error) = &first.error {
         println!("{}", error.message.as_ref().unwrap());
     }
@@ -513,7 +563,6 @@ ENTRYPOINT ls buildkit-bollard.txt
     c.write_all(&uncompressed).unwrap();
     let compressed = c.finish().unwrap();
 
-    let id = "build_buildkit_image_test";
     let build = &docker
         .build_image(
             BuildImageOptions {
@@ -535,6 +584,127 @@ ENTRYPOINT ls buildkit-bollard.txt
     assert!(build.is_err());
     let err = build.as_ref().unwrap_err();
     assert!(matches!(err, Error::MissingSessionBuildkitError {}));
+
+    Ok(())
+}
+
+#[cfg(feature = "buildkit")]
+async fn build_buildkit_image_inline_driver_test(docker: Docker) -> Result<(), Error> {
+    let dockerfile = String::from(
+        "FROM localhost:5000/alpine as builder1
+RUN touch bollard.txt
+FROM localhost:5000/alpine as builder2
+RUN --mount=type=bind,from=builder1,target=mnt cp mnt/bollard.txt buildkit-bollard.txt
+ENTRYPOINT ls buildkit-bollard.txt
+",
+    );
+    let mut header = tar::Header::new_gnu();
+    header.set_path("Dockerfile").unwrap();
+    header.set_size(dockerfile.len() as u64);
+    header.set_mode(0o755);
+    header.set_cksum();
+    let mut tar = tar::Builder::new(Vec::new());
+    tar.append(&header, dockerfile.as_bytes()).unwrap();
+
+    let uncompressed = tar.into_inner().unwrap();
+    let mut c = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::default());
+    c.write_all(&uncompressed).unwrap();
+    let compressed = c.finish().unwrap();
+
+    let name = "integration_test_build_buildkit_image_inline_driver";
+
+    let credentials = bollard::auth::DockerCredentials {
+        username: Some("bollard".to_string()),
+        password: std::env::var("REGISTRY_PASSWORD").ok(),
+        ..Default::default()
+    };
+    let mut creds_hsh = std::collections::HashMap::new();
+    creds_hsh.insert("localhost:5000".to_string(), credentials);
+
+    let cache_attrs = std::collections::HashMap::new();
+    let cache_from = bollard_buildkit_proto::moby::buildkit::v1::CacheOptionsEntry {
+        r#type: String::from("inline"),
+        attrs: std::collections::HashMap::clone(&cache_attrs),
+    };
+    let cache_to = bollard_buildkit_proto::moby::buildkit::v1::CacheOptionsEntry {
+        r#type: String::from("inline"),
+        attrs: cache_attrs,
+    };
+    let frontend_opts = bollard::grpc::build::ImageBuildFrontendOptions::builder()
+        .cachefrom(&cache_from)
+        .cacheto(&cache_to)
+        .pull(true)
+        .build();
+
+    let driver = bollard::grpc::driver::moby::Moby::new(&docker);
+
+    let load_input =
+        bollard::grpc::build::ImageBuildLoadInput::Upload(bytes::Bytes::from(compressed));
+
+    let credentials = bollard::auth::DockerCredentials {
+        username: Some("bollard".to_string()),
+        password: std::env::var("REGISTRY_PASSWORD").ok(),
+        ..Default::default()
+    };
+    let mut creds_hsh = std::collections::HashMap::new();
+    creds_hsh.insert("localhost:5000", credentials);
+
+    let res = bollard::grpc::driver::Build::docker_build(
+        driver,
+        name,
+        frontend_opts,
+        load_input,
+        Some(creds_hsh),
+    )
+    .await;
+
+    assert!(res.is_ok());
+
+    let _ = &docker
+        .create_container(
+            Some(CreateContainerOptions {
+                name: "integration_test_build_buildkit_image_inline_driver",
+                platform: None,
+            }),
+            Config {
+                image: Some("integration_test_build_buildkit_image_inline_driver"),
+                cmd: Some(vec!["ls", "/buildkit-bollard.txt"]),
+                ..Default::default()
+            },
+        )
+        .await?;
+
+    let _ = &docker
+        .start_container(
+            "integration_test_build_buildkit_image_inline_driver",
+            None::<StartContainerOptions<String>>,
+        )
+        .await?;
+
+    let vec = &docker
+        .wait_container(
+            "integration_test_build_buildkit_image_inline_driver",
+            None::<WaitContainerOptions<String>>,
+        )
+        .try_collect::<Vec<_>>()
+        .await?;
+
+    let first = vec.first().unwrap();
+    if let Some(error) = &first.error {
+        println!("{}", error.message.as_ref().unwrap());
+    }
+    assert_eq!(first.status_code, 0);
+    let _ = &docker
+        .remove_container("integration_test_build_buildkit_image_inline_driver", None)
+        .await?;
+
+    let _ = &docker
+        .remove_image(
+            "integration_test_build_buildkit_image_inline_driver",
+            None::<RemoveImageOptions>,
+            None,
+        )
+        .await?;
 
     Ok(())
 }
@@ -636,7 +806,7 @@ RUN apt-get update && \
         xutils-dev \
         gcc-multilib-arm-linux-gnueabihf \
         && \
-    apt-get clean && rm -rf /var/lib/apt/lists/* 
+    apt-get clean && rm -rf /var/lib/apt/lists/*
 ";
     let mut header = tar::Header::new_gnu();
     header.set_path("Dockerfile").unwrap();
@@ -679,30 +849,13 @@ async fn import_image_test(docker: Docker) -> Result<(), Error> {
     } else {
         format!("{}hello-world:linux", registry_http_addr())
     };
-    let temp_file = if cfg!(windows) {
-        "C:\\Users\\appveyor\\Appdata\\Local\\Temp\\bollard_test_import_image.tar"
-    } else {
-        "/tmp/bollard_test_import_image.tar"
-    };
 
     let mut res = docker.export_image(&image);
-    use tokio::io::AsyncWriteExt;
-    use tokio_util::codec;
 
-    let mut archive_file = tokio::fs::File::create(temp_file).await?;
+    let mut buf = bytes::BytesMut::new();
     while let Some(data) = res.next().await {
-        archive_file.write_all(&data.unwrap()).await?;
-        archive_file.sync_all().await?;
+        buf.put_slice(&data.unwrap());
     }
-    drop(archive_file);
-
-    let archive_file = tokio::fs::File::open(temp_file).await?;
-    let byte_stream = codec::FramedRead::new(archive_file, codec::BytesCodec::new()).map(|r| {
-        let bytes = r.unwrap().freeze();
-        Ok::<_, Error>(bytes)
-    });
-
-    let body = hyper::Body::wrap_stream(byte_stream);
 
     let mut creds = HashMap::new();
     creds.insert(
@@ -715,7 +868,7 @@ async fn import_image_test(docker: Docker) -> Result<(), Error> {
             ImportImageOptions {
                 ..Default::default()
             },
-            body,
+            buf.freeze(),
             Some(creds),
         )
         .try_collect::<Vec<_>>()
@@ -723,6 +876,7 @@ async fn import_image_test(docker: Docker) -> Result<(), Error> {
 
     Ok(())
 }
+
 // ND - Test sometimes hangs on appveyor.
 #[cfg(not(windows))]
 #[test]
@@ -733,6 +887,12 @@ fn integration_test_search_images() {
 #[test]
 fn integration_test_create_image() {
     connect_to_docker_and_run!(create_image_test);
+}
+
+#[test]
+#[cfg(unix)]
+fn integration_test_create_image_wasm() {
+    connect_to_docker_and_run!(create_image_wasm_test);
 }
 
 #[test]
@@ -786,6 +946,12 @@ fn integration_test_build_buildkit_image() {
 #[cfg(feature = "buildkit")]
 fn integration_test_buildkit_image_missing_session_test() {
     connect_to_docker_and_run!(buildkit_image_missing_session_test);
+}
+
+#[test]
+#[cfg(feature = "buildkit")]
+fn integration_test_build_buildkit_inline_driver() {
+    connect_to_docker_and_run!(build_buildkit_image_inline_driver_test);
 }
 
 #[test]

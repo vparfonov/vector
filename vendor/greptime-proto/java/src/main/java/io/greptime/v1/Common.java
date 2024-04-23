@@ -14,424 +14,490 @@ public final class Common {
     registerAllExtensions(
         (com.google.protobuf.ExtensionRegistryLite) registry);
   }
-  public interface ResponseHeaderOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:greptime.v1.ResponseHeader)
-      com.google.protobuf.MessageOrBuilder {
-  }
   /**
-   * Protobuf type {@code greptime.v1.ResponseHeader}
+   * Protobuf enum {@code greptime.v1.SemanticType}
    */
-  public static final class ResponseHeader extends
-      com.google.protobuf.GeneratedMessageV3 implements
-      // @@protoc_insertion_point(message_implements:greptime.v1.ResponseHeader)
-      ResponseHeaderOrBuilder {
-  private static final long serialVersionUID = 0L;
-    // Use ResponseHeader.newBuilder() to construct.
-    private ResponseHeader(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
-      super(builder);
-    }
-    private ResponseHeader() {
-    }
-
-    @java.lang.Override
-    @SuppressWarnings({"unused"})
-    protected java.lang.Object newInstance(
-        UnusedPrivateParameter unused) {
-      return new ResponseHeader();
-    }
-
-    @java.lang.Override
-    public final com.google.protobuf.UnknownFieldSet
-    getUnknownFields() {
-      return this.unknownFields;
-    }
-    private ResponseHeader(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      this();
-      if (extensionRegistry == null) {
-        throw new java.lang.NullPointerException();
-      }
-      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
-          com.google.protobuf.UnknownFieldSet.newBuilder();
-      try {
-        boolean done = false;
-        while (!done) {
-          int tag = input.readTag();
-          switch (tag) {
-            case 0:
-              done = true;
-              break;
-            default: {
-              if (!parseUnknownField(
-                  input, unknownFields, extensionRegistry, tag)) {
-                done = true;
-              }
-              break;
-            }
-          }
-        }
-      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-        throw e.setUnfinishedMessage(this);
-      } catch (com.google.protobuf.UninitializedMessageException e) {
-        throw e.asInvalidProtocolBufferException().setUnfinishedMessage(this);
-      } catch (java.io.IOException e) {
-        throw new com.google.protobuf.InvalidProtocolBufferException(
-            e).setUnfinishedMessage(this);
-      } finally {
-        this.unknownFields = unknownFields.build();
-        makeExtensionsImmutable();
-      }
-    }
-    public static final com.google.protobuf.Descriptors.Descriptor
-        getDescriptor() {
-      return io.greptime.v1.Common.internal_static_greptime_v1_ResponseHeader_descriptor;
-    }
-
-    @java.lang.Override
-    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-        internalGetFieldAccessorTable() {
-      return io.greptime.v1.Common.internal_static_greptime_v1_ResponseHeader_fieldAccessorTable
-          .ensureFieldAccessorsInitialized(
-              io.greptime.v1.Common.ResponseHeader.class, io.greptime.v1.Common.ResponseHeader.Builder.class);
-    }
-
-    private byte memoizedIsInitialized = -1;
-    @java.lang.Override
-    public final boolean isInitialized() {
-      byte isInitialized = memoizedIsInitialized;
-      if (isInitialized == 1) return true;
-      if (isInitialized == 0) return false;
-
-      memoizedIsInitialized = 1;
-      return true;
-    }
-
-    @java.lang.Override
-    public void writeTo(com.google.protobuf.CodedOutputStream output)
-                        throws java.io.IOException {
-      unknownFields.writeTo(output);
-    }
-
-    @java.lang.Override
-    public int getSerializedSize() {
-      int size = memoizedSize;
-      if (size != -1) return size;
-
-      size = 0;
-      size += unknownFields.getSerializedSize();
-      memoizedSize = size;
-      return size;
-    }
-
-    @java.lang.Override
-    public boolean equals(final java.lang.Object obj) {
-      if (obj == this) {
-       return true;
-      }
-      if (!(obj instanceof io.greptime.v1.Common.ResponseHeader)) {
-        return super.equals(obj);
-      }
-      io.greptime.v1.Common.ResponseHeader other = (io.greptime.v1.Common.ResponseHeader) obj;
-
-      if (!unknownFields.equals(other.unknownFields)) return false;
-      return true;
-    }
-
-    @java.lang.Override
-    public int hashCode() {
-      if (memoizedHashCode != 0) {
-        return memoizedHashCode;
-      }
-      int hash = 41;
-      hash = (19 * hash) + getDescriptor().hashCode();
-      hash = (29 * hash) + unknownFields.hashCode();
-      memoizedHashCode = hash;
-      return hash;
-    }
-
-    public static io.greptime.v1.Common.ResponseHeader parseFrom(
-        java.nio.ByteBuffer data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data);
-    }
-    public static io.greptime.v1.Common.ResponseHeader parseFrom(
-        java.nio.ByteBuffer data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data, extensionRegistry);
-    }
-    public static io.greptime.v1.Common.ResponseHeader parseFrom(
-        com.google.protobuf.ByteString data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data);
-    }
-    public static io.greptime.v1.Common.ResponseHeader parseFrom(
-        com.google.protobuf.ByteString data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data, extensionRegistry);
-    }
-    public static io.greptime.v1.Common.ResponseHeader parseFrom(byte[] data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data);
-    }
-    public static io.greptime.v1.Common.ResponseHeader parseFrom(
-        byte[] data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data, extensionRegistry);
-    }
-    public static io.greptime.v1.Common.ResponseHeader parseFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseWithIOException(PARSER, input);
-    }
-    public static io.greptime.v1.Common.ResponseHeader parseFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseWithIOException(PARSER, input, extensionRegistry);
-    }
-    public static io.greptime.v1.Common.ResponseHeader parseDelimitedFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseDelimitedWithIOException(PARSER, input);
-    }
-    public static io.greptime.v1.Common.ResponseHeader parseDelimitedFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
-    }
-    public static io.greptime.v1.Common.ResponseHeader parseFrom(
-        com.google.protobuf.CodedInputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseWithIOException(PARSER, input);
-    }
-    public static io.greptime.v1.Common.ResponseHeader parseFrom(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseWithIOException(PARSER, input, extensionRegistry);
-    }
-
-    @java.lang.Override
-    public Builder newBuilderForType() { return newBuilder(); }
-    public static Builder newBuilder() {
-      return DEFAULT_INSTANCE.toBuilder();
-    }
-    public static Builder newBuilder(io.greptime.v1.Common.ResponseHeader prototype) {
-      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
-    }
-    @java.lang.Override
-    public Builder toBuilder() {
-      return this == DEFAULT_INSTANCE
-          ? new Builder() : new Builder().mergeFrom(this);
-    }
-
-    @java.lang.Override
-    protected Builder newBuilderForType(
-        com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
-    }
+  public enum SemanticType
+      implements com.google.protobuf.ProtocolMessageEnum {
     /**
-     * Protobuf type {@code greptime.v1.ResponseHeader}
+     * <code>TAG = 0;</code>
      */
-    public static final class Builder extends
-        com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
-        // @@protoc_insertion_point(builder_implements:greptime.v1.ResponseHeader)
-        io.greptime.v1.Common.ResponseHeaderOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
-          getDescriptor() {
-        return io.greptime.v1.Common.internal_static_greptime_v1_ResponseHeader_descriptor;
-      }
+    TAG(0),
+    /**
+     * <code>FIELD = 1;</code>
+     */
+    FIELD(1),
+    /**
+     * <code>TIMESTAMP = 2;</code>
+     */
+    TIMESTAMP(2),
+    UNRECOGNIZED(-1),
+    ;
 
-      @java.lang.Override
-      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-          internalGetFieldAccessorTable() {
-        return io.greptime.v1.Common.internal_static_greptime_v1_ResponseHeader_fieldAccessorTable
-            .ensureFieldAccessorsInitialized(
-                io.greptime.v1.Common.ResponseHeader.class, io.greptime.v1.Common.ResponseHeader.Builder.class);
-      }
-
-      // Construct using io.greptime.v1.Common.ResponseHeader.newBuilder()
-      private Builder() {
-        maybeForceBuilderInitialization();
-      }
-
-      private Builder(
-          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
-        super(parent);
-        maybeForceBuilderInitialization();
-      }
-      private void maybeForceBuilderInitialization() {
-        if (com.google.protobuf.GeneratedMessageV3
-                .alwaysUseFieldBuilders) {
-        }
-      }
-      @java.lang.Override
-      public Builder clear() {
-        super.clear();
-        return this;
-      }
-
-      @java.lang.Override
-      public com.google.protobuf.Descriptors.Descriptor
-          getDescriptorForType() {
-        return io.greptime.v1.Common.internal_static_greptime_v1_ResponseHeader_descriptor;
-      }
-
-      @java.lang.Override
-      public io.greptime.v1.Common.ResponseHeader getDefaultInstanceForType() {
-        return io.greptime.v1.Common.ResponseHeader.getDefaultInstance();
-      }
-
-      @java.lang.Override
-      public io.greptime.v1.Common.ResponseHeader build() {
-        io.greptime.v1.Common.ResponseHeader result = buildPartial();
-        if (!result.isInitialized()) {
-          throw newUninitializedMessageException(result);
-        }
-        return result;
-      }
-
-      @java.lang.Override
-      public io.greptime.v1.Common.ResponseHeader buildPartial() {
-        io.greptime.v1.Common.ResponseHeader result = new io.greptime.v1.Common.ResponseHeader(this);
-        onBuilt();
-        return result;
-      }
-
-      @java.lang.Override
-      public Builder clone() {
-        return super.clone();
-      }
-      @java.lang.Override
-      public Builder setField(
-          com.google.protobuf.Descriptors.FieldDescriptor field,
-          java.lang.Object value) {
-        return super.setField(field, value);
-      }
-      @java.lang.Override
-      public Builder clearField(
-          com.google.protobuf.Descriptors.FieldDescriptor field) {
-        return super.clearField(field);
-      }
-      @java.lang.Override
-      public Builder clearOneof(
-          com.google.protobuf.Descriptors.OneofDescriptor oneof) {
-        return super.clearOneof(oneof);
-      }
-      @java.lang.Override
-      public Builder setRepeatedField(
-          com.google.protobuf.Descriptors.FieldDescriptor field,
-          int index, java.lang.Object value) {
-        return super.setRepeatedField(field, index, value);
-      }
-      @java.lang.Override
-      public Builder addRepeatedField(
-          com.google.protobuf.Descriptors.FieldDescriptor field,
-          java.lang.Object value) {
-        return super.addRepeatedField(field, value);
-      }
-      @java.lang.Override
-      public Builder mergeFrom(com.google.protobuf.Message other) {
-        if (other instanceof io.greptime.v1.Common.ResponseHeader) {
-          return mergeFrom((io.greptime.v1.Common.ResponseHeader)other);
-        } else {
-          super.mergeFrom(other);
-          return this;
-        }
-      }
-
-      public Builder mergeFrom(io.greptime.v1.Common.ResponseHeader other) {
-        if (other == io.greptime.v1.Common.ResponseHeader.getDefaultInstance()) return this;
-        this.mergeUnknownFields(other.unknownFields);
-        onChanged();
-        return this;
-      }
-
-      @java.lang.Override
-      public final boolean isInitialized() {
-        return true;
-      }
-
-      @java.lang.Override
-      public Builder mergeFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        io.greptime.v1.Common.ResponseHeader parsedMessage = null;
-        try {
-          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
-        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-          parsedMessage = (io.greptime.v1.Common.ResponseHeader) e.getUnfinishedMessage();
-          throw e.unwrapIOException();
-        } finally {
-          if (parsedMessage != null) {
-            mergeFrom(parsedMessage);
-          }
-        }
-        return this;
-      }
-      @java.lang.Override
-      public final Builder setUnknownFields(
-          final com.google.protobuf.UnknownFieldSet unknownFields) {
-        return super.setUnknownFields(unknownFields);
-      }
-
-      @java.lang.Override
-      public final Builder mergeUnknownFields(
-          final com.google.protobuf.UnknownFieldSet unknownFields) {
-        return super.mergeUnknownFields(unknownFields);
-      }
+    /**
+     * <code>TAG = 0;</code>
+     */
+    public static final int TAG_VALUE = 0;
+    /**
+     * <code>FIELD = 1;</code>
+     */
+    public static final int FIELD_VALUE = 1;
+    /**
+     * <code>TIMESTAMP = 2;</code>
+     */
+    public static final int TIMESTAMP_VALUE = 2;
 
 
-      // @@protoc_insertion_point(builder_scope:greptime.v1.ResponseHeader)
+    public final int getNumber() {
+      if (this == UNRECOGNIZED) {
+        throw new java.lang.IllegalArgumentException(
+            "Can't get the number of an unknown enum value.");
+      }
+      return value;
     }
 
-    // @@protoc_insertion_point(class_scope:greptime.v1.ResponseHeader)
-    private static final io.greptime.v1.Common.ResponseHeader DEFAULT_INSTANCE;
-    static {
-      DEFAULT_INSTANCE = new io.greptime.v1.Common.ResponseHeader();
+    /**
+     * @param value The numeric wire value of the corresponding enum entry.
+     * @return The enum associated with the given numeric wire value.
+     * @deprecated Use {@link #forNumber(int)} instead.
+     */
+    @java.lang.Deprecated
+    public static SemanticType valueOf(int value) {
+      return forNumber(value);
     }
 
-    public static io.greptime.v1.Common.ResponseHeader getDefaultInstance() {
-      return DEFAULT_INSTANCE;
-    }
-
-    private static final com.google.protobuf.Parser<ResponseHeader>
-        PARSER = new com.google.protobuf.AbstractParser<ResponseHeader>() {
-      @java.lang.Override
-      public ResponseHeader parsePartialFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return new ResponseHeader(input, extensionRegistry);
+    /**
+     * @param value The numeric wire value of the corresponding enum entry.
+     * @return The enum associated with the given numeric wire value.
+     */
+    public static SemanticType forNumber(int value) {
+      switch (value) {
+        case 0: return TAG;
+        case 1: return FIELD;
+        case 2: return TIMESTAMP;
+        default: return null;
       }
-    };
-
-    public static com.google.protobuf.Parser<ResponseHeader> parser() {
-      return PARSER;
     }
 
-    @java.lang.Override
-    public com.google.protobuf.Parser<ResponseHeader> getParserForType() {
-      return PARSER;
+    public static com.google.protobuf.Internal.EnumLiteMap<SemanticType>
+        internalGetValueMap() {
+      return internalValueMap;
+    }
+    private static final com.google.protobuf.Internal.EnumLiteMap<
+        SemanticType> internalValueMap =
+          new com.google.protobuf.Internal.EnumLiteMap<SemanticType>() {
+            public SemanticType findValueByNumber(int number) {
+              return SemanticType.forNumber(number);
+            }
+          };
+
+    public final com.google.protobuf.Descriptors.EnumValueDescriptor
+        getValueDescriptor() {
+      if (this == UNRECOGNIZED) {
+        throw new java.lang.IllegalStateException(
+            "Can't get the descriptor of an unrecognized enum value.");
+      }
+      return getDescriptor().getValues().get(ordinal());
+    }
+    public final com.google.protobuf.Descriptors.EnumDescriptor
+        getDescriptorForType() {
+      return getDescriptor();
+    }
+    public static final com.google.protobuf.Descriptors.EnumDescriptor
+        getDescriptor() {
+      return io.greptime.v1.Common.getDescriptor().getEnumTypes().get(0);
     }
 
-    @java.lang.Override
-    public io.greptime.v1.Common.ResponseHeader getDefaultInstanceForType() {
-      return DEFAULT_INSTANCE;
+    private static final SemanticType[] VALUES = values();
+
+    public static SemanticType valueOf(
+        com.google.protobuf.Descriptors.EnumValueDescriptor desc) {
+      if (desc.getType() != getDescriptor()) {
+        throw new java.lang.IllegalArgumentException(
+          "EnumValueDescriptor is not for this type.");
+      }
+      if (desc.getIndex() == -1) {
+        return UNRECOGNIZED;
+      }
+      return VALUES[desc.getIndex()];
     }
 
+    private final int value;
+
+    private SemanticType(int value) {
+      this.value = value;
+    }
+
+    // @@protoc_insertion_point(enum_scope:greptime.v1.SemanticType)
+  }
+
+  /**
+   * Protobuf enum {@code greptime.v1.ColumnDataType}
+   */
+  public enum ColumnDataType
+      implements com.google.protobuf.ProtocolMessageEnum {
+    /**
+     * <code>BOOLEAN = 0;</code>
+     */
+    BOOLEAN(0),
+    /**
+     * <code>INT8 = 1;</code>
+     */
+    INT8(1),
+    /**
+     * <code>INT16 = 2;</code>
+     */
+    INT16(2),
+    /**
+     * <code>INT32 = 3;</code>
+     */
+    INT32(3),
+    /**
+     * <code>INT64 = 4;</code>
+     */
+    INT64(4),
+    /**
+     * <code>UINT8 = 5;</code>
+     */
+    UINT8(5),
+    /**
+     * <code>UINT16 = 6;</code>
+     */
+    UINT16(6),
+    /**
+     * <code>UINT32 = 7;</code>
+     */
+    UINT32(7),
+    /**
+     * <code>UINT64 = 8;</code>
+     */
+    UINT64(8),
+    /**
+     * <code>FLOAT32 = 9;</code>
+     */
+    FLOAT32(9),
+    /**
+     * <code>FLOAT64 = 10;</code>
+     */
+    FLOAT64(10),
+    /**
+     * <code>BINARY = 11;</code>
+     */
+    BINARY(11),
+    /**
+     * <code>STRING = 12;</code>
+     */
+    STRING(12),
+    /**
+     * <code>DATE = 13;</code>
+     */
+    DATE(13),
+    /**
+     * <code>DATETIME = 14;</code>
+     */
+    DATETIME(14),
+    /**
+     * <code>TIMESTAMP_SECOND = 15;</code>
+     */
+    TIMESTAMP_SECOND(15),
+    /**
+     * <code>TIMESTAMP_MILLISECOND = 16;</code>
+     */
+    TIMESTAMP_MILLISECOND(16),
+    /**
+     * <code>TIMESTAMP_MICROSECOND = 17;</code>
+     */
+    TIMESTAMP_MICROSECOND(17),
+    /**
+     * <code>TIMESTAMP_NANOSECOND = 18;</code>
+     */
+    TIMESTAMP_NANOSECOND(18),
+    /**
+     * <code>TIME_SECOND = 19;</code>
+     */
+    TIME_SECOND(19),
+    /**
+     * <code>TIME_MILLISECOND = 20;</code>
+     */
+    TIME_MILLISECOND(20),
+    /**
+     * <code>TIME_MICROSECOND = 21;</code>
+     */
+    TIME_MICROSECOND(21),
+    /**
+     * <code>TIME_NANOSECOND = 22;</code>
+     */
+    TIME_NANOSECOND(22),
+    /**
+     * <code>INTERVAL_YEAR_MONTH = 23;</code>
+     */
+    INTERVAL_YEAR_MONTH(23),
+    /**
+     * <code>INTERVAL_DAY_TIME = 24;</code>
+     */
+    INTERVAL_DAY_TIME(24),
+    /**
+     * <code>INTERVAL_MONTH_DAY_NANO = 25;</code>
+     */
+    INTERVAL_MONTH_DAY_NANO(25),
+    /**
+     * <code>DURATION_SECOND = 26;</code>
+     */
+    DURATION_SECOND(26),
+    /**
+     * <code>DURATION_MILLISECOND = 27;</code>
+     */
+    DURATION_MILLISECOND(27),
+    /**
+     * <code>DURATION_MICROSECOND = 28;</code>
+     */
+    DURATION_MICROSECOND(28),
+    /**
+     * <code>DURATION_NANOSECOND = 29;</code>
+     */
+    DURATION_NANOSECOND(29),
+    /**
+     * <code>DECIMAL128 = 30;</code>
+     */
+    DECIMAL128(30),
+    UNRECOGNIZED(-1),
+    ;
+
+    /**
+     * <code>BOOLEAN = 0;</code>
+     */
+    public static final int BOOLEAN_VALUE = 0;
+    /**
+     * <code>INT8 = 1;</code>
+     */
+    public static final int INT8_VALUE = 1;
+    /**
+     * <code>INT16 = 2;</code>
+     */
+    public static final int INT16_VALUE = 2;
+    /**
+     * <code>INT32 = 3;</code>
+     */
+    public static final int INT32_VALUE = 3;
+    /**
+     * <code>INT64 = 4;</code>
+     */
+    public static final int INT64_VALUE = 4;
+    /**
+     * <code>UINT8 = 5;</code>
+     */
+    public static final int UINT8_VALUE = 5;
+    /**
+     * <code>UINT16 = 6;</code>
+     */
+    public static final int UINT16_VALUE = 6;
+    /**
+     * <code>UINT32 = 7;</code>
+     */
+    public static final int UINT32_VALUE = 7;
+    /**
+     * <code>UINT64 = 8;</code>
+     */
+    public static final int UINT64_VALUE = 8;
+    /**
+     * <code>FLOAT32 = 9;</code>
+     */
+    public static final int FLOAT32_VALUE = 9;
+    /**
+     * <code>FLOAT64 = 10;</code>
+     */
+    public static final int FLOAT64_VALUE = 10;
+    /**
+     * <code>BINARY = 11;</code>
+     */
+    public static final int BINARY_VALUE = 11;
+    /**
+     * <code>STRING = 12;</code>
+     */
+    public static final int STRING_VALUE = 12;
+    /**
+     * <code>DATE = 13;</code>
+     */
+    public static final int DATE_VALUE = 13;
+    /**
+     * <code>DATETIME = 14;</code>
+     */
+    public static final int DATETIME_VALUE = 14;
+    /**
+     * <code>TIMESTAMP_SECOND = 15;</code>
+     */
+    public static final int TIMESTAMP_SECOND_VALUE = 15;
+    /**
+     * <code>TIMESTAMP_MILLISECOND = 16;</code>
+     */
+    public static final int TIMESTAMP_MILLISECOND_VALUE = 16;
+    /**
+     * <code>TIMESTAMP_MICROSECOND = 17;</code>
+     */
+    public static final int TIMESTAMP_MICROSECOND_VALUE = 17;
+    /**
+     * <code>TIMESTAMP_NANOSECOND = 18;</code>
+     */
+    public static final int TIMESTAMP_NANOSECOND_VALUE = 18;
+    /**
+     * <code>TIME_SECOND = 19;</code>
+     */
+    public static final int TIME_SECOND_VALUE = 19;
+    /**
+     * <code>TIME_MILLISECOND = 20;</code>
+     */
+    public static final int TIME_MILLISECOND_VALUE = 20;
+    /**
+     * <code>TIME_MICROSECOND = 21;</code>
+     */
+    public static final int TIME_MICROSECOND_VALUE = 21;
+    /**
+     * <code>TIME_NANOSECOND = 22;</code>
+     */
+    public static final int TIME_NANOSECOND_VALUE = 22;
+    /**
+     * <code>INTERVAL_YEAR_MONTH = 23;</code>
+     */
+    public static final int INTERVAL_YEAR_MONTH_VALUE = 23;
+    /**
+     * <code>INTERVAL_DAY_TIME = 24;</code>
+     */
+    public static final int INTERVAL_DAY_TIME_VALUE = 24;
+    /**
+     * <code>INTERVAL_MONTH_DAY_NANO = 25;</code>
+     */
+    public static final int INTERVAL_MONTH_DAY_NANO_VALUE = 25;
+    /**
+     * <code>DURATION_SECOND = 26;</code>
+     */
+    public static final int DURATION_SECOND_VALUE = 26;
+    /**
+     * <code>DURATION_MILLISECOND = 27;</code>
+     */
+    public static final int DURATION_MILLISECOND_VALUE = 27;
+    /**
+     * <code>DURATION_MICROSECOND = 28;</code>
+     */
+    public static final int DURATION_MICROSECOND_VALUE = 28;
+    /**
+     * <code>DURATION_NANOSECOND = 29;</code>
+     */
+    public static final int DURATION_NANOSECOND_VALUE = 29;
+    /**
+     * <code>DECIMAL128 = 30;</code>
+     */
+    public static final int DECIMAL128_VALUE = 30;
+
+
+    public final int getNumber() {
+      if (this == UNRECOGNIZED) {
+        throw new java.lang.IllegalArgumentException(
+            "Can't get the number of an unknown enum value.");
+      }
+      return value;
+    }
+
+    /**
+     * @param value The numeric wire value of the corresponding enum entry.
+     * @return The enum associated with the given numeric wire value.
+     * @deprecated Use {@link #forNumber(int)} instead.
+     */
+    @java.lang.Deprecated
+    public static ColumnDataType valueOf(int value) {
+      return forNumber(value);
+    }
+
+    /**
+     * @param value The numeric wire value of the corresponding enum entry.
+     * @return The enum associated with the given numeric wire value.
+     */
+    public static ColumnDataType forNumber(int value) {
+      switch (value) {
+        case 0: return BOOLEAN;
+        case 1: return INT8;
+        case 2: return INT16;
+        case 3: return INT32;
+        case 4: return INT64;
+        case 5: return UINT8;
+        case 6: return UINT16;
+        case 7: return UINT32;
+        case 8: return UINT64;
+        case 9: return FLOAT32;
+        case 10: return FLOAT64;
+        case 11: return BINARY;
+        case 12: return STRING;
+        case 13: return DATE;
+        case 14: return DATETIME;
+        case 15: return TIMESTAMP_SECOND;
+        case 16: return TIMESTAMP_MILLISECOND;
+        case 17: return TIMESTAMP_MICROSECOND;
+        case 18: return TIMESTAMP_NANOSECOND;
+        case 19: return TIME_SECOND;
+        case 20: return TIME_MILLISECOND;
+        case 21: return TIME_MICROSECOND;
+        case 22: return TIME_NANOSECOND;
+        case 23: return INTERVAL_YEAR_MONTH;
+        case 24: return INTERVAL_DAY_TIME;
+        case 25: return INTERVAL_MONTH_DAY_NANO;
+        case 26: return DURATION_SECOND;
+        case 27: return DURATION_MILLISECOND;
+        case 28: return DURATION_MICROSECOND;
+        case 29: return DURATION_NANOSECOND;
+        case 30: return DECIMAL128;
+        default: return null;
+      }
+    }
+
+    public static com.google.protobuf.Internal.EnumLiteMap<ColumnDataType>
+        internalGetValueMap() {
+      return internalValueMap;
+    }
+    private static final com.google.protobuf.Internal.EnumLiteMap<
+        ColumnDataType> internalValueMap =
+          new com.google.protobuf.Internal.EnumLiteMap<ColumnDataType>() {
+            public ColumnDataType findValueByNumber(int number) {
+              return ColumnDataType.forNumber(number);
+            }
+          };
+
+    public final com.google.protobuf.Descriptors.EnumValueDescriptor
+        getValueDescriptor() {
+      if (this == UNRECOGNIZED) {
+        throw new java.lang.IllegalStateException(
+            "Can't get the descriptor of an unrecognized enum value.");
+      }
+      return getDescriptor().getValues().get(ordinal());
+    }
+    public final com.google.protobuf.Descriptors.EnumDescriptor
+        getDescriptorForType() {
+      return getDescriptor();
+    }
+    public static final com.google.protobuf.Descriptors.EnumDescriptor
+        getDescriptor() {
+      return io.greptime.v1.Common.getDescriptor().getEnumTypes().get(1);
+    }
+
+    private static final ColumnDataType[] VALUES = values();
+
+    public static ColumnDataType valueOf(
+        com.google.protobuf.Descriptors.EnumValueDescriptor desc) {
+      if (desc.getType() != getDescriptor()) {
+        throw new java.lang.IllegalArgumentException(
+          "EnumValueDescriptor is not for this type.");
+      }
+      if (desc.getIndex() == -1) {
+        return UNRECOGNIZED;
+      }
+      return VALUES[desc.getIndex()];
+    }
+
+    private final int value;
+
+    private ColumnDataType(int value) {
+      this.value = value;
+    }
+
+    // @@protoc_insertion_point(enum_scope:greptime.v1.ColumnDataType)
   }
 
   public interface RequestHeaderOrBuilder extends
@@ -524,6 +590,67 @@ public final class Common {
      */
     com.google.protobuf.ByteString
         getDbnameBytes();
+
+    /**
+     * <pre>
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
+     * </pre>
+     *
+     * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+     */
+    int getTracingContextCount();
+    /**
+     * <pre>
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
+     * </pre>
+     *
+     * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+     */
+    boolean containsTracingContext(
+        java.lang.String key);
+    /**
+     * Use {@link #getTracingContextMap()} instead.
+     */
+    @java.lang.Deprecated
+    java.util.Map<java.lang.String, java.lang.String>
+    getTracingContext();
+    /**
+     * <pre>
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
+     * </pre>
+     *
+     * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+     */
+    java.util.Map<java.lang.String, java.lang.String>
+    getTracingContextMap();
+    /**
+     * <pre>
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
+     * </pre>
+     *
+     * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+     */
+
+    /* nullable */
+java.lang.String getTracingContextOrDefault(
+        java.lang.String key,
+        /* nullable */
+java.lang.String defaultValue);
+    /**
+     * <pre>
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
+     * </pre>
+     *
+     * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+     */
+
+    java.lang.String getTracingContextOrThrow(
+        java.lang.String key);
   }
   /**
    * Protobuf type {@code greptime.v1.RequestHeader}
@@ -563,6 +690,7 @@ public final class Common {
       if (extensionRegistry == null) {
         throw new java.lang.NullPointerException();
       }
+      int mutable_bitField0_ = 0;
       com.google.protobuf.UnknownFieldSet.Builder unknownFields =
           com.google.protobuf.UnknownFieldSet.newBuilder();
       try {
@@ -604,6 +732,19 @@ public final class Common {
               dbname_ = s;
               break;
             }
+            case 42: {
+              if (!((mutable_bitField0_ & 0x00000001) != 0)) {
+                tracingContext_ = com.google.protobuf.MapField.newMapField(
+                    TracingContextDefaultEntryHolder.defaultEntry);
+                mutable_bitField0_ |= 0x00000001;
+              }
+              com.google.protobuf.MapEntry<java.lang.String, java.lang.String>
+              tracingContext__ = input.readMessage(
+                  TracingContextDefaultEntryHolder.defaultEntry.getParserForType(), extensionRegistry);
+              tracingContext_.getMutableMap().put(
+                  tracingContext__.getKey(), tracingContext__.getValue());
+              break;
+            }
             default: {
               if (!parseUnknownField(
                   input, unknownFields, extensionRegistry, tag)) {
@@ -630,6 +771,18 @@ public final class Common {
       return io.greptime.v1.Common.internal_static_greptime_v1_RequestHeader_descriptor;
     }
 
+    @SuppressWarnings({"rawtypes"})
+    @java.lang.Override
+    protected com.google.protobuf.MapField internalGetMapField(
+        int number) {
+      switch (number) {
+        case 5:
+          return internalGetTracingContext();
+        default:
+          throw new RuntimeException(
+              "Invalid map field number: " + number);
+      }
+    }
     @java.lang.Override
     protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
         internalGetFieldAccessorTable() {
@@ -814,6 +967,107 @@ public final class Common {
       }
     }
 
+    public static final int TRACING_CONTEXT_FIELD_NUMBER = 5;
+    private static final class TracingContextDefaultEntryHolder {
+      static final com.google.protobuf.MapEntry<
+          java.lang.String, java.lang.String> defaultEntry =
+              com.google.protobuf.MapEntry
+              .<java.lang.String, java.lang.String>newDefaultInstance(
+                  io.greptime.v1.Common.internal_static_greptime_v1_RequestHeader_TracingContextEntry_descriptor, 
+                  com.google.protobuf.WireFormat.FieldType.STRING,
+                  "",
+                  com.google.protobuf.WireFormat.FieldType.STRING,
+                  "");
+    }
+    private com.google.protobuf.MapField<
+        java.lang.String, java.lang.String> tracingContext_;
+    private com.google.protobuf.MapField<java.lang.String, java.lang.String>
+    internalGetTracingContext() {
+      if (tracingContext_ == null) {
+        return com.google.protobuf.MapField.emptyMapField(
+            TracingContextDefaultEntryHolder.defaultEntry);
+      }
+      return tracingContext_;
+    }
+
+    public int getTracingContextCount() {
+      return internalGetTracingContext().getMap().size();
+    }
+    /**
+     * <pre>
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
+     * </pre>
+     *
+     * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+     */
+
+    @java.lang.Override
+    public boolean containsTracingContext(
+        java.lang.String key) {
+      if (key == null) { throw new NullPointerException("map key"); }
+      return internalGetTracingContext().getMap().containsKey(key);
+    }
+    /**
+     * Use {@link #getTracingContextMap()} instead.
+     */
+    @java.lang.Override
+    @java.lang.Deprecated
+    public java.util.Map<java.lang.String, java.lang.String> getTracingContext() {
+      return getTracingContextMap();
+    }
+    /**
+     * <pre>
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
+     * </pre>
+     *
+     * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+     */
+    @java.lang.Override
+
+    public java.util.Map<java.lang.String, java.lang.String> getTracingContextMap() {
+      return internalGetTracingContext().getMap();
+    }
+    /**
+     * <pre>
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
+     * </pre>
+     *
+     * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+     */
+    @java.lang.Override
+
+    public java.lang.String getTracingContextOrDefault(
+        java.lang.String key,
+        java.lang.String defaultValue) {
+      if (key == null) { throw new NullPointerException("map key"); }
+      java.util.Map<java.lang.String, java.lang.String> map =
+          internalGetTracingContext().getMap();
+      return map.containsKey(key) ? map.get(key) : defaultValue;
+    }
+    /**
+     * <pre>
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
+     * </pre>
+     *
+     * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+     */
+    @java.lang.Override
+
+    public java.lang.String getTracingContextOrThrow(
+        java.lang.String key) {
+      if (key == null) { throw new NullPointerException("map key"); }
+      java.util.Map<java.lang.String, java.lang.String> map =
+          internalGetTracingContext().getMap();
+      if (!map.containsKey(key)) {
+        throw new java.lang.IllegalArgumentException();
+      }
+      return map.get(key);
+    }
+
     private byte memoizedIsInitialized = -1;
     @java.lang.Override
     public final boolean isInitialized() {
@@ -840,6 +1094,12 @@ public final class Common {
       if (!com.google.protobuf.GeneratedMessageV3.isStringEmpty(dbname_)) {
         com.google.protobuf.GeneratedMessageV3.writeString(output, 4, dbname_);
       }
+      com.google.protobuf.GeneratedMessageV3
+        .serializeStringMapTo(
+          output,
+          internalGetTracingContext(),
+          TracingContextDefaultEntryHolder.defaultEntry,
+          5);
       unknownFields.writeTo(output);
     }
 
@@ -861,6 +1121,16 @@ public final class Common {
       }
       if (!com.google.protobuf.GeneratedMessageV3.isStringEmpty(dbname_)) {
         size += com.google.protobuf.GeneratedMessageV3.computeStringSize(4, dbname_);
+      }
+      for (java.util.Map.Entry<java.lang.String, java.lang.String> entry
+           : internalGetTracingContext().getMap().entrySet()) {
+        com.google.protobuf.MapEntry<java.lang.String, java.lang.String>
+        tracingContext__ = TracingContextDefaultEntryHolder.defaultEntry.newBuilderForType()
+            .setKey(entry.getKey())
+            .setValue(entry.getValue())
+            .build();
+        size += com.google.protobuf.CodedOutputStream
+            .computeMessageSize(5, tracingContext__);
       }
       size += unknownFields.getSerializedSize();
       memoizedSize = size;
@@ -888,6 +1158,8 @@ public final class Common {
       }
       if (!getDbname()
           .equals(other.getDbname())) return false;
+      if (!internalGetTracingContext().equals(
+          other.internalGetTracingContext())) return false;
       if (!unknownFields.equals(other.unknownFields)) return false;
       return true;
     }
@@ -909,6 +1181,10 @@ public final class Common {
       }
       hash = (37 * hash) + DBNAME_FIELD_NUMBER;
       hash = (53 * hash) + getDbname().hashCode();
+      if (!internalGetTracingContext().getMap().isEmpty()) {
+        hash = (37 * hash) + TRACING_CONTEXT_FIELD_NUMBER;
+        hash = (53 * hash) + internalGetTracingContext().hashCode();
+      }
       hash = (29 * hash) + unknownFields.hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -1016,6 +1292,28 @@ public final class Common {
         return io.greptime.v1.Common.internal_static_greptime_v1_RequestHeader_descriptor;
       }
 
+      @SuppressWarnings({"rawtypes"})
+      protected com.google.protobuf.MapField internalGetMapField(
+          int number) {
+        switch (number) {
+          case 5:
+            return internalGetTracingContext();
+          default:
+            throw new RuntimeException(
+                "Invalid map field number: " + number);
+        }
+      }
+      @SuppressWarnings({"rawtypes"})
+      protected com.google.protobuf.MapField internalGetMutableMapField(
+          int number) {
+        switch (number) {
+          case 5:
+            return internalGetMutableTracingContext();
+          default:
+            throw new RuntimeException(
+                "Invalid map field number: " + number);
+        }
+      }
       @java.lang.Override
       protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
           internalGetFieldAccessorTable() {
@@ -1054,6 +1352,7 @@ public final class Common {
         }
         dbname_ = "";
 
+        internalGetMutableTracingContext().clear();
         return this;
       }
 
@@ -1080,6 +1379,7 @@ public final class Common {
       @java.lang.Override
       public io.greptime.v1.Common.RequestHeader buildPartial() {
         io.greptime.v1.Common.RequestHeader result = new io.greptime.v1.Common.RequestHeader(this);
+        int from_bitField0_ = bitField0_;
         result.catalog_ = catalog_;
         result.schema_ = schema_;
         if (authorizationBuilder_ == null) {
@@ -1088,6 +1388,8 @@ public final class Common {
           result.authorization_ = authorizationBuilder_.build();
         }
         result.dbname_ = dbname_;
+        result.tracingContext_ = internalGetTracingContext();
+        result.tracingContext_.makeImmutable();
         onBuilt();
         return result;
       }
@@ -1151,6 +1453,8 @@ public final class Common {
           dbname_ = other.dbname_;
           onChanged();
         }
+        internalGetMutableTracingContext().mergeFrom(
+            other.internalGetTracingContext());
         this.mergeUnknownFields(other.unknownFields);
         onChanged();
         return this;
@@ -1179,6 +1483,7 @@ public final class Common {
         }
         return this;
       }
+      private int bitField0_;
 
       private java.lang.Object catalog_ = "";
       /**
@@ -1622,6 +1927,172 @@ public final class Common {
         onChanged();
         return this;
       }
+
+      private com.google.protobuf.MapField<
+          java.lang.String, java.lang.String> tracingContext_;
+      private com.google.protobuf.MapField<java.lang.String, java.lang.String>
+      internalGetTracingContext() {
+        if (tracingContext_ == null) {
+          return com.google.protobuf.MapField.emptyMapField(
+              TracingContextDefaultEntryHolder.defaultEntry);
+        }
+        return tracingContext_;
+      }
+      private com.google.protobuf.MapField<java.lang.String, java.lang.String>
+      internalGetMutableTracingContext() {
+        onChanged();;
+        if (tracingContext_ == null) {
+          tracingContext_ = com.google.protobuf.MapField.newMapField(
+              TracingContextDefaultEntryHolder.defaultEntry);
+        }
+        if (!tracingContext_.isMutable()) {
+          tracingContext_ = tracingContext_.copy();
+        }
+        return tracingContext_;
+      }
+
+      public int getTracingContextCount() {
+        return internalGetTracingContext().getMap().size();
+      }
+      /**
+       * <pre>
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
+       * </pre>
+       *
+       * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+       */
+
+      @java.lang.Override
+      public boolean containsTracingContext(
+          java.lang.String key) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        return internalGetTracingContext().getMap().containsKey(key);
+      }
+      /**
+       * Use {@link #getTracingContextMap()} instead.
+       */
+      @java.lang.Override
+      @java.lang.Deprecated
+      public java.util.Map<java.lang.String, java.lang.String> getTracingContext() {
+        return getTracingContextMap();
+      }
+      /**
+       * <pre>
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
+       * </pre>
+       *
+       * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+       */
+      @java.lang.Override
+
+      public java.util.Map<java.lang.String, java.lang.String> getTracingContextMap() {
+        return internalGetTracingContext().getMap();
+      }
+      /**
+       * <pre>
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
+       * </pre>
+       *
+       * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+       */
+      @java.lang.Override
+
+      public java.lang.String getTracingContextOrDefault(
+          java.lang.String key,
+          java.lang.String defaultValue) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        java.util.Map<java.lang.String, java.lang.String> map =
+            internalGetTracingContext().getMap();
+        return map.containsKey(key) ? map.get(key) : defaultValue;
+      }
+      /**
+       * <pre>
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
+       * </pre>
+       *
+       * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+       */
+      @java.lang.Override
+
+      public java.lang.String getTracingContextOrThrow(
+          java.lang.String key) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        java.util.Map<java.lang.String, java.lang.String> map =
+            internalGetTracingContext().getMap();
+        if (!map.containsKey(key)) {
+          throw new java.lang.IllegalArgumentException();
+        }
+        return map.get(key);
+      }
+
+      public Builder clearTracingContext() {
+        internalGetMutableTracingContext().getMutableMap()
+            .clear();
+        return this;
+      }
+      /**
+       * <pre>
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
+       * </pre>
+       *
+       * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+       */
+
+      public Builder removeTracingContext(
+          java.lang.String key) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        internalGetMutableTracingContext().getMutableMap()
+            .remove(key);
+        return this;
+      }
+      /**
+       * Use alternate mutation accessors instead.
+       */
+      @java.lang.Deprecated
+      public java.util.Map<java.lang.String, java.lang.String>
+      getMutableTracingContext() {
+        return internalGetMutableTracingContext().getMutableMap();
+      }
+      /**
+       * <pre>
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
+       * </pre>
+       *
+       * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+       */
+      public Builder putTracingContext(
+          java.lang.String key,
+          java.lang.String value) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        if (value == null) {
+  throw new NullPointerException("map value");
+}
+
+        internalGetMutableTracingContext().getMutableMap()
+            .put(key, value);
+        return this;
+      }
+      /**
+       * <pre>
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
+       * </pre>
+       *
+       * <code>map&lt;string, string&gt; tracing_context = 5;</code>
+       */
+
+      public Builder putAllTracingContext(
+          java.util.Map<java.lang.String, java.lang.String> values) {
+        internalGetMutableTracingContext().getMutableMap()
+            .putAll(values);
+        return this;
+      }
       @java.lang.Override
       public final Builder setUnknownFields(
           final com.google.protobuf.UnknownFieldSet unknownFields) {
@@ -1670,6 +2141,1289 @@ public final class Common {
 
     @java.lang.Override
     public io.greptime.v1.Common.RequestHeader getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
+  public interface ResponseHeaderOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:greptime.v1.ResponseHeader)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>.greptime.v1.Status status = 1;</code>
+     * @return Whether the status field is set.
+     */
+    boolean hasStatus();
+    /**
+     * <code>.greptime.v1.Status status = 1;</code>
+     * @return The status.
+     */
+    io.greptime.v1.Common.Status getStatus();
+    /**
+     * <code>.greptime.v1.Status status = 1;</code>
+     */
+    io.greptime.v1.Common.StatusOrBuilder getStatusOrBuilder();
+  }
+  /**
+   * Protobuf type {@code greptime.v1.ResponseHeader}
+   */
+  public static final class ResponseHeader extends
+      com.google.protobuf.GeneratedMessageV3 implements
+      // @@protoc_insertion_point(message_implements:greptime.v1.ResponseHeader)
+      ResponseHeaderOrBuilder {
+  private static final long serialVersionUID = 0L;
+    // Use ResponseHeader.newBuilder() to construct.
+    private ResponseHeader(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+      super(builder);
+    }
+    private ResponseHeader() {
+    }
+
+    @java.lang.Override
+    @SuppressWarnings({"unused"})
+    protected java.lang.Object newInstance(
+        UnusedPrivateParameter unused) {
+      return new ResponseHeader();
+    }
+
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+    getUnknownFields() {
+      return this.unknownFields;
+    }
+    private ResponseHeader(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      this();
+      if (extensionRegistry == null) {
+        throw new java.lang.NullPointerException();
+      }
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            case 10: {
+              io.greptime.v1.Common.Status.Builder subBuilder = null;
+              if (status_ != null) {
+                subBuilder = status_.toBuilder();
+              }
+              status_ = input.readMessage(io.greptime.v1.Common.Status.parser(), extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom(status_);
+                status_ = subBuilder.buildPartial();
+              }
+
+              break;
+            }
+            default: {
+              if (!parseUnknownField(
+                  input, unknownFields, extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (com.google.protobuf.UninitializedMessageException e) {
+        throw e.asInvalidProtocolBufferException().setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return io.greptime.v1.Common.internal_static_greptime_v1_ResponseHeader_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return io.greptime.v1.Common.internal_static_greptime_v1_ResponseHeader_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              io.greptime.v1.Common.ResponseHeader.class, io.greptime.v1.Common.ResponseHeader.Builder.class);
+    }
+
+    public static final int STATUS_FIELD_NUMBER = 1;
+    private io.greptime.v1.Common.Status status_;
+    /**
+     * <code>.greptime.v1.Status status = 1;</code>
+     * @return Whether the status field is set.
+     */
+    @java.lang.Override
+    public boolean hasStatus() {
+      return status_ != null;
+    }
+    /**
+     * <code>.greptime.v1.Status status = 1;</code>
+     * @return The status.
+     */
+    @java.lang.Override
+    public io.greptime.v1.Common.Status getStatus() {
+      return status_ == null ? io.greptime.v1.Common.Status.getDefaultInstance() : status_;
+    }
+    /**
+     * <code>.greptime.v1.Status status = 1;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.Common.StatusOrBuilder getStatusOrBuilder() {
+      return getStatus();
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      if (status_ != null) {
+        output.writeMessage(1, getStatus());
+      }
+      unknownFields.writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (status_ != null) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, getStatus());
+      }
+      size += unknownFields.getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof io.greptime.v1.Common.ResponseHeader)) {
+        return super.equals(obj);
+      }
+      io.greptime.v1.Common.ResponseHeader other = (io.greptime.v1.Common.ResponseHeader) obj;
+
+      if (hasStatus() != other.hasStatus()) return false;
+      if (hasStatus()) {
+        if (!getStatus()
+            .equals(other.getStatus())) return false;
+      }
+      if (!unknownFields.equals(other.unknownFields)) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      if (hasStatus()) {
+        hash = (37 * hash) + STATUS_FIELD_NUMBER;
+        hash = (53 * hash) + getStatus().hashCode();
+      }
+      hash = (29 * hash) + unknownFields.hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static io.greptime.v1.Common.ResponseHeader parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.ResponseHeader parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.ResponseHeader parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.ResponseHeader parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.ResponseHeader parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.ResponseHeader parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.ResponseHeader parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.ResponseHeader parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.ResponseHeader parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.ResponseHeader parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.ResponseHeader parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.ResponseHeader parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(io.greptime.v1.Common.ResponseHeader prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code greptime.v1.ResponseHeader}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:greptime.v1.ResponseHeader)
+        io.greptime.v1.Common.ResponseHeaderOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_ResponseHeader_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_ResponseHeader_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                io.greptime.v1.Common.ResponseHeader.class, io.greptime.v1.Common.ResponseHeader.Builder.class);
+      }
+
+      // Construct using io.greptime.v1.Common.ResponseHeader.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessageV3
+                .alwaysUseFieldBuilders) {
+        }
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        if (statusBuilder_ == null) {
+          status_ = null;
+        } else {
+          status_ = null;
+          statusBuilder_ = null;
+        }
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_ResponseHeader_descriptor;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.ResponseHeader getDefaultInstanceForType() {
+        return io.greptime.v1.Common.ResponseHeader.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.ResponseHeader build() {
+        io.greptime.v1.Common.ResponseHeader result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.ResponseHeader buildPartial() {
+        io.greptime.v1.Common.ResponseHeader result = new io.greptime.v1.Common.ResponseHeader(this);
+        if (statusBuilder_ == null) {
+          result.status_ = status_;
+        } else {
+          result.status_ = statusBuilder_.build();
+        }
+        onBuilt();
+        return result;
+      }
+
+      @java.lang.Override
+      public Builder clone() {
+        return super.clone();
+      }
+      @java.lang.Override
+      public Builder setField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.setField(field, value);
+      }
+      @java.lang.Override
+      public Builder clearField(
+          com.google.protobuf.Descriptors.FieldDescriptor field) {
+        return super.clearField(field);
+      }
+      @java.lang.Override
+      public Builder clearOneof(
+          com.google.protobuf.Descriptors.OneofDescriptor oneof) {
+        return super.clearOneof(oneof);
+      }
+      @java.lang.Override
+      public Builder setRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          int index, java.lang.Object value) {
+        return super.setRepeatedField(field, index, value);
+      }
+      @java.lang.Override
+      public Builder addRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.addRepeatedField(field, value);
+      }
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof io.greptime.v1.Common.ResponseHeader) {
+          return mergeFrom((io.greptime.v1.Common.ResponseHeader)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(io.greptime.v1.Common.ResponseHeader other) {
+        if (other == io.greptime.v1.Common.ResponseHeader.getDefaultInstance()) return this;
+        if (other.hasStatus()) {
+          mergeStatus(other.getStatus());
+        }
+        this.mergeUnknownFields(other.unknownFields);
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        io.greptime.v1.Common.ResponseHeader parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (io.greptime.v1.Common.ResponseHeader) e.getUnfinishedMessage();
+          throw e.unwrapIOException();
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+
+      private io.greptime.v1.Common.Status status_;
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.Common.Status, io.greptime.v1.Common.Status.Builder, io.greptime.v1.Common.StatusOrBuilder> statusBuilder_;
+      /**
+       * <code>.greptime.v1.Status status = 1;</code>
+       * @return Whether the status field is set.
+       */
+      public boolean hasStatus() {
+        return statusBuilder_ != null || status_ != null;
+      }
+      /**
+       * <code>.greptime.v1.Status status = 1;</code>
+       * @return The status.
+       */
+      public io.greptime.v1.Common.Status getStatus() {
+        if (statusBuilder_ == null) {
+          return status_ == null ? io.greptime.v1.Common.Status.getDefaultInstance() : status_;
+        } else {
+          return statusBuilder_.getMessage();
+        }
+      }
+      /**
+       * <code>.greptime.v1.Status status = 1;</code>
+       */
+      public Builder setStatus(io.greptime.v1.Common.Status value) {
+        if (statusBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          status_ = value;
+          onChanged();
+        } else {
+          statusBuilder_.setMessage(value);
+        }
+
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.Status status = 1;</code>
+       */
+      public Builder setStatus(
+          io.greptime.v1.Common.Status.Builder builderForValue) {
+        if (statusBuilder_ == null) {
+          status_ = builderForValue.build();
+          onChanged();
+        } else {
+          statusBuilder_.setMessage(builderForValue.build());
+        }
+
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.Status status = 1;</code>
+       */
+      public Builder mergeStatus(io.greptime.v1.Common.Status value) {
+        if (statusBuilder_ == null) {
+          if (status_ != null) {
+            status_ =
+              io.greptime.v1.Common.Status.newBuilder(status_).mergeFrom(value).buildPartial();
+          } else {
+            status_ = value;
+          }
+          onChanged();
+        } else {
+          statusBuilder_.mergeFrom(value);
+        }
+
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.Status status = 1;</code>
+       */
+      public Builder clearStatus() {
+        if (statusBuilder_ == null) {
+          status_ = null;
+          onChanged();
+        } else {
+          status_ = null;
+          statusBuilder_ = null;
+        }
+
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.Status status = 1;</code>
+       */
+      public io.greptime.v1.Common.Status.Builder getStatusBuilder() {
+        
+        onChanged();
+        return getStatusFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>.greptime.v1.Status status = 1;</code>
+       */
+      public io.greptime.v1.Common.StatusOrBuilder getStatusOrBuilder() {
+        if (statusBuilder_ != null) {
+          return statusBuilder_.getMessageOrBuilder();
+        } else {
+          return status_ == null ?
+              io.greptime.v1.Common.Status.getDefaultInstance() : status_;
+        }
+      }
+      /**
+       * <code>.greptime.v1.Status status = 1;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.Common.Status, io.greptime.v1.Common.Status.Builder, io.greptime.v1.Common.StatusOrBuilder> 
+          getStatusFieldBuilder() {
+        if (statusBuilder_ == null) {
+          statusBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+              io.greptime.v1.Common.Status, io.greptime.v1.Common.Status.Builder, io.greptime.v1.Common.StatusOrBuilder>(
+                  getStatus(),
+                  getParentForChildren(),
+                  isClean());
+          status_ = null;
+        }
+        return statusBuilder_;
+      }
+      @java.lang.Override
+      public final Builder setUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.setUnknownFields(unknownFields);
+      }
+
+      @java.lang.Override
+      public final Builder mergeUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.mergeUnknownFields(unknownFields);
+      }
+
+
+      // @@protoc_insertion_point(builder_scope:greptime.v1.ResponseHeader)
+    }
+
+    // @@protoc_insertion_point(class_scope:greptime.v1.ResponseHeader)
+    private static final io.greptime.v1.Common.ResponseHeader DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new io.greptime.v1.Common.ResponseHeader();
+    }
+
+    public static io.greptime.v1.Common.ResponseHeader getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<ResponseHeader>
+        PARSER = new com.google.protobuf.AbstractParser<ResponseHeader>() {
+      @java.lang.Override
+      public ResponseHeader parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new ResponseHeader(input, extensionRegistry);
+      }
+    };
+
+    public static com.google.protobuf.Parser<ResponseHeader> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<ResponseHeader> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public io.greptime.v1.Common.ResponseHeader getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
+  public interface StatusOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:greptime.v1.Status)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <pre>
+     * Corresponding to the `StatusCode` definition of GreptimeDB
+     * </pre>
+     *
+     * <code>uint32 status_code = 1;</code>
+     * @return The statusCode.
+     */
+    int getStatusCode();
+
+    /**
+     * <code>string err_msg = 2;</code>
+     * @return The errMsg.
+     */
+    java.lang.String getErrMsg();
+    /**
+     * <code>string err_msg = 2;</code>
+     * @return The bytes for errMsg.
+     */
+    com.google.protobuf.ByteString
+        getErrMsgBytes();
+  }
+  /**
+   * Protobuf type {@code greptime.v1.Status}
+   */
+  public static final class Status extends
+      com.google.protobuf.GeneratedMessageV3 implements
+      // @@protoc_insertion_point(message_implements:greptime.v1.Status)
+      StatusOrBuilder {
+  private static final long serialVersionUID = 0L;
+    // Use Status.newBuilder() to construct.
+    private Status(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+      super(builder);
+    }
+    private Status() {
+      errMsg_ = "";
+    }
+
+    @java.lang.Override
+    @SuppressWarnings({"unused"})
+    protected java.lang.Object newInstance(
+        UnusedPrivateParameter unused) {
+      return new Status();
+    }
+
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+    getUnknownFields() {
+      return this.unknownFields;
+    }
+    private Status(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      this();
+      if (extensionRegistry == null) {
+        throw new java.lang.NullPointerException();
+      }
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            case 8: {
+
+              statusCode_ = input.readUInt32();
+              break;
+            }
+            case 18: {
+              java.lang.String s = input.readStringRequireUtf8();
+
+              errMsg_ = s;
+              break;
+            }
+            default: {
+              if (!parseUnknownField(
+                  input, unknownFields, extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (com.google.protobuf.UninitializedMessageException e) {
+        throw e.asInvalidProtocolBufferException().setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return io.greptime.v1.Common.internal_static_greptime_v1_Status_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return io.greptime.v1.Common.internal_static_greptime_v1_Status_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              io.greptime.v1.Common.Status.class, io.greptime.v1.Common.Status.Builder.class);
+    }
+
+    public static final int STATUS_CODE_FIELD_NUMBER = 1;
+    private int statusCode_;
+    /**
+     * <pre>
+     * Corresponding to the `StatusCode` definition of GreptimeDB
+     * </pre>
+     *
+     * <code>uint32 status_code = 1;</code>
+     * @return The statusCode.
+     */
+    @java.lang.Override
+    public int getStatusCode() {
+      return statusCode_;
+    }
+
+    public static final int ERR_MSG_FIELD_NUMBER = 2;
+    private volatile java.lang.Object errMsg_;
+    /**
+     * <code>string err_msg = 2;</code>
+     * @return The errMsg.
+     */
+    @java.lang.Override
+    public java.lang.String getErrMsg() {
+      java.lang.Object ref = errMsg_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        errMsg_ = s;
+        return s;
+      }
+    }
+    /**
+     * <code>string err_msg = 2;</code>
+     * @return The bytes for errMsg.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getErrMsgBytes() {
+      java.lang.Object ref = errMsg_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        errMsg_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      if (statusCode_ != 0) {
+        output.writeUInt32(1, statusCode_);
+      }
+      if (!com.google.protobuf.GeneratedMessageV3.isStringEmpty(errMsg_)) {
+        com.google.protobuf.GeneratedMessageV3.writeString(output, 2, errMsg_);
+      }
+      unknownFields.writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (statusCode_ != 0) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeUInt32Size(1, statusCode_);
+      }
+      if (!com.google.protobuf.GeneratedMessageV3.isStringEmpty(errMsg_)) {
+        size += com.google.protobuf.GeneratedMessageV3.computeStringSize(2, errMsg_);
+      }
+      size += unknownFields.getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof io.greptime.v1.Common.Status)) {
+        return super.equals(obj);
+      }
+      io.greptime.v1.Common.Status other = (io.greptime.v1.Common.Status) obj;
+
+      if (getStatusCode()
+          != other.getStatusCode()) return false;
+      if (!getErrMsg()
+          .equals(other.getErrMsg())) return false;
+      if (!unknownFields.equals(other.unknownFields)) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      hash = (37 * hash) + STATUS_CODE_FIELD_NUMBER;
+      hash = (53 * hash) + getStatusCode();
+      hash = (37 * hash) + ERR_MSG_FIELD_NUMBER;
+      hash = (53 * hash) + getErrMsg().hashCode();
+      hash = (29 * hash) + unknownFields.hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static io.greptime.v1.Common.Status parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.Status parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.Status parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.Status parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.Status parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.Status parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.Status parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.Status parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.Status parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.Status parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.Status parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.Status parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(io.greptime.v1.Common.Status prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code greptime.v1.Status}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:greptime.v1.Status)
+        io.greptime.v1.Common.StatusOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_Status_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_Status_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                io.greptime.v1.Common.Status.class, io.greptime.v1.Common.Status.Builder.class);
+      }
+
+      // Construct using io.greptime.v1.Common.Status.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessageV3
+                .alwaysUseFieldBuilders) {
+        }
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        statusCode_ = 0;
+
+        errMsg_ = "";
+
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_Status_descriptor;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.Status getDefaultInstanceForType() {
+        return io.greptime.v1.Common.Status.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.Status build() {
+        io.greptime.v1.Common.Status result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.Status buildPartial() {
+        io.greptime.v1.Common.Status result = new io.greptime.v1.Common.Status(this);
+        result.statusCode_ = statusCode_;
+        result.errMsg_ = errMsg_;
+        onBuilt();
+        return result;
+      }
+
+      @java.lang.Override
+      public Builder clone() {
+        return super.clone();
+      }
+      @java.lang.Override
+      public Builder setField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.setField(field, value);
+      }
+      @java.lang.Override
+      public Builder clearField(
+          com.google.protobuf.Descriptors.FieldDescriptor field) {
+        return super.clearField(field);
+      }
+      @java.lang.Override
+      public Builder clearOneof(
+          com.google.protobuf.Descriptors.OneofDescriptor oneof) {
+        return super.clearOneof(oneof);
+      }
+      @java.lang.Override
+      public Builder setRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          int index, java.lang.Object value) {
+        return super.setRepeatedField(field, index, value);
+      }
+      @java.lang.Override
+      public Builder addRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.addRepeatedField(field, value);
+      }
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof io.greptime.v1.Common.Status) {
+          return mergeFrom((io.greptime.v1.Common.Status)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(io.greptime.v1.Common.Status other) {
+        if (other == io.greptime.v1.Common.Status.getDefaultInstance()) return this;
+        if (other.getStatusCode() != 0) {
+          setStatusCode(other.getStatusCode());
+        }
+        if (!other.getErrMsg().isEmpty()) {
+          errMsg_ = other.errMsg_;
+          onChanged();
+        }
+        this.mergeUnknownFields(other.unknownFields);
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        io.greptime.v1.Common.Status parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (io.greptime.v1.Common.Status) e.getUnfinishedMessage();
+          throw e.unwrapIOException();
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+
+      private int statusCode_ ;
+      /**
+       * <pre>
+       * Corresponding to the `StatusCode` definition of GreptimeDB
+       * </pre>
+       *
+       * <code>uint32 status_code = 1;</code>
+       * @return The statusCode.
+       */
+      @java.lang.Override
+      public int getStatusCode() {
+        return statusCode_;
+      }
+      /**
+       * <pre>
+       * Corresponding to the `StatusCode` definition of GreptimeDB
+       * </pre>
+       *
+       * <code>uint32 status_code = 1;</code>
+       * @param value The statusCode to set.
+       * @return This builder for chaining.
+       */
+      public Builder setStatusCode(int value) {
+        
+        statusCode_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * Corresponding to the `StatusCode` definition of GreptimeDB
+       * </pre>
+       *
+       * <code>uint32 status_code = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearStatusCode() {
+        
+        statusCode_ = 0;
+        onChanged();
+        return this;
+      }
+
+      private java.lang.Object errMsg_ = "";
+      /**
+       * <code>string err_msg = 2;</code>
+       * @return The errMsg.
+       */
+      public java.lang.String getErrMsg() {
+        java.lang.Object ref = errMsg_;
+        if (!(ref instanceof java.lang.String)) {
+          com.google.protobuf.ByteString bs =
+              (com.google.protobuf.ByteString) ref;
+          java.lang.String s = bs.toStringUtf8();
+          errMsg_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <code>string err_msg = 2;</code>
+       * @return The bytes for errMsg.
+       */
+      public com.google.protobuf.ByteString
+          getErrMsgBytes() {
+        java.lang.Object ref = errMsg_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          errMsg_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <code>string err_msg = 2;</code>
+       * @param value The errMsg to set.
+       * @return This builder for chaining.
+       */
+      public Builder setErrMsg(
+          java.lang.String value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  
+        errMsg_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>string err_msg = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearErrMsg() {
+        
+        errMsg_ = getDefaultInstance().getErrMsg();
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>string err_msg = 2;</code>
+       * @param value The bytes for errMsg to set.
+       * @return This builder for chaining.
+       */
+      public Builder setErrMsgBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  checkByteStringIsUtf8(value);
+        
+        errMsg_ = value;
+        onChanged();
+        return this;
+      }
+      @java.lang.Override
+      public final Builder setUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.setUnknownFields(unknownFields);
+      }
+
+      @java.lang.Override
+      public final Builder mergeUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.mergeUnknownFields(unknownFields);
+      }
+
+
+      // @@protoc_insertion_point(builder_scope:greptime.v1.Status)
+    }
+
+    // @@protoc_insertion_point(class_scope:greptime.v1.Status)
+    private static final io.greptime.v1.Common.Status DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new io.greptime.v1.Common.Status();
+    }
+
+    public static io.greptime.v1.Common.Status getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<Status>
+        PARSER = new com.google.protobuf.AbstractParser<Status>() {
+      @java.lang.Override
+      public Status parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new Status(input, extensionRegistry);
+      }
+    };
+
+    public static com.google.protobuf.Parser<Status> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<Status> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public io.greptime.v1.Common.Status getDefaultInstanceForType() {
       return DEFAULT_INSTANCE;
     }
 
@@ -5029,16 +6783,2516 @@ public final class Common {
 
   }
 
+  public interface IntervalMonthDayNanoOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:greptime.v1.IntervalMonthDayNano)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>int32 months = 1;</code>
+     * @return The months.
+     */
+    int getMonths();
+
+    /**
+     * <code>int32 days = 2;</code>
+     * @return The days.
+     */
+    int getDays();
+
+    /**
+     * <code>int64 nanoseconds = 3;</code>
+     * @return The nanoseconds.
+     */
+    long getNanoseconds();
+  }
+  /**
+   * Protobuf type {@code greptime.v1.IntervalMonthDayNano}
+   */
+  public static final class IntervalMonthDayNano extends
+      com.google.protobuf.GeneratedMessageV3 implements
+      // @@protoc_insertion_point(message_implements:greptime.v1.IntervalMonthDayNano)
+      IntervalMonthDayNanoOrBuilder {
+  private static final long serialVersionUID = 0L;
+    // Use IntervalMonthDayNano.newBuilder() to construct.
+    private IntervalMonthDayNano(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+      super(builder);
+    }
+    private IntervalMonthDayNano() {
+    }
+
+    @java.lang.Override
+    @SuppressWarnings({"unused"})
+    protected java.lang.Object newInstance(
+        UnusedPrivateParameter unused) {
+      return new IntervalMonthDayNano();
+    }
+
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+    getUnknownFields() {
+      return this.unknownFields;
+    }
+    private IntervalMonthDayNano(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      this();
+      if (extensionRegistry == null) {
+        throw new java.lang.NullPointerException();
+      }
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            case 8: {
+
+              months_ = input.readInt32();
+              break;
+            }
+            case 16: {
+
+              days_ = input.readInt32();
+              break;
+            }
+            case 24: {
+
+              nanoseconds_ = input.readInt64();
+              break;
+            }
+            default: {
+              if (!parseUnknownField(
+                  input, unknownFields, extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (com.google.protobuf.UninitializedMessageException e) {
+        throw e.asInvalidProtocolBufferException().setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return io.greptime.v1.Common.internal_static_greptime_v1_IntervalMonthDayNano_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return io.greptime.v1.Common.internal_static_greptime_v1_IntervalMonthDayNano_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              io.greptime.v1.Common.IntervalMonthDayNano.class, io.greptime.v1.Common.IntervalMonthDayNano.Builder.class);
+    }
+
+    public static final int MONTHS_FIELD_NUMBER = 1;
+    private int months_;
+    /**
+     * <code>int32 months = 1;</code>
+     * @return The months.
+     */
+    @java.lang.Override
+    public int getMonths() {
+      return months_;
+    }
+
+    public static final int DAYS_FIELD_NUMBER = 2;
+    private int days_;
+    /**
+     * <code>int32 days = 2;</code>
+     * @return The days.
+     */
+    @java.lang.Override
+    public int getDays() {
+      return days_;
+    }
+
+    public static final int NANOSECONDS_FIELD_NUMBER = 3;
+    private long nanoseconds_;
+    /**
+     * <code>int64 nanoseconds = 3;</code>
+     * @return The nanoseconds.
+     */
+    @java.lang.Override
+    public long getNanoseconds() {
+      return nanoseconds_;
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      if (months_ != 0) {
+        output.writeInt32(1, months_);
+      }
+      if (days_ != 0) {
+        output.writeInt32(2, days_);
+      }
+      if (nanoseconds_ != 0L) {
+        output.writeInt64(3, nanoseconds_);
+      }
+      unknownFields.writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (months_ != 0) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt32Size(1, months_);
+      }
+      if (days_ != 0) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt32Size(2, days_);
+      }
+      if (nanoseconds_ != 0L) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt64Size(3, nanoseconds_);
+      }
+      size += unknownFields.getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof io.greptime.v1.Common.IntervalMonthDayNano)) {
+        return super.equals(obj);
+      }
+      io.greptime.v1.Common.IntervalMonthDayNano other = (io.greptime.v1.Common.IntervalMonthDayNano) obj;
+
+      if (getMonths()
+          != other.getMonths()) return false;
+      if (getDays()
+          != other.getDays()) return false;
+      if (getNanoseconds()
+          != other.getNanoseconds()) return false;
+      if (!unknownFields.equals(other.unknownFields)) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      hash = (37 * hash) + MONTHS_FIELD_NUMBER;
+      hash = (53 * hash) + getMonths();
+      hash = (37 * hash) + DAYS_FIELD_NUMBER;
+      hash = (53 * hash) + getDays();
+      hash = (37 * hash) + NANOSECONDS_FIELD_NUMBER;
+      hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
+          getNanoseconds());
+      hash = (29 * hash) + unknownFields.hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static io.greptime.v1.Common.IntervalMonthDayNano parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.IntervalMonthDayNano parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.IntervalMonthDayNano parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.IntervalMonthDayNano parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.IntervalMonthDayNano parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.IntervalMonthDayNano parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.IntervalMonthDayNano parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.IntervalMonthDayNano parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.IntervalMonthDayNano parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.IntervalMonthDayNano parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.IntervalMonthDayNano parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.IntervalMonthDayNano parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(io.greptime.v1.Common.IntervalMonthDayNano prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code greptime.v1.IntervalMonthDayNano}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:greptime.v1.IntervalMonthDayNano)
+        io.greptime.v1.Common.IntervalMonthDayNanoOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_IntervalMonthDayNano_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_IntervalMonthDayNano_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                io.greptime.v1.Common.IntervalMonthDayNano.class, io.greptime.v1.Common.IntervalMonthDayNano.Builder.class);
+      }
+
+      // Construct using io.greptime.v1.Common.IntervalMonthDayNano.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessageV3
+                .alwaysUseFieldBuilders) {
+        }
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        months_ = 0;
+
+        days_ = 0;
+
+        nanoseconds_ = 0L;
+
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_IntervalMonthDayNano_descriptor;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.IntervalMonthDayNano getDefaultInstanceForType() {
+        return io.greptime.v1.Common.IntervalMonthDayNano.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.IntervalMonthDayNano build() {
+        io.greptime.v1.Common.IntervalMonthDayNano result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.IntervalMonthDayNano buildPartial() {
+        io.greptime.v1.Common.IntervalMonthDayNano result = new io.greptime.v1.Common.IntervalMonthDayNano(this);
+        result.months_ = months_;
+        result.days_ = days_;
+        result.nanoseconds_ = nanoseconds_;
+        onBuilt();
+        return result;
+      }
+
+      @java.lang.Override
+      public Builder clone() {
+        return super.clone();
+      }
+      @java.lang.Override
+      public Builder setField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.setField(field, value);
+      }
+      @java.lang.Override
+      public Builder clearField(
+          com.google.protobuf.Descriptors.FieldDescriptor field) {
+        return super.clearField(field);
+      }
+      @java.lang.Override
+      public Builder clearOneof(
+          com.google.protobuf.Descriptors.OneofDescriptor oneof) {
+        return super.clearOneof(oneof);
+      }
+      @java.lang.Override
+      public Builder setRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          int index, java.lang.Object value) {
+        return super.setRepeatedField(field, index, value);
+      }
+      @java.lang.Override
+      public Builder addRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.addRepeatedField(field, value);
+      }
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof io.greptime.v1.Common.IntervalMonthDayNano) {
+          return mergeFrom((io.greptime.v1.Common.IntervalMonthDayNano)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(io.greptime.v1.Common.IntervalMonthDayNano other) {
+        if (other == io.greptime.v1.Common.IntervalMonthDayNano.getDefaultInstance()) return this;
+        if (other.getMonths() != 0) {
+          setMonths(other.getMonths());
+        }
+        if (other.getDays() != 0) {
+          setDays(other.getDays());
+        }
+        if (other.getNanoseconds() != 0L) {
+          setNanoseconds(other.getNanoseconds());
+        }
+        this.mergeUnknownFields(other.unknownFields);
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        io.greptime.v1.Common.IntervalMonthDayNano parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (io.greptime.v1.Common.IntervalMonthDayNano) e.getUnfinishedMessage();
+          throw e.unwrapIOException();
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+
+      private int months_ ;
+      /**
+       * <code>int32 months = 1;</code>
+       * @return The months.
+       */
+      @java.lang.Override
+      public int getMonths() {
+        return months_;
+      }
+      /**
+       * <code>int32 months = 1;</code>
+       * @param value The months to set.
+       * @return This builder for chaining.
+       */
+      public Builder setMonths(int value) {
+        
+        months_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>int32 months = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearMonths() {
+        
+        months_ = 0;
+        onChanged();
+        return this;
+      }
+
+      private int days_ ;
+      /**
+       * <code>int32 days = 2;</code>
+       * @return The days.
+       */
+      @java.lang.Override
+      public int getDays() {
+        return days_;
+      }
+      /**
+       * <code>int32 days = 2;</code>
+       * @param value The days to set.
+       * @return This builder for chaining.
+       */
+      public Builder setDays(int value) {
+        
+        days_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>int32 days = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearDays() {
+        
+        days_ = 0;
+        onChanged();
+        return this;
+      }
+
+      private long nanoseconds_ ;
+      /**
+       * <code>int64 nanoseconds = 3;</code>
+       * @return The nanoseconds.
+       */
+      @java.lang.Override
+      public long getNanoseconds() {
+        return nanoseconds_;
+      }
+      /**
+       * <code>int64 nanoseconds = 3;</code>
+       * @param value The nanoseconds to set.
+       * @return This builder for chaining.
+       */
+      public Builder setNanoseconds(long value) {
+        
+        nanoseconds_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>int64 nanoseconds = 3;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearNanoseconds() {
+        
+        nanoseconds_ = 0L;
+        onChanged();
+        return this;
+      }
+      @java.lang.Override
+      public final Builder setUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.setUnknownFields(unknownFields);
+      }
+
+      @java.lang.Override
+      public final Builder mergeUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.mergeUnknownFields(unknownFields);
+      }
+
+
+      // @@protoc_insertion_point(builder_scope:greptime.v1.IntervalMonthDayNano)
+    }
+
+    // @@protoc_insertion_point(class_scope:greptime.v1.IntervalMonthDayNano)
+    private static final io.greptime.v1.Common.IntervalMonthDayNano DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new io.greptime.v1.Common.IntervalMonthDayNano();
+    }
+
+    public static io.greptime.v1.Common.IntervalMonthDayNano getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<IntervalMonthDayNano>
+        PARSER = new com.google.protobuf.AbstractParser<IntervalMonthDayNano>() {
+      @java.lang.Override
+      public IntervalMonthDayNano parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new IntervalMonthDayNano(input, extensionRegistry);
+      }
+    };
+
+    public static com.google.protobuf.Parser<IntervalMonthDayNano> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<IntervalMonthDayNano> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public io.greptime.v1.Common.IntervalMonthDayNano getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
+  public interface Decimal128OrBuilder extends
+      // @@protoc_insertion_point(interface_extends:greptime.v1.Decimal128)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>int64 hi = 1;</code>
+     * @return The hi.
+     */
+    long getHi();
+
+    /**
+     * <code>int64 lo = 2;</code>
+     * @return The lo.
+     */
+    long getLo();
+  }
+  /**
+   * <pre>
+   * (hi: high 64 bits, lo: low 64 bits) are used to keep the decimal128 value.
+   * </pre>
+   *
+   * Protobuf type {@code greptime.v1.Decimal128}
+   */
+  public static final class Decimal128 extends
+      com.google.protobuf.GeneratedMessageV3 implements
+      // @@protoc_insertion_point(message_implements:greptime.v1.Decimal128)
+      Decimal128OrBuilder {
+  private static final long serialVersionUID = 0L;
+    // Use Decimal128.newBuilder() to construct.
+    private Decimal128(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+      super(builder);
+    }
+    private Decimal128() {
+    }
+
+    @java.lang.Override
+    @SuppressWarnings({"unused"})
+    protected java.lang.Object newInstance(
+        UnusedPrivateParameter unused) {
+      return new Decimal128();
+    }
+
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+    getUnknownFields() {
+      return this.unknownFields;
+    }
+    private Decimal128(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      this();
+      if (extensionRegistry == null) {
+        throw new java.lang.NullPointerException();
+      }
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            case 8: {
+
+              hi_ = input.readInt64();
+              break;
+            }
+            case 16: {
+
+              lo_ = input.readInt64();
+              break;
+            }
+            default: {
+              if (!parseUnknownField(
+                  input, unknownFields, extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (com.google.protobuf.UninitializedMessageException e) {
+        throw e.asInvalidProtocolBufferException().setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return io.greptime.v1.Common.internal_static_greptime_v1_Decimal128_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return io.greptime.v1.Common.internal_static_greptime_v1_Decimal128_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              io.greptime.v1.Common.Decimal128.class, io.greptime.v1.Common.Decimal128.Builder.class);
+    }
+
+    public static final int HI_FIELD_NUMBER = 1;
+    private long hi_;
+    /**
+     * <code>int64 hi = 1;</code>
+     * @return The hi.
+     */
+    @java.lang.Override
+    public long getHi() {
+      return hi_;
+    }
+
+    public static final int LO_FIELD_NUMBER = 2;
+    private long lo_;
+    /**
+     * <code>int64 lo = 2;</code>
+     * @return The lo.
+     */
+    @java.lang.Override
+    public long getLo() {
+      return lo_;
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      if (hi_ != 0L) {
+        output.writeInt64(1, hi_);
+      }
+      if (lo_ != 0L) {
+        output.writeInt64(2, lo_);
+      }
+      unknownFields.writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (hi_ != 0L) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt64Size(1, hi_);
+      }
+      if (lo_ != 0L) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt64Size(2, lo_);
+      }
+      size += unknownFields.getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof io.greptime.v1.Common.Decimal128)) {
+        return super.equals(obj);
+      }
+      io.greptime.v1.Common.Decimal128 other = (io.greptime.v1.Common.Decimal128) obj;
+
+      if (getHi()
+          != other.getHi()) return false;
+      if (getLo()
+          != other.getLo()) return false;
+      if (!unknownFields.equals(other.unknownFields)) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      hash = (37 * hash) + HI_FIELD_NUMBER;
+      hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
+          getHi());
+      hash = (37 * hash) + LO_FIELD_NUMBER;
+      hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
+          getLo());
+      hash = (29 * hash) + unknownFields.hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static io.greptime.v1.Common.Decimal128 parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.Decimal128 parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.Decimal128 parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.Decimal128 parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.Decimal128 parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.Decimal128 parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.Decimal128 parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.Decimal128 parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.Decimal128 parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.Decimal128 parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.Decimal128 parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.Decimal128 parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(io.greptime.v1.Common.Decimal128 prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * <pre>
+     * (hi: high 64 bits, lo: low 64 bits) are used to keep the decimal128 value.
+     * </pre>
+     *
+     * Protobuf type {@code greptime.v1.Decimal128}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:greptime.v1.Decimal128)
+        io.greptime.v1.Common.Decimal128OrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_Decimal128_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_Decimal128_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                io.greptime.v1.Common.Decimal128.class, io.greptime.v1.Common.Decimal128.Builder.class);
+      }
+
+      // Construct using io.greptime.v1.Common.Decimal128.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessageV3
+                .alwaysUseFieldBuilders) {
+        }
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        hi_ = 0L;
+
+        lo_ = 0L;
+
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_Decimal128_descriptor;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.Decimal128 getDefaultInstanceForType() {
+        return io.greptime.v1.Common.Decimal128.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.Decimal128 build() {
+        io.greptime.v1.Common.Decimal128 result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.Decimal128 buildPartial() {
+        io.greptime.v1.Common.Decimal128 result = new io.greptime.v1.Common.Decimal128(this);
+        result.hi_ = hi_;
+        result.lo_ = lo_;
+        onBuilt();
+        return result;
+      }
+
+      @java.lang.Override
+      public Builder clone() {
+        return super.clone();
+      }
+      @java.lang.Override
+      public Builder setField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.setField(field, value);
+      }
+      @java.lang.Override
+      public Builder clearField(
+          com.google.protobuf.Descriptors.FieldDescriptor field) {
+        return super.clearField(field);
+      }
+      @java.lang.Override
+      public Builder clearOneof(
+          com.google.protobuf.Descriptors.OneofDescriptor oneof) {
+        return super.clearOneof(oneof);
+      }
+      @java.lang.Override
+      public Builder setRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          int index, java.lang.Object value) {
+        return super.setRepeatedField(field, index, value);
+      }
+      @java.lang.Override
+      public Builder addRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.addRepeatedField(field, value);
+      }
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof io.greptime.v1.Common.Decimal128) {
+          return mergeFrom((io.greptime.v1.Common.Decimal128)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(io.greptime.v1.Common.Decimal128 other) {
+        if (other == io.greptime.v1.Common.Decimal128.getDefaultInstance()) return this;
+        if (other.getHi() != 0L) {
+          setHi(other.getHi());
+        }
+        if (other.getLo() != 0L) {
+          setLo(other.getLo());
+        }
+        this.mergeUnknownFields(other.unknownFields);
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        io.greptime.v1.Common.Decimal128 parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (io.greptime.v1.Common.Decimal128) e.getUnfinishedMessage();
+          throw e.unwrapIOException();
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+
+      private long hi_ ;
+      /**
+       * <code>int64 hi = 1;</code>
+       * @return The hi.
+       */
+      @java.lang.Override
+      public long getHi() {
+        return hi_;
+      }
+      /**
+       * <code>int64 hi = 1;</code>
+       * @param value The hi to set.
+       * @return This builder for chaining.
+       */
+      public Builder setHi(long value) {
+        
+        hi_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>int64 hi = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearHi() {
+        
+        hi_ = 0L;
+        onChanged();
+        return this;
+      }
+
+      private long lo_ ;
+      /**
+       * <code>int64 lo = 2;</code>
+       * @return The lo.
+       */
+      @java.lang.Override
+      public long getLo() {
+        return lo_;
+      }
+      /**
+       * <code>int64 lo = 2;</code>
+       * @param value The lo to set.
+       * @return This builder for chaining.
+       */
+      public Builder setLo(long value) {
+        
+        lo_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>int64 lo = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearLo() {
+        
+        lo_ = 0L;
+        onChanged();
+        return this;
+      }
+      @java.lang.Override
+      public final Builder setUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.setUnknownFields(unknownFields);
+      }
+
+      @java.lang.Override
+      public final Builder mergeUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.mergeUnknownFields(unknownFields);
+      }
+
+
+      // @@protoc_insertion_point(builder_scope:greptime.v1.Decimal128)
+    }
+
+    // @@protoc_insertion_point(class_scope:greptime.v1.Decimal128)
+    private static final io.greptime.v1.Common.Decimal128 DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new io.greptime.v1.Common.Decimal128();
+    }
+
+    public static io.greptime.v1.Common.Decimal128 getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<Decimal128>
+        PARSER = new com.google.protobuf.AbstractParser<Decimal128>() {
+      @java.lang.Override
+      public Decimal128 parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new Decimal128(input, extensionRegistry);
+      }
+    };
+
+    public static com.google.protobuf.Parser<Decimal128> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<Decimal128> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public io.greptime.v1.Common.Decimal128 getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
+  public interface ColumnDataTypeExtensionOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:greptime.v1.ColumnDataTypeExtension)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+     * @return Whether the decimalType field is set.
+     */
+    boolean hasDecimalType();
+    /**
+     * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+     * @return The decimalType.
+     */
+    io.greptime.v1.Common.DecimalTypeExtension getDecimalType();
+    /**
+     * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+     */
+    io.greptime.v1.Common.DecimalTypeExtensionOrBuilder getDecimalTypeOrBuilder();
+
+    public io.greptime.v1.Common.ColumnDataTypeExtension.TypeExtCase getTypeExtCase();
+  }
+  /**
+   * <pre>
+   * Type extension for some complex types
+   * </pre>
+   *
+   * Protobuf type {@code greptime.v1.ColumnDataTypeExtension}
+   */
+  public static final class ColumnDataTypeExtension extends
+      com.google.protobuf.GeneratedMessageV3 implements
+      // @@protoc_insertion_point(message_implements:greptime.v1.ColumnDataTypeExtension)
+      ColumnDataTypeExtensionOrBuilder {
+  private static final long serialVersionUID = 0L;
+    // Use ColumnDataTypeExtension.newBuilder() to construct.
+    private ColumnDataTypeExtension(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+      super(builder);
+    }
+    private ColumnDataTypeExtension() {
+    }
+
+    @java.lang.Override
+    @SuppressWarnings({"unused"})
+    protected java.lang.Object newInstance(
+        UnusedPrivateParameter unused) {
+      return new ColumnDataTypeExtension();
+    }
+
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+    getUnknownFields() {
+      return this.unknownFields;
+    }
+    private ColumnDataTypeExtension(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      this();
+      if (extensionRegistry == null) {
+        throw new java.lang.NullPointerException();
+      }
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            case 10: {
+              io.greptime.v1.Common.DecimalTypeExtension.Builder subBuilder = null;
+              if (typeExtCase_ == 1) {
+                subBuilder = ((io.greptime.v1.Common.DecimalTypeExtension) typeExt_).toBuilder();
+              }
+              typeExt_ =
+                  input.readMessage(io.greptime.v1.Common.DecimalTypeExtension.parser(), extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom((io.greptime.v1.Common.DecimalTypeExtension) typeExt_);
+                typeExt_ = subBuilder.buildPartial();
+              }
+              typeExtCase_ = 1;
+              break;
+            }
+            default: {
+              if (!parseUnknownField(
+                  input, unknownFields, extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (com.google.protobuf.UninitializedMessageException e) {
+        throw e.asInvalidProtocolBufferException().setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return io.greptime.v1.Common.internal_static_greptime_v1_ColumnDataTypeExtension_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return io.greptime.v1.Common.internal_static_greptime_v1_ColumnDataTypeExtension_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              io.greptime.v1.Common.ColumnDataTypeExtension.class, io.greptime.v1.Common.ColumnDataTypeExtension.Builder.class);
+    }
+
+    private int typeExtCase_ = 0;
+    private java.lang.Object typeExt_;
+    public enum TypeExtCase
+        implements com.google.protobuf.Internal.EnumLite,
+            com.google.protobuf.AbstractMessage.InternalOneOfEnum {
+      DECIMAL_TYPE(1),
+      TYPEEXT_NOT_SET(0);
+      private final int value;
+      private TypeExtCase(int value) {
+        this.value = value;
+      }
+      /**
+       * @param value The number of the enum to look for.
+       * @return The enum associated with the given number.
+       * @deprecated Use {@link #forNumber(int)} instead.
+       */
+      @java.lang.Deprecated
+      public static TypeExtCase valueOf(int value) {
+        return forNumber(value);
+      }
+
+      public static TypeExtCase forNumber(int value) {
+        switch (value) {
+          case 1: return DECIMAL_TYPE;
+          case 0: return TYPEEXT_NOT_SET;
+          default: return null;
+        }
+      }
+      public int getNumber() {
+        return this.value;
+      }
+    };
+
+    public TypeExtCase
+    getTypeExtCase() {
+      return TypeExtCase.forNumber(
+          typeExtCase_);
+    }
+
+    public static final int DECIMAL_TYPE_FIELD_NUMBER = 1;
+    /**
+     * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+     * @return Whether the decimalType field is set.
+     */
+    @java.lang.Override
+    public boolean hasDecimalType() {
+      return typeExtCase_ == 1;
+    }
+    /**
+     * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+     * @return The decimalType.
+     */
+    @java.lang.Override
+    public io.greptime.v1.Common.DecimalTypeExtension getDecimalType() {
+      if (typeExtCase_ == 1) {
+         return (io.greptime.v1.Common.DecimalTypeExtension) typeExt_;
+      }
+      return io.greptime.v1.Common.DecimalTypeExtension.getDefaultInstance();
+    }
+    /**
+     * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.Common.DecimalTypeExtensionOrBuilder getDecimalTypeOrBuilder() {
+      if (typeExtCase_ == 1) {
+         return (io.greptime.v1.Common.DecimalTypeExtension) typeExt_;
+      }
+      return io.greptime.v1.Common.DecimalTypeExtension.getDefaultInstance();
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      if (typeExtCase_ == 1) {
+        output.writeMessage(1, (io.greptime.v1.Common.DecimalTypeExtension) typeExt_);
+      }
+      unknownFields.writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (typeExtCase_ == 1) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, (io.greptime.v1.Common.DecimalTypeExtension) typeExt_);
+      }
+      size += unknownFields.getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof io.greptime.v1.Common.ColumnDataTypeExtension)) {
+        return super.equals(obj);
+      }
+      io.greptime.v1.Common.ColumnDataTypeExtension other = (io.greptime.v1.Common.ColumnDataTypeExtension) obj;
+
+      if (!getTypeExtCase().equals(other.getTypeExtCase())) return false;
+      switch (typeExtCase_) {
+        case 1:
+          if (!getDecimalType()
+              .equals(other.getDecimalType())) return false;
+          break;
+        case 0:
+        default:
+      }
+      if (!unknownFields.equals(other.unknownFields)) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      switch (typeExtCase_) {
+        case 1:
+          hash = (37 * hash) + DECIMAL_TYPE_FIELD_NUMBER;
+          hash = (53 * hash) + getDecimalType().hashCode();
+          break;
+        case 0:
+        default:
+      }
+      hash = (29 * hash) + unknownFields.hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static io.greptime.v1.Common.ColumnDataTypeExtension parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.ColumnDataTypeExtension parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.ColumnDataTypeExtension parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.ColumnDataTypeExtension parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.ColumnDataTypeExtension parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.ColumnDataTypeExtension parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.ColumnDataTypeExtension parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.ColumnDataTypeExtension parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.ColumnDataTypeExtension parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.ColumnDataTypeExtension parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.ColumnDataTypeExtension parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.ColumnDataTypeExtension parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(io.greptime.v1.Common.ColumnDataTypeExtension prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * <pre>
+     * Type extension for some complex types
+     * </pre>
+     *
+     * Protobuf type {@code greptime.v1.ColumnDataTypeExtension}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:greptime.v1.ColumnDataTypeExtension)
+        io.greptime.v1.Common.ColumnDataTypeExtensionOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_ColumnDataTypeExtension_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_ColumnDataTypeExtension_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                io.greptime.v1.Common.ColumnDataTypeExtension.class, io.greptime.v1.Common.ColumnDataTypeExtension.Builder.class);
+      }
+
+      // Construct using io.greptime.v1.Common.ColumnDataTypeExtension.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessageV3
+                .alwaysUseFieldBuilders) {
+        }
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        typeExtCase_ = 0;
+        typeExt_ = null;
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_ColumnDataTypeExtension_descriptor;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.ColumnDataTypeExtension getDefaultInstanceForType() {
+        return io.greptime.v1.Common.ColumnDataTypeExtension.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.ColumnDataTypeExtension build() {
+        io.greptime.v1.Common.ColumnDataTypeExtension result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.ColumnDataTypeExtension buildPartial() {
+        io.greptime.v1.Common.ColumnDataTypeExtension result = new io.greptime.v1.Common.ColumnDataTypeExtension(this);
+        if (typeExtCase_ == 1) {
+          if (decimalTypeBuilder_ == null) {
+            result.typeExt_ = typeExt_;
+          } else {
+            result.typeExt_ = decimalTypeBuilder_.build();
+          }
+        }
+        result.typeExtCase_ = typeExtCase_;
+        onBuilt();
+        return result;
+      }
+
+      @java.lang.Override
+      public Builder clone() {
+        return super.clone();
+      }
+      @java.lang.Override
+      public Builder setField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.setField(field, value);
+      }
+      @java.lang.Override
+      public Builder clearField(
+          com.google.protobuf.Descriptors.FieldDescriptor field) {
+        return super.clearField(field);
+      }
+      @java.lang.Override
+      public Builder clearOneof(
+          com.google.protobuf.Descriptors.OneofDescriptor oneof) {
+        return super.clearOneof(oneof);
+      }
+      @java.lang.Override
+      public Builder setRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          int index, java.lang.Object value) {
+        return super.setRepeatedField(field, index, value);
+      }
+      @java.lang.Override
+      public Builder addRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.addRepeatedField(field, value);
+      }
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof io.greptime.v1.Common.ColumnDataTypeExtension) {
+          return mergeFrom((io.greptime.v1.Common.ColumnDataTypeExtension)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(io.greptime.v1.Common.ColumnDataTypeExtension other) {
+        if (other == io.greptime.v1.Common.ColumnDataTypeExtension.getDefaultInstance()) return this;
+        switch (other.getTypeExtCase()) {
+          case DECIMAL_TYPE: {
+            mergeDecimalType(other.getDecimalType());
+            break;
+          }
+          case TYPEEXT_NOT_SET: {
+            break;
+          }
+        }
+        this.mergeUnknownFields(other.unknownFields);
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        io.greptime.v1.Common.ColumnDataTypeExtension parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (io.greptime.v1.Common.ColumnDataTypeExtension) e.getUnfinishedMessage();
+          throw e.unwrapIOException();
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+      private int typeExtCase_ = 0;
+      private java.lang.Object typeExt_;
+      public TypeExtCase
+          getTypeExtCase() {
+        return TypeExtCase.forNumber(
+            typeExtCase_);
+      }
+
+      public Builder clearTypeExt() {
+        typeExtCase_ = 0;
+        typeExt_ = null;
+        onChanged();
+        return this;
+      }
+
+
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.Common.DecimalTypeExtension, io.greptime.v1.Common.DecimalTypeExtension.Builder, io.greptime.v1.Common.DecimalTypeExtensionOrBuilder> decimalTypeBuilder_;
+      /**
+       * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+       * @return Whether the decimalType field is set.
+       */
+      @java.lang.Override
+      public boolean hasDecimalType() {
+        return typeExtCase_ == 1;
+      }
+      /**
+       * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+       * @return The decimalType.
+       */
+      @java.lang.Override
+      public io.greptime.v1.Common.DecimalTypeExtension getDecimalType() {
+        if (decimalTypeBuilder_ == null) {
+          if (typeExtCase_ == 1) {
+            return (io.greptime.v1.Common.DecimalTypeExtension) typeExt_;
+          }
+          return io.greptime.v1.Common.DecimalTypeExtension.getDefaultInstance();
+        } else {
+          if (typeExtCase_ == 1) {
+            return decimalTypeBuilder_.getMessage();
+          }
+          return io.greptime.v1.Common.DecimalTypeExtension.getDefaultInstance();
+        }
+      }
+      /**
+       * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+       */
+      public Builder setDecimalType(io.greptime.v1.Common.DecimalTypeExtension value) {
+        if (decimalTypeBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          typeExt_ = value;
+          onChanged();
+        } else {
+          decimalTypeBuilder_.setMessage(value);
+        }
+        typeExtCase_ = 1;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+       */
+      public Builder setDecimalType(
+          io.greptime.v1.Common.DecimalTypeExtension.Builder builderForValue) {
+        if (decimalTypeBuilder_ == null) {
+          typeExt_ = builderForValue.build();
+          onChanged();
+        } else {
+          decimalTypeBuilder_.setMessage(builderForValue.build());
+        }
+        typeExtCase_ = 1;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+       */
+      public Builder mergeDecimalType(io.greptime.v1.Common.DecimalTypeExtension value) {
+        if (decimalTypeBuilder_ == null) {
+          if (typeExtCase_ == 1 &&
+              typeExt_ != io.greptime.v1.Common.DecimalTypeExtension.getDefaultInstance()) {
+            typeExt_ = io.greptime.v1.Common.DecimalTypeExtension.newBuilder((io.greptime.v1.Common.DecimalTypeExtension) typeExt_)
+                .mergeFrom(value).buildPartial();
+          } else {
+            typeExt_ = value;
+          }
+          onChanged();
+        } else {
+          if (typeExtCase_ == 1) {
+            decimalTypeBuilder_.mergeFrom(value);
+          } else {
+            decimalTypeBuilder_.setMessage(value);
+          }
+        }
+        typeExtCase_ = 1;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+       */
+      public Builder clearDecimalType() {
+        if (decimalTypeBuilder_ == null) {
+          if (typeExtCase_ == 1) {
+            typeExtCase_ = 0;
+            typeExt_ = null;
+            onChanged();
+          }
+        } else {
+          if (typeExtCase_ == 1) {
+            typeExtCase_ = 0;
+            typeExt_ = null;
+          }
+          decimalTypeBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+       */
+      public io.greptime.v1.Common.DecimalTypeExtension.Builder getDecimalTypeBuilder() {
+        return getDecimalTypeFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+       */
+      @java.lang.Override
+      public io.greptime.v1.Common.DecimalTypeExtensionOrBuilder getDecimalTypeOrBuilder() {
+        if ((typeExtCase_ == 1) && (decimalTypeBuilder_ != null)) {
+          return decimalTypeBuilder_.getMessageOrBuilder();
+        } else {
+          if (typeExtCase_ == 1) {
+            return (io.greptime.v1.Common.DecimalTypeExtension) typeExt_;
+          }
+          return io.greptime.v1.Common.DecimalTypeExtension.getDefaultInstance();
+        }
+      }
+      /**
+       * <code>.greptime.v1.DecimalTypeExtension decimal_type = 1;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.Common.DecimalTypeExtension, io.greptime.v1.Common.DecimalTypeExtension.Builder, io.greptime.v1.Common.DecimalTypeExtensionOrBuilder> 
+          getDecimalTypeFieldBuilder() {
+        if (decimalTypeBuilder_ == null) {
+          if (!(typeExtCase_ == 1)) {
+            typeExt_ = io.greptime.v1.Common.DecimalTypeExtension.getDefaultInstance();
+          }
+          decimalTypeBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+              io.greptime.v1.Common.DecimalTypeExtension, io.greptime.v1.Common.DecimalTypeExtension.Builder, io.greptime.v1.Common.DecimalTypeExtensionOrBuilder>(
+                  (io.greptime.v1.Common.DecimalTypeExtension) typeExt_,
+                  getParentForChildren(),
+                  isClean());
+          typeExt_ = null;
+        }
+        typeExtCase_ = 1;
+        onChanged();;
+        return decimalTypeBuilder_;
+      }
+      @java.lang.Override
+      public final Builder setUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.setUnknownFields(unknownFields);
+      }
+
+      @java.lang.Override
+      public final Builder mergeUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.mergeUnknownFields(unknownFields);
+      }
+
+
+      // @@protoc_insertion_point(builder_scope:greptime.v1.ColumnDataTypeExtension)
+    }
+
+    // @@protoc_insertion_point(class_scope:greptime.v1.ColumnDataTypeExtension)
+    private static final io.greptime.v1.Common.ColumnDataTypeExtension DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new io.greptime.v1.Common.ColumnDataTypeExtension();
+    }
+
+    public static io.greptime.v1.Common.ColumnDataTypeExtension getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<ColumnDataTypeExtension>
+        PARSER = new com.google.protobuf.AbstractParser<ColumnDataTypeExtension>() {
+      @java.lang.Override
+      public ColumnDataTypeExtension parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new ColumnDataTypeExtension(input, extensionRegistry);
+      }
+    };
+
+    public static com.google.protobuf.Parser<ColumnDataTypeExtension> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<ColumnDataTypeExtension> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public io.greptime.v1.Common.ColumnDataTypeExtension getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
+  public interface DecimalTypeExtensionOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:greptime.v1.DecimalTypeExtension)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>int32 precision = 1;</code>
+     * @return The precision.
+     */
+    int getPrecision();
+
+    /**
+     * <code>int32 scale = 2;</code>
+     * @return The scale.
+     */
+    int getScale();
+  }
+  /**
+   * Protobuf type {@code greptime.v1.DecimalTypeExtension}
+   */
+  public static final class DecimalTypeExtension extends
+      com.google.protobuf.GeneratedMessageV3 implements
+      // @@protoc_insertion_point(message_implements:greptime.v1.DecimalTypeExtension)
+      DecimalTypeExtensionOrBuilder {
+  private static final long serialVersionUID = 0L;
+    // Use DecimalTypeExtension.newBuilder() to construct.
+    private DecimalTypeExtension(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+      super(builder);
+    }
+    private DecimalTypeExtension() {
+    }
+
+    @java.lang.Override
+    @SuppressWarnings({"unused"})
+    protected java.lang.Object newInstance(
+        UnusedPrivateParameter unused) {
+      return new DecimalTypeExtension();
+    }
+
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+    getUnknownFields() {
+      return this.unknownFields;
+    }
+    private DecimalTypeExtension(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      this();
+      if (extensionRegistry == null) {
+        throw new java.lang.NullPointerException();
+      }
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            case 8: {
+
+              precision_ = input.readInt32();
+              break;
+            }
+            case 16: {
+
+              scale_ = input.readInt32();
+              break;
+            }
+            default: {
+              if (!parseUnknownField(
+                  input, unknownFields, extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (com.google.protobuf.UninitializedMessageException e) {
+        throw e.asInvalidProtocolBufferException().setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e).setUnfinishedMessage(this);
+      } finally {
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return io.greptime.v1.Common.internal_static_greptime_v1_DecimalTypeExtension_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return io.greptime.v1.Common.internal_static_greptime_v1_DecimalTypeExtension_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              io.greptime.v1.Common.DecimalTypeExtension.class, io.greptime.v1.Common.DecimalTypeExtension.Builder.class);
+    }
+
+    public static final int PRECISION_FIELD_NUMBER = 1;
+    private int precision_;
+    /**
+     * <code>int32 precision = 1;</code>
+     * @return The precision.
+     */
+    @java.lang.Override
+    public int getPrecision() {
+      return precision_;
+    }
+
+    public static final int SCALE_FIELD_NUMBER = 2;
+    private int scale_;
+    /**
+     * <code>int32 scale = 2;</code>
+     * @return The scale.
+     */
+    @java.lang.Override
+    public int getScale() {
+      return scale_;
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      if (precision_ != 0) {
+        output.writeInt32(1, precision_);
+      }
+      if (scale_ != 0) {
+        output.writeInt32(2, scale_);
+      }
+      unknownFields.writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      if (precision_ != 0) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt32Size(1, precision_);
+      }
+      if (scale_ != 0) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeInt32Size(2, scale_);
+      }
+      size += unknownFields.getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof io.greptime.v1.Common.DecimalTypeExtension)) {
+        return super.equals(obj);
+      }
+      io.greptime.v1.Common.DecimalTypeExtension other = (io.greptime.v1.Common.DecimalTypeExtension) obj;
+
+      if (getPrecision()
+          != other.getPrecision()) return false;
+      if (getScale()
+          != other.getScale()) return false;
+      if (!unknownFields.equals(other.unknownFields)) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      hash = (37 * hash) + PRECISION_FIELD_NUMBER;
+      hash = (53 * hash) + getPrecision();
+      hash = (37 * hash) + SCALE_FIELD_NUMBER;
+      hash = (53 * hash) + getScale();
+      hash = (29 * hash) + unknownFields.hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static io.greptime.v1.Common.DecimalTypeExtension parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.DecimalTypeExtension parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.DecimalTypeExtension parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.DecimalTypeExtension parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.DecimalTypeExtension parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.Common.DecimalTypeExtension parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.DecimalTypeExtension parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.DecimalTypeExtension parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.DecimalTypeExtension parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.DecimalTypeExtension parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.Common.DecimalTypeExtension parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.Common.DecimalTypeExtension parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(io.greptime.v1.Common.DecimalTypeExtension prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code greptime.v1.DecimalTypeExtension}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:greptime.v1.DecimalTypeExtension)
+        io.greptime.v1.Common.DecimalTypeExtensionOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_DecimalTypeExtension_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_DecimalTypeExtension_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                io.greptime.v1.Common.DecimalTypeExtension.class, io.greptime.v1.Common.DecimalTypeExtension.Builder.class);
+      }
+
+      // Construct using io.greptime.v1.Common.DecimalTypeExtension.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessageV3
+                .alwaysUseFieldBuilders) {
+        }
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        precision_ = 0;
+
+        scale_ = 0;
+
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return io.greptime.v1.Common.internal_static_greptime_v1_DecimalTypeExtension_descriptor;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.DecimalTypeExtension getDefaultInstanceForType() {
+        return io.greptime.v1.Common.DecimalTypeExtension.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.DecimalTypeExtension build() {
+        io.greptime.v1.Common.DecimalTypeExtension result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.Common.DecimalTypeExtension buildPartial() {
+        io.greptime.v1.Common.DecimalTypeExtension result = new io.greptime.v1.Common.DecimalTypeExtension(this);
+        result.precision_ = precision_;
+        result.scale_ = scale_;
+        onBuilt();
+        return result;
+      }
+
+      @java.lang.Override
+      public Builder clone() {
+        return super.clone();
+      }
+      @java.lang.Override
+      public Builder setField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.setField(field, value);
+      }
+      @java.lang.Override
+      public Builder clearField(
+          com.google.protobuf.Descriptors.FieldDescriptor field) {
+        return super.clearField(field);
+      }
+      @java.lang.Override
+      public Builder clearOneof(
+          com.google.protobuf.Descriptors.OneofDescriptor oneof) {
+        return super.clearOneof(oneof);
+      }
+      @java.lang.Override
+      public Builder setRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          int index, java.lang.Object value) {
+        return super.setRepeatedField(field, index, value);
+      }
+      @java.lang.Override
+      public Builder addRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.addRepeatedField(field, value);
+      }
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof io.greptime.v1.Common.DecimalTypeExtension) {
+          return mergeFrom((io.greptime.v1.Common.DecimalTypeExtension)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(io.greptime.v1.Common.DecimalTypeExtension other) {
+        if (other == io.greptime.v1.Common.DecimalTypeExtension.getDefaultInstance()) return this;
+        if (other.getPrecision() != 0) {
+          setPrecision(other.getPrecision());
+        }
+        if (other.getScale() != 0) {
+          setScale(other.getScale());
+        }
+        this.mergeUnknownFields(other.unknownFields);
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        io.greptime.v1.Common.DecimalTypeExtension parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (io.greptime.v1.Common.DecimalTypeExtension) e.getUnfinishedMessage();
+          throw e.unwrapIOException();
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+
+      private int precision_ ;
+      /**
+       * <code>int32 precision = 1;</code>
+       * @return The precision.
+       */
+      @java.lang.Override
+      public int getPrecision() {
+        return precision_;
+      }
+      /**
+       * <code>int32 precision = 1;</code>
+       * @param value The precision to set.
+       * @return This builder for chaining.
+       */
+      public Builder setPrecision(int value) {
+        
+        precision_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>int32 precision = 1;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearPrecision() {
+        
+        precision_ = 0;
+        onChanged();
+        return this;
+      }
+
+      private int scale_ ;
+      /**
+       * <code>int32 scale = 2;</code>
+       * @return The scale.
+       */
+      @java.lang.Override
+      public int getScale() {
+        return scale_;
+      }
+      /**
+       * <code>int32 scale = 2;</code>
+       * @param value The scale to set.
+       * @return This builder for chaining.
+       */
+      public Builder setScale(int value) {
+        
+        scale_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <code>int32 scale = 2;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearScale() {
+        
+        scale_ = 0;
+        onChanged();
+        return this;
+      }
+      @java.lang.Override
+      public final Builder setUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.setUnknownFields(unknownFields);
+      }
+
+      @java.lang.Override
+      public final Builder mergeUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.mergeUnknownFields(unknownFields);
+      }
+
+
+      // @@protoc_insertion_point(builder_scope:greptime.v1.DecimalTypeExtension)
+    }
+
+    // @@protoc_insertion_point(class_scope:greptime.v1.DecimalTypeExtension)
+    private static final io.greptime.v1.Common.DecimalTypeExtension DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new io.greptime.v1.Common.DecimalTypeExtension();
+    }
+
+    public static io.greptime.v1.Common.DecimalTypeExtension getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<DecimalTypeExtension>
+        PARSER = new com.google.protobuf.AbstractParser<DecimalTypeExtension>() {
+      @java.lang.Override
+      public DecimalTypeExtension parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new DecimalTypeExtension(input, extensionRegistry);
+      }
+    };
+
+    public static com.google.protobuf.Parser<DecimalTypeExtension> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<DecimalTypeExtension> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public io.greptime.v1.Common.DecimalTypeExtension getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_greptime_v1_RequestHeader_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_greptime_v1_RequestHeader_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_greptime_v1_RequestHeader_TracingContextEntry_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_greptime_v1_RequestHeader_TracingContextEntry_fieldAccessorTable;
   private static final com.google.protobuf.Descriptors.Descriptor
     internal_static_greptime_v1_ResponseHeader_descriptor;
   private static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_greptime_v1_ResponseHeader_fieldAccessorTable;
   private static final com.google.protobuf.Descriptors.Descriptor
-    internal_static_greptime_v1_RequestHeader_descriptor;
+    internal_static_greptime_v1_Status_descriptor;
   private static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_greptime_v1_RequestHeader_fieldAccessorTable;
+      internal_static_greptime_v1_Status_fieldAccessorTable;
   private static final com.google.protobuf.Descriptors.Descriptor
     internal_static_greptime_v1_AuthHeader_descriptor;
   private static final 
@@ -5064,6 +9318,26 @@ public final class Common {
   private static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_greptime_v1_FlightMetadata_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_greptime_v1_IntervalMonthDayNano_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_greptime_v1_IntervalMonthDayNano_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_greptime_v1_Decimal128_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_greptime_v1_Decimal128_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_greptime_v1_ColumnDataTypeExtension_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_greptime_v1_ColumnDataTypeExtension_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_greptime_v1_DecimalTypeExtension_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_greptime_v1_DecimalTypeExtension_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -5074,66 +9348,129 @@ public final class Common {
   static {
     java.lang.String[] descriptorData = {
       "\n\030greptime/v1/common.proto\022\013greptime.v1\"" +
-      "\020\n\016ResponseHeader\"p\n\rRequestHeader\022\017\n\007ca" +
-      "talog\030\001 \001(\t\022\016\n\006schema\030\002 \001(\t\022.\n\rauthoriza" +
-      "tion\030\003 \001(\0132\027.greptime.v1.AuthHeader\022\016\n\006d" +
-      "bname\030\004 \001(\t\"e\n\nAuthHeader\022#\n\005basic\030\001 \001(\013" +
-      "2\022.greptime.v1.BasicH\000\022#\n\005token\030\002 \001(\0132\022." +
-      "greptime.v1.TokenH\000B\r\n\013auth_scheme\"+\n\005Ba" +
-      "sic\022\020\n\010username\030\001 \001(\t\022\020\n\010password\030\002 \001(\t\"" +
-      "\026\n\005Token\022\r\n\005token\030\001 \001(\t\"\035\n\014AffectedRows\022" +
-      "\r\n\005value\030\001 \001(\r\"B\n\016FlightMetadata\0220\n\raffe" +
-      "cted_rows\030\001 \001(\0132\031.greptime.v1.AffectedRo" +
-      "wsBO\n\016io.greptime.v1B\006CommonZ5github.com" +
-      "/GreptimeTeam/greptime-proto/go/greptime" +
-      "/v1b\006proto3"
+      "\360\001\n\rRequestHeader\022\017\n\007catalog\030\001 \001(\t\022\016\n\006sc" +
+      "hema\030\002 \001(\t\022.\n\rauthorization\030\003 \001(\0132\027.grep" +
+      "time.v1.AuthHeader\022\016\n\006dbname\030\004 \001(\t\022G\n\017tr" +
+      "acing_context\030\005 \003(\0132..greptime.v1.Reques" +
+      "tHeader.TracingContextEntry\0325\n\023TracingCo" +
+      "ntextEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\002" +
+      "8\001\"5\n\016ResponseHeader\022#\n\006status\030\001 \001(\0132\023.g" +
+      "reptime.v1.Status\".\n\006Status\022\023\n\013status_co" +
+      "de\030\001 \001(\r\022\017\n\007err_msg\030\002 \001(\t\"e\n\nAuthHeader\022" +
+      "#\n\005basic\030\001 \001(\0132\022.greptime.v1.BasicH\000\022#\n\005" +
+      "token\030\002 \001(\0132\022.greptime.v1.TokenH\000B\r\n\013aut" +
+      "h_scheme\"+\n\005Basic\022\020\n\010username\030\001 \001(\t\022\020\n\010p" +
+      "assword\030\002 \001(\t\"\026\n\005Token\022\r\n\005token\030\001 \001(\t\"\035\n" +
+      "\014AffectedRows\022\r\n\005value\030\001 \001(\r\"B\n\016FlightMe" +
+      "tadata\0220\n\raffected_rows\030\001 \001(\0132\031.greptime" +
+      ".v1.AffectedRows\"I\n\024IntervalMonthDayNano" +
+      "\022\016\n\006months\030\001 \001(\005\022\014\n\004days\030\002 \001(\005\022\023\n\013nanose" +
+      "conds\030\003 \001(\003\"$\n\nDecimal128\022\n\n\002hi\030\001 \001(\003\022\n\n" +
+      "\002lo\030\002 \001(\003\"`\n\027ColumnDataTypeExtension\0229\n\014" +
+      "decimal_type\030\001 \001(\0132!.greptime.v1.Decimal" +
+      "TypeExtensionH\000B\n\n\010type_ext\"8\n\024DecimalTy" +
+      "peExtension\022\021\n\tprecision\030\001 \001(\005\022\r\n\005scale\030" +
+      "\002 \001(\005*1\n\014SemanticType\022\007\n\003TAG\020\000\022\t\n\005FIELD\020" +
+      "\001\022\r\n\tTIMESTAMP\020\002*\270\004\n\016ColumnDataType\022\013\n\007B" +
+      "OOLEAN\020\000\022\010\n\004INT8\020\001\022\t\n\005INT16\020\002\022\t\n\005INT32\020\003" +
+      "\022\t\n\005INT64\020\004\022\t\n\005UINT8\020\005\022\n\n\006UINT16\020\006\022\n\n\006UI" +
+      "NT32\020\007\022\n\n\006UINT64\020\010\022\013\n\007FLOAT32\020\t\022\013\n\007FLOAT" +
+      "64\020\n\022\n\n\006BINARY\020\013\022\n\n\006STRING\020\014\022\010\n\004DATE\020\r\022\014" +
+      "\n\010DATETIME\020\016\022\024\n\020TIMESTAMP_SECOND\020\017\022\031\n\025TI" +
+      "MESTAMP_MILLISECOND\020\020\022\031\n\025TIMESTAMP_MICRO" +
+      "SECOND\020\021\022\030\n\024TIMESTAMP_NANOSECOND\020\022\022\017\n\013TI" +
+      "ME_SECOND\020\023\022\024\n\020TIME_MILLISECOND\020\024\022\024\n\020TIM" +
+      "E_MICROSECOND\020\025\022\023\n\017TIME_NANOSECOND\020\026\022\027\n\023" +
+      "INTERVAL_YEAR_MONTH\020\027\022\025\n\021INTERVAL_DAY_TI" +
+      "ME\020\030\022\033\n\027INTERVAL_MONTH_DAY_NANO\020\031\022\023\n\017DUR" +
+      "ATION_SECOND\020\032\022\030\n\024DURATION_MILLISECOND\020\033" +
+      "\022\030\n\024DURATION_MICROSECOND\020\034\022\027\n\023DURATION_N" +
+      "ANOSECOND\020\035\022\016\n\nDECIMAL128\020\036BO\n\016io.grepti" +
+      "me.v1B\006CommonZ5github.com/GreptimeTeam/g" +
+      "reptime-proto/go/greptime/v1b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
         new com.google.protobuf.Descriptors.FileDescriptor[] {
         });
-    internal_static_greptime_v1_ResponseHeader_descriptor =
-      getDescriptor().getMessageTypes().get(0);
-    internal_static_greptime_v1_ResponseHeader_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-        internal_static_greptime_v1_ResponseHeader_descriptor,
-        new java.lang.String[] { });
     internal_static_greptime_v1_RequestHeader_descriptor =
-      getDescriptor().getMessageTypes().get(1);
+      getDescriptor().getMessageTypes().get(0);
     internal_static_greptime_v1_RequestHeader_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_RequestHeader_descriptor,
-        new java.lang.String[] { "Catalog", "Schema", "Authorization", "Dbname", });
-    internal_static_greptime_v1_AuthHeader_descriptor =
+        new java.lang.String[] { "Catalog", "Schema", "Authorization", "Dbname", "TracingContext", });
+    internal_static_greptime_v1_RequestHeader_TracingContextEntry_descriptor =
+      internal_static_greptime_v1_RequestHeader_descriptor.getNestedTypes().get(0);
+    internal_static_greptime_v1_RequestHeader_TracingContextEntry_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_greptime_v1_RequestHeader_TracingContextEntry_descriptor,
+        new java.lang.String[] { "Key", "Value", });
+    internal_static_greptime_v1_ResponseHeader_descriptor =
+      getDescriptor().getMessageTypes().get(1);
+    internal_static_greptime_v1_ResponseHeader_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_greptime_v1_ResponseHeader_descriptor,
+        new java.lang.String[] { "Status", });
+    internal_static_greptime_v1_Status_descriptor =
       getDescriptor().getMessageTypes().get(2);
+    internal_static_greptime_v1_Status_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_greptime_v1_Status_descriptor,
+        new java.lang.String[] { "StatusCode", "ErrMsg", });
+    internal_static_greptime_v1_AuthHeader_descriptor =
+      getDescriptor().getMessageTypes().get(3);
     internal_static_greptime_v1_AuthHeader_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_AuthHeader_descriptor,
         new java.lang.String[] { "Basic", "Token", "AuthScheme", });
     internal_static_greptime_v1_Basic_descriptor =
-      getDescriptor().getMessageTypes().get(3);
+      getDescriptor().getMessageTypes().get(4);
     internal_static_greptime_v1_Basic_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_Basic_descriptor,
         new java.lang.String[] { "Username", "Password", });
     internal_static_greptime_v1_Token_descriptor =
-      getDescriptor().getMessageTypes().get(4);
+      getDescriptor().getMessageTypes().get(5);
     internal_static_greptime_v1_Token_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_Token_descriptor,
         new java.lang.String[] { "Token", });
     internal_static_greptime_v1_AffectedRows_descriptor =
-      getDescriptor().getMessageTypes().get(5);
+      getDescriptor().getMessageTypes().get(6);
     internal_static_greptime_v1_AffectedRows_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_AffectedRows_descriptor,
         new java.lang.String[] { "Value", });
     internal_static_greptime_v1_FlightMetadata_descriptor =
-      getDescriptor().getMessageTypes().get(6);
+      getDescriptor().getMessageTypes().get(7);
     internal_static_greptime_v1_FlightMetadata_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_FlightMetadata_descriptor,
         new java.lang.String[] { "AffectedRows", });
+    internal_static_greptime_v1_IntervalMonthDayNano_descriptor =
+      getDescriptor().getMessageTypes().get(8);
+    internal_static_greptime_v1_IntervalMonthDayNano_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_greptime_v1_IntervalMonthDayNano_descriptor,
+        new java.lang.String[] { "Months", "Days", "Nanoseconds", });
+    internal_static_greptime_v1_Decimal128_descriptor =
+      getDescriptor().getMessageTypes().get(9);
+    internal_static_greptime_v1_Decimal128_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_greptime_v1_Decimal128_descriptor,
+        new java.lang.String[] { "Hi", "Lo", });
+    internal_static_greptime_v1_ColumnDataTypeExtension_descriptor =
+      getDescriptor().getMessageTypes().get(10);
+    internal_static_greptime_v1_ColumnDataTypeExtension_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_greptime_v1_ColumnDataTypeExtension_descriptor,
+        new java.lang.String[] { "DecimalType", "TypeExt", });
+    internal_static_greptime_v1_DecimalTypeExtension_descriptor =
+      getDescriptor().getMessageTypes().get(11);
+    internal_static_greptime_v1_DecimalTypeExtension_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_greptime_v1_DecimalTypeExtension_descriptor,
+        new java.lang.String[] { "Precision", "Scale", });
   }
 
   // @@protoc_insertion_point(outer_class_scope)

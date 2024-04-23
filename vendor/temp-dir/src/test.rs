@@ -1,28 +1,27 @@
-use crate::{TempDir, COUNTER};
+use crate::{TempDir, COUNTER, INTERNAL_RETRY};
 use core::sync::atomic::Ordering;
 use safe_lock::SafeLock;
 use std::io::ErrorKind;
 use std::path::Path;
 
+// TODO: Move this file to tests/ dir.
+
 // The error tests require all tests to run single-threaded.
 static LOCK: SafeLock = SafeLock::new();
 
 fn make_non_writable(path: &Path) {
-    assert!(std::process::Command::new("chmod")
-        .arg("-w")
-        .arg(path)
-        .status()
-        .unwrap()
-        .success());
+    let metadata = std::fs::metadata(path).unwrap();
+    let mut permissions = metadata.permissions();
+    permissions.set_readonly(true);
+    std::fs::set_permissions(path, permissions).unwrap();
 }
 
 fn make_writable(path: &Path) {
-    assert!(std::process::Command::new("chmod")
-        .arg("u+w")
-        .arg(path)
-        .status()
-        .unwrap()
-        .success());
+    let metadata = std::fs::metadata(path).unwrap();
+    let mut permissions = metadata.permissions();
+    #[allow(clippy::permissions_set_readonly_false)]
+    permissions.set_readonly(false);
+    std::fs::set_permissions(path, permissions).unwrap();
 }
 
 fn should_skip_cleanup_test() -> bool {
@@ -35,11 +34,24 @@ fn should_skip_cleanup_test() -> bool {
     false
 }
 
+struct DisableRetryAndEnableOnDrop;
+impl DisableRetryAndEnableOnDrop {
+    pub fn new() -> Self {
+        INTERNAL_RETRY.store(false, Ordering::SeqCst);
+        Self {}
+    }
+}
+impl Drop for DisableRetryAndEnableOnDrop {
+    fn drop(&mut self) {
+        INTERNAL_RETRY.store(true, Ordering::SeqCst);
+    }
+}
+
 #[test]
 fn new() {
     let _guard = LOCK.lock();
     let temp_dir = TempDir::new().unwrap();
-    println!("{:?}", temp_dir);
+    println!("{temp_dir:?}");
     println!("{:?}", TempDir::new().unwrap());
     let metadata = std::fs::metadata(temp_dir.path()).unwrap();
     assert!(metadata.is_dir());
@@ -50,6 +62,7 @@ fn new() {
 #[test]
 fn new_error() {
     let _guard = LOCK.lock();
+    let _disable_retry = DisableRetryAndEnableOnDrop::new();
     let previous_counter_value = COUNTER.load(Ordering::SeqCst);
     let temp_dir = TempDir::new().unwrap();
     let dir_path = temp_dir.path().to_path_buf();
@@ -58,9 +71,8 @@ fn new_error() {
     assert_eq!(std::io::ErrorKind::AlreadyExists, e.kind());
     assert!(
         e.to_string()
-            .starts_with(&format!("error creating directory {:?}: ", dir_path)),
-        "unexpected error {:?}",
-        e
+            .starts_with(&format!("error creating directory {dir_path:?}: ")),
+        "unexpected error {e:?}",
     );
 }
 
@@ -71,8 +83,7 @@ fn with_prefix() {
     let name = temp_dir.path().file_name().unwrap();
     assert!(
         name.to_str().unwrap().starts_with("prefix1"),
-        "{:?}",
-        temp_dir
+        "{temp_dir:?}",
     );
     let metadata = std::fs::metadata(temp_dir.path()).unwrap();
     assert!(metadata.is_dir());
@@ -83,6 +94,7 @@ fn with_prefix() {
 #[test]
 fn with_prefix_error() {
     let _guard = LOCK.lock();
+    let _disable_retry = DisableRetryAndEnableOnDrop::new();
     let previous_counter_value = COUNTER.load(Ordering::SeqCst);
     let temp_dir = TempDir::with_prefix("prefix1").unwrap();
     COUNTER.store(previous_counter_value, Ordering::SeqCst);
@@ -91,8 +103,7 @@ fn with_prefix_error() {
     assert!(
         e.to_string()
             .starts_with(&format!("error creating directory {:?}: ", temp_dir.path())),
-        "unexpected error {:?}",
-        e
+        "unexpected error {e:?}",
     );
 }
 
@@ -118,7 +129,7 @@ fn child() {
 fn cleanup() {
     let _guard = LOCK.lock();
     let temp_dir = TempDir::new().unwrap();
-    std::fs::write(&temp_dir.child("file1"), b"abc").unwrap();
+    std::fs::write(temp_dir.child("file1"), b"abc").unwrap();
     let dir_path = temp_dir.path().to_path_buf();
     std::fs::metadata(&dir_path).unwrap();
     temp_dir.cleanup().unwrap();
@@ -157,11 +168,9 @@ fn cleanup_error() {
     assert_eq!(std::io::ErrorKind::PermissionDenied, e.kind());
     assert!(
         e.to_string().starts_with(&format!(
-            "error removing directory and contents {:?}: ",
-            dir_path
+            "error removing directory and contents {dir_path:?}: "
         )),
-        "unexpected error {:?}",
-        e
+        "unexpected error {e:?}",
     );
 }
 
@@ -232,8 +241,7 @@ fn drop_error_panic() {
     let msg = result.unwrap_err().downcast::<String>().unwrap();
     assert!(
         msg.contains("error removing directory and contents ",),
-        "unexpected panic message {:?}",
-        msg
+        "unexpected panic message {msg:?}",
     );
 }
 

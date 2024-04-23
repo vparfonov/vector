@@ -182,13 +182,26 @@ fn test_coroutine_panic() {
         let thrd_main = lua.create_function(|_, ()| -> Result<()> {
             panic!("test_panic");
         })?;
-        lua.globals().set("main", thrd_main.clone())?;
+        lua.globals().set("main", &thrd_main)?;
         let thrd: Thread = lua.create_thread(thrd_main)?;
         thrd.resume(())
     }) {
         Ok(r) => panic!("coroutine panic not propagated, instead returned {:?}", r),
         Err(p) => assert!(*p.downcast::<&str>().unwrap() == "test_panic"),
     }
+}
+
+#[test]
+fn test_thread_pointer() -> Result<()> {
+    let lua = Lua::new();
+
+    let func = lua.load("return 123").into_function()?;
+    let thread = lua.create_thread(func.clone())?;
+
+    assert_eq!(thread.to_pointer(), thread.clone().to_pointer());
+    assert_ne!(thread.to_pointer(), lua.current_thread().to_pointer());
+
+    Ok(())
 }
 
 #[cfg(all(feature = "unstable", not(feature = "send")))]

@@ -1,9 +1,18 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
+/*
+ * Copyright (C) 2015 Benjamin Fry <benjaminfry@me.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 //! parameters used for the nsec3 hash method
 
@@ -12,13 +21,9 @@ use std::fmt;
 #[cfg(feature = "serde-config")]
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    error::{ProtoError, ProtoErrorKind, ProtoResult},
-    rr::{dnssec::Nsec3HashAlgorithm, RData, RecordData, RecordType},
-    serialize::binary::*,
-};
-
-use super::DNSSECRData;
+use crate::error::*;
+use crate::rr::dnssec::Nsec3HashAlgorithm;
+use crate::serialize::binary::*;
 
 /// [RFC 5155](https://tools.ietf.org/html/rfc5155#section-4), NSEC3, March 2008
 ///
@@ -168,63 +173,36 @@ impl NSEC3PARAM {
     }
 }
 
-impl BinEncodable for NSEC3PARAM {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        encoder.emit(self.hash_algorithm().into())?;
-        encoder.emit(self.flags())?;
-        encoder.emit_u16(self.iterations())?;
-        encoder.emit(self.salt().len() as u8)?;
-        encoder.emit_vec(self.salt())?;
+/// Read the RData from the given Decoder
+pub fn read(decoder: &mut BinDecoder<'_>) -> ProtoResult<NSEC3PARAM> {
+    let hash_algorithm =
+        Nsec3HashAlgorithm::from_u8(decoder.read_u8()?.unverified(/*Algorithm verified as safe*/))?;
+    let flags: u8 = decoder
+        .read_u8()?
+        .verify_unwrap(|flags| flags & 0b1111_1110 == 0)
+        .map_err(|flags| ProtoError::from(ProtoErrorKind::UnrecognizedNsec3Flags(flags)))?;
 
-        Ok(())
-    }
+    let opt_out: bool = flags & 0b0000_0001 == 0b0000_0001;
+    let iterations: u16 = decoder.read_u16()?.unverified(/*valid as any u16*/);
+    let salt_len: usize = decoder
+        .read_u8()?
+        .map(|u| u as usize)
+        .verify_unwrap(|salt_len| *salt_len <= decoder.len())
+        .map_err(|_| ProtoError::from("salt_len exceeds buffer length"))?;
+    let salt: Vec<u8> = decoder.read_vec(salt_len)?.unverified(/*valid as any array of u8*/);
+
+    Ok(NSEC3PARAM::new(hash_algorithm, opt_out, iterations, salt))
 }
 
-impl<'r> BinDecodable<'r> for NSEC3PARAM {
-    fn read(decoder: &mut BinDecoder<'r>) -> ProtoResult<Self> {
-        let hash_algorithm = Nsec3HashAlgorithm::from_u8(
-            decoder.read_u8()?.unverified(/*Algorithm verified as safe*/),
-        )?;
-        let flags: u8 = decoder
-            .read_u8()?
-            .verify_unwrap(|flags| flags & 0b1111_1110 == 0)
-            .map_err(|flags| ProtoError::from(ProtoErrorKind::UnrecognizedNsec3Flags(flags)))?;
+/// Write the RData from the given Decoder
+pub fn emit(encoder: &mut BinEncoder<'_>, rdata: &NSEC3PARAM) -> ProtoResult<()> {
+    encoder.emit(rdata.hash_algorithm().into())?;
+    encoder.emit(rdata.flags())?;
+    encoder.emit_u16(rdata.iterations())?;
+    encoder.emit(rdata.salt().len() as u8)?;
+    encoder.emit_vec(rdata.salt())?;
 
-        let opt_out: bool = flags & 0b0000_0001 == 0b0000_0001;
-        let iterations: u16 = decoder.read_u16()?.unverified(/*valid as any u16*/);
-        let salt_len: usize = decoder
-            .read_u8()?
-            .map(|u| u as usize)
-            .verify_unwrap(|salt_len| *salt_len <= decoder.len())
-            .map_err(|_| ProtoError::from("salt_len exceeds buffer length"))?;
-        let salt: Vec<u8> = decoder.read_vec(salt_len)?.unverified(/*valid as any array of u8*/);
-
-        Ok(Self::new(hash_algorithm, opt_out, iterations, salt))
-    }
-}
-
-impl RecordData for NSEC3PARAM {
-    fn try_from_rdata(data: RData) -> Result<Self, RData> {
-        match data {
-            RData::DNSSEC(DNSSECRData::NSEC3PARAM(csync)) => Ok(csync),
-            _ => Err(data),
-        }
-    }
-
-    fn try_borrow(data: &RData) -> Option<&Self> {
-        match data {
-            RData::DNSSEC(DNSSECRData::NSEC3PARAM(csync)) => Some(csync),
-            _ => None,
-        }
-    }
-
-    fn record_type(&self) -> RecordType {
-        RecordType::NSEC3PARAM
-    }
-
-    fn into_rdata(self) -> RData {
-        RData::DNSSEC(DNSSECRData::NSEC3PARAM(self))
-    }
+    Ok(())
 }
 
 /// [RFC 5155](https://tools.ietf.org/html/rfc5155#section-4), NSEC3, March 2008
@@ -281,13 +259,13 @@ mod tests {
 
         let mut bytes = Vec::new();
         let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        assert!(rdata.emit(&mut encoder).is_ok());
+        assert!(emit(&mut encoder, &rdata).is_ok());
         let bytes = encoder.into_bytes();
 
-        println!("bytes: {bytes:?}");
+        println!("bytes: {:?}", bytes);
 
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
-        let read_rdata = NSEC3PARAM::read(&mut decoder).expect("Decoding error");
+        let read_rdata = read(&mut decoder).expect("Decoding error");
         assert_eq!(rdata, read_rdata);
     }
 }

@@ -1,6 +1,7 @@
-use std::collections::btree_map::{BTreeMap, Entry};
-use std::iter;
-use std::ops::RangeBounds;
+use alloc::collections::btree_map::{BTreeMap, Entry};
+use alloc::vec::Vec;
+use core::iter;
+use core::ops::RangeBounds;
 
 use crate::RoaringBitmap;
 use crate::RoaringTreemap;
@@ -46,7 +47,7 @@ impl RoaringTreemap {
     /// ```
     pub fn insert(&mut self, value: u64) -> bool {
         let (hi, lo) = util::split(value);
-        self.map.entry(hi).or_insert_with(RoaringBitmap::new).insert(lo)
+        self.map.entry(hi).or_default().insert(lo)
     }
 
     /// Inserts a range of values.
@@ -81,11 +82,11 @@ impl RoaringTreemap {
 
             // Calculate the sub-range from the lower 32 bits
             counter += if hi == end_hi && hi == start_hi {
-                entry.or_insert_with(RoaringBitmap::new).insert_range(start_lo..=end_lo)
+                entry.or_default().insert_range(start_lo..=end_lo)
             } else if hi == start_hi {
-                entry.or_insert_with(RoaringBitmap::new).insert_range(start_lo..=u32::MAX)
+                entry.or_default().insert_range(start_lo..=u32::MAX)
             } else if hi == end_hi {
-                entry.or_insert_with(RoaringBitmap::new).insert_range(0..=end_lo)
+                entry.or_default().insert_range(0..=end_lo)
             } else {
                 // We insert a full bitmap if it doesn't already exist and return the size of it.
                 // But if the bitmap already exists at this spot we replace it with a full bitmap
@@ -122,7 +123,7 @@ impl RoaringTreemap {
     /// ```
     pub fn push(&mut self, value: u64) -> bool {
         let (hi, lo) = util::split(value);
-        self.map.entry(hi).or_insert_with(RoaringBitmap::new).push(lo)
+        self.map.entry(hi).or_default().push(lo)
     }
 
     /// Pushes `value` in the treemap only if it is greater than the current maximum value.
@@ -385,7 +386,7 @@ impl RoaringTreemap {
             + iter.map(|(_, bitmap)| bitmap.len()).sum::<u64>()
     }
 
-    /// Returns the `n`th integer in the set or `None` if `n <= len()`
+    /// Returns the `n`th integer in the set or `None` if `n >= len()`
     ///
     /// # Examples
     ///

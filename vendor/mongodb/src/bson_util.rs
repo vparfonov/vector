@@ -3,16 +3,16 @@ use std::{
     io::{Read, Write},
 };
 
-use bson::RawBsonRef;
-
 use crate::{
-    bson::{Bson, Document},
+    bson::{Bson, Document, RawArrayBuf, RawBson, RawBsonRef, RawDocumentBuf},
+    checked::Checked,
     error::{ErrorKind, Result},
     runtime::SyncLittleEndianRead,
 };
 
 /// Coerce numeric types into an `i64` if it would be lossless to do so. If this Bson is not numeric
 /// or the conversion would be lossy (e.g. 1.5 -> 1), this returns `None`.
+#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn get_int(val: &Bson) -> Option<i64> {
     match *val {
         Bson::Int32(i) => Some(i64::from(i)),
@@ -35,6 +35,7 @@ pub(crate) fn get_int_raw(val: RawBsonRef<'_>) -> Option<i64> {
 
 /// Coerce numeric types into an `u64` if it would be lossless to do so. If this Bson is not numeric
 /// or the conversion would be lossy (e.g. 1.5 -> 1), this returns `None`.
+#[allow(clippy::cast_possible_truncation)]
 pub(crate) fn get_u64(val: &Bson) -> Option<u64> {
     match *val {
         Bson::Int32(i) => u64::try_from(i).ok(),
@@ -46,6 +47,14 @@ pub(crate) fn get_u64(val: &Bson) -> Option<u64> {
 
 pub(crate) fn to_bson_array(docs: &[Document]) -> Bson {
     Bson::Array(docs.iter().map(|doc| Bson::Document(doc.clone())).collect())
+}
+
+pub(crate) fn to_raw_bson_array(docs: &[Document]) -> Result<RawBson> {
+    let mut array = RawArrayBuf::new();
+    for doc in docs {
+        array.push(RawDocumentBuf::from_document(doc)?);
+    }
+    Ok(RawBson::Array(array))
 }
 
 #[cfg(test)]
@@ -62,11 +71,11 @@ pub(crate) fn first_key(document: &Document) -> Option<&str> {
     document.keys().next().map(String::as_str)
 }
 
-pub(crate) fn replacement_document_check(replacement: &Document) -> Result<()> {
-    match first_key(replacement) {
-        Some(s) if !s.starts_with('$') => Ok(()),
+pub(crate) fn replacement_raw_document_check(replacement: &RawDocumentBuf) -> Result<()> {
+    match replacement.iter().next().transpose()? {
+        Some((key, _)) if !key.starts_with('$') => Ok(()),
         _ => Err(ErrorKind::InvalidArgument {
-            message: "replace document must have first key not starting with '$".to_string(),
+            message: "replace document must have first key not starting with '$'".to_string(),
         }
         .into()),
     }
@@ -83,18 +92,18 @@ pub(crate) fn update_document_check(update: &Document) -> Result<()> {
 }
 
 /// The size in bytes of the provided document's entry in a BSON array at the given index.
-pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> u64 {
+pub(crate) fn array_entry_size_bytes(index: usize, doc_len: usize) -> Result<usize> {
     //   * type (1 byte)
     //   * number of decimal digits in key
     //   * null terminator for the key (1 byte)
     //   * size of value
 
-    1 + num_decimal_digits(index) + 1 + doc_len as u64
+    (Checked::new(1) + num_decimal_digits(index) + 1 + doc_len).get()
 }
 
 /// The number of digits in `n` in base 10.
 /// Useful for calculating the size of an array entry in BSON.
-fn num_decimal_digits(mut n: usize) -> u64 {
+fn num_decimal_digits(mut n: usize) -> usize {
     let mut digits = 0;
 
     loop {
@@ -117,6 +126,17 @@ pub(crate) fn read_document_bytes<R: Read>(mut reader: R) -> Result<Vec<u8>> {
     reader.take(length as u64 - 4).read_to_end(&mut bytes)?;
 
     Ok(bytes)
+}
+
+pub(crate) fn extend_raw_document_buf(
+    this: &mut RawDocumentBuf,
+    other: RawDocumentBuf,
+) -> Result<()> {
+    for result in other.iter() {
+        let (k, v) = result?;
+        this.append(k, v.to_raw_bson());
+    }
+    Ok(())
 }
 
 #[cfg(test)]

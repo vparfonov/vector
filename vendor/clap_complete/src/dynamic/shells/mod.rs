@@ -13,20 +13,26 @@ use std::io::Write as _;
 
 use crate::dynamic::Completer as _;
 
+/// A subcommand definition to `flatten` into your CLI
+///
+/// This provides a one-stop solution for integrating completions into your CLI
 #[derive(clap::Subcommand)]
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
+#[command(about = None, long_about = None)]
 pub enum CompleteCommand {
     /// Register shell completions for this program
     #[command(hide = true)]
     Complete(CompleteArgs),
 }
 
+/// Generally used via [`CompleteCommand`]
 #[derive(clap::Args)]
 #[command(arg_required_else_help = true)]
 #[command(group = clap::ArgGroup::new("complete").multiple(true).conflicts_with("register"))]
 #[allow(missing_docs)]
 #[derive(Clone, Debug)]
+#[command(about = None, long_about = None)]
 pub struct CompleteArgs {
     /// Specify shell to complete for
     #[arg(long)]

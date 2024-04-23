@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
+// Copyright 2015-2021 Benjamin Fry <benjaminfry@me.com>
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -12,14 +12,10 @@ use std::fmt;
 #[cfg(feature = "serde-config")]
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    error::*,
-    rr::{
-        type_bit_map::{decode_type_bit_maps, encode_type_bit_maps},
-        RData, RecordData, RecordDataDecodable, RecordType,
-    },
-    serialize::binary::*,
-};
+use crate::error::*;
+use crate::rr::type_bit_map::{decode_type_bit_maps, encode_type_bit_maps};
+use crate::rr::RecordType;
+use crate::serialize::binary::*;
 
 /// [RFC 7477, Child-to-Parent Synchronization in DNS, March 2015][rfc7477]
 ///
@@ -128,62 +124,36 @@ impl CSYNC {
     }
 }
 
-impl BinEncodable for CSYNC {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        encoder.emit_u32(self.soa_serial)?;
-        encoder.emit_u16(self.flags())?;
-        encode_type_bit_maps(encoder, self.type_bit_maps())?;
+/// Read the RData from the given Decoder
+pub fn read(decoder: &mut BinDecoder<'_>, rdata_length: Restrict<u16>) -> ProtoResult<CSYNC> {
+    let start_idx = decoder.index();
 
-        Ok(())
-    }
+    let soa_serial = decoder.read_u32()?.unverified();
+
+    let flags: u16 = decoder
+        .read_u16()?
+        .verify_unwrap(|flags| flags & 0b1111_1100 == 0)
+        .map_err(|flags| ProtoError::from(ProtoErrorKind::UnrecognizedCsyncFlags(flags)))?;
+
+    let immediate: bool = flags & 0b0000_0001 == 0b0000_0001;
+    let soa_minimum: bool = flags & 0b0000_0010 == 0b0000_0010;
+
+    let bit_map_len = rdata_length
+        .map(|u| u as usize)
+        .checked_sub(decoder.index() - start_idx)
+        .map_err(|_| ProtoError::from("invalid rdata length in CSYNC"))?;
+    let record_types = decode_type_bit_maps(decoder, bit_map_len)?;
+
+    Ok(CSYNC::new(soa_serial, immediate, soa_minimum, record_types))
 }
 
-impl<'r> RecordDataDecodable<'r> for CSYNC {
-    fn read_data(decoder: &mut BinDecoder<'r>, length: Restrict<u16>) -> ProtoResult<Self> {
-        let start_idx = decoder.index();
+/// Write the RData from the given Decoder
+pub fn emit(encoder: &mut BinEncoder<'_>, csync: &CSYNC) -> ProtoResult<()> {
+    encoder.emit_u32(csync.soa_serial)?;
+    encoder.emit_u16(csync.flags())?;
+    encode_type_bit_maps(encoder, csync.type_bit_maps())?;
 
-        let soa_serial = decoder.read_u32()?.unverified();
-
-        let flags: u16 = decoder
-            .read_u16()?
-            .verify_unwrap(|flags| flags & 0b1111_1100 == 0)
-            .map_err(|flags| ProtoError::from(ProtoErrorKind::UnrecognizedCsyncFlags(flags)))?;
-
-        let immediate: bool = flags & 0b0000_0001 == 0b0000_0001;
-        let soa_minimum: bool = flags & 0b0000_0010 == 0b0000_0010;
-
-        let bit_map_len = length
-            .map(|u| u as usize)
-            .checked_sub(decoder.index() - start_idx)
-            .map_err(|_| ProtoError::from("invalid rdata length in CSYNC"))?;
-        let record_types = decode_type_bit_maps(decoder, bit_map_len)?;
-
-        Ok(Self::new(soa_serial, immediate, soa_minimum, record_types))
-    }
-}
-
-impl RecordData for CSYNC {
-    fn try_from_rdata(data: RData) -> Result<Self, RData> {
-        match data {
-            RData::CSYNC(csync) => Ok(csync),
-            _ => Err(data),
-        }
-    }
-
-    fn try_borrow(data: &RData) -> Option<&Self> {
-        match data {
-            RData::CSYNC(csync) => Some(csync),
-            _ => None,
-        }
-    }
-
-    fn record_type(&self) -> RecordType {
-        RecordType::CSYNC
-    }
-
-    fn into_rdata(self) -> RData {
-        RData::CSYNC(self)
-    }
+    Ok(())
 }
 
 impl fmt::Display for CSYNC {
@@ -196,7 +166,7 @@ impl fmt::Display for CSYNC {
         )?;
 
         for ty in &self.type_bit_maps {
-            write!(f, " {ty}")?;
+            write!(f, " {}", ty)?;
         }
 
         Ok(())
@@ -217,14 +187,14 @@ mod tests {
 
         let mut bytes = Vec::new();
         let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        assert!(rdata.emit(&mut encoder).is_ok());
+        assert!(emit(&mut encoder, &rdata).is_ok());
         let bytes = encoder.into_bytes();
 
-        println!("bytes: {bytes:?}");
+        println!("bytes: {:?}", bytes);
 
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
         let restrict = Restrict::new(bytes.len() as u16);
-        let read_rdata = CSYNC::read_data(&mut decoder, restrict).expect("Decoding error");
+        let read_rdata = read(&mut decoder, restrict).expect("Decoding error");
         assert_eq!(rdata, read_rdata);
     }
 }

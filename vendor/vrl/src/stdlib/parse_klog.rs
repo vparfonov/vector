@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 fn parse_klog(bytes: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
     let message = String::from_utf8_lossy(&bytes);
-    let mut log: BTreeMap<String, Value> = BTreeMap::new();
+    let mut log = ObjectMap::new();
     let captures = REGEX_KLOG
         .captures(&message)
         .ok_or("failed parsing klog message")?;
@@ -29,7 +29,7 @@ fn parse_klog(bytes: Value) -> Resolved {
             "timestamp".into(),
             Value::Timestamp(
                 Utc.datetime_from_str(&format!("{year}{timestamp}"), "%Y%m%d %H:%M:%S%.f")
-                    .map_err(|error| format!(r#"failed parsing timestamp {timestamp}: {error}"#))?,
+                    .map_err(|error| format!("failed parsing timestamp {timestamp}: {error}"))?,
             ),
         );
     }
@@ -88,7 +88,7 @@ impl Function for ParseKlog {
                     "level": "info",
                     "line": 70,
                     "message": "hello from klog",
-                    "timestamp": "2023-05-05T17:59:40.692994Z"
+                    "timestamp": "2024-05-05T17:59:40.692994Z"
                 }"#}),
         }]
     }

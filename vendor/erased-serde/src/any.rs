@@ -1,4 +1,4 @@
-use crate::alloc::Box;
+use alloc::boxed::Box;
 use core::any::TypeId;
 use core::marker::PhantomData;
 use core::mem::{self, MaybeUninit};
@@ -37,7 +37,7 @@ impl Any {
     //    let a = Any::new(&s);
     //    drop(s);
     //
-    // Now `a.view()` and `a.take()` return references to a dead String.
+    // Now `a.as_ref()` and `a.take()` return references to a dead String.
     pub(crate) unsafe fn new<T>(t: T) -> Self {
         let value: Value;
         let drop: unsafe fn(&mut Value);
@@ -67,21 +67,6 @@ impl Any {
             #[cfg(feature = "unstable-debug")]
             type_name: any::type_name::<T>(),
         }
-    }
-
-    // This is unsafe -- caller is responsible that T is the correct type.
-    pub(crate) unsafe fn view<T>(&mut self) -> &mut T {
-        if self.type_id != non_static_type_id::<T>() {
-            self.invalid_cast_to::<T>();
-        }
-
-        let ptr = if is_small::<T>() {
-            unsafe { self.value.inline.as_mut_ptr().cast::<T>() }
-        } else {
-            unsafe { self.value.ptr.cast::<T>() }
-        };
-
-        unsafe { &mut *ptr }
     }
 
     // This is unsafe -- caller is responsible that T is the correct type.
@@ -137,10 +122,10 @@ impl<T: ?Sized> NonStaticAny for PhantomData<T> {
     }
 }
 
-fn non_static_type_id<T>() -> TypeId {
-    let non_static_thing = &PhantomData::<T>;
+fn non_static_type_id<T: ?Sized>() -> TypeId {
+    let non_static_thing = PhantomData::<T>;
     let thing = unsafe {
-        mem::transmute::<&dyn NonStaticAny, &(dyn NonStaticAny + 'static)>(non_static_thing)
+        mem::transmute::<&dyn NonStaticAny, &(dyn NonStaticAny + 'static)>(&non_static_thing)
     };
     NonStaticAny::get_type_id(thing)
 }

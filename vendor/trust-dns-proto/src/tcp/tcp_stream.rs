@@ -18,8 +18,9 @@ use async_trait::async_trait;
 use futures_io::{AsyncRead, AsyncWrite};
 use futures_util::stream::Stream;
 use futures_util::{self, future::Future, ready, FutureExt};
-use tracing::debug;
+use log::debug;
 
+use crate::error::*;
 use crate::xfer::{SerialMessage, StreamReceiver};
 use crate::BufDnsStreamHandle;
 use crate::Time;
@@ -102,12 +103,15 @@ impl<S: Connect> TcpStream<S> {
     ///
     /// * `name_server` - the IP and Port of the DNS server to connect to
     #[allow(clippy::new_ret_no_self, clippy::type_complexity)]
-    pub fn new(
+    pub fn new<E>(
         name_server: SocketAddr,
     ) -> (
         impl Future<Output = Result<Self, io::Error>> + Send,
         BufDnsStreamHandle,
-    ) {
+    )
+    where
+        E: FromProtoError,
+    {
         Self::with_timeout(name_server, Duration::from_secs(5))
     }
 
@@ -163,7 +167,25 @@ impl<S: Connect> TcpStream<S> {
         outbound_messages: StreamReceiver,
     ) -> Result<Self, io::Error> {
         let tcp = S::connect_with_bind(name_server, bind_addr);
-        Self::connect_with_future(tcp, name_server, timeout, outbound_messages).await
+        S::Time::timeout(timeout, tcp)
+            .map(move |tcp_stream: Result<Result<S, io::Error>, _>| {
+                tcp_stream
+                    .and_then(|tcp_stream| tcp_stream)
+                    .map(|tcp_stream| {
+                        debug!("TCP connection established to: {}", name_server);
+                        Self {
+                            socket: tcp_stream,
+                            outbound_messages,
+                            send_state: None,
+                            read_state: ReadTcpState::LenBytes {
+                                pos: 0,
+                                bytes: [0u8; 2],
+                            },
+                            peer_addr: name_server,
+                        }
+                    })
+            })
+            .await
     }
 }
 
@@ -219,55 +241,6 @@ impl<S: DnsTcpStream> TcpStream<S> {
             },
             peer_addr,
         }
-    }
-
-    /// Creates a new future of the eventually establish a IO stream connection or fail trying
-    ///
-    /// # Arguments
-    ///
-    /// * `future` - underlying stream future which this tcp stream relies on
-    /// * `name_server` - the IP and Port of the DNS server to connect to
-    /// * `timeout` - connection timeout
-    #[allow(clippy::type_complexity)]
-    pub fn with_future<F: Future<Output = Result<S, io::Error>> + Send + 'static>(
-        future: F,
-        name_server: SocketAddr,
-        timeout: Duration,
-    ) -> (
-        impl Future<Output = Result<Self, io::Error>> + Send,
-        BufDnsStreamHandle,
-    ) {
-        let (message_sender, outbound_messages) = BufDnsStreamHandle::new(name_server);
-        let stream_fut = Self::connect_with_future(future, name_server, timeout, outbound_messages);
-
-        (stream_fut, message_sender)
-    }
-
-    async fn connect_with_future<F: Future<Output = Result<S, io::Error>> + Send + 'static>(
-        future: F,
-        name_server: SocketAddr,
-        timeout: Duration,
-        outbound_messages: StreamReceiver,
-    ) -> Result<Self, io::Error> {
-        S::Time::timeout(timeout, future)
-            .map(move |tcp_stream: Result<Result<S, io::Error>, _>| {
-                tcp_stream
-                    .and_then(|tcp_stream| tcp_stream)
-                    .map(|tcp_stream| {
-                        debug!("TCP connection established to: {}", name_server);
-                        Self {
-                            socket: tcp_stream,
-                            outbound_messages,
-                            send_state: None,
-                            read_state: ReadTcpState::LenBytes {
-                                pos: 0,
-                                bytes: [0u8; 2],
-                            },
-                            peer_addr: name_server,
-                        }
-                    })
-            })
-            .await
     }
 }
 
@@ -352,13 +325,16 @@ impl<S: DnsTcpStream> Stream for TcpStream<S> {
                         if peer != dst {
                             return Poll::Ready(Some(Err(io::Error::new(
                                 io::ErrorKind::InvalidData,
-                                format!("mismatched peer: {peer} and dst: {dst}"),
+                                format!("mismatched peer: {} and dst: {}", peer, dst),
                             ))));
                         }
 
                         // will return if the socket will block
                         // the length is 16 bits
-                        let len = u16::to_be_bytes(buffer.len() as u16);
+                        let len: [u8; 2] = [
+                            (buffer.len() >> 8 & 0xFF) as u8,
+                            (buffer.len() & 0xFF) as u8,
+                        ];
 
                         debug!("sending message len: {} to: {}", buffer.len(), dst);
                         *send_state = Some(WriteTcpState::LenBytes {
@@ -414,7 +390,8 @@ impl<S: DnsTcpStream> Stream for TcpStream<S> {
                         debug!("remain ReadTcpState::LenBytes: {}", pos);
                         None
                     } else {
-                        let length = u16::from_be_bytes(*bytes);
+                        let length =
+                            u16::from(bytes[0]) << 8 & 0xFF00 | u16::from(bytes[1]) & 0x00FF;
                         debug!("got length: {}", length);
                         let mut bytes = vec![0; length as usize];
                         bytes.resize(length as usize, 0);
@@ -491,12 +468,13 @@ mod tests {
     use tokio::runtime::Runtime;
 
     use crate::iocompat::AsyncIoTokioAsStd;
+    use crate::TokioTime;
 
     use crate::tests::tcp_stream_test;
     #[test]
     fn test_tcp_stream_ipv4() {
         let io_loop = Runtime::new().expect("failed to create tokio runtime");
-        tcp_stream_test::<AsyncIoTokioAsStd<TokioTcpStream>, Runtime>(
+        tcp_stream_test::<AsyncIoTokioAsStd<TokioTcpStream>, Runtime, TokioTime>(
             IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             io_loop,
         )
@@ -506,7 +484,7 @@ mod tests {
     #[cfg(not(target_os = "linux"))] // ignored until Travis-CI fixes IPv6
     fn test_tcp_stream_ipv6() {
         let io_loop = Runtime::new().expect("failed to create tokio runtime");
-        tcp_stream_test::<AsyncIoTokioAsStd<TokioTcpStream>, Runtime>(
+        tcp_stream_test::<AsyncIoTokioAsStd<TokioTcpStream>, Runtime, TokioTime>(
             IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
             io_loop,
         )

@@ -37,7 +37,7 @@ This crate is available on [crates.io](https://crates.io/crates/bson). To use it
 
 ```toml
 [dependencies]
-bson = "2.7.0"
+bson = "2.8.0"
 ```
 
 Note that if you are using `bson` through the `mongodb` crate, you do not need to specify it in your
@@ -257,7 +257,7 @@ This crate compiles to the `wasm32-unknown-unknown` target; when doing so, the `
 
 ## Minimum supported Rust version (MSRV)
 
-The MSRV for this crate is currently 1.48.0. This will be rarely be increased, and if it ever is,
+The MSRV for this crate is currently 1.61.0. This will be rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.
 
 ## Contributing

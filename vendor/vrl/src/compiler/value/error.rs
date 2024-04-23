@@ -1,17 +1,17 @@
+use crate::compiler::ExpressionError;
 use crate::diagnostic::DiagnosticMessage;
 
 use super::Kind;
-use crate::compiler::ExpressionError;
 
 #[derive(thiserror::Error, Debug, PartialEq, Eq)]
 pub enum ValueError {
     #[error(
-        r#"expected {}, got {got}"#,
+        "expected {}, got {got}",
         .expected
     )]
     Expected { got: Kind, expected: Kind },
 
-    #[error(r#"can't coerce {0} into {1}"#)]
+    #[error("can't coerce {0} into {1}")]
     Coerce(Kind, Kind),
 
     #[error("can't calculate remainder of type {0} and {1}")]

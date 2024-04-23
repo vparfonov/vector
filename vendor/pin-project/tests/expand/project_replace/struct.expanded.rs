@@ -24,6 +24,7 @@ const _: () = {
     extern crate pin_project as _pin_project;
     #[allow(dead_code)]
     #[allow(clippy::mut_mut)]
+    #[allow(clippy::missing_docs_in_private_items)]
     struct __StructProjection<'pin, T, U>
     where
         Struct<T, U>: 'pin,
@@ -33,6 +34,7 @@ const _: () = {
     }
     #[allow(dead_code)]
     #[allow(clippy::ref_option_ref)]
+    #[allow(clippy::missing_docs_in_private_items)]
     struct __StructProjectionRef<'pin, T, U>
     where
         Struct<T, U>: 'pin,
@@ -41,6 +43,7 @@ const _: () = {
         unpinned: &'pin (U),
     }
     #[allow(dead_code)]
+    #[allow(clippy::missing_docs_in_private_items)]
     struct __StructProjectionOwned<T, U> {
         pinned: ::pin_project::__private::PhantomData<T>,
         unpinned: U,

@@ -39,7 +39,7 @@
 //!
 //! ```toml
 //! [dependencies.uuid]
-//! version = "1.5.0"
+//! version = "1.8.0"
 //! features = [
 //!     "v4",                # Lets you generate random UUIDs
 //!     "fast-rng",          # Use a faster (but still sufficiently random) RNG
@@ -80,6 +80,9 @@
 //! * `v3` - Version 3 UUIDs based on the MD5 hash of some data.
 //! * `v4` - Version 4 UUIDs with random data.
 //! * `v5` - Version 5 UUIDs based on the SHA1 hash of some data.
+//! * `v6` - Version 6 UUIDs using a timestamp and monotonic counter.
+//! * `v7` - Version 7 UUIDs using a Unix timestamp.
+//! * `v8` - Version 8 UUIDs using user-defined data.
 //!
 //! Versions that are in draft are also supported. See the _unstable features_ section for details.
 //!
@@ -103,6 +106,8 @@
 //! * `macro-diagnostics` - enhances the diagnostics of `uuid!` macro.
 //! * `serde` - adds the ability to serialize and deserialize a UUID using
 //!   `serde`.
+//! * `borsh` - adds the ability to serialize and deserialize a UUID using
+//!   `borsh`.
 //! * `arbitrary` - adds an `Arbitrary` trait implementation to `Uuid` for
 //!   fuzzing.
 //! * `fast-rng` - uses a faster algorithm for generating random UUIDs.
@@ -115,13 +120,8 @@
 //! Some features are unstable. They may be incomplete or depend on other
 //! unstable libraries. These include:
 //!
-//! * `v6` - Version 6 UUIDs using a timestamp and monotonic counter.
-//! * `v7` - Version 7 UUIDs using a Unix timestamp.
-//! * `v8` - Version 8 UUIDs using user-defined data.
 //! * `zerocopy` - adds support for zero-copy deserialization using the
 //!   `zerocopy` library.
-//! * `borsh` - adds the ability to serialize and deserialize a UUID using
-//!   `borsh`.
 //!
 //! Unstable features may break between minor releases.
 //!
@@ -141,7 +141,7 @@
 //!
 //! ```toml
 //! [dependencies.uuid]
-//! version = "1.5.0"
+//! version = "1.8.0"
 //! features = [
 //!     "v4",
 //!     "v7",
@@ -156,7 +156,7 @@
 //!
 //! ```toml
 //! [dependencies.uuid]
-//! version = "1.5.0"
+//! version = "1.8.0"
 //! default-features = false
 //! ```
 //!
@@ -169,7 +169,7 @@
 //! follow [`getrandom`'s docs] on configuring a source of randomness
 //! on currently unsupported targets. Alternatively, you can produce
 //! random bytes yourself and then pass them to [`Builder::from_random_bytes`]
-//! without enabling the `v4` feature.
+//! without enabling the `v4` or `v7` features.
 //!
 //! # Examples
 //!
@@ -214,7 +214,7 @@
 #![doc(
     html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
     html_favicon_url = "https://www.rust-lang.org/favicon.ico",
-    html_root_url = "https://docs.rs/uuid/1.5.0"
+    html_root_url = "https://docs.rs/uuid/1.8.0"
 )]
 
 #[cfg(any(feature = "std", test))]
@@ -251,11 +251,11 @@ mod v3;
 mod v4;
 #[cfg(feature = "v5")]
 mod v5;
-#[cfg(all(uuid_unstable, feature = "v6"))]
+#[cfg(feature = "v6")]
 mod v6;
-#[cfg(all(uuid_unstable, feature = "v7"))]
+#[cfg(feature = "v7")]
 mod v7;
-#[cfg(all(uuid_unstable, feature = "v8"))]
+#[cfg(feature = "v8")]
 mod v8;
 
 #[cfg(feature = "md5")]
@@ -312,16 +312,12 @@ pub enum Version {
     /// Version 5: SHA-1 hash.
     Sha1 = 5,
     /// Version 6: Sortable Timestamp and node ID.
-    #[cfg(uuid_unstable)]
     SortMac = 6,
     /// Version 7: Timestamp and random.
-    #[cfg(uuid_unstable)]
     SortRand = 7,
     /// Version 8: Custom.
-    #[cfg(uuid_unstable)]
     Custom = 8,
     /// The "max" (all ones) UUID.
-    #[cfg(uuid_unstable)]
     Max = 0xff,
 }
 
@@ -444,8 +440,8 @@ pub enum Variant {
     derive(AsBytes, FromBytes, Unaligned)
 )]
 #[cfg_attr(
-    all(uuid_unstable, feature = "borsh"),
-    derive(borsh::BorshDeserialize, borsh::BorshSerialize)
+    feature = "borsh",
+    derive(borsh_derive::BorshDeserialize, borsh_derive::BorshSerialize)
 )]
 #[repr(transparent)]
 #[cfg_attr(
@@ -575,13 +571,9 @@ impl Uuid {
             3 => Some(Version::Md5),
             4 => Some(Version::Random),
             5 => Some(Version::Sha1),
-            #[cfg(uuid_unstable)]
             6 => Some(Version::SortMac),
-            #[cfg(uuid_unstable)]
             7 => Some(Version::SortRand),
-            #[cfg(uuid_unstable)]
             8 => Some(Version::Custom),
-            #[cfg(uuid_unstable)]
             0xf => Some(Version::Max),
             _ => None,
         }
@@ -851,7 +843,6 @@ impl Uuid {
     }
 
     /// Tests if the UUID is max (all ones).
-    #[cfg(uuid_unstable)]
     pub const fn is_max(&self) -> bool {
         self.as_u128() == u128::MAX
     }
@@ -911,13 +902,11 @@ impl Uuid {
 
                 Some(Timestamp::from_rfc4122(ticks, counter))
             }
-            #[cfg(uuid_unstable)]
             Some(Version::SortMac) => {
                 let (ticks, counter) = timestamp::decode_sorted_rfc4122_timestamp(self);
 
                 Some(Timestamp::from_rfc4122(ticks, counter))
             }
-            #[cfg(uuid_unstable)]
             Some(Version::SortRand) => {
                 let millis = timestamp::decode_unix_timestamp_millis(self);
 
@@ -940,6 +929,13 @@ impl Default for Uuid {
     #[inline]
     fn default() -> Self {
         Uuid::nil()
+    }
+}
+
+impl AsRef<Uuid> for Uuid {
+    #[inline]
+    fn as_ref(&self) -> &Uuid {
+        self
     }
 }
 
@@ -974,7 +970,7 @@ pub mod serde {
     //! to change the way a [`Uuid`](../struct.Uuid.html) is serialized
     //! and deserialized.
 
-    pub use crate::external::serde_support::compact;
+    pub use crate::external::serde_support::{braced, compact, simple, urn};
 }
 
 #[cfg(test)]
@@ -1184,7 +1180,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(uuid_unstable)]
     #[cfg_attr(
         all(
             target_arch = "wasm32",
@@ -1757,7 +1752,7 @@ mod tests {
     fn test_as_bytes() {
         let u = new();
         let ub = u.as_bytes();
-        let ur = u.as_ref();
+        let ur: &[u8] = u.as_ref();
 
         assert_eq!(ub.len(), 16);
         assert_eq!(ur.len(), 16);
@@ -1779,7 +1774,7 @@ mod tests {
         use crate::std::{convert::TryInto, vec::Vec};
 
         let u = new();
-        let ub = u.as_ref();
+        let ub: &[u8] = u.as_ref();
 
         let v: Vec<u8> = u.into();
 

@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "bollard-stubs"
-version = "1.43.0-rc.2"
+version = "1.44.0-rc.2"
 authors = ["Bollard contributors"]
 description = "Stubs used for the Bollard rust async Docker client API"
 readme = "README.md"
@@ -23,7 +23,7 @@ version = "0.21"
 optional = true
 
 [dependencies.bollard-buildkit-proto]
-version = "=0.2.0"
+version = "=0.3.0"
 optional = true
 
 [dependencies.bytes]

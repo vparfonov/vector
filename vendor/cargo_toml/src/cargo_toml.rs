@@ -1,4 +1,6 @@
 #![forbid(unsafe_code)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
+
 //! This crate defines `struct`s that can be deserialized with Serde
 //! to load and inspect `Cargo.toml` metadata.
 //!
@@ -12,22 +14,30 @@
 //! The crate has methods for processing this information, but you will need to write some glue code to obtain it. See [`Manifest::complete_from_path_and_workspace`].
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::convert::TryFrom;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Display;
 use std::mem::take;
 use std::path::{Path, PathBuf};
 use std::{fs, io};
 pub use toml::Value;
 
-/// Dependencies. The keys in this map may not be crate names if `package` is used, but may be feature names if they're optional.
+/// Dependencies. The keys in this map are not always crate names, this can be overriden by the `package` field, and there may be multiple copies of the same crate.
+/// Optional dependencies may create implicit features, see the [`features`] module for dealing with this.
 pub type DepsSet = BTreeMap<String, Dependency>;
 /// Config target (see [`parse_cfg`](https://lib.rs/parse_cfg) crate) + deps for the target.
 pub type TargetDepsSet = BTreeMap<String, Target>;
-/// `[features]` section. `default` is special.
+/// The `[features]` section. This set may be incomplete!
+///
+/// The `default` is special, and there may be more features
+/// implied by optional dependencies.
+/// See the [`features`] module for more info.
 pub type FeatureSet = BTreeMap<String, Vec<String>>;
 /// Locally replace dependencies
 pub type PatchSet = BTreeMap<String, DepsSet>;
+/// A set of lints.
+pub type LintSet = BTreeMap<String, Lint>;
+/// Lint groups such as [lints.rust].
+pub type LintGroups = BTreeMap<String, LintSet>;
 
 mod afs;
 mod error;
@@ -35,6 +45,10 @@ mod inheritable;
 pub use crate::afs::*;
 pub use crate::error::Error;
 pub use crate::inheritable::Inheritable;
+
+#[cfg(feature = "features")]
+#[cfg_attr(docsrs, doc(cfg(feature = "features")))]
+pub mod features;
 
 /// The top-level `Cargo.toml` structure. **This is the main type in this library.**
 ///
@@ -65,7 +79,14 @@ pub struct Manifest<Metadata = Value> {
     #[serde(default, skip_serializing_if = "TargetDepsSet::is_empty")]
     pub target: TargetDepsSet,
 
-    /// `[features]` section
+    /// The `[features]` section. This set may be incomplete!
+    ///
+    /// Optional dependencies may create implied Cargo features.
+    /// This features section also supports microsyntax with `dep:`, `/`, and `?`
+    /// for managing dependencies and their features.io
+    ///
+    /// This crate has an optional [`features`] module for dealing with this
+    /// complexity and getting the real list of features.
     #[serde(default, skip_serializing_if = "FeatureSet::is_empty")]
     pub features: FeatureSet,
 
@@ -106,10 +127,14 @@ pub struct Manifest<Metadata = Value> {
     /// Examples
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub example: Vec<Product>,
+
+    /// Lints
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lints: Option<Lints>,
 }
 
 /// A manifest can contain both a package and workspace-wide properties
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "kebab-case")]
 pub struct Workspace<Metadata = Value> {
     /// Relative paths of crates in here
@@ -141,6 +166,10 @@ pub struct Workspace<Metadata = Value> {
     /// Template for needs_workspace_inheritance
     #[serde(default, skip_serializing_if = "DepsSet::is_empty")]
     pub dependencies: DepsSet,
+
+    /// Workspace-level lint groups
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lints: Option<LintGroups>,
 }
 
 /// Workspace can predefine properties that can be inherited via `{ workspace = true }` in its member packages.
@@ -252,25 +281,31 @@ impl Manifest<Value> {
     #[inline(always)]
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(cargo_toml_content: &str) -> Result<Self, Error> {
-        Self::from_slice_with_metadata(cargo_toml_content.as_bytes())
+        Self::from_slice_with_metadata_str(cargo_toml_content)
     }
 }
 
 impl<Metadata: for<'a> Deserialize<'a>> Manifest<Metadata> {
+
     /// Parse `Cargo.toml`, and parse its `[package.metadata]` into a custom Serde-compatible type.
     ///
     /// It does not call [`Manifest::complete_from_path`], so may be missing implicit data.
+    #[inline]
     pub fn from_slice_with_metadata(cargo_toml_content: &[u8]) -> Result<Self, Error> {
         let cargo_toml_content = std::str::from_utf8(cargo_toml_content).map_err(|_| Error::Other("utf8"))?;
-        let mut manifest: Self = toml::from_str(cargo_toml_content)?;
-        if manifest.package.is_none() && manifest.workspace.is_none() {
-            // Some old crates lack the `[package]` header
+        Self::from_slice_with_metadata_str(cargo_toml_content)
+    }
 
-            let val: Value = toml::from_str(cargo_toml_content)?;
-            if let Some(project) = val.get("project") {
-                manifest.package = Some(project.clone().try_into()?);
-            } else {
-                manifest.package = Some(val.try_into()?);
+    #[inline(never)]
+    fn from_slice_with_metadata_str(cargo_toml_content: &str) -> Result<Self, Error> {
+        let mut manifest: Self = toml::from_str(cargo_toml_content)?;
+
+        if let Some(package) = &mut manifest.package {
+            // This is a clumsy implementation of Cargo's rule that missing version defaults publish to false.
+            // Serde just doesn't support such relationship for default field values, so this will be incorrect
+            // for explicit `version = "0.0.0"` and `publish = true`.
+            if package.version.get().map_or(false, |v| v == "0.0.0") && package.publish.get().map_or(false, |p| p.is_default()) {
+                package.publish = Inheritable::Set(Publish::Flag(false));
             }
         }
         Ok(manifest)
@@ -281,12 +316,14 @@ impl<Metadata: for<'a> Deserialize<'a>> Manifest<Metadata> {
     /// Calls [`Manifest::complete_from_path`]
     pub fn from_path_with_metadata<P: AsRef<Path>>(cargo_toml_path: P) -> Result<Self, Error> {
         let cargo_toml_path = cargo_toml_path.as_ref();
-        let cargo_toml_content = fs::read(cargo_toml_path)?;
-        let mut manifest = Self::from_slice_with_metadata(&cargo_toml_content)?;
+        let cargo_toml_content = fs::read_to_string(cargo_toml_path)?;
+        let mut manifest = Self::from_slice_with_metadata_str(&cargo_toml_content)?;
         manifest.complete_from_path(cargo_toml_path)?;
         Ok(manifest)
     }
+}
 
+impl<Metadata> Manifest<Metadata> {
     /// `Cargo.toml` doesn't contain explicit information about `[lib]` and `[[bin]]`,
     /// which are inferred based on files on disk.
     ///
@@ -333,7 +370,10 @@ impl<Metadata: for<'a> Deserialize<'a>> Manifest<Metadata> {
         self.complete_from_abstract_filesystem_inner(&fs)
     }
 
-    fn needs_workspace_inheritance(&self) -> bool {
+    /// If `true`, some fields are unavailable. If `false`, it's fully usable as-is.
+    ///
+    /// It is `false` in manifests that use workspace inheritance, but had their data completed from the root manifest already.
+    pub fn needs_workspace_inheritance(&self) -> bool {
         self.package.as_ref().map_or(false, Package::needs_workspace_inheritance) ||
         self.dependencies.values()
             .chain(self.build_dependencies.values())
@@ -609,10 +649,10 @@ fn inherit_dependencies<Ignored>(deps_to_inherit: &mut BTreeMap<String, Dependen
             let mut overrides = overrides.clone();
             *dep = template.clone();
             if overrides.optional {
-                dep.detail_mut().optional = true;
+                dep.try_detail_mut()?.optional = true;
             }
             if !overrides.features.is_empty() {
-                dep.detail_mut().features.append(&mut overrides.features);
+                dep.try_detail_mut()?.features.append(&mut overrides.features);
             }
             if let Dependency::Detailed(dep) = dep {
                 dep.inherited = true;
@@ -645,6 +685,7 @@ impl<Metadata: Default> Default for Manifest<Metadata> {
             bench: Default::default(),
             test: Default::default(),
             example: Default::default(),
+            lints: Default::default(),
         }
     }
 }
@@ -674,7 +715,7 @@ pub struct Profiles {
 
     /// User-suppiled for `cargo --profile=name`
     #[serde(flatten)]
-    pub custom: HashMap<String, Profile>,
+    pub custom: BTreeMap<String, Profile>,
 }
 
 impl Profiles {
@@ -804,7 +845,8 @@ impl TryFrom<Value> for LtoSetting {
             Value::String(s) => match s.as_str() {
                 "off" | "n" | "no" => Self::None,
                 "thin" => Self::Thin,
-                "fat" | "on" | "y" | "yes" => Self::Fat,
+                "fat" | "on" | "y" | "yes" | "true" => Self::Fat,
+                "false" => Self::ThinLocal,
                 _ => return Err(Error::Other("lto setting has unknown string value")),
             },
             _ => return Err(Error::Other("wrong data type for lto setting")),
@@ -861,12 +903,16 @@ pub struct Profile {
     pub strip: Option<StripSetting>,
 
     /// Profile overrides for dependencies, `*` is special.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub package: BTreeMap<String, Value>,
 
     /// Profile overrides for build dependencies, `*` is special.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub build_override: Option<Value>,
+
+    /// Only relevant for non-standard profiles
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inherits: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -929,7 +975,7 @@ pub struct Product {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub crate_type: Vec<String>,
 
-    /// The required-features field specifies which features the product needs in order to be built.
+    /// The `required-features` field specifies which features the product needs in order to be built.
     /// If any of the required features are not selected, the product will be skipped.
     /// This is only relevant for the `[[bin]]`, `[[bench]]`, `[[test]]`, and `[[example]]` sections,
     /// it has no effect on `[lib]`.
@@ -957,7 +1003,7 @@ impl Default for Product {
 }
 
 /// Dependencies that are platform-specific or enabled through custom `cfg()`.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct Target {
     /// platform-specific normal deps
@@ -974,18 +1020,21 @@ pub struct Target {
 /// Dependency definition. Note that this struct doesn't carry it's key/name, which you need to read from its section.
 ///
 /// It can be simple version number, or detailed settings, or inherited.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum Dependency {
-    /// Version
+    /// Version requirement (e.g. `^1.5`)
     Simple(String),
     /// Incomplete data
     Inherited(InheritedDependencyDetail), // order is important for serde
-    Detailed(DependencyDetail),
+    /// `{ version = "^1.5", features = ["a", "b"] }` etc.
+    Detailed(Box<DependencyDetail>),
 }
 
 impl Dependency {
     /// Get object with special dependency settings if it's not just a version number.
+    ///
+    /// Returns `None` if it's inherited and the value is not available
     #[inline]
     #[must_use] pub fn detail(&self) -> Option<&DependencyDetail> {
         match *self {
@@ -996,24 +1045,34 @@ impl Dependency {
 
     /// Panics if inherited value is not available
     #[inline]
+    #[track_caller]
     pub fn detail_mut(&mut self) -> &mut DependencyDetail {
+        self.try_detail_mut().expect("dependency not available due to workspace inheritance")
+    }
+
+    /// Returns error if inherited value is not available
+    ///
+    /// Makes it detailed otherwise
+    pub fn try_detail_mut(&mut self) -> Result<&mut DependencyDetail, Error> {
         match self {
-            Dependency::Detailed(d) => d,
+            Dependency::Detailed(d) => Ok(d),
             Dependency::Simple(ver) => {
-                *self = Dependency::Detailed(DependencyDetail {
+                *self = Dependency::Detailed(Box::new(DependencyDetail {
                     version: Some(ver.clone()),
                     ..Default::default()
-                });
+                }));
                 match self {
-                    Dependency::Detailed(d) => d,
+                    Dependency::Detailed(d) => Ok(d),
                     _ => unreachable!(),
                 }
             },
-            Dependency::Inherited(_) => panic!("dependency not available due to workspace inheritance"),
+            Dependency::Inherited(_) => Err(Error::InheritedUnknownValue),
         }
     }
 
     /// Version requirement
+    ///
+    /// Panics if inherited value is not available
     #[inline]
     #[track_caller]
     #[must_use]
@@ -1025,7 +1084,7 @@ impl Dependency {
         }
     }
 
-    /// Enable extra features for this dep.
+    /// Enable extra features for this dep, in addition to the `default` features controlled via `default_features`.
     #[inline]
     #[must_use]
     pub fn req_features(&self) -> &[String] {
@@ -1036,7 +1095,8 @@ impl Dependency {
         }
     }
 
-    /// Is it optional. Note that optional deps can be used as features, unless features use `dep:`/`?` syntax for them..
+    /// Is it optional. Note that optional deps can be used as features, unless features use `dep:`/`?` syntax for them.
+    /// See the [`features`] module for more info.
     #[inline]
     #[must_use]
     pub fn optional(&self) -> bool {
@@ -1095,7 +1155,7 @@ impl Dependency {
 }
 
 /// When definition of a dependency is more than just a version string.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub struct DependencyDetail {
     /// Semver requirement. Note that a plain version number implies this version *or newer* compatible one.
@@ -1143,10 +1203,11 @@ pub struct DependencyDetail {
     /// NB: Not allowed at workspace level
     ///
     /// If not used with `dep:` or `?/` syntax in `[features]`, this also creates an implicit feature.
+    /// See the [`features`] module for more info.
     #[serde(default, skip_serializing_if = "is_false")]
     pub optional: bool,
 
-    /// Enable `default` features of the dependency.
+    /// Enable the `default` set of features of the dependency (enabled by default).
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub default_features: bool,
 
@@ -1155,6 +1216,31 @@ pub struct DependencyDetail {
     /// By using this, a crate can have multiple versions of the same dependency.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub package: Option<String>,
+
+    /// Contains the remaining unstable keys and values for the dependency.
+    #[serde(flatten)]
+    pub unstable: BTreeMap<String, Value>
+}
+
+impl Default for DependencyDetail {
+    fn default() -> Self {
+        DependencyDetail {
+            version: None,
+            registry: None,
+            registry_index: None,
+            path: None,
+            inherited: false,
+            git: None,
+            branch: None,
+            tag: None,
+            rev: None,
+            features: Vec::new(),
+            optional: false,
+            default_features: true, // != bool::default()
+            package: None,
+            unstable: BTreeMap::new(),
+        }
+    }
 }
 
 /// When a dependency is defined as `{ workspace = true }`,
@@ -1194,6 +1280,7 @@ pub struct Package<Metadata = Value> {
     pub rust_version: Option<Inheritable<String>>,
 
     /// Must parse as semver, e.g. "1.9.0"
+    #[serde(default = "default_version")]
     pub version: Inheritable<String>,
 
     /// Build script definition
@@ -1483,6 +1570,9 @@ impl<Metadata> Package<Metadata> {
         &self.name
     }
 
+    /// If `true`, some fields are unavailable.
+    ///
+    /// It is `false` in manifests that use inheritance, but had their data completed from the root manifest already.
     fn needs_workspace_inheritance(&self) -> bool {
         !(self.authors.is_set() &&
         self.categories.is_set() &&
@@ -1586,6 +1676,20 @@ impl PartialEq<bool> for Publish {
     }
 }
 
+impl PartialEq<bool> for &Publish {
+    #[inline]
+    fn eq(&self, b: &bool) -> bool {
+        b.eq(*self)
+    }
+}
+
+impl PartialEq<&Publish> for bool {
+    #[inline]
+    fn eq(&self, b: &&Publish) -> bool {
+        (*self).eq(*b)
+    }
+}
+
 /// In badges section of Cargo.toml
 ///
 /// Mostly obsolete.
@@ -1610,6 +1714,10 @@ where
     D: Deserializer<'de>,
 {
     Ok(Deserialize::deserialize(deserializer).unwrap_or_default())
+}
+
+fn default_version() -> Inheritable<String> {
+    Inheritable::Set("0.0.0".into())
 }
 
 /// `[badges]` section of `Cargo.toml`, deprecated by crates-io except `maintenance`.
@@ -1741,4 +1849,41 @@ impl Display for Resolver {
 
 impl Default for Resolver {
     fn default() -> Self { Self::V1 }
+}
+
+
+
+/// Lint definition.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Lint {
+    Simple(LintLevel),
+    Detailed {
+        level: LintLevel,
+        /// Controls which lints or lint groups override other lint groups.
+        priority: Option<i32>,
+    }
+}
+
+/// Lint level.
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum LintLevel {
+    Allow,
+    Warn,
+    Deny,
+    Forbid,
+}
+
+/// `[lints]` section.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub struct Lints {
+    /// Inherit lint rules from the workspace.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub workspace: bool,
+
+    /// Lint groups
+    #[serde(flatten)]
+    pub groups: LintGroups,
 }

@@ -11,9 +11,9 @@
 
 [package]
 edition = "2018"
-rust-version = "1.47"
+rust-version = "1.48"
 name = "data-encoding"
-version = "2.4.0"
+version = "2.5.0"
 authors = ["Julien Cretin <git@ia0.eu>"]
 include = [
     "Cargo.toml",
@@ -36,6 +36,9 @@ categories = [
 ]
 license = "MIT"
 repository = "https://github.com/ia0/data-encoding"
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg=docsrs"]
 
 [features]
 alloc = []

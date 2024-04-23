@@ -23,11 +23,16 @@
 //! ```
 #![allow(clippy::bool_to_int_with_if)]
 
-pub use atty::Stream;
-
 use std::cell::UnsafeCell;
 use std::env;
 use std::sync::Once;
+
+/// possible stream sources
+#[derive(Clone, Copy, Debug)]
+pub enum Stream {
+    Stdout,
+    Stderr,
+}
 
 fn env_force_color() -> usize {
     if let Ok(force) = env::var("FORCE_COLOR") {
@@ -75,13 +80,25 @@ fn translate_level(level: usize) -> Option<ColorLevel> {
     }
 }
 
+fn is_a_tty(stream: Stream) -> bool {
+    use is_terminal::*;
+    match stream {
+        Stream::Stdout => std::io::stdout().is_terminal(),
+        Stream::Stderr => std::io::stderr().is_terminal(),
+    }
+}
+
 fn supports_color(stream: Stream) -> usize {
     let force_color = env_force_color();
     if force_color > 0 {
         force_color
-    } else if env_no_color() || !atty::is(stream) || as_str(&env::var("TERM")) == Ok("dumb") {
+    } else if env_no_color()
+        || as_str(&env::var("TERM")) == Ok("dumb")
+        || !(is_a_tty(stream) || env::var("IGNORE_IS_TERMINAL").map_or(false, |v| v != "0"))
+    {
         0
-    } else if as_str(&env::var("COLORTERM")) == Ok("truecolor")
+    } else if env::var("COLORTERM").map(|colorterm| check_colorterm_16m(&colorterm)) == Ok(true)
+        || env::var("TERM").map(|term| check_term_16m(&term)) == Ok(true)
         || as_str(&env::var("TERM_PROGRAM")) == Ok("iTerm.app")
     {
         3
@@ -113,6 +130,14 @@ fn check_ansi_color(term: &str) -> bool {
         || term.contains("linux")
 }
 
+fn check_colorterm_16m(colorterm: &str) -> bool {
+    colorterm == "truecolor" || colorterm == "24bit"
+}
+
+fn check_term_16m(term: &str) -> bool {
+    term.ends_with("direct") || term.ends_with("truecolor")
+}
+
 fn check_256_color(term: &str) -> bool {
     term.ends_with("256") || term.ends_with("256color")
 }
@@ -128,9 +153,8 @@ struct CacheCell(UnsafeCell<Option<ColorLevel>>);
 
 unsafe impl Sync for CacheCell {}
 
-static INIT: [Once; 3] = [Once::new(), Once::new(), Once::new()];
-static ON_CACHE: [CacheCell; 3] = [
-    CacheCell(UnsafeCell::new(None)),
+static INIT: [Once; 2] = [Once::new(), Once::new()];
+static ON_CACHE: [CacheCell; 2] = [
     CacheCell(UnsafeCell::new(None)),
     CacheCell(UnsafeCell::new(None)),
 ];
@@ -138,13 +162,13 @@ static ON_CACHE: [CacheCell; 3] = [
 macro_rules! assert_stream_in_bounds {
     ($($variant:ident)*) => {
         $(
-            const _: () = [(); 3][Stream::$variant as usize];
+            const _: () = [(); 2][Stream::$variant as usize];
         )*
     };
 }
 
 // Compile-time assertion that the below indexing will never panic
-assert_stream_in_bounds!(Stdout Stderr Stdin);
+assert_stream_in_bounds!(Stdout Stderr);
 
 /**
 Returns a [ColorLevel] if a [Stream] supports terminal colors, caching the result to
@@ -197,7 +221,7 @@ mod tests {
         let _test_guard = TEST_LOCK.lock().unwrap();
         set_up();
 
-        assert_eq!(on(atty::Stream::Stdout), None);
+        assert_eq!(on(Stream::Stdout), None);
     }
 
     #[test]
@@ -206,6 +230,7 @@ mod tests {
         let _test_guard = TEST_LOCK.lock().unwrap();
         set_up();
 
+        env::set_var("IGNORE_IS_TERMINAL", "1");
         env::set_var("CLICOLOR", "1");
         let expected = Some(ColorLevel {
             level: 1,
@@ -213,10 +238,10 @@ mod tests {
             has_256: false,
             has_16m: false,
         });
-        assert_eq!(on(atty::Stream::Stdout), expected);
+        assert_eq!(on(Stream::Stdout), expected);
 
         env::set_var("CLICOLOR", "0");
-        assert_eq!(on(atty::Stream::Stdout), None);
+        assert_eq!(on(Stream::Stdout), None);
     }
 
     #[test]
@@ -233,6 +258,6 @@ mod tests {
             has_256: false,
             has_16m: false,
         });
-        assert_eq!(on(atty::Stream::Stdout), expected);
+        assert_eq!(on(Stream::Stdout), expected);
     }
 }

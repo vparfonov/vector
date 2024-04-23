@@ -1,4 +1,4 @@
-// Copyright 2023 Greptime Team
+// Copyright 2024 Greptime Team
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,6 @@
 
 use derive_new::new;
 
-use greptimedb_client::api::v1::column::*;
 use greptimedb_client::api::v1::*;
 use greptimedb_client::{Client, Database, DEFAULT_SCHEMA_NAME};
 
@@ -125,7 +124,7 @@ fn to_insert_request(records: Vec<WeatherRecord>) -> InsertRequest {
         Column {
             column_name: "ts".to_owned(),
             values: Some(column::Values {
-                ts_millisecond_values: timestamp_millis,
+                timestamp_millisecond_values: timestamp_millis,
                 ..Default::default()
             }),
             semantic_type: SemanticType::Timestamp as i32,

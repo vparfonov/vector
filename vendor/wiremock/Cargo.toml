@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "wiremock"
-version = "0.5.19"
+version = "0.5.22"
 authors = ["Luca Palmieri <rust@lpalmieri.com>"]
 description = "HTTP mocking to test Rust applications."
 documentation = "https://docs.rs/wiremock/"

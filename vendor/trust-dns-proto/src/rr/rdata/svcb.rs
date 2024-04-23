@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
+// Copyright 2015-2021 Benjamin Fry <benjaminfry@me.com>
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -6,12 +6,13 @@
 // copied, modified, or distributed except according to those terms.
 
 //! SVCB records, see [draft-ietf-dnsop-svcb-https-03 SVCB and HTTPS RRs for DNS, February 2021](https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-03)
-#![allow(clippy::use_self)]
 
 use std::{
     cmp::{Ord, Ordering, PartialOrd},
     convert::TryFrom,
     fmt,
+    net::Ipv4Addr,
+    net::Ipv6Addr,
 };
 
 #[cfg(feature = "serde-config")]
@@ -19,16 +20,9 @@ use serde::{Deserialize, Serialize};
 
 use enum_as_inner::EnumAsInner;
 
-use crate::{
-    error::{ProtoError, ProtoErrorKind, ProtoResult},
-    rr::{
-        rdata::{A, AAAA},
-        Name, RData, RecordData, RecordDataDecodable, RecordType,
-    },
-    serialize::binary::{
-        BinDecodable, BinDecoder, BinEncodable, BinEncoder, Restrict, RestrictedMath,
-    },
-};
+use crate::error::*;
+use crate::rr::Name;
+use crate::serialize::binary::*;
 
 ///  [draft-ietf-dnsop-svcb-https-03 SVCB and HTTPS RRs for DNS, February 2021](https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-03#section-2.2)
 ///
@@ -277,16 +271,16 @@ impl BinEncodable for SvcParamKey {
 impl fmt::Display for SvcParamKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match *self {
-            Self::Mandatory => f.write_str("mandatory")?,
-            Self::Alpn => f.write_str("alpn")?,
-            Self::NoDefaultAlpn => f.write_str("no-default-alpn")?,
-            Self::Port => f.write_str("port")?,
-            Self::Ipv4Hint => f.write_str("ipv4hint")?,
-            Self::EchConfig => f.write_str("echconfig")?,
-            Self::Ipv6Hint => f.write_str("ipv6hint")?,
-            Self::Key(val) => write!(f, "key{val}")?,
-            Self::Key65535 => f.write_str("key65535")?,
-            Self::Unknown(val) => write!(f, "unknown{val}")?,
+            SvcParamKey::Mandatory => f.write_str("mandatory")?,
+            SvcParamKey::Alpn => f.write_str("alpn")?,
+            SvcParamKey::NoDefaultAlpn => f.write_str("no-default-alpn")?,
+            SvcParamKey::Port => f.write_str("port")?,
+            SvcParamKey::Ipv4Hint => f.write_str("ipv4hint")?,
+            SvcParamKey::EchConfig => f.write_str("echconfig")?,
+            SvcParamKey::Ipv6Hint => f.write_str("ipv6hint")?,
+            SvcParamKey::Key(val) => write!(f, "key{}", val)?,
+            SvcParamKey::Key65535 => f.write_str("key65535")?,
+            SvcParamKey::Unknown(val) => write!(f, "unknown{}", val)?,
         }
 
         Ok(())
@@ -301,7 +295,8 @@ impl std::str::FromStr for SvcParamKey {
         fn parse_unknown_key(key: &str) -> Result<SvcParamKey, ProtoError> {
             let key_value = key.strip_prefix("key").ok_or_else(|| {
                 ProtoError::from(ProtoErrorKind::Msg(format!(
-                    "bad formatted key ({key}), expected key1234"
+                    "bad formatted key ({}), expected key1234",
+                    key
                 )))
             })?;
 
@@ -402,7 +397,7 @@ pub enum SvcParamValue {
     ///   or other geo-aware features and thereby degrade client performance.
     ///
     /// see `IpHint`
-    Ipv4Hint(IpHint<A>),
+    Ipv4Hint(IpHint<Ipv4Addr>),
     /// ```text
     /// 6.3.  "echconfig"
     ///
@@ -425,7 +420,7 @@ pub enum SvcParamValue {
     /// ```
     EchConfig(EchConfig),
     /// See `IpHint`
-    Ipv6Hint(IpHint<AAAA>),
+    Ipv6Hint(IpHint<Ipv6Addr>),
     /// Unparsed network data. Refer to documents on the associated key value
     ///
     /// This will be left as is when read off the wire, and encoded in bas64
@@ -470,9 +465,9 @@ impl SvcParamValue {
                 let port = decoder.read_u16()?.unverified(/*all values are legal ports*/);
                 Self::Port(port)
             }
-            SvcParamKey::Ipv4Hint => Self::Ipv4Hint(IpHint::<A>::read(&mut decoder)?),
+            SvcParamKey::Ipv4Hint => Self::Ipv4Hint(IpHint::<Ipv4Addr>::read(&mut decoder)?),
             SvcParamKey::EchConfig => Self::EchConfig(EchConfig::read(&mut decoder)?),
-            SvcParamKey::Ipv6Hint => Self::Ipv6Hint(IpHint::<AAAA>::read(&mut decoder)?),
+            SvcParamKey::Ipv6Hint => Self::Ipv6Hint(IpHint::<Ipv6Addr>::read(&mut decoder)?),
             SvcParamKey::Key(_) | SvcParamKey::Key65535 | SvcParamKey::Unknown(_) => {
                 Self::Unknown(Unknown::read(&mut decoder)?)
             }
@@ -491,14 +486,14 @@ impl BinEncodable for SvcParamValue {
         let place = encoder.place::<u16>()?;
 
         match self {
-            Self::Mandatory(mandatory) => mandatory.emit(encoder)?,
-            Self::Alpn(alpn) => alpn.emit(encoder)?,
-            Self::NoDefaultAlpn => (),
-            Self::Port(port) => encoder.emit_u16(*port)?,
-            Self::Ipv4Hint(ip_hint) => ip_hint.emit(encoder)?,
-            Self::EchConfig(ech_config) => ech_config.emit(encoder)?,
-            Self::Ipv6Hint(ip_hint) => ip_hint.emit(encoder)?,
-            Self::Unknown(unknown) => unknown.emit(encoder)?,
+            SvcParamValue::Mandatory(mandatory) => mandatory.emit(encoder)?,
+            SvcParamValue::Alpn(alpn) => alpn.emit(encoder)?,
+            SvcParamValue::NoDefaultAlpn => (),
+            SvcParamValue::Port(port) => encoder.emit_u16(*port)?,
+            SvcParamValue::Ipv4Hint(ip_hint) => ip_hint.emit(encoder)?,
+            SvcParamValue::EchConfig(ech_config) => ech_config.emit(encoder)?,
+            SvcParamValue::Ipv6Hint(ip_hint) => ip_hint.emit(encoder)?,
+            SvcParamValue::Unknown(unknown) => unknown.emit(encoder)?,
         }
 
         // go back and set the length
@@ -513,14 +508,14 @@ impl BinEncodable for SvcParamValue {
 impl fmt::Display for SvcParamValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
-            Self::Mandatory(mandatory) => write!(f, "{mandatory}")?,
-            Self::Alpn(alpn) => write!(f, "{alpn}")?,
-            Self::NoDefaultAlpn => (),
-            Self::Port(port) => write!(f, "{port}")?,
-            Self::Ipv4Hint(ip_hint) => write!(f, "{ip_hint}")?,
-            Self::EchConfig(ech_config) => write!(f, "{ech_config}")?,
-            Self::Ipv6Hint(ip_hint) => write!(f, "{ip_hint}")?,
-            Self::Unknown(unknown) => write!(f, "{unknown}")?,
+            SvcParamValue::Mandatory(mandatory) => write!(f, "{}", mandatory)?,
+            SvcParamValue::Alpn(alpn) => write!(f, "{}", alpn)?,
+            SvcParamValue::NoDefaultAlpn => (),
+            SvcParamValue::Port(port) => write!(f, "{}", port)?,
+            SvcParamValue::Ipv4Hint(ip_hint) => write!(f, "{}", ip_hint)?,
+            SvcParamValue::EchConfig(ech_config) => write!(f, "{}", ech_config)?,
+            SvcParamValue::Ipv6Hint(ip_hint) => write!(f, "{}", ip_hint)?,
+            SvcParamValue::Unknown(unknown) => write!(f, "{}", unknown)?,
         }
 
         Ok(())
@@ -633,7 +628,7 @@ impl fmt::Display for Mandatory {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         for key in self.0.iter() {
             // TODO: confirm in the RFC that trailing commas are ok
-            write!(f, "{key},")?;
+            write!(f, "{},", key)?;
         }
 
         Ok(())
@@ -788,7 +783,7 @@ impl fmt::Display for Alpn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         for alpn in self.0.iter() {
             // TODO: confirm in the RFC that trailing commas are ok
-            write!(f, "{alpn},")?;
+            write!(f, "{},", alpn)?;
         }
 
         Ok(())
@@ -980,7 +975,7 @@ where
     ///   this SvcParamValue MUST NOT contain escape sequences.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         for ip in self.0.iter() {
-            write!(f, "{ip},")?;
+            write!(f, "{},", ip)?;
         }
 
         Ok(())
@@ -1005,16 +1000,17 @@ where
 #[cfg_attr(feature = "serde-config", derive(Deserialize, Serialize))]
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 #[repr(transparent)]
-pub struct Unknown(pub Vec<u8>);
+pub struct Unknown(pub Vec<Vec<u8>>);
 
 impl<'r> BinDecodable<'r> for Unknown {
     fn read(decoder: &mut BinDecoder<'r>) -> ProtoResult<Self> {
-        // The passed slice is already length delimited, and we cannot
-        // assume it's a collection of anything.
-        let len = decoder.len();
+        let mut unknowns = Vec::new();
 
-        let data = decoder.read_vec(len)?;
-        let unknowns = data.unverified(/*any data is valid here*/).to_vec();
+        while decoder.peek().is_some() {
+            let data = decoder.read_character_data()?;
+            let data = data.unverified(/*any data is valid here*/).to_vec();
+            unknowns.push(data)
+        }
 
         Ok(Self(unknowns))
     }
@@ -1022,10 +1018,9 @@ impl<'r> BinDecodable<'r> for Unknown {
 
 impl BinEncodable for Unknown {
     fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        // draft-ietf-dnsop-svcb-https-11#appendix-A: The algorithm is the same as used by
-        // <character-string> in RFC 1035, although the output length in this
-        // document is not limited to 255 octets.
-        encoder.emit_character_data_unrestricted(&self.0)?;
+        for unknown in self.0.iter() {
+            encoder.emit_character_data(unknown)?;
+        }
 
         Ok(())
     }
@@ -1033,121 +1028,96 @@ impl BinEncodable for Unknown {
 
 impl fmt::Display for Unknown {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        // TODO: this needs to be properly encoded
-        write!(f, "\"{}\",", String::from_utf8_lossy(&self.0))?;
-
-        Ok(())
-    }
-}
-
-impl BinEncodable for SVCB {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        self.svc_priority.emit(encoder)?;
-        self.target_name.emit(encoder)?;
-
-        let mut last_key: Option<SvcParamKey> = None;
-        for (key, param) in self.svc_params.iter() {
-            if let Some(last_key) = last_key {
-                if key <= &last_key {
-                    return Err(ProtoError::from("SvcParams out of order"));
-                }
-            }
-
-            key.emit(encoder)?;
-            param.emit(encoder)?;
-
-            last_key = Some(*key);
+        for unknown in self.0.iter() {
+            // TODO: this needs to be properly encoded
+            write!(f, "\"{}\",", String::from_utf8_lossy(unknown))?;
         }
 
         Ok(())
     }
 }
 
-impl<'r> RecordDataDecodable<'r> for SVCB {
-    /// Reads the SVCB record from the decoder.
-    ///
-    /// ```text
-    ///   Clients MUST consider an RR malformed if:
-    ///
-    ///   *  the end of the RDATA occurs within a SvcParam.
-    ///   *  SvcParamKeys are not in strictly increasing numeric order.
-    ///   *  the SvcParamValue for an SvcParamKey does not have the expected
-    ///      format.
-    ///
-    ///   Note that the second condition implies that there are no duplicate
-    ///   SvcParamKeys.
-    ///
-    ///   If any RRs are malformed, the client MUST reject the entire RRSet and
-    ///   fall back to non-SVCB connection establishment.
-    /// ```
-    fn read_data(decoder: &mut BinDecoder<'_>, rdata_length: Restrict<u16>) -> ProtoResult<SVCB> {
-        let start_index = decoder.index();
+/// Reads the SVCB record from the decoder.
+///
+/// ```text
+///   Clients MUST consider an RR malformed if:
+///
+///   *  the end of the RDATA occurs within a SvcParam.
+///   *  SvcParamKeys are not in strictly increasing numeric order.
+///   *  the SvcParamValue for an SvcParamKey does not have the expected
+///      format.
+///
+///   Note that the second condition implies that there are no duplicate
+///   SvcParamKeys.
+///
+///   If any RRs are malformed, the client MUST reject the entire RRSet and
+///   fall back to non-SVCB connection establishment.
+/// ```
+pub fn read(decoder: &mut BinDecoder<'_>, rdata_length: Restrict<u16>) -> ProtoResult<SVCB> {
+    let start_index = decoder.index();
 
-        let svc_priority = decoder.read_u16()?.unverified(/*any u16 is valid*/);
-        let target_name = Name::read(decoder)?;
+    let svc_priority = decoder.read_u16()?.unverified(/*any u16 is valid*/);
+    let target_name = Name::read(decoder)?;
 
-        let mut remainder_len = rdata_length
+    let mut remainder_len = rdata_length
+        .map(|len| len as usize)
+        .checked_sub(decoder.index() - start_index)
+        .map_err(|len| format!("Bad length for RDATA of SVCB: {}", len))?
+        .unverified(); // valid len
+    let mut svc_params: Vec<(SvcParamKey, SvcParamValue)> = Vec::new();
+
+    // must have at least 4 bytes left for the key and the length
+    while remainder_len >= 4 {
+        // a 2 octet field containing the SvcParamKey as an integer in
+        //      network byte order.  (See Section 14.3.2 for the defined values.)
+        let key = SvcParamKey::read(decoder)?;
+
+        // a 2 octet field containing the length of the SvcParamValue as an
+        //      integer between 0 and 65535 in network byte order (but constrained
+        //      by the RDATA and DNS message sizes).
+        let value = SvcParamValue::read(key, decoder)?;
+
+        if let Some(last_key) = svc_params.last().map(|(key, _)| key) {
+            if last_key >= &key {
+                return Err(ProtoError::from("SvcParams out of order"));
+            }
+        }
+
+        svc_params.push((key, value));
+        remainder_len = rdata_length
             .map(|len| len as usize)
             .checked_sub(decoder.index() - start_index)
-            .map_err(|len| format!("Bad length for RDATA of SVCB: {len}"))?
+            .map_err(|len| format!("Bad length for RDATA of SVCB: {}", len))?
             .unverified(); // valid len
-        let mut svc_params: Vec<(SvcParamKey, SvcParamValue)> = Vec::new();
-
-        // must have at least 4 bytes left for the key and the length
-        while remainder_len >= 4 {
-            // a 2 octet field containing the SvcParamKey as an integer in
-            //      network byte order.  (See Section 14.3.2 for the defined values.)
-            let key = SvcParamKey::read(decoder)?;
-
-            // a 2 octet field containing the length of the SvcParamValue as an
-            //      integer between 0 and 65535 in network byte order (but constrained
-            //      by the RDATA and DNS message sizes).
-            let value = SvcParamValue::read(key, decoder)?;
-
-            if let Some(last_key) = svc_params.last().map(|(key, _)| key) {
-                if last_key >= &key {
-                    return Err(ProtoError::from("SvcParams out of order"));
-                }
-            }
-
-            svc_params.push((key, value));
-            remainder_len = rdata_length
-                .map(|len| len as usize)
-                .checked_sub(decoder.index() - start_index)
-                .map_err(|len| format!("Bad length for RDATA of SVCB: {len}"))?
-                .unverified(); // valid len
-        }
-
-        Ok(Self {
-            svc_priority,
-            target_name,
-            svc_params,
-        })
     }
+
+    Ok(SVCB {
+        svc_priority,
+        target_name,
+        svc_params,
+    })
 }
 
-impl RecordData for SVCB {
-    fn try_from_rdata(data: RData) -> Result<Self, RData> {
-        match data {
-            RData::SVCB(data) => Ok(data),
-            _ => Err(data),
+/// Write the RData from the given Decoder
+pub fn emit(encoder: &mut BinEncoder<'_>, svcb: &SVCB) -> ProtoResult<()> {
+    svcb.svc_priority.emit(encoder)?;
+    svcb.target_name.emit(encoder)?;
+
+    let mut last_key: Option<SvcParamKey> = None;
+    for (key, param) in svcb.svc_params.iter() {
+        if let Some(last_key) = last_key {
+            if key <= &last_key {
+                return Err(ProtoError::from("SvcParams out of order"));
+            }
         }
+
+        key.emit(encoder)?;
+        param.emit(encoder)?;
+
+        last_key = Some(*key);
     }
 
-    fn try_borrow(data: &RData) -> Option<&Self> {
-        match data {
-            RData::SVCB(data) => Some(data),
-            _ => None,
-        }
-    }
-
-    fn record_type(&self) -> RecordType {
-        RecordType::SVCB
-    }
-
-    fn into_rdata(self) -> RData {
-        RData::SVCB(self)
-    }
+    Ok(())
 }
 
 /// [draft-ietf-dnsop-svcb-https-03 SVCB and HTTPS RRs for DNS, February 2021](https://datatracker.ietf.org/doc/html/draft-ietf-dnsop-svcb-https-03#section-10.3)
@@ -1169,7 +1139,7 @@ impl fmt::Display for SVCB {
         )?;
 
         for (key, param) in self.svc_params.iter() {
-            write!(f, " {key}={param}")?
+            write!(f, " {key}={param}", key = key, param = param)?
         }
 
         Ok(())
@@ -1214,12 +1184,15 @@ mod tests {
     fn test_encode_decode(rdata: SVCB) {
         let mut bytes = Vec::new();
         let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        rdata.emit(&mut encoder).expect("failed to emit SVCB");
+        emit(&mut encoder, &rdata).expect("failed to emit SVCB");
         let bytes = encoder.into_bytes();
 
+        println!("svcb: {}", rdata);
+        println!("bytes: {:?}", bytes);
+
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
-        let read_rdata = SVCB::read_data(&mut decoder, Restrict::new(bytes.len() as u16))
-            .expect("failed to read back");
+        let read_rdata =
+            read(&mut decoder, Restrict::new(bytes.len() as u16)).expect("failed to read back");
         assert_eq!(rdata, read_rdata);
     }
 
@@ -1280,21 +1253,5 @@ mod tests {
             0, 0, 7, 7, 0, 0, 0, 0, 0, 0, 0,
         ];
         assert!(crate::op::Message::from_vec(BUF).is_err());
-    }
-
-    #[test]
-    fn test_unrestricted_output_size() {
-        let svcb = SVCB::new(
-            8224,
-            Name::from_utf8(".").unwrap(),
-            vec![(
-                SvcParamKey::Unknown(8224),
-                SvcParamValue::Unknown(Unknown(vec![32; 257])),
-            )],
-        );
-
-        let mut buf = Vec::new();
-        let mut encoder = BinEncoder::new(&mut buf);
-        svcb.emit(&mut encoder).unwrap();
     }
 }

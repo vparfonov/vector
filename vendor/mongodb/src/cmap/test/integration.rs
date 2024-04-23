@@ -1,5 +1,4 @@
 use serde::Deserialize;
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use super::{event::EventHandler, EVENT_TIMEOUT};
 use crate::{
@@ -17,13 +16,12 @@ use crate::{
     sdam::TopologyUpdater,
     selection_criteria::ReadPreference,
     test::{
+        get_client_options,
         log_uncaptured,
         FailCommandOptions,
         FailPoint,
         FailPointMode,
         TestClient,
-        CLIENT_OPTIONS,
-        LOCK,
     },
 };
 use semver::VersionReq;
@@ -42,9 +40,7 @@ struct DatabaseEntry {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn acquire_connection_and_send_command() {
-    let _guard: RwLockReadGuard<()> = LOCK.run_concurrently().await;
-
-    let client_options = CLIENT_OPTIONS.get().await.clone();
+    let client_options = get_client_options().await.clone();
     let mut pool_options = ConnectionPoolOptions::from_client_options(&client_options);
     pool_options.ready = Some(true);
 
@@ -88,9 +84,7 @@ async fn acquire_connection_and_send_command() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test)]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn concurrent_connections() {
-    let _guard = LOCK.run_exclusively().await;
-
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     if options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping concurrent_connections test due to load-balanced topology");
         return;
@@ -121,14 +115,14 @@ async fn concurrent_connections() {
         .expect("failpoint should succeed");
 
     let handler = Arc::new(EventHandler::new());
-    let client_options = CLIENT_OPTIONS.get().await.clone();
+    let client_options = get_client_options().await.clone();
     let mut options = ConnectionPoolOptions::from_client_options(&client_options);
     options.cmap_event_handler =
         Some(handler.clone() as Arc<dyn crate::event::cmap::CmapEventHandler>);
     options.ready = Some(true);
 
     let pool = ConnectionPool::new(
-        CLIENT_OPTIONS.get().await.hosts[0].clone(),
+        get_client_options().await.hosts[0].clone(),
         ConnectionEstablisher::new(EstablisherOptions::from_client_options(&client_options))
             .unwrap(),
         TopologyUpdater::channel().0,
@@ -178,10 +172,9 @@ async fn concurrent_connections() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-async fn connection_error_during_establishment() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
-    let mut client_options = CLIENT_OPTIONS.get().await.clone();
+async fn connection_error_during_establishment() {
+    let mut client_options = get_client_options().await.clone();
     if client_options.load_balanced.unwrap_or(false) {
         log_uncaptured(
             "skipping connection_error_during_establishment test due to load-balanced topology",
@@ -242,10 +235,9 @@ async fn connection_error_during_establishment() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
-async fn connection_error_during_operation() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
 
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+async fn connection_error_during_operation() {
+    let mut options = get_client_options().await.clone();
     let handler = Arc::new(EventHandler::new());
     options.cmap_event_handler = Some(handler.clone() as Arc<dyn CmapEventHandler>);
     options.hosts.drain(1..);

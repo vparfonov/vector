@@ -9,6 +9,10 @@ mock_instant = { version = "0.2", features = ["sync"] }
 
 It provides a replacement `std::time::Instant` and `std::time::SystemTime` that uses a deterministic thread-local 'clock'
 
+**NOTE:** if this is enabled then all tests will use the same singleton `MockClock` source
+
+---
+
 You can swap out the `std::time::Instant` with this one by doing something similar to:
 ```rust
 #[cfg(test)]
@@ -96,11 +100,11 @@ mod reference {
     }
 
     pub fn with_time(d: impl Fn(&mut Duration)) {
-        TIME.with(|t| d(&mut *t.borrow_mut()))
+        TIME.with(|t| d(&mut t.borrow_mut()))
     }
 
     pub fn with_system_time(d: impl Fn(&mut Duration)) {
-        SYSTEM_TIME.with(|t| d(&mut *t.borrow_mut()))
+        SYSTEM_TIME.with(|t| d(&mut t.borrow_mut()))
     }
 
     pub fn get_time() -> Duration {
@@ -252,6 +256,22 @@ impl std::ops::Sub<Duration> for SystemTime {
 impl std::ops::SubAssign<Duration> for SystemTime {
     fn sub_assign(&mut self, rhs: Duration) {
         *self = *self - rhs
+    }
+}
+
+impl From<std::time::SystemTime> for SystemTime {
+    fn from(value: std::time::SystemTime) -> Self {
+        Self(
+            value
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .expect("std::time::SystemTime is before UNIX_EPOCH"),
+        )
+    }
+}
+
+impl From<SystemTime> for std::time::SystemTime {
+    fn from(value: SystemTime) -> Self {
+        Self::UNIX_EPOCH + value.0
     }
 }
 
@@ -421,6 +441,15 @@ mod tests {
         assert!(SystemTime::now()
             .checked_sub(Duration::from_millis(43))
             .is_none());
+    }
+
+    #[test]
+    fn system_time_from_std_roundtrip() {
+        let std_now = std::time::SystemTime::now();
+        let mock_now: SystemTime = std_now.into();
+        assert!(mock_now.0 > Duration::from_secs(1708041600)); // Friday 16 February 2024 00:00:00 GMT
+        let roundtrip_now: std::time::SystemTime = mock_now.into();
+        assert_eq!(std_now, roundtrip_now)
     }
 
     #[test]

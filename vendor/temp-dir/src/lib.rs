@@ -1,13 +1,13 @@
+//! temp-dir
+//! ========
 //! [![crates.io version](https://img.shields.io/crates/v/temp-dir.svg)](https://crates.io/crates/temp-dir)
 //! [![license: Apache 2.0](https://gitlab.com/leonhard-llc/ops/-/raw/main/license-apache-2.0.svg)](https://gitlab.com/leonhard-llc/ops/-/raw/main/temp-dir/LICENSE)
 //! [![unsafe forbidden](https://gitlab.com/leonhard-llc/ops/-/raw/main/unsafe-forbidden.svg)](https://github.com/rust-secure-code/safety-dance/)
 //! [![pipeline status](https://gitlab.com/leonhard-llc/ops/badges/main/pipeline.svg)](https://gitlab.com/leonhard-llc/ops/-/pipelines)
 //!
-//! # temp-dir
-//!
 //! Provides a `TempDir` struct.
 //!
-//! ## Features
+//! # Features
 //! - Makes a directory in a system temporary directory
 //! - Recursively deletes the directory and its contents on drop
 //! - Deletes symbolic links and does not follow them.
@@ -16,7 +16,7 @@
 //! - `forbid(unsafe_code)`
 //! - 100% test coverage
 //!
-//! ## Limitations
+//! # Limitations
 //! - Not security-hardened.
 //!   For example, directory and file names are predictable.
 //! - This crate uses
@@ -25,7 +25,7 @@
 //!   See [rust#29497](https://github.com/rust-lang/rust/issues/29497) and
 //!   [`remove_dir_all`](https://crates.io/crates/remove_dir_all) crate.
 //!
-//! ## Alternatives
+//! # Alternatives
 //! - [`tempfile`](https://crates.io/crates/tempfile)
 //!   - Popular and mature
 //!   - Contains `unsafe`, dependencies full of `unsafe`
@@ -40,10 +40,10 @@
 //!   - Contains `unsafe`
 //!   - No readme or online docs
 //!
-//! ## Related Crates
+//! # Related Crates
 //! - [`temp-file`](https://crates.io/crates/temp-file)
 //!
-//! ## Example
+//! # Example
 //! ```rust
 //! use temp_dir::TempDir;
 //! let d = TempDir::new().unwrap();
@@ -62,9 +62,9 @@
 //!     "{:?}", TempDir::new().unwrap().path());
 //! ```
 //!
-//! ## Cargo Geiger Safety Report
-//!
-//! ## Changelog
+//! # Cargo Geiger Safety Report
+//! # Changelog
+//! - v0.1.12 - Work when the directory already exists.
 //! - v0.1.11
 //!   - Return `std::io::Error` instead of `String`.
 //!   - Add
@@ -92,18 +92,14 @@
 //! - v0.1.2 - Update docs
 //! - v0.1.1 - Fix license
 //! - v0.1.0 - Initial version
-//!
-//! ## Happy Contributors 🙂
-//! Fixing bugs and adding features is easy and fast.
-//! Send us a pull request and we intend to:
-//! - Always respond within 24 hours
-//! - Provide clear & concrete feedback
-//! - Immediately make a new release for your accepted change
 #![forbid(unsafe_code)]
 use core::sync::atomic::{AtomicU32, Ordering};
+use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 
 static COUNTER: AtomicU32 = AtomicU32::new(0);
+static INTERNAL_RETRY: AtomicBool = AtomicBool::new(true);
 
 /// The path of an existing writable directory in a system temporary directory.
 ///
@@ -142,7 +138,7 @@ impl TempDir {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
             Err(e) => Err(std::io::Error::new(
                 e.kind(),
-                format!("error removing directory and contents {:?}: {}", path, e),
+                format!("error removing directory and contents {path:?}: {e}"),
             )),
         }
     }
@@ -186,25 +182,34 @@ impl TempDir {
     /// println!("{:?}", temp_dir::TempDir::with_prefix("ok").unwrap().path());
     /// ```
     pub fn with_prefix(prefix: impl AsRef<str>) -> Result<Self, std::io::Error> {
-        let path_buf = std::env::temp_dir().join(format!(
-            "{}{:x}-{:x}",
-            prefix.as_ref(),
-            std::process::id(),
-            COUNTER.fetch_add(1, Ordering::AcqRel),
-        ));
-        std::fs::create_dir(&path_buf).map_err(|e| {
-            std::io::Error::new(
-                e.kind(),
-                format!("error creating directory {:?}: {}", &path_buf, e),
-            )
-        })?;
-        Ok(Self {
-            path_buf: Some(path_buf),
-            panic_on_delete_err: false,
-        })
+        loop {
+            let path_buf = std::env::temp_dir().join(format!(
+                "{}{:x}-{:x}",
+                prefix.as_ref(),
+                std::process::id(),
+                COUNTER.fetch_add(1, Ordering::AcqRel),
+            ));
+            match std::fs::create_dir(&path_buf) {
+                Err(e)
+                    if e.kind() == ErrorKind::AlreadyExists
+                        && INTERNAL_RETRY.load(Ordering::Acquire) => {}
+                Err(e) => {
+                    return Err(std::io::Error::new(
+                        e.kind(),
+                        format!("error creating directory {path_buf:?}: {e}"),
+                    ))
+                }
+                Ok(()) => {
+                    return Ok(Self {
+                        path_buf: Some(path_buf),
+                        panic_on_delete_err: false,
+                    })
+                }
+            }
+        }
     }
 
-    /// Remove the directory on its contents now.  Do nothing later on drop.
+    /// Remove the directory and its contents now.
     ///
     /// # Errors
     /// Returns an error if the directory exists and we fail to remove it and its contents.
@@ -213,14 +218,12 @@ impl TempDir {
         Self::remove_dir(&self.path_buf.take().unwrap())
     }
 
-    /// Make the struct panic on Drop if it hits an error while
+    /// Make the struct panic on drop if it hits an error while
     /// removing the directory or its contents.
     #[must_use]
     pub fn panic_on_cleanup_error(mut self) -> Self {
-        Self {
-            path_buf: self.path_buf.take(),
-            panic_on_delete_err: true,
-        }
+        self.panic_on_delete_err = true;
+        self
     }
 
     /// Do not delete the directory or its contents.

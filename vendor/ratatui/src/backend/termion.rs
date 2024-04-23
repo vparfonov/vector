@@ -1,51 +1,89 @@
-//! This module provides the `TermionBackend` implementation for the [`Backend`] trait.
-//! It uses the Termion crate to interact with the terminal.
+//! This module provides the [`TermionBackend`] implementation for the [`Backend`] trait. It uses
+//! the [Termion] crate to interact with the terminal.
 //!
 //! [`Backend`]: crate::backend::Backend
 //! [`TermionBackend`]: crate::backend::TermionBackend
-
+//! [Termion]: https://docs.rs/termion
 use std::{
     fmt,
     io::{self, Write},
 };
 
+use termion::{color as tcolor, style as tstyle};
+
 use crate::{
-    backend::{Backend, ClearType},
+    backend::{Backend, ClearType, WindowSize},
     buffer::Cell,
-    layout::Rect,
-    style::{Color, Modifier},
+    prelude::Rect,
+    style::{Color, Modifier, Style},
 };
 
-/// A backend that uses the Termion library to draw content, manipulate the cursor,
-/// and clear the terminal screen.
+/// A [`Backend`] implementation that uses [Termion] to render to the terminal.
+///
+/// The `TermionBackend` struct is a wrapper around a writer implementing [`Write`], which is used
+/// to send commands to the terminal. It provides methods for drawing content, manipulating the
+/// cursor, and clearing the terminal screen.
+///
+/// Most applications should not call the methods on `TermionBackend` directly, but will instead
+/// use the [`Terminal`] struct, which provides a more ergonomic interface.
+///
+/// Usually applications will enable raw mode and switch to alternate screen mode when starting.
+/// This is done by calling [`IntoRawMode::into_raw_mode()`] and
+/// [`IntoAlternateScreen::into_alternate_screen()`] on the writer before creating the backend.
+/// This is not done automatically by the backend because it is possible that the application may
+/// want to use the terminal for other purposes (like showing help text) before entering alternate
+/// screen mode. This backend automatically disable raw mode and switches back to the primary
+/// screen when the writer is dropped.
 ///
 /// # Example
 ///
-/// ```rust
-/// use ratatui::backend::{Backend, TermionBackend};
+/// ```rust,no_run
+/// use std::io::{stderr, stdout};
 ///
-/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
-/// let stdout = std::io::stdout();
-/// let mut backend = TermionBackend::new(stdout);
-/// backend.clear()?;
-/// # Ok(())
-/// # }
+/// use ratatui::prelude::*;
+/// use termion::{raw::IntoRawMode, screen::IntoAlternateScreen};
+///
+/// let writer = stdout().into_raw_mode()?.into_alternate_screen()?;
+/// let mut backend = TermionBackend::new(writer);
+/// // or
+/// let writer = stderr().into_raw_mode()?.into_alternate_screen()?;
+/// let backend = TermionBackend::new(stderr());
+/// let mut terminal = Terminal::new(backend)?;
+///
+/// terminal.clear()?;
+/// terminal.draw(|frame| {
+///     // -- snip --
+/// })?;
+/// # std::io::Result::Ok(())
 /// ```
+///
+/// [`IntoRawMode::into_raw_mode()`]: termion::raw::IntoRawMode
+/// [`IntoAlternateScreen::into_alternate_screen()`]: termion::screen::IntoAlternateScreen
+/// [`Terminal`]: crate::terminal::Terminal
+/// [Termion]: https://docs.rs/termion
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash)]
 pub struct TermionBackend<W>
 where
     W: Write,
 {
-    stdout: W,
+    writer: W,
 }
 
 impl<W> TermionBackend<W>
 where
     W: Write,
 {
-    /// Creates a new Termion backend with the given output.
-    pub fn new(stdout: W) -> TermionBackend<W> {
-        TermionBackend { stdout }
+    /// Creates a new Termion backend with the given writer.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// # use std::io::stdout;
+    /// # use ratatui::prelude::*;
+    /// let backend = TermionBackend::new(stdout());
+    /// ```
+    pub fn new(writer: W) -> TermionBackend<W> {
+        TermionBackend { writer }
     }
 }
 
@@ -54,11 +92,11 @@ where
     W: Write,
 {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.stdout.write(buf)
+        self.writer.write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        self.stdout.flush()
+        self.writer.flush()
     }
 }
 
@@ -72,39 +110,39 @@ where
 
     fn clear_region(&mut self, clear_type: ClearType) -> io::Result<()> {
         match clear_type {
-            ClearType::All => write!(self.stdout, "{}", termion::clear::All)?,
-            ClearType::AfterCursor => write!(self.stdout, "{}", termion::clear::AfterCursor)?,
-            ClearType::BeforeCursor => write!(self.stdout, "{}", termion::clear::BeforeCursor)?,
-            ClearType::CurrentLine => write!(self.stdout, "{}", termion::clear::CurrentLine)?,
-            ClearType::UntilNewLine => write!(self.stdout, "{}", termion::clear::UntilNewline)?,
+            ClearType::All => write!(self.writer, "{}", termion::clear::All)?,
+            ClearType::AfterCursor => write!(self.writer, "{}", termion::clear::AfterCursor)?,
+            ClearType::BeforeCursor => write!(self.writer, "{}", termion::clear::BeforeCursor)?,
+            ClearType::CurrentLine => write!(self.writer, "{}", termion::clear::CurrentLine)?,
+            ClearType::UntilNewLine => write!(self.writer, "{}", termion::clear::UntilNewline)?,
         };
-        self.stdout.flush()
+        self.writer.flush()
     }
 
     fn append_lines(&mut self, n: u16) -> io::Result<()> {
         for _ in 0..n {
-            writeln!(self.stdout)?;
+            writeln!(self.writer)?;
         }
-        self.stdout.flush()
+        self.writer.flush()
     }
 
     fn hide_cursor(&mut self) -> io::Result<()> {
-        write!(self.stdout, "{}", termion::cursor::Hide)?;
-        self.stdout.flush()
+        write!(self.writer, "{}", termion::cursor::Hide)?;
+        self.writer.flush()
     }
 
     fn show_cursor(&mut self) -> io::Result<()> {
-        write!(self.stdout, "{}", termion::cursor::Show)?;
-        self.stdout.flush()
+        write!(self.writer, "{}", termion::cursor::Show)?;
+        self.writer.flush()
     }
 
     fn get_cursor(&mut self) -> io::Result<(u16, u16)> {
-        termion::cursor::DetectCursorPos::cursor_pos(&mut self.stdout).map(|(x, y)| (x - 1, y - 1))
+        termion::cursor::DetectCursorPos::cursor_pos(&mut self.writer).map(|(x, y)| (x - 1, y - 1))
     }
 
     fn set_cursor(&mut self, x: u16, y: u16) -> io::Result<()> {
-        write!(self.stdout, "{}", termion::cursor::Goto(x + 1, y + 1))?;
-        self.stdout.flush()
+        write!(self.writer, "{}", termion::cursor::Goto(x + 1, y + 1))?;
+        self.writer.flush()
     }
 
     fn draw<'a, I>(&mut self, content: I) -> io::Result<()>
@@ -144,10 +182,10 @@ where
                 write!(string, "{}", Bg(cell.bg)).unwrap();
                 bg = cell.bg;
             }
-            string.push_str(&cell.symbol);
+            string.push_str(cell.symbol());
         }
         write!(
-            self.stdout,
+            self.writer,
             "{string}{}{}{}",
             Fg(Color::Reset),
             Bg(Color::Reset),
@@ -160,8 +198,15 @@ where
         Ok(Rect::new(0, 0, terminal.0, terminal.1))
     }
 
+    fn window_size(&mut self) -> Result<WindowSize, io::Error> {
+        Ok(WindowSize {
+            columns_rows: termion::terminal_size()?.into(),
+            pixels: termion::terminal_size_pixels()?.into(),
+        })
+    }
+
     fn flush(&mut self) -> io::Result<()> {
-        self.stdout.flush()
+        self.writer.flush()
     }
 }
 #[derive(Debug, Default, Clone, Copy, Eq, PartialEq, Hash)]
@@ -232,6 +277,82 @@ impl fmt::Display for Bg {
     }
 }
 
+macro_rules! from_termion_for_color {
+    ($termion_color:ident, $color: ident) => {
+        impl From<tcolor::$termion_color> for Color {
+            fn from(_: tcolor::$termion_color) -> Self {
+                Color::$color
+            }
+        }
+
+        impl From<tcolor::Bg<tcolor::$termion_color>> for Style {
+            fn from(_: tcolor::Bg<tcolor::$termion_color>) -> Self {
+                Style::default().bg(Color::$color)
+            }
+        }
+
+        impl From<tcolor::Fg<tcolor::$termion_color>> for Style {
+            fn from(_: tcolor::Fg<tcolor::$termion_color>) -> Self {
+                Style::default().fg(Color::$color)
+            }
+        }
+    };
+}
+
+from_termion_for_color!(Reset, Reset);
+from_termion_for_color!(Black, Black);
+from_termion_for_color!(Red, Red);
+from_termion_for_color!(Green, Green);
+from_termion_for_color!(Yellow, Yellow);
+from_termion_for_color!(Blue, Blue);
+from_termion_for_color!(Magenta, Magenta);
+from_termion_for_color!(Cyan, Cyan);
+from_termion_for_color!(White, Gray);
+from_termion_for_color!(LightBlack, DarkGray);
+from_termion_for_color!(LightRed, LightRed);
+from_termion_for_color!(LightGreen, LightGreen);
+from_termion_for_color!(LightBlue, LightBlue);
+from_termion_for_color!(LightYellow, LightYellow);
+from_termion_for_color!(LightMagenta, LightMagenta);
+from_termion_for_color!(LightCyan, LightCyan);
+from_termion_for_color!(LightWhite, White);
+
+impl From<tcolor::AnsiValue> for Color {
+    fn from(value: tcolor::AnsiValue) -> Self {
+        Color::Indexed(value.0)
+    }
+}
+
+impl From<tcolor::Bg<tcolor::AnsiValue>> for Style {
+    fn from(value: tcolor::Bg<tcolor::AnsiValue>) -> Self {
+        Style::default().bg(Color::Indexed(value.0 .0))
+    }
+}
+
+impl From<tcolor::Fg<tcolor::AnsiValue>> for Style {
+    fn from(value: tcolor::Fg<tcolor::AnsiValue>) -> Self {
+        Style::default().fg(Color::Indexed(value.0 .0))
+    }
+}
+
+impl From<tcolor::Rgb> for Color {
+    fn from(value: tcolor::Rgb) -> Self {
+        Color::Rgb(value.0, value.1, value.2)
+    }
+}
+
+impl From<tcolor::Bg<tcolor::Rgb>> for Style {
+    fn from(value: tcolor::Bg<tcolor::Rgb>) -> Self {
+        Style::default().bg(Color::Rgb(value.0 .0, value.0 .1, value.0 .2))
+    }
+}
+
+impl From<tcolor::Fg<tcolor::Rgb>> for Style {
+    fn from(value: tcolor::Fg<tcolor::Rgb>) -> Self {
+        Style::default().fg(Color::Rgb(value.0 .0, value.0 .1, value.0 .2))
+    }
+}
+
 impl fmt::Display for ModifierDiff {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let remove = self.from - self.to;
@@ -294,5 +415,149 @@ impl fmt::Display for ModifierDiff {
         }
 
         Ok(())
+    }
+}
+
+macro_rules! from_termion_for_modifier {
+    ($termion_modifier:ident, $modifier: ident) => {
+        impl From<tstyle::$termion_modifier> for Modifier {
+            fn from(_: tstyle::$termion_modifier) -> Self {
+                Modifier::$modifier
+            }
+        }
+    };
+}
+
+from_termion_for_modifier!(Invert, REVERSED);
+from_termion_for_modifier!(Bold, BOLD);
+from_termion_for_modifier!(Italic, ITALIC);
+from_termion_for_modifier!(Underline, UNDERLINED);
+from_termion_for_modifier!(Faint, DIM);
+from_termion_for_modifier!(CrossedOut, CROSSED_OUT);
+from_termion_for_modifier!(Blink, SLOW_BLINK);
+
+impl From<termion::style::Reset> for Modifier {
+    fn from(_: termion::style::Reset) -> Self {
+        Modifier::empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::style::Stylize;
+
+    #[test]
+    fn from_termion_color() {
+        assert_eq!(Color::from(tcolor::Reset), Color::Reset);
+        assert_eq!(Color::from(tcolor::Black), Color::Black);
+        assert_eq!(Color::from(tcolor::Red), Color::Red);
+        assert_eq!(Color::from(tcolor::Green), Color::Green);
+        assert_eq!(Color::from(tcolor::Yellow), Color::Yellow);
+        assert_eq!(Color::from(tcolor::Blue), Color::Blue);
+        assert_eq!(Color::from(tcolor::Magenta), Color::Magenta);
+        assert_eq!(Color::from(tcolor::Cyan), Color::Cyan);
+        assert_eq!(Color::from(tcolor::White), Color::Gray);
+        assert_eq!(Color::from(tcolor::LightBlack), Color::DarkGray);
+        assert_eq!(Color::from(tcolor::LightRed), Color::LightRed);
+        assert_eq!(Color::from(tcolor::LightGreen), Color::LightGreen);
+        assert_eq!(Color::from(tcolor::LightBlue), Color::LightBlue);
+        assert_eq!(Color::from(tcolor::LightYellow), Color::LightYellow);
+        assert_eq!(Color::from(tcolor::LightMagenta), Color::LightMagenta);
+        assert_eq!(Color::from(tcolor::LightCyan), Color::LightCyan);
+        assert_eq!(Color::from(tcolor::LightWhite), Color::White);
+        assert_eq!(Color::from(tcolor::AnsiValue(31)), Color::Indexed(31));
+        assert_eq!(Color::from(tcolor::Rgb(1, 2, 3)), Color::Rgb(1, 2, 3));
+    }
+
+    #[test]
+    fn from_termion_bg() {
+        use tc::Bg;
+        use tcolor as tc;
+
+        assert_eq!(Style::from(Bg(tc::Reset)), Style::new().bg(Color::Reset));
+        assert_eq!(Style::from(Bg(tc::Black)), Style::new().on_black());
+        assert_eq!(Style::from(Bg(tc::Red)), Style::new().on_red());
+        assert_eq!(Style::from(Bg(tc::Green)), Style::new().on_green());
+        assert_eq!(Style::from(Bg(tc::Yellow)), Style::new().on_yellow());
+        assert_eq!(Style::from(Bg(tc::Blue)), Style::new().on_blue());
+        assert_eq!(Style::from(Bg(tc::Magenta)), Style::new().on_magenta());
+        assert_eq!(Style::from(Bg(tc::Cyan)), Style::new().on_cyan());
+        assert_eq!(Style::from(Bg(tc::White)), Style::new().on_gray());
+        assert_eq!(Style::from(Bg(tc::LightBlack)), Style::new().on_dark_gray());
+        assert_eq!(Style::from(Bg(tc::LightRed)), Style::new().on_light_red());
+        assert_eq!(
+            Style::from(Bg(tc::LightGreen)),
+            Style::new().on_light_green()
+        );
+        assert_eq!(Style::from(Bg(tc::LightBlue)), Style::new().on_light_blue());
+        assert_eq!(
+            Style::from(Bg(tc::LightYellow)),
+            Style::new().on_light_yellow()
+        );
+        assert_eq!(
+            Style::from(Bg(tc::LightMagenta)),
+            Style::new().on_light_magenta()
+        );
+        assert_eq!(Style::from(Bg(tc::LightCyan)), Style::new().on_light_cyan());
+        assert_eq!(Style::from(Bg(tc::LightWhite)), Style::new().on_white());
+        assert_eq!(
+            Style::from(Bg(tc::AnsiValue(31))),
+            Style::new().bg(Color::Indexed(31))
+        );
+        assert_eq!(
+            Style::from(Bg(tc::Rgb(1, 2, 3))),
+            Style::new().bg(Color::Rgb(1, 2, 3))
+        );
+    }
+
+    #[test]
+    fn from_termion_fg() {
+        use tc::Fg;
+        use tcolor as tc;
+
+        assert_eq!(Style::from(Fg(tc::Reset)), Style::new().fg(Color::Reset));
+        assert_eq!(Style::from(Fg(tc::Black)), Style::new().black());
+        assert_eq!(Style::from(Fg(tc::Red)), Style::new().red());
+        assert_eq!(Style::from(Fg(tc::Green)), Style::new().green());
+        assert_eq!(Style::from(Fg(tc::Yellow)), Style::new().yellow());
+        assert_eq!(Style::from(Fg(tc::Blue)), Style::default().blue());
+        assert_eq!(Style::from(Fg(tc::Magenta)), Style::default().magenta());
+        assert_eq!(Style::from(Fg(tc::Cyan)), Style::default().cyan());
+        assert_eq!(Style::from(Fg(tc::White)), Style::default().gray());
+        assert_eq!(Style::from(Fg(tc::LightBlack)), Style::new().dark_gray());
+        assert_eq!(Style::from(Fg(tc::LightRed)), Style::new().light_red());
+        assert_eq!(Style::from(Fg(tc::LightGreen)), Style::new().light_green());
+        assert_eq!(Style::from(Fg(tc::LightBlue)), Style::new().light_blue());
+        assert_eq!(
+            Style::from(Fg(tc::LightYellow)),
+            Style::new().light_yellow()
+        );
+        assert_eq!(
+            Style::from(Fg(tc::LightMagenta)),
+            Style::new().light_magenta()
+        );
+        assert_eq!(Style::from(Fg(tc::LightCyan)), Style::new().light_cyan());
+        assert_eq!(Style::from(Fg(tc::LightWhite)), Style::new().white());
+        assert_eq!(
+            Style::from(Fg(tc::AnsiValue(31))),
+            Style::default().fg(Color::Indexed(31))
+        );
+        assert_eq!(
+            Style::from(Fg(tc::Rgb(1, 2, 3))),
+            Style::default().fg(Color::Rgb(1, 2, 3))
+        );
+    }
+
+    #[test]
+    fn from_termion_style() {
+        assert_eq!(Modifier::from(tstyle::Invert), Modifier::REVERSED);
+        assert_eq!(Modifier::from(tstyle::Bold), Modifier::BOLD);
+        assert_eq!(Modifier::from(tstyle::Italic), Modifier::ITALIC);
+        assert_eq!(Modifier::from(tstyle::Underline), Modifier::UNDERLINED);
+        assert_eq!(Modifier::from(tstyle::Faint), Modifier::DIM);
+        assert_eq!(Modifier::from(tstyle::CrossedOut), Modifier::CROSSED_OUT);
+        assert_eq!(Modifier::from(tstyle::Blink), Modifier::SLOW_BLINK);
+        assert_eq!(Modifier::from(tstyle::Reset), Modifier::empty());
     }
 }

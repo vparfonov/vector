@@ -5,7 +5,7 @@ use std::fmt;
 use std::hash::Hash;
 use std::mem;
 use std::ops::{Deref, DerefMut};
-use std::os::raw::{c_char, c_int};
+use std::os::raw::{c_char, c_int, c_void};
 use std::string::String as StdString;
 
 #[cfg(feature = "async")]
@@ -22,7 +22,7 @@ use crate::function::Function;
 use crate::lua::Lua;
 use crate::string::String;
 use crate::table::{Table, TablePairs};
-use crate::types::{LuaRef, MaybeSend};
+use crate::types::{LuaRef, MaybeSend, SubtypeId};
 use crate::util::{check_stack, get_userdata, take_userdata, StackGuard};
 use crate::value::{FromLua, FromLuaMulti, IntoLua, IntoLuaMulti, Value};
 use crate::UserDataRegistry;
@@ -580,12 +580,12 @@ pub trait UserDataFields<'lua, T> {
 /// # use mlua::{Lua, Result, UserData};
 /// # fn main() -> Result<()> {
 /// # let lua = Lua::new();
-/// struct MyUserData(i32);
+/// struct MyUserData;
 ///
 /// impl UserData for MyUserData {}
 ///
 /// // `MyUserData` now implements `IntoLua`:
-/// lua.globals().set("myobject", MyUserData(123))?;
+/// lua.globals().set("myobject", MyUserData)?;
 ///
 /// lua.load("assert(type(myobject) == 'userdata')").exec()?;
 /// # Ok(())
@@ -791,7 +791,7 @@ impl<T> Deref for UserDataVariant<T> {
 /// [`is`]: crate::AnyUserData::is
 /// [`borrow`]: crate::AnyUserData::borrow
 #[derive(Clone, Debug)]
-pub struct AnyUserData<'lua>(pub(crate) LuaRef<'lua>);
+pub struct AnyUserData<'lua>(pub(crate) LuaRef<'lua>, pub(crate) SubtypeId);
 
 /// Owned handle to an internal Lua userdata.
 ///
@@ -801,14 +801,14 @@ pub struct AnyUserData<'lua>(pub(crate) LuaRef<'lua>);
 #[cfg(feature = "unstable")]
 #[cfg_attr(docsrs, doc(cfg(feature = "unstable")))]
 #[derive(Clone, Debug)]
-pub struct OwnedAnyUserData(pub(crate) crate::types::LuaOwnedRef);
+pub struct OwnedAnyUserData(pub(crate) crate::types::LuaOwnedRef, pub(crate) SubtypeId);
 
 #[cfg(feature = "unstable")]
 impl OwnedAnyUserData {
     /// Get borrowed handle to the underlying Lua userdata.
     #[cfg_attr(feature = "send", allow(unused))]
     pub const fn to_ref(&self) -> AnyUserData {
-        AnyUserData(self.0.to_ref())
+        AnyUserData(self.0.to_ref(), self.1)
     }
 }
 
@@ -919,7 +919,7 @@ impl<'lua> AnyUserData<'lua> {
             check_stack(state, 5)?;
 
             lua.push_userdata_ref(&self.0)?;
-            lua.push_value(v.into_lua(lua)?)?;
+            lua.push(v)?;
 
             #[cfg(feature = "lua54")]
             if n < USER_VALUE_MAXSLOT {
@@ -1014,7 +1014,7 @@ impl<'lua> AnyUserData<'lua> {
             check_stack(state, 5)?;
 
             lua.push_userdata_ref(&self.0)?;
-            lua.push_value(v.into_lua(lua)?)?;
+            lua.push(v)?;
 
             // Multiple (extra) user values are emulated by storing them in a table
             protect_lua!(state, 2, 0, |state| {
@@ -1096,12 +1096,22 @@ impl<'lua> AnyUserData<'lua> {
         }
     }
 
+    /// Converts this userdata to a generic C pointer.
+    ///
+    /// There is no way to convert the pointer back to its original value.
+    ///
+    /// Typically this function is used only for hashing and debug information.
+    #[inline]
+    pub fn to_pointer(&self) -> *const c_void {
+        self.0.to_pointer()
+    }
+
     /// Convert this handle to owned version.
     #[cfg(all(feature = "unstable", any(not(feature = "send"), doc)))]
     #[cfg_attr(docsrs, doc(cfg(all(feature = "unstable", not(feature = "send")))))]
     #[inline]
     pub fn into_owned(self) -> OwnedAnyUserData {
-        OwnedAnyUserData(self.0.into_owned())
+        OwnedAnyUserData(self.0.into_owned(), self.1)
     }
 
     #[cfg(feature = "async")]
@@ -1112,6 +1122,14 @@ impl<'lua> AnyUserData<'lua> {
 
     /// Returns a type name of this `UserData` (from a metatable field).
     pub(crate) fn type_name(&self) -> Result<Option<StdString>> {
+        match self.1 {
+            SubtypeId::None => {}
+            #[cfg(feature = "luau")]
+            SubtypeId::Buffer => return Ok(Some("buffer".to_owned())),
+            #[cfg(feature = "luajit")]
+            SubtypeId::CData => return Ok(Some("cdata".to_owned())),
+        }
+
         let lua = self.0.lua;
         let state = lua.state();
         unsafe {

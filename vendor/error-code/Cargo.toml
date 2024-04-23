@@ -12,21 +12,20 @@
 [package]
 edition = "2018"
 name = "error-code"
-version = "2.3.1"
+version = "3.0.0"
 authors = ["Douman <douman@gmx.se>"]
-include = ["**/*.rs", "Cargo.toml", "README.md"]
-description = "Alternative Error for Rust"
+include = [
+    "**/*.rs",
+    "Cargo.toml",
+    "README.md",
+]
+description = "Error code"
 readme = "README.md"
 license = "BSL-1.0"
 repository = "https://github.com/DoumanAsh/error-code"
+
 [package.metadata.docs.rs]
 features = ["std"]
-[dependencies.libc]
-version = "0.2"
-default-features = false
-
-[dependencies.str-buf]
-version = "1"
 
 [features]
 std = []

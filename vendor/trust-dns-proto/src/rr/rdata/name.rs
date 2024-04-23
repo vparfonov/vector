@@ -1,9 +1,18 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
+/*
+ * Copyright (C) 2015 Benjamin Fry <benjaminfry@me.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 //! Record type for all cname like records.
 //!
@@ -30,16 +39,9 @@
 //! the description of name server logic in [RFC-1034] for details.
 //! ```
 
-use std::{fmt, ops::Deref};
-
-#[cfg(feature = "serde-config")]
-use serde::{Deserialize, Serialize};
-
-use crate::{
-    error::ProtoResult,
-    rr::{domain::Name, RData, RecordData, RecordType},
-    serialize::binary::*,
-};
+use crate::error::*;
+use crate::rr::domain::Name;
+use crate::serialize::binary::*;
 
 /// Read the RData from the given Decoder
 pub fn read(decoder: &mut BinDecoder<'_>) -> ProtoResult<Name> {
@@ -66,101 +68,24 @@ pub fn read(decoder: &mut BinDecoder<'_>) -> ProtoResult<Name> {
 /// ```
 pub fn emit(encoder: &mut BinEncoder<'_>, name_data: &Name) -> ProtoResult<()> {
     let is_canonical_names = encoder.is_canonical_names();
-
-    // to_lowercase for rfc4034 and rfc6840
     name_data.emit_with_lowercase(encoder, is_canonical_names)?;
     Ok(())
 }
 
-macro_rules! name_rdata {
-    ($name: ident) => {
-        #[doc = stringify!(new type for the RecordData of $name)]
-        #[cfg_attr(feature = "serde-config", derive(Deserialize, Serialize))]
-        #[derive(Debug, PartialEq, Eq, Hash, Clone)]
-        pub struct $name(pub Name);
+#[test]
+pub fn test() {
+    #![allow(clippy::dbg_macro, clippy::print_stdout)]
 
-        impl BinEncodable for $name {
-            fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-                emit(encoder, &self.0)
-            }
-        }
+    let rdata = Name::from_ascii("WWW.example.com.").unwrap();
 
-        impl<'r> BinDecodable<'r> for $name {
-            fn read(decoder: &mut BinDecoder<'r>) -> ProtoResult<Self> {
-                Name::read(decoder).map(Self)
-            }
-        }
+    let mut bytes = Vec::new();
+    let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
+    assert!(emit(&mut encoder, &rdata).is_ok());
+    let bytes = encoder.into_bytes();
 
-        impl RecordData for $name {
-            fn try_from_rdata(data: RData) -> Result<Self, RData> {
-                match data {
-                    RData::$name(data) => Ok(data),
-                    _ => Err(data),
-                }
-            }
+    println!("bytes: {:?}", bytes);
 
-            fn try_borrow(data: &RData) -> Option<&Self> {
-                match data {
-                    RData::$name(data) => Some(data),
-                    _ => None,
-                }
-            }
-
-            fn record_type(&self) -> RecordType {
-                RecordType::$name
-            }
-
-            fn into_rdata(self) -> RData {
-                RData::$name(self)
-            }
-        }
-
-        impl Deref for $name {
-            type Target = Name;
-
-            fn deref(&self) -> &Self::Target {
-                &self.0
-            }
-        }
-
-        impl fmt::Display for $name {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-                write!(f, "{}", self.0)
-            }
-        }
-    };
-}
-
-name_rdata!(CNAME);
-name_rdata!(NS);
-name_rdata!(PTR);
-name_rdata!(ANAME);
-
-#[cfg(test)]
-mod tests {
-
-    use super::*;
-
-    #[test]
-    fn test_it_to_string_should_not_stack_overflow() {
-        assert_eq!(PTR("abc.com".parse().unwrap()).to_string(), "abc.com");
-    }
-
-    #[test]
-    fn test() {
-        #![allow(clippy::dbg_macro, clippy::print_stdout)]
-
-        let rdata = Name::from_ascii("WWW.example.com.").unwrap();
-
-        let mut bytes = Vec::new();
-        let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        assert!(emit(&mut encoder, &rdata).is_ok());
-        let bytes = encoder.into_bytes();
-
-        println!("bytes: {bytes:?}");
-
-        let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
-        let read_rdata = read(&mut decoder).expect("Decoding error");
-        assert_eq!(rdata, read_rdata);
-    }
+    let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
+    let read_rdata = read(&mut decoder).expect("Decoding error");
+    assert_eq!(rdata, read_rdata);
 }

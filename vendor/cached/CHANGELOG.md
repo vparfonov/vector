@@ -5,6 +5,59 @@
 ## Changed
 ## Removed
 
+## [0.49.2]
+## Added
+## Changed
+- While handling cache refreshes in `DiskCache::cache_get`, treat deserialization failures as non-existent values
+## Removed
+
+## [0.49.1]
+## Added
+## Changed
+- Fix `DiskCache::remove_expired_entries` signature
+## Removed
+
+## [0.49.0 / [cached_proc_macro[0.20.0]] ]
+## Added
+- Add DiskCache store
+- Add `disk=true` (and company) flags to `#[io_cached]`
+## Changed
+## Removed
+
+## [0.48.1 / [cached_proc_macro[0.19.1]] / [cached_proc_macro_types[0.1.1]]]
+## Added
+- Include LICENSE file in `cached_proc_macro` and `cached_proc_macro_types`
+## Changed
+## Removed
+
+## [0.48.0 / [cached_proc_macro[0.19.0]]]
+## Added
+- Add `CloneCached` trait with additional methods when the cache value type implements `Clone`
+- Add `result_fallback` option to `cached` proc_macro to support re-using expired cache values
+  when utilizing an expiring cache store and a fallible function.
+## Changed
+## Removed
+
+## [0.47.0]
+## Added
+## Changed
+- Update redis `0.23.0` -> `0.24.0`
+## Removed
+
+## [0.46.1 / [cached_proc_macro[0.18.1]]
+## Added
+## Changed
+- Fix #once sync_writes bug causing a deadlock after ttl expiry, https://github.com/jaemk/cached/issues/174
+## Removed
+
+## [0.46.0]
+## Added
+- Add `ahash` feature to use the faster [ahash](https://github.com/tkaitchuck/aHash) algorithm.
+- Set `ahash` as a default feature.
+- Update hashbrown `0.13.0` -> `0.14.0`
+## Changed
+## Removed
+
 ## [0.45.1] / [cached_proc_macro[0.18.0]]
 ## Added
 ## Changed

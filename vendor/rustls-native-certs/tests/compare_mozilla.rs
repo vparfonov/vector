@@ -6,12 +6,13 @@
 //! This is, obviously, quite a heuristic test.
 use std::collections::HashMap;
 
+use pki_types::Der;
 use ring::io::der;
-use webpki::TrustAnchor;
+use webpki::anchor_from_trusted_cert;
 
-fn stringify_x500name(subject: &[u8]) -> String {
+fn stringify_x500name(subject: &Der<'_>) -> String {
     let mut parts = vec![];
-    let mut reader = untrusted::Reader::new(subject.into());
+    let mut reader = untrusted::Reader::new(subject.as_ref().into());
 
     while !reader.at_end() {
         let (tag, contents) = der::read_tag_and_get_value(&mut reader).unwrap();
@@ -52,33 +53,24 @@ fn stringify_x500name(subject: &[u8]) -> String {
     parts.join(", ")
 }
 
-fn to_map<'a>(
-    anchors: &'a [webpki::TrustAnchor<'a>],
-) -> HashMap<Vec<u8>, &'a webpki::TrustAnchor<'a>> {
-    let mut r = HashMap::new();
-
-    for anchor in anchors {
-        r.insert(anchor.spki.to_vec(), anchor);
-    }
-
-    r
-}
-
 #[test]
 fn test_does_not_have_many_roots_unknown_by_mozilla() {
     let native = rustls_native_certs::load_native_certs().unwrap();
-    let mozilla = to_map(webpki_roots::TLS_SERVER_ROOTS.0);
+    let mozilla = webpki_roots::TLS_SERVER_ROOTS
+        .iter()
+        .map(|ta| (ta.subject_public_key_info.as_ref(), ta))
+        .collect::<HashMap<_, _>>();
 
     let mut missing_in_moz_roots = 0;
 
     for cert in &native {
-        let cert = TrustAnchor::try_from_cert_der(&cert.0).unwrap();
-        if let Some(moz) = mozilla.get(cert.spki) {
+        let cert = anchor_from_trusted_cert(&cert).unwrap();
+        if let Some(moz) = mozilla.get(cert.subject_public_key_info.as_ref()) {
             assert_eq!(cert.subject, moz.subject, "subjects differ for public key");
         } else {
             println!(
                 "Native anchor {:?} is missing from mozilla set",
-                stringify_x500name(cert.subject)
+                stringify_x500name(&cert.subject)
             );
             missing_in_moz_roots += 1;
         }
@@ -108,17 +100,21 @@ fn test_contains_most_roots_known_by_mozilla() {
 
     let mut native_map = HashMap::new();
     for anchor in &native {
-        let cert = TrustAnchor::try_from_cert_der(&anchor.0).unwrap();
-        native_map.insert(cert.spki.to_vec(), anchor);
+        let cert = anchor_from_trusted_cert(&anchor).unwrap();
+        let spki = cert.subject_public_key_info.as_ref();
+        native_map.insert(spki.to_owned(), anchor);
     }
 
     let mut missing_in_native_roots = 0;
-    let mozilla = webpki_roots::TLS_SERVER_ROOTS.0;
+    let mozilla = webpki_roots::TLS_SERVER_ROOTS;
     for cert in mozilla {
-        if native_map.get(cert.spki).is_none() {
+        if native_map
+            .get(cert.subject_public_key_info.as_ref())
+            .is_none()
+        {
             println!(
                 "Mozilla anchor {:?} is missing from native set",
-                stringify_x500name(cert.subject)
+                stringify_x500name(&cert.subject)
             );
             missing_in_native_roots += 1;
         }
@@ -147,7 +143,7 @@ fn util_list_certs() {
     let native = rustls_native_certs::load_native_certs().unwrap();
 
     for (i, cert) in native.iter().enumerate() {
-        let cert = TrustAnchor::try_from_cert_der(&cert.0).unwrap();
-        println!("cert[{}] = {}", i, stringify_x500name(cert.subject));
+        let cert = anchor_from_trusted_cert(&cert).unwrap();
+        println!("cert[{i}] = {}", stringify_x500name(&cert.subject));
     }
 }

@@ -1,3 +1,39 @@
+## v0.9.6
+
+- Added `to_pointer` function to `Function`/`Table`/`Thread`
+- Implemented `IntoLua` for `&Value`
+- Implemented `FromLua` for `RegistryKey`
+- Faster (~5%) table array traversal during serialization
+- Some performance improvements for bool/int types
+
+## v0.9.5
+
+- Minimal Luau updated to 0.609
+- Luau max stack size increased to 1M (from 100K)
+- Implemented `IntoLua` for refs to `String`/`Table`/`Function`/`AnyUserData`/`Thread` + `RegistryKey`
+- Implemented `IntoLua` and `FromLua` for `OwnedThread`/`OwnedString`
+- Fixed `FromLua` derive proc macro to cover more cases
+
+## v0.9.4
+
+- Fixed loading all-in-one modules under mixed states (eg. main state and coroutines)
+
+## v0.9.3
+
+- WebAssembly support (`wasm32-unknown-emscripten` target)
+- Performance improvements (faster Lua function calls for lua51/jit/luau)
+
+## v0.9.2
+
+- Added binary modules support to Luau
+- Added Luau package module (uses `StdLib::PACKAGE`) with loaders (follows lua5.1 interface)
+- Added support of Luau 0.601+ buffer type (represented as userdata in Rust)
+- LuaJIT `cdata` type is also represented as userdata in Rust (instead of panic)
+- Vendored LuaJIT switched to rolling vanilla (from openresty)
+- Added `Table::for_each` method for fast table pairs traversal (faster than `pairs`)
+- Performance improvements around table traversal (and faster serialization)
+- Bug fixes and improvements
+
 ## v0.9.1
 
 - impl Default for Lua

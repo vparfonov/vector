@@ -28,7 +28,7 @@ use tinyvec::TinyVec;
 pub struct Name {
     is_fqdn: bool,
     label_data: TinyVec<[u8; 32]>,
-    // This 24 is chosen because TinyVec accommodates an inline buffer up to 24 bytes without
+    // This 24 is chosen because TinyVec accomodates an inline buffer up to 24 bytes without
     // increasing its stack footprint
     label_ends: TinyVec<[u8; 24]>,
 }
@@ -51,7 +51,7 @@ impl Name {
         self.label_data.extend_from_slice(label);
         self.label_ends.push(self.label_data.len() as u8);
         if self.len() > 255 {
-            return Err(ProtoErrorKind::DomainNameTooLong(self.len()).into());
+            return Err("labels exceed maximum length of 255".into());
         };
         Ok(())
     }
@@ -110,7 +110,7 @@ impl Name {
         LabelIter {
             name: self,
             start: 0,
-            end: self.label_ends.len() as u8,
+            end: self.label_ends.len(),
         }
     }
 
@@ -167,10 +167,10 @@ impl Name {
         let errors: Vec<_> = errors.into_iter().map(Result::unwrap_err).collect();
 
         if labels.len() > 255 {
-            return Err(ProtoErrorKind::DomainNameTooLong(labels.len()).into());
+            return Err("labels exceed maximum length of 255".into());
         };
         if !errors.is_empty() {
-            return Err(format!("error converting some labels: {errors:?}").into());
+            return Err(format!("error converting some labels: {:?}", errors).into());
         };
 
         let mut name = Self {
@@ -538,14 +538,14 @@ impl Name {
                     }
                     '\\' => state = ParseState::Escape1,
                     ch if !ch.is_control() && !ch.is_whitespace() => label.push(ch),
-                    _ => return Err(format!("unrecognized char: {ch}").into()),
+                    _ => return Err(format!("unrecognized char: {}", ch).into()),
                 },
                 ParseState::Escape1 => {
                     if ch.is_numeric() {
-                        state = ParseState::Escape2(
-                            ch.to_digit(8)
-                                .ok_or_else(|| ProtoError::from(format!("illegal char: {ch}")))?,
-                        );
+                        state =
+                            ParseState::Escape2(ch.to_digit(8).ok_or_else(|| {
+                                ProtoError::from(format!("illegal char: {}", ch))
+                            })?);
                     } else {
                         // it's a single escaped char
                         label.push(ch);
@@ -557,10 +557,10 @@ impl Name {
                         state = ParseState::Escape3(
                             i,
                             ch.to_digit(8)
-                                .ok_or_else(|| ProtoError::from(format!("illegal char: {ch}")))?,
+                                .ok_or_else(|| ProtoError::from(format!("illegal char: {}", ch)))?,
                         );
                     } else {
-                        return Err(ProtoError::from(format!("unrecognized char: {ch}")));
+                        return Err(ProtoError::from(format!("unrecognized char: {}", ch)));
                     }
                 }
                 ParseState::Escape3(i, ii) => {
@@ -569,13 +569,13 @@ impl Name {
                         let val: u32 = (i * 8 * 8)
                             + (ii * 8)
                             + ch.to_digit(8)
-                                .ok_or_else(|| ProtoError::from(format!("illegal char: {ch}")))?;
+                                .ok_or_else(|| ProtoError::from(format!("illegal char: {}", ch)))?;
                         let new: char = char::from_u32(val)
-                            .ok_or_else(|| ProtoError::from(format!("illegal char: {ch}")))?;
+                            .ok_or_else(|| ProtoError::from(format!("illegal char: {}", ch)))?;
                         label.push(new);
                         state = ParseState::Label;
                     } else {
-                        return Err(format!("unrecognized char: {ch}").into());
+                        return Err(format!("unrecognized char: {}", ch).into());
                     }
                 }
             }
@@ -727,7 +727,7 @@ impl Name {
     ///  is followed by the final `.`, e.g. as in `www.example.com.`, which represents a fully
     ///  qualified Name.
     pub fn to_utf8(&self) -> String {
-        format!("{self}")
+        format!("{}", self)
     }
 
     /// Converts a *.arpa Name in a PTR record back into an IpNet if possible.
@@ -921,15 +921,15 @@ impl LabelEnc for LabelEncUtf8 {
     }
 
     fn write_label<W: Write>(f: &mut W, label: &Label) -> Result<(), fmt::Error> {
-        write!(f, "{label}")
+        write!(f, "{}", label)
     }
 }
 
 /// An iterator over labels in a name
 pub struct LabelIter<'a> {
     name: &'a Name,
-    start: u8,
-    end: u8,
+    start: usize,
+    end: usize,
 }
 
 impl<'a> Iterator for LabelIter<'a> {
@@ -940,17 +940,17 @@ impl<'a> Iterator for LabelIter<'a> {
             return None;
         }
 
-        let end = *self.name.label_ends.get(self.start as usize)?;
+        let end = *self.name.label_ends.get(self.start)?;
         let start = match self.start {
             0 => 0,
-            _ => self.name.label_ends[(self.start - 1) as usize],
+            _ => self.name.label_ends[self.start - 1],
         };
         self.start += 1;
         Some(&self.name.label_data[start as usize..end as usize])
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let len = self.end.saturating_sub(self.start) as usize;
+        let len = self.end.saturating_sub(self.start);
         (len, Some(len))
     }
 }
@@ -965,10 +965,10 @@ impl<'a> DoubleEndedIterator for LabelIter<'a> {
 
         self.end -= 1;
 
-        let end = *self.name.label_ends.get(self.end as usize)?;
+        let end = *self.name.label_ends.get(self.end)?;
         let start = match self.end {
             0 => 0,
-            _ => self.name.label_ends[(self.end - 1) as usize],
+            _ => self.name.label_ends[self.end - 1],
         };
 
         Some(&self.name.label_data[start as usize..end as usize])
@@ -1002,7 +1002,7 @@ impl From<Ipv4Addr> for Name {
                 .iter()
                 .rev()
                 .fold(Vec::<Label>::with_capacity(6), |mut labels, o| {
-                    let label: Label = format!("{o}")
+                    let label: Label = format!("{}", o)
                         .as_bytes()
                         .into_label()
                         .expect("IP octet to label should never fail");
@@ -1583,7 +1583,7 @@ mod tests {
         ];
 
         for (left, right) in comparisons {
-            println!("left: {left}, right: {right}");
+            println!("left: {}, right: {}", left, right);
             assert_eq!(left.partial_cmp(&right), Some(Ordering::Equal));
         }
     }
@@ -1626,7 +1626,7 @@ mod tests {
         ];
 
         for (left, right) in comparisons {
-            println!("left: {left}, right: {right}");
+            println!("left: {}, right: {}", left, right);
             assert_eq!(left.cmp(&right), Ordering::Less);
         }
     }
@@ -1645,7 +1645,7 @@ mod tests {
         ];
 
         for (left, right) in comparisons {
-            println!("left: {left}, right: {right}");
+            println!("left: {}, right: {}", left, right);
             assert_eq!(left, right);
         }
     }
@@ -1775,9 +1775,9 @@ mod tests {
 
         let mut result = Ok(());
         for i in 0..10000 {
-            let name = Name::from_ascii(format!("name{i}.example.com.")).unwrap();
+            let name = Name::from_ascii(format!("name{}.example.com.", i)).unwrap();
             result = name.emit(&mut encoder);
-            if result.is_err() {
+            if let Err(..) = result {
                 break;
             }
         }
@@ -1891,10 +1891,11 @@ mod tests {
 
         let error = n
             .append_domain(&sfx)
-            .expect_err("should have errored, too long");
+            .err()
+            .expect("should have errored, too long");
 
         match error.kind() {
-            ProtoErrorKind::DomainNameTooLong(_) => (),
+            ProtoErrorKind::Message("labels exceed maximum length of 255") => (),
             _ => panic!("expected too long message"),
         }
     }

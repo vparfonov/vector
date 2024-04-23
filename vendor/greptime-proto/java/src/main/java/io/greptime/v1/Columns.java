@@ -14,267 +14,6 @@ public final class Columns {
     registerAllExtensions(
         (com.google.protobuf.ExtensionRegistryLite) registry);
   }
-  /**
-   * Protobuf enum {@code greptime.v1.ColumnDataType}
-   */
-  public enum ColumnDataType
-      implements com.google.protobuf.ProtocolMessageEnum {
-    /**
-     * <code>BOOLEAN = 0;</code>
-     */
-    BOOLEAN(0),
-    /**
-     * <code>INT8 = 1;</code>
-     */
-    INT8(1),
-    /**
-     * <code>INT16 = 2;</code>
-     */
-    INT16(2),
-    /**
-     * <code>INT32 = 3;</code>
-     */
-    INT32(3),
-    /**
-     * <code>INT64 = 4;</code>
-     */
-    INT64(4),
-    /**
-     * <code>UINT8 = 5;</code>
-     */
-    UINT8(5),
-    /**
-     * <code>UINT16 = 6;</code>
-     */
-    UINT16(6),
-    /**
-     * <code>UINT32 = 7;</code>
-     */
-    UINT32(7),
-    /**
-     * <code>UINT64 = 8;</code>
-     */
-    UINT64(8),
-    /**
-     * <code>FLOAT32 = 9;</code>
-     */
-    FLOAT32(9),
-    /**
-     * <code>FLOAT64 = 10;</code>
-     */
-    FLOAT64(10),
-    /**
-     * <code>BINARY = 11;</code>
-     */
-    BINARY(11),
-    /**
-     * <code>STRING = 12;</code>
-     */
-    STRING(12),
-    /**
-     * <code>DATE = 13;</code>
-     */
-    DATE(13),
-    /**
-     * <code>DATETIME = 14;</code>
-     */
-    DATETIME(14),
-    /**
-     * <code>TIMESTAMP_SECOND = 15;</code>
-     */
-    TIMESTAMP_SECOND(15),
-    /**
-     * <code>TIMESTAMP_MILLISECOND = 16;</code>
-     */
-    TIMESTAMP_MILLISECOND(16),
-    /**
-     * <code>TIMESTAMP_MICROSECOND = 17;</code>
-     */
-    TIMESTAMP_MICROSECOND(17),
-    /**
-     * <code>TIMESTAMP_NANOSECOND = 18;</code>
-     */
-    TIMESTAMP_NANOSECOND(18),
-    UNRECOGNIZED(-1),
-    ;
-
-    /**
-     * <code>BOOLEAN = 0;</code>
-     */
-    public static final int BOOLEAN_VALUE = 0;
-    /**
-     * <code>INT8 = 1;</code>
-     */
-    public static final int INT8_VALUE = 1;
-    /**
-     * <code>INT16 = 2;</code>
-     */
-    public static final int INT16_VALUE = 2;
-    /**
-     * <code>INT32 = 3;</code>
-     */
-    public static final int INT32_VALUE = 3;
-    /**
-     * <code>INT64 = 4;</code>
-     */
-    public static final int INT64_VALUE = 4;
-    /**
-     * <code>UINT8 = 5;</code>
-     */
-    public static final int UINT8_VALUE = 5;
-    /**
-     * <code>UINT16 = 6;</code>
-     */
-    public static final int UINT16_VALUE = 6;
-    /**
-     * <code>UINT32 = 7;</code>
-     */
-    public static final int UINT32_VALUE = 7;
-    /**
-     * <code>UINT64 = 8;</code>
-     */
-    public static final int UINT64_VALUE = 8;
-    /**
-     * <code>FLOAT32 = 9;</code>
-     */
-    public static final int FLOAT32_VALUE = 9;
-    /**
-     * <code>FLOAT64 = 10;</code>
-     */
-    public static final int FLOAT64_VALUE = 10;
-    /**
-     * <code>BINARY = 11;</code>
-     */
-    public static final int BINARY_VALUE = 11;
-    /**
-     * <code>STRING = 12;</code>
-     */
-    public static final int STRING_VALUE = 12;
-    /**
-     * <code>DATE = 13;</code>
-     */
-    public static final int DATE_VALUE = 13;
-    /**
-     * <code>DATETIME = 14;</code>
-     */
-    public static final int DATETIME_VALUE = 14;
-    /**
-     * <code>TIMESTAMP_SECOND = 15;</code>
-     */
-    public static final int TIMESTAMP_SECOND_VALUE = 15;
-    /**
-     * <code>TIMESTAMP_MILLISECOND = 16;</code>
-     */
-    public static final int TIMESTAMP_MILLISECOND_VALUE = 16;
-    /**
-     * <code>TIMESTAMP_MICROSECOND = 17;</code>
-     */
-    public static final int TIMESTAMP_MICROSECOND_VALUE = 17;
-    /**
-     * <code>TIMESTAMP_NANOSECOND = 18;</code>
-     */
-    public static final int TIMESTAMP_NANOSECOND_VALUE = 18;
-
-
-    public final int getNumber() {
-      if (this == UNRECOGNIZED) {
-        throw new java.lang.IllegalArgumentException(
-            "Can't get the number of an unknown enum value.");
-      }
-      return value;
-    }
-
-    /**
-     * @param value The numeric wire value of the corresponding enum entry.
-     * @return The enum associated with the given numeric wire value.
-     * @deprecated Use {@link #forNumber(int)} instead.
-     */
-    @java.lang.Deprecated
-    public static ColumnDataType valueOf(int value) {
-      return forNumber(value);
-    }
-
-    /**
-     * @param value The numeric wire value of the corresponding enum entry.
-     * @return The enum associated with the given numeric wire value.
-     */
-    public static ColumnDataType forNumber(int value) {
-      switch (value) {
-        case 0: return BOOLEAN;
-        case 1: return INT8;
-        case 2: return INT16;
-        case 3: return INT32;
-        case 4: return INT64;
-        case 5: return UINT8;
-        case 6: return UINT16;
-        case 7: return UINT32;
-        case 8: return UINT64;
-        case 9: return FLOAT32;
-        case 10: return FLOAT64;
-        case 11: return BINARY;
-        case 12: return STRING;
-        case 13: return DATE;
-        case 14: return DATETIME;
-        case 15: return TIMESTAMP_SECOND;
-        case 16: return TIMESTAMP_MILLISECOND;
-        case 17: return TIMESTAMP_MICROSECOND;
-        case 18: return TIMESTAMP_NANOSECOND;
-        default: return null;
-      }
-    }
-
-    public static com.google.protobuf.Internal.EnumLiteMap<ColumnDataType>
-        internalGetValueMap() {
-      return internalValueMap;
-    }
-    private static final com.google.protobuf.Internal.EnumLiteMap<
-        ColumnDataType> internalValueMap =
-          new com.google.protobuf.Internal.EnumLiteMap<ColumnDataType>() {
-            public ColumnDataType findValueByNumber(int number) {
-              return ColumnDataType.forNumber(number);
-            }
-          };
-
-    public final com.google.protobuf.Descriptors.EnumValueDescriptor
-        getValueDescriptor() {
-      if (this == UNRECOGNIZED) {
-        throw new java.lang.IllegalStateException(
-            "Can't get the descriptor of an unrecognized enum value.");
-      }
-      return getDescriptor().getValues().get(ordinal());
-    }
-    public final com.google.protobuf.Descriptors.EnumDescriptor
-        getDescriptorForType() {
-      return getDescriptor();
-    }
-    public static final com.google.protobuf.Descriptors.EnumDescriptor
-        getDescriptor() {
-      return io.greptime.v1.Columns.getDescriptor().getEnumTypes().get(0);
-    }
-
-    private static final ColumnDataType[] VALUES = values();
-
-    public static ColumnDataType valueOf(
-        com.google.protobuf.Descriptors.EnumValueDescriptor desc) {
-      if (desc.getType() != getDescriptor()) {
-        throw new java.lang.IllegalArgumentException(
-          "EnumValueDescriptor is not for this type.");
-      }
-      if (desc.getIndex() == -1) {
-        return UNRECOGNIZED;
-      }
-      return VALUES[desc.getIndex()];
-    }
-
-    private final int value;
-
-    private ColumnDataType(int value) {
-      this.value = value;
-    }
-
-    // @@protoc_insertion_point(enum_scope:greptime.v1.ColumnDataType)
-  }
-
   public interface ColumnOrBuilder extends
       // @@protoc_insertion_point(interface_extends:greptime.v1.Column)
       com.google.protobuf.MessageOrBuilder {
@@ -292,15 +31,15 @@ public final class Columns {
         getColumnNameBytes();
 
     /**
-     * <code>.greptime.v1.Column.SemanticType semantic_type = 2;</code>
+     * <code>.greptime.v1.SemanticType semantic_type = 2;</code>
      * @return The enum numeric value on the wire for semanticType.
      */
     int getSemanticTypeValue();
     /**
-     * <code>.greptime.v1.Column.SemanticType semantic_type = 2;</code>
+     * <code>.greptime.v1.SemanticType semantic_type = 2;</code>
      * @return The semanticType.
      */
-    io.greptime.v1.Columns.Column.SemanticType getSemanticType();
+    io.greptime.v1.Common.SemanticType getSemanticType();
 
     /**
      * <pre>
@@ -379,7 +118,34 @@ public final class Columns {
      * <code>.greptime.v1.ColumnDataType datatype = 5;</code>
      * @return The datatype.
      */
-    io.greptime.v1.Columns.ColumnDataType getDatatype();
+    io.greptime.v1.Common.ColumnDataType getDatatype();
+
+    /**
+     * <pre>
+     * Extension for ColumnDataType.
+     * </pre>
+     *
+     * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+     * @return Whether the datatypeExtension field is set.
+     */
+    boolean hasDatatypeExtension();
+    /**
+     * <pre>
+     * Extension for ColumnDataType.
+     * </pre>
+     *
+     * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+     * @return The datatypeExtension.
+     */
+    io.greptime.v1.Common.ColumnDataTypeExtension getDatatypeExtension();
+    /**
+     * <pre>
+     * Extension for ColumnDataType.
+     * </pre>
+     *
+     * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+     */
+    io.greptime.v1.Common.ColumnDataTypeExtensionOrBuilder getDatatypeExtensionOrBuilder();
   }
   /**
    * Protobuf type {@code greptime.v1.Column}
@@ -466,6 +232,19 @@ public final class Columns {
               datatype_ = rawValue;
               break;
             }
+            case 50: {
+              io.greptime.v1.Common.ColumnDataTypeExtension.Builder subBuilder = null;
+              if (datatypeExtension_ != null) {
+                subBuilder = datatypeExtension_.toBuilder();
+              }
+              datatypeExtension_ = input.readMessage(io.greptime.v1.Common.ColumnDataTypeExtension.parser(), extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom(datatypeExtension_);
+                datatypeExtension_ = subBuilder.buildPartial();
+              }
+
+              break;
+            }
             default: {
               if (!parseUnknownField(
                   input, unknownFields, extensionRegistry, tag)) {
@@ -498,123 +277,6 @@ public final class Columns {
       return io.greptime.v1.Columns.internal_static_greptime_v1_Column_fieldAccessorTable
           .ensureFieldAccessorsInitialized(
               io.greptime.v1.Columns.Column.class, io.greptime.v1.Columns.Column.Builder.class);
-    }
-
-    /**
-     * Protobuf enum {@code greptime.v1.Column.SemanticType}
-     */
-    public enum SemanticType
-        implements com.google.protobuf.ProtocolMessageEnum {
-      /**
-       * <code>TAG = 0;</code>
-       */
-      TAG(0),
-      /**
-       * <code>FIELD = 1;</code>
-       */
-      FIELD(1),
-      /**
-       * <code>TIMESTAMP = 2;</code>
-       */
-      TIMESTAMP(2),
-      UNRECOGNIZED(-1),
-      ;
-
-      /**
-       * <code>TAG = 0;</code>
-       */
-      public static final int TAG_VALUE = 0;
-      /**
-       * <code>FIELD = 1;</code>
-       */
-      public static final int FIELD_VALUE = 1;
-      /**
-       * <code>TIMESTAMP = 2;</code>
-       */
-      public static final int TIMESTAMP_VALUE = 2;
-
-
-      public final int getNumber() {
-        if (this == UNRECOGNIZED) {
-          throw new java.lang.IllegalArgumentException(
-              "Can't get the number of an unknown enum value.");
-        }
-        return value;
-      }
-
-      /**
-       * @param value The numeric wire value of the corresponding enum entry.
-       * @return The enum associated with the given numeric wire value.
-       * @deprecated Use {@link #forNumber(int)} instead.
-       */
-      @java.lang.Deprecated
-      public static SemanticType valueOf(int value) {
-        return forNumber(value);
-      }
-
-      /**
-       * @param value The numeric wire value of the corresponding enum entry.
-       * @return The enum associated with the given numeric wire value.
-       */
-      public static SemanticType forNumber(int value) {
-        switch (value) {
-          case 0: return TAG;
-          case 1: return FIELD;
-          case 2: return TIMESTAMP;
-          default: return null;
-        }
-      }
-
-      public static com.google.protobuf.Internal.EnumLiteMap<SemanticType>
-          internalGetValueMap() {
-        return internalValueMap;
-      }
-      private static final com.google.protobuf.Internal.EnumLiteMap<
-          SemanticType> internalValueMap =
-            new com.google.protobuf.Internal.EnumLiteMap<SemanticType>() {
-              public SemanticType findValueByNumber(int number) {
-                return SemanticType.forNumber(number);
-              }
-            };
-
-      public final com.google.protobuf.Descriptors.EnumValueDescriptor
-          getValueDescriptor() {
-        if (this == UNRECOGNIZED) {
-          throw new java.lang.IllegalStateException(
-              "Can't get the descriptor of an unrecognized enum value.");
-        }
-        return getDescriptor().getValues().get(ordinal());
-      }
-      public final com.google.protobuf.Descriptors.EnumDescriptor
-          getDescriptorForType() {
-        return getDescriptor();
-      }
-      public static final com.google.protobuf.Descriptors.EnumDescriptor
-          getDescriptor() {
-        return io.greptime.v1.Columns.Column.getDescriptor().getEnumTypes().get(0);
-      }
-
-      private static final SemanticType[] VALUES = values();
-
-      public static SemanticType valueOf(
-          com.google.protobuf.Descriptors.EnumValueDescriptor desc) {
-        if (desc.getType() != getDescriptor()) {
-          throw new java.lang.IllegalArgumentException(
-            "EnumValueDescriptor is not for this type.");
-        }
-        if (desc.getIndex() == -1) {
-          return UNRECOGNIZED;
-        }
-        return VALUES[desc.getIndex()];
-      }
-
-      private final int value;
-
-      private SemanticType(int value) {
-        this.value = value;
-      }
-
-      // @@protoc_insertion_point(enum_scope:greptime.v1.Column.SemanticType)
     }
 
     public interface ValuesOrBuilder extends
@@ -885,72 +547,290 @@ public final class Columns {
       long getDatetimeValues(int index);
 
       /**
-       * <code>repeated int64 ts_second_values = 16;</code>
-       * @return A list containing the tsSecondValues.
+       * <code>repeated int64 timestamp_second_values = 16;</code>
+       * @return A list containing the timestampSecondValues.
        */
-      java.util.List<java.lang.Long> getTsSecondValuesList();
+      java.util.List<java.lang.Long> getTimestampSecondValuesList();
       /**
-       * <code>repeated int64 ts_second_values = 16;</code>
-       * @return The count of tsSecondValues.
+       * <code>repeated int64 timestamp_second_values = 16;</code>
+       * @return The count of timestampSecondValues.
        */
-      int getTsSecondValuesCount();
+      int getTimestampSecondValuesCount();
       /**
-       * <code>repeated int64 ts_second_values = 16;</code>
+       * <code>repeated int64 timestamp_second_values = 16;</code>
        * @param index The index of the element to return.
-       * @return The tsSecondValues at the given index.
+       * @return The timestampSecondValues at the given index.
        */
-      long getTsSecondValues(int index);
+      long getTimestampSecondValues(int index);
 
       /**
-       * <code>repeated int64 ts_millisecond_values = 17;</code>
-       * @return A list containing the tsMillisecondValues.
+       * <code>repeated int64 timestamp_millisecond_values = 17;</code>
+       * @return A list containing the timestampMillisecondValues.
        */
-      java.util.List<java.lang.Long> getTsMillisecondValuesList();
+      java.util.List<java.lang.Long> getTimestampMillisecondValuesList();
       /**
-       * <code>repeated int64 ts_millisecond_values = 17;</code>
-       * @return The count of tsMillisecondValues.
+       * <code>repeated int64 timestamp_millisecond_values = 17;</code>
+       * @return The count of timestampMillisecondValues.
        */
-      int getTsMillisecondValuesCount();
+      int getTimestampMillisecondValuesCount();
       /**
-       * <code>repeated int64 ts_millisecond_values = 17;</code>
+       * <code>repeated int64 timestamp_millisecond_values = 17;</code>
        * @param index The index of the element to return.
-       * @return The tsMillisecondValues at the given index.
+       * @return The timestampMillisecondValues at the given index.
        */
-      long getTsMillisecondValues(int index);
+      long getTimestampMillisecondValues(int index);
 
       /**
-       * <code>repeated int64 ts_microsecond_values = 18;</code>
-       * @return A list containing the tsMicrosecondValues.
+       * <code>repeated int64 timestamp_microsecond_values = 18;</code>
+       * @return A list containing the timestampMicrosecondValues.
        */
-      java.util.List<java.lang.Long> getTsMicrosecondValuesList();
+      java.util.List<java.lang.Long> getTimestampMicrosecondValuesList();
       /**
-       * <code>repeated int64 ts_microsecond_values = 18;</code>
-       * @return The count of tsMicrosecondValues.
+       * <code>repeated int64 timestamp_microsecond_values = 18;</code>
+       * @return The count of timestampMicrosecondValues.
        */
-      int getTsMicrosecondValuesCount();
+      int getTimestampMicrosecondValuesCount();
       /**
-       * <code>repeated int64 ts_microsecond_values = 18;</code>
+       * <code>repeated int64 timestamp_microsecond_values = 18;</code>
        * @param index The index of the element to return.
-       * @return The tsMicrosecondValues at the given index.
+       * @return The timestampMicrosecondValues at the given index.
        */
-      long getTsMicrosecondValues(int index);
+      long getTimestampMicrosecondValues(int index);
 
       /**
-       * <code>repeated int64 ts_nanosecond_values = 19;</code>
-       * @return A list containing the tsNanosecondValues.
+       * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
+       * @return A list containing the timestampNanosecondValues.
        */
-      java.util.List<java.lang.Long> getTsNanosecondValuesList();
+      java.util.List<java.lang.Long> getTimestampNanosecondValuesList();
       /**
-       * <code>repeated int64 ts_nanosecond_values = 19;</code>
-       * @return The count of tsNanosecondValues.
+       * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
+       * @return The count of timestampNanosecondValues.
        */
-      int getTsNanosecondValuesCount();
+      int getTimestampNanosecondValuesCount();
       /**
-       * <code>repeated int64 ts_nanosecond_values = 19;</code>
+       * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
        * @param index The index of the element to return.
-       * @return The tsNanosecondValues at the given index.
+       * @return The timestampNanosecondValues at the given index.
        */
-      long getTsNanosecondValues(int index);
+      long getTimestampNanosecondValues(int index);
+
+      /**
+       * <code>repeated int64 time_second_values = 20;</code>
+       * @return A list containing the timeSecondValues.
+       */
+      java.util.List<java.lang.Long> getTimeSecondValuesList();
+      /**
+       * <code>repeated int64 time_second_values = 20;</code>
+       * @return The count of timeSecondValues.
+       */
+      int getTimeSecondValuesCount();
+      /**
+       * <code>repeated int64 time_second_values = 20;</code>
+       * @param index The index of the element to return.
+       * @return The timeSecondValues at the given index.
+       */
+      long getTimeSecondValues(int index);
+
+      /**
+       * <code>repeated int64 time_millisecond_values = 21;</code>
+       * @return A list containing the timeMillisecondValues.
+       */
+      java.util.List<java.lang.Long> getTimeMillisecondValuesList();
+      /**
+       * <code>repeated int64 time_millisecond_values = 21;</code>
+       * @return The count of timeMillisecondValues.
+       */
+      int getTimeMillisecondValuesCount();
+      /**
+       * <code>repeated int64 time_millisecond_values = 21;</code>
+       * @param index The index of the element to return.
+       * @return The timeMillisecondValues at the given index.
+       */
+      long getTimeMillisecondValues(int index);
+
+      /**
+       * <code>repeated int64 time_microsecond_values = 22;</code>
+       * @return A list containing the timeMicrosecondValues.
+       */
+      java.util.List<java.lang.Long> getTimeMicrosecondValuesList();
+      /**
+       * <code>repeated int64 time_microsecond_values = 22;</code>
+       * @return The count of timeMicrosecondValues.
+       */
+      int getTimeMicrosecondValuesCount();
+      /**
+       * <code>repeated int64 time_microsecond_values = 22;</code>
+       * @param index The index of the element to return.
+       * @return The timeMicrosecondValues at the given index.
+       */
+      long getTimeMicrosecondValues(int index);
+
+      /**
+       * <code>repeated int64 time_nanosecond_values = 23;</code>
+       * @return A list containing the timeNanosecondValues.
+       */
+      java.util.List<java.lang.Long> getTimeNanosecondValuesList();
+      /**
+       * <code>repeated int64 time_nanosecond_values = 23;</code>
+       * @return The count of timeNanosecondValues.
+       */
+      int getTimeNanosecondValuesCount();
+      /**
+       * <code>repeated int64 time_nanosecond_values = 23;</code>
+       * @param index The index of the element to return.
+       * @return The timeNanosecondValues at the given index.
+       */
+      long getTimeNanosecondValues(int index);
+
+      /**
+       * <code>repeated int32 interval_year_month_values = 24;</code>
+       * @return A list containing the intervalYearMonthValues.
+       */
+      java.util.List<java.lang.Integer> getIntervalYearMonthValuesList();
+      /**
+       * <code>repeated int32 interval_year_month_values = 24;</code>
+       * @return The count of intervalYearMonthValues.
+       */
+      int getIntervalYearMonthValuesCount();
+      /**
+       * <code>repeated int32 interval_year_month_values = 24;</code>
+       * @param index The index of the element to return.
+       * @return The intervalYearMonthValues at the given index.
+       */
+      int getIntervalYearMonthValues(int index);
+
+      /**
+       * <code>repeated int64 interval_day_time_values = 25;</code>
+       * @return A list containing the intervalDayTimeValues.
+       */
+      java.util.List<java.lang.Long> getIntervalDayTimeValuesList();
+      /**
+       * <code>repeated int64 interval_day_time_values = 25;</code>
+       * @return The count of intervalDayTimeValues.
+       */
+      int getIntervalDayTimeValuesCount();
+      /**
+       * <code>repeated int64 interval_day_time_values = 25;</code>
+       * @param index The index of the element to return.
+       * @return The intervalDayTimeValues at the given index.
+       */
+      long getIntervalDayTimeValues(int index);
+
+      /**
+       * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+       */
+      java.util.List<io.greptime.v1.Common.IntervalMonthDayNano> 
+          getIntervalMonthDayNanoValuesList();
+      /**
+       * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+       */
+      io.greptime.v1.Common.IntervalMonthDayNano getIntervalMonthDayNanoValues(int index);
+      /**
+       * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+       */
+      int getIntervalMonthDayNanoValuesCount();
+      /**
+       * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+       */
+      java.util.List<? extends io.greptime.v1.Common.IntervalMonthDayNanoOrBuilder> 
+          getIntervalMonthDayNanoValuesOrBuilderList();
+      /**
+       * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+       */
+      io.greptime.v1.Common.IntervalMonthDayNanoOrBuilder getIntervalMonthDayNanoValuesOrBuilder(
+          int index);
+
+      /**
+       * <code>repeated int64 duration_second_values = 27;</code>
+       * @return A list containing the durationSecondValues.
+       */
+      java.util.List<java.lang.Long> getDurationSecondValuesList();
+      /**
+       * <code>repeated int64 duration_second_values = 27;</code>
+       * @return The count of durationSecondValues.
+       */
+      int getDurationSecondValuesCount();
+      /**
+       * <code>repeated int64 duration_second_values = 27;</code>
+       * @param index The index of the element to return.
+       * @return The durationSecondValues at the given index.
+       */
+      long getDurationSecondValues(int index);
+
+      /**
+       * <code>repeated int64 duration_millisecond_values = 28;</code>
+       * @return A list containing the durationMillisecondValues.
+       */
+      java.util.List<java.lang.Long> getDurationMillisecondValuesList();
+      /**
+       * <code>repeated int64 duration_millisecond_values = 28;</code>
+       * @return The count of durationMillisecondValues.
+       */
+      int getDurationMillisecondValuesCount();
+      /**
+       * <code>repeated int64 duration_millisecond_values = 28;</code>
+       * @param index The index of the element to return.
+       * @return The durationMillisecondValues at the given index.
+       */
+      long getDurationMillisecondValues(int index);
+
+      /**
+       * <code>repeated int64 duration_microsecond_values = 29;</code>
+       * @return A list containing the durationMicrosecondValues.
+       */
+      java.util.List<java.lang.Long> getDurationMicrosecondValuesList();
+      /**
+       * <code>repeated int64 duration_microsecond_values = 29;</code>
+       * @return The count of durationMicrosecondValues.
+       */
+      int getDurationMicrosecondValuesCount();
+      /**
+       * <code>repeated int64 duration_microsecond_values = 29;</code>
+       * @param index The index of the element to return.
+       * @return The durationMicrosecondValues at the given index.
+       */
+      long getDurationMicrosecondValues(int index);
+
+      /**
+       * <code>repeated int64 duration_nanosecond_values = 30;</code>
+       * @return A list containing the durationNanosecondValues.
+       */
+      java.util.List<java.lang.Long> getDurationNanosecondValuesList();
+      /**
+       * <code>repeated int64 duration_nanosecond_values = 30;</code>
+       * @return The count of durationNanosecondValues.
+       */
+      int getDurationNanosecondValuesCount();
+      /**
+       * <code>repeated int64 duration_nanosecond_values = 30;</code>
+       * @param index The index of the element to return.
+       * @return The durationNanosecondValues at the given index.
+       */
+      long getDurationNanosecondValues(int index);
+
+      /**
+       * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+       */
+      java.util.List<io.greptime.v1.Common.Decimal128> 
+          getDecimal128ValuesList();
+      /**
+       * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+       */
+      io.greptime.v1.Common.Decimal128 getDecimal128Values(int index);
+      /**
+       * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+       */
+      int getDecimal128ValuesCount();
+      /**
+       * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+       */
+      java.util.List<? extends io.greptime.v1.Common.Decimal128OrBuilder> 
+          getDecimal128ValuesOrBuilderList();
+      /**
+       * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+       */
+      io.greptime.v1.Common.Decimal128OrBuilder getDecimal128ValuesOrBuilder(
+          int index);
     }
     /**
      * Protobuf type {@code greptime.v1.Column.Values}
@@ -980,10 +860,22 @@ public final class Columns {
         stringValues_ = com.google.protobuf.LazyStringArrayList.EMPTY;
         dateValues_ = emptyIntList();
         datetimeValues_ = emptyLongList();
-        tsSecondValues_ = emptyLongList();
-        tsMillisecondValues_ = emptyLongList();
-        tsMicrosecondValues_ = emptyLongList();
-        tsNanosecondValues_ = emptyLongList();
+        timestampSecondValues_ = emptyLongList();
+        timestampMillisecondValues_ = emptyLongList();
+        timestampMicrosecondValues_ = emptyLongList();
+        timestampNanosecondValues_ = emptyLongList();
+        timeSecondValues_ = emptyLongList();
+        timeMillisecondValues_ = emptyLongList();
+        timeMicrosecondValues_ = emptyLongList();
+        timeNanosecondValues_ = emptyLongList();
+        intervalYearMonthValues_ = emptyIntList();
+        intervalDayTimeValues_ = emptyLongList();
+        intervalMonthDayNanoValues_ = java.util.Collections.emptyList();
+        durationSecondValues_ = emptyLongList();
+        durationMillisecondValues_ = emptyLongList();
+        durationMicrosecondValues_ = emptyLongList();
+        durationNanosecondValues_ = emptyLongList();
+        decimal128Values_ = java.util.Collections.emptyList();
       }
 
       @java.lang.Override
@@ -1309,86 +1201,314 @@ public final class Columns {
               }
               case 128: {
                 if (!((mutable_bitField0_ & 0x00008000) != 0)) {
-                  tsSecondValues_ = newLongList();
+                  timestampSecondValues_ = newLongList();
                   mutable_bitField0_ |= 0x00008000;
                 }
-                tsSecondValues_.addLong(input.readInt64());
+                timestampSecondValues_.addLong(input.readInt64());
                 break;
               }
               case 130: {
                 int length = input.readRawVarint32();
                 int limit = input.pushLimit(length);
                 if (!((mutable_bitField0_ & 0x00008000) != 0) && input.getBytesUntilLimit() > 0) {
-                  tsSecondValues_ = newLongList();
+                  timestampSecondValues_ = newLongList();
                   mutable_bitField0_ |= 0x00008000;
                 }
                 while (input.getBytesUntilLimit() > 0) {
-                  tsSecondValues_.addLong(input.readInt64());
+                  timestampSecondValues_.addLong(input.readInt64());
                 }
                 input.popLimit(limit);
                 break;
               }
               case 136: {
                 if (!((mutable_bitField0_ & 0x00010000) != 0)) {
-                  tsMillisecondValues_ = newLongList();
+                  timestampMillisecondValues_ = newLongList();
                   mutable_bitField0_ |= 0x00010000;
                 }
-                tsMillisecondValues_.addLong(input.readInt64());
+                timestampMillisecondValues_.addLong(input.readInt64());
                 break;
               }
               case 138: {
                 int length = input.readRawVarint32();
                 int limit = input.pushLimit(length);
                 if (!((mutable_bitField0_ & 0x00010000) != 0) && input.getBytesUntilLimit() > 0) {
-                  tsMillisecondValues_ = newLongList();
+                  timestampMillisecondValues_ = newLongList();
                   mutable_bitField0_ |= 0x00010000;
                 }
                 while (input.getBytesUntilLimit() > 0) {
-                  tsMillisecondValues_.addLong(input.readInt64());
+                  timestampMillisecondValues_.addLong(input.readInt64());
                 }
                 input.popLimit(limit);
                 break;
               }
               case 144: {
                 if (!((mutable_bitField0_ & 0x00020000) != 0)) {
-                  tsMicrosecondValues_ = newLongList();
+                  timestampMicrosecondValues_ = newLongList();
                   mutable_bitField0_ |= 0x00020000;
                 }
-                tsMicrosecondValues_.addLong(input.readInt64());
+                timestampMicrosecondValues_.addLong(input.readInt64());
                 break;
               }
               case 146: {
                 int length = input.readRawVarint32();
                 int limit = input.pushLimit(length);
                 if (!((mutable_bitField0_ & 0x00020000) != 0) && input.getBytesUntilLimit() > 0) {
-                  tsMicrosecondValues_ = newLongList();
+                  timestampMicrosecondValues_ = newLongList();
                   mutable_bitField0_ |= 0x00020000;
                 }
                 while (input.getBytesUntilLimit() > 0) {
-                  tsMicrosecondValues_.addLong(input.readInt64());
+                  timestampMicrosecondValues_.addLong(input.readInt64());
                 }
                 input.popLimit(limit);
                 break;
               }
               case 152: {
                 if (!((mutable_bitField0_ & 0x00040000) != 0)) {
-                  tsNanosecondValues_ = newLongList();
+                  timestampNanosecondValues_ = newLongList();
                   mutable_bitField0_ |= 0x00040000;
                 }
-                tsNanosecondValues_.addLong(input.readInt64());
+                timestampNanosecondValues_.addLong(input.readInt64());
                 break;
               }
               case 154: {
                 int length = input.readRawVarint32();
                 int limit = input.pushLimit(length);
                 if (!((mutable_bitField0_ & 0x00040000) != 0) && input.getBytesUntilLimit() > 0) {
-                  tsNanosecondValues_ = newLongList();
+                  timestampNanosecondValues_ = newLongList();
                   mutable_bitField0_ |= 0x00040000;
                 }
                 while (input.getBytesUntilLimit() > 0) {
-                  tsNanosecondValues_.addLong(input.readInt64());
+                  timestampNanosecondValues_.addLong(input.readInt64());
                 }
                 input.popLimit(limit);
+                break;
+              }
+              case 160: {
+                if (!((mutable_bitField0_ & 0x00080000) != 0)) {
+                  timeSecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x00080000;
+                }
+                timeSecondValues_.addLong(input.readInt64());
+                break;
+              }
+              case 162: {
+                int length = input.readRawVarint32();
+                int limit = input.pushLimit(length);
+                if (!((mutable_bitField0_ & 0x00080000) != 0) && input.getBytesUntilLimit() > 0) {
+                  timeSecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x00080000;
+                }
+                while (input.getBytesUntilLimit() > 0) {
+                  timeSecondValues_.addLong(input.readInt64());
+                }
+                input.popLimit(limit);
+                break;
+              }
+              case 168: {
+                if (!((mutable_bitField0_ & 0x00100000) != 0)) {
+                  timeMillisecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x00100000;
+                }
+                timeMillisecondValues_.addLong(input.readInt64());
+                break;
+              }
+              case 170: {
+                int length = input.readRawVarint32();
+                int limit = input.pushLimit(length);
+                if (!((mutable_bitField0_ & 0x00100000) != 0) && input.getBytesUntilLimit() > 0) {
+                  timeMillisecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x00100000;
+                }
+                while (input.getBytesUntilLimit() > 0) {
+                  timeMillisecondValues_.addLong(input.readInt64());
+                }
+                input.popLimit(limit);
+                break;
+              }
+              case 176: {
+                if (!((mutable_bitField0_ & 0x00200000) != 0)) {
+                  timeMicrosecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x00200000;
+                }
+                timeMicrosecondValues_.addLong(input.readInt64());
+                break;
+              }
+              case 178: {
+                int length = input.readRawVarint32();
+                int limit = input.pushLimit(length);
+                if (!((mutable_bitField0_ & 0x00200000) != 0) && input.getBytesUntilLimit() > 0) {
+                  timeMicrosecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x00200000;
+                }
+                while (input.getBytesUntilLimit() > 0) {
+                  timeMicrosecondValues_.addLong(input.readInt64());
+                }
+                input.popLimit(limit);
+                break;
+              }
+              case 184: {
+                if (!((mutable_bitField0_ & 0x00400000) != 0)) {
+                  timeNanosecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x00400000;
+                }
+                timeNanosecondValues_.addLong(input.readInt64());
+                break;
+              }
+              case 186: {
+                int length = input.readRawVarint32();
+                int limit = input.pushLimit(length);
+                if (!((mutable_bitField0_ & 0x00400000) != 0) && input.getBytesUntilLimit() > 0) {
+                  timeNanosecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x00400000;
+                }
+                while (input.getBytesUntilLimit() > 0) {
+                  timeNanosecondValues_.addLong(input.readInt64());
+                }
+                input.popLimit(limit);
+                break;
+              }
+              case 192: {
+                if (!((mutable_bitField0_ & 0x00800000) != 0)) {
+                  intervalYearMonthValues_ = newIntList();
+                  mutable_bitField0_ |= 0x00800000;
+                }
+                intervalYearMonthValues_.addInt(input.readInt32());
+                break;
+              }
+              case 194: {
+                int length = input.readRawVarint32();
+                int limit = input.pushLimit(length);
+                if (!((mutable_bitField0_ & 0x00800000) != 0) && input.getBytesUntilLimit() > 0) {
+                  intervalYearMonthValues_ = newIntList();
+                  mutable_bitField0_ |= 0x00800000;
+                }
+                while (input.getBytesUntilLimit() > 0) {
+                  intervalYearMonthValues_.addInt(input.readInt32());
+                }
+                input.popLimit(limit);
+                break;
+              }
+              case 200: {
+                if (!((mutable_bitField0_ & 0x01000000) != 0)) {
+                  intervalDayTimeValues_ = newLongList();
+                  mutable_bitField0_ |= 0x01000000;
+                }
+                intervalDayTimeValues_.addLong(input.readInt64());
+                break;
+              }
+              case 202: {
+                int length = input.readRawVarint32();
+                int limit = input.pushLimit(length);
+                if (!((mutable_bitField0_ & 0x01000000) != 0) && input.getBytesUntilLimit() > 0) {
+                  intervalDayTimeValues_ = newLongList();
+                  mutable_bitField0_ |= 0x01000000;
+                }
+                while (input.getBytesUntilLimit() > 0) {
+                  intervalDayTimeValues_.addLong(input.readInt64());
+                }
+                input.popLimit(limit);
+                break;
+              }
+              case 210: {
+                if (!((mutable_bitField0_ & 0x02000000) != 0)) {
+                  intervalMonthDayNanoValues_ = new java.util.ArrayList<io.greptime.v1.Common.IntervalMonthDayNano>();
+                  mutable_bitField0_ |= 0x02000000;
+                }
+                intervalMonthDayNanoValues_.add(
+                    input.readMessage(io.greptime.v1.Common.IntervalMonthDayNano.parser(), extensionRegistry));
+                break;
+              }
+              case 216: {
+                if (!((mutable_bitField0_ & 0x04000000) != 0)) {
+                  durationSecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x04000000;
+                }
+                durationSecondValues_.addLong(input.readInt64());
+                break;
+              }
+              case 218: {
+                int length = input.readRawVarint32();
+                int limit = input.pushLimit(length);
+                if (!((mutable_bitField0_ & 0x04000000) != 0) && input.getBytesUntilLimit() > 0) {
+                  durationSecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x04000000;
+                }
+                while (input.getBytesUntilLimit() > 0) {
+                  durationSecondValues_.addLong(input.readInt64());
+                }
+                input.popLimit(limit);
+                break;
+              }
+              case 224: {
+                if (!((mutable_bitField0_ & 0x08000000) != 0)) {
+                  durationMillisecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x08000000;
+                }
+                durationMillisecondValues_.addLong(input.readInt64());
+                break;
+              }
+              case 226: {
+                int length = input.readRawVarint32();
+                int limit = input.pushLimit(length);
+                if (!((mutable_bitField0_ & 0x08000000) != 0) && input.getBytesUntilLimit() > 0) {
+                  durationMillisecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x08000000;
+                }
+                while (input.getBytesUntilLimit() > 0) {
+                  durationMillisecondValues_.addLong(input.readInt64());
+                }
+                input.popLimit(limit);
+                break;
+              }
+              case 232: {
+                if (!((mutable_bitField0_ & 0x10000000) != 0)) {
+                  durationMicrosecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x10000000;
+                }
+                durationMicrosecondValues_.addLong(input.readInt64());
+                break;
+              }
+              case 234: {
+                int length = input.readRawVarint32();
+                int limit = input.pushLimit(length);
+                if (!((mutable_bitField0_ & 0x10000000) != 0) && input.getBytesUntilLimit() > 0) {
+                  durationMicrosecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x10000000;
+                }
+                while (input.getBytesUntilLimit() > 0) {
+                  durationMicrosecondValues_.addLong(input.readInt64());
+                }
+                input.popLimit(limit);
+                break;
+              }
+              case 240: {
+                if (!((mutable_bitField0_ & 0x20000000) != 0)) {
+                  durationNanosecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x20000000;
+                }
+                durationNanosecondValues_.addLong(input.readInt64());
+                break;
+              }
+              case 242: {
+                int length = input.readRawVarint32();
+                int limit = input.pushLimit(length);
+                if (!((mutable_bitField0_ & 0x20000000) != 0) && input.getBytesUntilLimit() > 0) {
+                  durationNanosecondValues_ = newLongList();
+                  mutable_bitField0_ |= 0x20000000;
+                }
+                while (input.getBytesUntilLimit() > 0) {
+                  durationNanosecondValues_.addLong(input.readInt64());
+                }
+                input.popLimit(limit);
+                break;
+              }
+              case 250: {
+                if (!((mutable_bitField0_ & 0x40000000) != 0)) {
+                  decimal128Values_ = new java.util.ArrayList<io.greptime.v1.Common.Decimal128>();
+                  mutable_bitField0_ |= 0x40000000;
+                }
+                decimal128Values_.add(
+                    input.readMessage(io.greptime.v1.Common.Decimal128.parser(), extensionRegistry));
                 break;
               }
               default: {
@@ -1454,16 +1574,52 @@ public final class Columns {
             datetimeValues_.makeImmutable(); // C
           }
           if (((mutable_bitField0_ & 0x00008000) != 0)) {
-            tsSecondValues_.makeImmutable(); // C
+            timestampSecondValues_.makeImmutable(); // C
           }
           if (((mutable_bitField0_ & 0x00010000) != 0)) {
-            tsMillisecondValues_.makeImmutable(); // C
+            timestampMillisecondValues_.makeImmutable(); // C
           }
           if (((mutable_bitField0_ & 0x00020000) != 0)) {
-            tsMicrosecondValues_.makeImmutable(); // C
+            timestampMicrosecondValues_.makeImmutable(); // C
           }
           if (((mutable_bitField0_ & 0x00040000) != 0)) {
-            tsNanosecondValues_.makeImmutable(); // C
+            timestampNanosecondValues_.makeImmutable(); // C
+          }
+          if (((mutable_bitField0_ & 0x00080000) != 0)) {
+            timeSecondValues_.makeImmutable(); // C
+          }
+          if (((mutable_bitField0_ & 0x00100000) != 0)) {
+            timeMillisecondValues_.makeImmutable(); // C
+          }
+          if (((mutable_bitField0_ & 0x00200000) != 0)) {
+            timeMicrosecondValues_.makeImmutable(); // C
+          }
+          if (((mutable_bitField0_ & 0x00400000) != 0)) {
+            timeNanosecondValues_.makeImmutable(); // C
+          }
+          if (((mutable_bitField0_ & 0x00800000) != 0)) {
+            intervalYearMonthValues_.makeImmutable(); // C
+          }
+          if (((mutable_bitField0_ & 0x01000000) != 0)) {
+            intervalDayTimeValues_.makeImmutable(); // C
+          }
+          if (((mutable_bitField0_ & 0x02000000) != 0)) {
+            intervalMonthDayNanoValues_ = java.util.Collections.unmodifiableList(intervalMonthDayNanoValues_);
+          }
+          if (((mutable_bitField0_ & 0x04000000) != 0)) {
+            durationSecondValues_.makeImmutable(); // C
+          }
+          if (((mutable_bitField0_ & 0x08000000) != 0)) {
+            durationMillisecondValues_.makeImmutable(); // C
+          }
+          if (((mutable_bitField0_ & 0x10000000) != 0)) {
+            durationMicrosecondValues_.makeImmutable(); // C
+          }
+          if (((mutable_bitField0_ & 0x20000000) != 0)) {
+            durationNanosecondValues_.makeImmutable(); // C
+          }
+          if (((mutable_bitField0_ & 0x40000000) != 0)) {
+            decimal128Values_ = java.util.Collections.unmodifiableList(decimal128Values_);
           }
           this.unknownFields = unknownFields.build();
           makeExtensionsImmutable();
@@ -1908,117 +2064,477 @@ public final class Columns {
       }
       private int datetimeValuesMemoizedSerializedSize = -1;
 
-      public static final int TS_SECOND_VALUES_FIELD_NUMBER = 16;
-      private com.google.protobuf.Internal.LongList tsSecondValues_;
+      public static final int TIMESTAMP_SECOND_VALUES_FIELD_NUMBER = 16;
+      private com.google.protobuf.Internal.LongList timestampSecondValues_;
       /**
-       * <code>repeated int64 ts_second_values = 16;</code>
-       * @return A list containing the tsSecondValues.
+       * <code>repeated int64 timestamp_second_values = 16;</code>
+       * @return A list containing the timestampSecondValues.
        */
       @java.lang.Override
       public java.util.List<java.lang.Long>
-          getTsSecondValuesList() {
-        return tsSecondValues_;
+          getTimestampSecondValuesList() {
+        return timestampSecondValues_;
       }
       /**
-       * <code>repeated int64 ts_second_values = 16;</code>
-       * @return The count of tsSecondValues.
+       * <code>repeated int64 timestamp_second_values = 16;</code>
+       * @return The count of timestampSecondValues.
        */
-      public int getTsSecondValuesCount() {
-        return tsSecondValues_.size();
+      public int getTimestampSecondValuesCount() {
+        return timestampSecondValues_.size();
       }
       /**
-       * <code>repeated int64 ts_second_values = 16;</code>
+       * <code>repeated int64 timestamp_second_values = 16;</code>
        * @param index The index of the element to return.
-       * @return The tsSecondValues at the given index.
+       * @return The timestampSecondValues at the given index.
        */
-      public long getTsSecondValues(int index) {
-        return tsSecondValues_.getLong(index);
+      public long getTimestampSecondValues(int index) {
+        return timestampSecondValues_.getLong(index);
       }
-      private int tsSecondValuesMemoizedSerializedSize = -1;
+      private int timestampSecondValuesMemoizedSerializedSize = -1;
 
-      public static final int TS_MILLISECOND_VALUES_FIELD_NUMBER = 17;
-      private com.google.protobuf.Internal.LongList tsMillisecondValues_;
+      public static final int TIMESTAMP_MILLISECOND_VALUES_FIELD_NUMBER = 17;
+      private com.google.protobuf.Internal.LongList timestampMillisecondValues_;
       /**
-       * <code>repeated int64 ts_millisecond_values = 17;</code>
-       * @return A list containing the tsMillisecondValues.
+       * <code>repeated int64 timestamp_millisecond_values = 17;</code>
+       * @return A list containing the timestampMillisecondValues.
        */
       @java.lang.Override
       public java.util.List<java.lang.Long>
-          getTsMillisecondValuesList() {
-        return tsMillisecondValues_;
+          getTimestampMillisecondValuesList() {
+        return timestampMillisecondValues_;
       }
       /**
-       * <code>repeated int64 ts_millisecond_values = 17;</code>
-       * @return The count of tsMillisecondValues.
+       * <code>repeated int64 timestamp_millisecond_values = 17;</code>
+       * @return The count of timestampMillisecondValues.
        */
-      public int getTsMillisecondValuesCount() {
-        return tsMillisecondValues_.size();
+      public int getTimestampMillisecondValuesCount() {
+        return timestampMillisecondValues_.size();
       }
       /**
-       * <code>repeated int64 ts_millisecond_values = 17;</code>
+       * <code>repeated int64 timestamp_millisecond_values = 17;</code>
        * @param index The index of the element to return.
-       * @return The tsMillisecondValues at the given index.
+       * @return The timestampMillisecondValues at the given index.
        */
-      public long getTsMillisecondValues(int index) {
-        return tsMillisecondValues_.getLong(index);
+      public long getTimestampMillisecondValues(int index) {
+        return timestampMillisecondValues_.getLong(index);
       }
-      private int tsMillisecondValuesMemoizedSerializedSize = -1;
+      private int timestampMillisecondValuesMemoizedSerializedSize = -1;
 
-      public static final int TS_MICROSECOND_VALUES_FIELD_NUMBER = 18;
-      private com.google.protobuf.Internal.LongList tsMicrosecondValues_;
+      public static final int TIMESTAMP_MICROSECOND_VALUES_FIELD_NUMBER = 18;
+      private com.google.protobuf.Internal.LongList timestampMicrosecondValues_;
       /**
-       * <code>repeated int64 ts_microsecond_values = 18;</code>
-       * @return A list containing the tsMicrosecondValues.
+       * <code>repeated int64 timestamp_microsecond_values = 18;</code>
+       * @return A list containing the timestampMicrosecondValues.
        */
       @java.lang.Override
       public java.util.List<java.lang.Long>
-          getTsMicrosecondValuesList() {
-        return tsMicrosecondValues_;
+          getTimestampMicrosecondValuesList() {
+        return timestampMicrosecondValues_;
       }
       /**
-       * <code>repeated int64 ts_microsecond_values = 18;</code>
-       * @return The count of tsMicrosecondValues.
+       * <code>repeated int64 timestamp_microsecond_values = 18;</code>
+       * @return The count of timestampMicrosecondValues.
        */
-      public int getTsMicrosecondValuesCount() {
-        return tsMicrosecondValues_.size();
+      public int getTimestampMicrosecondValuesCount() {
+        return timestampMicrosecondValues_.size();
       }
       /**
-       * <code>repeated int64 ts_microsecond_values = 18;</code>
+       * <code>repeated int64 timestamp_microsecond_values = 18;</code>
        * @param index The index of the element to return.
-       * @return The tsMicrosecondValues at the given index.
+       * @return The timestampMicrosecondValues at the given index.
        */
-      public long getTsMicrosecondValues(int index) {
-        return tsMicrosecondValues_.getLong(index);
+      public long getTimestampMicrosecondValues(int index) {
+        return timestampMicrosecondValues_.getLong(index);
       }
-      private int tsMicrosecondValuesMemoizedSerializedSize = -1;
+      private int timestampMicrosecondValuesMemoizedSerializedSize = -1;
 
-      public static final int TS_NANOSECOND_VALUES_FIELD_NUMBER = 19;
-      private com.google.protobuf.Internal.LongList tsNanosecondValues_;
+      public static final int TIMESTAMP_NANOSECOND_VALUES_FIELD_NUMBER = 19;
+      private com.google.protobuf.Internal.LongList timestampNanosecondValues_;
       /**
-       * <code>repeated int64 ts_nanosecond_values = 19;</code>
-       * @return A list containing the tsNanosecondValues.
+       * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
+       * @return A list containing the timestampNanosecondValues.
        */
       @java.lang.Override
       public java.util.List<java.lang.Long>
-          getTsNanosecondValuesList() {
-        return tsNanosecondValues_;
+          getTimestampNanosecondValuesList() {
+        return timestampNanosecondValues_;
       }
       /**
-       * <code>repeated int64 ts_nanosecond_values = 19;</code>
-       * @return The count of tsNanosecondValues.
+       * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
+       * @return The count of timestampNanosecondValues.
        */
-      public int getTsNanosecondValuesCount() {
-        return tsNanosecondValues_.size();
+      public int getTimestampNanosecondValuesCount() {
+        return timestampNanosecondValues_.size();
       }
       /**
-       * <code>repeated int64 ts_nanosecond_values = 19;</code>
+       * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
        * @param index The index of the element to return.
-       * @return The tsNanosecondValues at the given index.
+       * @return The timestampNanosecondValues at the given index.
        */
-      public long getTsNanosecondValues(int index) {
-        return tsNanosecondValues_.getLong(index);
+      public long getTimestampNanosecondValues(int index) {
+        return timestampNanosecondValues_.getLong(index);
       }
-      private int tsNanosecondValuesMemoizedSerializedSize = -1;
+      private int timestampNanosecondValuesMemoizedSerializedSize = -1;
+
+      public static final int TIME_SECOND_VALUES_FIELD_NUMBER = 20;
+      private com.google.protobuf.Internal.LongList timeSecondValues_;
+      /**
+       * <code>repeated int64 time_second_values = 20;</code>
+       * @return A list containing the timeSecondValues.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.Long>
+          getTimeSecondValuesList() {
+        return timeSecondValues_;
+      }
+      /**
+       * <code>repeated int64 time_second_values = 20;</code>
+       * @return The count of timeSecondValues.
+       */
+      public int getTimeSecondValuesCount() {
+        return timeSecondValues_.size();
+      }
+      /**
+       * <code>repeated int64 time_second_values = 20;</code>
+       * @param index The index of the element to return.
+       * @return The timeSecondValues at the given index.
+       */
+      public long getTimeSecondValues(int index) {
+        return timeSecondValues_.getLong(index);
+      }
+      private int timeSecondValuesMemoizedSerializedSize = -1;
+
+      public static final int TIME_MILLISECOND_VALUES_FIELD_NUMBER = 21;
+      private com.google.protobuf.Internal.LongList timeMillisecondValues_;
+      /**
+       * <code>repeated int64 time_millisecond_values = 21;</code>
+       * @return A list containing the timeMillisecondValues.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.Long>
+          getTimeMillisecondValuesList() {
+        return timeMillisecondValues_;
+      }
+      /**
+       * <code>repeated int64 time_millisecond_values = 21;</code>
+       * @return The count of timeMillisecondValues.
+       */
+      public int getTimeMillisecondValuesCount() {
+        return timeMillisecondValues_.size();
+      }
+      /**
+       * <code>repeated int64 time_millisecond_values = 21;</code>
+       * @param index The index of the element to return.
+       * @return The timeMillisecondValues at the given index.
+       */
+      public long getTimeMillisecondValues(int index) {
+        return timeMillisecondValues_.getLong(index);
+      }
+      private int timeMillisecondValuesMemoizedSerializedSize = -1;
+
+      public static final int TIME_MICROSECOND_VALUES_FIELD_NUMBER = 22;
+      private com.google.protobuf.Internal.LongList timeMicrosecondValues_;
+      /**
+       * <code>repeated int64 time_microsecond_values = 22;</code>
+       * @return A list containing the timeMicrosecondValues.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.Long>
+          getTimeMicrosecondValuesList() {
+        return timeMicrosecondValues_;
+      }
+      /**
+       * <code>repeated int64 time_microsecond_values = 22;</code>
+       * @return The count of timeMicrosecondValues.
+       */
+      public int getTimeMicrosecondValuesCount() {
+        return timeMicrosecondValues_.size();
+      }
+      /**
+       * <code>repeated int64 time_microsecond_values = 22;</code>
+       * @param index The index of the element to return.
+       * @return The timeMicrosecondValues at the given index.
+       */
+      public long getTimeMicrosecondValues(int index) {
+        return timeMicrosecondValues_.getLong(index);
+      }
+      private int timeMicrosecondValuesMemoizedSerializedSize = -1;
+
+      public static final int TIME_NANOSECOND_VALUES_FIELD_NUMBER = 23;
+      private com.google.protobuf.Internal.LongList timeNanosecondValues_;
+      /**
+       * <code>repeated int64 time_nanosecond_values = 23;</code>
+       * @return A list containing the timeNanosecondValues.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.Long>
+          getTimeNanosecondValuesList() {
+        return timeNanosecondValues_;
+      }
+      /**
+       * <code>repeated int64 time_nanosecond_values = 23;</code>
+       * @return The count of timeNanosecondValues.
+       */
+      public int getTimeNanosecondValuesCount() {
+        return timeNanosecondValues_.size();
+      }
+      /**
+       * <code>repeated int64 time_nanosecond_values = 23;</code>
+       * @param index The index of the element to return.
+       * @return The timeNanosecondValues at the given index.
+       */
+      public long getTimeNanosecondValues(int index) {
+        return timeNanosecondValues_.getLong(index);
+      }
+      private int timeNanosecondValuesMemoizedSerializedSize = -1;
+
+      public static final int INTERVAL_YEAR_MONTH_VALUES_FIELD_NUMBER = 24;
+      private com.google.protobuf.Internal.IntList intervalYearMonthValues_;
+      /**
+       * <code>repeated int32 interval_year_month_values = 24;</code>
+       * @return A list containing the intervalYearMonthValues.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.Integer>
+          getIntervalYearMonthValuesList() {
+        return intervalYearMonthValues_;
+      }
+      /**
+       * <code>repeated int32 interval_year_month_values = 24;</code>
+       * @return The count of intervalYearMonthValues.
+       */
+      public int getIntervalYearMonthValuesCount() {
+        return intervalYearMonthValues_.size();
+      }
+      /**
+       * <code>repeated int32 interval_year_month_values = 24;</code>
+       * @param index The index of the element to return.
+       * @return The intervalYearMonthValues at the given index.
+       */
+      public int getIntervalYearMonthValues(int index) {
+        return intervalYearMonthValues_.getInt(index);
+      }
+      private int intervalYearMonthValuesMemoizedSerializedSize = -1;
+
+      public static final int INTERVAL_DAY_TIME_VALUES_FIELD_NUMBER = 25;
+      private com.google.protobuf.Internal.LongList intervalDayTimeValues_;
+      /**
+       * <code>repeated int64 interval_day_time_values = 25;</code>
+       * @return A list containing the intervalDayTimeValues.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.Long>
+          getIntervalDayTimeValuesList() {
+        return intervalDayTimeValues_;
+      }
+      /**
+       * <code>repeated int64 interval_day_time_values = 25;</code>
+       * @return The count of intervalDayTimeValues.
+       */
+      public int getIntervalDayTimeValuesCount() {
+        return intervalDayTimeValues_.size();
+      }
+      /**
+       * <code>repeated int64 interval_day_time_values = 25;</code>
+       * @param index The index of the element to return.
+       * @return The intervalDayTimeValues at the given index.
+       */
+      public long getIntervalDayTimeValues(int index) {
+        return intervalDayTimeValues_.getLong(index);
+      }
+      private int intervalDayTimeValuesMemoizedSerializedSize = -1;
+
+      public static final int INTERVAL_MONTH_DAY_NANO_VALUES_FIELD_NUMBER = 26;
+      private java.util.List<io.greptime.v1.Common.IntervalMonthDayNano> intervalMonthDayNanoValues_;
+      /**
+       * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+       */
+      @java.lang.Override
+      public java.util.List<io.greptime.v1.Common.IntervalMonthDayNano> getIntervalMonthDayNanoValuesList() {
+        return intervalMonthDayNanoValues_;
+      }
+      /**
+       * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+       */
+      @java.lang.Override
+      public java.util.List<? extends io.greptime.v1.Common.IntervalMonthDayNanoOrBuilder> 
+          getIntervalMonthDayNanoValuesOrBuilderList() {
+        return intervalMonthDayNanoValues_;
+      }
+      /**
+       * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+       */
+      @java.lang.Override
+      public int getIntervalMonthDayNanoValuesCount() {
+        return intervalMonthDayNanoValues_.size();
+      }
+      /**
+       * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+       */
+      @java.lang.Override
+      public io.greptime.v1.Common.IntervalMonthDayNano getIntervalMonthDayNanoValues(int index) {
+        return intervalMonthDayNanoValues_.get(index);
+      }
+      /**
+       * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+       */
+      @java.lang.Override
+      public io.greptime.v1.Common.IntervalMonthDayNanoOrBuilder getIntervalMonthDayNanoValuesOrBuilder(
+          int index) {
+        return intervalMonthDayNanoValues_.get(index);
+      }
+
+      public static final int DURATION_SECOND_VALUES_FIELD_NUMBER = 27;
+      private com.google.protobuf.Internal.LongList durationSecondValues_;
+      /**
+       * <code>repeated int64 duration_second_values = 27;</code>
+       * @return A list containing the durationSecondValues.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.Long>
+          getDurationSecondValuesList() {
+        return durationSecondValues_;
+      }
+      /**
+       * <code>repeated int64 duration_second_values = 27;</code>
+       * @return The count of durationSecondValues.
+       */
+      public int getDurationSecondValuesCount() {
+        return durationSecondValues_.size();
+      }
+      /**
+       * <code>repeated int64 duration_second_values = 27;</code>
+       * @param index The index of the element to return.
+       * @return The durationSecondValues at the given index.
+       */
+      public long getDurationSecondValues(int index) {
+        return durationSecondValues_.getLong(index);
+      }
+      private int durationSecondValuesMemoizedSerializedSize = -1;
+
+      public static final int DURATION_MILLISECOND_VALUES_FIELD_NUMBER = 28;
+      private com.google.protobuf.Internal.LongList durationMillisecondValues_;
+      /**
+       * <code>repeated int64 duration_millisecond_values = 28;</code>
+       * @return A list containing the durationMillisecondValues.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.Long>
+          getDurationMillisecondValuesList() {
+        return durationMillisecondValues_;
+      }
+      /**
+       * <code>repeated int64 duration_millisecond_values = 28;</code>
+       * @return The count of durationMillisecondValues.
+       */
+      public int getDurationMillisecondValuesCount() {
+        return durationMillisecondValues_.size();
+      }
+      /**
+       * <code>repeated int64 duration_millisecond_values = 28;</code>
+       * @param index The index of the element to return.
+       * @return The durationMillisecondValues at the given index.
+       */
+      public long getDurationMillisecondValues(int index) {
+        return durationMillisecondValues_.getLong(index);
+      }
+      private int durationMillisecondValuesMemoizedSerializedSize = -1;
+
+      public static final int DURATION_MICROSECOND_VALUES_FIELD_NUMBER = 29;
+      private com.google.protobuf.Internal.LongList durationMicrosecondValues_;
+      /**
+       * <code>repeated int64 duration_microsecond_values = 29;</code>
+       * @return A list containing the durationMicrosecondValues.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.Long>
+          getDurationMicrosecondValuesList() {
+        return durationMicrosecondValues_;
+      }
+      /**
+       * <code>repeated int64 duration_microsecond_values = 29;</code>
+       * @return The count of durationMicrosecondValues.
+       */
+      public int getDurationMicrosecondValuesCount() {
+        return durationMicrosecondValues_.size();
+      }
+      /**
+       * <code>repeated int64 duration_microsecond_values = 29;</code>
+       * @param index The index of the element to return.
+       * @return The durationMicrosecondValues at the given index.
+       */
+      public long getDurationMicrosecondValues(int index) {
+        return durationMicrosecondValues_.getLong(index);
+      }
+      private int durationMicrosecondValuesMemoizedSerializedSize = -1;
+
+      public static final int DURATION_NANOSECOND_VALUES_FIELD_NUMBER = 30;
+      private com.google.protobuf.Internal.LongList durationNanosecondValues_;
+      /**
+       * <code>repeated int64 duration_nanosecond_values = 30;</code>
+       * @return A list containing the durationNanosecondValues.
+       */
+      @java.lang.Override
+      public java.util.List<java.lang.Long>
+          getDurationNanosecondValuesList() {
+        return durationNanosecondValues_;
+      }
+      /**
+       * <code>repeated int64 duration_nanosecond_values = 30;</code>
+       * @return The count of durationNanosecondValues.
+       */
+      public int getDurationNanosecondValuesCount() {
+        return durationNanosecondValues_.size();
+      }
+      /**
+       * <code>repeated int64 duration_nanosecond_values = 30;</code>
+       * @param index The index of the element to return.
+       * @return The durationNanosecondValues at the given index.
+       */
+      public long getDurationNanosecondValues(int index) {
+        return durationNanosecondValues_.getLong(index);
+      }
+      private int durationNanosecondValuesMemoizedSerializedSize = -1;
+
+      public static final int DECIMAL128_VALUES_FIELD_NUMBER = 31;
+      private java.util.List<io.greptime.v1.Common.Decimal128> decimal128Values_;
+      /**
+       * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+       */
+      @java.lang.Override
+      public java.util.List<io.greptime.v1.Common.Decimal128> getDecimal128ValuesList() {
+        return decimal128Values_;
+      }
+      /**
+       * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+       */
+      @java.lang.Override
+      public java.util.List<? extends io.greptime.v1.Common.Decimal128OrBuilder> 
+          getDecimal128ValuesOrBuilderList() {
+        return decimal128Values_;
+      }
+      /**
+       * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+       */
+      @java.lang.Override
+      public int getDecimal128ValuesCount() {
+        return decimal128Values_.size();
+      }
+      /**
+       * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+       */
+      @java.lang.Override
+      public io.greptime.v1.Common.Decimal128 getDecimal128Values(int index) {
+        return decimal128Values_.get(index);
+      }
+      /**
+       * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+       */
+      @java.lang.Override
+      public io.greptime.v1.Common.Decimal128OrBuilder getDecimal128ValuesOrBuilder(
+          int index) {
+        return decimal128Values_.get(index);
+      }
 
       private byte memoizedIsInitialized = -1;
       @java.lang.Override
@@ -2132,33 +2648,109 @@ public final class Columns {
         for (int i = 0; i < datetimeValues_.size(); i++) {
           output.writeInt64NoTag(datetimeValues_.getLong(i));
         }
-        if (getTsSecondValuesList().size() > 0) {
+        if (getTimestampSecondValuesList().size() > 0) {
           output.writeUInt32NoTag(130);
-          output.writeUInt32NoTag(tsSecondValuesMemoizedSerializedSize);
+          output.writeUInt32NoTag(timestampSecondValuesMemoizedSerializedSize);
         }
-        for (int i = 0; i < tsSecondValues_.size(); i++) {
-          output.writeInt64NoTag(tsSecondValues_.getLong(i));
+        for (int i = 0; i < timestampSecondValues_.size(); i++) {
+          output.writeInt64NoTag(timestampSecondValues_.getLong(i));
         }
-        if (getTsMillisecondValuesList().size() > 0) {
+        if (getTimestampMillisecondValuesList().size() > 0) {
           output.writeUInt32NoTag(138);
-          output.writeUInt32NoTag(tsMillisecondValuesMemoizedSerializedSize);
+          output.writeUInt32NoTag(timestampMillisecondValuesMemoizedSerializedSize);
         }
-        for (int i = 0; i < tsMillisecondValues_.size(); i++) {
-          output.writeInt64NoTag(tsMillisecondValues_.getLong(i));
+        for (int i = 0; i < timestampMillisecondValues_.size(); i++) {
+          output.writeInt64NoTag(timestampMillisecondValues_.getLong(i));
         }
-        if (getTsMicrosecondValuesList().size() > 0) {
+        if (getTimestampMicrosecondValuesList().size() > 0) {
           output.writeUInt32NoTag(146);
-          output.writeUInt32NoTag(tsMicrosecondValuesMemoizedSerializedSize);
+          output.writeUInt32NoTag(timestampMicrosecondValuesMemoizedSerializedSize);
         }
-        for (int i = 0; i < tsMicrosecondValues_.size(); i++) {
-          output.writeInt64NoTag(tsMicrosecondValues_.getLong(i));
+        for (int i = 0; i < timestampMicrosecondValues_.size(); i++) {
+          output.writeInt64NoTag(timestampMicrosecondValues_.getLong(i));
         }
-        if (getTsNanosecondValuesList().size() > 0) {
+        if (getTimestampNanosecondValuesList().size() > 0) {
           output.writeUInt32NoTag(154);
-          output.writeUInt32NoTag(tsNanosecondValuesMemoizedSerializedSize);
+          output.writeUInt32NoTag(timestampNanosecondValuesMemoizedSerializedSize);
         }
-        for (int i = 0; i < tsNanosecondValues_.size(); i++) {
-          output.writeInt64NoTag(tsNanosecondValues_.getLong(i));
+        for (int i = 0; i < timestampNanosecondValues_.size(); i++) {
+          output.writeInt64NoTag(timestampNanosecondValues_.getLong(i));
+        }
+        if (getTimeSecondValuesList().size() > 0) {
+          output.writeUInt32NoTag(162);
+          output.writeUInt32NoTag(timeSecondValuesMemoizedSerializedSize);
+        }
+        for (int i = 0; i < timeSecondValues_.size(); i++) {
+          output.writeInt64NoTag(timeSecondValues_.getLong(i));
+        }
+        if (getTimeMillisecondValuesList().size() > 0) {
+          output.writeUInt32NoTag(170);
+          output.writeUInt32NoTag(timeMillisecondValuesMemoizedSerializedSize);
+        }
+        for (int i = 0; i < timeMillisecondValues_.size(); i++) {
+          output.writeInt64NoTag(timeMillisecondValues_.getLong(i));
+        }
+        if (getTimeMicrosecondValuesList().size() > 0) {
+          output.writeUInt32NoTag(178);
+          output.writeUInt32NoTag(timeMicrosecondValuesMemoizedSerializedSize);
+        }
+        for (int i = 0; i < timeMicrosecondValues_.size(); i++) {
+          output.writeInt64NoTag(timeMicrosecondValues_.getLong(i));
+        }
+        if (getTimeNanosecondValuesList().size() > 0) {
+          output.writeUInt32NoTag(186);
+          output.writeUInt32NoTag(timeNanosecondValuesMemoizedSerializedSize);
+        }
+        for (int i = 0; i < timeNanosecondValues_.size(); i++) {
+          output.writeInt64NoTag(timeNanosecondValues_.getLong(i));
+        }
+        if (getIntervalYearMonthValuesList().size() > 0) {
+          output.writeUInt32NoTag(194);
+          output.writeUInt32NoTag(intervalYearMonthValuesMemoizedSerializedSize);
+        }
+        for (int i = 0; i < intervalYearMonthValues_.size(); i++) {
+          output.writeInt32NoTag(intervalYearMonthValues_.getInt(i));
+        }
+        if (getIntervalDayTimeValuesList().size() > 0) {
+          output.writeUInt32NoTag(202);
+          output.writeUInt32NoTag(intervalDayTimeValuesMemoizedSerializedSize);
+        }
+        for (int i = 0; i < intervalDayTimeValues_.size(); i++) {
+          output.writeInt64NoTag(intervalDayTimeValues_.getLong(i));
+        }
+        for (int i = 0; i < intervalMonthDayNanoValues_.size(); i++) {
+          output.writeMessage(26, intervalMonthDayNanoValues_.get(i));
+        }
+        if (getDurationSecondValuesList().size() > 0) {
+          output.writeUInt32NoTag(218);
+          output.writeUInt32NoTag(durationSecondValuesMemoizedSerializedSize);
+        }
+        for (int i = 0; i < durationSecondValues_.size(); i++) {
+          output.writeInt64NoTag(durationSecondValues_.getLong(i));
+        }
+        if (getDurationMillisecondValuesList().size() > 0) {
+          output.writeUInt32NoTag(226);
+          output.writeUInt32NoTag(durationMillisecondValuesMemoizedSerializedSize);
+        }
+        for (int i = 0; i < durationMillisecondValues_.size(); i++) {
+          output.writeInt64NoTag(durationMillisecondValues_.getLong(i));
+        }
+        if (getDurationMicrosecondValuesList().size() > 0) {
+          output.writeUInt32NoTag(234);
+          output.writeUInt32NoTag(durationMicrosecondValuesMemoizedSerializedSize);
+        }
+        for (int i = 0; i < durationMicrosecondValues_.size(); i++) {
+          output.writeInt64NoTag(durationMicrosecondValues_.getLong(i));
+        }
+        if (getDurationNanosecondValuesList().size() > 0) {
+          output.writeUInt32NoTag(242);
+          output.writeUInt32NoTag(durationNanosecondValuesMemoizedSerializedSize);
+        }
+        for (int i = 0; i < durationNanosecondValues_.size(); i++) {
+          output.writeInt64NoTag(durationNanosecondValues_.getLong(i));
+        }
+        for (int i = 0; i < decimal128Values_.size(); i++) {
+          output.writeMessage(31, decimal128Values_.get(i));
         }
         unknownFields.writeTo(output);
       }
@@ -2361,59 +2953,207 @@ public final class Columns {
         }
         {
           int dataSize = 0;
-          for (int i = 0; i < tsSecondValues_.size(); i++) {
+          for (int i = 0; i < timestampSecondValues_.size(); i++) {
             dataSize += com.google.protobuf.CodedOutputStream
-              .computeInt64SizeNoTag(tsSecondValues_.getLong(i));
+              .computeInt64SizeNoTag(timestampSecondValues_.getLong(i));
           }
           size += dataSize;
-          if (!getTsSecondValuesList().isEmpty()) {
+          if (!getTimestampSecondValuesList().isEmpty()) {
             size += 2;
             size += com.google.protobuf.CodedOutputStream
                 .computeInt32SizeNoTag(dataSize);
           }
-          tsSecondValuesMemoizedSerializedSize = dataSize;
+          timestampSecondValuesMemoizedSerializedSize = dataSize;
         }
         {
           int dataSize = 0;
-          for (int i = 0; i < tsMillisecondValues_.size(); i++) {
+          for (int i = 0; i < timestampMillisecondValues_.size(); i++) {
             dataSize += com.google.protobuf.CodedOutputStream
-              .computeInt64SizeNoTag(tsMillisecondValues_.getLong(i));
+              .computeInt64SizeNoTag(timestampMillisecondValues_.getLong(i));
           }
           size += dataSize;
-          if (!getTsMillisecondValuesList().isEmpty()) {
+          if (!getTimestampMillisecondValuesList().isEmpty()) {
             size += 2;
             size += com.google.protobuf.CodedOutputStream
                 .computeInt32SizeNoTag(dataSize);
           }
-          tsMillisecondValuesMemoizedSerializedSize = dataSize;
+          timestampMillisecondValuesMemoizedSerializedSize = dataSize;
         }
         {
           int dataSize = 0;
-          for (int i = 0; i < tsMicrosecondValues_.size(); i++) {
+          for (int i = 0; i < timestampMicrosecondValues_.size(); i++) {
             dataSize += com.google.protobuf.CodedOutputStream
-              .computeInt64SizeNoTag(tsMicrosecondValues_.getLong(i));
+              .computeInt64SizeNoTag(timestampMicrosecondValues_.getLong(i));
           }
           size += dataSize;
-          if (!getTsMicrosecondValuesList().isEmpty()) {
+          if (!getTimestampMicrosecondValuesList().isEmpty()) {
             size += 2;
             size += com.google.protobuf.CodedOutputStream
                 .computeInt32SizeNoTag(dataSize);
           }
-          tsMicrosecondValuesMemoizedSerializedSize = dataSize;
+          timestampMicrosecondValuesMemoizedSerializedSize = dataSize;
         }
         {
           int dataSize = 0;
-          for (int i = 0; i < tsNanosecondValues_.size(); i++) {
+          for (int i = 0; i < timestampNanosecondValues_.size(); i++) {
             dataSize += com.google.protobuf.CodedOutputStream
-              .computeInt64SizeNoTag(tsNanosecondValues_.getLong(i));
+              .computeInt64SizeNoTag(timestampNanosecondValues_.getLong(i));
           }
           size += dataSize;
-          if (!getTsNanosecondValuesList().isEmpty()) {
+          if (!getTimestampNanosecondValuesList().isEmpty()) {
             size += 2;
             size += com.google.protobuf.CodedOutputStream
                 .computeInt32SizeNoTag(dataSize);
           }
-          tsNanosecondValuesMemoizedSerializedSize = dataSize;
+          timestampNanosecondValuesMemoizedSerializedSize = dataSize;
+        }
+        {
+          int dataSize = 0;
+          for (int i = 0; i < timeSecondValues_.size(); i++) {
+            dataSize += com.google.protobuf.CodedOutputStream
+              .computeInt64SizeNoTag(timeSecondValues_.getLong(i));
+          }
+          size += dataSize;
+          if (!getTimeSecondValuesList().isEmpty()) {
+            size += 2;
+            size += com.google.protobuf.CodedOutputStream
+                .computeInt32SizeNoTag(dataSize);
+          }
+          timeSecondValuesMemoizedSerializedSize = dataSize;
+        }
+        {
+          int dataSize = 0;
+          for (int i = 0; i < timeMillisecondValues_.size(); i++) {
+            dataSize += com.google.protobuf.CodedOutputStream
+              .computeInt64SizeNoTag(timeMillisecondValues_.getLong(i));
+          }
+          size += dataSize;
+          if (!getTimeMillisecondValuesList().isEmpty()) {
+            size += 2;
+            size += com.google.protobuf.CodedOutputStream
+                .computeInt32SizeNoTag(dataSize);
+          }
+          timeMillisecondValuesMemoizedSerializedSize = dataSize;
+        }
+        {
+          int dataSize = 0;
+          for (int i = 0; i < timeMicrosecondValues_.size(); i++) {
+            dataSize += com.google.protobuf.CodedOutputStream
+              .computeInt64SizeNoTag(timeMicrosecondValues_.getLong(i));
+          }
+          size += dataSize;
+          if (!getTimeMicrosecondValuesList().isEmpty()) {
+            size += 2;
+            size += com.google.protobuf.CodedOutputStream
+                .computeInt32SizeNoTag(dataSize);
+          }
+          timeMicrosecondValuesMemoizedSerializedSize = dataSize;
+        }
+        {
+          int dataSize = 0;
+          for (int i = 0; i < timeNanosecondValues_.size(); i++) {
+            dataSize += com.google.protobuf.CodedOutputStream
+              .computeInt64SizeNoTag(timeNanosecondValues_.getLong(i));
+          }
+          size += dataSize;
+          if (!getTimeNanosecondValuesList().isEmpty()) {
+            size += 2;
+            size += com.google.protobuf.CodedOutputStream
+                .computeInt32SizeNoTag(dataSize);
+          }
+          timeNanosecondValuesMemoizedSerializedSize = dataSize;
+        }
+        {
+          int dataSize = 0;
+          for (int i = 0; i < intervalYearMonthValues_.size(); i++) {
+            dataSize += com.google.protobuf.CodedOutputStream
+              .computeInt32SizeNoTag(intervalYearMonthValues_.getInt(i));
+          }
+          size += dataSize;
+          if (!getIntervalYearMonthValuesList().isEmpty()) {
+            size += 2;
+            size += com.google.protobuf.CodedOutputStream
+                .computeInt32SizeNoTag(dataSize);
+          }
+          intervalYearMonthValuesMemoizedSerializedSize = dataSize;
+        }
+        {
+          int dataSize = 0;
+          for (int i = 0; i < intervalDayTimeValues_.size(); i++) {
+            dataSize += com.google.protobuf.CodedOutputStream
+              .computeInt64SizeNoTag(intervalDayTimeValues_.getLong(i));
+          }
+          size += dataSize;
+          if (!getIntervalDayTimeValuesList().isEmpty()) {
+            size += 2;
+            size += com.google.protobuf.CodedOutputStream
+                .computeInt32SizeNoTag(dataSize);
+          }
+          intervalDayTimeValuesMemoizedSerializedSize = dataSize;
+        }
+        for (int i = 0; i < intervalMonthDayNanoValues_.size(); i++) {
+          size += com.google.protobuf.CodedOutputStream
+            .computeMessageSize(26, intervalMonthDayNanoValues_.get(i));
+        }
+        {
+          int dataSize = 0;
+          for (int i = 0; i < durationSecondValues_.size(); i++) {
+            dataSize += com.google.protobuf.CodedOutputStream
+              .computeInt64SizeNoTag(durationSecondValues_.getLong(i));
+          }
+          size += dataSize;
+          if (!getDurationSecondValuesList().isEmpty()) {
+            size += 2;
+            size += com.google.protobuf.CodedOutputStream
+                .computeInt32SizeNoTag(dataSize);
+          }
+          durationSecondValuesMemoizedSerializedSize = dataSize;
+        }
+        {
+          int dataSize = 0;
+          for (int i = 0; i < durationMillisecondValues_.size(); i++) {
+            dataSize += com.google.protobuf.CodedOutputStream
+              .computeInt64SizeNoTag(durationMillisecondValues_.getLong(i));
+          }
+          size += dataSize;
+          if (!getDurationMillisecondValuesList().isEmpty()) {
+            size += 2;
+            size += com.google.protobuf.CodedOutputStream
+                .computeInt32SizeNoTag(dataSize);
+          }
+          durationMillisecondValuesMemoizedSerializedSize = dataSize;
+        }
+        {
+          int dataSize = 0;
+          for (int i = 0; i < durationMicrosecondValues_.size(); i++) {
+            dataSize += com.google.protobuf.CodedOutputStream
+              .computeInt64SizeNoTag(durationMicrosecondValues_.getLong(i));
+          }
+          size += dataSize;
+          if (!getDurationMicrosecondValuesList().isEmpty()) {
+            size += 2;
+            size += com.google.protobuf.CodedOutputStream
+                .computeInt32SizeNoTag(dataSize);
+          }
+          durationMicrosecondValuesMemoizedSerializedSize = dataSize;
+        }
+        {
+          int dataSize = 0;
+          for (int i = 0; i < durationNanosecondValues_.size(); i++) {
+            dataSize += com.google.protobuf.CodedOutputStream
+              .computeInt64SizeNoTag(durationNanosecondValues_.getLong(i));
+          }
+          size += dataSize;
+          if (!getDurationNanosecondValuesList().isEmpty()) {
+            size += 2;
+            size += com.google.protobuf.CodedOutputStream
+                .computeInt32SizeNoTag(dataSize);
+          }
+          durationNanosecondValuesMemoizedSerializedSize = dataSize;
+        }
+        for (int i = 0; i < decimal128Values_.size(); i++) {
+          size += com.google.protobuf.CodedOutputStream
+            .computeMessageSize(31, decimal128Values_.get(i));
         }
         size += unknownFields.getSerializedSize();
         memoizedSize = size;
@@ -2460,14 +3200,38 @@ public final class Columns {
             .equals(other.getDateValuesList())) return false;
         if (!getDatetimeValuesList()
             .equals(other.getDatetimeValuesList())) return false;
-        if (!getTsSecondValuesList()
-            .equals(other.getTsSecondValuesList())) return false;
-        if (!getTsMillisecondValuesList()
-            .equals(other.getTsMillisecondValuesList())) return false;
-        if (!getTsMicrosecondValuesList()
-            .equals(other.getTsMicrosecondValuesList())) return false;
-        if (!getTsNanosecondValuesList()
-            .equals(other.getTsNanosecondValuesList())) return false;
+        if (!getTimestampSecondValuesList()
+            .equals(other.getTimestampSecondValuesList())) return false;
+        if (!getTimestampMillisecondValuesList()
+            .equals(other.getTimestampMillisecondValuesList())) return false;
+        if (!getTimestampMicrosecondValuesList()
+            .equals(other.getTimestampMicrosecondValuesList())) return false;
+        if (!getTimestampNanosecondValuesList()
+            .equals(other.getTimestampNanosecondValuesList())) return false;
+        if (!getTimeSecondValuesList()
+            .equals(other.getTimeSecondValuesList())) return false;
+        if (!getTimeMillisecondValuesList()
+            .equals(other.getTimeMillisecondValuesList())) return false;
+        if (!getTimeMicrosecondValuesList()
+            .equals(other.getTimeMicrosecondValuesList())) return false;
+        if (!getTimeNanosecondValuesList()
+            .equals(other.getTimeNanosecondValuesList())) return false;
+        if (!getIntervalYearMonthValuesList()
+            .equals(other.getIntervalYearMonthValuesList())) return false;
+        if (!getIntervalDayTimeValuesList()
+            .equals(other.getIntervalDayTimeValuesList())) return false;
+        if (!getIntervalMonthDayNanoValuesList()
+            .equals(other.getIntervalMonthDayNanoValuesList())) return false;
+        if (!getDurationSecondValuesList()
+            .equals(other.getDurationSecondValuesList())) return false;
+        if (!getDurationMillisecondValuesList()
+            .equals(other.getDurationMillisecondValuesList())) return false;
+        if (!getDurationMicrosecondValuesList()
+            .equals(other.getDurationMicrosecondValuesList())) return false;
+        if (!getDurationNanosecondValuesList()
+            .equals(other.getDurationNanosecondValuesList())) return false;
+        if (!getDecimal128ValuesList()
+            .equals(other.getDecimal128ValuesList())) return false;
         if (!unknownFields.equals(other.unknownFields)) return false;
         return true;
       }
@@ -2539,21 +3303,69 @@ public final class Columns {
           hash = (37 * hash) + DATETIME_VALUES_FIELD_NUMBER;
           hash = (53 * hash) + getDatetimeValuesList().hashCode();
         }
-        if (getTsSecondValuesCount() > 0) {
-          hash = (37 * hash) + TS_SECOND_VALUES_FIELD_NUMBER;
-          hash = (53 * hash) + getTsSecondValuesList().hashCode();
+        if (getTimestampSecondValuesCount() > 0) {
+          hash = (37 * hash) + TIMESTAMP_SECOND_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getTimestampSecondValuesList().hashCode();
         }
-        if (getTsMillisecondValuesCount() > 0) {
-          hash = (37 * hash) + TS_MILLISECOND_VALUES_FIELD_NUMBER;
-          hash = (53 * hash) + getTsMillisecondValuesList().hashCode();
+        if (getTimestampMillisecondValuesCount() > 0) {
+          hash = (37 * hash) + TIMESTAMP_MILLISECOND_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getTimestampMillisecondValuesList().hashCode();
         }
-        if (getTsMicrosecondValuesCount() > 0) {
-          hash = (37 * hash) + TS_MICROSECOND_VALUES_FIELD_NUMBER;
-          hash = (53 * hash) + getTsMicrosecondValuesList().hashCode();
+        if (getTimestampMicrosecondValuesCount() > 0) {
+          hash = (37 * hash) + TIMESTAMP_MICROSECOND_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getTimestampMicrosecondValuesList().hashCode();
         }
-        if (getTsNanosecondValuesCount() > 0) {
-          hash = (37 * hash) + TS_NANOSECOND_VALUES_FIELD_NUMBER;
-          hash = (53 * hash) + getTsNanosecondValuesList().hashCode();
+        if (getTimestampNanosecondValuesCount() > 0) {
+          hash = (37 * hash) + TIMESTAMP_NANOSECOND_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getTimestampNanosecondValuesList().hashCode();
+        }
+        if (getTimeSecondValuesCount() > 0) {
+          hash = (37 * hash) + TIME_SECOND_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getTimeSecondValuesList().hashCode();
+        }
+        if (getTimeMillisecondValuesCount() > 0) {
+          hash = (37 * hash) + TIME_MILLISECOND_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getTimeMillisecondValuesList().hashCode();
+        }
+        if (getTimeMicrosecondValuesCount() > 0) {
+          hash = (37 * hash) + TIME_MICROSECOND_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getTimeMicrosecondValuesList().hashCode();
+        }
+        if (getTimeNanosecondValuesCount() > 0) {
+          hash = (37 * hash) + TIME_NANOSECOND_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getTimeNanosecondValuesList().hashCode();
+        }
+        if (getIntervalYearMonthValuesCount() > 0) {
+          hash = (37 * hash) + INTERVAL_YEAR_MONTH_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getIntervalYearMonthValuesList().hashCode();
+        }
+        if (getIntervalDayTimeValuesCount() > 0) {
+          hash = (37 * hash) + INTERVAL_DAY_TIME_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getIntervalDayTimeValuesList().hashCode();
+        }
+        if (getIntervalMonthDayNanoValuesCount() > 0) {
+          hash = (37 * hash) + INTERVAL_MONTH_DAY_NANO_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getIntervalMonthDayNanoValuesList().hashCode();
+        }
+        if (getDurationSecondValuesCount() > 0) {
+          hash = (37 * hash) + DURATION_SECOND_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getDurationSecondValuesList().hashCode();
+        }
+        if (getDurationMillisecondValuesCount() > 0) {
+          hash = (37 * hash) + DURATION_MILLISECOND_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getDurationMillisecondValuesList().hashCode();
+        }
+        if (getDurationMicrosecondValuesCount() > 0) {
+          hash = (37 * hash) + DURATION_MICROSECOND_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getDurationMicrosecondValuesList().hashCode();
+        }
+        if (getDurationNanosecondValuesCount() > 0) {
+          hash = (37 * hash) + DURATION_NANOSECOND_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getDurationNanosecondValuesList().hashCode();
+        }
+        if (getDecimal128ValuesCount() > 0) {
+          hash = (37 * hash) + DECIMAL128_VALUES_FIELD_NUMBER;
+          hash = (53 * hash) + getDecimal128ValuesList().hashCode();
         }
         hash = (29 * hash) + unknownFields.hashCode();
         memoizedHashCode = hash;
@@ -2683,6 +3495,8 @@ public final class Columns {
         private void maybeForceBuilderInitialization() {
           if (com.google.protobuf.GeneratedMessageV3
                   .alwaysUseFieldBuilders) {
+            getIntervalMonthDayNanoValuesFieldBuilder();
+            getDecimal128ValuesFieldBuilder();
           }
         }
         @java.lang.Override
@@ -2718,14 +3532,46 @@ public final class Columns {
           bitField0_ = (bitField0_ & ~0x00002000);
           datetimeValues_ = emptyLongList();
           bitField0_ = (bitField0_ & ~0x00004000);
-          tsSecondValues_ = emptyLongList();
+          timestampSecondValues_ = emptyLongList();
           bitField0_ = (bitField0_ & ~0x00008000);
-          tsMillisecondValues_ = emptyLongList();
+          timestampMillisecondValues_ = emptyLongList();
           bitField0_ = (bitField0_ & ~0x00010000);
-          tsMicrosecondValues_ = emptyLongList();
+          timestampMicrosecondValues_ = emptyLongList();
           bitField0_ = (bitField0_ & ~0x00020000);
-          tsNanosecondValues_ = emptyLongList();
+          timestampNanosecondValues_ = emptyLongList();
           bitField0_ = (bitField0_ & ~0x00040000);
+          timeSecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x00080000);
+          timeMillisecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x00100000);
+          timeMicrosecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x00200000);
+          timeNanosecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x00400000);
+          intervalYearMonthValues_ = emptyIntList();
+          bitField0_ = (bitField0_ & ~0x00800000);
+          intervalDayTimeValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x01000000);
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            intervalMonthDayNanoValues_ = java.util.Collections.emptyList();
+            bitField0_ = (bitField0_ & ~0x02000000);
+          } else {
+            intervalMonthDayNanoValuesBuilder_.clear();
+          }
+          durationSecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x04000000);
+          durationMillisecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x08000000);
+          durationMicrosecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x10000000);
+          durationNanosecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x20000000);
+          if (decimal128ValuesBuilder_ == null) {
+            decimal128Values_ = java.util.Collections.emptyList();
+            bitField0_ = (bitField0_ & ~0x40000000);
+          } else {
+            decimal128ValuesBuilder_.clear();
+          }
           return this;
         }
 
@@ -2829,25 +3675,93 @@ public final class Columns {
           }
           result.datetimeValues_ = datetimeValues_;
           if (((bitField0_ & 0x00008000) != 0)) {
-            tsSecondValues_.makeImmutable();
+            timestampSecondValues_.makeImmutable();
             bitField0_ = (bitField0_ & ~0x00008000);
           }
-          result.tsSecondValues_ = tsSecondValues_;
+          result.timestampSecondValues_ = timestampSecondValues_;
           if (((bitField0_ & 0x00010000) != 0)) {
-            tsMillisecondValues_.makeImmutable();
+            timestampMillisecondValues_.makeImmutable();
             bitField0_ = (bitField0_ & ~0x00010000);
           }
-          result.tsMillisecondValues_ = tsMillisecondValues_;
+          result.timestampMillisecondValues_ = timestampMillisecondValues_;
           if (((bitField0_ & 0x00020000) != 0)) {
-            tsMicrosecondValues_.makeImmutable();
+            timestampMicrosecondValues_.makeImmutable();
             bitField0_ = (bitField0_ & ~0x00020000);
           }
-          result.tsMicrosecondValues_ = tsMicrosecondValues_;
+          result.timestampMicrosecondValues_ = timestampMicrosecondValues_;
           if (((bitField0_ & 0x00040000) != 0)) {
-            tsNanosecondValues_.makeImmutable();
+            timestampNanosecondValues_.makeImmutable();
             bitField0_ = (bitField0_ & ~0x00040000);
           }
-          result.tsNanosecondValues_ = tsNanosecondValues_;
+          result.timestampNanosecondValues_ = timestampNanosecondValues_;
+          if (((bitField0_ & 0x00080000) != 0)) {
+            timeSecondValues_.makeImmutable();
+            bitField0_ = (bitField0_ & ~0x00080000);
+          }
+          result.timeSecondValues_ = timeSecondValues_;
+          if (((bitField0_ & 0x00100000) != 0)) {
+            timeMillisecondValues_.makeImmutable();
+            bitField0_ = (bitField0_ & ~0x00100000);
+          }
+          result.timeMillisecondValues_ = timeMillisecondValues_;
+          if (((bitField0_ & 0x00200000) != 0)) {
+            timeMicrosecondValues_.makeImmutable();
+            bitField0_ = (bitField0_ & ~0x00200000);
+          }
+          result.timeMicrosecondValues_ = timeMicrosecondValues_;
+          if (((bitField0_ & 0x00400000) != 0)) {
+            timeNanosecondValues_.makeImmutable();
+            bitField0_ = (bitField0_ & ~0x00400000);
+          }
+          result.timeNanosecondValues_ = timeNanosecondValues_;
+          if (((bitField0_ & 0x00800000) != 0)) {
+            intervalYearMonthValues_.makeImmutable();
+            bitField0_ = (bitField0_ & ~0x00800000);
+          }
+          result.intervalYearMonthValues_ = intervalYearMonthValues_;
+          if (((bitField0_ & 0x01000000) != 0)) {
+            intervalDayTimeValues_.makeImmutable();
+            bitField0_ = (bitField0_ & ~0x01000000);
+          }
+          result.intervalDayTimeValues_ = intervalDayTimeValues_;
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            if (((bitField0_ & 0x02000000) != 0)) {
+              intervalMonthDayNanoValues_ = java.util.Collections.unmodifiableList(intervalMonthDayNanoValues_);
+              bitField0_ = (bitField0_ & ~0x02000000);
+            }
+            result.intervalMonthDayNanoValues_ = intervalMonthDayNanoValues_;
+          } else {
+            result.intervalMonthDayNanoValues_ = intervalMonthDayNanoValuesBuilder_.build();
+          }
+          if (((bitField0_ & 0x04000000) != 0)) {
+            durationSecondValues_.makeImmutable();
+            bitField0_ = (bitField0_ & ~0x04000000);
+          }
+          result.durationSecondValues_ = durationSecondValues_;
+          if (((bitField0_ & 0x08000000) != 0)) {
+            durationMillisecondValues_.makeImmutable();
+            bitField0_ = (bitField0_ & ~0x08000000);
+          }
+          result.durationMillisecondValues_ = durationMillisecondValues_;
+          if (((bitField0_ & 0x10000000) != 0)) {
+            durationMicrosecondValues_.makeImmutable();
+            bitField0_ = (bitField0_ & ~0x10000000);
+          }
+          result.durationMicrosecondValues_ = durationMicrosecondValues_;
+          if (((bitField0_ & 0x20000000) != 0)) {
+            durationNanosecondValues_.makeImmutable();
+            bitField0_ = (bitField0_ & ~0x20000000);
+          }
+          result.durationNanosecondValues_ = durationNanosecondValues_;
+          if (decimal128ValuesBuilder_ == null) {
+            if (((bitField0_ & 0x40000000) != 0)) {
+              decimal128Values_ = java.util.Collections.unmodifiableList(decimal128Values_);
+              bitField0_ = (bitField0_ & ~0x40000000);
+            }
+            result.decimal128Values_ = decimal128Values_;
+          } else {
+            result.decimal128Values_ = decimal128ValuesBuilder_.build();
+          }
           onBuilt();
           return result;
         }
@@ -3046,45 +3960,197 @@ public final class Columns {
             }
             onChanged();
           }
-          if (!other.tsSecondValues_.isEmpty()) {
-            if (tsSecondValues_.isEmpty()) {
-              tsSecondValues_ = other.tsSecondValues_;
+          if (!other.timestampSecondValues_.isEmpty()) {
+            if (timestampSecondValues_.isEmpty()) {
+              timestampSecondValues_ = other.timestampSecondValues_;
               bitField0_ = (bitField0_ & ~0x00008000);
             } else {
-              ensureTsSecondValuesIsMutable();
-              tsSecondValues_.addAll(other.tsSecondValues_);
+              ensureTimestampSecondValuesIsMutable();
+              timestampSecondValues_.addAll(other.timestampSecondValues_);
             }
             onChanged();
           }
-          if (!other.tsMillisecondValues_.isEmpty()) {
-            if (tsMillisecondValues_.isEmpty()) {
-              tsMillisecondValues_ = other.tsMillisecondValues_;
+          if (!other.timestampMillisecondValues_.isEmpty()) {
+            if (timestampMillisecondValues_.isEmpty()) {
+              timestampMillisecondValues_ = other.timestampMillisecondValues_;
               bitField0_ = (bitField0_ & ~0x00010000);
             } else {
-              ensureTsMillisecondValuesIsMutable();
-              tsMillisecondValues_.addAll(other.tsMillisecondValues_);
+              ensureTimestampMillisecondValuesIsMutable();
+              timestampMillisecondValues_.addAll(other.timestampMillisecondValues_);
             }
             onChanged();
           }
-          if (!other.tsMicrosecondValues_.isEmpty()) {
-            if (tsMicrosecondValues_.isEmpty()) {
-              tsMicrosecondValues_ = other.tsMicrosecondValues_;
+          if (!other.timestampMicrosecondValues_.isEmpty()) {
+            if (timestampMicrosecondValues_.isEmpty()) {
+              timestampMicrosecondValues_ = other.timestampMicrosecondValues_;
               bitField0_ = (bitField0_ & ~0x00020000);
             } else {
-              ensureTsMicrosecondValuesIsMutable();
-              tsMicrosecondValues_.addAll(other.tsMicrosecondValues_);
+              ensureTimestampMicrosecondValuesIsMutable();
+              timestampMicrosecondValues_.addAll(other.timestampMicrosecondValues_);
             }
             onChanged();
           }
-          if (!other.tsNanosecondValues_.isEmpty()) {
-            if (tsNanosecondValues_.isEmpty()) {
-              tsNanosecondValues_ = other.tsNanosecondValues_;
+          if (!other.timestampNanosecondValues_.isEmpty()) {
+            if (timestampNanosecondValues_.isEmpty()) {
+              timestampNanosecondValues_ = other.timestampNanosecondValues_;
               bitField0_ = (bitField0_ & ~0x00040000);
             } else {
-              ensureTsNanosecondValuesIsMutable();
-              tsNanosecondValues_.addAll(other.tsNanosecondValues_);
+              ensureTimestampNanosecondValuesIsMutable();
+              timestampNanosecondValues_.addAll(other.timestampNanosecondValues_);
             }
             onChanged();
+          }
+          if (!other.timeSecondValues_.isEmpty()) {
+            if (timeSecondValues_.isEmpty()) {
+              timeSecondValues_ = other.timeSecondValues_;
+              bitField0_ = (bitField0_ & ~0x00080000);
+            } else {
+              ensureTimeSecondValuesIsMutable();
+              timeSecondValues_.addAll(other.timeSecondValues_);
+            }
+            onChanged();
+          }
+          if (!other.timeMillisecondValues_.isEmpty()) {
+            if (timeMillisecondValues_.isEmpty()) {
+              timeMillisecondValues_ = other.timeMillisecondValues_;
+              bitField0_ = (bitField0_ & ~0x00100000);
+            } else {
+              ensureTimeMillisecondValuesIsMutable();
+              timeMillisecondValues_.addAll(other.timeMillisecondValues_);
+            }
+            onChanged();
+          }
+          if (!other.timeMicrosecondValues_.isEmpty()) {
+            if (timeMicrosecondValues_.isEmpty()) {
+              timeMicrosecondValues_ = other.timeMicrosecondValues_;
+              bitField0_ = (bitField0_ & ~0x00200000);
+            } else {
+              ensureTimeMicrosecondValuesIsMutable();
+              timeMicrosecondValues_.addAll(other.timeMicrosecondValues_);
+            }
+            onChanged();
+          }
+          if (!other.timeNanosecondValues_.isEmpty()) {
+            if (timeNanosecondValues_.isEmpty()) {
+              timeNanosecondValues_ = other.timeNanosecondValues_;
+              bitField0_ = (bitField0_ & ~0x00400000);
+            } else {
+              ensureTimeNanosecondValuesIsMutable();
+              timeNanosecondValues_.addAll(other.timeNanosecondValues_);
+            }
+            onChanged();
+          }
+          if (!other.intervalYearMonthValues_.isEmpty()) {
+            if (intervalYearMonthValues_.isEmpty()) {
+              intervalYearMonthValues_ = other.intervalYearMonthValues_;
+              bitField0_ = (bitField0_ & ~0x00800000);
+            } else {
+              ensureIntervalYearMonthValuesIsMutable();
+              intervalYearMonthValues_.addAll(other.intervalYearMonthValues_);
+            }
+            onChanged();
+          }
+          if (!other.intervalDayTimeValues_.isEmpty()) {
+            if (intervalDayTimeValues_.isEmpty()) {
+              intervalDayTimeValues_ = other.intervalDayTimeValues_;
+              bitField0_ = (bitField0_ & ~0x01000000);
+            } else {
+              ensureIntervalDayTimeValuesIsMutable();
+              intervalDayTimeValues_.addAll(other.intervalDayTimeValues_);
+            }
+            onChanged();
+          }
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            if (!other.intervalMonthDayNanoValues_.isEmpty()) {
+              if (intervalMonthDayNanoValues_.isEmpty()) {
+                intervalMonthDayNanoValues_ = other.intervalMonthDayNanoValues_;
+                bitField0_ = (bitField0_ & ~0x02000000);
+              } else {
+                ensureIntervalMonthDayNanoValuesIsMutable();
+                intervalMonthDayNanoValues_.addAll(other.intervalMonthDayNanoValues_);
+              }
+              onChanged();
+            }
+          } else {
+            if (!other.intervalMonthDayNanoValues_.isEmpty()) {
+              if (intervalMonthDayNanoValuesBuilder_.isEmpty()) {
+                intervalMonthDayNanoValuesBuilder_.dispose();
+                intervalMonthDayNanoValuesBuilder_ = null;
+                intervalMonthDayNanoValues_ = other.intervalMonthDayNanoValues_;
+                bitField0_ = (bitField0_ & ~0x02000000);
+                intervalMonthDayNanoValuesBuilder_ = 
+                  com.google.protobuf.GeneratedMessageV3.alwaysUseFieldBuilders ?
+                     getIntervalMonthDayNanoValuesFieldBuilder() : null;
+              } else {
+                intervalMonthDayNanoValuesBuilder_.addAllMessages(other.intervalMonthDayNanoValues_);
+              }
+            }
+          }
+          if (!other.durationSecondValues_.isEmpty()) {
+            if (durationSecondValues_.isEmpty()) {
+              durationSecondValues_ = other.durationSecondValues_;
+              bitField0_ = (bitField0_ & ~0x04000000);
+            } else {
+              ensureDurationSecondValuesIsMutable();
+              durationSecondValues_.addAll(other.durationSecondValues_);
+            }
+            onChanged();
+          }
+          if (!other.durationMillisecondValues_.isEmpty()) {
+            if (durationMillisecondValues_.isEmpty()) {
+              durationMillisecondValues_ = other.durationMillisecondValues_;
+              bitField0_ = (bitField0_ & ~0x08000000);
+            } else {
+              ensureDurationMillisecondValuesIsMutable();
+              durationMillisecondValues_.addAll(other.durationMillisecondValues_);
+            }
+            onChanged();
+          }
+          if (!other.durationMicrosecondValues_.isEmpty()) {
+            if (durationMicrosecondValues_.isEmpty()) {
+              durationMicrosecondValues_ = other.durationMicrosecondValues_;
+              bitField0_ = (bitField0_ & ~0x10000000);
+            } else {
+              ensureDurationMicrosecondValuesIsMutable();
+              durationMicrosecondValues_.addAll(other.durationMicrosecondValues_);
+            }
+            onChanged();
+          }
+          if (!other.durationNanosecondValues_.isEmpty()) {
+            if (durationNanosecondValues_.isEmpty()) {
+              durationNanosecondValues_ = other.durationNanosecondValues_;
+              bitField0_ = (bitField0_ & ~0x20000000);
+            } else {
+              ensureDurationNanosecondValuesIsMutable();
+              durationNanosecondValues_.addAll(other.durationNanosecondValues_);
+            }
+            onChanged();
+          }
+          if (decimal128ValuesBuilder_ == null) {
+            if (!other.decimal128Values_.isEmpty()) {
+              if (decimal128Values_.isEmpty()) {
+                decimal128Values_ = other.decimal128Values_;
+                bitField0_ = (bitField0_ & ~0x40000000);
+              } else {
+                ensureDecimal128ValuesIsMutable();
+                decimal128Values_.addAll(other.decimal128Values_);
+              }
+              onChanged();
+            }
+          } else {
+            if (!other.decimal128Values_.isEmpty()) {
+              if (decimal128ValuesBuilder_.isEmpty()) {
+                decimal128ValuesBuilder_.dispose();
+                decimal128ValuesBuilder_ = null;
+                decimal128Values_ = other.decimal128Values_;
+                bitField0_ = (bitField0_ & ~0x40000000);
+                decimal128ValuesBuilder_ = 
+                  com.google.protobuf.GeneratedMessageV3.alwaysUseFieldBuilders ?
+                     getDecimal128ValuesFieldBuilder() : null;
+              } else {
+                decimal128ValuesBuilder_.addAllMessages(other.decimal128Values_);
+              }
+            }
           }
           this.mergeUnknownFields(other.unknownFields);
           onChanged();
@@ -4338,320 +5404,1590 @@ public final class Columns {
           return this;
         }
 
-        private com.google.protobuf.Internal.LongList tsSecondValues_ = emptyLongList();
-        private void ensureTsSecondValuesIsMutable() {
+        private com.google.protobuf.Internal.LongList timestampSecondValues_ = emptyLongList();
+        private void ensureTimestampSecondValuesIsMutable() {
           if (!((bitField0_ & 0x00008000) != 0)) {
-            tsSecondValues_ = mutableCopy(tsSecondValues_);
+            timestampSecondValues_ = mutableCopy(timestampSecondValues_);
             bitField0_ |= 0x00008000;
            }
         }
         /**
-         * <code>repeated int64 ts_second_values = 16;</code>
-         * @return A list containing the tsSecondValues.
+         * <code>repeated int64 timestamp_second_values = 16;</code>
+         * @return A list containing the timestampSecondValues.
          */
         public java.util.List<java.lang.Long>
-            getTsSecondValuesList() {
+            getTimestampSecondValuesList() {
           return ((bitField0_ & 0x00008000) != 0) ?
-                   java.util.Collections.unmodifiableList(tsSecondValues_) : tsSecondValues_;
+                   java.util.Collections.unmodifiableList(timestampSecondValues_) : timestampSecondValues_;
         }
         /**
-         * <code>repeated int64 ts_second_values = 16;</code>
-         * @return The count of tsSecondValues.
+         * <code>repeated int64 timestamp_second_values = 16;</code>
+         * @return The count of timestampSecondValues.
          */
-        public int getTsSecondValuesCount() {
-          return tsSecondValues_.size();
+        public int getTimestampSecondValuesCount() {
+          return timestampSecondValues_.size();
         }
         /**
-         * <code>repeated int64 ts_second_values = 16;</code>
+         * <code>repeated int64 timestamp_second_values = 16;</code>
          * @param index The index of the element to return.
-         * @return The tsSecondValues at the given index.
+         * @return The timestampSecondValues at the given index.
          */
-        public long getTsSecondValues(int index) {
-          return tsSecondValues_.getLong(index);
+        public long getTimestampSecondValues(int index) {
+          return timestampSecondValues_.getLong(index);
         }
         /**
-         * <code>repeated int64 ts_second_values = 16;</code>
+         * <code>repeated int64 timestamp_second_values = 16;</code>
          * @param index The index to set the value at.
-         * @param value The tsSecondValues to set.
+         * @param value The timestampSecondValues to set.
          * @return This builder for chaining.
          */
-        public Builder setTsSecondValues(
+        public Builder setTimestampSecondValues(
             int index, long value) {
-          ensureTsSecondValuesIsMutable();
-          tsSecondValues_.setLong(index, value);
+          ensureTimestampSecondValuesIsMutable();
+          timestampSecondValues_.setLong(index, value);
           onChanged();
           return this;
         }
         /**
-         * <code>repeated int64 ts_second_values = 16;</code>
-         * @param value The tsSecondValues to add.
+         * <code>repeated int64 timestamp_second_values = 16;</code>
+         * @param value The timestampSecondValues to add.
          * @return This builder for chaining.
          */
-        public Builder addTsSecondValues(long value) {
-          ensureTsSecondValuesIsMutable();
-          tsSecondValues_.addLong(value);
+        public Builder addTimestampSecondValues(long value) {
+          ensureTimestampSecondValuesIsMutable();
+          timestampSecondValues_.addLong(value);
           onChanged();
           return this;
         }
         /**
-         * <code>repeated int64 ts_second_values = 16;</code>
-         * @param values The tsSecondValues to add.
+         * <code>repeated int64 timestamp_second_values = 16;</code>
+         * @param values The timestampSecondValues to add.
          * @return This builder for chaining.
          */
-        public Builder addAllTsSecondValues(
+        public Builder addAllTimestampSecondValues(
             java.lang.Iterable<? extends java.lang.Long> values) {
-          ensureTsSecondValuesIsMutable();
+          ensureTimestampSecondValuesIsMutable();
           com.google.protobuf.AbstractMessageLite.Builder.addAll(
-              values, tsSecondValues_);
+              values, timestampSecondValues_);
           onChanged();
           return this;
         }
         /**
-         * <code>repeated int64 ts_second_values = 16;</code>
+         * <code>repeated int64 timestamp_second_values = 16;</code>
          * @return This builder for chaining.
          */
-        public Builder clearTsSecondValues() {
-          tsSecondValues_ = emptyLongList();
+        public Builder clearTimestampSecondValues() {
+          timestampSecondValues_ = emptyLongList();
           bitField0_ = (bitField0_ & ~0x00008000);
           onChanged();
           return this;
         }
 
-        private com.google.protobuf.Internal.LongList tsMillisecondValues_ = emptyLongList();
-        private void ensureTsMillisecondValuesIsMutable() {
+        private com.google.protobuf.Internal.LongList timestampMillisecondValues_ = emptyLongList();
+        private void ensureTimestampMillisecondValuesIsMutable() {
           if (!((bitField0_ & 0x00010000) != 0)) {
-            tsMillisecondValues_ = mutableCopy(tsMillisecondValues_);
+            timestampMillisecondValues_ = mutableCopy(timestampMillisecondValues_);
             bitField0_ |= 0x00010000;
            }
         }
         /**
-         * <code>repeated int64 ts_millisecond_values = 17;</code>
-         * @return A list containing the tsMillisecondValues.
+         * <code>repeated int64 timestamp_millisecond_values = 17;</code>
+         * @return A list containing the timestampMillisecondValues.
          */
         public java.util.List<java.lang.Long>
-            getTsMillisecondValuesList() {
+            getTimestampMillisecondValuesList() {
           return ((bitField0_ & 0x00010000) != 0) ?
-                   java.util.Collections.unmodifiableList(tsMillisecondValues_) : tsMillisecondValues_;
+                   java.util.Collections.unmodifiableList(timestampMillisecondValues_) : timestampMillisecondValues_;
         }
         /**
-         * <code>repeated int64 ts_millisecond_values = 17;</code>
-         * @return The count of tsMillisecondValues.
+         * <code>repeated int64 timestamp_millisecond_values = 17;</code>
+         * @return The count of timestampMillisecondValues.
          */
-        public int getTsMillisecondValuesCount() {
-          return tsMillisecondValues_.size();
+        public int getTimestampMillisecondValuesCount() {
+          return timestampMillisecondValues_.size();
         }
         /**
-         * <code>repeated int64 ts_millisecond_values = 17;</code>
+         * <code>repeated int64 timestamp_millisecond_values = 17;</code>
          * @param index The index of the element to return.
-         * @return The tsMillisecondValues at the given index.
+         * @return The timestampMillisecondValues at the given index.
          */
-        public long getTsMillisecondValues(int index) {
-          return tsMillisecondValues_.getLong(index);
+        public long getTimestampMillisecondValues(int index) {
+          return timestampMillisecondValues_.getLong(index);
         }
         /**
-         * <code>repeated int64 ts_millisecond_values = 17;</code>
+         * <code>repeated int64 timestamp_millisecond_values = 17;</code>
          * @param index The index to set the value at.
-         * @param value The tsMillisecondValues to set.
+         * @param value The timestampMillisecondValues to set.
          * @return This builder for chaining.
          */
-        public Builder setTsMillisecondValues(
+        public Builder setTimestampMillisecondValues(
             int index, long value) {
-          ensureTsMillisecondValuesIsMutable();
-          tsMillisecondValues_.setLong(index, value);
+          ensureTimestampMillisecondValuesIsMutable();
+          timestampMillisecondValues_.setLong(index, value);
           onChanged();
           return this;
         }
         /**
-         * <code>repeated int64 ts_millisecond_values = 17;</code>
-         * @param value The tsMillisecondValues to add.
+         * <code>repeated int64 timestamp_millisecond_values = 17;</code>
+         * @param value The timestampMillisecondValues to add.
          * @return This builder for chaining.
          */
-        public Builder addTsMillisecondValues(long value) {
-          ensureTsMillisecondValuesIsMutable();
-          tsMillisecondValues_.addLong(value);
+        public Builder addTimestampMillisecondValues(long value) {
+          ensureTimestampMillisecondValuesIsMutable();
+          timestampMillisecondValues_.addLong(value);
           onChanged();
           return this;
         }
         /**
-         * <code>repeated int64 ts_millisecond_values = 17;</code>
-         * @param values The tsMillisecondValues to add.
+         * <code>repeated int64 timestamp_millisecond_values = 17;</code>
+         * @param values The timestampMillisecondValues to add.
          * @return This builder for chaining.
          */
-        public Builder addAllTsMillisecondValues(
+        public Builder addAllTimestampMillisecondValues(
             java.lang.Iterable<? extends java.lang.Long> values) {
-          ensureTsMillisecondValuesIsMutable();
+          ensureTimestampMillisecondValuesIsMutable();
           com.google.protobuf.AbstractMessageLite.Builder.addAll(
-              values, tsMillisecondValues_);
+              values, timestampMillisecondValues_);
           onChanged();
           return this;
         }
         /**
-         * <code>repeated int64 ts_millisecond_values = 17;</code>
+         * <code>repeated int64 timestamp_millisecond_values = 17;</code>
          * @return This builder for chaining.
          */
-        public Builder clearTsMillisecondValues() {
-          tsMillisecondValues_ = emptyLongList();
+        public Builder clearTimestampMillisecondValues() {
+          timestampMillisecondValues_ = emptyLongList();
           bitField0_ = (bitField0_ & ~0x00010000);
           onChanged();
           return this;
         }
 
-        private com.google.protobuf.Internal.LongList tsMicrosecondValues_ = emptyLongList();
-        private void ensureTsMicrosecondValuesIsMutable() {
+        private com.google.protobuf.Internal.LongList timestampMicrosecondValues_ = emptyLongList();
+        private void ensureTimestampMicrosecondValuesIsMutable() {
           if (!((bitField0_ & 0x00020000) != 0)) {
-            tsMicrosecondValues_ = mutableCopy(tsMicrosecondValues_);
+            timestampMicrosecondValues_ = mutableCopy(timestampMicrosecondValues_);
             bitField0_ |= 0x00020000;
            }
         }
         /**
-         * <code>repeated int64 ts_microsecond_values = 18;</code>
-         * @return A list containing the tsMicrosecondValues.
+         * <code>repeated int64 timestamp_microsecond_values = 18;</code>
+         * @return A list containing the timestampMicrosecondValues.
          */
         public java.util.List<java.lang.Long>
-            getTsMicrosecondValuesList() {
+            getTimestampMicrosecondValuesList() {
           return ((bitField0_ & 0x00020000) != 0) ?
-                   java.util.Collections.unmodifiableList(tsMicrosecondValues_) : tsMicrosecondValues_;
+                   java.util.Collections.unmodifiableList(timestampMicrosecondValues_) : timestampMicrosecondValues_;
         }
         /**
-         * <code>repeated int64 ts_microsecond_values = 18;</code>
-         * @return The count of tsMicrosecondValues.
+         * <code>repeated int64 timestamp_microsecond_values = 18;</code>
+         * @return The count of timestampMicrosecondValues.
          */
-        public int getTsMicrosecondValuesCount() {
-          return tsMicrosecondValues_.size();
+        public int getTimestampMicrosecondValuesCount() {
+          return timestampMicrosecondValues_.size();
         }
         /**
-         * <code>repeated int64 ts_microsecond_values = 18;</code>
+         * <code>repeated int64 timestamp_microsecond_values = 18;</code>
          * @param index The index of the element to return.
-         * @return The tsMicrosecondValues at the given index.
+         * @return The timestampMicrosecondValues at the given index.
          */
-        public long getTsMicrosecondValues(int index) {
-          return tsMicrosecondValues_.getLong(index);
+        public long getTimestampMicrosecondValues(int index) {
+          return timestampMicrosecondValues_.getLong(index);
         }
         /**
-         * <code>repeated int64 ts_microsecond_values = 18;</code>
+         * <code>repeated int64 timestamp_microsecond_values = 18;</code>
          * @param index The index to set the value at.
-         * @param value The tsMicrosecondValues to set.
+         * @param value The timestampMicrosecondValues to set.
          * @return This builder for chaining.
          */
-        public Builder setTsMicrosecondValues(
+        public Builder setTimestampMicrosecondValues(
             int index, long value) {
-          ensureTsMicrosecondValuesIsMutable();
-          tsMicrosecondValues_.setLong(index, value);
+          ensureTimestampMicrosecondValuesIsMutable();
+          timestampMicrosecondValues_.setLong(index, value);
           onChanged();
           return this;
         }
         /**
-         * <code>repeated int64 ts_microsecond_values = 18;</code>
-         * @param value The tsMicrosecondValues to add.
+         * <code>repeated int64 timestamp_microsecond_values = 18;</code>
+         * @param value The timestampMicrosecondValues to add.
          * @return This builder for chaining.
          */
-        public Builder addTsMicrosecondValues(long value) {
-          ensureTsMicrosecondValuesIsMutable();
-          tsMicrosecondValues_.addLong(value);
+        public Builder addTimestampMicrosecondValues(long value) {
+          ensureTimestampMicrosecondValuesIsMutable();
+          timestampMicrosecondValues_.addLong(value);
           onChanged();
           return this;
         }
         /**
-         * <code>repeated int64 ts_microsecond_values = 18;</code>
-         * @param values The tsMicrosecondValues to add.
+         * <code>repeated int64 timestamp_microsecond_values = 18;</code>
+         * @param values The timestampMicrosecondValues to add.
          * @return This builder for chaining.
          */
-        public Builder addAllTsMicrosecondValues(
+        public Builder addAllTimestampMicrosecondValues(
             java.lang.Iterable<? extends java.lang.Long> values) {
-          ensureTsMicrosecondValuesIsMutable();
+          ensureTimestampMicrosecondValuesIsMutable();
           com.google.protobuf.AbstractMessageLite.Builder.addAll(
-              values, tsMicrosecondValues_);
+              values, timestampMicrosecondValues_);
           onChanged();
           return this;
         }
         /**
-         * <code>repeated int64 ts_microsecond_values = 18;</code>
+         * <code>repeated int64 timestamp_microsecond_values = 18;</code>
          * @return This builder for chaining.
          */
-        public Builder clearTsMicrosecondValues() {
-          tsMicrosecondValues_ = emptyLongList();
+        public Builder clearTimestampMicrosecondValues() {
+          timestampMicrosecondValues_ = emptyLongList();
           bitField0_ = (bitField0_ & ~0x00020000);
           onChanged();
           return this;
         }
 
-        private com.google.protobuf.Internal.LongList tsNanosecondValues_ = emptyLongList();
-        private void ensureTsNanosecondValuesIsMutable() {
+        private com.google.protobuf.Internal.LongList timestampNanosecondValues_ = emptyLongList();
+        private void ensureTimestampNanosecondValuesIsMutable() {
           if (!((bitField0_ & 0x00040000) != 0)) {
-            tsNanosecondValues_ = mutableCopy(tsNanosecondValues_);
+            timestampNanosecondValues_ = mutableCopy(timestampNanosecondValues_);
             bitField0_ |= 0x00040000;
            }
         }
         /**
-         * <code>repeated int64 ts_nanosecond_values = 19;</code>
-         * @return A list containing the tsNanosecondValues.
+         * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
+         * @return A list containing the timestampNanosecondValues.
          */
         public java.util.List<java.lang.Long>
-            getTsNanosecondValuesList() {
+            getTimestampNanosecondValuesList() {
           return ((bitField0_ & 0x00040000) != 0) ?
-                   java.util.Collections.unmodifiableList(tsNanosecondValues_) : tsNanosecondValues_;
+                   java.util.Collections.unmodifiableList(timestampNanosecondValues_) : timestampNanosecondValues_;
         }
         /**
-         * <code>repeated int64 ts_nanosecond_values = 19;</code>
-         * @return The count of tsNanosecondValues.
+         * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
+         * @return The count of timestampNanosecondValues.
          */
-        public int getTsNanosecondValuesCount() {
-          return tsNanosecondValues_.size();
+        public int getTimestampNanosecondValuesCount() {
+          return timestampNanosecondValues_.size();
         }
         /**
-         * <code>repeated int64 ts_nanosecond_values = 19;</code>
+         * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
          * @param index The index of the element to return.
-         * @return The tsNanosecondValues at the given index.
+         * @return The timestampNanosecondValues at the given index.
          */
-        public long getTsNanosecondValues(int index) {
-          return tsNanosecondValues_.getLong(index);
+        public long getTimestampNanosecondValues(int index) {
+          return timestampNanosecondValues_.getLong(index);
         }
         /**
-         * <code>repeated int64 ts_nanosecond_values = 19;</code>
+         * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
          * @param index The index to set the value at.
-         * @param value The tsNanosecondValues to set.
+         * @param value The timestampNanosecondValues to set.
          * @return This builder for chaining.
          */
-        public Builder setTsNanosecondValues(
+        public Builder setTimestampNanosecondValues(
             int index, long value) {
-          ensureTsNanosecondValuesIsMutable();
-          tsNanosecondValues_.setLong(index, value);
+          ensureTimestampNanosecondValuesIsMutable();
+          timestampNanosecondValues_.setLong(index, value);
           onChanged();
           return this;
         }
         /**
-         * <code>repeated int64 ts_nanosecond_values = 19;</code>
-         * @param value The tsNanosecondValues to add.
+         * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
+         * @param value The timestampNanosecondValues to add.
          * @return This builder for chaining.
          */
-        public Builder addTsNanosecondValues(long value) {
-          ensureTsNanosecondValuesIsMutable();
-          tsNanosecondValues_.addLong(value);
+        public Builder addTimestampNanosecondValues(long value) {
+          ensureTimestampNanosecondValuesIsMutable();
+          timestampNanosecondValues_.addLong(value);
           onChanged();
           return this;
         }
         /**
-         * <code>repeated int64 ts_nanosecond_values = 19;</code>
-         * @param values The tsNanosecondValues to add.
+         * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
+         * @param values The timestampNanosecondValues to add.
          * @return This builder for chaining.
          */
-        public Builder addAllTsNanosecondValues(
+        public Builder addAllTimestampNanosecondValues(
             java.lang.Iterable<? extends java.lang.Long> values) {
-          ensureTsNanosecondValuesIsMutable();
+          ensureTimestampNanosecondValuesIsMutable();
           com.google.protobuf.AbstractMessageLite.Builder.addAll(
-              values, tsNanosecondValues_);
+              values, timestampNanosecondValues_);
           onChanged();
           return this;
         }
         /**
-         * <code>repeated int64 ts_nanosecond_values = 19;</code>
+         * <code>repeated int64 timestamp_nanosecond_values = 19;</code>
          * @return This builder for chaining.
          */
-        public Builder clearTsNanosecondValues() {
-          tsNanosecondValues_ = emptyLongList();
+        public Builder clearTimestampNanosecondValues() {
+          timestampNanosecondValues_ = emptyLongList();
           bitField0_ = (bitField0_ & ~0x00040000);
           onChanged();
           return this;
+        }
+
+        private com.google.protobuf.Internal.LongList timeSecondValues_ = emptyLongList();
+        private void ensureTimeSecondValuesIsMutable() {
+          if (!((bitField0_ & 0x00080000) != 0)) {
+            timeSecondValues_ = mutableCopy(timeSecondValues_);
+            bitField0_ |= 0x00080000;
+           }
+        }
+        /**
+         * <code>repeated int64 time_second_values = 20;</code>
+         * @return A list containing the timeSecondValues.
+         */
+        public java.util.List<java.lang.Long>
+            getTimeSecondValuesList() {
+          return ((bitField0_ & 0x00080000) != 0) ?
+                   java.util.Collections.unmodifiableList(timeSecondValues_) : timeSecondValues_;
+        }
+        /**
+         * <code>repeated int64 time_second_values = 20;</code>
+         * @return The count of timeSecondValues.
+         */
+        public int getTimeSecondValuesCount() {
+          return timeSecondValues_.size();
+        }
+        /**
+         * <code>repeated int64 time_second_values = 20;</code>
+         * @param index The index of the element to return.
+         * @return The timeSecondValues at the given index.
+         */
+        public long getTimeSecondValues(int index) {
+          return timeSecondValues_.getLong(index);
+        }
+        /**
+         * <code>repeated int64 time_second_values = 20;</code>
+         * @param index The index to set the value at.
+         * @param value The timeSecondValues to set.
+         * @return This builder for chaining.
+         */
+        public Builder setTimeSecondValues(
+            int index, long value) {
+          ensureTimeSecondValuesIsMutable();
+          timeSecondValues_.setLong(index, value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 time_second_values = 20;</code>
+         * @param value The timeSecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addTimeSecondValues(long value) {
+          ensureTimeSecondValuesIsMutable();
+          timeSecondValues_.addLong(value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 time_second_values = 20;</code>
+         * @param values The timeSecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addAllTimeSecondValues(
+            java.lang.Iterable<? extends java.lang.Long> values) {
+          ensureTimeSecondValuesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, timeSecondValues_);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 time_second_values = 20;</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearTimeSecondValues() {
+          timeSecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x00080000);
+          onChanged();
+          return this;
+        }
+
+        private com.google.protobuf.Internal.LongList timeMillisecondValues_ = emptyLongList();
+        private void ensureTimeMillisecondValuesIsMutable() {
+          if (!((bitField0_ & 0x00100000) != 0)) {
+            timeMillisecondValues_ = mutableCopy(timeMillisecondValues_);
+            bitField0_ |= 0x00100000;
+           }
+        }
+        /**
+         * <code>repeated int64 time_millisecond_values = 21;</code>
+         * @return A list containing the timeMillisecondValues.
+         */
+        public java.util.List<java.lang.Long>
+            getTimeMillisecondValuesList() {
+          return ((bitField0_ & 0x00100000) != 0) ?
+                   java.util.Collections.unmodifiableList(timeMillisecondValues_) : timeMillisecondValues_;
+        }
+        /**
+         * <code>repeated int64 time_millisecond_values = 21;</code>
+         * @return The count of timeMillisecondValues.
+         */
+        public int getTimeMillisecondValuesCount() {
+          return timeMillisecondValues_.size();
+        }
+        /**
+         * <code>repeated int64 time_millisecond_values = 21;</code>
+         * @param index The index of the element to return.
+         * @return The timeMillisecondValues at the given index.
+         */
+        public long getTimeMillisecondValues(int index) {
+          return timeMillisecondValues_.getLong(index);
+        }
+        /**
+         * <code>repeated int64 time_millisecond_values = 21;</code>
+         * @param index The index to set the value at.
+         * @param value The timeMillisecondValues to set.
+         * @return This builder for chaining.
+         */
+        public Builder setTimeMillisecondValues(
+            int index, long value) {
+          ensureTimeMillisecondValuesIsMutable();
+          timeMillisecondValues_.setLong(index, value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 time_millisecond_values = 21;</code>
+         * @param value The timeMillisecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addTimeMillisecondValues(long value) {
+          ensureTimeMillisecondValuesIsMutable();
+          timeMillisecondValues_.addLong(value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 time_millisecond_values = 21;</code>
+         * @param values The timeMillisecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addAllTimeMillisecondValues(
+            java.lang.Iterable<? extends java.lang.Long> values) {
+          ensureTimeMillisecondValuesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, timeMillisecondValues_);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 time_millisecond_values = 21;</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearTimeMillisecondValues() {
+          timeMillisecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x00100000);
+          onChanged();
+          return this;
+        }
+
+        private com.google.protobuf.Internal.LongList timeMicrosecondValues_ = emptyLongList();
+        private void ensureTimeMicrosecondValuesIsMutable() {
+          if (!((bitField0_ & 0x00200000) != 0)) {
+            timeMicrosecondValues_ = mutableCopy(timeMicrosecondValues_);
+            bitField0_ |= 0x00200000;
+           }
+        }
+        /**
+         * <code>repeated int64 time_microsecond_values = 22;</code>
+         * @return A list containing the timeMicrosecondValues.
+         */
+        public java.util.List<java.lang.Long>
+            getTimeMicrosecondValuesList() {
+          return ((bitField0_ & 0x00200000) != 0) ?
+                   java.util.Collections.unmodifiableList(timeMicrosecondValues_) : timeMicrosecondValues_;
+        }
+        /**
+         * <code>repeated int64 time_microsecond_values = 22;</code>
+         * @return The count of timeMicrosecondValues.
+         */
+        public int getTimeMicrosecondValuesCount() {
+          return timeMicrosecondValues_.size();
+        }
+        /**
+         * <code>repeated int64 time_microsecond_values = 22;</code>
+         * @param index The index of the element to return.
+         * @return The timeMicrosecondValues at the given index.
+         */
+        public long getTimeMicrosecondValues(int index) {
+          return timeMicrosecondValues_.getLong(index);
+        }
+        /**
+         * <code>repeated int64 time_microsecond_values = 22;</code>
+         * @param index The index to set the value at.
+         * @param value The timeMicrosecondValues to set.
+         * @return This builder for chaining.
+         */
+        public Builder setTimeMicrosecondValues(
+            int index, long value) {
+          ensureTimeMicrosecondValuesIsMutable();
+          timeMicrosecondValues_.setLong(index, value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 time_microsecond_values = 22;</code>
+         * @param value The timeMicrosecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addTimeMicrosecondValues(long value) {
+          ensureTimeMicrosecondValuesIsMutable();
+          timeMicrosecondValues_.addLong(value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 time_microsecond_values = 22;</code>
+         * @param values The timeMicrosecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addAllTimeMicrosecondValues(
+            java.lang.Iterable<? extends java.lang.Long> values) {
+          ensureTimeMicrosecondValuesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, timeMicrosecondValues_);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 time_microsecond_values = 22;</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearTimeMicrosecondValues() {
+          timeMicrosecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x00200000);
+          onChanged();
+          return this;
+        }
+
+        private com.google.protobuf.Internal.LongList timeNanosecondValues_ = emptyLongList();
+        private void ensureTimeNanosecondValuesIsMutable() {
+          if (!((bitField0_ & 0x00400000) != 0)) {
+            timeNanosecondValues_ = mutableCopy(timeNanosecondValues_);
+            bitField0_ |= 0x00400000;
+           }
+        }
+        /**
+         * <code>repeated int64 time_nanosecond_values = 23;</code>
+         * @return A list containing the timeNanosecondValues.
+         */
+        public java.util.List<java.lang.Long>
+            getTimeNanosecondValuesList() {
+          return ((bitField0_ & 0x00400000) != 0) ?
+                   java.util.Collections.unmodifiableList(timeNanosecondValues_) : timeNanosecondValues_;
+        }
+        /**
+         * <code>repeated int64 time_nanosecond_values = 23;</code>
+         * @return The count of timeNanosecondValues.
+         */
+        public int getTimeNanosecondValuesCount() {
+          return timeNanosecondValues_.size();
+        }
+        /**
+         * <code>repeated int64 time_nanosecond_values = 23;</code>
+         * @param index The index of the element to return.
+         * @return The timeNanosecondValues at the given index.
+         */
+        public long getTimeNanosecondValues(int index) {
+          return timeNanosecondValues_.getLong(index);
+        }
+        /**
+         * <code>repeated int64 time_nanosecond_values = 23;</code>
+         * @param index The index to set the value at.
+         * @param value The timeNanosecondValues to set.
+         * @return This builder for chaining.
+         */
+        public Builder setTimeNanosecondValues(
+            int index, long value) {
+          ensureTimeNanosecondValuesIsMutable();
+          timeNanosecondValues_.setLong(index, value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 time_nanosecond_values = 23;</code>
+         * @param value The timeNanosecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addTimeNanosecondValues(long value) {
+          ensureTimeNanosecondValuesIsMutable();
+          timeNanosecondValues_.addLong(value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 time_nanosecond_values = 23;</code>
+         * @param values The timeNanosecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addAllTimeNanosecondValues(
+            java.lang.Iterable<? extends java.lang.Long> values) {
+          ensureTimeNanosecondValuesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, timeNanosecondValues_);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 time_nanosecond_values = 23;</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearTimeNanosecondValues() {
+          timeNanosecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x00400000);
+          onChanged();
+          return this;
+        }
+
+        private com.google.protobuf.Internal.IntList intervalYearMonthValues_ = emptyIntList();
+        private void ensureIntervalYearMonthValuesIsMutable() {
+          if (!((bitField0_ & 0x00800000) != 0)) {
+            intervalYearMonthValues_ = mutableCopy(intervalYearMonthValues_);
+            bitField0_ |= 0x00800000;
+           }
+        }
+        /**
+         * <code>repeated int32 interval_year_month_values = 24;</code>
+         * @return A list containing the intervalYearMonthValues.
+         */
+        public java.util.List<java.lang.Integer>
+            getIntervalYearMonthValuesList() {
+          return ((bitField0_ & 0x00800000) != 0) ?
+                   java.util.Collections.unmodifiableList(intervalYearMonthValues_) : intervalYearMonthValues_;
+        }
+        /**
+         * <code>repeated int32 interval_year_month_values = 24;</code>
+         * @return The count of intervalYearMonthValues.
+         */
+        public int getIntervalYearMonthValuesCount() {
+          return intervalYearMonthValues_.size();
+        }
+        /**
+         * <code>repeated int32 interval_year_month_values = 24;</code>
+         * @param index The index of the element to return.
+         * @return The intervalYearMonthValues at the given index.
+         */
+        public int getIntervalYearMonthValues(int index) {
+          return intervalYearMonthValues_.getInt(index);
+        }
+        /**
+         * <code>repeated int32 interval_year_month_values = 24;</code>
+         * @param index The index to set the value at.
+         * @param value The intervalYearMonthValues to set.
+         * @return This builder for chaining.
+         */
+        public Builder setIntervalYearMonthValues(
+            int index, int value) {
+          ensureIntervalYearMonthValuesIsMutable();
+          intervalYearMonthValues_.setInt(index, value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int32 interval_year_month_values = 24;</code>
+         * @param value The intervalYearMonthValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addIntervalYearMonthValues(int value) {
+          ensureIntervalYearMonthValuesIsMutable();
+          intervalYearMonthValues_.addInt(value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int32 interval_year_month_values = 24;</code>
+         * @param values The intervalYearMonthValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addAllIntervalYearMonthValues(
+            java.lang.Iterable<? extends java.lang.Integer> values) {
+          ensureIntervalYearMonthValuesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, intervalYearMonthValues_);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int32 interval_year_month_values = 24;</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearIntervalYearMonthValues() {
+          intervalYearMonthValues_ = emptyIntList();
+          bitField0_ = (bitField0_ & ~0x00800000);
+          onChanged();
+          return this;
+        }
+
+        private com.google.protobuf.Internal.LongList intervalDayTimeValues_ = emptyLongList();
+        private void ensureIntervalDayTimeValuesIsMutable() {
+          if (!((bitField0_ & 0x01000000) != 0)) {
+            intervalDayTimeValues_ = mutableCopy(intervalDayTimeValues_);
+            bitField0_ |= 0x01000000;
+           }
+        }
+        /**
+         * <code>repeated int64 interval_day_time_values = 25;</code>
+         * @return A list containing the intervalDayTimeValues.
+         */
+        public java.util.List<java.lang.Long>
+            getIntervalDayTimeValuesList() {
+          return ((bitField0_ & 0x01000000) != 0) ?
+                   java.util.Collections.unmodifiableList(intervalDayTimeValues_) : intervalDayTimeValues_;
+        }
+        /**
+         * <code>repeated int64 interval_day_time_values = 25;</code>
+         * @return The count of intervalDayTimeValues.
+         */
+        public int getIntervalDayTimeValuesCount() {
+          return intervalDayTimeValues_.size();
+        }
+        /**
+         * <code>repeated int64 interval_day_time_values = 25;</code>
+         * @param index The index of the element to return.
+         * @return The intervalDayTimeValues at the given index.
+         */
+        public long getIntervalDayTimeValues(int index) {
+          return intervalDayTimeValues_.getLong(index);
+        }
+        /**
+         * <code>repeated int64 interval_day_time_values = 25;</code>
+         * @param index The index to set the value at.
+         * @param value The intervalDayTimeValues to set.
+         * @return This builder for chaining.
+         */
+        public Builder setIntervalDayTimeValues(
+            int index, long value) {
+          ensureIntervalDayTimeValuesIsMutable();
+          intervalDayTimeValues_.setLong(index, value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 interval_day_time_values = 25;</code>
+         * @param value The intervalDayTimeValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addIntervalDayTimeValues(long value) {
+          ensureIntervalDayTimeValuesIsMutable();
+          intervalDayTimeValues_.addLong(value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 interval_day_time_values = 25;</code>
+         * @param values The intervalDayTimeValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addAllIntervalDayTimeValues(
+            java.lang.Iterable<? extends java.lang.Long> values) {
+          ensureIntervalDayTimeValuesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, intervalDayTimeValues_);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 interval_day_time_values = 25;</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearIntervalDayTimeValues() {
+          intervalDayTimeValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x01000000);
+          onChanged();
+          return this;
+        }
+
+        private java.util.List<io.greptime.v1.Common.IntervalMonthDayNano> intervalMonthDayNanoValues_ =
+          java.util.Collections.emptyList();
+        private void ensureIntervalMonthDayNanoValuesIsMutable() {
+          if (!((bitField0_ & 0x02000000) != 0)) {
+            intervalMonthDayNanoValues_ = new java.util.ArrayList<io.greptime.v1.Common.IntervalMonthDayNano>(intervalMonthDayNanoValues_);
+            bitField0_ |= 0x02000000;
+           }
+        }
+
+        private com.google.protobuf.RepeatedFieldBuilderV3<
+            io.greptime.v1.Common.IntervalMonthDayNano, io.greptime.v1.Common.IntervalMonthDayNano.Builder, io.greptime.v1.Common.IntervalMonthDayNanoOrBuilder> intervalMonthDayNanoValuesBuilder_;
+
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public java.util.List<io.greptime.v1.Common.IntervalMonthDayNano> getIntervalMonthDayNanoValuesList() {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            return java.util.Collections.unmodifiableList(intervalMonthDayNanoValues_);
+          } else {
+            return intervalMonthDayNanoValuesBuilder_.getMessageList();
+          }
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public int getIntervalMonthDayNanoValuesCount() {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            return intervalMonthDayNanoValues_.size();
+          } else {
+            return intervalMonthDayNanoValuesBuilder_.getCount();
+          }
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public io.greptime.v1.Common.IntervalMonthDayNano getIntervalMonthDayNanoValues(int index) {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            return intervalMonthDayNanoValues_.get(index);
+          } else {
+            return intervalMonthDayNanoValuesBuilder_.getMessage(index);
+          }
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public Builder setIntervalMonthDayNanoValues(
+            int index, io.greptime.v1.Common.IntervalMonthDayNano value) {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            if (value == null) {
+              throw new NullPointerException();
+            }
+            ensureIntervalMonthDayNanoValuesIsMutable();
+            intervalMonthDayNanoValues_.set(index, value);
+            onChanged();
+          } else {
+            intervalMonthDayNanoValuesBuilder_.setMessage(index, value);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public Builder setIntervalMonthDayNanoValues(
+            int index, io.greptime.v1.Common.IntervalMonthDayNano.Builder builderForValue) {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            ensureIntervalMonthDayNanoValuesIsMutable();
+            intervalMonthDayNanoValues_.set(index, builderForValue.build());
+            onChanged();
+          } else {
+            intervalMonthDayNanoValuesBuilder_.setMessage(index, builderForValue.build());
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public Builder addIntervalMonthDayNanoValues(io.greptime.v1.Common.IntervalMonthDayNano value) {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            if (value == null) {
+              throw new NullPointerException();
+            }
+            ensureIntervalMonthDayNanoValuesIsMutable();
+            intervalMonthDayNanoValues_.add(value);
+            onChanged();
+          } else {
+            intervalMonthDayNanoValuesBuilder_.addMessage(value);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public Builder addIntervalMonthDayNanoValues(
+            int index, io.greptime.v1.Common.IntervalMonthDayNano value) {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            if (value == null) {
+              throw new NullPointerException();
+            }
+            ensureIntervalMonthDayNanoValuesIsMutable();
+            intervalMonthDayNanoValues_.add(index, value);
+            onChanged();
+          } else {
+            intervalMonthDayNanoValuesBuilder_.addMessage(index, value);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public Builder addIntervalMonthDayNanoValues(
+            io.greptime.v1.Common.IntervalMonthDayNano.Builder builderForValue) {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            ensureIntervalMonthDayNanoValuesIsMutable();
+            intervalMonthDayNanoValues_.add(builderForValue.build());
+            onChanged();
+          } else {
+            intervalMonthDayNanoValuesBuilder_.addMessage(builderForValue.build());
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public Builder addIntervalMonthDayNanoValues(
+            int index, io.greptime.v1.Common.IntervalMonthDayNano.Builder builderForValue) {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            ensureIntervalMonthDayNanoValuesIsMutable();
+            intervalMonthDayNanoValues_.add(index, builderForValue.build());
+            onChanged();
+          } else {
+            intervalMonthDayNanoValuesBuilder_.addMessage(index, builderForValue.build());
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public Builder addAllIntervalMonthDayNanoValues(
+            java.lang.Iterable<? extends io.greptime.v1.Common.IntervalMonthDayNano> values) {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            ensureIntervalMonthDayNanoValuesIsMutable();
+            com.google.protobuf.AbstractMessageLite.Builder.addAll(
+                values, intervalMonthDayNanoValues_);
+            onChanged();
+          } else {
+            intervalMonthDayNanoValuesBuilder_.addAllMessages(values);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public Builder clearIntervalMonthDayNanoValues() {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            intervalMonthDayNanoValues_ = java.util.Collections.emptyList();
+            bitField0_ = (bitField0_ & ~0x02000000);
+            onChanged();
+          } else {
+            intervalMonthDayNanoValuesBuilder_.clear();
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public Builder removeIntervalMonthDayNanoValues(int index) {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            ensureIntervalMonthDayNanoValuesIsMutable();
+            intervalMonthDayNanoValues_.remove(index);
+            onChanged();
+          } else {
+            intervalMonthDayNanoValuesBuilder_.remove(index);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public io.greptime.v1.Common.IntervalMonthDayNano.Builder getIntervalMonthDayNanoValuesBuilder(
+            int index) {
+          return getIntervalMonthDayNanoValuesFieldBuilder().getBuilder(index);
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public io.greptime.v1.Common.IntervalMonthDayNanoOrBuilder getIntervalMonthDayNanoValuesOrBuilder(
+            int index) {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            return intervalMonthDayNanoValues_.get(index);  } else {
+            return intervalMonthDayNanoValuesBuilder_.getMessageOrBuilder(index);
+          }
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public java.util.List<? extends io.greptime.v1.Common.IntervalMonthDayNanoOrBuilder> 
+             getIntervalMonthDayNanoValuesOrBuilderList() {
+          if (intervalMonthDayNanoValuesBuilder_ != null) {
+            return intervalMonthDayNanoValuesBuilder_.getMessageOrBuilderList();
+          } else {
+            return java.util.Collections.unmodifiableList(intervalMonthDayNanoValues_);
+          }
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public io.greptime.v1.Common.IntervalMonthDayNano.Builder addIntervalMonthDayNanoValuesBuilder() {
+          return getIntervalMonthDayNanoValuesFieldBuilder().addBuilder(
+              io.greptime.v1.Common.IntervalMonthDayNano.getDefaultInstance());
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public io.greptime.v1.Common.IntervalMonthDayNano.Builder addIntervalMonthDayNanoValuesBuilder(
+            int index) {
+          return getIntervalMonthDayNanoValuesFieldBuilder().addBuilder(
+              index, io.greptime.v1.Common.IntervalMonthDayNano.getDefaultInstance());
+        }
+        /**
+         * <code>repeated .greptime.v1.IntervalMonthDayNano interval_month_day_nano_values = 26;</code>
+         */
+        public java.util.List<io.greptime.v1.Common.IntervalMonthDayNano.Builder> 
+             getIntervalMonthDayNanoValuesBuilderList() {
+          return getIntervalMonthDayNanoValuesFieldBuilder().getBuilderList();
+        }
+        private com.google.protobuf.RepeatedFieldBuilderV3<
+            io.greptime.v1.Common.IntervalMonthDayNano, io.greptime.v1.Common.IntervalMonthDayNano.Builder, io.greptime.v1.Common.IntervalMonthDayNanoOrBuilder> 
+            getIntervalMonthDayNanoValuesFieldBuilder() {
+          if (intervalMonthDayNanoValuesBuilder_ == null) {
+            intervalMonthDayNanoValuesBuilder_ = new com.google.protobuf.RepeatedFieldBuilderV3<
+                io.greptime.v1.Common.IntervalMonthDayNano, io.greptime.v1.Common.IntervalMonthDayNano.Builder, io.greptime.v1.Common.IntervalMonthDayNanoOrBuilder>(
+                    intervalMonthDayNanoValues_,
+                    ((bitField0_ & 0x02000000) != 0),
+                    getParentForChildren(),
+                    isClean());
+            intervalMonthDayNanoValues_ = null;
+          }
+          return intervalMonthDayNanoValuesBuilder_;
+        }
+
+        private com.google.protobuf.Internal.LongList durationSecondValues_ = emptyLongList();
+        private void ensureDurationSecondValuesIsMutable() {
+          if (!((bitField0_ & 0x04000000) != 0)) {
+            durationSecondValues_ = mutableCopy(durationSecondValues_);
+            bitField0_ |= 0x04000000;
+           }
+        }
+        /**
+         * <code>repeated int64 duration_second_values = 27;</code>
+         * @return A list containing the durationSecondValues.
+         */
+        public java.util.List<java.lang.Long>
+            getDurationSecondValuesList() {
+          return ((bitField0_ & 0x04000000) != 0) ?
+                   java.util.Collections.unmodifiableList(durationSecondValues_) : durationSecondValues_;
+        }
+        /**
+         * <code>repeated int64 duration_second_values = 27;</code>
+         * @return The count of durationSecondValues.
+         */
+        public int getDurationSecondValuesCount() {
+          return durationSecondValues_.size();
+        }
+        /**
+         * <code>repeated int64 duration_second_values = 27;</code>
+         * @param index The index of the element to return.
+         * @return The durationSecondValues at the given index.
+         */
+        public long getDurationSecondValues(int index) {
+          return durationSecondValues_.getLong(index);
+        }
+        /**
+         * <code>repeated int64 duration_second_values = 27;</code>
+         * @param index The index to set the value at.
+         * @param value The durationSecondValues to set.
+         * @return This builder for chaining.
+         */
+        public Builder setDurationSecondValues(
+            int index, long value) {
+          ensureDurationSecondValuesIsMutable();
+          durationSecondValues_.setLong(index, value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 duration_second_values = 27;</code>
+         * @param value The durationSecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addDurationSecondValues(long value) {
+          ensureDurationSecondValuesIsMutable();
+          durationSecondValues_.addLong(value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 duration_second_values = 27;</code>
+         * @param values The durationSecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addAllDurationSecondValues(
+            java.lang.Iterable<? extends java.lang.Long> values) {
+          ensureDurationSecondValuesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, durationSecondValues_);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 duration_second_values = 27;</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearDurationSecondValues() {
+          durationSecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x04000000);
+          onChanged();
+          return this;
+        }
+
+        private com.google.protobuf.Internal.LongList durationMillisecondValues_ = emptyLongList();
+        private void ensureDurationMillisecondValuesIsMutable() {
+          if (!((bitField0_ & 0x08000000) != 0)) {
+            durationMillisecondValues_ = mutableCopy(durationMillisecondValues_);
+            bitField0_ |= 0x08000000;
+           }
+        }
+        /**
+         * <code>repeated int64 duration_millisecond_values = 28;</code>
+         * @return A list containing the durationMillisecondValues.
+         */
+        public java.util.List<java.lang.Long>
+            getDurationMillisecondValuesList() {
+          return ((bitField0_ & 0x08000000) != 0) ?
+                   java.util.Collections.unmodifiableList(durationMillisecondValues_) : durationMillisecondValues_;
+        }
+        /**
+         * <code>repeated int64 duration_millisecond_values = 28;</code>
+         * @return The count of durationMillisecondValues.
+         */
+        public int getDurationMillisecondValuesCount() {
+          return durationMillisecondValues_.size();
+        }
+        /**
+         * <code>repeated int64 duration_millisecond_values = 28;</code>
+         * @param index The index of the element to return.
+         * @return The durationMillisecondValues at the given index.
+         */
+        public long getDurationMillisecondValues(int index) {
+          return durationMillisecondValues_.getLong(index);
+        }
+        /**
+         * <code>repeated int64 duration_millisecond_values = 28;</code>
+         * @param index The index to set the value at.
+         * @param value The durationMillisecondValues to set.
+         * @return This builder for chaining.
+         */
+        public Builder setDurationMillisecondValues(
+            int index, long value) {
+          ensureDurationMillisecondValuesIsMutable();
+          durationMillisecondValues_.setLong(index, value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 duration_millisecond_values = 28;</code>
+         * @param value The durationMillisecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addDurationMillisecondValues(long value) {
+          ensureDurationMillisecondValuesIsMutable();
+          durationMillisecondValues_.addLong(value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 duration_millisecond_values = 28;</code>
+         * @param values The durationMillisecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addAllDurationMillisecondValues(
+            java.lang.Iterable<? extends java.lang.Long> values) {
+          ensureDurationMillisecondValuesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, durationMillisecondValues_);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 duration_millisecond_values = 28;</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearDurationMillisecondValues() {
+          durationMillisecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x08000000);
+          onChanged();
+          return this;
+        }
+
+        private com.google.protobuf.Internal.LongList durationMicrosecondValues_ = emptyLongList();
+        private void ensureDurationMicrosecondValuesIsMutable() {
+          if (!((bitField0_ & 0x10000000) != 0)) {
+            durationMicrosecondValues_ = mutableCopy(durationMicrosecondValues_);
+            bitField0_ |= 0x10000000;
+           }
+        }
+        /**
+         * <code>repeated int64 duration_microsecond_values = 29;</code>
+         * @return A list containing the durationMicrosecondValues.
+         */
+        public java.util.List<java.lang.Long>
+            getDurationMicrosecondValuesList() {
+          return ((bitField0_ & 0x10000000) != 0) ?
+                   java.util.Collections.unmodifiableList(durationMicrosecondValues_) : durationMicrosecondValues_;
+        }
+        /**
+         * <code>repeated int64 duration_microsecond_values = 29;</code>
+         * @return The count of durationMicrosecondValues.
+         */
+        public int getDurationMicrosecondValuesCount() {
+          return durationMicrosecondValues_.size();
+        }
+        /**
+         * <code>repeated int64 duration_microsecond_values = 29;</code>
+         * @param index The index of the element to return.
+         * @return The durationMicrosecondValues at the given index.
+         */
+        public long getDurationMicrosecondValues(int index) {
+          return durationMicrosecondValues_.getLong(index);
+        }
+        /**
+         * <code>repeated int64 duration_microsecond_values = 29;</code>
+         * @param index The index to set the value at.
+         * @param value The durationMicrosecondValues to set.
+         * @return This builder for chaining.
+         */
+        public Builder setDurationMicrosecondValues(
+            int index, long value) {
+          ensureDurationMicrosecondValuesIsMutable();
+          durationMicrosecondValues_.setLong(index, value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 duration_microsecond_values = 29;</code>
+         * @param value The durationMicrosecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addDurationMicrosecondValues(long value) {
+          ensureDurationMicrosecondValuesIsMutable();
+          durationMicrosecondValues_.addLong(value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 duration_microsecond_values = 29;</code>
+         * @param values The durationMicrosecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addAllDurationMicrosecondValues(
+            java.lang.Iterable<? extends java.lang.Long> values) {
+          ensureDurationMicrosecondValuesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, durationMicrosecondValues_);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 duration_microsecond_values = 29;</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearDurationMicrosecondValues() {
+          durationMicrosecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x10000000);
+          onChanged();
+          return this;
+        }
+
+        private com.google.protobuf.Internal.LongList durationNanosecondValues_ = emptyLongList();
+        private void ensureDurationNanosecondValuesIsMutable() {
+          if (!((bitField0_ & 0x20000000) != 0)) {
+            durationNanosecondValues_ = mutableCopy(durationNanosecondValues_);
+            bitField0_ |= 0x20000000;
+           }
+        }
+        /**
+         * <code>repeated int64 duration_nanosecond_values = 30;</code>
+         * @return A list containing the durationNanosecondValues.
+         */
+        public java.util.List<java.lang.Long>
+            getDurationNanosecondValuesList() {
+          return ((bitField0_ & 0x20000000) != 0) ?
+                   java.util.Collections.unmodifiableList(durationNanosecondValues_) : durationNanosecondValues_;
+        }
+        /**
+         * <code>repeated int64 duration_nanosecond_values = 30;</code>
+         * @return The count of durationNanosecondValues.
+         */
+        public int getDurationNanosecondValuesCount() {
+          return durationNanosecondValues_.size();
+        }
+        /**
+         * <code>repeated int64 duration_nanosecond_values = 30;</code>
+         * @param index The index of the element to return.
+         * @return The durationNanosecondValues at the given index.
+         */
+        public long getDurationNanosecondValues(int index) {
+          return durationNanosecondValues_.getLong(index);
+        }
+        /**
+         * <code>repeated int64 duration_nanosecond_values = 30;</code>
+         * @param index The index to set the value at.
+         * @param value The durationNanosecondValues to set.
+         * @return This builder for chaining.
+         */
+        public Builder setDurationNanosecondValues(
+            int index, long value) {
+          ensureDurationNanosecondValuesIsMutable();
+          durationNanosecondValues_.setLong(index, value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 duration_nanosecond_values = 30;</code>
+         * @param value The durationNanosecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addDurationNanosecondValues(long value) {
+          ensureDurationNanosecondValuesIsMutable();
+          durationNanosecondValues_.addLong(value);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 duration_nanosecond_values = 30;</code>
+         * @param values The durationNanosecondValues to add.
+         * @return This builder for chaining.
+         */
+        public Builder addAllDurationNanosecondValues(
+            java.lang.Iterable<? extends java.lang.Long> values) {
+          ensureDurationNanosecondValuesIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, durationNanosecondValues_);
+          onChanged();
+          return this;
+        }
+        /**
+         * <code>repeated int64 duration_nanosecond_values = 30;</code>
+         * @return This builder for chaining.
+         */
+        public Builder clearDurationNanosecondValues() {
+          durationNanosecondValues_ = emptyLongList();
+          bitField0_ = (bitField0_ & ~0x20000000);
+          onChanged();
+          return this;
+        }
+
+        private java.util.List<io.greptime.v1.Common.Decimal128> decimal128Values_ =
+          java.util.Collections.emptyList();
+        private void ensureDecimal128ValuesIsMutable() {
+          if (!((bitField0_ & 0x40000000) != 0)) {
+            decimal128Values_ = new java.util.ArrayList<io.greptime.v1.Common.Decimal128>(decimal128Values_);
+            bitField0_ |= 0x40000000;
+           }
+        }
+
+        private com.google.protobuf.RepeatedFieldBuilderV3<
+            io.greptime.v1.Common.Decimal128, io.greptime.v1.Common.Decimal128.Builder, io.greptime.v1.Common.Decimal128OrBuilder> decimal128ValuesBuilder_;
+
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public java.util.List<io.greptime.v1.Common.Decimal128> getDecimal128ValuesList() {
+          if (decimal128ValuesBuilder_ == null) {
+            return java.util.Collections.unmodifiableList(decimal128Values_);
+          } else {
+            return decimal128ValuesBuilder_.getMessageList();
+          }
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public int getDecimal128ValuesCount() {
+          if (decimal128ValuesBuilder_ == null) {
+            return decimal128Values_.size();
+          } else {
+            return decimal128ValuesBuilder_.getCount();
+          }
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public io.greptime.v1.Common.Decimal128 getDecimal128Values(int index) {
+          if (decimal128ValuesBuilder_ == null) {
+            return decimal128Values_.get(index);
+          } else {
+            return decimal128ValuesBuilder_.getMessage(index);
+          }
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public Builder setDecimal128Values(
+            int index, io.greptime.v1.Common.Decimal128 value) {
+          if (decimal128ValuesBuilder_ == null) {
+            if (value == null) {
+              throw new NullPointerException();
+            }
+            ensureDecimal128ValuesIsMutable();
+            decimal128Values_.set(index, value);
+            onChanged();
+          } else {
+            decimal128ValuesBuilder_.setMessage(index, value);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public Builder setDecimal128Values(
+            int index, io.greptime.v1.Common.Decimal128.Builder builderForValue) {
+          if (decimal128ValuesBuilder_ == null) {
+            ensureDecimal128ValuesIsMutable();
+            decimal128Values_.set(index, builderForValue.build());
+            onChanged();
+          } else {
+            decimal128ValuesBuilder_.setMessage(index, builderForValue.build());
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public Builder addDecimal128Values(io.greptime.v1.Common.Decimal128 value) {
+          if (decimal128ValuesBuilder_ == null) {
+            if (value == null) {
+              throw new NullPointerException();
+            }
+            ensureDecimal128ValuesIsMutable();
+            decimal128Values_.add(value);
+            onChanged();
+          } else {
+            decimal128ValuesBuilder_.addMessage(value);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public Builder addDecimal128Values(
+            int index, io.greptime.v1.Common.Decimal128 value) {
+          if (decimal128ValuesBuilder_ == null) {
+            if (value == null) {
+              throw new NullPointerException();
+            }
+            ensureDecimal128ValuesIsMutable();
+            decimal128Values_.add(index, value);
+            onChanged();
+          } else {
+            decimal128ValuesBuilder_.addMessage(index, value);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public Builder addDecimal128Values(
+            io.greptime.v1.Common.Decimal128.Builder builderForValue) {
+          if (decimal128ValuesBuilder_ == null) {
+            ensureDecimal128ValuesIsMutable();
+            decimal128Values_.add(builderForValue.build());
+            onChanged();
+          } else {
+            decimal128ValuesBuilder_.addMessage(builderForValue.build());
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public Builder addDecimal128Values(
+            int index, io.greptime.v1.Common.Decimal128.Builder builderForValue) {
+          if (decimal128ValuesBuilder_ == null) {
+            ensureDecimal128ValuesIsMutable();
+            decimal128Values_.add(index, builderForValue.build());
+            onChanged();
+          } else {
+            decimal128ValuesBuilder_.addMessage(index, builderForValue.build());
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public Builder addAllDecimal128Values(
+            java.lang.Iterable<? extends io.greptime.v1.Common.Decimal128> values) {
+          if (decimal128ValuesBuilder_ == null) {
+            ensureDecimal128ValuesIsMutable();
+            com.google.protobuf.AbstractMessageLite.Builder.addAll(
+                values, decimal128Values_);
+            onChanged();
+          } else {
+            decimal128ValuesBuilder_.addAllMessages(values);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public Builder clearDecimal128Values() {
+          if (decimal128ValuesBuilder_ == null) {
+            decimal128Values_ = java.util.Collections.emptyList();
+            bitField0_ = (bitField0_ & ~0x40000000);
+            onChanged();
+          } else {
+            decimal128ValuesBuilder_.clear();
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public Builder removeDecimal128Values(int index) {
+          if (decimal128ValuesBuilder_ == null) {
+            ensureDecimal128ValuesIsMutable();
+            decimal128Values_.remove(index);
+            onChanged();
+          } else {
+            decimal128ValuesBuilder_.remove(index);
+          }
+          return this;
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public io.greptime.v1.Common.Decimal128.Builder getDecimal128ValuesBuilder(
+            int index) {
+          return getDecimal128ValuesFieldBuilder().getBuilder(index);
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public io.greptime.v1.Common.Decimal128OrBuilder getDecimal128ValuesOrBuilder(
+            int index) {
+          if (decimal128ValuesBuilder_ == null) {
+            return decimal128Values_.get(index);  } else {
+            return decimal128ValuesBuilder_.getMessageOrBuilder(index);
+          }
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public java.util.List<? extends io.greptime.v1.Common.Decimal128OrBuilder> 
+             getDecimal128ValuesOrBuilderList() {
+          if (decimal128ValuesBuilder_ != null) {
+            return decimal128ValuesBuilder_.getMessageOrBuilderList();
+          } else {
+            return java.util.Collections.unmodifiableList(decimal128Values_);
+          }
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public io.greptime.v1.Common.Decimal128.Builder addDecimal128ValuesBuilder() {
+          return getDecimal128ValuesFieldBuilder().addBuilder(
+              io.greptime.v1.Common.Decimal128.getDefaultInstance());
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public io.greptime.v1.Common.Decimal128.Builder addDecimal128ValuesBuilder(
+            int index) {
+          return getDecimal128ValuesFieldBuilder().addBuilder(
+              index, io.greptime.v1.Common.Decimal128.getDefaultInstance());
+        }
+        /**
+         * <code>repeated .greptime.v1.Decimal128 decimal128_values = 31;</code>
+         */
+        public java.util.List<io.greptime.v1.Common.Decimal128.Builder> 
+             getDecimal128ValuesBuilderList() {
+          return getDecimal128ValuesFieldBuilder().getBuilderList();
+        }
+        private com.google.protobuf.RepeatedFieldBuilderV3<
+            io.greptime.v1.Common.Decimal128, io.greptime.v1.Common.Decimal128.Builder, io.greptime.v1.Common.Decimal128OrBuilder> 
+            getDecimal128ValuesFieldBuilder() {
+          if (decimal128ValuesBuilder_ == null) {
+            decimal128ValuesBuilder_ = new com.google.protobuf.RepeatedFieldBuilderV3<
+                io.greptime.v1.Common.Decimal128, io.greptime.v1.Common.Decimal128.Builder, io.greptime.v1.Common.Decimal128OrBuilder>(
+                    decimal128Values_,
+                    ((bitField0_ & 0x40000000) != 0),
+                    getParentForChildren(),
+                    isClean());
+            decimal128Values_ = null;
+          }
+          return decimal128ValuesBuilder_;
         }
         @java.lang.Override
         public final Builder setUnknownFields(
@@ -4747,20 +7083,20 @@ public final class Columns {
     public static final int SEMANTIC_TYPE_FIELD_NUMBER = 2;
     private int semanticType_;
     /**
-     * <code>.greptime.v1.Column.SemanticType semantic_type = 2;</code>
+     * <code>.greptime.v1.SemanticType semantic_type = 2;</code>
      * @return The enum numeric value on the wire for semanticType.
      */
     @java.lang.Override public int getSemanticTypeValue() {
       return semanticType_;
     }
     /**
-     * <code>.greptime.v1.Column.SemanticType semantic_type = 2;</code>
+     * <code>.greptime.v1.SemanticType semantic_type = 2;</code>
      * @return The semanticType.
      */
-    @java.lang.Override public io.greptime.v1.Columns.Column.SemanticType getSemanticType() {
+    @java.lang.Override public io.greptime.v1.Common.SemanticType getSemanticType() {
       @SuppressWarnings("deprecation")
-      io.greptime.v1.Columns.Column.SemanticType result = io.greptime.v1.Columns.Column.SemanticType.valueOf(semanticType_);
-      return result == null ? io.greptime.v1.Columns.Column.SemanticType.UNRECOGNIZED : result;
+      io.greptime.v1.Common.SemanticType result = io.greptime.v1.Common.SemanticType.valueOf(semanticType_);
+      return result == null ? io.greptime.v1.Common.SemanticType.UNRECOGNIZED : result;
     }
 
     public static final int VALUES_FIELD_NUMBER = 3;
@@ -4860,10 +7196,48 @@ public final class Columns {
      * <code>.greptime.v1.ColumnDataType datatype = 5;</code>
      * @return The datatype.
      */
-    @java.lang.Override public io.greptime.v1.Columns.ColumnDataType getDatatype() {
+    @java.lang.Override public io.greptime.v1.Common.ColumnDataType getDatatype() {
       @SuppressWarnings("deprecation")
-      io.greptime.v1.Columns.ColumnDataType result = io.greptime.v1.Columns.ColumnDataType.valueOf(datatype_);
-      return result == null ? io.greptime.v1.Columns.ColumnDataType.UNRECOGNIZED : result;
+      io.greptime.v1.Common.ColumnDataType result = io.greptime.v1.Common.ColumnDataType.valueOf(datatype_);
+      return result == null ? io.greptime.v1.Common.ColumnDataType.UNRECOGNIZED : result;
+    }
+
+    public static final int DATATYPE_EXTENSION_FIELD_NUMBER = 6;
+    private io.greptime.v1.Common.ColumnDataTypeExtension datatypeExtension_;
+    /**
+     * <pre>
+     * Extension for ColumnDataType.
+     * </pre>
+     *
+     * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+     * @return Whether the datatypeExtension field is set.
+     */
+    @java.lang.Override
+    public boolean hasDatatypeExtension() {
+      return datatypeExtension_ != null;
+    }
+    /**
+     * <pre>
+     * Extension for ColumnDataType.
+     * </pre>
+     *
+     * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+     * @return The datatypeExtension.
+     */
+    @java.lang.Override
+    public io.greptime.v1.Common.ColumnDataTypeExtension getDatatypeExtension() {
+      return datatypeExtension_ == null ? io.greptime.v1.Common.ColumnDataTypeExtension.getDefaultInstance() : datatypeExtension_;
+    }
+    /**
+     * <pre>
+     * Extension for ColumnDataType.
+     * </pre>
+     *
+     * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.Common.ColumnDataTypeExtensionOrBuilder getDatatypeExtensionOrBuilder() {
+      return getDatatypeExtension();
     }
 
     private byte memoizedIsInitialized = -1;
@@ -4883,7 +7257,7 @@ public final class Columns {
       if (!com.google.protobuf.GeneratedMessageV3.isStringEmpty(columnName_)) {
         com.google.protobuf.GeneratedMessageV3.writeString(output, 1, columnName_);
       }
-      if (semanticType_ != io.greptime.v1.Columns.Column.SemanticType.TAG.getNumber()) {
+      if (semanticType_ != io.greptime.v1.Common.SemanticType.TAG.getNumber()) {
         output.writeEnum(2, semanticType_);
       }
       if (values_ != null) {
@@ -4892,8 +7266,11 @@ public final class Columns {
       if (!nullMask_.isEmpty()) {
         output.writeBytes(4, nullMask_);
       }
-      if (datatype_ != io.greptime.v1.Columns.ColumnDataType.BOOLEAN.getNumber()) {
+      if (datatype_ != io.greptime.v1.Common.ColumnDataType.BOOLEAN.getNumber()) {
         output.writeEnum(5, datatype_);
+      }
+      if (datatypeExtension_ != null) {
+        output.writeMessage(6, getDatatypeExtension());
       }
       unknownFields.writeTo(output);
     }
@@ -4907,7 +7284,7 @@ public final class Columns {
       if (!com.google.protobuf.GeneratedMessageV3.isStringEmpty(columnName_)) {
         size += com.google.protobuf.GeneratedMessageV3.computeStringSize(1, columnName_);
       }
-      if (semanticType_ != io.greptime.v1.Columns.Column.SemanticType.TAG.getNumber()) {
+      if (semanticType_ != io.greptime.v1.Common.SemanticType.TAG.getNumber()) {
         size += com.google.protobuf.CodedOutputStream
           .computeEnumSize(2, semanticType_);
       }
@@ -4919,9 +7296,13 @@ public final class Columns {
         size += com.google.protobuf.CodedOutputStream
           .computeBytesSize(4, nullMask_);
       }
-      if (datatype_ != io.greptime.v1.Columns.ColumnDataType.BOOLEAN.getNumber()) {
+      if (datatype_ != io.greptime.v1.Common.ColumnDataType.BOOLEAN.getNumber()) {
         size += com.google.protobuf.CodedOutputStream
           .computeEnumSize(5, datatype_);
+      }
+      if (datatypeExtension_ != null) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(6, getDatatypeExtension());
       }
       size += unknownFields.getSerializedSize();
       memoizedSize = size;
@@ -4949,6 +7330,11 @@ public final class Columns {
       if (!getNullMask()
           .equals(other.getNullMask())) return false;
       if (datatype_ != other.datatype_) return false;
+      if (hasDatatypeExtension() != other.hasDatatypeExtension()) return false;
+      if (hasDatatypeExtension()) {
+        if (!getDatatypeExtension()
+            .equals(other.getDatatypeExtension())) return false;
+      }
       if (!unknownFields.equals(other.unknownFields)) return false;
       return true;
     }
@@ -4972,6 +7358,10 @@ public final class Columns {
       hash = (53 * hash) + getNullMask().hashCode();
       hash = (37 * hash) + DATATYPE_FIELD_NUMBER;
       hash = (53 * hash) + datatype_;
+      if (hasDatatypeExtension()) {
+        hash = (37 * hash) + DATATYPE_EXTENSION_FIELD_NUMBER;
+        hash = (53 * hash) + getDatatypeExtension().hashCode();
+      }
       hash = (29 * hash) + unknownFields.hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -5119,6 +7509,12 @@ public final class Columns {
 
         datatype_ = 0;
 
+        if (datatypeExtensionBuilder_ == null) {
+          datatypeExtension_ = null;
+        } else {
+          datatypeExtension_ = null;
+          datatypeExtensionBuilder_ = null;
+        }
         return this;
       }
 
@@ -5154,6 +7550,11 @@ public final class Columns {
         }
         result.nullMask_ = nullMask_;
         result.datatype_ = datatype_;
+        if (datatypeExtensionBuilder_ == null) {
+          result.datatypeExtension_ = datatypeExtension_;
+        } else {
+          result.datatypeExtension_ = datatypeExtensionBuilder_.build();
+        }
         onBuilt();
         return result;
       }
@@ -5217,6 +7618,9 @@ public final class Columns {
         }
         if (other.datatype_ != 0) {
           setDatatypeValue(other.getDatatypeValue());
+        }
+        if (other.hasDatatypeExtension()) {
+          mergeDatatypeExtension(other.getDatatypeExtension());
         }
         this.mergeUnknownFields(other.unknownFields);
         onChanged();
@@ -5325,14 +7729,14 @@ public final class Columns {
 
       private int semanticType_ = 0;
       /**
-       * <code>.greptime.v1.Column.SemanticType semantic_type = 2;</code>
+       * <code>.greptime.v1.SemanticType semantic_type = 2;</code>
        * @return The enum numeric value on the wire for semanticType.
        */
       @java.lang.Override public int getSemanticTypeValue() {
         return semanticType_;
       }
       /**
-       * <code>.greptime.v1.Column.SemanticType semantic_type = 2;</code>
+       * <code>.greptime.v1.SemanticType semantic_type = 2;</code>
        * @param value The enum numeric value on the wire for semanticType to set.
        * @return This builder for chaining.
        */
@@ -5343,21 +7747,21 @@ public final class Columns {
         return this;
       }
       /**
-       * <code>.greptime.v1.Column.SemanticType semantic_type = 2;</code>
+       * <code>.greptime.v1.SemanticType semantic_type = 2;</code>
        * @return The semanticType.
        */
       @java.lang.Override
-      public io.greptime.v1.Columns.Column.SemanticType getSemanticType() {
+      public io.greptime.v1.Common.SemanticType getSemanticType() {
         @SuppressWarnings("deprecation")
-        io.greptime.v1.Columns.Column.SemanticType result = io.greptime.v1.Columns.Column.SemanticType.valueOf(semanticType_);
-        return result == null ? io.greptime.v1.Columns.Column.SemanticType.UNRECOGNIZED : result;
+        io.greptime.v1.Common.SemanticType result = io.greptime.v1.Common.SemanticType.valueOf(semanticType_);
+        return result == null ? io.greptime.v1.Common.SemanticType.UNRECOGNIZED : result;
       }
       /**
-       * <code>.greptime.v1.Column.SemanticType semantic_type = 2;</code>
+       * <code>.greptime.v1.SemanticType semantic_type = 2;</code>
        * @param value The semanticType to set.
        * @return This builder for chaining.
        */
-      public Builder setSemanticType(io.greptime.v1.Columns.Column.SemanticType value) {
+      public Builder setSemanticType(io.greptime.v1.Common.SemanticType value) {
         if (value == null) {
           throw new NullPointerException();
         }
@@ -5367,7 +7771,7 @@ public final class Columns {
         return this;
       }
       /**
-       * <code>.greptime.v1.Column.SemanticType semantic_type = 2;</code>
+       * <code>.greptime.v1.SemanticType semantic_type = 2;</code>
        * @return This builder for chaining.
        */
       public Builder clearSemanticType() {
@@ -5683,10 +8087,10 @@ public final class Columns {
        * @return The datatype.
        */
       @java.lang.Override
-      public io.greptime.v1.Columns.ColumnDataType getDatatype() {
+      public io.greptime.v1.Common.ColumnDataType getDatatype() {
         @SuppressWarnings("deprecation")
-        io.greptime.v1.Columns.ColumnDataType result = io.greptime.v1.Columns.ColumnDataType.valueOf(datatype_);
-        return result == null ? io.greptime.v1.Columns.ColumnDataType.UNRECOGNIZED : result;
+        io.greptime.v1.Common.ColumnDataType result = io.greptime.v1.Common.ColumnDataType.valueOf(datatype_);
+        return result == null ? io.greptime.v1.Common.ColumnDataType.UNRECOGNIZED : result;
       }
       /**
        * <pre>
@@ -5697,7 +8101,7 @@ public final class Columns {
        * @param value The datatype to set.
        * @return This builder for chaining.
        */
-      public Builder setDatatype(io.greptime.v1.Columns.ColumnDataType value) {
+      public Builder setDatatype(io.greptime.v1.Common.ColumnDataType value) {
         if (value == null) {
           throw new NullPointerException();
         }
@@ -5719,6 +8123,161 @@ public final class Columns {
         datatype_ = 0;
         onChanged();
         return this;
+      }
+
+      private io.greptime.v1.Common.ColumnDataTypeExtension datatypeExtension_;
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.Common.ColumnDataTypeExtension, io.greptime.v1.Common.ColumnDataTypeExtension.Builder, io.greptime.v1.Common.ColumnDataTypeExtensionOrBuilder> datatypeExtensionBuilder_;
+      /**
+       * <pre>
+       * Extension for ColumnDataType.
+       * </pre>
+       *
+       * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+       * @return Whether the datatypeExtension field is set.
+       */
+      public boolean hasDatatypeExtension() {
+        return datatypeExtensionBuilder_ != null || datatypeExtension_ != null;
+      }
+      /**
+       * <pre>
+       * Extension for ColumnDataType.
+       * </pre>
+       *
+       * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+       * @return The datatypeExtension.
+       */
+      public io.greptime.v1.Common.ColumnDataTypeExtension getDatatypeExtension() {
+        if (datatypeExtensionBuilder_ == null) {
+          return datatypeExtension_ == null ? io.greptime.v1.Common.ColumnDataTypeExtension.getDefaultInstance() : datatypeExtension_;
+        } else {
+          return datatypeExtensionBuilder_.getMessage();
+        }
+      }
+      /**
+       * <pre>
+       * Extension for ColumnDataType.
+       * </pre>
+       *
+       * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+       */
+      public Builder setDatatypeExtension(io.greptime.v1.Common.ColumnDataTypeExtension value) {
+        if (datatypeExtensionBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          datatypeExtension_ = value;
+          onChanged();
+        } else {
+          datatypeExtensionBuilder_.setMessage(value);
+        }
+
+        return this;
+      }
+      /**
+       * <pre>
+       * Extension for ColumnDataType.
+       * </pre>
+       *
+       * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+       */
+      public Builder setDatatypeExtension(
+          io.greptime.v1.Common.ColumnDataTypeExtension.Builder builderForValue) {
+        if (datatypeExtensionBuilder_ == null) {
+          datatypeExtension_ = builderForValue.build();
+          onChanged();
+        } else {
+          datatypeExtensionBuilder_.setMessage(builderForValue.build());
+        }
+
+        return this;
+      }
+      /**
+       * <pre>
+       * Extension for ColumnDataType.
+       * </pre>
+       *
+       * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+       */
+      public Builder mergeDatatypeExtension(io.greptime.v1.Common.ColumnDataTypeExtension value) {
+        if (datatypeExtensionBuilder_ == null) {
+          if (datatypeExtension_ != null) {
+            datatypeExtension_ =
+              io.greptime.v1.Common.ColumnDataTypeExtension.newBuilder(datatypeExtension_).mergeFrom(value).buildPartial();
+          } else {
+            datatypeExtension_ = value;
+          }
+          onChanged();
+        } else {
+          datatypeExtensionBuilder_.mergeFrom(value);
+        }
+
+        return this;
+      }
+      /**
+       * <pre>
+       * Extension for ColumnDataType.
+       * </pre>
+       *
+       * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+       */
+      public Builder clearDatatypeExtension() {
+        if (datatypeExtensionBuilder_ == null) {
+          datatypeExtension_ = null;
+          onChanged();
+        } else {
+          datatypeExtension_ = null;
+          datatypeExtensionBuilder_ = null;
+        }
+
+        return this;
+      }
+      /**
+       * <pre>
+       * Extension for ColumnDataType.
+       * </pre>
+       *
+       * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+       */
+      public io.greptime.v1.Common.ColumnDataTypeExtension.Builder getDatatypeExtensionBuilder() {
+        
+        onChanged();
+        return getDatatypeExtensionFieldBuilder().getBuilder();
+      }
+      /**
+       * <pre>
+       * Extension for ColumnDataType.
+       * </pre>
+       *
+       * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+       */
+      public io.greptime.v1.Common.ColumnDataTypeExtensionOrBuilder getDatatypeExtensionOrBuilder() {
+        if (datatypeExtensionBuilder_ != null) {
+          return datatypeExtensionBuilder_.getMessageOrBuilder();
+        } else {
+          return datatypeExtension_ == null ?
+              io.greptime.v1.Common.ColumnDataTypeExtension.getDefaultInstance() : datatypeExtension_;
+        }
+      }
+      /**
+       * <pre>
+       * Extension for ColumnDataType.
+       * </pre>
+       *
+       * <code>.greptime.v1.ColumnDataTypeExtension datatype_extension = 6;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.Common.ColumnDataTypeExtension, io.greptime.v1.Common.ColumnDataTypeExtension.Builder, io.greptime.v1.Common.ColumnDataTypeExtensionOrBuilder> 
+          getDatatypeExtensionFieldBuilder() {
+        if (datatypeExtensionBuilder_ == null) {
+          datatypeExtensionBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+              io.greptime.v1.Common.ColumnDataTypeExtension, io.greptime.v1.Common.ColumnDataTypeExtension.Builder, io.greptime.v1.Common.ColumnDataTypeExtensionOrBuilder>(
+                  getDatatypeExtension(),
+                  getParentForChildren(),
+                  isClean());
+          datatypeExtension_ = null;
+        }
+        return datatypeExtensionBuilder_;
       }
       @java.lang.Override
       public final Builder setUnknownFields(
@@ -5773,828 +8332,6 @@ public final class Columns {
 
   }
 
-  public interface ColumnDefOrBuilder extends
-      // @@protoc_insertion_point(interface_extends:greptime.v1.ColumnDef)
-      com.google.protobuf.MessageOrBuilder {
-
-    /**
-     * <code>string name = 1;</code>
-     * @return The name.
-     */
-    java.lang.String getName();
-    /**
-     * <code>string name = 1;</code>
-     * @return The bytes for name.
-     */
-    com.google.protobuf.ByteString
-        getNameBytes();
-
-    /**
-     * <code>.greptime.v1.ColumnDataType datatype = 2;</code>
-     * @return The enum numeric value on the wire for datatype.
-     */
-    int getDatatypeValue();
-    /**
-     * <code>.greptime.v1.ColumnDataType datatype = 2;</code>
-     * @return The datatype.
-     */
-    io.greptime.v1.Columns.ColumnDataType getDatatype();
-
-    /**
-     * <code>bool is_nullable = 3;</code>
-     * @return The isNullable.
-     */
-    boolean getIsNullable();
-
-    /**
-     * <code>bytes default_constraint = 4;</code>
-     * @return The defaultConstraint.
-     */
-    com.google.protobuf.ByteString getDefaultConstraint();
-  }
-  /**
-   * Protobuf type {@code greptime.v1.ColumnDef}
-   */
-  public static final class ColumnDef extends
-      com.google.protobuf.GeneratedMessageV3 implements
-      // @@protoc_insertion_point(message_implements:greptime.v1.ColumnDef)
-      ColumnDefOrBuilder {
-  private static final long serialVersionUID = 0L;
-    // Use ColumnDef.newBuilder() to construct.
-    private ColumnDef(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
-      super(builder);
-    }
-    private ColumnDef() {
-      name_ = "";
-      datatype_ = 0;
-      defaultConstraint_ = com.google.protobuf.ByteString.EMPTY;
-    }
-
-    @java.lang.Override
-    @SuppressWarnings({"unused"})
-    protected java.lang.Object newInstance(
-        UnusedPrivateParameter unused) {
-      return new ColumnDef();
-    }
-
-    @java.lang.Override
-    public final com.google.protobuf.UnknownFieldSet
-    getUnknownFields() {
-      return this.unknownFields;
-    }
-    private ColumnDef(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      this();
-      if (extensionRegistry == null) {
-        throw new java.lang.NullPointerException();
-      }
-      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
-          com.google.protobuf.UnknownFieldSet.newBuilder();
-      try {
-        boolean done = false;
-        while (!done) {
-          int tag = input.readTag();
-          switch (tag) {
-            case 0:
-              done = true;
-              break;
-            case 10: {
-              java.lang.String s = input.readStringRequireUtf8();
-
-              name_ = s;
-              break;
-            }
-            case 16: {
-              int rawValue = input.readEnum();
-
-              datatype_ = rawValue;
-              break;
-            }
-            case 24: {
-
-              isNullable_ = input.readBool();
-              break;
-            }
-            case 34: {
-
-              defaultConstraint_ = input.readBytes();
-              break;
-            }
-            default: {
-              if (!parseUnknownField(
-                  input, unknownFields, extensionRegistry, tag)) {
-                done = true;
-              }
-              break;
-            }
-          }
-        }
-      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-        throw e.setUnfinishedMessage(this);
-      } catch (com.google.protobuf.UninitializedMessageException e) {
-        throw e.asInvalidProtocolBufferException().setUnfinishedMessage(this);
-      } catch (java.io.IOException e) {
-        throw new com.google.protobuf.InvalidProtocolBufferException(
-            e).setUnfinishedMessage(this);
-      } finally {
-        this.unknownFields = unknownFields.build();
-        makeExtensionsImmutable();
-      }
-    }
-    public static final com.google.protobuf.Descriptors.Descriptor
-        getDescriptor() {
-      return io.greptime.v1.Columns.internal_static_greptime_v1_ColumnDef_descriptor;
-    }
-
-    @java.lang.Override
-    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-        internalGetFieldAccessorTable() {
-      return io.greptime.v1.Columns.internal_static_greptime_v1_ColumnDef_fieldAccessorTable
-          .ensureFieldAccessorsInitialized(
-              io.greptime.v1.Columns.ColumnDef.class, io.greptime.v1.Columns.ColumnDef.Builder.class);
-    }
-
-    public static final int NAME_FIELD_NUMBER = 1;
-    private volatile java.lang.Object name_;
-    /**
-     * <code>string name = 1;</code>
-     * @return The name.
-     */
-    @java.lang.Override
-    public java.lang.String getName() {
-      java.lang.Object ref = name_;
-      if (ref instanceof java.lang.String) {
-        return (java.lang.String) ref;
-      } else {
-        com.google.protobuf.ByteString bs = 
-            (com.google.protobuf.ByteString) ref;
-        java.lang.String s = bs.toStringUtf8();
-        name_ = s;
-        return s;
-      }
-    }
-    /**
-     * <code>string name = 1;</code>
-     * @return The bytes for name.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString
-        getNameBytes() {
-      java.lang.Object ref = name_;
-      if (ref instanceof java.lang.String) {
-        com.google.protobuf.ByteString b = 
-            com.google.protobuf.ByteString.copyFromUtf8(
-                (java.lang.String) ref);
-        name_ = b;
-        return b;
-      } else {
-        return (com.google.protobuf.ByteString) ref;
-      }
-    }
-
-    public static final int DATATYPE_FIELD_NUMBER = 2;
-    private int datatype_;
-    /**
-     * <code>.greptime.v1.ColumnDataType datatype = 2;</code>
-     * @return The enum numeric value on the wire for datatype.
-     */
-    @java.lang.Override public int getDatatypeValue() {
-      return datatype_;
-    }
-    /**
-     * <code>.greptime.v1.ColumnDataType datatype = 2;</code>
-     * @return The datatype.
-     */
-    @java.lang.Override public io.greptime.v1.Columns.ColumnDataType getDatatype() {
-      @SuppressWarnings("deprecation")
-      io.greptime.v1.Columns.ColumnDataType result = io.greptime.v1.Columns.ColumnDataType.valueOf(datatype_);
-      return result == null ? io.greptime.v1.Columns.ColumnDataType.UNRECOGNIZED : result;
-    }
-
-    public static final int IS_NULLABLE_FIELD_NUMBER = 3;
-    private boolean isNullable_;
-    /**
-     * <code>bool is_nullable = 3;</code>
-     * @return The isNullable.
-     */
-    @java.lang.Override
-    public boolean getIsNullable() {
-      return isNullable_;
-    }
-
-    public static final int DEFAULT_CONSTRAINT_FIELD_NUMBER = 4;
-    private com.google.protobuf.ByteString defaultConstraint_;
-    /**
-     * <code>bytes default_constraint = 4;</code>
-     * @return The defaultConstraint.
-     */
-    @java.lang.Override
-    public com.google.protobuf.ByteString getDefaultConstraint() {
-      return defaultConstraint_;
-    }
-
-    private byte memoizedIsInitialized = -1;
-    @java.lang.Override
-    public final boolean isInitialized() {
-      byte isInitialized = memoizedIsInitialized;
-      if (isInitialized == 1) return true;
-      if (isInitialized == 0) return false;
-
-      memoizedIsInitialized = 1;
-      return true;
-    }
-
-    @java.lang.Override
-    public void writeTo(com.google.protobuf.CodedOutputStream output)
-                        throws java.io.IOException {
-      if (!com.google.protobuf.GeneratedMessageV3.isStringEmpty(name_)) {
-        com.google.protobuf.GeneratedMessageV3.writeString(output, 1, name_);
-      }
-      if (datatype_ != io.greptime.v1.Columns.ColumnDataType.BOOLEAN.getNumber()) {
-        output.writeEnum(2, datatype_);
-      }
-      if (isNullable_ != false) {
-        output.writeBool(3, isNullable_);
-      }
-      if (!defaultConstraint_.isEmpty()) {
-        output.writeBytes(4, defaultConstraint_);
-      }
-      unknownFields.writeTo(output);
-    }
-
-    @java.lang.Override
-    public int getSerializedSize() {
-      int size = memoizedSize;
-      if (size != -1) return size;
-
-      size = 0;
-      if (!com.google.protobuf.GeneratedMessageV3.isStringEmpty(name_)) {
-        size += com.google.protobuf.GeneratedMessageV3.computeStringSize(1, name_);
-      }
-      if (datatype_ != io.greptime.v1.Columns.ColumnDataType.BOOLEAN.getNumber()) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeEnumSize(2, datatype_);
-      }
-      if (isNullable_ != false) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeBoolSize(3, isNullable_);
-      }
-      if (!defaultConstraint_.isEmpty()) {
-        size += com.google.protobuf.CodedOutputStream
-          .computeBytesSize(4, defaultConstraint_);
-      }
-      size += unknownFields.getSerializedSize();
-      memoizedSize = size;
-      return size;
-    }
-
-    @java.lang.Override
-    public boolean equals(final java.lang.Object obj) {
-      if (obj == this) {
-       return true;
-      }
-      if (!(obj instanceof io.greptime.v1.Columns.ColumnDef)) {
-        return super.equals(obj);
-      }
-      io.greptime.v1.Columns.ColumnDef other = (io.greptime.v1.Columns.ColumnDef) obj;
-
-      if (!getName()
-          .equals(other.getName())) return false;
-      if (datatype_ != other.datatype_) return false;
-      if (getIsNullable()
-          != other.getIsNullable()) return false;
-      if (!getDefaultConstraint()
-          .equals(other.getDefaultConstraint())) return false;
-      if (!unknownFields.equals(other.unknownFields)) return false;
-      return true;
-    }
-
-    @java.lang.Override
-    public int hashCode() {
-      if (memoizedHashCode != 0) {
-        return memoizedHashCode;
-      }
-      int hash = 41;
-      hash = (19 * hash) + getDescriptor().hashCode();
-      hash = (37 * hash) + NAME_FIELD_NUMBER;
-      hash = (53 * hash) + getName().hashCode();
-      hash = (37 * hash) + DATATYPE_FIELD_NUMBER;
-      hash = (53 * hash) + datatype_;
-      hash = (37 * hash) + IS_NULLABLE_FIELD_NUMBER;
-      hash = (53 * hash) + com.google.protobuf.Internal.hashBoolean(
-          getIsNullable());
-      hash = (37 * hash) + DEFAULT_CONSTRAINT_FIELD_NUMBER;
-      hash = (53 * hash) + getDefaultConstraint().hashCode();
-      hash = (29 * hash) + unknownFields.hashCode();
-      memoizedHashCode = hash;
-      return hash;
-    }
-
-    public static io.greptime.v1.Columns.ColumnDef parseFrom(
-        java.nio.ByteBuffer data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data);
-    }
-    public static io.greptime.v1.Columns.ColumnDef parseFrom(
-        java.nio.ByteBuffer data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data, extensionRegistry);
-    }
-    public static io.greptime.v1.Columns.ColumnDef parseFrom(
-        com.google.protobuf.ByteString data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data);
-    }
-    public static io.greptime.v1.Columns.ColumnDef parseFrom(
-        com.google.protobuf.ByteString data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data, extensionRegistry);
-    }
-    public static io.greptime.v1.Columns.ColumnDef parseFrom(byte[] data)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data);
-    }
-    public static io.greptime.v1.Columns.ColumnDef parseFrom(
-        byte[] data,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws com.google.protobuf.InvalidProtocolBufferException {
-      return PARSER.parseFrom(data, extensionRegistry);
-    }
-    public static io.greptime.v1.Columns.ColumnDef parseFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseWithIOException(PARSER, input);
-    }
-    public static io.greptime.v1.Columns.ColumnDef parseFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseWithIOException(PARSER, input, extensionRegistry);
-    }
-    public static io.greptime.v1.Columns.ColumnDef parseDelimitedFrom(java.io.InputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseDelimitedWithIOException(PARSER, input);
-    }
-    public static io.greptime.v1.Columns.ColumnDef parseDelimitedFrom(
-        java.io.InputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
-    }
-    public static io.greptime.v1.Columns.ColumnDef parseFrom(
-        com.google.protobuf.CodedInputStream input)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseWithIOException(PARSER, input);
-    }
-    public static io.greptime.v1.Columns.ColumnDef parseFrom(
-        com.google.protobuf.CodedInputStream input,
-        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-        throws java.io.IOException {
-      return com.google.protobuf.GeneratedMessageV3
-          .parseWithIOException(PARSER, input, extensionRegistry);
-    }
-
-    @java.lang.Override
-    public Builder newBuilderForType() { return newBuilder(); }
-    public static Builder newBuilder() {
-      return DEFAULT_INSTANCE.toBuilder();
-    }
-    public static Builder newBuilder(io.greptime.v1.Columns.ColumnDef prototype) {
-      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
-    }
-    @java.lang.Override
-    public Builder toBuilder() {
-      return this == DEFAULT_INSTANCE
-          ? new Builder() : new Builder().mergeFrom(this);
-    }
-
-    @java.lang.Override
-    protected Builder newBuilderForType(
-        com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
-      Builder builder = new Builder(parent);
-      return builder;
-    }
-    /**
-     * Protobuf type {@code greptime.v1.ColumnDef}
-     */
-    public static final class Builder extends
-        com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
-        // @@protoc_insertion_point(builder_implements:greptime.v1.ColumnDef)
-        io.greptime.v1.Columns.ColumnDefOrBuilder {
-      public static final com.google.protobuf.Descriptors.Descriptor
-          getDescriptor() {
-        return io.greptime.v1.Columns.internal_static_greptime_v1_ColumnDef_descriptor;
-      }
-
-      @java.lang.Override
-      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-          internalGetFieldAccessorTable() {
-        return io.greptime.v1.Columns.internal_static_greptime_v1_ColumnDef_fieldAccessorTable
-            .ensureFieldAccessorsInitialized(
-                io.greptime.v1.Columns.ColumnDef.class, io.greptime.v1.Columns.ColumnDef.Builder.class);
-      }
-
-      // Construct using io.greptime.v1.Columns.ColumnDef.newBuilder()
-      private Builder() {
-        maybeForceBuilderInitialization();
-      }
-
-      private Builder(
-          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
-        super(parent);
-        maybeForceBuilderInitialization();
-      }
-      private void maybeForceBuilderInitialization() {
-        if (com.google.protobuf.GeneratedMessageV3
-                .alwaysUseFieldBuilders) {
-        }
-      }
-      @java.lang.Override
-      public Builder clear() {
-        super.clear();
-        name_ = "";
-
-        datatype_ = 0;
-
-        isNullable_ = false;
-
-        defaultConstraint_ = com.google.protobuf.ByteString.EMPTY;
-
-        return this;
-      }
-
-      @java.lang.Override
-      public com.google.protobuf.Descriptors.Descriptor
-          getDescriptorForType() {
-        return io.greptime.v1.Columns.internal_static_greptime_v1_ColumnDef_descriptor;
-      }
-
-      @java.lang.Override
-      public io.greptime.v1.Columns.ColumnDef getDefaultInstanceForType() {
-        return io.greptime.v1.Columns.ColumnDef.getDefaultInstance();
-      }
-
-      @java.lang.Override
-      public io.greptime.v1.Columns.ColumnDef build() {
-        io.greptime.v1.Columns.ColumnDef result = buildPartial();
-        if (!result.isInitialized()) {
-          throw newUninitializedMessageException(result);
-        }
-        return result;
-      }
-
-      @java.lang.Override
-      public io.greptime.v1.Columns.ColumnDef buildPartial() {
-        io.greptime.v1.Columns.ColumnDef result = new io.greptime.v1.Columns.ColumnDef(this);
-        result.name_ = name_;
-        result.datatype_ = datatype_;
-        result.isNullable_ = isNullable_;
-        result.defaultConstraint_ = defaultConstraint_;
-        onBuilt();
-        return result;
-      }
-
-      @java.lang.Override
-      public Builder clone() {
-        return super.clone();
-      }
-      @java.lang.Override
-      public Builder setField(
-          com.google.protobuf.Descriptors.FieldDescriptor field,
-          java.lang.Object value) {
-        return super.setField(field, value);
-      }
-      @java.lang.Override
-      public Builder clearField(
-          com.google.protobuf.Descriptors.FieldDescriptor field) {
-        return super.clearField(field);
-      }
-      @java.lang.Override
-      public Builder clearOneof(
-          com.google.protobuf.Descriptors.OneofDescriptor oneof) {
-        return super.clearOneof(oneof);
-      }
-      @java.lang.Override
-      public Builder setRepeatedField(
-          com.google.protobuf.Descriptors.FieldDescriptor field,
-          int index, java.lang.Object value) {
-        return super.setRepeatedField(field, index, value);
-      }
-      @java.lang.Override
-      public Builder addRepeatedField(
-          com.google.protobuf.Descriptors.FieldDescriptor field,
-          java.lang.Object value) {
-        return super.addRepeatedField(field, value);
-      }
-      @java.lang.Override
-      public Builder mergeFrom(com.google.protobuf.Message other) {
-        if (other instanceof io.greptime.v1.Columns.ColumnDef) {
-          return mergeFrom((io.greptime.v1.Columns.ColumnDef)other);
-        } else {
-          super.mergeFrom(other);
-          return this;
-        }
-      }
-
-      public Builder mergeFrom(io.greptime.v1.Columns.ColumnDef other) {
-        if (other == io.greptime.v1.Columns.ColumnDef.getDefaultInstance()) return this;
-        if (!other.getName().isEmpty()) {
-          name_ = other.name_;
-          onChanged();
-        }
-        if (other.datatype_ != 0) {
-          setDatatypeValue(other.getDatatypeValue());
-        }
-        if (other.getIsNullable() != false) {
-          setIsNullable(other.getIsNullable());
-        }
-        if (other.getDefaultConstraint() != com.google.protobuf.ByteString.EMPTY) {
-          setDefaultConstraint(other.getDefaultConstraint());
-        }
-        this.mergeUnknownFields(other.unknownFields);
-        onChanged();
-        return this;
-      }
-
-      @java.lang.Override
-      public final boolean isInitialized() {
-        return true;
-      }
-
-      @java.lang.Override
-      public Builder mergeFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws java.io.IOException {
-        io.greptime.v1.Columns.ColumnDef parsedMessage = null;
-        try {
-          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
-        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
-          parsedMessage = (io.greptime.v1.Columns.ColumnDef) e.getUnfinishedMessage();
-          throw e.unwrapIOException();
-        } finally {
-          if (parsedMessage != null) {
-            mergeFrom(parsedMessage);
-          }
-        }
-        return this;
-      }
-
-      private java.lang.Object name_ = "";
-      /**
-       * <code>string name = 1;</code>
-       * @return The name.
-       */
-      public java.lang.String getName() {
-        java.lang.Object ref = name_;
-        if (!(ref instanceof java.lang.String)) {
-          com.google.protobuf.ByteString bs =
-              (com.google.protobuf.ByteString) ref;
-          java.lang.String s = bs.toStringUtf8();
-          name_ = s;
-          return s;
-        } else {
-          return (java.lang.String) ref;
-        }
-      }
-      /**
-       * <code>string name = 1;</code>
-       * @return The bytes for name.
-       */
-      public com.google.protobuf.ByteString
-          getNameBytes() {
-        java.lang.Object ref = name_;
-        if (ref instanceof String) {
-          com.google.protobuf.ByteString b = 
-              com.google.protobuf.ByteString.copyFromUtf8(
-                  (java.lang.String) ref);
-          name_ = b;
-          return b;
-        } else {
-          return (com.google.protobuf.ByteString) ref;
-        }
-      }
-      /**
-       * <code>string name = 1;</code>
-       * @param value The name to set.
-       * @return This builder for chaining.
-       */
-      public Builder setName(
-          java.lang.String value) {
-        if (value == null) {
-    throw new NullPointerException();
-  }
-  
-        name_ = value;
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>string name = 1;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearName() {
-        
-        name_ = getDefaultInstance().getName();
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>string name = 1;</code>
-       * @param value The bytes for name to set.
-       * @return This builder for chaining.
-       */
-      public Builder setNameBytes(
-          com.google.protobuf.ByteString value) {
-        if (value == null) {
-    throw new NullPointerException();
-  }
-  checkByteStringIsUtf8(value);
-        
-        name_ = value;
-        onChanged();
-        return this;
-      }
-
-      private int datatype_ = 0;
-      /**
-       * <code>.greptime.v1.ColumnDataType datatype = 2;</code>
-       * @return The enum numeric value on the wire for datatype.
-       */
-      @java.lang.Override public int getDatatypeValue() {
-        return datatype_;
-      }
-      /**
-       * <code>.greptime.v1.ColumnDataType datatype = 2;</code>
-       * @param value The enum numeric value on the wire for datatype to set.
-       * @return This builder for chaining.
-       */
-      public Builder setDatatypeValue(int value) {
-        
-        datatype_ = value;
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>.greptime.v1.ColumnDataType datatype = 2;</code>
-       * @return The datatype.
-       */
-      @java.lang.Override
-      public io.greptime.v1.Columns.ColumnDataType getDatatype() {
-        @SuppressWarnings("deprecation")
-        io.greptime.v1.Columns.ColumnDataType result = io.greptime.v1.Columns.ColumnDataType.valueOf(datatype_);
-        return result == null ? io.greptime.v1.Columns.ColumnDataType.UNRECOGNIZED : result;
-      }
-      /**
-       * <code>.greptime.v1.ColumnDataType datatype = 2;</code>
-       * @param value The datatype to set.
-       * @return This builder for chaining.
-       */
-      public Builder setDatatype(io.greptime.v1.Columns.ColumnDataType value) {
-        if (value == null) {
-          throw new NullPointerException();
-        }
-        
-        datatype_ = value.getNumber();
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>.greptime.v1.ColumnDataType datatype = 2;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearDatatype() {
-        
-        datatype_ = 0;
-        onChanged();
-        return this;
-      }
-
-      private boolean isNullable_ ;
-      /**
-       * <code>bool is_nullable = 3;</code>
-       * @return The isNullable.
-       */
-      @java.lang.Override
-      public boolean getIsNullable() {
-        return isNullable_;
-      }
-      /**
-       * <code>bool is_nullable = 3;</code>
-       * @param value The isNullable to set.
-       * @return This builder for chaining.
-       */
-      public Builder setIsNullable(boolean value) {
-        
-        isNullable_ = value;
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>bool is_nullable = 3;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearIsNullable() {
-        
-        isNullable_ = false;
-        onChanged();
-        return this;
-      }
-
-      private com.google.protobuf.ByteString defaultConstraint_ = com.google.protobuf.ByteString.EMPTY;
-      /**
-       * <code>bytes default_constraint = 4;</code>
-       * @return The defaultConstraint.
-       */
-      @java.lang.Override
-      public com.google.protobuf.ByteString getDefaultConstraint() {
-        return defaultConstraint_;
-      }
-      /**
-       * <code>bytes default_constraint = 4;</code>
-       * @param value The defaultConstraint to set.
-       * @return This builder for chaining.
-       */
-      public Builder setDefaultConstraint(com.google.protobuf.ByteString value) {
-        if (value == null) {
-    throw new NullPointerException();
-  }
-  
-        defaultConstraint_ = value;
-        onChanged();
-        return this;
-      }
-      /**
-       * <code>bytes default_constraint = 4;</code>
-       * @return This builder for chaining.
-       */
-      public Builder clearDefaultConstraint() {
-        
-        defaultConstraint_ = getDefaultInstance().getDefaultConstraint();
-        onChanged();
-        return this;
-      }
-      @java.lang.Override
-      public final Builder setUnknownFields(
-          final com.google.protobuf.UnknownFieldSet unknownFields) {
-        return super.setUnknownFields(unknownFields);
-      }
-
-      @java.lang.Override
-      public final Builder mergeUnknownFields(
-          final com.google.protobuf.UnknownFieldSet unknownFields) {
-        return super.mergeUnknownFields(unknownFields);
-      }
-
-
-      // @@protoc_insertion_point(builder_scope:greptime.v1.ColumnDef)
-    }
-
-    // @@protoc_insertion_point(class_scope:greptime.v1.ColumnDef)
-    private static final io.greptime.v1.Columns.ColumnDef DEFAULT_INSTANCE;
-    static {
-      DEFAULT_INSTANCE = new io.greptime.v1.Columns.ColumnDef();
-    }
-
-    public static io.greptime.v1.Columns.ColumnDef getDefaultInstance() {
-      return DEFAULT_INSTANCE;
-    }
-
-    private static final com.google.protobuf.Parser<ColumnDef>
-        PARSER = new com.google.protobuf.AbstractParser<ColumnDef>() {
-      @java.lang.Override
-      public ColumnDef parsePartialFrom(
-          com.google.protobuf.CodedInputStream input,
-          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
-          throws com.google.protobuf.InvalidProtocolBufferException {
-        return new ColumnDef(input, extensionRegistry);
-      }
-    };
-
-    public static com.google.protobuf.Parser<ColumnDef> parser() {
-      return PARSER;
-    }
-
-    @java.lang.Override
-    public com.google.protobuf.Parser<ColumnDef> getParserForType() {
-      return PARSER;
-    }
-
-    @java.lang.Override
-    public io.greptime.v1.Columns.ColumnDef getDefaultInstanceForType() {
-      return DEFAULT_INSTANCE;
-    }
-
-  }
-
   private static final com.google.protobuf.Descriptors.Descriptor
     internal_static_greptime_v1_Column_descriptor;
   private static final 
@@ -6605,11 +8342,6 @@ public final class Columns {
   private static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_greptime_v1_Column_Values_fieldAccessorTable;
-  private static final com.google.protobuf.Descriptors.Descriptor
-    internal_static_greptime_v1_ColumnDef_descriptor;
-  private static final 
-    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
-      internal_static_greptime_v1_ColumnDef_fieldAccessorTable;
 
   public static com.google.protobuf.Descriptors.FileDescriptor
       getDescriptor() {
@@ -6619,60 +8351,59 @@ public final class Columns {
       descriptor;
   static {
     java.lang.String[] descriptorData = {
-      "\n\030greptime/v1/column.proto\022\013greptime.v1\"" +
-      "\257\005\n\006Column\022\023\n\013column_name\030\001 \001(\t\0227\n\rseman" +
-      "tic_type\030\002 \001(\0162 .greptime.v1.Column.Sema" +
-      "nticType\022*\n\006values\030\003 \001(\0132\032.greptime.v1.C" +
-      "olumn.Values\022\021\n\tnull_mask\030\004 \001(\014\022-\n\010datat" +
-      "ype\030\005 \001(\0162\033.greptime.v1.ColumnDataType\032\265" +
-      "\003\n\006Values\022\021\n\ti8_values\030\001 \003(\005\022\022\n\ni16_valu" +
-      "es\030\002 \003(\005\022\022\n\ni32_values\030\003 \003(\005\022\022\n\ni64_valu" +
-      "es\030\004 \003(\003\022\021\n\tu8_values\030\005 \003(\r\022\022\n\nu16_value" +
-      "s\030\006 \003(\r\022\022\n\nu32_values\030\007 \003(\r\022\022\n\nu64_value" +
-      "s\030\010 \003(\004\022\022\n\nf32_values\030\t \003(\002\022\022\n\nf64_value" +
-      "s\030\n \003(\001\022\023\n\013bool_values\030\013 \003(\010\022\025\n\rbinary_v" +
-      "alues\030\014 \003(\014\022\025\n\rstring_values\030\r \003(\t\022\023\n\013da" +
-      "te_values\030\016 \003(\005\022\027\n\017datetime_values\030\017 \003(\003" +
-      "\022\030\n\020ts_second_values\030\020 \003(\003\022\035\n\025ts_millise" +
-      "cond_values\030\021 \003(\003\022\035\n\025ts_microsecond_valu" +
-      "es\030\022 \003(\003\022\034\n\024ts_nanosecond_values\030\023 \003(\003\"1" +
-      "\n\014SemanticType\022\007\n\003TAG\020\000\022\t\n\005FIELD\020\001\022\r\n\tTI" +
-      "MESTAMP\020\002\"y\n\tColumnDef\022\014\n\004name\030\001 \001(\t\022-\n\010" +
-      "datatype\030\002 \001(\0162\033.greptime.v1.ColumnDataT" +
-      "ype\022\023\n\013is_nullable\030\003 \001(\010\022\032\n\022default_cons" +
-      "traint\030\004 \001(\014*\247\002\n\016ColumnDataType\022\013\n\007BOOLE" +
-      "AN\020\000\022\010\n\004INT8\020\001\022\t\n\005INT16\020\002\022\t\n\005INT32\020\003\022\t\n\005" +
-      "INT64\020\004\022\t\n\005UINT8\020\005\022\n\n\006UINT16\020\006\022\n\n\006UINT32" +
-      "\020\007\022\n\n\006UINT64\020\010\022\013\n\007FLOAT32\020\t\022\013\n\007FLOAT64\020\n" +
-      "\022\n\n\006BINARY\020\013\022\n\n\006STRING\020\014\022\010\n\004DATE\020\r\022\014\n\010DA" +
-      "TETIME\020\016\022\024\n\020TIMESTAMP_SECOND\020\017\022\031\n\025TIMEST" +
-      "AMP_MILLISECOND\020\020\022\031\n\025TIMESTAMP_MICROSECO" +
-      "ND\020\021\022\030\n\024TIMESTAMP_NANOSECOND\020\022BP\n\016io.gre" +
-      "ptime.v1B\007ColumnsZ5github.com/GreptimeTe" +
-      "am/greptime-proto/go/greptime/v1b\006proto3"
+      "\n\030greptime/v1/column.proto\022\013greptime.v1\032" +
+      "\030greptime/v1/common.proto\"\244\t\n\006Column\022\023\n\013" +
+      "column_name\030\001 \001(\t\0220\n\rsemantic_type\030\002 \001(\016" +
+      "2\031.greptime.v1.SemanticType\022*\n\006values\030\003 " +
+      "\001(\0132\032.greptime.v1.Column.Values\022\021\n\tnull_" +
+      "mask\030\004 \001(\014\022-\n\010datatype\030\005 \001(\0162\033.greptime." +
+      "v1.ColumnDataType\022@\n\022datatype_extension\030" +
+      "\006 \001(\0132$.greptime.v1.ColumnDataTypeExtens" +
+      "ion\032\242\007\n\006Values\022\021\n\ti8_values\030\001 \003(\005\022\022\n\ni16" +
+      "_values\030\002 \003(\005\022\022\n\ni32_values\030\003 \003(\005\022\022\n\ni64" +
+      "_values\030\004 \003(\003\022\021\n\tu8_values\030\005 \003(\r\022\022\n\nu16_" +
+      "values\030\006 \003(\r\022\022\n\nu32_values\030\007 \003(\r\022\022\n\nu64_" +
+      "values\030\010 \003(\004\022\022\n\nf32_values\030\t \003(\002\022\022\n\nf64_" +
+      "values\030\n \003(\001\022\023\n\013bool_values\030\013 \003(\010\022\025\n\rbin" +
+      "ary_values\030\014 \003(\014\022\025\n\rstring_values\030\r \003(\t\022" +
+      "\023\n\013date_values\030\016 \003(\005\022\027\n\017datetime_values\030" +
+      "\017 \003(\003\022\037\n\027timestamp_second_values\030\020 \003(\003\022$" +
+      "\n\034timestamp_millisecond_values\030\021 \003(\003\022$\n\034" +
+      "timestamp_microsecond_values\030\022 \003(\003\022#\n\033ti" +
+      "mestamp_nanosecond_values\030\023 \003(\003\022\032\n\022time_" +
+      "second_values\030\024 \003(\003\022\037\n\027time_millisecond_" +
+      "values\030\025 \003(\003\022\037\n\027time_microsecond_values\030" +
+      "\026 \003(\003\022\036\n\026time_nanosecond_values\030\027 \003(\003\022\"\n" +
+      "\032interval_year_month_values\030\030 \003(\005\022 \n\030int" +
+      "erval_day_time_values\030\031 \003(\003\022I\n\036interval_" +
+      "month_day_nano_values\030\032 \003(\0132!.greptime.v" +
+      "1.IntervalMonthDayNano\022\036\n\026duration_secon" +
+      "d_values\030\033 \003(\003\022#\n\033duration_millisecond_v" +
+      "alues\030\034 \003(\003\022#\n\033duration_microsecond_valu" +
+      "es\030\035 \003(\003\022\"\n\032duration_nanosecond_values\030\036" +
+      " \003(\003\0222\n\021decimal128_values\030\037 \003(\0132\027.grepti" +
+      "me.v1.Decimal128BP\n\016io.greptime.v1B\007Colu" +
+      "mnsZ5github.com/GreptimeTeam/greptime-pr" +
+      "oto/go/greptime/v1b\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
         new com.google.protobuf.Descriptors.FileDescriptor[] {
+          io.greptime.v1.Common.getDescriptor(),
         });
     internal_static_greptime_v1_Column_descriptor =
       getDescriptor().getMessageTypes().get(0);
     internal_static_greptime_v1_Column_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_Column_descriptor,
-        new java.lang.String[] { "ColumnName", "SemanticType", "Values", "NullMask", "Datatype", });
+        new java.lang.String[] { "ColumnName", "SemanticType", "Values", "NullMask", "Datatype", "DatatypeExtension", });
     internal_static_greptime_v1_Column_Values_descriptor =
       internal_static_greptime_v1_Column_descriptor.getNestedTypes().get(0);
     internal_static_greptime_v1_Column_Values_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_Column_Values_descriptor,
-        new java.lang.String[] { "I8Values", "I16Values", "I32Values", "I64Values", "U8Values", "U16Values", "U32Values", "U64Values", "F32Values", "F64Values", "BoolValues", "BinaryValues", "StringValues", "DateValues", "DatetimeValues", "TsSecondValues", "TsMillisecondValues", "TsMicrosecondValues", "TsNanosecondValues", });
-    internal_static_greptime_v1_ColumnDef_descriptor =
-      getDescriptor().getMessageTypes().get(1);
-    internal_static_greptime_v1_ColumnDef_fieldAccessorTable = new
-      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
-        internal_static_greptime_v1_ColumnDef_descriptor,
-        new java.lang.String[] { "Name", "Datatype", "IsNullable", "DefaultConstraint", });
+        new java.lang.String[] { "I8Values", "I16Values", "I32Values", "I64Values", "U8Values", "U16Values", "U32Values", "U64Values", "F32Values", "F64Values", "BoolValues", "BinaryValues", "StringValues", "DateValues", "DatetimeValues", "TimestampSecondValues", "TimestampMillisecondValues", "TimestampMicrosecondValues", "TimestampNanosecondValues", "TimeSecondValues", "TimeMillisecondValues", "TimeMicrosecondValues", "TimeNanosecondValues", "IntervalYearMonthValues", "IntervalDayTimeValues", "IntervalMonthDayNanoValues", "DurationSecondValues", "DurationMillisecondValues", "DurationMicrosecondValues", "DurationNanosecondValues", "Decimal128Values", });
+    io.greptime.v1.Common.getDescriptor();
   }
 
   // @@protoc_insertion_point(outer_class_scope)

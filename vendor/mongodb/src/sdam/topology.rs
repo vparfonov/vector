@@ -10,6 +10,7 @@ use futures_util::{
     stream::{FuturesUnordered, StreamExt},
     FutureExt,
 };
+use serde::Serialize;
 use tokio::sync::{
     mpsc::{self, UnboundedReceiver, UnboundedSender},
     watch::{self, Ref},
@@ -198,7 +199,7 @@ impl Topology {
     }
 
     /// Updates the given `command` as needed based on the `criteria`.
-    pub(crate) fn update_command_with_read_pref<T>(
+    pub(crate) fn update_command_with_read_pref<T: Serialize>(
         &self,
         server_address: &ServerAddress,
         command: &mut Command<T>,
@@ -480,7 +481,7 @@ impl TopologyWorker {
 
     async fn sync_hosts(&mut self, hosts: HashSet<ServerAddress>) -> bool {
         let mut new_description = self.topology_description.clone();
-        new_description.sync_hosts(&hosts);
+        new_description.sync_hosts(hosts);
         self.update_topology(new_description).await
     }
 

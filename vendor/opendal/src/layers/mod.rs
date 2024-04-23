@@ -17,6 +17,15 @@
 
 //! `Layer` is the mechanism to intercept operations.
 
+mod type_eraser;
+pub(crate) use type_eraser::TypeEraseLayer;
+
+mod error_context;
+pub(crate) use error_context::ErrorContextLayer;
+
+mod complete;
+pub(crate) use complete::CompleteLayer;
+
 mod concurrent_limit;
 pub use concurrent_limit::ConcurrentLimitLayer;
 
@@ -28,6 +37,11 @@ pub use logging::LoggingLayer;
 
 mod timeout;
 pub use timeout::TimeoutLayer;
+
+#[cfg(feature = "layers-blocking")]
+mod blocking;
+#[cfg(feature = "layers-blocking")]
+pub use blocking::BlockingLayer;
 
 #[cfg(feature = "layers-chaos")]
 mod chaos;
@@ -44,7 +58,13 @@ mod prometheus;
 #[cfg(feature = "layers-prometheus")]
 pub use self::prometheus::PrometheusLayer;
 
+#[cfg(feature = "layers-prometheus-client")]
+mod prometheus_client;
+#[cfg(feature = "layers-prometheus-client")]
+pub use self::prometheus_client::PrometheusClientLayer;
+
 mod retry;
+pub use self::retry::RetryInterceptor;
 pub use self::retry::RetryLayer;
 
 #[cfg(feature = "layers-tracing")]
@@ -57,18 +77,8 @@ mod minitrace;
 #[cfg(feature = "layers-minitrace")]
 pub use self::minitrace::MinitraceLayer;
 
-mod type_eraser;
-pub(crate) use type_eraser::TypeEraseLayer;
-
-mod error_context;
-pub(crate) use error_context::ErrorContextLayer;
-
-mod complete;
-pub(crate) use complete::CompleteLayer;
-
 #[cfg(feature = "layers-madsim")]
 mod madsim;
-
 #[cfg(feature = "layers-madsim")]
 pub use self::madsim::MadsimLayer;
 #[cfg(feature = "layers-madsim")]
@@ -76,10 +86,25 @@ pub use self::madsim::MadsimServer;
 
 #[cfg(feature = "layers-otel-trace")]
 mod oteltrace;
+#[cfg(feature = "layers-otel-trace")]
+pub use self::oteltrace::OtelTraceLayer;
 
 #[cfg(feature = "layers-throttle")]
 mod throttle;
-#[cfg(feature = "layers-otel-trace")]
-pub use self::oteltrace::OtelTraceLayer;
 #[cfg(feature = "layers-throttle")]
 pub use self::throttle::ThrottleLayer;
+
+#[cfg(feature = "layers-await-tree")]
+mod await_tree;
+#[cfg(feature = "layers-await-tree")]
+pub use self::await_tree::AwaitTreeLayer;
+
+#[cfg(feature = "layers-async-backtrace")]
+mod async_backtrace;
+#[cfg(feature = "layers-async-backtrace")]
+pub use self::async_backtrace::AsyncBacktraceLayer;
+
+#[cfg(all(target_os = "linux", feature = "layers-dtrace"))]
+mod dtrace;
+#[cfg(all(target_os = "linux", feature = "layers-dtrace"))]
+pub use self::dtrace::DtraceLayer;

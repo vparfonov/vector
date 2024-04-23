@@ -1,10 +1,10 @@
-# Borsh in Rust &emsp; [![Latest Version]][crates.io] [![borsh: rustc 1.55+]][Rust 1.55] [![License Apache-2.0 badge]][License Apache-2.0] [![License MIT badge]][License MIT]
+# Borsh in Rust &emsp; [![Latest Version]][crates.io] [![borsh: rustc 1.66+]][Rust 1.66] [![License Apache-2.0 badge]][License Apache-2.0] [![License MIT badge]][License MIT]
 
 [Borsh]: https://borsh.io
 [Latest Version]: https://img.shields.io/crates/v/borsh.svg
 [crates.io]: https://crates.io/crates/borsh
-[borsh: rustc 1.55+]: https://img.shields.io/badge/rustc-1.55+-lightgray.svg
-[Rust 1.55]: https://blog.rust-lang.org/2021/09/09/Rust-1.55.0.html
+[borsh: rustc 1.66+]: https://img.shields.io/badge/rustc-1.66+-lightgray.svg
+[Rust 1.66]: https://blog.rust-lang.org/2022/12/15/Rust-1.66.0.html
 [License Apache-2.0 badge]: https://img.shields.io/badge/license-Apache2.0-blue.svg
 [License Apache-2.0]: https://opensource.org/licenses/Apache-2.0
 [License MIT badge]: https://img.shields.io/badge/license-MIT-blue.svg
@@ -19,7 +19,7 @@ strict [specification](https://github.com/near/borsh#specification).
 ## Example
 
 ```rust
-use borsh::{BorshSerialize, BorshDeserialize};
+use borsh::{BorshSerialize, BorshDeserialize, from_slice, to_vec};
 
 #[derive(BorshSerialize, BorshDeserialize, PartialEq, Debug)]
 struct A {
@@ -33,8 +33,8 @@ fn test_simple_struct() {
         x: 3301,
         y: "liber primus".to_string(),
     };
-    let encoded_a = a.try_to_vec().unwrap();
-    let decoded_a = A::try_from_slice(&encoded_a).unwrap();
+    let encoded_a = to_vec(&a).unwrap();
+    let decoded_a = from_slice::<A>(&encoded_a).unwrap();
     assert_eq!(a, decoded_a);
 }
 ```
@@ -42,13 +42,13 @@ fn test_simple_struct() {
 ## Features
 
 Opting out from Serde allows borsh to have some features that currently are not available for serde-compatible serializers.
-Currently we support two features: `borsh_init` and `borsh_skip` (the former one not available in Serde).
+Currently we support two features: `borsh(init=<your initialization method name>` and `borsh(skip)` (the former one not available in Serde).
 
-`borsh_init` allows to automatically run an initialization function right after deserialization. This adds a lot of convenience for objects that are architectured to be used as strictly immutable. Usage example:
+`borsh(init=...)` allows to automatically run an initialization function right after deserialization. This adds a lot of convenience for objects that are architectured to be used as strictly immutable. Usage example:
 
 ```rust
 #[derive(BorshSerialize, BorshDeserialize)]
-#[borsh_init(init)]
+#[borsh(init=init)]
 struct Message {
     message: String,
     timestamp: u64,
@@ -65,14 +65,37 @@ impl Message {
 }
 ```
 
-`borsh_skip` allows to skip serializing/deserializing fields, assuming they implement `Default` trait, similary to `#[serde(skip)]`.
+`borsh(skip)` allows to skip serializing/deserializing fields, assuming they implement `Default` trait, similarly to `#[serde(skip)]`.
 
 ```rust
 #[derive(BorshSerialize, BorshDeserialize)]
 struct A {
     x: u64,
-    #[borsh_skip]
+    #[borsh(skip)]
     y: f32,
+}
+```
+
+### Enum with explicit discriminant
+
+`#[borsh(use_discriminant=false|true])` is required if you have an enum with explicit discriminant. This setting affects `BorshSerialize` and `BorshDeserialize` behaviour at the same time.
+
+In the future, borsh will drop the requirement to explicitly use `#[borsh(use_discriminant=false|true)]`, and will default to `true`, but to make sure that the transition from the older versions of borsh (before 0.11 release) does not cause silent breaking changes in de-/serialization, borsh 1.0 will require to specify if the explicit enum discriminant should be used as a de-/serialization tag value.
+
+If you don't specify `use_discriminant` option for enum with explicit discriminant, you will get an error:
+
+```bash
+error: You have to specify `#[borsh(use_discriminant=true)]` or `#[borsh(use_discriminant=false)]` for all enums with explicit discriminant
+```
+
+In order to preserve the behaviour of borsh versions before 0.11, which did not respect explicit enum discriminants for de-/serialization, use `#[borsh(use_discriminant=false)]`, otherwise, use `true`:
+
+```rust
+#[derive(BorshDeserialize, BorshSerialize)]
+#[borsh(use_discriminant=false)]
+enum A {
+    X,
+    Y = 10,
 }
 ```
 

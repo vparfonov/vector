@@ -20,6 +20,7 @@ mod list_indexes;
 mod raw_output;
 mod run_command;
 mod run_cursor_command;
+mod search_index;
 mod update;
 
 #[cfg(test)]
@@ -32,7 +33,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 
 use crate::{
     bson::{self, Bson, Document},
-    bson_util,
+    bson_util::{self, extend_raw_document_buf},
     client::{ClusterTime, HELLO_COMMAND_NAMES, REDACTED_COMMANDS},
     cmap::{conn::PinnedConnectionHandle, Command, RawCommandResponse, StreamDescription},
     error::{
@@ -73,10 +74,16 @@ pub(crate) use list_indexes::ListIndexes;
 pub(crate) use raw_output::RawOutput;
 pub(crate) use run_command::RunCommand;
 pub(crate) use run_cursor_command::RunCursorCommand;
-pub(crate) use update::Update;
+pub(crate) use search_index::{CreateSearchIndexes, DropSearchIndex, UpdateSearchIndex};
+pub(crate) use update::{Update, UpdateOrReplace};
 
 const SERVER_4_2_0_WIRE_VERSION: i32 = 8;
 const SERVER_4_4_0_WIRE_VERSION: i32 = 9;
+// The maximum number of bytes that may be included in a write payload when auto-encryption is
+// enabled.
+const MAX_ENCRYPTED_WRITE_SIZE: usize = 2_097_152;
+// The amount of overhead bytes to account for when building a document sequence.
+const COMMAND_OVERHEAD_SIZE: usize = 16_000;
 
 /// A trait modeling the behavior of a server side operation.
 ///
@@ -95,10 +102,6 @@ pub(crate) trait Operation {
     /// Returns the command that should be sent to the server as part of this operation.
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>>;
-
-    /// Perform custom serialization of the built command.
-    /// By default, this will just call through to the `Serialize` implementation of the command.
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>>;
 
     /// Parse the response for the atClusterTime field.
     /// Depending on the operation, this may be found in different locations.
@@ -224,28 +227,28 @@ impl From<CommandErrorBody> for Error {
     }
 }
 
-/// Appends a serializable struct to the input document.
-/// The serializable struct MUST serialize to a Document, otherwise an error will be thrown.
+/// Appends a serializable struct to the input document. The serializable struct MUST serialize to a
+/// Document; otherwise, an error will be thrown.
 pub(crate) fn append_options<T: Serialize + Debug>(
     doc: &mut Document,
     options: Option<&T>,
 ) -> Result<()> {
-    match options {
-        Some(options) => {
-            let temp_doc = bson::to_bson(options)?;
-            match temp_doc {
-                Bson::Document(d) => {
-                    doc.extend(d);
-                    Ok(())
-                }
-                _ => Err(ErrorKind::Internal {
-                    message: format!("options did not serialize to a Document: {:?}", options),
-                }
-                .into()),
-            }
-        }
-        None => Ok(()),
+    if let Some(options) = options {
+        let options_doc = bson::to_document(options)?;
+        doc.extend(options_doc);
     }
+    Ok(())
+}
+
+pub(crate) fn append_options_to_raw_document<T: Serialize>(
+    doc: &mut RawDocumentBuf,
+    options: Option<&T>,
+) -> Result<()> {
+    if let Some(options) = options {
+        let options_raw_doc = bson::to_raw_document_buf(options)?;
+        extend_raw_document_buf(doc, options_raw_doc)?;
+    }
+    Ok(())
 }
 
 #[derive(Deserialize, Debug)]
@@ -411,12 +414,6 @@ pub(crate) trait OperationWithDefaults {
     /// The operation may store some additional state that is required for handling the response.
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>>;
 
-    /// Perform custom serialization of the built command.
-    /// By default, this will just call through to the `Serialize` implementation of the command.
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        Ok(bson::to_vec(&cmd)?)
-    }
-
     /// Parse the response for the atClusterTime field.
     /// Depending on the operation, this may be found in different locations.
     fn extract_at_cluster_time(&self, _response: &RawDocument) -> Result<Option<Timestamp>> {
@@ -486,9 +483,6 @@ impl<T: OperationWithDefaults> Operation for T {
     const NAME: &'static str = T::NAME;
     fn build(&mut self, description: &StreamDescription) -> Result<Command<Self::Command>> {
         self.build(description)
-    }
-    fn serialize_command(&mut self, cmd: Command<Self::Command>) -> Result<Vec<u8>> {
-        self.serialize_command(cmd)
     }
     fn extract_at_cluster_time(&self, response: &RawDocument) -> Result<Option<Timestamp>> {
         self.extract_at_cluster_time(response)

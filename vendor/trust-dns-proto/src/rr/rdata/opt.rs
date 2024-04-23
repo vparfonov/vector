@@ -1,27 +1,30 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
+/*
+ * Copyright (C) 2015 Benjamin Fry <benjaminfry@me.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 //! option record for passing protocol options between the client and server
-#![allow(clippy::use_self)]
 
-use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
-use std::str::FromStr;
-use std::{collections::HashMap, fmt};
+use std::collections::HashMap;
 
 #[cfg(feature = "serde-config")]
 use serde::{Deserialize, Serialize};
 
-use tracing::warn;
+use log::warn;
 
-use crate::{
-    error::{ProtoError, ProtoErrorKind, ProtoResult},
-    rr::{RData, RecordData, RecordDataDecodable, RecordType},
-    serialize::binary::{BinDecodable, BinDecoder, BinEncodable, BinEncoder, Restrict},
-};
+use crate::error::*;
+use crate::serialize::binary::*;
 
 #[cfg(feature = "dnssec")]
 use crate::rr::dnssec::SupportedAlgorithms;
@@ -216,118 +219,87 @@ impl AsRef<HashMap<EdnsCode, EdnsOption>> for OPT {
     }
 }
 
-impl BinEncodable for OPT {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        for (edns_code, edns_option) in self.as_ref().iter() {
-            encoder.emit_u16(u16::from(*edns_code))?;
-            encoder.emit_u16(edns_option.len())?;
-            edns_option.emit(encoder)?
-        }
-        Ok(())
-    }
-}
+/// Read the RData from the given Decoder
+pub fn read(decoder: &mut BinDecoder<'_>, rdata_length: Restrict<u16>) -> ProtoResult<OPT> {
+    let mut state: OptReadState = OptReadState::ReadCode;
+    let mut options: HashMap<EdnsCode, EdnsOption> = HashMap::new();
+    let start_idx = decoder.index();
 
-impl<'r> RecordDataDecodable<'r> for OPT {
-    fn read_data(decoder: &mut BinDecoder<'r>, length: Restrict<u16>) -> ProtoResult<Self> {
-        let mut state: OptReadState = OptReadState::ReadCode;
-        let mut options: HashMap<EdnsCode, EdnsOption> = HashMap::new();
-        let start_idx = decoder.index();
-
-        // There is no unsafe direct use of the rdata length after this point
-        let rdata_length = length.map(|u| u as usize).unverified(/*rdata length usage is bounded*/);
-        while rdata_length > decoder.index() - start_idx {
-            match state {
-                OptReadState::ReadCode => {
-                    state = OptReadState::Code {
-                        code: EdnsCode::from(
-                            decoder.read_u16()?.unverified(/*EdnsCode is verified as safe*/),
-                        ),
-                    };
-                }
-                OptReadState::Code { code } => {
-                    let length = decoder
-                        .read_u16()?
-                        .map(|u| u as usize)
-                        .verify_unwrap(|u| *u <= rdata_length)
-                        .map_err(|_| ProtoError::from("OPT value length exceeds rdata length"))?;
-                    // If we know that the length is 0, we can avoid the `OptReadState::Data` state
-                    // and directly add the option to the map.
-                    // The data state does not process 0-length correctly, since it always reads at
-                    // least 1 byte, thus making the length check fail.
-                    state = if length == 0 {
-                        options.insert(code, (code, &[] as &[u8]).try_into()?);
-                        OptReadState::ReadCode
-                    } else {
-                        OptReadState::Data {
-                            code,
-                            length,
-                            // TODO: this can be replaced with decoder.read_vec(), right?
-                            //  the current version allows for malformed opt to be skipped...
-                            collected: Vec::<u8>::with_capacity(length),
-                        }
-                    };
-                }
-                OptReadState::Data {
-                    code,
-                    length,
-                    mut collected,
-                } => {
-                    // TODO: can this be replaced by read_slice()?
-                    collected.push(decoder.pop()?.unverified(/*byte array is safe*/));
-                    if length == collected.len() {
-                        options.insert(code, (code, &collected as &[u8]).try_into()?);
-                        state = OptReadState::ReadCode;
-                    } else {
-                        state = OptReadState::Data {
-                            code,
-                            length,
-                            collected,
-                        };
+    // There is no unsafe direct use of the rdata length after this point
+    let rdata_length =
+        rdata_length.map(|u| u as usize).unverified(/*rdata length usage is bounded*/);
+    while rdata_length > decoder.index() - start_idx {
+        match state {
+            OptReadState::ReadCode => {
+                state = OptReadState::Code {
+                    code: EdnsCode::from(
+                        decoder.read_u16()?.unverified(/*EdnsCode is verified as safe*/),
+                    ),
+                };
+            }
+            OptReadState::Code { code } => {
+                let length = decoder
+                    .read_u16()?
+                    .map(|u| u as usize)
+                    .verify_unwrap(|u| *u <= rdata_length)
+                    .map_err(|_| ProtoError::from("OPT value length exceeds rdata length"))?;
+                // If we know that the length is 0, we can avoid the `OptReadState::Data` state
+                // and directly add the option to the map.
+                // The data state does not process 0-length correctly, since it always reads at
+                // least 1 byte, thus making the length check fail.
+                state = if length == 0 {
+                    options.insert(code, (code, &[] as &[u8]).into());
+                    OptReadState::ReadCode
+                } else {
+                    OptReadState::Data {
+                        code,
+                        length,
+                        // TODO: this cean be replaced with decoder.read_vec(), right?
+                        //  the current version allows for malformed opt to be skipped...
+                        collected: Vec::<u8>::with_capacity(length),
                     }
+                };
+            }
+            OptReadState::Data {
+                code,
+                length,
+                mut collected,
+            } => {
+                // TODO: can this be replaced by read_slice()?
+                collected.push(decoder.pop()?.unverified(/*byte array is safe*/));
+                if length == collected.len() {
+                    options.insert(code, (code, &collected as &[u8]).into());
+                    state = OptReadState::ReadCode;
+                } else {
+                    state = OptReadState::Data {
+                        code,
+                        length,
+                        collected,
+                    };
                 }
             }
         }
-
-        if state != OptReadState::ReadCode {
-            // there was some problem parsing the data for the options, ignoring them
-            // TODO: should we ignore all of the EDNS data in this case?
-            warn!("incomplete or poorly formatted EDNS options: {:?}", state);
-            options.clear();
-        }
-
-        // the record data is stored as unstructured data, the expectation is that this will be processed after initial parsing.
-        Ok(Self::new(options))
     }
+
+    if state != OptReadState::ReadCode {
+        // there was some problem parsing the data for the options, ignoring them
+        // TODO: should we ignore all of the EDNS data in this case?
+        warn!("incomplete or poorly formatted EDNS options: {:?}", state);
+        options.clear();
+    }
+
+    // the record data is stored as unstructured data, the expectation is that this will be processed after initial parsing.
+    Ok(OPT::new(options))
 }
 
-impl RecordData for OPT {
-    fn try_from_rdata(data: RData) -> Result<Self, RData> {
-        match data {
-            RData::OPT(csync) => Ok(csync),
-            _ => Err(data),
-        }
+/// Write the RData from the given Decoder
+pub fn emit(encoder: &mut BinEncoder<'_>, opt: &OPT) -> ProtoResult<()> {
+    for (edns_code, edns_option) in opt.as_ref().iter() {
+        encoder.emit_u16(u16::from(*edns_code))?;
+        encoder.emit_u16(edns_option.len())?;
+        edns_option.emit(encoder)?
     }
-
-    fn try_borrow(data: &RData) -> Option<&Self> {
-        match data {
-            RData::OPT(csync) => Some(csync),
-            _ => None,
-        }
-    }
-
-    fn record_type(&self) -> RecordType {
-        RecordType::OPT
-    }
-
-    fn into_rdata(self) -> RData {
-        RData::OPT(self)
-    }
-}
-
-impl fmt::Display for OPT {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        fmt::Debug::fmt(self, f)
-    }
+    Ok(())
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -460,9 +432,6 @@ pub enum EdnsOption {
     #[cfg_attr(docsrs, doc(cfg(feature = "dnssec")))]
     N3U(SupportedAlgorithms),
 
-    /// [RFC 7871, Client Subnet, Optional](https://tools.ietf.org/html/rfc7871)
-    Subnet(ClientSubnet),
-
     /// Unknown, used to deal with unknown or unsupported codes
     Unknown(u16, Vec<u8>),
 }
@@ -475,7 +444,6 @@ impl EdnsOption {
             EdnsOption::DAU(ref algorithms)
             | EdnsOption::DHU(ref algorithms)
             | EdnsOption::N3U(ref algorithms) => algorithms.len(),
-            EdnsOption::Subnet(ref subnet) => subnet.len(),
             EdnsOption::Unknown(_, ref data) => data.len() as u16, // TODO: should we verify?
         }
     }
@@ -487,7 +455,6 @@ impl EdnsOption {
             EdnsOption::DAU(ref algorithms)
             | EdnsOption::DHU(ref algorithms)
             | EdnsOption::N3U(ref algorithms) => algorithms.is_empty(),
-            EdnsOption::Subnet(ref subnet) => subnet.is_empty(),
             EdnsOption::Unknown(_, ref data) => data.is_empty(),
         }
     }
@@ -500,43 +467,36 @@ impl BinEncodable for EdnsOption {
             EdnsOption::DAU(ref algorithms)
             | EdnsOption::DHU(ref algorithms)
             | EdnsOption::N3U(ref algorithms) => algorithms.emit(encoder),
-            EdnsOption::Subnet(ref subnet) => subnet.emit(encoder),
             EdnsOption::Unknown(_, ref data) => encoder.emit_vec(data), // gah, clone needed or make a crazy api.
         }
     }
 }
 
 /// only the supported extensions are listed right now.
-impl<'a> TryFrom<(EdnsCode, &'a [u8])> for EdnsOption {
-    type Error = ProtoError;
-
+impl<'a> From<(EdnsCode, &'a [u8])> for EdnsOption {
     #[allow(clippy::match_single_binding)]
-    fn try_from(value: (EdnsCode, &'a [u8])) -> Result<Self, Self::Error> {
-        Ok(match value.0 {
+    fn from(value: (EdnsCode, &'a [u8])) -> Self {
+        match value.0 {
             #[cfg(feature = "dnssec")]
             EdnsCode::DAU => Self::DAU(value.1.into()),
             #[cfg(feature = "dnssec")]
             EdnsCode::DHU => Self::DHU(value.1.into()),
             #[cfg(feature = "dnssec")]
             EdnsCode::N3U => Self::N3U(value.1.into()),
-            EdnsCode::Subnet => Self::Subnet(value.1.try_into()?),
             _ => Self::Unknown(value.0.into(), value.1.to_vec()),
-        })
+        }
     }
 }
 
-impl<'a> TryFrom<&'a EdnsOption> for Vec<u8> {
-    type Error = ProtoError;
-
-    fn try_from(value: &'a EdnsOption) -> Result<Self, Self::Error> {
-        Ok(match *value {
+impl<'a> From<&'a EdnsOption> for Vec<u8> {
+    fn from(value: &'a EdnsOption) -> Self {
+        match *value {
             #[cfg(feature = "dnssec")]
             EdnsOption::DAU(ref algorithms)
             | EdnsOption::DHU(ref algorithms)
             | EdnsOption::N3U(ref algorithms) => algorithms.into(),
-            EdnsOption::Subnet(ref subnet) => subnet.try_into()?,
             EdnsOption::Unknown(_, ref data) => data.clone(), // gah, clone needed or make a crazy api.
-        })
+        }
     }
 }
 
@@ -549,202 +509,8 @@ impl<'a> From<&'a EdnsOption> for EdnsCode {
             EdnsOption::DHU(..) => Self::DHU,
             #[cfg(feature = "dnssec")]
             EdnsOption::N3U(..) => Self::N3U,
-            EdnsOption::Subnet(..) => Self::Subnet,
             EdnsOption::Unknown(code, _) => code.into(),
         }
-    }
-}
-
-/// [RFC 7871, Client Subnet, Optional](https://tools.ietf.org/html/rfc7871)
-///
-/// +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-/// 0: |                            FAMILY                             |
-///    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-/// 2: |     SOURCE PREFIX-LENGTH      |     SCOPE PREFIX-LENGTH       |
-///    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-/// 4: |                           ADDRESS...                          /
-///    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-///
-/// o  FAMILY, 2 octets, indicates the family of the address contained in
-///    the option, using address family codes as assigned by IANA in
-///    Address Family Numbers [Address_Family_Numbers].
-/// o  SOURCE PREFIX-LENGTH, an unsigned octet representing the leftmost
-///    number of significant bits of ADDRESS to be used for the lookup.
-///    In responses, it mirrors the same value as in the queries.
-/// o  SCOPE PREFIX-LENGTH, an unsigned octet representing the leftmost
-///    number of significant bits of ADDRESS that the response covers.
-///    In queries, it MUST be set to 0.
-/// o  ADDRESS, variable number of octets, contains either an IPv4 or
-///    IPv6 address, depending on FAMILY, which MUST be truncated to the
-///    number of bits indicated by the SOURCE PREFIX-LENGTH field,
-///    padding with 0 bits to pad to the end of the last octet needed.
-/// o  A server receiving an ECS option that uses either too few or too
-///    many ADDRESS octets, or that has non-zero ADDRESS bits set beyond
-///    SOURCE PREFIX-LENGTH, SHOULD return FORMERR to reject the packet,
-///    as a signal to the software developer making the request to fix
-///    their implementation.
-#[cfg_attr(feature = "serde-config", derive(Deserialize, Serialize))]
-#[derive(Debug, PartialOrd, PartialEq, Eq, Clone, Copy, Hash)]
-pub struct ClientSubnet {
-    address: IpAddr,
-    source_prefix: u8,
-    scope_prefix: u8,
-}
-
-impl ClientSubnet {
-    /// Construct a new EcsOption with the address, source_prefix and scope_prefix.
-    pub fn new(address: IpAddr, source_prefix: u8, scope_prefix: u8) -> Self {
-        Self {
-            address,
-            source_prefix,
-            scope_prefix,
-        }
-    }
-
-    /// Returns the length in bytes of the EdnsOption
-    pub fn len(&self) -> u16 {
-        // FAMILY: 2 octets
-        // SOURCE PREFIX-LENGTH: 1 octets
-        // SCOPE PREFIX-LENGTH: 1 octets
-        // ADDRESS: runcated to the number of bits indicated by the SOURCE PREFIX-LENGTH field
-        2 + 1 + 1 + self.addr_len()
-    }
-
-    /// Returns `true` if the length in bytes of the EcsOption is 0
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        false
-    }
-
-    fn addr_len(&self) -> u16 {
-        let source_prefix = self.source_prefix as u16;
-        source_prefix / 8 + if source_prefix % 8 > 0 { 1 } else { 0 }
-    }
-}
-
-impl BinEncodable for ClientSubnet {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        let address = self.address;
-        let source_prefix = self.source_prefix;
-        let scope_prefix = self.scope_prefix;
-
-        let addr_len = self.addr_len();
-
-        match address {
-            IpAddr::V4(ip) => {
-                encoder.emit_u16(1)?; // FAMILY: IPv4
-                encoder.emit_u8(source_prefix)?;
-                encoder.emit_u8(scope_prefix)?;
-                let octets = ip.octets();
-                let addr_len = addr_len as usize;
-                if addr_len <= octets.len() {
-                    encoder.emit_vec(&octets[0..addr_len])?
-                } else {
-                    return Err(ProtoErrorKind::Message(
-                        "Invalid addr length for encode EcsOption",
-                    )
-                    .into());
-                }
-            }
-            IpAddr::V6(ip) => {
-                encoder.emit_u16(2)?; // FAMILY: IPv6
-                encoder.emit_u8(source_prefix)?;
-                encoder.emit_u8(scope_prefix)?;
-                let octets = ip.octets();
-                let addr_len = addr_len as usize;
-                if addr_len <= octets.len() {
-                    encoder.emit_vec(&octets[0..addr_len])?
-                } else {
-                    return Err(ProtoErrorKind::Message(
-                        "Invalid addr length for encode EcsOption",
-                    )
-                    .into());
-                }
-            }
-        }
-        Ok(())
-    }
-}
-
-impl<'a> BinDecodable<'a> for ClientSubnet {
-    fn read(decoder: &mut BinDecoder<'a>) -> ProtoResult<Self> {
-        let family = decoder.read_u16()?.unverified();
-
-        match family {
-            1 => {
-                // ipv4
-                let source_prefix = decoder.read_u8()?.unverified();
-                let scope_prefix = decoder.read_u8()?.unverified();
-                let addr_len =
-                    (source_prefix / 8 + if source_prefix % 8 > 0 { 1 } else { 0 }) as usize;
-                let mut octets = Ipv4Addr::UNSPECIFIED.octets();
-                for octet in octets.iter_mut().take(addr_len) {
-                    *octet = decoder.read_u8()?.unverified();
-                }
-                Ok(Self {
-                    address: IpAddr::from(octets),
-                    source_prefix,
-                    scope_prefix,
-                })
-            }
-            2 => {
-                // ipv6
-                let source_prefix = decoder.read_u8()?.unverified();
-                let scope_prefix = decoder.read_u8()?.unverified();
-                let addr_len =
-                    (source_prefix / 8 + if source_prefix % 8 > 0 { 1 } else { 0 }) as usize;
-                let mut octets = Ipv6Addr::UNSPECIFIED.octets();
-                for octet in octets.iter_mut().take(addr_len) {
-                    *octet = decoder.read_u8()?.unverified();
-                }
-
-                Ok(Self {
-                    address: IpAddr::from(octets),
-                    source_prefix,
-                    scope_prefix,
-                })
-            }
-            _ => Err(ProtoErrorKind::Message("Invalid family type.").into()),
-        }
-    }
-}
-
-impl<'a> TryFrom<&'a ClientSubnet> for Vec<u8> {
-    type Error = ProtoError;
-
-    fn try_from(value: &'a ClientSubnet) -> Result<Self, Self::Error> {
-        let mut bytes = Self::with_capacity(value.len() as usize); // today this is less than 8
-        let mut encoder = BinEncoder::new(&mut bytes);
-        value.emit(&mut encoder)?;
-        bytes.shrink_to_fit();
-        Ok(bytes)
-    }
-}
-
-impl<'a> TryFrom<&'a [u8]> for ClientSubnet {
-    type Error = ProtoError;
-
-    fn try_from(value: &'a [u8]) -> Result<Self, Self::Error> {
-        let mut decoder = BinDecoder::new(value);
-        Self::read(&mut decoder)
-    }
-}
-
-impl From<ipnet::IpNet> for ClientSubnet {
-    fn from(net: ipnet::IpNet) -> Self {
-        Self {
-            address: net.addr(),
-            source_prefix: net.prefix_len(),
-            scope_prefix: Default::default(),
-        }
-    }
-}
-
-impl FromStr for ClientSubnet {
-    type Err = ipnet::AddrParseError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        ipnet::IpNet::from_str(s).map(ClientSubnet::from)
     }
 }
 
@@ -762,14 +528,14 @@ mod tests {
 
         let mut bytes = Vec::new();
         let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        assert!(rdata.emit(&mut encoder).is_ok());
+        assert!(emit(&mut encoder, &rdata).is_ok());
         let bytes = encoder.into_bytes();
 
-        println!("bytes: {bytes:?}");
+        println!("bytes: {:?}", bytes);
 
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
         let restrict = Restrict::new(bytes.len() as u16);
-        let read_rdata = OPT::read_data(&mut decoder, restrict).expect("Decoding error");
+        let read_rdata = read(&mut decoder, restrict).expect("Decoding error");
         assert_eq!(rdata, read_rdata);
     }
 
@@ -780,8 +546,8 @@ mod tests {
             0x00, 0x04, 0x00, 0x01, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x00,
         ];
 
-        let mut decoder: BinDecoder<'_> = BinDecoder::new(&bytes);
-        let read_rdata = OPT::read_data(&mut decoder, Restrict::new(bytes.len() as u16));
+        let mut decoder: BinDecoder<'_> = BinDecoder::new(&*bytes);
+        let read_rdata = read(&mut decoder, Restrict::new(bytes.len() as u16));
         assert!(
             read_rdata.is_ok(),
             "error decoding: {:?}",
@@ -790,10 +556,7 @@ mod tests {
 
         let opt = read_rdata.unwrap();
         let mut options = HashMap::default();
-        options.insert(
-            EdnsCode::Subnet,
-            EdnsOption::Subnet("0.0.0.0/0".parse().unwrap()),
-        );
+        options.insert(EdnsCode::Subnet, EdnsOption::Unknown(8, vec![0, 1, 0, 0]));
         options.insert(
             EdnsCode::Cookie,
             EdnsOption::Unknown(10, vec![0x0b, 0x64, 0xb4, 0xdc, 0xd7, 0xb0, 0xcc, 0x8f]),
@@ -801,21 +564,5 @@ mod tests {
         options.insert(EdnsCode::Keepalive, EdnsOption::Unknown(11, vec![]));
         let options = OPT::new(options);
         assert_eq!(opt, options);
-    }
-
-    #[test]
-    fn test_write_client_subnet() {
-        let expected_bytes: Vec<u8> = vec![0x00, 0x01, 0x18, 0x00, 0xac, 0x01, 0x01];
-        let ecs: ClientSubnet = "172.1.1.1/24".parse().unwrap();
-        let bytes = Vec::<u8>::try_from(&ecs).unwrap();
-        println!("bytes: {bytes:?}");
-        assert_eq!(bytes, expected_bytes);
-    }
-
-    #[test]
-    fn test_read_client_subnet() {
-        let bytes: Vec<u8> = vec![0x00, 0x01, 0x18, 0x00, 0xac, 0x01, 0x01];
-        let ecs = ClientSubnet::try_from(bytes.as_slice()).unwrap();
-        assert_eq!(ecs, "172.1.1.0/24".parse().unwrap());
     }
 }

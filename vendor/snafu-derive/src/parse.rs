@@ -21,6 +21,7 @@ mod kw {
     custom_keyword!(module);
     custom_keyword!(provide);
     custom_keyword!(source);
+    custom_keyword!(transparent);
     custom_keyword!(visibility);
     custom_keyword!(whatever);
 
@@ -40,7 +41,7 @@ pub(crate) fn attributes_from_syn(
     let mut errs = Vec::new();
 
     for attr in attrs {
-        if attr.path.is_ident("snafu") {
+        if attr.path().is_ident("snafu") {
             let attr_list = Punctuated::<Attribute, token::Comma>::parse_terminated;
 
             match attr.parse_args_with(attr_list) {
@@ -49,11 +50,11 @@ pub(crate) fn attributes_from_syn(
                 }
                 Err(e) => errs.push(e),
             }
-        } else if attr.path.is_ident("doc") {
+        } else if attr.path().is_ident("doc") {
             // Ignore any errors that occur while parsing the doc
             // comment. This isn't our attribute so we shouldn't
             // assume that we know what values are acceptable.
-            if let Ok(comment) = syn::parse2::<DocComment>(attr.tokens) {
+            if let Ok(comment) = syn::parse2::<DocComment>(attr.meta.to_token_stream()) {
                 ours.push(comment.into());
             }
         }
@@ -86,6 +87,7 @@ enum Attribute {
     Module(Module),
     Provide(Provide),
     Source(Source),
+    Transparent(Transparent),
     Visibility(Visibility),
     Whatever(Whatever),
 }
@@ -103,6 +105,7 @@ impl From<Attribute> for SnafuAttribute {
             Module(v) => SnafuAttribute::Module(v.to_token_stream(), v.into_value()),
             Provide(v) => SnafuAttribute::Provide(v.to_token_stream(), v.into_value()),
             Source(s) => SnafuAttribute::Source(s.to_token_stream(), s.into_components()),
+            Transparent(t) => SnafuAttribute::Transparent(t.to_token_stream(), t.into_bool()),
             Visibility(v) => SnafuAttribute::Visibility(v.to_token_stream(), v.into_arbitrary()),
             Whatever(o) => SnafuAttribute::Whatever(o.to_token_stream()),
         }
@@ -128,6 +131,8 @@ impl Parse for Attribute {
             input.parse().map(Attribute::Provide)
         } else if lookahead.peek(kw::source) {
             input.parse().map(Attribute::Source)
+        } else if lookahead.peek(kw::transparent) {
+            input.parse().map(Attribute::Transparent)
         } else if lookahead.peek(kw::visibility) {
             input.parse().map(Attribute::Visibility)
         } else if lookahead.peek(kw::whatever) {
@@ -422,6 +427,7 @@ impl ToTokens for Display {
 }
 
 struct DocComment {
+    doc_ident: Ident,
     eq_token: token::Eq,
     str: LitStr,
 }
@@ -441,6 +447,7 @@ impl From<DocComment> for SnafuAttribute {
 impl Parse for DocComment {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(Self {
+            doc_ident: input.parse()?,
             eq_token: input.parse()?,
             str: input.parse()?,
         })
@@ -449,6 +456,7 @@ impl Parse for DocComment {
 
 impl ToTokens for DocComment {
     fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.doc_ident.to_tokens(tokens);
         self.eq_token.to_tokens(tokens);
         self.str.to_tokens(tokens);
     }
@@ -659,31 +667,19 @@ impl ProvideFlag {
     }
 
     fn is_chain(&self) -> bool {
-        match self {
-            ProvideFlag::Chain(_) => true,
-            _ => false,
-        }
+        matches!(self, ProvideFlag::Chain(_))
     }
 
     fn is_opt(&self) -> bool {
-        match self {
-            ProvideFlag::Opt(_) => true,
-            _ => false,
-        }
+        matches!(self, ProvideFlag::Opt(_))
     }
 
     fn is_priority(&self) -> bool {
-        match self {
-            ProvideFlag::Priority(_) => true,
-            _ => false,
-        }
+        matches!(self, ProvideFlag::Priority(_))
     }
 
     fn is_ref(&self) -> bool {
-        match self {
-            ProvideFlag::Ref(_) => true,
-            _ => false,
-        }
+        matches!(self, ProvideFlag::Ref(_))
     }
 }
 
@@ -740,7 +736,7 @@ impl Parse for Source {
     fn parse(input: ParseStream) -> Result<Self> {
         Ok(Self {
             source_token: input.parse()?,
-            args: MaybeArg::parse_with(&input, Punctuated::parse_terminated)?,
+            args: MaybeArg::parse_with(input, Punctuated::parse_terminated)?,
         })
     }
 }
@@ -808,6 +804,33 @@ impl ToTokens for SourceArg {
                 })
             }
         }
+    }
+}
+
+struct Transparent {
+    transparent_token: kw::transparent,
+    arg: MaybeArg<LitBool>,
+}
+
+impl Transparent {
+    fn into_bool(self) -> bool {
+        self.arg.into_option().map_or(true, |a| a.value)
+    }
+}
+
+impl Parse for Transparent {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self {
+            transparent_token: input.parse()?,
+            arg: input.parse()?,
+        })
+    }
+}
+
+impl ToTokens for Transparent {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.transparent_token.to_tokens(tokens);
+        self.arg.to_tokens(tokens);
     }
 }
 

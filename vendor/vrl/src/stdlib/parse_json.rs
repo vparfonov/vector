@@ -1,9 +1,11 @@
-use crate::compiler::prelude::*;
+use std::collections::HashMap;
+
 use serde_json::{
     value::{RawValue, Value as JsonValue},
     Error, Map,
 };
-use std::collections::HashMap;
+
+use crate::compiler::prelude::*;
 
 fn parse_json(value: Value) -> Resolved {
     let bytes = value.try_bytes()?;
@@ -99,12 +101,12 @@ impl Function for ParseJson {
     }
 
     fn usage(&self) -> &'static str {
-        indoc! {r#"
+        indoc! {"
             Parses the provided `value` as JSON.
 
             Only JSON types are returned. If you need to convert a `string` into a `timestamp`,
             consider the `parse_timestamp` function.
-        "#}
+        "}
     }
 
     fn parameters(&self) -> &'static [Parameter] {
@@ -305,6 +307,19 @@ mod tests {
         invalid_input_max_depth {
             args: func_args![ value: r#"{"top_layer": "finish"}"#, max_depth: 129],
             want: Err("max_depth value should be greater than 0 and less than 128, got 129"),
+            tdef: type_def(),
+        }
+
+        // // TODO: provide a function version of the `test_function!` macro.
+        max_int {
+            args: func_args![ value: format!("{{\"num\": {}}}", i64::MAX - 1)],
+            want: Ok(value!({"num": 9_223_372_036_854_775_806_i64})),
+            tdef: type_def(),
+        }
+
+        lossy_float_conversion {
+            args: func_args![ value: r#"{"num": 9223372036854775808}"#],
+            want: Ok(value!({"num": 9.223_372_036_854_776e18})),
             tdef: type_def(),
         }
     ];

@@ -40,13 +40,14 @@ pub use select::Selector;
 
 use std::{
     collections::VecDeque,
-    sync::{Arc, atomic::{AtomicUsize, AtomicBool, Ordering}},
+    sync::{Arc, atomic::{AtomicUsize, AtomicBool, Ordering}, Weak},
     time::{Duration, Instant},
     marker::PhantomData,
     thread,
     fmt,
 };
 
+#[cfg(feature = "spin")]
 use spin1::{Mutex as Spinlock, MutexGuard as SpinlockGuard};
 use crate::signal::{Signal, SyncSignal};
 
@@ -256,14 +257,69 @@ enum TryRecvTimeoutError {
 }
 
 // TODO: Investigate some sort of invalidation flag for timeouts
+#[cfg(feature = "spin")]
 struct Hook<T, S: ?Sized>(Option<Spinlock<Option<T>>>, S);
 
+#[cfg(not(feature = "spin"))]
+struct Hook<T, S: ?Sized>(Option<Mutex<Option<T>>>, S);
+
+#[cfg(feature = "spin")]
 impl<T, S: ?Sized + Signal> Hook<T, S> {
-    pub fn slot(msg: Option<T>, signal: S) -> Arc<Self> where S: Sized {
+    pub fn slot(msg: Option<T>, signal: S) -> Arc<Self>
+    where
+        S: Sized,
+    {
         Arc::new(Self(Some(Spinlock::new(msg)), signal))
     }
 
-    pub fn trigger(signal: S) -> Arc<Self> where S: Sized {
+    fn lock(&self) -> Option<SpinlockGuard<'_, Option<T>>> {
+        self.0.as_ref().map(|s| s.lock())
+    }
+}
+
+#[cfg(not(feature = "spin"))]
+impl<T, S: ?Sized + Signal> Hook<T, S> {
+    pub fn slot(msg: Option<T>, signal: S) -> Arc<Self>
+    where
+        S: Sized,
+    {
+        Arc::new(Self(Some(Mutex::new(msg)), signal))
+    }
+
+    fn lock(&self) -> Option<MutexGuard<'_, Option<T>>> {
+        self.0.as_ref().map(|s| s.lock().unwrap())
+    }
+}
+
+impl<T, S: ?Sized + Signal> Hook<T, S> {
+    pub fn fire_recv(&self) -> (T, &S) {
+        let msg = self.lock().unwrap().take().unwrap();
+        (msg, self.signal())
+    }
+
+    pub fn fire_send(&self, msg: T) -> (Option<T>, &S) {
+        let ret = match self.lock() {
+            Some(mut lock) => {
+                *lock = Some(msg);
+                None
+            }
+            None => Some(msg),
+        };
+        (ret, self.signal())
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.lock().map(|s| s.is_none()).unwrap_or(true)
+    }
+
+    pub fn try_take(&self) -> Option<T> {
+        self.lock().unwrap().take()
+    }
+
+    pub fn trigger(signal: S) -> Arc<Self>
+    where
+        S: Sized,
+    {
         Arc::new(Self(None, signal))
     }
 
@@ -274,37 +330,13 @@ impl<T, S: ?Sized + Signal> Hook<T, S> {
     pub fn fire_nothing(&self) -> bool {
         self.signal().fire()
     }
-
-    pub fn fire_recv(&self) -> (T, &S) {
-        let msg = self.0.as_ref().unwrap().lock().take().unwrap();
-        (msg, self.signal())
-    }
-
-    pub fn fire_send(&self, msg: T) -> (Option<T>, &S) {
-        let ret = match &self.0 {
-            Some(hook) => {
-                *hook.lock() = Some(msg);
-                None
-            },
-            None => Some(msg),
-        };
-        (ret, self.signal())
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.0.as_ref().map(|s| s.lock().is_none()).unwrap_or(true)
-    }
-
-    pub fn try_take(&self) -> Option<T> {
-        self.0.as_ref().and_then(|s| s.lock().take())
-    }
 }
 
 impl<T> Hook<T, SyncSignal> {
     pub fn wait_recv(&self, abort: &AtomicBool) -> Option<T> {
         loop {
             let disconnected = abort.load(Ordering::SeqCst); // Check disconnect *before* msg
-            let msg = self.0.as_ref().unwrap().lock().take();
+            let msg = self.lock().unwrap().take();
             if let Some(msg) = msg {
                 break Some(msg);
             } else if disconnected {
@@ -319,7 +351,7 @@ impl<T> Hook<T, SyncSignal> {
     pub fn wait_deadline_recv(&self, abort: &AtomicBool, deadline: Instant) -> Result<T, bool> {
         loop {
             let disconnected = abort.load(Ordering::SeqCst); // Check disconnect *before* msg
-            let msg = self.0.as_ref().unwrap().lock().take();
+            let msg = self.lock().unwrap().take();
             if let Some(msg) = msg {
                 break Ok(msg);
             } else if disconnected {
@@ -335,7 +367,7 @@ impl<T> Hook<T, SyncSignal> {
     pub fn wait_send(&self, abort: &AtomicBool) {
         loop {
             let disconnected = abort.load(Ordering::SeqCst); // Check disconnect *before* msg
-            if disconnected || self.0.as_ref().unwrap().lock().is_none() {
+            if disconnected || self.lock().unwrap().is_none() {
                 break;
             }
 
@@ -347,7 +379,7 @@ impl<T> Hook<T, SyncSignal> {
     pub fn wait_deadline_send(&self, abort: &AtomicBool, deadline: Instant) -> Result<(), bool> {
         loop {
             let disconnected = abort.load(Ordering::SeqCst); // Check disconnect *before* msg
-            if self.0.as_ref().unwrap().lock().is_none() {
+            if self.lock().unwrap().is_none() {
                 break Ok(());
             } else if disconnected {
                 break Err(false);
@@ -648,6 +680,14 @@ impl<T> Shared<T> {
     fn capacity(&self) -> Option<usize> {
         wait_lock(&self.chan).sending.as_ref().map(|(cap, _)| *cap)
     }
+
+    fn sender_count(&self) -> usize {
+        self.sender_count.load(Ordering::Relaxed)
+    }
+
+    fn receiver_count(&self) -> usize {
+        self.receiver_count.load(Ordering::Relaxed)
+    }
 }
 
 /// A transmitting end of a channel.
@@ -724,6 +764,35 @@ impl<T> Sender<T> {
     pub fn capacity(&self) -> Option<usize> {
         self.shared.capacity()
     }
+
+    /// Get the number of senders that currently exist, including this one.
+    pub fn sender_count(&self) -> usize {
+        self.shared.sender_count()
+    }
+
+    /// Get the number of receivers that currently exist.
+    ///
+    /// Note that this method makes no guarantees that a subsequent send will succeed; it's
+    /// possible that between `receiver_count()` being called and a `send()`, all open receivers
+    /// could drop.
+    pub fn receiver_count(&self) -> usize {
+        self.shared.receiver_count()
+    }
+
+    /// Creates a [`WeakSender`] that does not keep the channel open.
+    ///
+    /// The channel is closed once all `Sender`s are dropped, even if there
+    /// are still active `WeakSender`s.
+    pub fn downgrade(&self) -> WeakSender<T> {
+        WeakSender {
+            shared: Arc::downgrade(&self.shared),
+        }
+    }
+
+    /// Returns whether the senders are belong to the same channel.
+    pub fn same_channel(&self, other: &Sender<T>) -> bool {
+        Arc::ptr_eq(&self.shared, &other.shared)
+    }
 }
 
 impl<T> Clone for Sender<T> {
@@ -747,6 +816,45 @@ impl<T> Drop for Sender<T> {
         if self.shared.sender_count.fetch_sub(1, Ordering::Relaxed) == 1 {
             self.shared.disconnect_all();
         }
+    }
+}
+
+/// A sender that does not prevent the channel from being closed.
+///
+/// Weak senders do not count towards the number of active senders on the channel. As soon as
+/// all normal [`Sender`]s are dropped, the channel is closed, even if there is still a
+/// `WeakSender`.
+///
+/// To send messages, a `WeakSender` must first be upgraded to a `Sender` using the [`upgrade`]
+/// method.
+pub struct WeakSender<T> {
+    shared: Weak<Shared<T>>,
+}
+
+impl<T> WeakSender<T> {
+    /// Tries to upgrade the `WeakSender` to a [`Sender`], in order to send messages.
+    ///
+    /// Returns `None` if the channel was closed already. Note that a `Some` return value
+    /// does not guarantee that the channel is still open.
+    pub fn upgrade(&self) -> Option<Sender<T>> {
+        self.shared
+            .upgrade()
+            // check that there are still live senders
+            .filter(|shared| {
+                shared
+                    .sender_count
+                    .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |count| {
+                        if count == 0 {
+                            // all senders are closed already -> don't increase the sender count
+                            None
+                        } else {
+                            // there is still at least one active sender
+                            Some(count + 1)
+                        }
+                    })
+                    .is_ok()
+            })
+            .map(|shared| Sender { shared })
     }
 }
 
@@ -845,6 +953,21 @@ impl<T> Receiver<T> {
     /// If the channel is bounded, returns its capacity.
     pub fn capacity(&self) -> Option<usize> {
         self.shared.capacity()
+    }
+
+    /// Get the number of senders that currently exist.
+    pub fn sender_count(&self) -> usize {
+        self.shared.sender_count()
+    }
+
+    /// Get the number of receivers that currently exist, including this one.
+    pub fn receiver_count(&self) -> usize {
+        self.shared.receiver_count()
+    }
+
+    /// Returns whether the receivers are belong to the same channel.
+    pub fn same_channel(&self, other: &Receiver<T>) -> bool {
+        Arc::ptr_eq(&self.shared, &other.shared)
     }
 }
 

@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.56"
+rust-version = "1.63"
 name = "tokio-test"
-version = "0.4.3"
+version = "0.4.4"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 description = """
 Testing utilities for Tokio- and futures-based code
@@ -22,7 +22,7 @@ homepage = "https://tokio.rs"
 readme = "README.md"
 categories = [
     "asynchronous",
-    "testing",
+    "development-tools::testing",
 ]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"

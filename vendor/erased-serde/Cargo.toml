@@ -13,8 +13,9 @@
 edition = "2021"
 rust-version = "1.56"
 name = "erased-serde"
-version = "0.3.31"
+version = "0.4.0"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
+exclude = ["benches"]
 description = "Type-erased Serialize and Serializer traits"
 documentation = "https://docs.rs/erased-serde"
 readme = "README.md"
@@ -64,5 +65,8 @@ features = ["diff"]
 [features]
 alloc = ["serde/alloc"]
 default = ["std"]
-std = ["serde/std"]
+std = [
+    "alloc",
+    "serde/std",
+]
 unstable-debug = []

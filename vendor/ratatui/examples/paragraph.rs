@@ -1,3 +1,18 @@
+//! # [Ratatui] Paragraph example
+//!
+//! The latest version of this example is available in the [examples] folder in the repository.
+//!
+//! Please note that the examples are designed to be run against the `main` branch of the Github
+//! repository. This means that you may not be able to compile with the latest release version on
+//! crates.io, or the one that you have installed locally.
+//!
+//! See the [examples readme] for more information on finding examples that match the version of the
+//! library you are using.
+//!
+//! [Ratatui]: https://github.com/ratatui-org/ratatui
+//! [examples]: https://github.com/ratatui-org/ratatui/blob/main/examples
+//! [examples readme]: https://github.com/ratatui-org/ratatui/blob/main/examples/README.md
+
 use std::{
     error::Error,
     io,
@@ -64,9 +79,7 @@ fn run_app<B: Backend>(
     loop {
         terminal.draw(|f| ui(f, &app))?;
 
-        let timeout = tick_rate
-            .checked_sub(last_tick.elapsed())
-            .unwrap_or_else(|| Duration::from_secs(0));
+        let timeout = tick_rate.saturating_sub(last_tick.elapsed());
         if crossterm::event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
                 if let KeyCode::Char('q') = key.code {
@@ -81,7 +94,7 @@ fn run_app<B: Backend>(
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+fn ui(f: &mut Frame, app: &App) {
     let size = f.size();
 
     // Words made "loooong" to demonstrate line breaking.
@@ -92,18 +105,7 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
     let block = Block::default().black();
     f.render_widget(block, size);
 
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints(
-            [
-                Constraint::Percentage(25),
-                Constraint::Percentage(25),
-                Constraint::Percentage(25),
-                Constraint::Percentage(25),
-            ]
-            .as_ref(),
-        )
-        .split(size);
+    let layout = Layout::vertical([Constraint::Ratio(1, 4); 4]).split(size);
 
     let text = vec![
         Line::from("This is a line "),
@@ -134,26 +136,26 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
     let paragraph = Paragraph::new(text.clone())
         .style(Style::default().fg(Color::Gray))
         .block(create_block("Default alignment (Left), no wrap"));
-    f.render_widget(paragraph, chunks[0]);
+    f.render_widget(paragraph, layout[0]);
 
     let paragraph = Paragraph::new(text.clone())
         .style(Style::default().fg(Color::Gray))
         .block(create_block("Default alignment (Left), with wrap"))
         .wrap(Wrap { trim: true });
-    f.render_widget(paragraph, chunks[1]);
+    f.render_widget(paragraph, layout[1]);
 
     let paragraph = Paragraph::new(text.clone())
         .style(Style::default().fg(Color::Gray))
         .block(create_block("Right alignment, with wrap"))
-        .alignment(Alignment::Right)
+        .right_aligned()
         .wrap(Wrap { trim: true });
-    f.render_widget(paragraph, chunks[2]);
+    f.render_widget(paragraph, layout[2]);
 
     let paragraph = Paragraph::new(text)
         .style(Style::default().fg(Color::Gray))
         .block(create_block("Center alignment, with wrap, with scroll"))
-        .alignment(Alignment::Center)
+        .centered()
         .wrap(Wrap { trim: true })
         .scroll((app.scroll, 0));
-    f.render_widget(paragraph, chunks[3]);
+    f.render_widget(paragraph, layout[3]);
 }

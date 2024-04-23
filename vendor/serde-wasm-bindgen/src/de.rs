@@ -1,4 +1,4 @@
-use js_sys::{Array, ArrayBuffer, JsString, Number, Object, Symbol, Uint8Array};
+use js_sys::{Array, ArrayBuffer, JsString, Map, Number, Object, Symbol, Uint8Array};
 use serde::de::value::{MapDeserializer, SeqDeserializer};
 use serde::de::{self, IntoDeserializer};
 use std::convert::TryFrom;
@@ -27,7 +27,7 @@ impl<'de> de::SeqAccess<'de> for SeqAccess {
     }
 }
 
-/// Provides [`serde::de::MapAccess`] from any JS iterator that returns `[key, value]` pairs.
+/// Provides [`de::MapAccess`] from any JS iterator that returns `[key, value]` pairs.
 struct MapAccess {
     iter: js_sys::IntoIter,
     next_value: Option<Deserializer>,
@@ -140,7 +140,7 @@ impl<'de> de::SeqAccess<'de> for PreservedValueAccess {
     }
 }
 
-/// Provides [`serde::de::EnumAccess`] from given JS values for the `tag` and the `payload`.
+/// Provides [`de::EnumAccess`] from given JS values for the `tag` and the `payload`.
 struct EnumAccess {
     tag: Deserializer,
     payload: Deserializer,
@@ -158,7 +158,7 @@ impl<'de> de::EnumAccess<'de> for EnumAccess {
     }
 }
 
-/// A newtype that allows using any [`JsValue`] as a [`serde::Deserializer`].
+/// A newtype that allows using any [`JsValue`] as a [`de::Deserializer`].
 pub struct Deserializer {
     value: JsValue,
 }
@@ -186,8 +186,6 @@ fn convert_pair(pair: JsValue) -> (Deserializer, Deserializer) {
 }
 
 impl Deserializer {
-    /// Casts the internal value into an object, including support for prototype-less objects.
-    /// See https://github.com/rustwasm/wasm-bindgen/issues/1366 for why we don't use `dyn_ref`.
     fn as_object_entries(&self) -> Option<Array> {
         if self.value.is_object() {
             Some(Object::entries(self.value.unchecked_ref()))
@@ -245,10 +243,8 @@ impl Deserializer {
     }
 
     fn as_safe_integer(&self) -> Option<i64> {
-        if let Some(v) = self.value.as_f64() {
-            if Number::is_safe_integer(&self.value) {
-                return Some(v as i64);
-            }
+        if Number::is_safe_integer(&self.value) {
+            return Some(self.value.unchecked_into_f64() as i64);
         }
         None
     }
@@ -314,15 +310,18 @@ impl<'de> de::Deserializer<'de> for Deserializer {
         } else if self.value.is_object() &&
             // The only reason we want to support objects here is because serde uses
             // `deserialize_any` for internally tagged enums
-            // (see https://github.com/cloudflare/serde-wasm-bindgen/pull/4#discussion_r352245020).
+            // (see https://github.com/RReverser/serde-wasm-bindgen/pull/4#discussion_r352245020).
             //
             // We expect such enums to be represented via plain JS objects, so let's explicitly
-            // exclude Sets, Maps and any other iterables. These should be deserialized via concrete
+            // exclude Sets and other iterables. These should be deserialized via concrete
             // `deserialize_*` methods instead of us trying to guess the right target type.
+            //
+            // We still do support Map, so that the format described here stays a self-describing
+            // format: we happen to serialize to Map, and it is not ambiguous.
             //
             // Hopefully we can rid of these hacks altogether once
             // https://github.com/serde-rs/serde/issues/1183 is implemented / fixed on serde side.
-            !Symbol::iterator().js_in(&self.value)
+            (!Symbol::iterator().js_in(&self.value) || self.value.has_type::<Map>())
         {
             self.deserialize_map(visitor)
         } else {
@@ -410,6 +409,9 @@ impl<'de> de::Deserializer<'de> for Deserializer {
         self.deserialize_from_js_number_unsigned(visitor)
     }
 
+    /// Supported inputs:
+    /// - `BigInt` within `i64` boundaries.
+    /// - number within safe integer boundaries.
     fn deserialize_i64<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         if self.value.is_bigint() {
             match i64::try_from(self.value) {
@@ -423,6 +425,9 @@ impl<'de> de::Deserializer<'de> for Deserializer {
         }
     }
 
+    /// Supported inputs:
+    /// - `BigInt` within `u64` boundaries.
+    /// - number within safe integer boundaries.
     fn deserialize_u64<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         if self.value.is_bigint() {
             match u64::try_from(self.value) {
@@ -436,6 +441,8 @@ impl<'de> de::Deserializer<'de> for Deserializer {
         }
     }
 
+    /// Supported inputs:
+    /// - `BigInt` within `i128` boundaries.
     fn deserialize_i128<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         if self.value.is_bigint() {
             match i128::try_from(self.value) {
@@ -449,6 +456,8 @@ impl<'de> de::Deserializer<'de> for Deserializer {
         }
     }
 
+    /// Supported inputs:
+    /// - `BigInt` within `u128` boundaries.
     fn deserialize_u128<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
         if self.value.is_bigint() {
             match u128::try_from(self.value) {
@@ -462,7 +471,7 @@ impl<'de> de::Deserializer<'de> for Deserializer {
         }
     }
 
-    /// Converts a JavaScript string to a Rust char.
+    /// Converts a JavaScript string to a Rust `char`.
     ///
     /// By default we don't perform detection of single chars because it's pretty complicated,
     /// but if we get a hint that they're expected, this methods allows to avoid heap allocations
@@ -476,6 +485,7 @@ impl<'de> de::Deserializer<'de> for Deserializer {
         self.invalid_type(visitor)
     }
 
+    /// Deserializes `undefined` or `null` into `None` and any other value into `Some(value)`.
     // Serde can deserialize `visit_unit` into `None`, but can't deserialize arbitrary value
     // as `Some`, so we need to provide own simple implementation.
     fn deserialize_option<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
@@ -486,7 +496,7 @@ impl<'de> de::Deserializer<'de> for Deserializer {
         }
     }
 
-    /// Simply calls `visit_newtype_struct`.
+    /// Forwards to deserializing newtype contents.
     fn deserialize_newtype_struct<V: de::Visitor<'de>>(
         self,
         _name: &'static str,
@@ -497,6 +507,7 @@ impl<'de> de::Deserializer<'de> for Deserializer {
 
     /// Supported inputs:
     ///  - JS iterable (an object with [`[Symbol.iterator]`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Symbol/iterator)).
+    ///
     /// Supported outputs:
     ///  - Any Rust sequence from Serde point of view ([`Vec`], [`HashSet`](std::collections::HashSet), etc.)
     fn deserialize_seq<V: de::Visitor<'de>>(self, visitor: V) -> Result<V::Value> {
@@ -530,6 +541,7 @@ impl<'de> de::Deserializer<'de> for Deserializer {
     /// Supported inputs:
     ///  - A JS iterable that is expected to return `[key, value]` pairs.
     ///  - A JS object, which will be iterated using [`Object.entries`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Object/entries).
+    ///
     /// Supported outputs:
     ///  - A Rust key-value map ([`HashMap`](std::collections::HashMap), [`BTreeMap`](std::collections::BTreeMap), etc.).
     ///  - A typed Rust structure with `#[derive(Deserialize)]`.
@@ -545,6 +557,7 @@ impl<'de> de::Deserializer<'de> for Deserializer {
 
     /// Supported inputs:
     ///  - A plain JS object.
+    ///
     /// Supported outputs:
     ///  - A typed Rust structure with `#[derive(Deserialize)]`.
     fn deserialize_struct<V: de::Visitor<'de>>(

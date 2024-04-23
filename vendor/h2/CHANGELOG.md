@@ -1,3 +1,33 @@
+# 0.4.4 (April 3, 2024)
+
+* Limit number of CONTINUATION frames for misbehaving connections.
+
+# 0.4.3 (March 15, 2024)
+
+* Fix flow control limits to not apply until receiving SETTINGS ack.
+* Fix not returning an error if IO ended without `close_notify`.
+* Improve performance of decoding many headers.
+
+# 0.4.2 (January 17th, 2024)
+
+* Limit error resets for misbehaving connections.
+* Fix selecting MAX_CONCURRENT_STREAMS value if no value is advertised initially.
+
+# 0.4.1 (January 8, 2024)
+
+* Fix assigning connection capacity which could starve streams in some instances.
+
+# 0.4.0 (November 15, 2023)
+
+* Update to `http` 1.0.
+* Remove deprecated `Server::poll_close()`.
+
+# 0.3.22 (November 15, 2023)
+
+* Add `header_table_size(usize)` option to client and server builders.
+* Improve throughput when vectored IO is not available.
+* Update indexmap to 2.
+
 # 0.3.21 (August 21, 2023)
 
 * Fix opening of new streams over peer's max concurrent limit.

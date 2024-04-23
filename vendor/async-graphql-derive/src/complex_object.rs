@@ -143,7 +143,7 @@ pub fn generate(
                 let ident = &method.sig.ident;
 
                 schema_fields.push(quote! {
-                    #crate_name::static_assertions::assert_impl_one!(#ty: #crate_name::ObjectType);
+                    #crate_name::static_assertions_next::assert_impl_one!(#ty: #crate_name::ObjectType);
                     <#ty>::create_type_info(registry);
                     if let #crate_name::registry::MetaType::Object { fields: obj_fields, .. } =
                         registry.create_fake_output_type::<#ty>() {
@@ -444,7 +444,6 @@ pub fn generate(
         #item_impl
 
         #[allow(clippy::all, clippy::pedantic)]
-        #[#crate_name::async_trait::async_trait]
         impl #generics #crate_name::ComplexObject for #self_ty #where_clause {
             fn fields(registry: &mut #crate_name::registry::Registry) -> ::std::vec::Vec<(::std::string::String, #crate_name::registry::MetaField)> {
                 let mut fields = ::std::vec::Vec::new();

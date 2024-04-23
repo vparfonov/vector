@@ -4,9 +4,9 @@ use approx::abs_diff_eq;
 use bson::{doc, Document};
 use semver::VersionReq;
 use serde::Deserialize;
-use tokio::sync::RwLockWriteGuard;
 
 use crate::{
+    cmap::DEFAULT_MAX_POOL_SIZE,
     coll::options::FindOptions,
     error::Result,
     event::cmap::CmapEvent,
@@ -16,6 +16,7 @@ use crate::{
     sdam::{description::topology::server_selection, Server},
     selection_criteria::{ReadPreference, SelectionCriteria},
     test::{
+        get_client_options,
         log_uncaptured,
         run_spec_test,
         Event,
@@ -24,8 +25,6 @@ use crate::{
         FailPoint,
         FailPointMode,
         TestClient,
-        CLIENT_OPTIONS,
-        LOCK,
     },
     ServerInfo,
 };
@@ -79,10 +78,14 @@ async fn run_test(test_file: TestFile) {
     .into();
 
     for _ in 0..test_file.iterations {
-        let selection =
-            server_selection::attempt_to_select_server(&read_pref, &topology_description, &servers)
-                .expect("selection should not fail")
-                .expect("a server should have been selected");
+        let selection = server_selection::attempt_to_select_server(
+            &read_pref,
+            &topology_description,
+            &servers,
+            None,
+        )
+        .expect("selection should not fail")
+        .expect("a server should have been selected");
         *tallies.entry(selection.address.clone()).or_insert(0) += 1;
     }
 
@@ -116,9 +119,7 @@ async fn select_in_window() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn load_balancing_test() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
-    let mut setup_client_options = CLIENT_OPTIONS.get().await.clone();
+    let mut setup_client_options = get_client_options().await.clone();
 
     if setup_client_options.load_balanced.unwrap_or(false) {
         log_uncaptured("skipping load_balancing_test test due to load-balanced topology");
@@ -148,7 +149,7 @@ async fn load_balancing_test() {
         return;
     }
 
-    if CLIENT_OPTIONS.get().await.hosts.len() != 2 {
+    if get_client_options().await.hosts.len() != 2 {
         log_uncaptured("skipping load_balancing_test test due to topology not having 2 mongoses");
         return;
     }
@@ -199,27 +200,29 @@ async fn load_balancing_test() {
         counts.sort();
 
         let share_of_selections = (*counts[0] as f64) / ((*counts[0] + *counts[1]) as f64);
-        assert!(
-            share_of_selections <= max_share,
-            "expected no more than {}% of selections, instead got {}%",
-            (max_share * 100.0) as u32,
-            (share_of_selections * 100.0) as u32
-        );
-        assert!(
-            share_of_selections >= min_share,
-            "expected at least {}% of selections, instead got {}%",
-            (min_share * 100.0) as u32,
-            (share_of_selections * 100.0) as u32
-        );
+        #[allow(clippy::cast_possible_truncation)]
+        {
+            assert!(
+                share_of_selections <= max_share,
+                "expected no more than {}% of selections, instead got {}%",
+                (max_share * 100.0) as u32,
+                (share_of_selections * 100.0) as u32
+            );
+            assert!(
+                share_of_selections >= min_share,
+                "expected at least {}% of selections, instead got {}%",
+                (min_share * 100.0) as u32,
+                (share_of_selections * 100.0) as u32
+            );
+        }
     }
 
     let mut handler = EventHandler::new();
     let mut subscriber = handler.subscribe();
-    let mut options = CLIENT_OPTIONS.get().await.clone();
-    let max_pool_size = 10;
+    let mut options = get_client_options().await.clone();
+    let max_pool_size = DEFAULT_MAX_POOL_SIZE;
     let hosts = options.hosts.clone();
     options.local_threshold = Duration::from_secs(30).into();
-    options.max_pool_size = Some(max_pool_size);
     options.min_pool_size = Some(max_pool_size);
     let client = TestClient::with_handler(Some(Arc::new(handler.clone())), options).await;
 
@@ -260,7 +263,7 @@ async fn load_balancing_test() {
         .build();
     let failpoint = FailPoint::fail_command(&["find"], FailPointMode::AlwaysOn, options);
 
-    let slow_host = CLIENT_OPTIONS.get().await.hosts[0].clone();
+    let slow_host = get_client_options().await.hosts[0].clone();
     let criteria = SelectionCriteria::Predicate(Arc::new(move |si| si.address() == &slow_host));
     let fp_guard = setup_client
         .enable_failpoint(failpoint, criteria)

@@ -15,12 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::fmt;
-use std::fmt::Debug;
-use std::fmt::Formatter;
-use std::fmt::Write;
-use std::time::Duration;
-
+use base64::prelude::BASE64_STANDARD;
+use base64::Engine;
+use bytes::Bytes;
 use http::header::HeaderName;
 use http::header::CONTENT_LENGTH;
 use http::header::CONTENT_TYPE;
@@ -32,6 +29,13 @@ use http::Response;
 use reqsign::AzureStorageCredential;
 use reqsign::AzureStorageLoader;
 use reqsign::AzureStorageSigner;
+use serde::{Deserialize, Serialize};
+use std::fmt;
+use std::fmt::Debug;
+use std::fmt::Formatter;
+use std::fmt::Write;
+use std::time::Duration;
+use uuid::Uuid;
 
 use crate::raw::*;
 use crate::*;
@@ -397,6 +401,118 @@ impl AzblobCore {
         Ok(req)
     }
 
+    pub fn azblob_put_block_request(
+        &self,
+        path: &str,
+        block_id: Uuid,
+        size: Option<u64>,
+        args: &OpWrite,
+        body: AsyncBody,
+    ) -> Result<Request<AsyncBody>> {
+        // To be written as part of a blob, a block must have been successfully written to the server in an earlier Put Block operation.
+        // refer to https://learn.microsoft.com/en-us/rest/api/storageservices/put-block?tabs=microsoft-entra-id
+        let p = build_abs_path(&self.root, path);
+
+        let encoded_block_id: String =
+            percent_encode_path(&BASE64_STANDARD.encode(block_id.as_bytes()));
+        let url = format!(
+            "{}/{}/{}?comp=block&blockid={}",
+            self.endpoint,
+            self.container,
+            percent_encode_path(&p),
+            encoded_block_id,
+        );
+        let mut req = Request::put(&url);
+        // Set SSE headers.
+        req = self.insert_sse_headers(req);
+
+        if let Some(cache_control) = args.cache_control() {
+            req = req.header(constants::X_MS_BLOB_CACHE_CONTROL, cache_control);
+        }
+        if let Some(size) = size {
+            req = req.header(CONTENT_LENGTH, size)
+        }
+
+        if let Some(ty) = args.content_type() {
+            req = req.header(CONTENT_TYPE, ty)
+        }
+        // Set body
+        let req = req.body(body).map_err(new_request_build_error)?;
+
+        Ok(req)
+    }
+
+    pub async fn azblob_put_block(
+        &self,
+        path: &str,
+        block_id: Uuid,
+        size: Option<u64>,
+        args: &OpWrite,
+        body: AsyncBody,
+    ) -> Result<Response<IncomingAsyncBody>> {
+        let mut req = self.azblob_put_block_request(path, block_id, size, args, body)?;
+
+        self.sign(&mut req).await?;
+        self.send(req).await
+    }
+
+    pub async fn azblob_complete_put_block_list_request(
+        &self,
+        path: &str,
+        block_ids: Vec<Uuid>,
+        args: &OpWrite,
+    ) -> Result<Request<AsyncBody>> {
+        let p = build_abs_path(&self.root, path);
+        let url = format!(
+            "{}/{}/{}?comp=blocklist",
+            self.endpoint,
+            self.container,
+            percent_encode_path(&p),
+        );
+
+        let req = Request::put(&url);
+
+        // Set SSE headers.
+        let mut req = self.insert_sse_headers(req);
+        if let Some(cache_control) = args.cache_control() {
+            req = req.header(constants::X_MS_BLOB_CACHE_CONTROL, cache_control);
+        }
+
+        let content = quick_xml::se::to_string(&PutBlockListRequest {
+            latest: block_ids
+                .into_iter()
+                .map(|block_id| {
+                    let encoded_block_id: String = BASE64_STANDARD.encode(block_id.as_bytes());
+                    encoded_block_id
+                })
+                .collect(),
+        })
+        .map_err(new_xml_deserialize_error)?;
+
+        req = req.header(CONTENT_LENGTH, content.len());
+
+        let req = req
+            .body(AsyncBody::Bytes(Bytes::from(content)))
+            .map_err(new_request_build_error)?;
+
+        Ok(req)
+    }
+
+    pub async fn azblob_complete_put_block_list(
+        &self,
+        path: &str,
+        block_ids: Vec<Uuid>,
+        args: &OpWrite,
+    ) -> Result<Response<IncomingAsyncBody>> {
+        let mut req = self
+            .azblob_complete_put_block_list_request(path, block_ids, args)
+            .await?;
+
+        self.sign(&mut req).await?;
+
+        self.send(req).await
+    }
+
     pub fn azblob_head_blob_request(
         &self,
         path: &str,
@@ -559,5 +675,280 @@ impl AzblobCore {
 
         self.sign(&mut req).await?;
         self.send(req).await
+    }
+}
+
+/// Request of PutBlockListRequest
+#[derive(Default, Debug, Serialize, Deserialize)]
+#[serde(default, rename = "BlockList", rename_all = "PascalCase")]
+pub struct PutBlockListRequest {
+    pub latest: Vec<String>,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct ListBlobsOutput {
+    pub blobs: Blobs,
+    #[serde(rename = "NextMarker")]
+    pub next_marker: Option<String>,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct Blobs {
+    pub blob: Vec<Blob>,
+    pub blob_prefix: Vec<BlobPrefix>,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct BlobPrefix {
+    pub name: String,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct Blob {
+    pub properties: Properties,
+    pub name: String,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct Properties {
+    #[serde(rename = "Content-Length")]
+    pub content_length: u64,
+    #[serde(rename = "Last-Modified")]
+    pub last_modified: String,
+    #[serde(rename = "Content-MD5")]
+    pub content_md5: String,
+    #[serde(rename = "Content-Type")]
+    pub content_type: String,
+    pub etag: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use bytes::Buf;
+    use bytes::Bytes;
+    use quick_xml::de;
+
+    use super::*;
+
+    #[test]
+    fn test_parse_xml() {
+        let bs = bytes::Bytes::from(
+            r#"
+            <?xml version="1.0" encoding="utf-8"?>
+            <EnumerationResults ServiceEndpoint="https://test.blob.core.windows.net/" ContainerName="myazurebucket">
+                <Prefix>dir1/</Prefix>
+                <Delimiter>/</Delimiter>
+                <Blobs>
+                    <Blob>
+                        <Name>dir1/2f018bb5-466f-4af1-84fa-2b167374ee06</Name>
+                        <Properties>
+                            <Creation-Time>Sun, 20 Mar 2022 11:29:03 GMT</Creation-Time>
+                            <Last-Modified>Sun, 20 Mar 2022 11:29:03 GMT</Last-Modified>
+                            <Etag>0x8DA0A64D66790C3</Etag>
+                            <Content-Length>3485277</Content-Length>
+                            <Content-Type>application/octet-stream</Content-Type>
+                            <Content-Encoding />
+                            <Content-Language />
+                            <Content-CRC64 />
+                            <Content-MD5>llJ/+jOlx5GdA1sL7SdKuw==</Content-MD5>
+                            <Cache-Control />
+                            <Content-Disposition />
+                            <BlobType>BlockBlob</BlobType>
+                            <AccessTier>Hot</AccessTier>
+                            <AccessTierInferred>true</AccessTierInferred>
+                            <LeaseStatus>unlocked</LeaseStatus>
+                            <LeaseState>available</LeaseState>
+                            <ServerEncrypted>true</ServerEncrypted>
+                        </Properties>
+                        <OrMetadata />
+                    </Blob>
+                    <Blob>
+                        <Name>dir1/5b9432b2-79c0-48d8-90c2-7d3e153826ed</Name>
+                        <Properties>
+                            <Creation-Time>Tue, 29 Mar 2022 01:54:07 GMT</Creation-Time>
+                            <Last-Modified>Tue, 29 Mar 2022 01:54:07 GMT</Last-Modified>
+                            <Etag>0x8DA112702D88FE4</Etag>
+                            <Content-Length>2471869</Content-Length>
+                            <Content-Type>application/octet-stream</Content-Type>
+                            <Content-Encoding />
+                            <Content-Language />
+                            <Content-CRC64 />
+                            <Content-MD5>xmgUltSnopLSJOukgCHFtg==</Content-MD5>
+                            <Cache-Control />
+                            <Content-Disposition />
+                            <BlobType>BlockBlob</BlobType>
+                            <AccessTier>Hot</AccessTier>
+                            <AccessTierInferred>true</AccessTierInferred>
+                            <LeaseStatus>unlocked</LeaseStatus>
+                            <LeaseState>available</LeaseState>
+                            <ServerEncrypted>true</ServerEncrypted>
+                        </Properties>
+                        <OrMetadata />
+                    </Blob>
+                    <Blob>
+                        <Name>dir1/b2d96f8b-d467-40d1-bb11-4632dddbf5b5</Name>
+                        <Properties>
+                            <Creation-Time>Sun, 20 Mar 2022 11:31:57 GMT</Creation-Time>
+                            <Last-Modified>Sun, 20 Mar 2022 11:31:57 GMT</Last-Modified>
+                            <Etag>0x8DA0A653DC82981</Etag>
+                            <Content-Length>1259677</Content-Length>
+                            <Content-Type>application/octet-stream</Content-Type>
+                            <Content-Encoding />
+                            <Content-Language />
+                            <Content-CRC64 />
+                            <Content-MD5>AxTiFXHwrXKaZC5b7ZRybw==</Content-MD5>
+                            <Cache-Control />
+                            <Content-Disposition />
+                            <BlobType>BlockBlob</BlobType>
+                            <AccessTier>Hot</AccessTier>
+                            <AccessTierInferred>true</AccessTierInferred>
+                            <LeaseStatus>unlocked</LeaseStatus>
+                            <LeaseState>available</LeaseState>
+                            <ServerEncrypted>true</ServerEncrypted>
+                        </Properties>
+                        <OrMetadata />
+                    </Blob>
+                    <BlobPrefix>
+                        <Name>dir1/dir2/</Name>
+                    </BlobPrefix>
+                    <BlobPrefix>
+                        <Name>dir1/dir21/</Name>
+                    </BlobPrefix>
+                </Blobs>
+                <NextMarker />
+            </EnumerationResults>"#,
+        );
+        let out: ListBlobsOutput = de::from_reader(bs.reader()).expect("must success");
+        println!("{out:?}");
+
+        assert_eq!(
+            out.blobs
+                .blob
+                .iter()
+                .map(|v| v.name.clone())
+                .collect::<Vec<String>>(),
+            [
+                "dir1/2f018bb5-466f-4af1-84fa-2b167374ee06",
+                "dir1/5b9432b2-79c0-48d8-90c2-7d3e153826ed",
+                "dir1/b2d96f8b-d467-40d1-bb11-4632dddbf5b5"
+            ]
+        );
+        assert_eq!(
+            out.blobs
+                .blob
+                .iter()
+                .map(|v| v.properties.content_length)
+                .collect::<Vec<u64>>(),
+            [3485277, 2471869, 1259677]
+        );
+        assert_eq!(
+            out.blobs
+                .blob
+                .iter()
+                .map(|v| v.properties.content_md5.clone())
+                .collect::<Vec<String>>(),
+            [
+                "llJ/+jOlx5GdA1sL7SdKuw==".to_string(),
+                "xmgUltSnopLSJOukgCHFtg==".to_string(),
+                "AxTiFXHwrXKaZC5b7ZRybw==".to_string()
+            ]
+        );
+        assert_eq!(
+            out.blobs
+                .blob
+                .iter()
+                .map(|v| v.properties.last_modified.clone())
+                .collect::<Vec<String>>(),
+            [
+                "Sun, 20 Mar 2022 11:29:03 GMT".to_string(),
+                "Tue, 29 Mar 2022 01:54:07 GMT".to_string(),
+                "Sun, 20 Mar 2022 11:31:57 GMT".to_string()
+            ]
+        );
+        assert_eq!(
+            out.blobs
+                .blob
+                .iter()
+                .map(|v| v.properties.etag.clone())
+                .collect::<Vec<String>>(),
+            [
+                "0x8DA0A64D66790C3".to_string(),
+                "0x8DA112702D88FE4".to_string(),
+                "0x8DA0A653DC82981".to_string()
+            ]
+        );
+        assert_eq!(
+            out.blobs
+                .blob_prefix
+                .iter()
+                .map(|v| v.name.clone())
+                .collect::<Vec<String>>(),
+            ["dir1/dir2/", "dir1/dir21/"]
+        );
+    }
+
+    /// This case is copied from real environment for testing
+    /// quick-xml overlapped-lists features. By default, quick-xml
+    /// can't deserialize content with overlapped-lists.
+    ///
+    /// For example, this case list blobs in this way:
+    ///
+    /// ```xml
+    /// <Blobs>
+    ///     <Blob>xxx</Blob>
+    ///     <BlobPrefix>yyy</BlobPrefix>
+    ///     <Blob>zzz</Blob>
+    /// </Blobs>
+    /// ```
+    ///
+    /// If `overlapped-lists` feature not enabled, we will get error `duplicate field Blob`.
+    #[test]
+    fn test_parse_overlapped_lists() {
+        let bs = "<?xml version=\"1.0\" encoding=\"utf-8\"?><EnumerationResults ServiceEndpoint=\"https://test.blob.core.windows.net/\" ContainerName=\"test\"><Prefix>9f7075e1-84d0-45ca-8196-ab9b71a8ef97/x/</Prefix><Delimiter>/</Delimiter><Blobs><Blob><Name>9f7075e1-84d0-45ca-8196-ab9b71a8ef97/x/</Name><Properties><Creation-Time>Thu, 01 Sep 2022 07:26:49 GMT</Creation-Time><Last-Modified>Thu, 01 Sep 2022 07:26:49 GMT</Last-Modified><Etag>0x8DA8BEB55D0EA35</Etag><Content-Length>0</Content-Length><Content-Type>application/octet-stream</Content-Type><Content-Encoding /><Content-Language /><Content-CRC64 /><Content-MD5>1B2M2Y8AsgTpgAmY7PhCfg==</Content-MD5><Cache-Control /><Content-Disposition /><BlobType>BlockBlob</BlobType><AccessTier>Hot</AccessTier><AccessTierInferred>true</AccessTierInferred><LeaseStatus>unlocked</LeaseStatus><LeaseState>available</LeaseState><ServerEncrypted>true</ServerEncrypted></Properties><OrMetadata /></Blob><BlobPrefix><Name>9f7075e1-84d0-45ca-8196-ab9b71a8ef97/x/x/</Name></BlobPrefix><Blob><Name>9f7075e1-84d0-45ca-8196-ab9b71a8ef97/x/y</Name><Properties><Creation-Time>Thu, 01 Sep 2022 07:26:50 GMT</Creation-Time><Last-Modified>Thu, 01 Sep 2022 07:26:50 GMT</Last-Modified><Etag>0x8DA8BEB55D99C08</Etag><Content-Length>0</Content-Length><Content-Type>application/octet-stream</Content-Type><Content-Encoding /><Content-Language /><Content-CRC64 /><Content-MD5>1B2M2Y8AsgTpgAmY7PhCfg==</Content-MD5><Cache-Control /><Content-Disposition /><BlobType>BlockBlob</BlobType><AccessTier>Hot</AccessTier><AccessTierInferred>true</AccessTierInferred><LeaseStatus>unlocked</LeaseStatus><LeaseState>available</LeaseState><ServerEncrypted>true</ServerEncrypted></Properties><OrMetadata /></Blob></Blobs><NextMarker /></EnumerationResults>";
+
+        de::from_reader(Bytes::from(bs).reader()).expect("must success")
+    }
+
+    /// This example is from https://learn.microsoft.com/en-us/rest/api/storageservices/put-block-list?tabs=microsoft-entra-id
+    #[test]
+    fn test_serialize_put_block_list_request() {
+        let req = PutBlockListRequest {
+            latest: vec!["1".to_string(), "2".to_string(), "3".to_string()],
+        };
+
+        let actual = quick_xml::se::to_string(&req).expect("must succeed");
+
+        pretty_assertions::assert_eq!(
+            actual,
+            r#"
+            <BlockList>
+               <Latest>1</Latest>
+               <Latest>2</Latest>
+               <Latest>3</Latest>
+            </BlockList>"#
+                // Cleanup space and new line
+                .replace([' ', '\n'], "")
+                // Escape `"` by hand to address <https://github.com/tafia/quick-xml/issues/362>
+                .replace('"', "&quot;")
+        );
+
+        let bs = "<?xml version=\"1.0\" encoding=\"utf-8\"?>
+            <BlockList>
+               <Latest>1</Latest>
+               <Latest>2</Latest>
+               <Latest>3</Latest>
+            </BlockList>";
+
+        let out: PutBlockListRequest =
+            de::from_reader(Bytes::from(bs).reader()).expect("must success");
+        assert_eq!(
+            out.latest,
+            vec!["1".to_string(), "2".to_string(), "3".to_string()]
+        );
     }
 }

@@ -9,8 +9,6 @@ use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::time::Duration;
-#[cfg(feature = "ct_logs")]
-use std::time::SystemTime;
 use std::{cmp, env, fmt};
 
 use futures_core::Stream;
@@ -19,24 +17,33 @@ use futures_util::future::TryFutureExt;
 use futures_util::stream::TryStreamExt;
 use http::header::CONTENT_TYPE;
 use http::request::Builder;
-use hyper::client::{Client, HttpConnector};
-use hyper::{self, body::Bytes, Body, Method, Request, Response, StatusCode};
+use http_body_util::{BodyExt, Full};
+use hyper::body::Incoming;
+use hyper::{self, body::Bytes, Method, Request, Response, StatusCode};
 #[cfg(feature = "ssl")]
 use hyper_rustls::HttpsConnector;
+use hyper_util::client::legacy::connect::HttpConnector;
+use hyper_util::{client::legacy::Client, rt::TokioExecutor};
 #[cfg(unix)]
-use hyperlocal::UnixConnector;
+use hyperlocal_next::UnixConnector;
+use log::{debug, trace};
 #[cfg(feature = "ssl")]
-use rustls::sign::{CertifiedKey, RsaSigningKey};
+use rustls::{crypto::ring::sign::any_supported_type, sign::CertifiedKey, ALL_VERSIONS};
+#[cfg(feature = "ssl")]
+use rustls_pki_types::{CertificateDer, PrivateKeyDer};
+use serde_derive::{Deserialize, Serialize};
 use tokio::io::{split, AsyncRead, AsyncWrite};
 use tokio_util::codec::FramedRead;
 
 use crate::container::LogOutput;
 use crate::errors::Error;
 use crate::errors::Error::*;
-#[cfg(windows)]
-use crate::named_pipe::NamedPipeConnector;
-use crate::read::{JsonLineDecoder, NewlineLogOutputDecoder, StreamReader};
+use crate::read::{
+    AsyncUpgraded, IncomingStream, JsonLineDecoder, NewlineLogOutputDecoder, StreamReader,
+};
 use crate::uri::Uri;
+#[cfg(windows)]
+use hyper_named_pipe::NamedPipeConnector;
 
 use serde::de::DeserializeOwned;
 use serde::ser::Serialize;
@@ -49,8 +56,16 @@ pub const DEFAULT_SOCKET: &str = "unix:///var/run/docker.sock";
 #[cfg(windows)]
 pub const DEFAULT_NAMED_PIPE: &str = "npipe:////./pipe/docker_engine";
 
+/// The default `DOCKER_TCP_ADDRESS` address that we will try to connect to.
+pub const DEFAULT_TCP_ADDRESS: &str = "tcp://localhost:2375";
+
 /// The default `DOCKER_HOST` address that we will try to connect to.
-pub const DEFAULT_DOCKER_HOST: &str = "tcp://localhost:2375";
+#[cfg(unix)]
+pub const DEFAULT_DOCKER_HOST: &str = DEFAULT_SOCKET;
+
+/// The default `DOCKER_HOST` address that we will try to connect to.
+#[cfg(windows)]
+pub const DEFAULT_DOCKER_HOST: &str = DEFAULT_NAMED_PIPE;
 
 /// Default timeout for all requests is 2 minutes.
 const DEFAULT_TIMEOUT: u64 = 120;
@@ -58,7 +73,7 @@ const DEFAULT_TIMEOUT: u64 = 120;
 /// Default Client Version to communicate with the server.
 pub const API_DEFAULT_VERSION: &ClientVersion = &ClientVersion {
     major_version: 1,
-    minor_version: 43,
+    minor_version: 44,
 };
 
 /// 2 years from ct_logs 0.9 release
@@ -83,23 +98,23 @@ pub(crate) enum ClientType {
 /// with various Connect traits fulfilled.
 pub(crate) enum Transport {
     Http {
-        client: Client<HttpConnector>,
+        client: Client<HttpConnector, Full<Bytes>>,
     },
     #[cfg(feature = "ssl")]
     Https {
-        client: Client<HttpsConnector<HttpConnector>>,
+        client: Client<HttpsConnector<HttpConnector>, Full<Bytes>>,
     },
     #[cfg(unix)]
     Unix {
-        client: Client<UnixConnector>,
+        client: Client<UnixConnector, Full<Bytes>>,
     },
     #[cfg(windows)]
     NamedPipe {
-        client: Client<NamedPipeConnector>,
+        client: Client<NamedPipeConnector, Full<Bytes>>,
     },
     #[cfg(test)]
     Mock {
-        client: Client<yup_hyper_mock::HostToReplyConnector>,
+        client: Client<yup_hyper_mock::HostToReplyConnector, Full<Bytes>>,
     },
 }
 
@@ -289,6 +304,7 @@ struct DockerServerErrorMessage {
 }
 
 #[cfg(feature = "ssl")]
+#[derive(Debug)]
 struct DockerClientCertResolver {
     ssl_key: PathBuf,
     ssl_cert: PathBuf,
@@ -312,28 +328,18 @@ impl DockerClientCertResolver {
         Ok(io::BufReader::new(fs::File::open(path)?))
     }
 
-    fn certs(path: &Path) -> Result<Vec<rustls::Certificate>, Error> {
+    fn certs(path: &Path) -> Result<Vec<CertificateDer<'static>>, Error> {
         Ok(rustls_pemfile::certs(&mut Self::open_buffered(path)?)
-            .map_err(|_| CertPathError {
-                path: path.to_path_buf(),
-            })?
-            .iter()
-            .map(|v| rustls::Certificate(v.clone()))
-            .collect())
+            .collect::<Result<Vec<CertificateDer<'static>>, std::io::Error>>()?)
     }
 
-    fn keys(path: &Path) -> Result<Vec<rustls::PrivateKey>, Error> {
+    fn keys(path: &Path) -> Result<Vec<PrivateKeyDer<'static>>, Error> {
         let mut rdr = Self::open_buffered(path)?;
         let mut keys = vec![];
-        loop {
-            match rustls_pemfile::read_one(&mut rdr).map_err(|_| CertPathError {
-                path: path.to_path_buf(),
-            })? {
-                Some(rustls_pemfile::Item::RSAKey(key)) => keys.push(rustls::PrivateKey(key)),
-                Some(rustls_pemfile::Item::PKCS8Key(key)) => keys.push(rustls::PrivateKey(key)),
-                None => break,
-                _ => {}
-            }
+        if let Some(key) = rustls_pemfile::private_key(&mut rdr).map_err(|_| CertPathError {
+            path: path.to_path_buf(),
+        })? {
+            keys.push(key);
         }
 
         Ok(keys)
@@ -352,14 +358,11 @@ impl DockerClientCertResolver {
             });
         };
 
-        let signing_key = RsaSigningKey::new(&key).map_err(|_| CertParseError {
+        let signing_key = any_supported_type(&key).map_err(|_| CertParseError {
             path: self.ssl_key.to_owned(),
         })?;
 
-        Ok(Arc::new(CertifiedKey::new(
-            all_certs,
-            Arc::new(signing_key),
-        )))
+        Ok(Arc::new(CertifiedKey::new(all_certs, signing_key)))
     }
 }
 
@@ -406,7 +409,7 @@ impl Docker {
             if let Ok(ref host) = env::var("DOCKER_HOST") {
                 host
             } else {
-                DEFAULT_DOCKER_HOST
+                DEFAULT_TCP_ADDRESS
             },
             &cert_path.join("key.pem"),
             &cert_path.join("cert.pem"),
@@ -458,46 +461,25 @@ impl Docker {
         let client_addr = addr.replacen("tcp://", "", 1).replacen("https://", "", 1);
 
         let mut root_store = rustls::RootCertStore::empty();
+
+        #[cfg(not(feature = "webpki"))]
         for cert in rustls_native_certs::load_native_certs()? {
             root_store
-                .add(&rustls::Certificate(cert.0))
-                .map_err(|err| NoNativeCertsError { err })?;
+                .add(cert)
+                .map_err(|err| NoNativeCertsError { err })?
         }
-
-        root_store.add_server_trust_anchors(webpki_roots::TLS_SERVER_ROOTS.iter().map(|ta| {
-            rustls::OwnedTrustAnchor::from_subject_spki_name_constraints(
-                ta.subject,
-                ta.spki,
-                ta.name_constraints,
-            )
-        }));
+        #[cfg(feature = "webpki")]
+        root_store.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
 
         let mut ca_pem = io::Cursor::new(fs::read(ssl_ca).map_err(|_| CertPathError {
             path: ssl_ca.to_owned(),
         })?);
 
-        root_store.add_parsable_certificates(&rustls_pemfile::certs(&mut ca_pem).map_err(
-            |_| CertParseError {
-                path: ssl_ca.to_owned(),
-            },
-        )?);
+        root_store.add_parsable_certificates(
+            rustls_pemfile::certs(&mut ca_pem).collect::<Result<Vec<_>, _>>()?,
+        );
 
-        #[cfg(feature = "ct_logs")]
-        let config = {
-            let ct_logs_expiry =
-                SystemTime::UNIX_EPOCH + Duration::from_secs(TIMESTAMP_CT_LOGS_EXPIRY);
-            rustls::ClientConfig::builder()
-                .with_safe_defaults()
-                .with_root_certificates(root_store)
-                .with_certificate_transparency_logs(&ct_logs::LOGS, ct_logs_expiry)
-                .with_client_cert_resolver(Arc::new(DockerClientCertResolver {
-                    ssl_key: ssl_key.to_owned(),
-                    ssl_cert: ssl_cert.to_owned(),
-                }))
-        };
-        #[cfg(not(feature = "ct_logs"))]
-        let config = rustls::ClientConfig::builder()
-            .with_safe_defaults()
+        let config = rustls::ClientConfig::builder_with_protocol_versions(ALL_VERSIONS)
             .with_root_certificates(root_store)
             .with_client_cert_resolver(Arc::new(DockerClientCertResolver {
                 ssl_key: ssl_key.to_owned(),
@@ -510,7 +492,7 @@ impl Docker {
         let https_connector: HttpsConnector<HttpConnector> =
             HttpsConnector::from((http_connector, config));
 
-        let client_builder = Client::builder();
+        let client_builder = Client::builder(TokioExecutor::new());
         let client = client_builder.build(https_connector);
         let transport = Transport::Https { client };
         let docker = Docker {
@@ -551,7 +533,7 @@ impl Docker {
     ///   .map_ok(|_| Ok::<_, ()>(println!("Connected!")));
     /// ```
     pub fn connect_with_http_defaults() -> Result<Docker, Error> {
-        let host = env::var("DOCKER_HOST").unwrap_or_else(|_| DEFAULT_DOCKER_HOST.to_string());
+        let host = env::var("DOCKER_HOST").unwrap_or_else(|_| DEFAULT_TCP_ADDRESS.to_string());
         Docker::connect_with_http(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
     }
 
@@ -586,7 +568,7 @@ impl Docker {
 
         let http_connector = HttpConnector::new();
 
-        let client_builder = Client::builder();
+        let client_builder = Client::builder(TokioExecutor::new());
         let client = client_builder.build(http_connector);
         let transport = Transport::Http { client };
         let docker = Docker {
@@ -661,6 +643,45 @@ impl Docker {
 
         docker
     }
+
+    /// Connect using a Unix socket, a Windows named pipe, or via HTTP.
+    /// The connection method is determined by the `DOCKER_HOST` environment variable.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use bollard::{API_DEFAULT_VERSION, Docker};
+    ///
+    /// use futures_util::future::TryFutureExt;
+    ///
+    /// let connection = Docker::connect_with_defaults().unwrap();
+    /// connection.ping().map_ok(|_| Ok::<_, ()>(println!("Connected!")));
+    /// ```
+    pub fn connect_with_defaults() -> Result<Docker, Error> {
+        let host = env::var("DOCKER_HOST").unwrap_or_else(|_| DEFAULT_DOCKER_HOST.to_string());
+        match host {
+            #[cfg(unix)]
+            h if h.starts_with("unix://") => {
+                Docker::connect_with_unix(&h, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+            }
+            #[cfg(windows)]
+            h if h.starts_with("npipe://") => {
+                Docker::connect_with_named_pipe(&h, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+            }
+            h if h.starts_with("tcp://") || h.starts_with("http://") => {
+                #[cfg(feature = "ssl")]
+                if env::var("DOCKER_TLS_VERIFY").is_ok() {
+                    return Docker::connect_with_ssl_defaults();
+                }
+                Docker::connect_with_http_defaults()
+            }
+            #[cfg(feature = "ssl")]
+            h if h.starts_with("https://") => Docker::connect_with_ssl_defaults(),
+            _ => Err(UnsupportedURISchemeError {
+                uri: host.to_string(),
+            }),
+        }
+    }
 }
 
 #[cfg(unix)]
@@ -725,8 +746,7 @@ impl Docker {
 
         let unix_connector = UnixConnector;
 
-        let mut client_builder = Client::builder();
-        client_builder.pool_max_idle_per_host(0);
+        let client_builder = Client::builder(TokioExecutor::new());
 
         let client = client_builder.build(unix_connector);
         let transport = Transport::Unix { client };
@@ -801,8 +821,7 @@ impl Docker {
 
         let named_pipe_connector = NamedPipeConnector;
 
-        let mut client_builder = Client::builder();
-        client_builder.pool_max_idle_per_host(0);
+        let mut client_builder = Client::builder(TokioExecutor::new());
         client_builder.http1_title_case_headers(true);
         let client = client_builder.build(named_pipe_connector);
         let transport = Transport::NamedPipe { client };
@@ -895,7 +914,7 @@ impl Docker {
         timeout: u64,
         client_version: &ClientVersion,
     ) -> Result<Docker, Error> {
-        let client_builder = Client::builder();
+        let client_builder = Client::builder(TokioExecutor::new());
         let client = client_builder.build(connector);
 
         let (transport, client_type) = (Transport::Mock { client }, ClientType::Http);
@@ -947,21 +966,18 @@ impl Docker {
 impl Docker {
     pub(crate) fn process_into_value<T>(
         &self,
-        req: Result<Request<Body>, Error>,
+        req: Result<Request<Full<Bytes>>, Error>,
     ) -> impl Future<Output = Result<T, Error>>
     where
         T: DeserializeOwned,
     {
         let fut = self.process_request(req);
-        async move {
-            let response = fut.await?;
-            Docker::decode_response(response).await
-        }
+        async move { Docker::decode_response(fut.await?).await }
     }
 
     pub(crate) fn process_into_stream<T>(
         &self,
-        req: Result<Request<Body>, Error>,
+        req: Result<Request<Full<Bytes>>, Error>,
     ) -> impl Stream<Item = Result<T, Error>> + Unpin
     where
         T: DeserializeOwned,
@@ -976,7 +992,7 @@ impl Docker {
 
     pub(crate) fn process_into_stream_string(
         &self,
-        req: Result<Request<Body>, Error>,
+        req: Result<Request<Full<Bytes>>, Error>,
     ) -> impl Stream<Item = Result<LogOutput, Error>> + Unpin {
         Box::pin(
             self.process_request(req)
@@ -987,7 +1003,7 @@ impl Docker {
 
     pub(crate) fn process_into_unit(
         &self,
-        req: Result<Request<Body>, Error>,
+        req: Result<Request<Full<Bytes>>, Error>,
     ) -> impl Future<Output = Result<(), Error>> {
         let fut = self.process_request(req);
         async move {
@@ -998,11 +1014,11 @@ impl Docker {
 
     pub(crate) fn process_into_body(
         &self,
-        req: Result<Request<Body>, Error>,
+        req: Result<Request<Full<Bytes>>, Error>,
     ) -> impl Stream<Item = Result<Bytes, Error>> + Unpin {
         Box::pin(
             self.process_request(req)
-                .map_ok(|response| response.into_body().map_err(Error::from))
+                .map_ok(|response| IncomingStream::new(response.into_body()))
                 .into_stream()
                 .try_flatten(),
         )
@@ -1010,7 +1026,7 @@ impl Docker {
 
     pub(crate) fn process_into_string(
         &self,
-        req: Result<Request<Body>, Error>,
+        req: Result<Request<Full<Bytes>>, Error>,
     ) -> impl Future<Output = Result<String, Error>> {
         let fut = self.process_request(req);
         async move {
@@ -1021,14 +1037,16 @@ impl Docker {
 
     pub(crate) async fn process_upgraded(
         &self,
-        req: Result<Request<Body>, Error>,
+        req: Result<Request<Full<Bytes>>, Error>,
     ) -> Result<(impl AsyncRead, impl AsyncWrite), Error> {
         let res = self.process_request(req).await?;
         let upgraded = hyper::upgrade::on(res).await?;
-        Ok(split(upgraded))
+        let tokio_upgraded = AsyncUpgraded::new(upgraded);
+
+        Ok(split(tokio_upgraded))
     }
 
-    pub(crate) fn serialize_payload<S>(body: Option<S>) -> Result<Body, Error>
+    pub(crate) fn serialize_payload<S>(body: Option<S>) -> Result<Full<Bytes>, Error>
     where
         S: Serialize,
     {
@@ -1040,8 +1058,8 @@ impl Docker {
         .map(|payload| {
             debug!("{}", payload.clone().unwrap_or_default());
             payload
-                .map(|content| content.into())
-                .unwrap_or_else(Body::empty)
+                .map(|content| Full::new(content.into()))
+                .unwrap_or(Full::new(Bytes::new()))
         })
     }
 
@@ -1068,7 +1086,7 @@ impl Docker {
             "/version",
             Builder::new().method(Method::GET),
             None::<String>,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         let res = self
@@ -1100,8 +1118,8 @@ impl Docker {
 
     pub(crate) fn process_request(
         &self,
-        request: Result<Request<Body>, Error>,
-    ) -> impl Future<Output = Result<Response<Body>, Error>> {
+        request: Result<Request<Full<Bytes>>, Error>,
+    ) -> impl Future<Output = Result<Response<Incoming>, Error>> {
         let transport = self.transport.clone();
         let timeout = self.client_timeout;
 
@@ -1142,8 +1160,8 @@ impl Docker {
         path: &str,
         builder: Builder,
         query: Option<O>,
-        payload: Result<Body, Error>,
-    ) -> Result<Request<Body>, Error>
+        payload: Result<Full<Bytes>, Error>,
+    ) -> Result<Request<Full<Bytes>>, Error>
     where
         O: Serialize,
     {
@@ -1164,9 +1182,9 @@ impl Docker {
 
     async fn execute_request(
         transport: Arc<Transport>,
-        req: Request<Body>,
+        req: Request<Full<Bytes>>,
         timeout: u64,
-    ) -> Result<Response<Body>, Error> {
+    ) -> Result<Response<Incoming>, Error> {
         // This is where we determine to which transport we issue the request.
         let request = match *transport {
             Transport::Http { ref client } => client.request(req),
@@ -1186,37 +1204,34 @@ impl Docker {
         }
     }
 
-    fn decode_into_stream<T>(res: Response<Body>) -> impl Stream<Item = Result<T, Error>>
+    fn decode_into_stream<T>(res: Response<Incoming>) -> impl Stream<Item = Result<T, Error>>
     where
         T: DeserializeOwned,
     {
-        FramedRead::new(
-            StreamReader::new(res.into_body().map_err(Error::from)),
-            JsonLineDecoder::new(),
-        )
+        FramedRead::new(StreamReader::new(res.into_body()), JsonLineDecoder::new())
     }
 
     fn decode_into_stream_string(
-        res: Response<Body>,
+        res: Response<Incoming>,
     ) -> impl Stream<Item = Result<LogOutput, Error>> {
         FramedRead::new(
-            StreamReader::new(res.into_body().map_err(Error::from)),
+            StreamReader::new(res.into_body()),
             NewlineLogOutputDecoder::new(false),
         )
         .map_err(Error::from)
     }
 
-    async fn decode_into_string(response: Response<Body>) -> Result<String, Error> {
-        let body = hyper::body::to_bytes(response.into_body()).await?;
+    async fn decode_into_string(response: Response<Incoming>) -> Result<String, Error> {
+        let body = response.into_body().collect().await?.to_bytes();
 
         Ok(String::from_utf8_lossy(&body).to_string())
     }
 
-    async fn decode_response<T>(response: Response<Body>) -> Result<T, Error>
+    async fn decode_response<T>(response: Response<Incoming>) -> Result<T, Error>
     where
         T: DeserializeOwned,
     {
-        let bytes = hyper::body::to_bytes(response.into_body()).await?;
+        let bytes = response.into_body().collect().await?.to_bytes();
 
         debug!("Decoded into string: {}", &String::from_utf8_lossy(&bytes));
 

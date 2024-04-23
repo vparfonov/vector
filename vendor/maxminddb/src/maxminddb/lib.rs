@@ -18,7 +18,7 @@ use memmap2::MmapOptions;
 #[cfg(feature = "mmap")]
 use std::fs::File;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum MaxMindDBError {
     AddressNotFoundError(String),
     InvalidDatabaseError(String),
@@ -39,17 +39,15 @@ impl Display for MaxMindDBError {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         match self {
             MaxMindDBError::AddressNotFoundError(msg) => {
-                write!(fmt, "AddressNotFoundError: {}", msg)?
+                write!(fmt, "AddressNotFoundError: {msg}")?
             }
             MaxMindDBError::InvalidDatabaseError(msg) => {
-                write!(fmt, "InvalidDatabaseError: {}", msg)?
+                write!(fmt, "InvalidDatabaseError: {msg}")?
             }
-            MaxMindDBError::IoError(msg) => write!(fmt, "IoError: {}", msg)?,
-            MaxMindDBError::MapError(msg) => write!(fmt, "MapError: {}", msg)?,
-            MaxMindDBError::DecodingError(msg) => write!(fmt, "DecodingError: {}", msg)?,
-            MaxMindDBError::InvalidNetworkError(msg) => {
-                write!(fmt, "InvalidNetworkError: {}", msg)?
-            }
+            MaxMindDBError::IoError(msg) => write!(fmt, "IoError: {msg}")?,
+            MaxMindDBError::MapError(msg) => write!(fmt, "MapError: {msg}")?,
+            MaxMindDBError::DecodingError(msg) => write!(fmt, "DecodingError: {msg}")?,
+            MaxMindDBError::InvalidNetworkError(msg) => write!(fmt, "InvalidNetworkError: {msg}")?,
         }
         Ok(())
     }
@@ -60,7 +58,7 @@ impl std::error::Error for MaxMindDBError {}
 
 impl de::Error for MaxMindDBError {
     fn custom<T: Display>(msg: T) -> Self {
-        MaxMindDBError::DecodingError(format!("{}", msg))
+        MaxMindDBError::DecodingError(format!("{msg}"))
     }
 }
 
@@ -102,8 +100,7 @@ impl<'de, T: Deserialize<'de>, S: AsRef<[u8]>> Iterator for Within<'de, T, S> {
     type Item = Result<WithinItem<T>, MaxMindDBError>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while !self.stack.is_empty() {
-            let current = self.stack.pop().unwrap();
+        while let Some(current) = self.stack.pop() {
             let bit_count = current.ip_bytes.len() * 8;
 
             // Skip networks that are aliases for the IPv4 network
@@ -199,7 +196,7 @@ impl<'de> Reader<Mmap> {
     }
 }
 
-impl<'de> Reader<Vec<u8>> {
+impl Reader<Vec<u8>> {
     /// Open a MaxMind DB database file by loading it into memory.
     ///
     /// # Example
@@ -442,8 +439,7 @@ impl<'de, S: AsRef<[u8]>> Reader<S> {
             s => {
                 return Err(MaxMindDBError::InvalidDatabaseError(format!(
                     "unknown record size: \
-                     {:?}",
-                    s
+                     {s:?}"
                 )))
             }
         };
@@ -508,14 +504,14 @@ fn bytes_and_prefix_to_net(bytes: &[u8], prefix: u8) -> Result<IpNetwork, MaxMin
                     prefix - 96,
                 )
             } else {
-                let a = (bytes[0] as u16) << 8 | bytes[1] as u16;
-                let b = (bytes[2] as u16) << 8 | bytes[3] as u16;
-                let c = (bytes[4] as u16) << 8 | bytes[5] as u16;
-                let d = (bytes[6] as u16) << 8 | bytes[7] as u16;
-                let e = (bytes[8] as u16) << 8 | bytes[9] as u16;
-                let f = (bytes[10] as u16) << 8 | bytes[11] as u16;
-                let g = (bytes[12] as u16) << 8 | bytes[13] as u16;
-                let h = (bytes[14] as u16) << 8 | bytes[15] as u16;
+                let a = u16::from(bytes[0]) << 8 | u16::from(bytes[1]);
+                let b = u16::from(bytes[2]) << 8 | u16::from(bytes[3]);
+                let c = u16::from(bytes[4]) << 8 | u16::from(bytes[5]);
+                let d = u16::from(bytes[6]) << 8 | u16::from(bytes[7]);
+                let e = u16::from(bytes[8]) << 8 | u16::from(bytes[9]);
+                let f = u16::from(bytes[10]) << 8 | u16::from(bytes[11]);
+                let g = u16::from(bytes[12]) << 8 | u16::from(bytes[13]);
+                let h = u16::from(bytes[14]) << 8 | u16::from(bytes[15]);
                 (IpAddr::V6(Ipv6Addr::new(a, b, c, d, e, f, g, h)), prefix)
             }
         }

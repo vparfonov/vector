@@ -18,8 +18,6 @@ License: ISC.
 #![warn(missing_docs)]
 #![warn(missing_copy_implementations)]
 #![warn(missing_debug_implementations)]
-// `matches!` available since 1.42, but we target 1.36 for now.
-#![allow(clippy::match_like_matches_macro)]
 
 extern crate alloc;
 
@@ -34,9 +32,12 @@ use core::ops::Range;
 
 use alloc::vec::Vec;
 
-pub use xmlparser::TextPos;
-
 mod parse;
+mod tokenizer;
+
+#[cfg(test)]
+mod tokenizer_tests;
+
 pub use crate::parse::*;
 
 /// The <http://www.w3.org/XML/1998/namespace> URI.
@@ -48,6 +49,29 @@ const NS_XML_PREFIX: &str = "xml";
 pub const NS_XMLNS_URI: &str = "http://www.w3.org/2000/xmlns/";
 /// The string 'xmlns', which is used to declare new namespaces
 const XMLNS: &str = "xmlns";
+
+/// Position in text.
+///
+/// Position indicates a row/line and a column in the original text. Starting from 1:1.
+#[allow(missing_docs)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+pub struct TextPos {
+    pub row: u32,
+    pub col: u32,
+}
+
+impl TextPos {
+    /// Constructs a new `TextPos`.
+    pub fn new(row: u32, col: u32) -> TextPos {
+        TextPos { row, col }
+    }
+}
+
+impl fmt::Display for TextPos {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}:{}", self.row, self.col)
+    }
+}
 
 /// An XML tree container.
 ///
@@ -175,7 +199,7 @@ impl<'input> Document<'input> {
     /// ```
     #[inline]
     pub fn text_pos_at(&self, pos: usize) -> TextPos {
-        xmlparser::Stream::from(self.text).gen_text_pos_from(pos)
+        tokenizer::Stream::new(self.text).gen_text_pos_from(pos)
     }
 
     /// Returns the input text of the original document.
@@ -400,26 +424,34 @@ struct NodeData<'input> {
     range: Range<usize>,
 }
 
+#[cfg(target_has_atomic = "ptr")]
+type OwnedSharedString = alloc::sync::Arc<str>;
+
+#[cfg(not(target_has_atomic = "ptr"))]
+type OwnedSharedString = alloc::rc::Rc<str>;
+
 /// A string storage.
 ///
 /// Used by text nodes and attributes values.
 ///
-/// We try our best to keep parsed strings as `&str`, but in some cases post-processing
-/// is necessary and we have to allocates them.
+/// We try our best not to allocate strings, referencing the input string as much as possible.
+/// But in some cases post-processing is necessary and we have to allocate them.
 ///
-/// All owned, allocated strings are stored as `Arc<str>`.
+/// All owned, allocated strings are stored as `Arc<str>` or as `Rc<str>` on targets
+/// were `Arc` isn't available.
+/// And unlike `Cow<&str>`, `StringStorage` is immutable and can be cheaply cloned.
 #[derive(Clone, Eq, Debug)]
 pub enum StringStorage<'input> {
     /// A raw slice of the input string.
     Borrowed(&'input str),
 
     /// A reference-counted string.
-    Owned(alloc::sync::Arc<str>),
+    Owned(OwnedSharedString),
 }
 
 impl StringStorage<'_> {
     /// Creates a new owned string from `&str` or `String`.
-    pub fn new_owned<T: Into<alloc::sync::Arc<str>>>(s: T) -> Self {
+    pub fn new_owned<T: Into<OwnedSharedString>>(s: T) -> Self {
         StringStorage::Owned(s.into())
     }
 
@@ -625,10 +657,10 @@ struct Namespaces<'input> {
 }
 
 impl<'input> Namespaces<'input> {
-    fn push_ns<'temp>(
+    fn push_ns(
         &mut self,
         name: Option<&'input str>,
-        uri: BorrowedText<'input, 'temp>,
+        uri: StringStorage<'input>,
     ) -> Result<(), Error> {
         debug_assert_ne!(name, Some(""));
 
@@ -643,10 +675,7 @@ impl<'input> Namespaces<'input> {
                     return Err(Error::NamespacesLimitReached);
                 }
                 let idx = NamespaceIdx(self.values.len() as u16);
-                self.values.push(Namespace {
-                    name,
-                    uri: uri.to_storage(),
-                });
+                self.values.push(Namespace { name, uri });
                 self.sorted_order.insert(sorted_idx, idx);
                 idx
             }

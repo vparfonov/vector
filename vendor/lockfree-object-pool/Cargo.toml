@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "lockfree-object-pool"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["Etienne Vaillant <vaillant.etienne@gmail.com>"]
 description = "A thread-safe object pool collection with automatic return and attach/detach semantics."
 homepage = "https://github.com/EVaillant/lockfree-object-pool"
@@ -39,7 +39,7 @@ harness = false
 [dependencies]
 
 [dev-dependencies.criterion]
-version = "0.4"
+version = "0.5.1"
 
 [dev-dependencies.criterion-plot]
 version = "0.5"

@@ -5,17 +5,14 @@ use ratatui::{
 
 use crate::app::App;
 
-pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
-    let chunks = Layout::default()
-        .constraints([Constraint::Length(3), Constraint::Min(0)].as_ref())
-        .split(f.size());
-    let titles = app
+pub fn draw(f: &mut Frame, app: &mut App) {
+    let chunks = Layout::vertical([Constraint::Length(3), Constraint::Min(0)]).split(f.size());
+    let tabs = app
         .tabs
         .titles
         .iter()
         .map(|t| text::Line::from(Span::styled(*t, Style::default().fg(Color::Green))))
-        .collect();
-    let tabs = Tabs::new(titles)
+        .collect::<Tabs>()
         .block(Block::default().borders(Borders::ALL).title(app.title))
         .highlight_style(Style::default().fg(Color::Yellow))
         .select(app.tabs.index);
@@ -28,40 +25,26 @@ pub fn draw<B: Backend>(f: &mut Frame<B>, app: &mut App) {
     };
 }
 
-fn draw_first_tab<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
-    let chunks = Layout::default()
-        .constraints(
-            [
-                Constraint::Length(9),
-                Constraint::Min(8),
-                Constraint::Length(7),
-            ]
-            .as_ref(),
-        )
-        .split(area);
+fn draw_first_tab(f: &mut Frame, app: &mut App, area: Rect) {
+    let chunks = Layout::vertical([
+        Constraint::Length(9),
+        Constraint::Min(8),
+        Constraint::Length(7),
+    ])
+    .split(area);
     draw_gauges(f, app, chunks[0]);
     draw_charts(f, app, chunks[1]);
     draw_text(f, chunks[2]);
 }
 
-fn draw_gauges<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
-    let chunks = Layout::default()
-        .constraints(
-            [
-                Constraint::Length(2),
-                Constraint::Length(3),
-                Constraint::Length(1),
-            ]
-            .as_ref(),
-        )
-        .margin(1)
-        .split(area);
+fn draw_gauges(f: &mut Frame, app: &mut App, area: Rect) {
+    let chunks = Layout::vertical([
+        Constraint::Length(2),
+        Constraint::Length(3),
+        Constraint::Length(1),
+    ])
+    .margin(1)
+    .split(area);
     let block = Block::default().borders(Borders::ALL).title("Graphs");
     f.render_widget(block, area);
 
@@ -102,28 +85,20 @@ where
     f.render_widget(line_gauge, chunks[2]);
 }
 
-fn draw_charts<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
+fn draw_charts(f: &mut Frame, app: &mut App, area: Rect) {
     let constraints = if app.show_chart {
         vec![Constraint::Percentage(50), Constraint::Percentage(50)]
     } else {
         vec![Constraint::Percentage(100)]
     };
-    let chunks = Layout::default()
-        .constraints(constraints)
-        .direction(Direction::Horizontal)
-        .split(area);
+    let chunks = Layout::horizontal(constraints).split(area);
     {
-        let chunks = Layout::default()
-            .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
+        let chunks = Layout::vertical([Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(chunks[0]);
         {
-            let chunks = Layout::default()
-                .constraints([Constraint::Percentage(50), Constraint::Percentage(50)].as_ref())
-                .direction(Direction::Horizontal)
-                .split(chunks[0]);
+            let chunks =
+                Layout::horizontal([Constraint::Percentage(50), Constraint::Percentage(50)])
+                    .split(chunks[0]);
 
             // Draw tasks
             let tasks: Vec<ListItem> = app
@@ -249,10 +224,7 @@ where
     }
 }
 
-fn draw_text<B>(f: &mut Frame<B>, area: Rect)
-where
-    B: Backend,
-{
+fn draw_text(f: &mut Frame, area: Rect) {
     let text = vec![
         text::Line::from("This is a paragraph with several lines. You can change style your text the way you want"),
         text::Line::from(""),
@@ -290,14 +262,9 @@ where
     f.render_widget(paragraph, area);
 }
 
-fn draw_second_tab<B>(f: &mut Frame<B>, app: &mut App, area: Rect)
-where
-    B: Backend,
-{
-    let chunks = Layout::default()
-        .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
-        .direction(Direction::Horizontal)
-        .split(area);
+fn draw_second_tab(f: &mut Frame, app: &mut App, area: Rect) {
+    let chunks =
+        Layout::horizontal([Constraint::Percentage(30), Constraint::Percentage(70)]).split(area);
     let up_style = Style::default().fg(Color::Green);
     let failure_style = Style::default()
         .fg(Color::Red)
@@ -310,18 +277,20 @@ where
         };
         Row::new(vec![s.name, s.location, s.status]).style(style)
     });
-    let table = Table::new(rows)
-        .header(
-            Row::new(vec!["Server", "Location", "Status"])
-                .style(Style::default().fg(Color::Yellow))
-                .bottom_margin(1),
-        )
-        .block(Block::default().title("Servers").borders(Borders::ALL))
-        .widths(&[
+    let table = Table::new(
+        rows,
+        [
             Constraint::Length(15),
             Constraint::Length(15),
             Constraint::Length(10),
-        ]);
+        ],
+    )
+    .header(
+        Row::new(vec!["Server", "Location", "Status"])
+            .style(Style::default().fg(Color::Yellow))
+            .bottom_margin(1),
+    )
+    .block(Block::default().title("Servers").borders(Borders::ALL));
     f.render_widget(table, chunks[0]);
 
     let map = Canvas::default()
@@ -379,14 +348,8 @@ where
     f.render_widget(map, chunks[1]);
 }
 
-fn draw_third_tab<B>(f: &mut Frame<B>, _app: &mut App, area: Rect)
-where
-    B: Backend,
-{
-    let chunks = Layout::default()
-        .direction(Direction::Horizontal)
-        .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
-        .split(area);
+fn draw_third_tab(f: &mut Frame, _app: &mut App, area: Rect) {
+    let chunks = Layout::horizontal([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)]).split(area);
     let colors = [
         Color::Reset,
         Color::Black,
@@ -417,12 +380,14 @@ where
             Row::new(cells)
         })
         .collect();
-    let table = Table::new(items)
-        .block(Block::default().title("Colors").borders(Borders::ALL))
-        .widths(&[
+    let table = Table::new(
+        items,
+        [
             Constraint::Ratio(1, 3),
             Constraint::Ratio(1, 3),
             Constraint::Ratio(1, 3),
-        ]);
+        ],
+    )
+    .block(Block::default().title("Colors").borders(Borders::ALL));
     f.render_widget(table, chunks[0]);
 }

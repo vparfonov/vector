@@ -5,6 +5,24 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Changed
+- `xmlparser` is no longer a dependency and its fork is used internally.
+- ~5% faster parsing.
+- Fallback to `Rc` when `Arc` isn't available.
+- Bump MSRV to 1.60
+- Bump edition to 2021
+- `Error` variants have changed quite a lot.
+- XML declaration validation was simplified. We no longer check for attributes content.
+  Meaning that `version`, `encoding` and `standalone` can contain any value now.
+  But we still do check attribute names and order.<br/>
+  And while we did validated those attributes before, they weren't really affecting
+  the parser in any way. Therefore the parsing behavior is mostly unchanged.
+
+### Fixed
+- `ParsingOptions::allow_dtd = false` would not trigger an error when an empty DTD was present.
+
+### Removed
+- The `xmlparser` dependency.
 
 ## [0.18.1] - 2023-09-30
 ### Added

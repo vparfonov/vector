@@ -1,5 +1,26 @@
 # Version History
 
+## 1.33.1
+
+### Fixed
+
+* Fixes an issue when converting from a `Decimal` to a float whereby the float would be inaccurate after rounding. ([#625](https://github.com/paupino/rust-decimal/pull/625))
+
+## 1.33.0
+
+### Fixed  
+
+* Fixes an issue when adding/subtracting two `Decimal`s when one has a scale of 29. ([#619](https://github.com/paupino/rust-decimal/pull/619))
+* An empty string will be parsed as `None` during JSON deserialization instead of panicking. ([#607](https://github.com/paupino/rust-decimal/pull/607))
+
+### Changed
+
+* Upgrades `borsh` to version `1.1` as a result of a [security advisory](https://rustsec.org/advisories/RUSTSEC-2023-0033.html). ([#621](https://github.com/paupino/rust-decimal/pull/621))
+
+### Credit
+
+Thank you to [@gai6948](https://github.com/gai6948) for their contribution! Also thank you to all of those that pushed for the security advisory changes.
+
 ## 1.32.0
 
 ### Fixed

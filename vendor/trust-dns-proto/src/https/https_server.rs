@@ -7,6 +7,7 @@
 
 //! HTTPS related server items
 
+use std::borrow::Borrow;
 use std::fmt::Debug;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -16,7 +17,7 @@ use futures_util::stream::{Stream, StreamExt};
 use h2;
 use http::header::CONTENT_LENGTH;
 use http::{Method, Request};
-use tracing::debug;
+use log::debug;
 
 use crate::https::HttpsError;
 
@@ -25,7 +26,7 @@ use crate::https::HttpsError;
 /// To allow downstream clients to do something interesting with the lifetime of the bytes, this doesn't
 ///   perform a conversion to a Message, only collects all the bytes.
 pub async fn message_from<R>(
-    this_server_name: Option<Arc<str>>,
+    this_server_name: Arc<str>,
     request: Request<R>,
 ) -> Result<BytesMut, HttpsError>
 where
@@ -33,7 +34,7 @@ where
 {
     debug!("Received request: {:#?}", request);
 
-    let this_server_name = this_server_name.as_deref();
+    let this_server_name = this_server_name.borrow();
     match crate::https::request::verify(this_server_name, &request) {
         Ok(_) => (),
         Err(err) => return Err(err),
@@ -126,7 +127,7 @@ mod tests {
         let request = request::new("ns.example.com", len).unwrap();
         let request = request.map(|()| stream);
 
-        let from_post = message_from(Some(Arc::from("ns.example.com")), request);
+        let from_post = message_from(Arc::from("ns.example.com"), request);
         let bytes = match block_on(from_post) {
             Ok(bytes) => bytes,
             e => panic!("{:#?}", e),

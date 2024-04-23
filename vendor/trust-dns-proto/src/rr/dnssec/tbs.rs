@@ -1,19 +1,10 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
+//! hash functions for DNSSec operations
 
-//! hash functions for DNSSEC operations
-
-use crate::{
-    error::*,
-    rr::{dnssec::Algorithm, DNSClass, Name, Record, RecordType},
-    serialize::binary::{BinEncodable, BinEncoder, EncodeMode},
-};
-
-use super::rdata::{sig, RRSIG, SIG};
+use super::rdata::{sig, DNSSECRData, SIG};
+use crate::error::*;
+use crate::rr::dnssec::Algorithm;
+use crate::rr::{DNSClass, Name, RData, Record, RecordType};
+use crate::serialize::binary::{BinEncodable, BinEncoder, EncodeMode};
 
 /// Data To Be Signed.
 pub struct TBS(Vec<u8>);
@@ -76,7 +67,7 @@ pub fn message_tbs<M: BinEncodable>(message: &M, pre_sig0: &SIG) -> ProtoResult<
 /// * `original_ttl` - Original TTL is the TTL as specified in the SOA zones RRSet associated record
 /// * `sig_expiration` - the epoch seconds of when this hashed signature will expire
 /// * `key_inception` - the epoch seconds of when this hashed signature will be valid
-/// * `signer_name` - label of the entity responsible for signing this hash
+/// * `signer_name` - label of the etity responsible for signing this hash
 /// * `records` - RRSet to hash
 ///
 /// # Returns
@@ -103,7 +94,7 @@ pub fn rrset_tbs(
     // collect only the records for this rrset
     for record in records {
         if dns_class == record.dns_class()
-            && type_covered == record.record_type()
+            && type_covered == record.rr_type()
             && name == record.name()
         {
             rrset.push(record);
@@ -192,8 +183,8 @@ pub fn rrset_tbs(
 /// # Return
 ///
 /// binary hash of the RRSet with the information from the RRSIG record
-pub fn rrset_tbs_with_rrsig(rrsig: &Record<RRSIG>, records: &[Record]) -> ProtoResult<TBS> {
-    if let Some(sig) = rrsig.data() {
+pub fn rrset_tbs_with_rrsig(rrsig: &Record, records: &[Record]) -> ProtoResult<TBS> {
+    if let Some(RData::DNSSEC(DNSSECRData::SIG(ref sig))) = rrsig.data() {
         rrset_tbs_with_sig(rrsig.name(), rrsig.dns_class(), sig, records)
     } else {
         Err(format!("could not determine name from {}", rrsig.name()).into())
@@ -295,5 +286,5 @@ pub fn determine_name(name: &Name, num_labels: u8) -> Result<Name, ProtoError> {
     //                   checks and MUST NOT be used to authenticate this
     //                   RRset.
 
-    Err(format!("could not determine name from {name}").into())
+    Err(format!("could not determine name from {}", name).into())
 }

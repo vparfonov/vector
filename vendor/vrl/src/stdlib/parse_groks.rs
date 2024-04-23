@@ -65,6 +65,8 @@ mod non_wasm {
 #[allow(clippy::wildcard_imports)]
 #[cfg(not(target_arch = "wasm32"))]
 use non_wasm::*;
+#[cfg(not(target_arch = "wasm32"))]
+use std::{fs::File, io::BufReader, path::Path};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseGroks;
@@ -89,6 +91,11 @@ impl Function for ParseGroks {
             Parameter {
                 keyword: "aliases",
                 kind: kind::OBJECT,
+                required: false,
+            },
+            Parameter {
+                keyword: "alias_sources",
+                kind: kind::ARRAY,
                 required: false,
             },
         ]
@@ -138,37 +145,86 @@ impl Function for ParseGroks {
             .into_iter()
             .map(|expr| {
                 let pattern = expr
+                    .clone()
                     .resolve_constant(state)
                     .ok_or(function::Error::ExpectedStaticExpression {
                         keyword: "patterns",
-                        expr,
+                        expr: expr.clone(),
                     })?
                     .try_bytes_utf8_lossy()
-                    .expect("grok pattern not bytes")
+                    .map_err(|_| function::Error::InvalidArgument {
+                        keyword: "patterns",
+                        value: format!("{expr:?}").into(),
+                        error: "grok pattern should be a string",
+                    })?
                     .into_owned();
                 Ok(pattern)
             })
             .collect::<std::result::Result<Vec<String>, function::Error>>()?;
 
-        let aliases = arguments
+        let mut aliases = arguments
             .optional_object("aliases")?
             .unwrap_or_default()
             .into_iter()
             .map(|(key, expr)| {
                 let alias = expr
+                    .clone()
                     .resolve_constant(state)
                     .ok_or(function::Error::ExpectedStaticExpression {
                         keyword: "aliases",
-                        expr,
-                    })
-                    .map(|e| {
-                        e.try_bytes_utf8_lossy()
-                            .expect("should be a string")
-                            .into_owned()
-                    })?;
+                        expr: expr.clone(),
+                    })?
+                    .try_bytes_utf8_lossy()
+                    .map_err(|_| function::Error::InvalidArgument {
+                        keyword: "aliases",
+                        value: format!("{expr:?}").into(),
+                        error: "alias pattern should be a string",
+                    })?
+                    .into_owned();
                 Ok((key, alias))
             })
-            .collect::<std::result::Result<BTreeMap<String, String>, function::Error>>()?;
+            .collect::<std::result::Result<BTreeMap<KeyString, String>, function::Error>>()?;
+
+        let alias_sources = arguments
+            .optional_array("alias_sources")?
+            .unwrap_or_default()
+            .into_iter()
+            .map(|expr| {
+                let path = expr
+                    .clone()
+                    .resolve_constant(state)
+                    .ok_or(function::Error::ExpectedStaticExpression {
+                        keyword: "alias_sources",
+                        expr: expr.clone(),
+                    })?
+                    .try_bytes_utf8_lossy()
+                    .map_err(|_| function::Error::InvalidArgument {
+                        keyword: "alias_sources",
+                        value: format!("{expr:?}").into(),
+                        error: "alias source should be a string",
+                    })?
+                    .into_owned();
+                Ok(path)
+            })
+            .collect::<std::result::Result<Vec<String>, function::Error>>()?;
+
+        for src in alias_sources {
+            let path = Path::new(&src);
+            let file = File::open(path).map_err(|_| function::Error::InvalidArgument {
+                keyword: "alias_sources",
+                value: format!("{path:?}").into(),
+                error: "Unable to open alias source file",
+            })?;
+            let reader = BufReader::new(file);
+            let mut src_aliases =
+                serde_json::from_reader(reader).map_err(|_| function::Error::InvalidArgument {
+                    keyword: "alias_sources",
+                    value: format!("{path:?}").into(),
+                    error: "Unable to read alias source",
+                })?;
+
+            aliases.append(&mut src_aliases);
+        }
 
         // we use a datadog library here because it is a superset of grok
         let grok_rules = crate::datadog_grok::parse_grok_rules::parse_grok_rules(
@@ -226,6 +282,16 @@ mod test {
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
+        error3 {
+            args: func_args![ value: "2020-10-02T23:22:12.223222Z info Hello world",
+                              patterns: vec!["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"],
+                              aliases: value!({
+                                  "TEST": 3
+                              })],
+            want: Err("invalid argument"),
+            tdef: TypeDef::object(Collection::any()).fallible(),
+        }
+
         parsed {
             args: func_args![ value: "2020-10-02T23:22:12.223222Z info Hello world",
                               patterns: vec!["%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"]],
@@ -248,7 +314,7 @@ mod test {
 
         multiple_patterns_and_aliases_first_pattern_matches {
             args: func_args![
-                value: r##"2020-10-02T23:22:12.223222Z info 200 hello world"##,
+                value: "2020-10-02T23:22:12.223222Z info 200 hello world",
                 patterns: Value::Array(vec![
                     "%{common_prefix} %{_status} %{_message}".into(),
                     "%{common_prefix} %{_message}".into(),
@@ -270,9 +336,34 @@ mod test {
             tdef: TypeDef::object(Collection::any()).fallible(),
         }
 
+        presence_of_alias_sources_argument {
+            args: func_args![
+                value: "2020-10-02T23:22:12.223222Z info 200 hello world",
+                patterns: Value::Array(vec![
+                    "%{common_prefix} %{_status} %{_message}".into(),
+                    "%{common_prefix} %{_message}".into(),
+                    ]),
+                aliases: value!({
+                    "common_prefix": "%{_timestamp} %{_loglevel}",
+                    "_timestamp": "%{TIMESTAMP_ISO8601:timestamp}",
+                    "_loglevel": "%{LOGLEVEL:level}",
+                    "_status": "%{POSINT:status}",
+                    "_message": "%{GREEDYDATA:message}"
+                }),
+                alias_sources: Value::Array(vec![]),
+            ],
+            want: Ok(Value::from(btreemap! {
+                "timestamp" => "2020-10-02T23:22:12.223222Z",
+                "level" => "info",
+                "status" => "200",
+                "message" => "hello world"
+            })),
+            tdef: TypeDef::object(Collection::any()).fallible(),
+        }
+
         multiple_patterns_and_aliases_second_pattern_matches {
             args: func_args![
-                value: r##"2020-10-02T23:22:12.223222Z info hello world"##,
+                value: "2020-10-02T23:22:12.223222Z info hello world",
                 patterns: Value::Array(vec![
                     "%{common_prefix} %{_status} %{_message}".into(),
                     "%{common_prefix} %{_message}".into(),
@@ -297,22 +388,22 @@ mod test {
             args: func_args![
                 value: r#"127.0.0.1 - frank [13/Jul/2016:10:55:36] "GET /apache_pb.gif HTTP/1.0" 200 2326 0.202 "http://www.perdu.com/" "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/55.0.2883.87 Safari/537.36" "-""#,
                 patterns: Value::Array(vec![
-                    r#"%{access_common}"#.into(),
+                    "%{access_common}".into(),
                     r#"%{access_common} (%{number:duration:scale(1000000000)} )?"%{_referer}" "%{_user_agent}"( "%{_x_forwarded_for}")?.*"#.into(),
                     ]),
                 aliases: value!({
                     "access_common": r#"%{_client_ip} %{_ident} %{_auth} \[%{_date_access}\] "(?>%{_method} |)%{_url}(?> %{_version}|)" %{_status_code} (?>%{_bytes_written}|-)"#,
                     "_auth": r#"%{notSpace:http.auth:nullIf("-")}"#,
-                    "_bytes_written": r#"%{integer:network.bytes_written}"#,
-                    "_client_ip": r#"%{ipOrHost:network.client.ip}"#,
+                    "_bytes_written": "%{integer:network.bytes_written}",
+                    "_client_ip": "%{ipOrHost:network.client.ip}",
                     "_version": r#"HTTP\/%{regex("\\d+\\.\\d+"):http.version}"#,
-                    "_url": r#"%{notSpace:http.url}"#,
-                    "_ident": r#"%{notSpace:http.ident}"#,
+                    "_url": "%{notSpace:http.url}",
+                    "_ident": "%{notSpace:http.ident}",
                     "_user_agent": r#"%{regex("[^\\\"]*"):http.useragent}"#,
-                    "_referer": r#"%{notSpace:http.referer}"#,
-                    "_status_code": r#"%{integer:http.status_code}"#,
-                    "_method": r#"%{word:http.method}"#,
-                    "_date_access": r#"%{notSpace:date_access}"#,
+                    "_referer": "%{notSpace:http.referer}",
+                    "_status_code": "%{integer:http.status_code}",
+                    "_method": "%{word:http.method}",
+                    "_date_access": "%{notSpace:date_access}",
                     "_x_forwarded_for": r#"%{regex("[^\\\"]*"):http._x_forwarded_for:nullIf("-")}"#
                 })
             ],

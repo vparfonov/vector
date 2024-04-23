@@ -115,8 +115,8 @@
 //! }
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/serde_yaml/0.9.25")]
-#![deny(missing_docs)]
+#![doc(html_root_url = "https://docs.rs/serde_yaml/0.9.33")]
+#![deny(missing_docs, unsafe_op_in_unsafe_fn)]
 // Suppressed clippy_pedantic lints
 #![allow(
     // buggy
@@ -134,11 +134,10 @@
     clippy::match_same_arms,
     clippy::module_name_repetitions,
     clippy::needless_pass_by_value,
-    clippy::option_if_let_else,
     clippy::redundant_else,
     clippy::single_match_else,
     // code is acceptable
-    clippy::blocks_in_if_conditions,
+    clippy::blocks_in_conditions,
     clippy::cast_possible_truncation,
     clippy::cast_possible_wrap,
     clippy::cast_precision_loss,

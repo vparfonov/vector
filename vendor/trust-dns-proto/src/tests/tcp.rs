@@ -4,10 +4,11 @@ use std::sync::{atomic::AtomicBool, Arc};
 
 use futures_util::stream::StreamExt;
 
+use crate::error::ProtoError;
 use crate::tcp::{Connect, TcpClientStream, TcpStream};
 use crate::xfer::dns_handle::DnsStreamHandle;
 use crate::xfer::SerialMessage;
-use crate::Executor;
+use crate::{Executor, Time};
 
 const TEST_BYTES: &[u8; 8] = b"DEADBEEF";
 const TEST_BYTES_LEN: usize = 8;
@@ -33,11 +34,10 @@ fn tcp_server_setup(
             println!("Thread Killer has been awoken, killing process");
             std::process::exit(-1);
         })
-        .expect("Thread spawning failed");
+        .unwrap();
 
     // TODO: need a timeout on listen
-    let server = std::net::TcpListener::bind(SocketAddr::new(server_addr, 0))
-        .expect("Unable to bind a TCP socket");
+    let server = std::net::TcpListener::bind(SocketAddr::new(server_addr, 0)).unwrap();
     let server_addr = server.local_addr().unwrap();
 
     // an in and out server
@@ -85,7 +85,7 @@ fn tcp_server_setup(
 }
 
 /// Test tcp_stream.
-pub fn tcp_stream_test<S: Connect, E: Executor>(server_addr: IpAddr, mut exec: E) {
+pub fn tcp_stream_test<S: Connect, E: Executor, TE: Time>(server_addr: IpAddr, mut exec: E) {
     let (succeeded, server_handle, server_addr) =
         tcp_server_setup("test_tcp_stream:server", server_addr);
 
@@ -94,7 +94,7 @@ pub fn tcp_stream_test<S: Connect, E: Executor>(server_addr: IpAddr, mut exec: E
     // the tests should run within 5 seconds... right?
     // TODO: add timeout here, so that test never hangs...
     // let timeout = Timeout::new(Duration::from_secs(5));
-    let (stream, mut sender) = TcpStream::<S>::new(server_addr);
+    let (stream, mut sender) = TcpStream::<S>::new::<ProtoError>(server_addr);
 
     let mut stream = exec.block_on(stream).expect("run failed to get stream");
 
@@ -117,7 +117,10 @@ pub fn tcp_stream_test<S: Connect, E: Executor>(server_addr: IpAddr, mut exec: E
 }
 
 /// Test tcp_client_stream.
-pub fn tcp_client_stream_test<S: Connect, E: Executor>(server_addr: IpAddr, mut exec: E) {
+pub fn tcp_client_stream_test<S: Connect, E: Executor, TE: Time + 'static>(
+    server_addr: IpAddr,
+    mut exec: E,
+) {
     let (succeeded, server_handle, server_addr) =
         tcp_server_setup("test_tcp_client_stream:server", server_addr);
 

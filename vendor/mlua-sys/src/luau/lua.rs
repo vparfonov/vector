@@ -2,13 +2,19 @@
 
 use std::marker::{PhantomData, PhantomPinned};
 use std::os::raw::{c_char, c_double, c_float, c_int, c_uint, c_void};
-use std::ptr;
+use std::{mem, ptr};
 
 // Option for multiple returns in 'lua_pcall' and 'lua_call'
 pub const LUA_MULTRET: c_int = -1;
 
 // Max number of Lua stack slots
-const LUAI_MAXCSTACK: c_int = 100000;
+const LUAI_MAXCSTACK: c_int = 1000000;
+
+// Number of valid Lua userdata tags
+const LUA_UTAG_LIMIT: c_int = 128;
+
+// Number of valid Lua lightuserdata tags
+const LUA_LUTAG_LIMIT: c_int = 128;
 
 //
 // Pseudo-indices
@@ -55,6 +61,7 @@ pub const LUA_TTABLE: c_int = 6;
 pub const LUA_TFUNCTION: c_int = 7;
 pub const LUA_TUSERDATA: c_int = 8;
 pub const LUA_TTHREAD: c_int = 9;
+pub const LUA_TBUFFER: c_int = 10;
 
 /// Guaranteed number of Lua stack slots available to a C function.
 pub const LUA_MINSTACK: c_int = 20;
@@ -143,10 +150,13 @@ extern "C-unwind" {
     pub fn lua_objlen(L: *mut lua_State, idx: c_int) -> usize;
     pub fn lua_tocfunction(L: *mut lua_State, idx: c_int) -> Option<lua_CFunction>;
     pub fn lua_tolightuserdata(L: *mut lua_State, idx: c_int) -> *mut c_void;
+    pub fn lua_tolightuserdatatagged(L: *mut lua_State, idx: c_int, tag: c_int) -> *mut c_void;
     pub fn lua_touserdata(L: *mut lua_State, idx: c_int) -> *mut c_void;
     pub fn lua_touserdatatagged(L: *mut lua_State, idx: c_int, tag: c_int) -> *mut c_void;
     pub fn lua_userdatatag(L: *mut lua_State, idx: c_int) -> c_int;
+    pub fn lua_lightuserdatatag(L: *mut lua_State, idx: c_int) -> c_int;
     pub fn lua_tothread(L: *mut lua_State, idx: c_int) -> *mut lua_State;
+    pub fn lua_tobuffer(L: *mut lua_State, idx: c_int, len: *mut usize) -> *mut c_void;
     pub fn lua_topointer(L: *mut lua_State, idx: c_int) -> *const c_void;
 
     //
@@ -177,9 +187,11 @@ extern "C-unwind" {
     pub fn lua_pushboolean(L: *mut lua_State, b: c_int);
     pub fn lua_pushthread(L: *mut lua_State) -> c_int;
 
-    pub fn lua_pushlightuserdata(L: *mut lua_State, p: *mut c_void);
+    pub fn lua_pushlightuserdatatagged(L: *mut lua_State, p: *mut c_void, tag: c_int);
     pub fn lua_newuserdatatagged(L: *mut lua_State, sz: usize, tag: c_int) -> *mut c_void;
     pub fn lua_newuserdatadtor(L: *mut lua_State, sz: usize, dtor: lua_Udestructor) -> *mut c_void;
+
+    pub fn lua_newbuffer(L: *mut lua_State, sz: usize) -> *mut c_void;
 
     //
     // Get functions (Lua -> stack)
@@ -276,8 +288,11 @@ extern "C-unwind" {
     pub fn lua_setuserdatatag(L: *mut lua_State, idx: c_int, tag: c_int);
     pub fn lua_setuserdatadtor(L: *mut lua_State, tag: c_int, dtor: Option<lua_Destructor>);
     pub fn lua_getuserdatadtor(L: *mut lua_State, tag: c_int) -> Option<lua_Destructor>;
+    pub fn lua_setlightuserdataname(L: *mut lua_State, tag: c_int, name: *const c_char);
+    pub fn lua_getlightuserdataname(L: *mut lua_State, tag: c_int) -> *const c_char;
     pub fn lua_clonefunction(L: *mut lua_State, idx: c_int);
     pub fn lua_cleartable(L: *mut lua_State, idx: c_int);
+    pub fn lua_getallocf(L: *mut lua_State, ud: *mut *mut c_void) -> lua_Alloc;
 }
 
 //
@@ -325,6 +340,15 @@ pub unsafe fn lua_newuserdata(L: *mut lua_State, sz: usize) -> *mut c_void {
     lua_newuserdatatagged(L, sz, 0)
 }
 
+#[inline(always)]
+pub unsafe fn lua_newuserdata_t<T>(L: *mut lua_State) -> *mut T {
+    unsafe extern "C-unwind" fn destructor<T>(ud: *mut c_void) {
+        ptr::drop_in_place(ud as *mut T);
+    }
+
+    lua_newuserdatadtor(L, mem::size_of::<T>(), destructor::<T>) as *mut T
+}
+
 // TODO: lua_strlen
 
 #[inline(always)]
@@ -363,6 +387,11 @@ pub unsafe fn lua_isthread(L: *mut lua_State, n: c_int) -> c_int {
 }
 
 #[inline(always)]
+pub unsafe fn lua_isbuffer(L: *mut lua_State, n: c_int) -> c_int {
+    (lua_type(L, n) == LUA_TBUFFER) as c_int
+}
+
+#[inline(always)]
 pub unsafe fn lua_isnone(L: *mut lua_State, n: c_int) -> c_int {
     (lua_type(L, n) == LUA_TNONE) as c_int
 }
@@ -379,18 +408,22 @@ pub unsafe fn lua_pushliteral(L: *mut lua_State, s: &'static str) {
     lua_pushlstring_(L, c_str.as_ptr(), c_str.as_bytes().len())
 }
 
+#[inline(always)]
 pub unsafe fn lua_pushcfunction(L: *mut lua_State, f: lua_CFunction) {
     lua_pushcclosurek(L, f, ptr::null(), 0, None)
 }
 
+#[inline(always)]
 pub unsafe fn lua_pushcfunctiond(L: *mut lua_State, f: lua_CFunction, debugname: *const c_char) {
     lua_pushcclosurek(L, f, debugname, 0, None)
 }
 
+#[inline(always)]
 pub unsafe fn lua_pushcclosure(L: *mut lua_State, f: lua_CFunction, nup: c_int) {
     lua_pushcclosurek(L, f, ptr::null(), nup, None)
 }
 
+#[inline(always)]
 pub unsafe fn lua_pushcclosured(
     L: *mut lua_State,
     f: lua_CFunction,
@@ -398,6 +431,11 @@ pub unsafe fn lua_pushcclosured(
     nup: c_int,
 ) {
     lua_pushcclosurek(L, f, debugname, nup, None)
+}
+
+#[inline(always)]
+pub unsafe fn lua_pushlightuserdata(L: *mut lua_State, p: *mut c_void) {
+    lua_pushlightuserdatatagged(L, p, 0)
 }
 
 #[inline(always)]

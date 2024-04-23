@@ -1,7 +1,7 @@
-use std::mem;
-use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Sub, SubAssign};
+use core::mem;
+use core::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Sub, SubAssign};
 
-use retain_mut::RetainMut;
+use alloc::vec::Vec;
 
 use crate::bitmap::container::Container;
 use crate::bitmap::Pairs;
@@ -240,7 +240,7 @@ impl BitAndAssign<RoaringBitmap> for RoaringBitmap {
             mem::swap(self, &mut rhs);
         }
 
-        RetainMut::retain_mut(&mut self.containers, |cont| {
+        self.containers.retain_mut(|cont| {
             let key = cont.key;
             match rhs.containers.binary_search_by_key(&key, |c| c.key) {
                 Ok(loc) => {
@@ -258,7 +258,7 @@ impl BitAndAssign<RoaringBitmap> for RoaringBitmap {
 impl BitAndAssign<&RoaringBitmap> for RoaringBitmap {
     /// An `intersection` between two sets.
     fn bitand_assign(&mut self, rhs: &RoaringBitmap) {
-        RetainMut::retain_mut(&mut self.containers, |cont| {
+        self.containers.retain_mut(|cont| {
             let key = cont.key;
             match rhs.containers.binary_search_by_key(&key, |c| c.key) {
                 Ok(loc) => {
@@ -335,7 +335,7 @@ impl SubAssign<RoaringBitmap> for RoaringBitmap {
 impl SubAssign<&RoaringBitmap> for RoaringBitmap {
     /// A `difference` between two sets.
     fn sub_assign(&mut self, rhs: &RoaringBitmap) {
-        RetainMut::retain_mut(&mut self.containers, |cont| {
+        self.containers.retain_mut(|cont| {
             match rhs.containers.binary_search_by_key(&cont.key, |c| c.key) {
                 Ok(loc) => {
                     SubAssign::sub_assign(cont, &rhs.containers[loc]);
@@ -442,8 +442,8 @@ impl BitXorAssign<&RoaringBitmap> for RoaringBitmap {
 #[cfg(test)]
 mod test {
     use crate::{MultiOps, RoaringBitmap};
+    use core::convert::Infallible;
     use proptest::prelude::*;
-    use std::convert::Infallible;
 
     // fast count tests
     proptest! {

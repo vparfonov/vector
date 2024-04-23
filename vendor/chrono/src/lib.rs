@@ -52,23 +52,18 @@
 //!
 //! ## Overview
 //!
-//! ### Duration
+//! ### Time delta / Duration
 //!
-//! Chrono currently uses its own [`Duration`] type to represent the magnitude
-//! of a time span. Since this has the same name as the newer, standard type for
-//! duration, the reference will refer this type as `OldDuration`.
+//! Chrono has a [`TimeDelta`] type to represent the magnitude of a time span. This is an
+//! "accurate" duration represented as seconds and nanoseconds, and does not represent "nominal"
+//! components such as days or months.
 //!
-//! Note that this is an "accurate" duration represented as seconds and
-//! nanoseconds and does not represent "nominal" components such as days or
-//! months.
+//! The [`TimeDelta`] type was previously named `Duration` (and is still available as a type alias
+//! with that name). A notable difference with the similar [`core::time::Duration`] is that it is a
+//! signed value instead of unsigned.
 //!
-//! Chrono does not yet natively support
-//! the standard [`Duration`](https://doc.rust-lang.org/std/time/struct.Duration.html) type,
-//! but it will be supported in the future.
-//! Meanwhile you can convert between two types with
-//! [`Duration::from_std`](https://docs.rs/time/0.1.40/time/struct.Duration.html#method.from_std)
-//! and
-//! [`Duration::to_std`](https://docs.rs/time/0.1.40/time/struct.Duration.html#method.to_std)
+//! Chrono currently only supports a small number of operations with [`core::time::Duration`] .
+//! You can convert between both types with the [`TimeDelta::from_std`] and [`TimeDelta::to_std`]
 //! methods.
 //!
 //! ### Date and Time
@@ -108,21 +103,28 @@
 //! or in the local time zone
 //! ([`Local::now()`](./offset/struct.Local.html#method.now)).
 //!
+#![cfg_attr(not(feature = "now"), doc = "```ignore")]
+#![cfg_attr(feature = "now", doc = "```rust")]
+//! use chrono::prelude::*;
+//!
+//! let utc: DateTime<Utc> = Utc::now();       // e.g. `2014-11-28T12:45:59.324310806Z`
+//! # let _ = utc;
+//! ```
+//!
 #![cfg_attr(not(feature = "clock"), doc = "```ignore")]
 #![cfg_attr(feature = "clock", doc = "```rust")]
 //! use chrono::prelude::*;
 //!
-//! let utc: DateTime<Utc> = Utc::now();       // e.g. `2014-11-28T12:45:59.324310806Z`
 //! let local: DateTime<Local> = Local::now(); // e.g. `2014-11-28T21:45:59.324310806+09:00`
-//! # let _ = utc; let _ = local;
+//! # let _ = local;
 //! ```
 //!
 //! Alternatively, you can create your own date and time.
 //! This is a bit verbose due to Rust's lack of function and method overloading,
 //! but in turn we get a rich combination of initialization methods.
 //!
-#![cfg_attr(not(feature = "std"), doc = "```ignore")]
-#![cfg_attr(feature = "std", doc = "```rust")]
+#![cfg_attr(not(feature = "now"), doc = "```ignore")]
+#![cfg_attr(feature = "now", doc = "```rust")]
 //! use chrono::prelude::*;
 //! use chrono::offset::LocalResult;
 //!
@@ -146,12 +148,14 @@
 //! assert_eq!(Utc.with_ymd_and_hms(2014, 7, 8, 80, 15, 33), LocalResult::None);
 //! assert_eq!(Utc.with_ymd_and_hms(2014, 7, 38, 21, 15, 33), LocalResult::None);
 //!
+//! # #[cfg(feature = "clock")] {
 //! // other time zone objects can be used to construct a local datetime.
 //! // obviously, `local_dt` is normally different from `dt`, but `fixed_dt` should be identical.
 //! let local_dt = Local.from_local_datetime(&NaiveDate::from_ymd_opt(2014, 7, 8).unwrap().and_hms_milli_opt(9, 10, 11, 12).unwrap()).unwrap();
 //! let fixed_dt = FixedOffset::east_opt(9 * 3600).unwrap().from_local_datetime(&NaiveDate::from_ymd_opt(2014, 7, 8).unwrap().and_hms_milli_opt(18, 10, 11, 12).unwrap()).unwrap();
 //! assert_eq!(dt, fixed_dt);
 //! # let _ = local_dt;
+//! # }
 //! # Some(())
 //! # }
 //! # doctest().unwrap();
@@ -165,7 +169,7 @@
 //!
 //! ```rust
 //! use chrono::prelude::*;
-//! use chrono::Duration;
+//! use chrono::TimeDelta;
 //!
 //! // assume this returned `2014-11-28T21:45:59.324310806+09:00`:
 //! let dt = FixedOffset::east_opt(9*3600).unwrap().from_local_datetime(&NaiveDate::from_ymd_opt(2014, 11, 28).unwrap().and_hms_nano_opt(21, 45, 59, 324310806).unwrap()).unwrap();
@@ -192,11 +196,11 @@
 //! // arithmetic operations
 //! let dt1 = Utc.with_ymd_and_hms(2014, 11, 14, 8, 9, 10).unwrap();
 //! let dt2 = Utc.with_ymd_and_hms(2014, 11, 14, 10, 9, 8).unwrap();
-//! assert_eq!(dt1.signed_duration_since(dt2), Duration::seconds(-2 * 3600 + 2));
-//! assert_eq!(dt2.signed_duration_since(dt1), Duration::seconds(2 * 3600 - 2));
-//! assert_eq!(Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).unwrap() + Duration::seconds(1_000_000_000),
+//! assert_eq!(dt1.signed_duration_since(dt2), TimeDelta::seconds(-2 * 3600 + 2));
+//! assert_eq!(dt2.signed_duration_since(dt1), TimeDelta::seconds(2 * 3600 - 2));
+//! assert_eq!(Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).unwrap() + TimeDelta::seconds(1_000_000_000),
 //!            Utc.with_ymd_and_hms(2001, 9, 9, 1, 46, 40).unwrap());
-//! assert_eq!(Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).unwrap() - Duration::seconds(1_000_000_000),
+//! assert_eq!(Utc.with_ymd_and_hms(1970, 1, 1, 0, 0, 0).unwrap() - TimeDelta::seconds(1_000_000_000),
 //!            Utc.with_ymd_and_hms(1938, 4, 24, 22, 13, 20).unwrap());
 //! ```
 //!
@@ -227,7 +231,7 @@
 //! # #[allow(unused_imports)]
 //! use chrono::prelude::*;
 //!
-//! # #[cfg(feature = "unstable-locales")]
+//! # #[cfg(all(feature = "unstable-locales", feature = "alloc"))]
 //! # fn test() {
 //! let dt = Utc.with_ymd_and_hms(2014, 11, 28, 12, 0, 9).unwrap();
 //! assert_eq!(dt.format("%Y-%m-%d %H:%M:%S").to_string(), "2014-11-28 12:00:09");
@@ -244,14 +248,14 @@
 //! let dt_nano = NaiveDate::from_ymd_opt(2014, 11, 28).unwrap().and_hms_nano_opt(12, 0, 9, 1).unwrap().and_local_timezone(Utc).unwrap();
 //! assert_eq!(format!("{:?}", dt_nano), "2014-11-28T12:00:09.000000001Z");
 //! # }
-//! # #[cfg(not(feature = "unstable-locales"))]
+//! # #[cfg(not(all(feature = "unstable-locales", feature = "alloc")))]
 //! # fn test() {}
-//! # if cfg!(feature = "unstable-locales") {
+//! # if cfg!(all(feature = "unstable-locales", feature = "alloc")) {
 //! #    test();
 //! # }
 //! ```
 //!
-//! Parsing can be done with three methods:
+//! Parsing can be done with two methods:
 //!
 //! 1. The standard [`FromStr`](https://doc.rust-lang.org/std/str/trait.FromStr.html) trait
 //!    (and [`parse`](https://doc.rust-lang.org/std/primitive.str.html#method.parse) method
@@ -268,12 +272,6 @@
 //!    and
 //!    [`DateTime::parse_from_rfc3339`](./struct.DateTime.html#method.parse_from_rfc3339)
 //!    are similar but for well-known formats.
-//!
-//! 3. [`Offset::datetime_from_str`](./offset/trait.TimeZone.html#method.datetime_from_str) is
-//!    similar but returns `DateTime` of given offset.
-//!    When the explicit offset is missing from the input, it simply uses given offset.
-//!    It issues an error when the input contains an explicit offset different
-//!    from the current offset.
 //!
 //! More detailed control over the parsing process is available via
 //! [`format`](./format/index.html) module.
@@ -351,30 +349,18 @@
 //!
 //! ## Limitations
 //!
-//! Only the proleptic Gregorian calendar (i.e. extended to support older dates) is supported.
-//! Date types are limited to about +/- 262,000 years from the common epoch.
-//! Time types are limited to nanosecond accuracy.
-//! Leap seconds can be represented, but Chrono does not fully support them.
-//! See [Leap Second Handling](https://docs.rs/chrono/latest/chrono/naive/struct.NaiveTime.html#leap-second-handling).
+//! * Only the proleptic Gregorian calendar (i.e. extended to support older dates) is supported.
+//! * Date types are limited to about +/- 262,000 years from the common epoch.
+//! * Time types are limited to nanosecond accuracy.
+//! * Leap seconds can be represented, but Chrono does not fully support them.
+//!   See [Leap Second Handling](https://docs.rs/chrono/latest/chrono/naive/struct.NaiveTime.html#leap-second-handling).
 //!
 //! ## Rust version requirements
 //!
-//! The Minimum Supported Rust Version (MSRV) is currently **Rust 1.57.0**.
+//! The Minimum Supported Rust Version (MSRV) is currently **Rust 1.61.0**.
 //!
 //! The MSRV is explicitly tested in CI. It may be bumped in minor releases, but this is not done
 //! lightly.
-//!
-//! Chrono inherently does not support an inaccurate or partial date and time representation.
-//! Any operation that can be ambiguous will return `None` in such cases.
-//! For example, "a month later" of 2014-01-30 is not well-defined
-//! and consequently `Utc.ymd_opt(2014, 1, 30).unwrap().with_month(2)` returns `None`.
-//!
-//! Non ISO week handling is not yet supported.
-//! For now you can use the [chrono_ext](https://crates.io/crates/chrono_ext)
-//! crate ([sources](https://github.com/bcourtine/chrono-ext/)).
-//!
-//! Advanced time zone handling is not yet supported.
-//! For now you can try the [Chrono-tz](https://github.com/chronotope/chrono-tz/) crate instead.
 //!
 //! ## Relation between chrono and time 0.1
 //!
@@ -469,83 +455,84 @@
 // can remove this if/when rustc-serialize support is removed
 // keeps clippy happy in the meantime
 #![cfg_attr(feature = "rustc-serialize", allow(deprecated))]
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-mod duration;
-pub use duration::Duration;
+mod time_delta;
 #[cfg(feature = "std")]
-pub use duration::OutOfRangeError;
+#[doc(no_inline)]
+pub use time_delta::OutOfRangeError;
+pub use time_delta::TimeDelta;
+
+/// Alias of [`TimeDelta`].
+pub type Duration = TimeDelta;
 
 use core::fmt;
 
 /// A convenience module appropriate for glob imports (`use chrono::prelude::*;`).
 pub mod prelude {
-    #[doc(no_inline)]
     #[allow(deprecated)]
     pub use crate::Date;
     #[cfg(feature = "clock")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "clock")))]
-    #[doc(no_inline)]
     pub use crate::Local;
-    #[cfg(feature = "unstable-locales")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "unstable-locales")))]
-    #[doc(no_inline)]
+    #[cfg(all(feature = "unstable-locales", feature = "alloc"))]
     pub use crate::Locale;
-    #[doc(no_inline)]
     pub use crate::SubsecRound;
-    #[doc(no_inline)]
     pub use crate::{DateTime, SecondsFormat};
-    #[doc(no_inline)]
     pub use crate::{Datelike, Month, Timelike, Weekday};
-    #[doc(no_inline)]
     pub use crate::{FixedOffset, Utc};
-    #[doc(no_inline)]
     pub use crate::{NaiveDate, NaiveDateTime, NaiveTime};
-    #[doc(no_inline)]
     pub use crate::{Offset, TimeZone};
 }
 
 mod date;
 #[allow(deprecated)]
-pub use date::{Date, MAX_DATE, MIN_DATE};
+pub use date::Date;
+#[doc(no_inline)]
+#[allow(deprecated)]
+pub use date::{MAX_DATE, MIN_DATE};
 
 mod datetime;
 #[cfg(feature = "rustc-serialize")]
-#[cfg_attr(docsrs, doc(cfg(feature = "rustc-serialize")))]
 pub use datetime::rustc_serialize::TsSeconds;
+pub use datetime::DateTime;
 #[allow(deprecated)]
-pub use datetime::{DateTime, SecondsFormat, MAX_DATETIME, MIN_DATETIME};
+#[doc(no_inline)]
+pub use datetime::{MAX_DATETIME, MIN_DATETIME};
 
 pub mod format;
 /// L10n locales.
 #[cfg(feature = "unstable-locales")]
-#[cfg_attr(docsrs, doc(cfg(feature = "unstable-locales")))]
 pub use format::Locale;
-pub use format::{ParseError, ParseResult};
+pub use format::{ParseError, ParseResult, SecondsFormat};
 
 pub mod naive;
-#[doc(no_inline)]
-pub use naive::{Days, IsoWeek, NaiveDate, NaiveDateTime, NaiveTime, NaiveWeek};
+#[doc(inline)]
+pub use naive::{Days, NaiveDate, NaiveDateTime, NaiveTime};
+pub use naive::{IsoWeek, NaiveWeek};
 
 pub mod offset;
 #[cfg(feature = "clock")]
-#[cfg_attr(docsrs, doc(cfg(feature = "clock")))]
-#[doc(no_inline)]
+#[doc(inline)]
 pub use offset::Local;
-#[doc(no_inline)]
-pub use offset::{FixedOffset, LocalResult, Offset, TimeZone, Utc};
+pub use offset::LocalResult;
+#[doc(inline)]
+pub use offset::{FixedOffset, Offset, TimeZone, Utc};
 
-mod round;
+pub mod round;
 pub use round::{DurationRound, RoundingError, SubsecRound};
 
 mod weekday;
-pub use weekday::{ParseWeekdayError, Weekday};
+#[doc(no_inline)]
+pub use weekday::ParseWeekdayError;
+pub use weekday::Weekday;
 
 mod month;
-pub use month::{Month, Months, ParseMonthError};
+#[doc(no_inline)]
+pub use month::ParseMonthError;
+pub use month::{Month, Months};
 
 mod traits;
 pub use traits::{Datelike, Timelike};
@@ -564,9 +551,30 @@ pub use naive::__BenchYearFlags;
 /// [1]: https://tools.ietf.org/html/rfc3339
 /// [2]: https://serde.rs/field-attrs.html#with
 #[cfg(feature = "serde")]
-#[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
 pub mod serde {
     pub use super::datetime::serde::*;
+}
+
+/// Zero-copy serialization/deserialization with rkyv.
+///
+/// This module re-exports the `Archived*` versions of chrono's types.
+#[cfg(any(feature = "rkyv", feature = "rkyv-16", feature = "rkyv-32", feature = "rkyv-64"))]
+pub mod rkyv {
+    pub use crate::datetime::ArchivedDateTime;
+    pub use crate::month::ArchivedMonth;
+    pub use crate::naive::date::ArchivedNaiveDate;
+    pub use crate::naive::datetime::ArchivedNaiveDateTime;
+    pub use crate::naive::isoweek::ArchivedIsoWeek;
+    pub use crate::naive::time::ArchivedNaiveTime;
+    pub use crate::offset::fixed::ArchivedFixedOffset;
+    #[cfg(feature = "clock")]
+    pub use crate::offset::local::ArchivedLocal;
+    pub use crate::offset::utc::ArchivedUtc;
+    pub use crate::time_delta::ArchivedTimeDelta;
+    pub use crate::weekday::ArchivedWeekday;
+
+    /// Alias of [`ArchivedTimeDelta`]
+    pub type ArchivedDuration = ArchivedTimeDelta;
 }
 
 /// Out of range error type used in various converting APIs
@@ -598,6 +606,7 @@ impl std::error::Error for OutOfRange {}
 
 /// Workaround because `?` is not (yet) available in const context.
 #[macro_export]
+#[doc(hidden)]
 macro_rules! try_opt {
     ($e:expr) => {
         match $e {
@@ -609,6 +618,7 @@ macro_rules! try_opt {
 
 /// Workaround because `.expect()` is not (yet) available in const context.
 #[macro_export]
+#[doc(hidden)]
 macro_rules! expect {
     ($e:expr, $m:literal) => {
         match $e {

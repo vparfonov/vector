@@ -4,8 +4,10 @@ use futures_core::Stream;
 use futures_util::{StreamExt, TryStreamExt};
 use http::header::{CONNECTION, CONTENT_TYPE, UPGRADE};
 use http::request::Builder;
-use hyper::{body::Bytes, Body, Method};
+use http_body_util::Full;
+use hyper::{body::Bytes, Method};
 use serde::Serialize;
+use serde_derive::Deserialize;
 use tokio::io::AsyncWrite;
 use tokio_util::codec::FramedRead;
 
@@ -17,7 +19,6 @@ use std::pin::Pin;
 
 use super::Docker;
 use crate::errors::Error;
-
 use crate::models::*;
 use crate::read::NewlineLogOutputDecoder;
 
@@ -749,6 +750,10 @@ pub struct StorageStats {
     pub write_size_bytes: Option<u64>,
 }
 
+fn empty_string() -> String {
+    "".to_string()
+}
+
 /// Statistics for the container.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[allow(missing_docs)]
@@ -782,10 +787,11 @@ pub struct Stats {
     pub cpu_stats: CPUStats,
     pub precpu_stats: CPUStats,
     pub storage_stats: StorageStats,
+    #[serde(default = "empty_string")]
     pub name: String,
 
     // Podman incorrectly capitalises the "id" field. See https://github.com/containers/podman/issues/17869
-    #[serde(alias = "Id")]
+    #[serde(alias = "Id", default = "empty_string")]
     pub id: String,
 }
 
@@ -1196,7 +1202,7 @@ impl Docker {
             url,
             Builder::new().method(Method::GET),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_value(req).await
@@ -1298,7 +1304,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::POST),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_unit(req).await
@@ -1343,7 +1349,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::POST),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_unit(req).await
@@ -1392,7 +1398,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::DELETE),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_unit(req).await
@@ -1443,7 +1449,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::POST),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_stream(req).map(|res| match res {
@@ -1517,7 +1523,7 @@ impl Docker {
                 .header(CONNECTION, "Upgrade")
                 .header(UPGRADE, "tcp"),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         let (read, write) = self.process_upgraded(req).await?;
@@ -1566,7 +1572,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::POST),
             Some(options),
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_unit(req).await
@@ -1612,7 +1618,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::POST),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_unit(req).await
@@ -1657,7 +1663,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::GET),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_value(req).await
@@ -1705,7 +1711,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::GET),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_value(req).await
@@ -1758,7 +1764,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::GET),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_stream_string(req)
@@ -1797,7 +1803,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::GET),
             None::<String>,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_value(req).await
@@ -1845,7 +1851,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::GET),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_stream(req)
@@ -1894,7 +1900,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::POST),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_unit(req).await
@@ -1995,7 +2001,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::POST),
             Some(options),
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_unit(req).await
@@ -2030,7 +2036,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::POST),
             None::<String>,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_unit(req).await
@@ -2065,7 +2071,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::POST),
             None::<String>,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_unit(req).await
@@ -2116,7 +2122,7 @@ impl Docker {
             url,
             Builder::new().method(Method::POST),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_value(req).await
@@ -2162,7 +2168,7 @@ impl Docker {
         &self,
         container_name: &str,
         options: Option<UploadToContainerOptions<T>>,
-        tar: Body,
+        tar: Bytes,
     ) -> Result<(), Error>
     where
         T: Into<String> + Serialize,
@@ -2175,7 +2181,7 @@ impl Docker {
                 .method(Method::PUT)
                 .header(CONTENT_TYPE, "application/x-tar"),
             options,
-            Ok(tar),
+            Ok(Full::new(tar)),
         );
 
         self.process_into_unit(req).await
@@ -2223,9 +2229,38 @@ impl Docker {
             &url,
             Builder::new().method(Method::GET),
             options,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
+        self.process_into_body(req)
+    }
+
+    /// ---
+    ///
+    /// # Export Container
+    ///
+    /// Get a tarball containing the filesystem contents of a container.
+    ///
+    /// See the [Docker API documentation](https://docs.docker.com/engine/api/v1.40/#operation/ContainerExport)
+    /// for more information.
+    /// # Arguments
+    /// - The `container_name` string referring to an individual container
+    ///
+    /// # Returns
+    ///  - An uncompressed TAR archive
+    pub fn export_container(
+        &self,
+        container_name: &str,
+    ) -> impl Stream<Item = Result<Bytes, Error>> {
+        let url = format!("/containers/{container_name}/export");
+        let req = self.build_request(
+            &url,
+            Builder::new()
+                .method(Method::GET)
+                .header(CONTENT_TYPE, "application/json"),
+            None::<String>,
+            Ok(Full::new(Bytes::new())),
+        );
         self.process_into_body(req)
     }
 }

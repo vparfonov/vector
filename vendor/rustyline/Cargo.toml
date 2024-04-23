@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "rustyline"
-version = "12.0.0"
+version = "14.0.0"
 authors = ["Katsu Kawakami <kkawa1570@gmail.com>"]
 exclude = [
     "/.github/*",
@@ -90,7 +90,7 @@ version = "2.0"
 version = "1.0"
 
 [dependencies.fd-lock]
-version = "3.0.0"
+version = "4.0.0"
 optional = true
 
 [dependencies.home]
@@ -115,7 +115,7 @@ version = "1.5.5"
 optional = true
 
 [dependencies.rusqlite]
-version = "0.29.0"
+version = "0.31.0"
 features = [
     "bundled",
     "backup",
@@ -124,7 +124,7 @@ optional = true
 default-features = false
 
 [dependencies.rustyline-derive]
-version = "0.9.0"
+version = "0.10.0"
 optional = true
 
 [dependencies.unicode-segmentation]
@@ -140,7 +140,7 @@ version = "1.2"
 version = "0.3"
 
 [dev-dependencies.env_logger]
-version = "0.10"
+version = "0.11"
 default-features = false
 
 [dev-dependencies.rand]
@@ -163,8 +163,13 @@ with-file-history = ["fd-lock"]
 with-fuzzy = ["skim"]
 with-sqlite-history = ["rusqlite"]
 
+[target."cfg(unix)".dependencies.buffer-redux]
+version = "1.0"
+optional = true
+default-features = false
+
 [target."cfg(unix)".dependencies.nix]
-version = "0.26"
+version = "0.28"
 features = [
     "fs",
     "ioctl",
@@ -184,27 +189,24 @@ version = "0.10"
 optional = true
 default-features = false
 
+[target."cfg(unix)".dependencies.termios]
+version = "0.3.3"
+optional = true
+
 [target."cfg(unix)".dependencies.utf8parse]
 version = "0.2"
 
 [target."cfg(windows)".dependencies.clipboard-win]
-version = "4.5"
+version = "5.0"
 
-[target."cfg(windows)".dependencies.scopeguard]
-version = "1.1"
-
-[target."cfg(windows)".dependencies.winapi]
-version = "0.3"
+[target."cfg(windows)".dependencies.windows-sys]
+version = "0.52.0"
 features = [
-    "consoleapi",
-    "handleapi",
-    "synchapi",
-    "minwindef",
-    "processenv",
-    "std",
-    "winbase",
-    "wincon",
-    "winuser",
+    "Win32_Foundation",
+    "Win32_System_Console",
+    "Win32_Security",
+    "Win32_System_Threading",
+    "Win32_UI_Input_KeyboardAndMouse",
 ]
 
 [badges.maintenance]

@@ -1,11 +1,12 @@
 //! Exec API: Run new commands inside running containers
 
+use bytes::Bytes;
 use futures_util::TryStreamExt;
 use http::header::{CONNECTION, UPGRADE};
 use http::request::Builder;
-use hyper::Body;
+use http_body_util::Full;
 use hyper::Method;
-use serde::ser::Serialize;
+use serde_derive::{Deserialize, Serialize};
 
 use super::Docker;
 
@@ -24,7 +25,7 @@ use tokio_util::codec::FramedRead;
 #[serde(rename_all = "PascalCase")]
 pub struct CreateExecOptions<T>
 where
-    T: Into<String> + Serialize,
+    T: Into<String> + serde::ser::Serialize,
 {
     /// Attach to `stdin` of the exec command.
     pub attach_stdin: Option<bool>,
@@ -64,6 +65,8 @@ pub struct CreateExecResults {
 pub struct StartExecOptions {
     /// Detach from the command.
     pub detach: bool,
+    /// Allocate a pseudo-TTY.
+    pub tty: bool,
     /// The maximum size for a line of output. The default is 8 * 1024 (roughly 1024 characters).
     pub output_capacity: Option<usize>,
 }
@@ -140,7 +143,7 @@ impl Docker {
         config: CreateExecOptions<T>,
     ) -> Result<CreateExecResults, Error>
     where
-        T: Into<String> + Serialize,
+        T: Into<String> + serde::ser::Serialize,
     {
         let url = format!("/containers/{container_name}/exec");
 
@@ -287,7 +290,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::GET),
             None::<String>,
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_value(req).await
@@ -338,7 +341,7 @@ impl Docker {
             &url,
             Builder::new().method(Method::POST),
             Some(options),
-            Ok(Body::empty()),
+            Ok(Full::new(Bytes::new())),
         );
 
         self.process_into_unit(req).await

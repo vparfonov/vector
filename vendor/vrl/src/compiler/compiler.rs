@@ -1,8 +1,10 @@
+use crate::compiler::expression::function_call::FunctionCallError;
+use crate::compiler::expression::ExpressionError;
 use crate::compiler::{
     expression::{
         assignment, function_call, literal, predicate, query, Abort, Array, Assignment, Block,
         Container, Expr, Expression, FunctionArgument, FunctionCall, Group, IfStatement, Literal,
-        Noop, Not, Object, Op, Predicate, Query, Target, Unary, Variable,
+        Noop, Not, Object, Op, Predicate, Query, Return, Target, Unary, Variable,
     },
     parser::ast::RootExpr,
     program::ProgramInfo,
@@ -12,7 +14,7 @@ use crate::diagnostic::{DiagnosticList, DiagnosticMessage, Note};
 use crate::parser::ast::{self, Node, QueryTarget};
 use crate::path::PathPrefix;
 use crate::path::{OwnedTargetPath, OwnedValuePath};
-use crate::prelude::ArgumentList;
+use crate::prelude::{expression, ArgumentList};
 use crate::value::Value;
 
 use super::state::TypeState;
@@ -52,9 +54,33 @@ pub struct Compiler<'a> {
     // This should probably be kept on the call stack as the "compile_*" functions are called
     // otherwise some expressions may remove it when they shouldn't (such as the RHS of an operation removing
     // the error from the LHS)
-    fallible_expression_error: Option<Box<dyn DiagnosticMessage>>,
+    fallible_expression_error: Option<CompilerError>,
 
     config: CompileConfig,
+}
+
+// TODO: The diagnostic related code is in dire need of refactoring.
+// This is a workaround to avoid doing this work upfront.
+#[derive(Debug)]
+pub(crate) enum CompilerError {
+    FunctionCallError(FunctionCallError),
+    ExpressionError(ExpressionError),
+}
+
+impl CompilerError {
+    fn to_diagnostic(&self) -> &dyn DiagnosticMessage {
+        match self {
+            CompilerError::FunctionCallError(e) => e,
+            CompilerError::ExpressionError(e) => e,
+        }
+    }
+
+    fn into_diagnostic_boxed(self) -> Box<dyn DiagnosticMessage> {
+        match self {
+            CompilerError::FunctionCallError(e) => Box::new(e),
+            CompilerError::ExpressionError(e) => Box::new(e),
+        }
+    }
 }
 
 impl<'a> Compiler<'a> {
@@ -124,8 +150,8 @@ impl<'a> Compiler<'a> {
 
     fn compile_expr(&mut self, node: Node<ast::Expr>, state: &mut TypeState) -> Option<Expr> {
         use ast::Expr::{
-            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Op, Query, Unary,
-            Variable,
+            Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Op, Query, Return,
+            Unary, Variable,
         };
         let original_state = state.clone();
 
@@ -142,6 +168,7 @@ impl<'a> Compiler<'a> {
             Variable(node) => self.compile_variable(node, state).map(Into::into),
             Unary(node) => self.compile_unary(node, state).map(Into::into),
             Abort(node) => self.compile_abort(node, state).map(Into::into),
+            Return(node) => self.compile_return(node, state).map(Into::into),
         }?;
 
         // If the previously compiled expression is fallible, _and_ we are
@@ -151,8 +178,9 @@ impl<'a> Compiler<'a> {
 
         let type_def = expr.type_info(&original_state).result;
         if type_def.is_fallible() && self.fallible_expression_error.is_none() {
-            let error = super::expression::Error::Fallible { span };
-            self.fallible_expression_error = Some(Box::new(error) as _);
+            self.fallible_expression_error = Some(CompilerError::ExpressionError(
+                expression::ExpressionError::Fallible { span },
+            ));
         }
 
         Some(expr)
@@ -234,7 +262,7 @@ impl<'a> Compiler<'a> {
 
                     if let Some(expr) = self.compile_expr(node_expr, state) {
                         if let Some(error) = self.fallible_expression_error.take() {
-                            self.diagnostics.push(error);
+                            self.diagnostics.push(error.into_diagnostic_boxed());
                         }
 
                         node_exprs.push(expr);
@@ -278,8 +306,6 @@ impl<'a> Compiler<'a> {
     }
 
     fn compile_object(&mut self, node: Node<ast::Object>, state: &mut TypeState) -> Option<Object> {
-        use std::collections::BTreeMap;
-
         let (keys, exprs): (Vec<String>, Vec<Option<Expr>>) = node
             .into_inner()
             .into_iter()
@@ -289,7 +315,10 @@ impl<'a> Compiler<'a> {
         let exprs = exprs.into_iter().collect::<Option<Vec<_>>>()?;
 
         Some(Object::new(
-            keys.into_iter().zip(exprs).collect::<BTreeMap<_, _>>(),
+            keys.into_iter()
+                .zip(exprs)
+                .map(|(key, value)| (key.into(), value))
+                .collect(),
         ))
     }
 
@@ -352,7 +381,9 @@ impl<'a> Compiler<'a> {
         Some(Predicate::new(
             Node::new(span, exprs),
             state,
-            self.fallible_expression_error.as_deref(),
+            self.fallible_expression_error
+                .as_ref()
+                .map(CompilerError::to_diagnostic),
         ))
     }
 
@@ -509,7 +540,7 @@ impl<'a> Compiler<'a> {
         let assignment = Assignment::new(
             node,
             state,
-            self.fallible_expression_error.as_deref(),
+            self.fallible_expression_error.as_ref(),
             &self.config,
         )
         .map_err(|err| self.diagnostics.push(Box::new(err)))
@@ -695,12 +726,16 @@ impl<'a> Compiler<'a> {
                     state,
                     block,
                     local_snapshot,
-                    &mut self.fallible_expression_error,
                     &mut self.config,
                 )
                 .map_err(|err| self.diagnostics.push(Box::new(err)))
                 .ok()
-                .map(|func| (arg_list, func))
+                .map(|result| {
+                    if let Some(e) = result.error {
+                        self.fallible_expression_error = Some(CompilerError::FunctionCallError(e));
+                    }
+                    (arg_list, result.function_call)
+                })
         });
 
         if let Some((args, function)) = &function_info {
@@ -778,6 +813,17 @@ impl<'a> Compiler<'a> {
         };
 
         Abort::new(span, message, state)
+            .map_err(|err| self.diagnostics.push(Box::new(err)))
+            .ok()
+    }
+
+    fn compile_return(&mut self, node: Node<ast::Return>, state: &mut TypeState) -> Option<Return> {
+        let (span, r#return) = node.take();
+
+        let expr = self.compile_expr(*r#return.expr, state)?;
+        let node = Node::new(span, expr);
+
+        Return::new(span, node, state)
             .map_err(|err| self.diagnostics.push(Box::new(err)))
             .ok()
     }

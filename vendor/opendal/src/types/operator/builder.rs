@@ -53,7 +53,7 @@ impl Operator {
     ///
     /// # Examples
     ///
-    /// Read more backend init examples in [examples](https://github.com/apache/incubator-opendal/tree/main/examples).
+    /// Read more backend init examples in [examples](https://github.com/apache/opendal/tree/main/examples).
     ///
     /// ```
     /// # use anyhow::Result;
@@ -153,16 +153,42 @@ impl Operator {
     /// ```
     pub fn via_map(scheme: Scheme, map: HashMap<String, String>) -> Result<Operator> {
         let op = match scheme {
+            #[cfg(feature = "services-atomicserver")]
+            Scheme::Atomicserver => Self::from_map::<services::Atomicserver>(map)?.finish(),
+            #[cfg(feature = "services-alluxio")]
+            Scheme::Alluxio => Self::from_map::<services::Alluxio>(map)?.finish(),
+            #[cfg(feature = "services-upyun")]
+            Scheme::Upyun => Self::from_map::<services::Upyun>(map)?.finish(),
+            #[cfg(feature = "services-koofr")]
+            Scheme::Koofr => Self::from_map::<services::Koofr>(map)?.finish(),
+            #[cfg(feature = "services-yandex-disk")]
+            Scheme::YandexDisk => Self::from_map::<services::YandexDisk>(map)?.finish(),
+            #[cfg(feature = "services-pcloud")]
+            Scheme::Pcloud => Self::from_map::<services::Pcloud>(map)?.finish(),
+            #[cfg(feature = "services-chainsafe")]
+            Scheme::Chainsafe => Self::from_map::<services::Chainsafe>(map)?.finish(),
             #[cfg(feature = "services-azblob")]
             Scheme::Azblob => Self::from_map::<services::Azblob>(map)?.finish(),
-            #[cfg(feature = "services-azdfs")]
-            Scheme::Azdfs => Self::from_map::<services::Azdfs>(map)?.finish(),
+            #[cfg(feature = "services-azdls")]
+            Scheme::Azdls => Self::from_map::<services::Azdls>(map)?.finish(),
+            #[cfg(feature = "services-azfile")]
+            Scheme::Azfile => Self::from_map::<services::Azfile>(map)?.finish(),
+            #[cfg(feature = "services-b2")]
+            Scheme::B2 => Self::from_map::<services::B2>(map)?.finish(),
             #[cfg(feature = "services-cacache")]
             Scheme::Cacache => Self::from_map::<services::Cacache>(map)?.finish(),
             #[cfg(feature = "services-cos")]
             Scheme::Cos => Self::from_map::<services::Cos>(map)?.finish(),
+            #[cfg(feature = "services-d1")]
+            Scheme::D1 => Self::from_map::<services::D1>(map)?.finish(),
             #[cfg(feature = "services-dashmap")]
             Scheme::Dashmap => Self::from_map::<services::Dashmap>(map)?.finish(),
+            #[cfg(feature = "services-dropbox")]
+            Scheme::Dropbox => Self::from_map::<services::Dropbox>(map)?.finish(),
+            #[cfg(feature = "services-etcd")]
+            Scheme::Etcd => Self::from_map::<services::Etcd>(map)?.finish(),
+            #[cfg(feature = "services-foundationdb")]
+            Scheme::Foundationdb => Self::from_map::<services::Foundationdb>(map)?.finish(),
             #[cfg(feature = "services-fs")]
             Scheme::Fs => Self::from_map::<services::Fs>(map)?.finish(),
             #[cfg(feature = "services-ftp")]
@@ -171,14 +197,22 @@ impl Operator {
             Scheme::Gcs => Self::from_map::<services::Gcs>(map)?.finish(),
             #[cfg(feature = "services-ghac")]
             Scheme::Ghac => Self::from_map::<services::Ghac>(map)?.finish(),
+            #[cfg(feature = "services-gridfs")]
+            Scheme::Gridfs => Self::from_map::<services::Gridfs>(map)?.finish(),
             #[cfg(feature = "services-hdfs")]
             Scheme::Hdfs => Self::from_map::<services::Hdfs>(map)?.finish(),
             #[cfg(feature = "services-http")]
             Scheme::Http => Self::from_map::<services::Http>(map)?.finish(),
+            #[cfg(feature = "services-huggingface")]
+            Scheme::Huggingface => Self::from_map::<services::Huggingface>(map)?.finish(),
             #[cfg(feature = "services-ipfs")]
             Scheme::Ipfs => Self::from_map::<services::Ipfs>(map)?.finish(),
             #[cfg(feature = "services-ipmfs")]
             Scheme::Ipmfs => Self::from_map::<services::Ipmfs>(map)?.finish(),
+            #[cfg(feature = "services-icloud")]
+            Scheme::Icloud => Self::from_map::<services::Icloud>(map)?.finish(),
+            #[cfg(feature = "services-libsql")]
+            Scheme::Libsql => Self::from_map::<services::Libsql>(map)?.finish(),
             #[cfg(feature = "services-memcached")]
             Scheme::Memcached => Self::from_map::<services::Memcached>(map)?.finish(),
             #[cfg(feature = "services-memory")]
@@ -187,36 +221,54 @@ impl Operator {
             Scheme::MiniMoka => Self::from_map::<services::MiniMoka>(map)?.finish(),
             #[cfg(feature = "services-moka")]
             Scheme::Moka => Self::from_map::<services::Moka>(map)?.finish(),
+            #[cfg(feature = "services-mysql")]
+            Scheme::Mysql => Self::from_map::<services::Mysql>(map)?.finish(),
             #[cfg(feature = "services-obs")]
             Scheme::Obs => Self::from_map::<services::Obs>(map)?.finish(),
             #[cfg(feature = "services-onedrive")]
             Scheme::Onedrive => Self::from_map::<services::Onedrive>(map)?.finish(),
+            #[cfg(feature = "services-postgresql")]
+            Scheme::Postgresql => Self::from_map::<services::Postgresql>(map)?.finish(),
             #[cfg(feature = "services-gdrive")]
             Scheme::Gdrive => Self::from_map::<services::Gdrive>(map)?.finish(),
             #[cfg(feature = "services-oss")]
             Scheme::Oss => Self::from_map::<services::Oss>(map)?.finish(),
+            #[cfg(feature = "services-persy")]
+            Scheme::Persy => Self::from_map::<services::Persy>(map)?.finish(),
             #[cfg(feature = "services-redis")]
             Scheme::Redis => Self::from_map::<services::Redis>(map)?.finish(),
             #[cfg(feature = "services-rocksdb")]
             Scheme::Rocksdb => Self::from_map::<services::Rocksdb>(map)?.finish(),
             #[cfg(feature = "services-s3")]
             Scheme::S3 => Self::from_map::<services::S3>(map)?.finish(),
+            #[cfg(feature = "services-seafile")]
+            Scheme::Seafile => Self::from_map::<services::Seafile>(map)?.finish(),
             #[cfg(feature = "services-sftp")]
             Scheme::Sftp => Self::from_map::<services::Sftp>(map)?.finish(),
             #[cfg(feature = "services-sled")]
             Scheme::Sled => Self::from_map::<services::Sled>(map)?.finish(),
+            #[cfg(feature = "services-sqlite")]
+            Scheme::Sqlite => Self::from_map::<services::Sqlite>(map)?.finish(),
             #[cfg(feature = "services-supabase")]
             Scheme::Supabase => Self::from_map::<services::Supabase>(map)?.finish(),
+            #[cfg(feature = "services-swift")]
+            Scheme::Swift => Self::from_map::<services::Swift>(map)?.finish(),
+            #[cfg(feature = "services-tikv")]
+            Scheme::Tikv => Self::from_map::<services::Tikv>(map)?.finish(),
             #[cfg(feature = "services-vercel-artifacts")]
             Scheme::VercelArtifacts => Self::from_map::<services::VercelArtifacts>(map)?.finish(),
-            #[cfg(feature = "services-wasabi")]
-            Scheme::Wasabi => Self::from_map::<services::Wasabi>(map)?.finish(),
+            #[cfg(feature = "services-vercel-blob")]
+            Scheme::VercelBlob => Self::from_map::<services::VercelBlob>(map)?.finish(),
             #[cfg(feature = "services-webdav")]
             Scheme::Webdav => Self::from_map::<services::Webdav>(map)?.finish(),
             #[cfg(feature = "services-webhdfs")]
             Scheme::Webhdfs => Self::from_map::<services::Webhdfs>(map)?.finish(),
             #[cfg(feature = "services-redb")]
             Scheme::Redb => Self::from_map::<services::Redb>(map)?.finish(),
+            #[cfg(feature = "services-mongodb")]
+            Scheme::Mongodb => Self::from_map::<services::Mongodb>(map)?.finish(),
+            #[cfg(feature = "services-hdfs-native")]
+            Scheme::HdfsNative => Self::from_map::<services::HdfsNative>(map)?.finish(),
             v => {
                 return Err(Error::new(
                     ErrorKind::Unsupported,
@@ -364,7 +416,6 @@ impl<A: Accessor> OperatorBuilder<A> {
     /// Finish the building to construct an Operator.
     pub fn finish(self) -> Operator {
         let ob = self.layer(TypeEraseLayer);
-
         Operator::from_inner(Arc::new(ob.accessor) as FusedAccessor)
     }
 }

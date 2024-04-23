@@ -18,6 +18,8 @@ impl Generator for Bash {
             .get_bin_name()
             .expect("crate::generate should have set the bin_name");
 
+        let fn_name = bin_name.replace('-', "__");
+
         w!(
             buf,
             format!(
@@ -58,13 +60,17 @@ impl Generator for Bash {
     esac
 }}
 
-complete -F _{name} -o nosort -o bashdefault -o default {name}
+if [[ \"${{BASH_VERSINFO[0]}}\" -eq 4 && \"${{BASH_VERSINFO[1]}}\" -ge 4 || \"${{BASH_VERSINFO[0]}}\" -gt 4 ]]; then
+    complete -F _{name} -o nosort -o bashdefault -o default {name}
+else
+    complete -F _{name} -o bashdefault -o default {name}
+fi
 ",
                 name = bin_name,
-                cmd = bin_name.replace('-', "__"),
+                cmd = fn_name,
                 name_opts = all_options_for_path(cmd, bin_name),
                 name_opts_details = option_details_for_path(cmd, bin_name),
-                subcmds = all_subcommands(cmd),
+                subcmds = all_subcommands(cmd, &fn_name),
                 subcmd_details = subcommand_details(cmd)
             )
             .as_bytes()
@@ -72,7 +78,7 @@ complete -F _{name} -o nosort -o bashdefault -o default {name}
     }
 }
 
-fn all_subcommands(cmd: &Command) -> String {
+fn all_subcommands(cmd: &Command, parent_fn_name: &str) -> String {
     debug!("all_subcommands");
 
     fn add_command(
@@ -102,9 +108,8 @@ fn all_subcommands(cmd: &Command) -> String {
         }
     }
     let mut subcmds = vec![];
-    let fn_name = cmd.get_name().replace('-', "__");
     for subcmd in cmd.get_subcommands() {
-        add_command(&fn_name, subcmd, &mut subcmds);
+        add_command(parent_fn_name, subcmd, &mut subcmds);
     }
     subcmds.sort();
 
@@ -164,29 +169,76 @@ fn option_details_for_path(cmd: &Command, path: &str) -> String {
     let mut opts = vec![String::new()];
 
     for o in p.get_opts() {
+        let compopt = match o.get_value_hint() {
+            ValueHint::FilePath => Some("compopt -o filenames"),
+            ValueHint::DirPath => Some("compopt -o plusdirs"),
+            ValueHint::Other => Some("compopt -o nospace"),
+            _ => None,
+        };
+
         if let Some(longs) = o.get_long_and_visible_aliases() {
             opts.extend(longs.iter().map(|long| {
-                format!(
-                    "--{})
-                    COMPREPLY=({})
-                    return 0
-                    ;;",
-                    long,
-                    vals_for(o)
-                )
+                let mut v = vec![format!("--{})", long)];
+
+                if o.get_value_hint() == ValueHint::FilePath {
+                    v.extend([
+                        "local oldifs".to_string(),
+                        "if [[ -v IFS ]]; then".to_string(),
+                        r#"    oldifs="$IFS""#.to_string(),
+                        "fi".to_string(),
+                        r#"IFS=$'\n'"#.to_string(),
+                        format!("COMPREPLY=({})", vals_for(o)),
+                        "if [[ -v oldifs ]]; then".to_string(),
+                        r#"    IFS="$oldifs""#.to_string(),
+                        "fi".to_string(),
+                    ]);
+                } else {
+                    v.push(format!("COMPREPLY=({})", vals_for(o)));
+                }
+
+                if let Some(copt) = compopt {
+                    v.extend([
+                        r#"if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then"#.to_string(),
+                        format!("    {}", copt),
+                        "fi".to_string(),
+                    ]);
+                }
+
+                v.extend(["return 0", ";;"].iter().map(|s| s.to_string()));
+                v.join("\n                    ")
             }));
         }
 
         if let Some(shorts) = o.get_short_and_visible_aliases() {
             opts.extend(shorts.iter().map(|short| {
-                format!(
-                    "-{})
-                    COMPREPLY=({})
-                    return 0
-                    ;;",
-                    short,
-                    vals_for(o)
-                )
+                let mut v = vec![format!("-{})", short)];
+
+                if o.get_value_hint() == ValueHint::FilePath {
+                    v.extend([
+                        "local oldifs".to_string(),
+                        "if [[ -v IFS ]]; then".to_string(),
+                        r#"    oldifs="$IFS""#.to_string(),
+                        "fi".to_string(),
+                        r#"IFS=$'\n'"#.to_string(),
+                        format!("COMPREPLY=({})", vals_for(o)),
+                        "if [[ -v oldifs ]]; then".to_string(),
+                        r#"    IFS="$oldifs""#.to_string(),
+                        "fi".to_string(),
+                    ]);
+                } else {
+                    v.push(format!("COMPREPLY=({})", vals_for(o)));
+                }
+
+                if let Some(copt) = compopt {
+                    v.extend([
+                        r#"if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then"#.to_string(),
+                        format!("    {}", copt),
+                        "fi".to_string(),
+                    ]);
+                }
+
+                v.extend(["return 0", ";;"].iter().map(|s| s.to_string()));
+                v.join("\n                    ")
             }));
         }
     }
@@ -206,6 +258,8 @@ fn vals_for(o: &Arg) -> String {
                 .collect::<Vec<_>>()
                 .join(" ")
         )
+    } else if o.get_value_hint() == ValueHint::DirPath {
+        String::from("") // should be empty to avoid duplicate candidates
     } else if o.get_value_hint() == ValueHint::Other {
         String::from("\"${cur}\"")
     } else {

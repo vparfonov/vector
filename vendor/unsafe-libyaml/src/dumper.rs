@@ -1,6 +1,7 @@
 use crate::api::{yaml_free, yaml_malloc};
 use crate::externs::{memset, strcmp};
 use crate::fmt::WriteToPtr;
+use crate::ops::ForceMul as _;
 use crate::success::{Success, FAIL, OK};
 use crate::yaml::{
     yaml_anchors_t, yaml_char_t, yaml_document_t, yaml_emitter_t, yaml_event_t, yaml_mark_t,
@@ -75,7 +76,7 @@ pub unsafe fn yaml_emitter_close(emitter: *mut yaml_emitter_t) -> Success {
 
 /// Emit a YAML document.
 ///
-/// The documen object may be generated using the yaml_parser_load() function or
+/// The document object may be generated using the yaml_parser_load() function or
 /// the yaml_document_initialize() function. The emitter takes the
 /// responsibility for the document object and destroys its content after it is
 /// emitted. The document object is destroyed even if the function fails.
@@ -116,15 +117,15 @@ pub unsafe fn yaml_emitter_dump(
                 let fresh1 = addr_of_mut!((*emitter).anchors);
                 *fresh1 = yaml_malloc(
                     (size_of::<yaml_anchors_t>() as libc::c_ulong)
-                        .wrapping_mul((*document).nodes.top.c_offset_from((*document).nodes.start)
-                            as libc::c_long as libc::c_ulong),
+                        .force_mul((*document).nodes.top.c_offset_from((*document).nodes.start)
+                            as libc::c_ulong),
                 ) as *mut yaml_anchors_t;
                 memset(
                     (*emitter).anchors as *mut libc::c_void,
                     0,
                     (size_of::<yaml_anchors_t>() as libc::c_ulong)
-                        .wrapping_mul((*document).nodes.top.c_offset_from((*document).nodes.start)
-                            as libc::c_long as libc::c_ulong),
+                        .force_mul((*document).nodes.top.c_offset_from((*document).nodes.start)
+                            as libc::c_ulong),
                 );
                 memset(
                     event as *mut libc::c_void,

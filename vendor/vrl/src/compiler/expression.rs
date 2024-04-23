@@ -1,36 +1,7 @@
 use std::fmt;
 
-use crate::diagnostic::{DiagnosticMessage, Label, Note};
-use crate::value::Value;
 use dyn_clone::{clone_trait_object, DynClone};
 
-use super::{Context, Span, TypeDef};
-
-mod abort;
-mod array;
-mod block;
-mod function_argument;
-mod group;
-mod if_statement;
-mod levenstein;
-mod noop;
-mod not;
-mod object;
-mod op;
-mod unary;
-mod variable;
-
-pub(crate) mod assignment;
-pub(crate) mod container;
-pub(crate) mod function;
-pub(crate) mod function_call;
-pub(crate) mod literal;
-pub(crate) mod predicate;
-pub mod query;
-
-pub use super::{ExpressionError, Resolved};
-
-use super::state::{TypeInfo, TypeState};
 pub use abort::Abort;
 pub use array::Array;
 pub use assignment::Assignment;
@@ -48,8 +19,38 @@ pub use object::Object;
 pub use op::Op;
 pub use predicate::Predicate;
 pub use query::{Query, Target};
+pub use r#return::Return;
 pub use unary::Unary;
 pub use variable::Variable;
+
+use crate::value::Value;
+
+use super::state::{TypeInfo, TypeState};
+use super::{Context, TypeDef};
+pub use super::{ExpressionError, Resolved};
+
+mod abort;
+mod array;
+mod block;
+mod function_argument;
+mod group;
+mod if_statement;
+mod levenstein;
+mod noop;
+mod not;
+mod object;
+mod op;
+mod r#return;
+pub(crate) mod unary;
+mod variable;
+
+pub(crate) mod assignment;
+pub(crate) mod container;
+pub(crate) mod function;
+pub(crate) mod function_call;
+pub(crate) mod literal;
+pub(crate) mod predicate;
+pub mod query;
 
 pub trait Expression: Send + Sync + fmt::Debug + DynClone {
     /// Resolve an expression to a concrete [`Value`].
@@ -116,6 +117,7 @@ pub enum Expr {
     Noop(Noop),
     Unary(Unary),
     Abort(Abort),
+    Return(Return),
 }
 
 impl Expr {
@@ -123,7 +125,7 @@ impl Expr {
         use container::Variant::{Array, Block, Group, Object};
         use Expr::{
             Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
-            Unary, Variable,
+            Return, Unary, Variable,
         };
 
         match self {
@@ -143,6 +145,7 @@ impl Expr {
             Noop(..) => "noop",
             Unary(..) => "unary operation",
             Abort(..) => "abort operation",
+            Return(..) => "return",
         }
     }
 
@@ -182,7 +185,7 @@ impl Expression for Expr {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         use Expr::{
             Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
-            Unary, Variable,
+            Return, Unary, Variable,
         };
 
         match self {
@@ -197,13 +200,14 @@ impl Expression for Expr {
             Noop(v) => v.resolve(ctx),
             Unary(v) => v.resolve(ctx),
             Abort(v) => v.resolve(ctx),
+            Return(v) => v.resolve(ctx),
         }
     }
 
     fn resolve_constant(&self, state: &TypeState) -> Option<Value> {
         use Expr::{
             Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
-            Unary, Variable,
+            Return, Unary, Variable,
         };
 
         match self {
@@ -218,13 +222,14 @@ impl Expression for Expr {
             Noop(v) => Expression::resolve_constant(v, state),
             Unary(v) => Expression::resolve_constant(v, state),
             Abort(v) => Expression::resolve_constant(v, state),
+            Return(v) => Expression::resolve_constant(v, state),
         }
     }
 
     fn type_info(&self, state: &TypeState) -> TypeInfo {
         use Expr::{
             Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
-            Unary, Variable,
+            Return, Unary, Variable,
         };
 
         match self {
@@ -239,6 +244,7 @@ impl Expression for Expr {
             Noop(v) => v.type_info(state),
             Unary(v) => v.type_info(state),
             Abort(v) => v.type_info(state),
+            Return(v) => v.type_info(state),
         }
     }
 }
@@ -247,7 +253,7 @@ impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Expr::{
             Abort, Assignment, Container, FunctionCall, IfStatement, Literal, Noop, Op, Query,
-            Unary, Variable,
+            Return, Unary, Variable,
         };
 
         match self {
@@ -262,6 +268,7 @@ impl fmt::Display for Expr {
             Noop(v) => v.fmt(f),
             Unary(v) => v.fmt(f),
             Abort(v) => v.fmt(f),
+            Return(v) => v.fmt(f),
         }
     }
 }
@@ -334,6 +341,12 @@ impl From<Abort> for Expr {
     }
 }
 
+impl From<Return> for Expr {
+    fn from(r#return: Return) -> Self {
+        Expr::Return(r#return)
+    }
+}
+
 impl From<Value> for Expr {
     fn from(value: Value) -> Self {
         use std::collections::BTreeMap;
@@ -366,55 +379,6 @@ impl From<Value> for Expr {
             Timestamp(v) => Literal::from(v).into(),
             Regex(v) => Literal::from(v).into(),
             Null => Literal::from(()).into(),
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-
-#[derive(thiserror::Error, Debug)]
-pub enum Error {
-    #[error("unhandled error")]
-    Fallible { span: Span },
-
-    #[error("expression type unavailable")]
-    Missing { span: Span, feature: &'static str },
-}
-
-impl DiagnosticMessage for Error {
-    fn code(&self) -> usize {
-        use Error::{Fallible, Missing};
-
-        match self {
-            Fallible { .. } => 100,
-            Missing { .. } => 900,
-        }
-    }
-
-    fn labels(&self) -> Vec<Label> {
-        use Error::{Fallible, Missing};
-
-        match self {
-            Fallible { span } => vec![
-                Label::primary("expression can result in runtime error", span),
-                Label::context("handle the error case to ensure runtime success", span),
-            ],
-            Missing { span, feature } => vec![
-                Label::primary("expression type is disabled in this version of vrl", span),
-                Label::context(
-                    format!("build vrl using the `{feature}` feature to enable it"),
-                    span,
-                ),
-            ],
-        }
-    }
-
-    fn notes(&self) -> Vec<Note> {
-        use Error::{Fallible, Missing};
-
-        match self {
-            Fallible { .. } => vec![Note::SeeErrorDocs],
-            Missing { .. } => vec![],
         }
     }
 }

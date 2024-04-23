@@ -20,7 +20,7 @@ pub struct luaL_Reg {
     pub func: lua_CFunction,
 }
 
-#[cfg_attr(all(windows, raw_dylib), link(name = "lua54", kind = "raw-dylib"))]
+#[cfg_attr(all(windows, raw_dylib), link(name = "lua53", kind = "raw-dylib"))]
 extern "C-unwind" {
     pub fn luaL_checkversion_(L: *mut lua_State, ver: lua_Number, sz: usize);
 
@@ -51,7 +51,7 @@ extern "C-unwind" {
     pub fn luaL_checkudata(L: *mut lua_State, ud: c_int, tname: *const c_char) -> *mut c_void;
 
     pub fn luaL_where(L: *mut lua_State, lvl: c_int);
-    pub fn luaL_error(L: *mut lua_State, fmt: *const c_char, ...) -> !;
+    pub fn luaL_error(L: *mut lua_State, fmt: *const c_char, ...) -> c_int;
 
     pub fn luaL_checkoption(
         L: *mut lua_State,

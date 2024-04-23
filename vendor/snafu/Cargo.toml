@@ -11,8 +11,9 @@
 
 [package]
 edition = "2018"
+rust-version = "1.56"
 name = "snafu"
-version = "0.7.5"
+version = "0.8.0"
 authors = ["Jake Goulding <jake.goulding@gmail.com>"]
 exclude = [
     "/.cirrus.yml",
@@ -37,8 +38,6 @@ repository = "https://github.com/shepmaster/snafu"
 
 [package.metadata.docs.rs]
 features = [
-    "std",
-    "backtraces",
     "futures",
     "guide",
 ]
@@ -47,10 +46,6 @@ features = [
 version = "0.3.0"
 optional = true
 
-[dependencies.doc-comment]
-version = "0.3.1"
-default-features = false
-
 [dependencies.futures-core-crate]
 version = "0.3.0"
 optional = true
@@ -58,29 +53,24 @@ default-features = false
 package = "futures-core"
 
 [dependencies.futures-crate]
-version = "0.3.0"
+version = "0.3.11"
 optional = true
 default-features = false
 package = "futures"
 
 [dependencies.pin-project]
-version = "1.0"
+version = "1.0.2"
 optional = true
 default-features = false
 
 [dependencies.snafu-derive]
-version = "0.7.5"
+version = "0.8.0"
 
 [features]
-backtraces = [
-    "std",
-    "backtrace",
-]
-backtraces-impl-backtrace-crate = ["backtraces"]
-backtraces-impl-std = []
+backtraces-impl-backtrace-crate = ["backtrace"]
 default = [
     "std",
-    "rust_1_46",
+    "rust_1_65",
 ]
 futures = [
     "futures-core-crate",
@@ -88,20 +78,9 @@ futures = [
 ]
 guide = []
 internal-dev-dependencies = ["futures-crate"]
-rust_1_39 = ["snafu-derive/rust_1_39"]
-rust_1_46 = [
-    "rust_1_39",
-    "snafu-derive/rust_1_46",
-]
-rust_1_61 = [
-    "rust_1_46",
-    "snafu-derive/rust_1_61",
-]
+rust_1_61 = ["snafu-derive/rust_1_61"]
+rust_1_65 = ["rust_1_61"]
 std = []
-unstable-backtraces-impl-std = [
-    "backtraces-impl-std",
-    "snafu-derive/unstable-backtraces-impl-std",
-]
 unstable-core-error = []
 unstable-provider-api = ["snafu-derive/unstable-provider-api"]
 unstable-try-trait = []

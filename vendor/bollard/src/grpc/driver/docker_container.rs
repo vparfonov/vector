@@ -1,6 +1,7 @@
 #![cfg(feature = "buildkit")]
 
 use std::{
+    collections::HashMap,
     pin::Pin,
     task::{Context, Poll},
     time::Duration,
@@ -20,31 +21,39 @@ use http::{
     request::Builder,
     Method,
 };
+use log::{debug, error, info, trace};
+use tonic::transport::Endpoint;
 use tonic::{codegen::InterceptedService, transport::Channel};
-use tonic::{service::Interceptor, transport::Endpoint};
 use tower_service::Service;
 
 use crate::{
+    auth::DockerCredentials,
     container::{Config, CreateContainerOptions},
     exec::{CreateExecOptions, StartExecOptions, StartExecResults},
-    grpc::error::GrpcError,
+    grpc::{
+        build::{ImageBuildFrontendOptions, ImageBuildLoadInput},
+        error::GrpcError,
+    },
     grpc::{
         io::{
             into_async_read::IntoAsyncRead, reader_stream::ReaderStream, GrpcFramedTransport,
             GrpcTransport,
         },
+        registry::ImageRegistryOutput,
         GrpcServer, HealthServerImpl,
     },
     image::CreateImageOptions,
     Docker,
 };
 
+use super::{DriverInterceptor, ImageExporterEnum};
+
 /// The default `Buildkit` image to use for the [`DockerContainer] driver.
 pub const DEFAULT_IMAGE: &str = "moby/buildkit:master";
 const DEFAULT_STATE_DIR: &str = "/var/lib/buildkit";
 const DUPLEX_BUF_SIZE: usize = 8 * 1024;
 
-impl Service<http::Uri> for DockerContainer {
+impl Service<tonic::transport::Uri> for DockerContainer {
     type Response = GrpcFramedTransport;
     type Error = GrpcError;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
@@ -53,7 +62,7 @@ impl Service<http::Uri> for DockerContainer {
         Poll::Ready(Ok(()))
     }
 
-    fn call(&mut self, _req: http::Uri) -> Self::Future {
+    fn call(&mut self, _req: tonic::transport::Uri) -> Self::Future {
         let client = Docker::clone(&self.docker);
         let name = String::clone(&self.name);
 
@@ -88,14 +97,11 @@ impl Service<http::Uri> for DockerContainer {
                 })),
             );
 
-            client
-                .process_upgraded(req)
-                .await
-                .and_then(|(read, write)| {
-                    let output = Box::pin(read);
-                    let input = Box::pin(write);
-                    Ok(GrpcFramedTransport::new(output, input, capacity))
-                })
+            client.process_upgraded(req).await.map(|(read, write)| {
+                let output = Box::pin(read);
+                let input = Box::pin(write);
+                GrpcFramedTransport::new(output, input, capacity)
+            })
         };
 
         Box::pin(fut.map_err(From::from))
@@ -103,7 +109,8 @@ impl Service<http::Uri> for DockerContainer {
 }
 
 /// Builder used to create a driver, needed to communicate with `Buildkit`, such as with the
-/// [`image_export_oci`][crate::Docker::image_export_oci] functionality.
+/// [`crate::grpc::driver::Export::export`] or [`crate::grpc::driver::Image::registry`]
+/// functionality.
 ///
 /// <div class="warning">
 ///  Warning: Buildkit features in Bollard are currently in Developer Preview and are intended strictly for feedback purposes only.
@@ -119,7 +126,7 @@ impl Service<http::Uri> for DockerContainer {
 /// // let docker = Docker::connect_...;
 /// # let docker = Docker::connect_with_local_defaults().unwrap();
 ///
-/// let builder = DockerContainerBuilder::new("buildkit_doctest", &docker, "buildkit_session_id");
+/// let builder = DockerContainerBuilder::new(&docker);
 ///
 /// ```
 ///
@@ -136,12 +143,12 @@ impl DockerContainerBuilder {
     ///  - The container name used to identify the buildkit in Docker
     ///  - A reference to the docker client
     ///  - A unique session id to identify the GRPC connection
-    pub fn new(name: &str, docker: &Docker, session_id: &str) -> Self {
+    pub fn new(docker: &Docker) -> Self {
         Self {
             inner: DockerContainer {
-                name: String::from(name),
+                name: format!("bollard_buildkit_{}", crate::grpc::new_id()),
                 docker: Docker::clone(docker),
-                session_id: String::from(session_id),
+                session_id: String::from(&crate::grpc::new_id()),
                 net_mode: None,
                 image: None,
                 cgroup_parent: None,
@@ -159,21 +166,19 @@ impl DockerContainerBuilder {
             self.network("host");
         }
 
-        let container_name = &self.inner.name;
-        match self
+        if let Err(crate::errors::Error::DockerResponseServerError {
+            status_code: 404,
+            message: _,
+        }) = self
             .inner
             .docker
             .inspect_container(&self.inner.name, None)
             .await
         {
-            Err(crate::errors::Error::DockerResponseServerError {
-                status_code: 404,
-                message: _,
-            }) => self.inner.create().await?,
-            _ => (),
+            self.inner.create().await?
         };
 
-        debug!("starting container {}", &container_name);
+        debug!("starting container {}", &self.inner.name);
 
         self.inner.start().await?;
         self.inner.wait().await?;
@@ -238,47 +243,24 @@ pub struct DockerContainer {
     args: Vec<String>,
 }
 
-impl<'a> DockerContainer {
-    /// Identifies the docker container name that runs `Buildkit`. This should be unique if you
-    /// intend to run multiple instances building in parallel on the same host.
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub(crate) async fn grpc_handle(
+impl super::Driver for DockerContainer {
+    async fn grpc_handle(
         self,
-        session_id: &'a str,
+        session_id: &str,
         services: Vec<GrpcServer>,
-    ) -> Result<ControlClient<InterceptedService<Channel, impl Interceptor + 'a>>, GrpcError> {
+    ) -> Result<ControlClient<InterceptedService<Channel, DriverInterceptor>>, GrpcError> {
         let channel = Endpoint::try_from("http://[::]:50051")?
             .connect_with_connector(self)
             .await?;
 
         let metadata_grpc_method: Vec<String> = services.iter().flat_map(|s| s.names()).collect();
 
-        let mut control_client =
-            ControlClient::with_interceptor(channel, move |mut req: tonic::Request<()>| {
-                let metadata = req.metadata_mut();
+        let interceptor = DriverInterceptor {
+            session_id: String::from(session_id),
+            metadata_grpc_method,
+        };
 
-                metadata.insert(
-                    "x-docker-expose-session-uuid",
-                    session_id.parse().map_err(|_| {
-                        tonic::Status::invalid_argument("invalid 'session_id' argument")
-                    })?,
-                );
-
-                debug!("grpc-method: {:?}", &metadata_grpc_method.join(","));
-                for metadata_grpc_method_value in &metadata_grpc_method {
-                    metadata.append(
-                        "x-docker-expose-session-grpc-method",
-                        metadata_grpc_method_value.parse().map_err(|_| {
-                            tonic::Status::invalid_argument("invalid grpc method name")
-                        })?,
-                    );
-                }
-
-                Ok(req)
-            });
+        let mut control_client = ControlClient::with_interceptor(channel, interceptor);
 
         let (asyncwriter, asyncreader) = tokio::io::duplex(DUPLEX_BUF_SIZE);
         let streamreader = ReaderStream::new(asyncreader);
@@ -301,7 +283,7 @@ impl<'a> DockerContainer {
                 router = service.append(router);
             }
             trace!("router: {:#?}", router);
-            match router
+            if let Err(e) = router
                 .serve_with_incoming(futures_util::stream::iter(vec![Ok::<
                     _,
                     tonic::transport::Error,
@@ -310,12 +292,26 @@ impl<'a> DockerContainer {
                 )]))
                 .await
             {
-                Err(e) => error!("Failed to serve grpc connection: {}", e),
-                _ => (),
+                error!("Failed to serve grpc connection: {}", e)
             }
         });
 
         Ok(control_client)
+    }
+
+    fn get_tear_down_handler(&self) -> Box<dyn super::DriverTearDownHandler> {
+        Box::new(DockerContainerTearDownHandler {
+            name: String::from(&self.name),
+            docker: Docker::clone(&self.docker),
+        })
+    }
+}
+
+impl<'a> DockerContainer {
+    /// Identifies the docker container name that runs `Buildkit`. This should be unique if you
+    /// intend to run multiple instances building in parallel on the same host.
+    pub fn name(&self) -> &str {
+        &self.name
     }
 
     async fn create(&self) -> Result<(), GrpcError> {
@@ -352,7 +348,7 @@ impl<'a> DockerContainer {
             // place all buildkit containers into this cgroup
             {
                 Some(if let Some(cgroup_parent) = &self.cgroup_parent {
-                    String::clone(&cgroup_parent)
+                    String::clone(cgroup_parent)
                 } else {
                     String::from("/docker/buildx")
                 })
@@ -360,11 +356,7 @@ impl<'a> DockerContainer {
             _ => None,
         };
 
-        let network_mode = if let Some(net_mode) = &self.net_mode {
-            Some(String::clone(&net_mode))
-        } else {
-            None
-        };
+        let network_mode = self.net_mode.as_ref().map(String::clone);
 
         let userns_mode = if let Some(security_options) = &info.security_options {
             if security_options.iter().any(|f| f == "userns") {
@@ -465,9 +457,78 @@ impl<'a> DockerContainer {
                 }
                 _ => {
                     tokio::time::sleep(Duration::from_millis(attempts * 120)).await;
-                    attempts = attempts + 1;
+                    attempts += 1;
                 }
             }
         }
+    }
+}
+
+struct DockerContainerTearDownHandler {
+    name: String,
+    docker: Docker,
+}
+
+impl super::DriverTearDownHandler for DockerContainerTearDownHandler {
+    fn tear_down<'a>(&'a self) -> Pin<Box<dyn Future<Output = Result<(), GrpcError>> + 'a>> {
+        Box::pin(async {
+            self.docker
+                .kill_container(
+                    &self.name,
+                    None::<crate::container::KillContainerOptions<String>>,
+                )
+                .map_err(GrpcError::from)
+                .await
+        })
+    }
+}
+
+impl super::Export for DockerContainer {
+    async fn export(
+        self,
+        exporter_request: ImageExporterEnum,
+        frontend_opts: ImageBuildFrontendOptions,
+        load_input: ImageBuildLoadInput,
+        credentials: Option<HashMap<&str, DockerCredentials>>,
+    ) -> Result<(), GrpcError> {
+        let (exporter, exporter_attrs, path) = match exporter_request {
+            ImageExporterEnum::OCI(request) => ("oci", request.output.into_map(), request.path),
+            ImageExporterEnum::Docker(request) => {
+                ("docker", request.output.into_map(), request.path)
+            }
+        };
+        super::solve(
+            self,
+            exporter,
+            exporter_attrs,
+            Some(path),
+            frontend_opts,
+            load_input,
+            credentials,
+        )
+        .await
+    }
+}
+
+impl super::Image for DockerContainer {
+    async fn registry(
+        self,
+        output: ImageRegistryOutput,
+        frontend_opts: ImageBuildFrontendOptions,
+        load_input: ImageBuildLoadInput,
+        credentials: Option<HashMap<&str, DockerCredentials>>,
+    ) -> Result<(), GrpcError> {
+        let exporter = "image";
+        let exporter_attrs = output.into_map();
+        super::solve(
+            self,
+            exporter,
+            exporter_attrs,
+            None,
+            frontend_opts,
+            load_input,
+            credentials,
+        )
+        .await
     }
 }

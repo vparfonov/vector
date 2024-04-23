@@ -3,9 +3,9 @@ use crate::value;
 use nom::{
     self,
     branch::alt,
-    bytes::complete::{escaped, tag, take_until, take_while1},
+    bytes::complete::{escaped, tag, take, take_until},
     character::complete::{char, satisfy, space0},
-    combinator::{eof, map, opt, peek, recognize, rest, verify},
+    combinator::{eof, map, opt, peek, rest, verify},
     error::{ContextError, ParseError, VerboseError},
     multi::{many0, many1, many_m_n, separated_list1},
     sequence::{delimited, preceded, terminated, tuple},
@@ -256,7 +256,7 @@ fn parse<'a>(
     field_delimiter: &'a str,
     whitespace: Whitespace,
     standalone_key: bool,
-) -> ExpressionResult<Vec<(String, Value)>> {
+) -> ExpressionResult<Vec<(KeyString, Value)>> {
     let (rest, result) = parse_line(
         input,
         key_value_delimiter,
@@ -286,7 +286,7 @@ fn parse_line<'a>(
     field_delimiter: &'a str,
     whitespace: Whitespace,
     standalone_key: bool,
-) -> IResult<&'a str, Vec<(String, Value)>, VerboseError<&'a str>> {
+) -> IResult<&'a str, Vec<(KeyString, Value)>, VerboseError<&'a str>> {
     separated_list1(
         parse_field_delimiter(field_delimiter),
         parse_key_value_(
@@ -321,7 +321,7 @@ fn parse_key_value_<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
     field_delimiter: &'a str,
     whitespace: Whitespace,
     standalone_key: bool,
-) -> impl Fn(&'a str) -> IResult<&'a str, (String, Value), E> {
+) -> impl Fn(&'a str) -> IResult<&'a str, (KeyString, Value), E> {
     move |input| {
         map(
             |input| match whitespace {
@@ -347,11 +347,10 @@ fn parse_key_value_<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                 ))(input),
             },
             |(field, sep, value): (&str, Vec<&str>, Value)| {
-                if sep.len() == 1 {
-                    (field.to_string(), value)
-                } else {
-                    (field.to_string(), value!(true))
-                }
+                (
+                    field.to_string().into(),
+                    if sep.len() == 1 { value } else { value!(true) },
+                )
             },
         )(input)
     }
@@ -375,16 +374,10 @@ fn parse_delimited<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
                 char(delimiter),
                 map(
                     opt(escaped(
-                        recognize(many1(tuple((
-                            take_while1(|c: char| c != '\\' && c != delimiter),
-                            // Consume \something
-                            opt(tuple((
-                                satisfy(|c| c == '\\'),
-                                satisfy(|c| c != '\\' && c != delimiter),
-                            ))),
-                        )))),
+                        satisfy(|c| c != '\\' && c != delimiter),
                         '\\',
-                        satisfy(|c| c == '\\' || c == delimiter),
+                        // match literally any character, there are no invalid escape sequences
+                        take(1usize),
                     )),
                     |inner| inner.unwrap_or(""),
                 ),
@@ -438,24 +431,30 @@ fn parse_key<'a, E: ParseError<&'a str> + ContextError<&'a str>>(
 ) -> Box<dyn Fn(&'a str) -> IResult<&'a str, &'a str, E> + 'a> {
     if standalone_key {
         Box::new(move |input| {
-            alt((
-                parse_delimited('\'', key_value_delimiter),
-                parse_delimited('\'', field_delimiter),
-                parse_delimited('"', key_value_delimiter),
-                parse_delimited('"', field_delimiter),
-                verify(parse_undelimited(key_value_delimiter), |s: &str| {
-                    !s.contains(field_delimiter)
-                }),
-                parse_undelimited(field_delimiter),
-            ))(input)
+            verify(
+                alt((
+                    parse_delimited('\'', key_value_delimiter),
+                    parse_delimited('\'', field_delimiter),
+                    parse_delimited('"', key_value_delimiter),
+                    parse_delimited('"', field_delimiter),
+                    verify(parse_undelimited(key_value_delimiter), |s: &str| {
+                        !s.is_empty() && !s.contains(field_delimiter)
+                    }),
+                    parse_undelimited(field_delimiter),
+                )),
+                |key: &str| !key.is_empty(),
+            )(input)
         })
     } else {
         Box::new(move |input| {
-            alt((
-                parse_delimited('\'', key_value_delimiter),
-                parse_delimited('"', key_value_delimiter),
-                parse_undelimited(key_value_delimiter),
-            ))(input)
+            verify(
+                alt((
+                    parse_delimited('\'', key_value_delimiter),
+                    parse_delimited('"', key_value_delimiter),
+                    parse_undelimited(key_value_delimiter),
+                )),
+                |key: &str| !key.is_empty(),
+            )(input)
         })
     }
 }
@@ -474,12 +473,12 @@ mod test {
     #[test]
     fn test_quote_and_escape_char() {
         assert_eq!(
-            Ok(vec![("key".to_string(), r"a\a".into()),]),
+            Ok(vec![("key".to_string().into(), r"a\a".into()),]),
             parse(r#"key="a\a""#, "=", " ", Whitespace::Strict, true,)
         );
 
         assert_eq!(
-            Ok(vec![(r"a\ a".to_string(), r#"val"#.into()),]),
+            Ok(vec![(r"a\ a".to_string().into(), "val".into()),]),
             parse(r#""a\ a"=val"#, "=", " ", Whitespace::Strict, true,)
         );
     }
@@ -488,14 +487,17 @@ mod test {
     fn test_parse() {
         assert_eq!(
             Ok(vec![
-                ("ook".to_string(), "pook".into()),
+                ("ook".to_string().into(), "pook".into()),
                 (
-                    "@timestamp".to_string(),
+                    "@timestamp".to_string().into(),
                     "2020-12-31T12:43:22.2322232Z".into()
                 ),
-                ("key#hash".to_string(), "value".into()),
-                ("key=with=special=characters".to_string(), "value".into()),
-                ("key".to_string(), "with special=characters".into()),
+                ("key#hash".to_string().into(), "value".into()),
+                (
+                    "key=with=special=characters".to_string().into(),
+                    "value".into()
+                ),
+                ("key".to_string().into(), "with special=characters".into()),
             ]),
             parse(
                 r#"ook=pook @timestamp=2020-12-31T12:43:22.2322232Z key#hash=value "key=with=special=characters"=value key="with special=characters""#,
@@ -510,15 +512,20 @@ mod test {
     #[test]
     fn test_parse_key_value() {
         assert_eq!(
-            Ok(("", ("ook".to_string(), "pook".into()))),
+            Ok(("", ("ook".to_string().into(), "pook".into()))),
             parse_key_value_::<VerboseError<&str>>("=", " ", Whitespace::Lenient, false)(
                 "ook=pook"
             )
         );
 
         assert_eq!(
-            Ok(("", ("key".to_string(), "".into()))),
+            Ok(("", ("key".to_string().into(), "".into()))),
             parse_key_value_::<VerboseError<&str>>("=", " ", Whitespace::Strict, false)("key=")
+        );
+
+        assert!(
+            parse_key_value_::<VerboseError<&str>>("=", " ", Whitespace::Strict, false)("=value")
+                .is_err()
         );
     }
 
@@ -526,8 +533,8 @@ mod test {
     fn test_parse_key_values() {
         assert_eq!(
             Ok(vec![
-                ("ook".to_string(), "pook".into()),
-                ("onk".to_string(), "ponk".into())
+                ("ook".to_string().into(), "pook".into()),
+                ("onk".to_string().into(), "ponk".into())
             ]),
             parse("ook=pook onk=ponk", "=", " ", Whitespace::Lenient, false)
         );
@@ -537,8 +544,8 @@ mod test {
     fn test_parse_key_values_strict() {
         assert_eq!(
             Ok(vec![
-                ("ook".to_string(), "".into()),
-                ("onk".to_string(), "ponk".into())
+                ("ook".to_string().into(), "".into()),
+                ("onk".to_string().into(), "ponk".into())
             ]),
             parse("ook= onk=ponk", "=", " ", Whitespace::Strict, false)
         );
@@ -548,8 +555,8 @@ mod test {
     fn test_parse_standalone_key() {
         assert_eq!(
             Ok(vec![
-                ("foo".to_string(), "bar".into()),
-                ("foobar".to_string(), value!(true))
+                ("foo".to_string().into(), "bar".into()),
+                ("foobar".to_string().into(), value!(true))
             ]),
             parse("foo:bar ,   foobar   ", ":", ",", Whitespace::Lenient, true)
         );
@@ -559,10 +566,10 @@ mod test {
     fn test_multiple_standalone_key() {
         assert_eq!(
             Ok(vec![
-                ("foo".to_string(), "bar".into()),
-                ("foobar".to_string(), value!(true)),
-                ("bar".to_string(), "baz".into()),
-                ("barfoo".to_string(), value!(true)),
+                ("foo".to_string().into(), "bar".into()),
+                ("foobar".to_string().into(), value!(true)),
+                ("bar".to_string().into(), "baz".into()),
+                ("barfoo".to_string().into(), value!(true)),
             ]),
             parse(
                 "foo=bar foobar bar=baz barfoo",
@@ -578,11 +585,11 @@ mod test {
     fn test_only_standalone_key() {
         assert_eq!(
             Ok(vec![
-                ("foo".to_string(), value!(true)),
-                ("bar".to_string(), value!(true)),
-                ("foobar".to_string(), value!(true)),
-                ("baz".to_string(), value!(true)),
-                ("barfoo".to_string(), value!(true)),
+                ("foo".to_string().into(), value!(true)),
+                ("bar".to_string().into(), value!(true)),
+                ("foobar".to_string().into(), value!(true)),
+                ("baz".to_string().into(), value!(true)),
+                ("barfoo".to_string().into(), value!(true)),
             ]),
             parse(
                 "foo bar foobar baz barfoo",
@@ -597,7 +604,7 @@ mod test {
     #[test]
     fn test_parse_single_standalone_key() {
         assert_eq!(
-            Ok(vec![("foobar".to_string(), value!(true))]),
+            Ok(vec![("foobar".to_string().into(), value!(true))]),
             parse("foobar", ":", ",", Whitespace::Lenient, true)
         );
     }
@@ -606,8 +613,8 @@ mod test {
     fn test_parse_standalone_key_strict() {
         assert_eq!(
             Ok(vec![
-                ("foo".to_string(), "bar".into()),
-                ("foobar".to_string(), value!(true))
+                ("foo".to_string().into(), "bar".into()),
+                ("foobar".to_string().into(), value!(true))
             ]),
             parse("foo:bar ,   foobar   ", ":", ",", Whitespace::Strict, true)
         );
@@ -654,8 +661,16 @@ mod test {
         // Standalone key
         assert_eq!(
             Ok((" bar=baz", "foo")),
-            parse_key::<VerboseError<&str>>("=", " ", true)(r#"foo bar=baz"#)
+            parse_key::<VerboseError<&str>>("=", " ", true)("foo bar=baz")
         );
+
+        // empty is invalid
+        assert!(parse_key::<VerboseError<&str>>("=", " ", true)("").is_err());
+        assert!(parse_key::<VerboseError<&str>>("=", " ", false)("").is_err());
+
+        // quoted but empty also invalid
+        assert!(parse_key::<VerboseError<&str>>("=", " ", true)(r#""""#).is_err());
+        assert!(parse_key::<VerboseError<&str>>("=", " ", false)(r#""""#).is_err());
     }
 
     #[test]
@@ -689,7 +704,7 @@ mod test {
     fn test_parse_delimited_with_single_quotes() {
         assert_eq!(
             Ok(("", "test")),
-            parse_delimited::<VerboseError<&str>>('\'', " ")(r#"'test'"#)
+            parse_delimited::<VerboseError<&str>>('\'', " ")("'test'")
         );
     }
 
@@ -697,8 +712,8 @@ mod test {
     fn test_parse_key_values_with_single_quotes() {
         assert_eq!(
             Ok(vec![
-                ("key1".to_string(), "val1".into()),
-                ("key2".to_string(), "val2".into())
+                ("key1".to_string().into(), "val1".into()),
+                ("key2".to_string().into(), "val2".into())
             ]),
             parse("key1=val1,key2='val2'", "=", ",", Whitespace::Strict, false)
         );
@@ -708,9 +723,9 @@ mod test {
     fn test_parse_key_values_with_single_quotes_and_nested_double_quotes() {
         assert_eq!(
             Ok(vec![
-                ("key1".to_string(), "val1".into()),
+                ("key1".to_string().into(), "val1".into()),
                 (
-                    "key2".to_string(),
+                    "key2".to_string().into(),
                     "some value with \"nested quotes\"".into()
                 )
             ]),
@@ -800,7 +815,7 @@ mod test {
 
         strict {
             args: func_args! [
-                value: r#"foo= bar= tar=data"#,
+                value: "foo= bar= tar=data",
                 whitespace: "strict"
             ],
             want: Ok(value!({foo: "",
@@ -854,7 +869,7 @@ mod test {
 
         error {
             args: func_args! [
-                value: r#"I am not a valid line."#,
+                value: "I am not a valid line.",
                 key_value_delimiter: "--",
                 field_delimiter: "||",
                 accept_standalone_key: false,
@@ -869,11 +884,11 @@ mod test {
         // key_value_delimiter is the value since there is no terminator to stop the parsing.
         missing_separator {
             args: func_args! [
-                value: r#"zork: zoog, nonk: nink norgle: noog"#,
+                value: "zork: zoog, nonk: nink norgle: noog",
                 key_value_delimiter: ":",
                 field_delimiter: ",",
             ],
-            want: Ok(value!({zork: r#"zoog"#,
+            want: Ok(value!({zork: "zoog",
                              nonk: "nink norgle: noog"})),
             tdef: type_def(),
         }
@@ -930,6 +945,111 @@ mod test {
                 field_delimiter: " ",
             ],
             want: Ok(value!({"Cc": "bob"})),
+            tdef: type_def(),
+        }
+
+        escaped_tab_escapes_in_quoted_value {
+            args: func_args! [
+                value: r#"level=info field="escaped tabs \t\t""#,
+                key_value_delimiter: "=",
+                field_delimiter: " ",
+            ],
+            want: Ok(value!({
+                "field": "escaped tabs \\t\\t",
+                "level": "info",
+            })),
+            tdef: type_def(),
+        }
+
+        escaped_quote_escapes_in_quoted_value {
+            args: func_args! [
+                value: r#"level=info field="quote -> \" <-""#,
+                key_value_delimiter: "=",
+                field_delimiter: " ",
+            ],
+            want: Ok(value!({
+                "field": "quote -> \\\" <-",
+                "level": "info",
+            })),
+            tdef: type_def(),
+        }
+
+        invalid_quotes_in_quoted_value {
+            args: func_args! [
+                value: r#"level=error field="no quote here """#,
+                //                 this extra quote causes  ~
+                //               the quoted parser to fail
+                //                        and these quotes ~~
+                //       cause the unquoted parser to fail
+                //             when there is an empty key!
+
+                key_value_delimiter: "=",
+                field_delimiter: " ",
+            ],
+            want: Err("could not parse whole line successfully"),
+            tdef: type_def(),
+        }
+
+        empty_keys_are_invalid {
+            args: func_args! [
+                value: "level=info =(key)",
+                key_value_delimiter: "=",
+                field_delimiter: " ",
+            ],
+            want: Ok(value!({
+                "=(key)": true,
+                "level": "info",
+            })),
+            tdef: type_def(),
+        }
+
+        unquoted_field_delimiter_followed_by_key_value_delimiter {
+            args: func_args! [
+                value: r"argh=no =",
+                key_value_delimiter: "=",
+                field_delimiter: " ",
+            ],
+            want: Ok(value!({
+                "argh": "no",
+                "=": true,
+            })),
+            tdef: type_def(),
+        }
+
+        field_delimiter_followed_by_unpaired_quote_followed_by_key_value_delimiter {
+            args: func_args! [
+                value: r"argh=no '=",
+                key_value_delimiter: "=",
+                field_delimiter: " ",
+            ],
+            want: Ok(value!({
+                "argh": "no",
+                "'": "",
+            })),
+            tdef: type_def(),
+        }
+
+        quoted_key_value_delimiter {
+            args: func_args! [
+                value: r#"argh="no =""#,
+                key_value_delimiter: "=",
+                field_delimiter: " ",
+            ],
+            want: Ok(value!({
+                "argh": "no =",
+            })),
+            tdef: type_def(),
+        }
+
+        backslash_key {
+            args: func_args! [
+                value: r#"\="oh boy""#,
+                key_value_delimiter: "=",
+                field_delimiter: " ",
+            ],
+            want: Ok(value!({
+                "\\": "oh boy",
+            })),
             tdef: type_def(),
         }
     ];

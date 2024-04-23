@@ -39,8 +39,6 @@ use madsim::net::Endpoint;
 #[cfg(madsim)]
 use madsim::net::Payload;
 
-use crate::raw::oio;
-use crate::raw::oio::Entry;
 use crate::raw::*;
 use crate::*;
 
@@ -142,16 +140,16 @@ pub struct MadsimAccessor {
     addr: SocketAddr,
 }
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl LayeredAccessor for MadsimAccessor {
     type Inner = ();
     type Reader = MadsimReader;
     type BlockingReader = ();
     type Writer = MadsimWriter;
     type BlockingWriter = ();
-    type Appender = ();
-    type Pager = MadsimPager;
-    type BlockingPager = ();
+    type Lister = MadsimLister;
+    type BlockingLister = ();
 
     fn inner(&self) -> &Self::Inner {
         &()
@@ -161,7 +159,7 @@ impl LayeredAccessor for MadsimAccessor {
         let mut info = AccessorInfo::default();
         info.set_name("madsim");
 
-        info.set_capability(Capability {
+        info.set_native_capability(Capability {
             read: true,
             write: true,
             ..Default::default()
@@ -192,10 +190,7 @@ impl LayeredAccessor for MadsimAccessor {
                 .downcast::<ReadResponse>()
                 .expect("fail to downcast response to ReadResponse");
             let content_length = resp.data.as_ref().map(|b| b.len()).unwrap_or(0);
-            Ok((
-                RpRead::new(content_length as u64),
-                MadsimReader { data: resp.data },
-            ))
+            Ok((RpRead::new(), MadsimReader { data: resp.data }))
         }
         #[cfg(not(madsim))]
         {
@@ -221,18 +216,7 @@ impl LayeredAccessor for MadsimAccessor {
         }
     }
 
-    async fn append(
-        &self,
-        path: &str,
-        args: OpAppend,
-    ) -> crate::Result<(RpAppend, Self::Appender)> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "will not be supported in MadsimLayer",
-        ))
-    }
-
-    async fn list(&self, path: &str, args: OpList) -> crate::Result<(RpList, Self::Pager)> {
+    async fn list(&self, path: &str, args: OpList) -> crate::Result<(RpList, Self::Lister)> {
         Err(Error::new(
             ErrorKind::Unsupported,
             "will be supported in the future",
@@ -265,7 +249,7 @@ impl LayeredAccessor for MadsimAccessor {
         &self,
         path: &str,
         args: OpList,
-    ) -> crate::Result<(RpList, Self::BlockingPager)> {
+    ) -> crate::Result<(RpList, Self::BlockingLister)> {
         Err(Error::new(
             ErrorKind::Unsupported,
             "will not be supported in MadsimLayer",
@@ -312,9 +296,12 @@ pub struct MadsimWriter {
     addr: SocketAddr,
 }
 
-#[async_trait]
 impl oio::Write for MadsimWriter {
-    async fn write(&mut self, bs: Bytes) -> crate::Result<()> {
+    fn poll_write(
+        &mut self,
+        cx: &mut Context<'_>,
+        bs: &dyn oio::WriteBuf,
+    ) -> Poll<crate::Result<usize>> {
         #[cfg(madsim)]
         {
             let req = Request::Write(self.path.to_string(), bs);
@@ -330,40 +317,26 @@ impl oio::Write for MadsimWriter {
         }
     }
 
-    async fn sink(&mut self, size: u64, s: oio::Streamer) -> crate::Result<()> {
-        Err(Error::new(
+    fn poll_abort(&mut self, cx: &mut Context<'_>) -> Poll<crate::Result<()>> {
+        Poll::Ready(Err(Error::new(
             ErrorKind::Unsupported,
             "will be supported in the future",
-        ))
+        )))
     }
 
-    async fn abort(&mut self) -> crate::Result<()> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "will be supported in the future",
-        ))
-    }
-
-    async fn close(&mut self) -> crate::Result<()> {
-        Ok(())
+    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<crate::Result<()>> {
+        Poll::Ready(Ok(()))
     }
 }
 
-pub struct MadsimPager {}
+pub struct MadsimLister {}
 
-#[async_trait]
-impl oio::Page for MadsimPager {
-    async fn next(&mut self) -> crate::Result<Option<Vec<Entry>>> {
-        Err(Error::new(
+impl oio::List for MadsimLister {
+    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<crate::Result<Option<oio::Entry>>> {
+        Poll::Ready(Err(Error::new(
             ErrorKind::Unsupported,
             "will be supported in the future",
-        ))
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Error::new(ErrorKind::Unexpected, "madsim error")
+        )))
     }
 }
 

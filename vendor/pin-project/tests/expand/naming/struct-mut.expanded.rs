@@ -17,6 +17,7 @@ struct Struct<T, U> {
 #[allow(clippy::type_repetition_in_bounds)]
 #[allow(dead_code)]
 #[allow(clippy::mut_mut)]
+#[allow(clippy::missing_docs_in_private_items)]
 struct Proj<'pin, T, U>
 where
     Struct<T, U>: 'pin,
@@ -43,6 +44,7 @@ const _: () = {
     extern crate pin_project as _pin_project;
     #[allow(dead_code)]
     #[allow(clippy::ref_option_ref)]
+    #[allow(clippy::missing_docs_in_private_items)]
     struct __StructProjectionRef<'pin, T, U>
     where
         Struct<T, U>: 'pin,

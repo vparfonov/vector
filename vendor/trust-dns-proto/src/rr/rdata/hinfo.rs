@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
+// Copyright 2015-2021 Benjamin Fry <benjaminfry@me.com>
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -12,11 +12,8 @@ use std::fmt;
 #[cfg(feature = "serde-config")]
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    error::*,
-    rr::{RData, RecordData, RecordType},
-    serialize::binary::*,
-};
+use crate::error::*;
+use crate::serialize::binary::*;
 
 /// [RFC 1035, DOMAIN NAMES - IMPLEMENTATION AND SPECIFICATION, November 1987][rfc1035]
 ///
@@ -95,52 +92,26 @@ impl HINFO {
     }
 }
 
-impl BinEncodable for HINFO {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        encoder.emit_character_data(&self.cpu)?;
-        encoder.emit_character_data(&self.os)?;
-
-        Ok(())
-    }
-}
-
-impl<'r> BinDecodable<'r> for HINFO {
-    fn read(decoder: &mut BinDecoder<'r>) -> ProtoResult<Self> {
-        let cpu = decoder.read_character_data()?
+/// Read the RData from the given Decoder
+pub fn read(decoder: &mut BinDecoder<'_>) -> ProtoResult<HINFO> {
+    let cpu = decoder.read_character_data()?
         .unverified(/*any data should be validate in HINFO CPU usage*/)
         .to_vec()
         .into_boxed_slice();
-        let os = decoder.read_character_data()?
+    let os = decoder.read_character_data()?
         .unverified(/*any data should be validate in HINFO OS usage*/)
         .to_vec()
         .into_boxed_slice();
 
-        Ok(Self { cpu, os })
-    }
+    Ok(HINFO { cpu, os })
 }
 
-impl RecordData for HINFO {
-    fn try_from_rdata(data: RData) -> Result<Self, RData> {
-        match data {
-            RData::HINFO(csync) => Ok(csync),
-            _ => Err(data),
-        }
-    }
+/// Write the RData from the given Decoder
+pub fn emit(encoder: &mut BinEncoder<'_>, hinfo: &HINFO) -> ProtoResult<()> {
+    encoder.emit_character_data(&hinfo.cpu)?;
+    encoder.emit_character_data(&hinfo.os)?;
 
-    fn try_borrow(data: &RData) -> Option<&Self> {
-        match data {
-            RData::HINFO(csync) => Some(csync),
-            _ => None,
-        }
-    }
-
-    fn record_type(&self) -> RecordType {
-        RecordType::HINFO
-    }
-
-    fn into_rdata(self) -> RData {
-        RData::HINFO(self)
-    }
+    Ok(())
 }
 
 /// [RFC 1033](https://tools.ietf.org/html/rfc1033), DOMAIN OPERATIONS GUIDE, November 1987
@@ -189,13 +160,13 @@ mod tests {
 
         let mut bytes = Vec::new();
         let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        assert!(rdata.emit(&mut encoder).is_ok());
+        assert!(emit(&mut encoder, &rdata).is_ok());
         let bytes = encoder.into_bytes();
 
-        println!("bytes: {bytes:?}");
+        println!("bytes: {:?}", bytes);
 
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
-        let read_rdata = HINFO::read(&mut decoder).expect("Decoding error");
+        let read_rdata = read(&mut decoder).expect("Decoding error");
         assert_eq!(rdata, read_rdata);
     }
 
@@ -209,13 +180,13 @@ mod tests {
 
         let mut bytes = Vec::new();
         let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        assert!(rdata.emit(&mut encoder).is_ok());
+        assert!(emit(&mut encoder, &rdata).is_ok());
         let bytes = encoder.into_bytes();
 
-        println!("bytes: {bytes:?}");
+        println!("bytes: {:?}", bytes);
 
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
-        let read_rdata = HINFO::read(&mut decoder).expect("Decoding error");
+        let read_rdata = read(&mut decoder).expect("Decoding error");
         assert_eq!(rdata, read_rdata);
     }
 }

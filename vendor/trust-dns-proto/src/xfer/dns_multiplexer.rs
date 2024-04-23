@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
+// Copyright 2015-2018 Benjamin Fry <benjaminfry@me.com>
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -7,39 +7,31 @@
 
 //! `DnsMultiplexer` and associated types implement the state machines for sending DNS messages while using the underlying streams.
 
-use std::{
-    borrow::Borrow,
-    collections::{hash_map::Entry, HashMap},
-    fmt::{self, Display},
-    marker::Unpin,
-    pin::Pin,
-    sync::Arc,
-    task::{Context, Poll},
-    time::{Duration, SystemTime, UNIX_EPOCH},
-};
+use std::borrow::Borrow;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
+use std::fmt::{self, Display};
+use std::marker::Unpin;
+use std::pin::Pin;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures_channel::mpsc;
-use futures_util::{
-    future::Future,
-    ready,
-    stream::{Stream, StreamExt},
-    FutureExt,
-};
-use rand::{
-    self,
-    distributions::{Distribution, Standard},
-};
-use tracing::debug;
+use futures_util::stream::{Stream, StreamExt};
+use futures_util::{future::Future, ready, FutureExt};
+use log::{debug, warn};
+use rand;
+use rand::distributions::{Distribution, Standard};
 
-use crate::{
-    error::{ProtoError, ProtoErrorKind},
-    op::{MessageFinalizer, MessageVerifier},
-    xfer::{
-        ignore_send, BufDnsStreamHandle, DnsClientStream, DnsRequest, DnsRequestSender,
-        DnsResponse, DnsResponseStream, SerialMessage, CHANNEL_BUFFER_SIZE,
-    },
-    DnsStreamHandle, Time,
+use crate::error::*;
+use crate::op::{MessageFinalizer, MessageVerifier};
+use crate::xfer::{
+    ignore_send, BufDnsStreamHandle, DnsClientStream, DnsRequest, DnsRequestSender, DnsResponse,
+    DnsResponseStream, SerialMessage, CHANNEL_BUFFER_SIZE,
 };
+use crate::DnsStreamHandle;
+use crate::Time;
 
 const QOS_MAX_RECEIVE_MSGS: usize = 100; // max number of messages to receive from the UDP socket
 
@@ -206,7 +198,11 @@ where
 
     /// Closes all outstanding completes with a closed stream error
     fn stream_closed_close_all(&mut self, error: ProtoError) {
-        debug!(error = error.as_dyn(), stream = %self.stream);
+        if !self.active_requests.is_empty() {
+            warn!("stream {} error: {}", self.stream, error);
+        } else {
+            debug!("stream {} error: {}", self.stream, error);
+        }
 
         for (_, active_request) in self.active_requests.drain() {
             // complete the request, it's failed...
@@ -318,15 +314,8 @@ where
 
         match request.to_vec() {
             Ok(buffer) => {
-                debug!(id = %active_request.request_id(), "sending message");
+                debug!("sending message id: {}", active_request.request_id());
                 let serial_message = SerialMessage::new(buffer, self.stream.name_server_addr());
-
-                debug!(
-                    "final message: {}",
-                    serial_message
-                        .to_message()
-                        .expect("bizarre we just made this message")
-                );
 
                 // add to the map -after- the client send b/c we don't want to put it in the map if
                 //  we ended up returning an error from the send.
@@ -339,9 +328,9 @@ where
             }
             Err(e) => {
                 debug!(
-                    id = %active_request.request_id(),
-                    error = e.as_dyn(),
-                    "error message"
+                    "error message id: {} error: {}",
+                    active_request.request_id(),
+                    e
                 );
                 // complete with the error, don't add to the map of active requests
                 return e.into();
@@ -398,15 +387,15 @@ where
                                             .try_send(verifier(buffer.bytes())),
                                     );
                                 } else {
-                                    ignore_send(active_request.completion.try_send(Ok(
-                                        DnsResponse::new(message, buffer.into_parts().0),
-                                    )));
+                                    ignore_send(
+                                        active_request.completion.try_send(Ok(message.into())),
+                                    );
                                 }
                             }
                             Entry::Vacant(..) => debug!("unexpected request_id: {}", message.id()),
                         },
                         // TODO: return src address for diagnostics
-                        Err(error) => debug!(error = error.as_dyn(), "error decoding message"),
+                        Err(e) => debug!("error decoding message: {}", e),
                     }
                 }
                 Poll::Ready(err) => {
@@ -553,7 +542,7 @@ mod test {
                 .set_ttl(86400)
                 .set_rr_type(RecordType::A)
                 .set_dns_class(DNSClass::IN)
-                .set_data(Some(RData::A(Ipv4Addr::new(93, 184, 216, 34).into())))
+                .set_data(Some(RData::A(Ipv4Addr::new(93, 184, 216, 34))))
                 .clone(),
         );
         (
@@ -603,38 +592,34 @@ mod test {
                 .set_ttl(86400)
                 .set_rr_type(RecordType::NS)
                 .set_dns_class(DNSClass::IN)
-                .set_data(Some(RData::NS(NS(Name::parse(
-                    "a.iana-servers.net.",
-                    None,
-                )
-                .unwrap()))))
+                .set_data(Some(RData::NS(
+                    Name::parse("a.iana-servers.net.", None).unwrap(),
+                )))
                 .clone(),
             Record::new()
                 .set_name(origin.clone())
                 .set_ttl(86400)
                 .set_rr_type(RecordType::NS)
                 .set_dns_class(DNSClass::IN)
-                .set_data(Some(RData::NS(NS(Name::parse(
-                    "b.iana-servers.net.",
-                    None,
-                )
-                .unwrap()))))
+                .set_data(Some(RData::NS(
+                    Name::parse("b.iana-servers.net.", None).unwrap(),
+                )))
                 .clone(),
             Record::new()
                 .set_name(origin.clone())
                 .set_ttl(86400)
                 .set_rr_type(RecordType::A)
                 .set_dns_class(DNSClass::IN)
-                .set_data(Some(RData::A(Ipv4Addr::new(93, 184, 216, 34).into())))
+                .set_data(Some(RData::A(Ipv4Addr::new(93, 184, 216, 34))))
                 .clone(),
             Record::new()
                 .set_name(origin)
                 .set_ttl(86400)
                 .set_rr_type(RecordType::AAAA)
                 .set_dns_class(DNSClass::IN)
-                .set_data(Some(RData::AAAA(
-                    Ipv6Addr::new(0x2606, 0x2800, 0x220, 0x1, 0x248, 0x1893, 0x25c8, 0x1946).into(),
-                )))
+                .set_data(Some(RData::AAAA(Ipv6Addr::new(
+                    0x2606, 0x2800, 0x220, 0x1, 0x248, 0x1893, 0x25c8, 0x1946,
+                ))))
                 .clone(),
             soa,
         ]

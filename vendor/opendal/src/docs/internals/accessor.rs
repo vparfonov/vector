@@ -29,10 +29,10 @@
 //! #[async_trait]
 //! //                  <----------Trait Bound-------------->
 //! pub trait Accessor: Send + Sync + Debug + Unpin + 'static {
-//!     type Reader: oio::Read;                 // --+
-//!     type BlockingReader: oio::BlockingRead; //   +--> Associated Type
-//!     type Pager: oio::Page;                  //   +
-//!     type BlockingPager: oio::BlockingPage;  // --+
+//!     type Reader: oio::Read;                    // --+
+//!     type BlockingReader: oio::BlockingRead;    //   +--> Associated Type
+//!     type Lister: oio::Lister;                  //   +
+//!     type BlockingLister: oio::BlockingLister;  // --+
 //!
 //!     // APIs
 //!     async fn hello(&self, path: &str, args: OpCreate) -> Result<RpCreate>;
@@ -62,9 +62,9 @@
 //!
 //! ```ignore
 //! pub trait Accessor {
-//!     fn create<'async>(
+//!     fn create_dir<'async>(
 //!         &'async self,
-//!     ) -> Pin<Box<dyn core::future::Future<Output = ()> + Send + 'async>>
+//!     ) -> Pin<Box<dyn core::future::Future<Output = Result()> + Send + 'async>>
 //!     where Self: Sync + 'async;
 //! }
 //! ```
@@ -102,8 +102,8 @@
 //!
 //! - `Reader`: reader returned by `read` operation.
 //! - `BlockingReader`: reader returned by `blocking_read` operation.
-//! - `Pager`: pager returned by `scan` or `list` operation.
-//! - `BlockingPager`: pager returned by `blocking_scan` or `blocking_list` operation.
+//! - `Lister`: lister returned by `scan` or `list` operation.
+//! - `BlockingLister`: lister returned by `blocking_scan` or `blocking_list` operation.
 //!
 //! Implementer of `Accessor` should take care the following things:
 //!
@@ -290,8 +290,8 @@
 //!     type BlockingReader = ();
 //!     type Writer = ();
 //!     type BlockingWriter = ();
-//!     type Pager = ();
-//!     type BlockingPager = ();
+//!     type Lister = ();
+//!     type BlockingLister = ();
 //!
 //!     fn metadata(&self) -> AccessorInfo {
 //!         let mut am = AccessorInfo::default();
@@ -316,7 +316,7 @@
 //! Super Power Ducks!
 //!
 //! What!? There are no Super Power Ducks? So sad, but never mind, we have
-//! really powerful storage services [here](https://github.com/apache/incubator-opendal/issues/5). Welcome to pick one to implement. I promise you won't
+//! really powerful storage services [here](https://github.com/apache/opendal/issues/5). Welcome to pick one to implement. I promise you won't
 //! have to `gagaga!()` this time.
 //!
 //! [`Accessor`]: crate::raw::Accessor

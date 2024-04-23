@@ -16,12 +16,15 @@
 // under the License.
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use futures::AsyncWriteExt;
 
 use super::backend::FtpBackend;
+use crate::raw::oio::WriteBuf;
 use crate::raw::*;
+use crate::services::ftp::err::parse_error;
 use crate::*;
+
+pub type FtpWriters = oio::OneShotWriter<FtpWriter>;
 
 pub struct FtpWriter {
     backend: FtpBackend,
@@ -32,39 +35,37 @@ pub struct FtpWriter {
 ///
 /// Writer is not implemented correctly.
 ///
-/// After we can use datastream, we should return it directly.
+/// After we can use data stream, we should return it directly.
 impl FtpWriter {
     pub fn new(backend: FtpBackend, path: String) -> Self {
         FtpWriter { backend, path }
     }
 }
 
+/// # Safety
+///
+/// We will only take `&mut Self` reference for FtpWriter.
+unsafe impl Sync for FtpWriter {}
+
 #[async_trait]
-impl oio::Write for FtpWriter {
-    async fn write(&mut self, bs: Bytes) -> Result<()> {
+impl oio::OneShotWrite for FtpWriter {
+    async fn write_once(&self, bs: &dyn WriteBuf) -> Result<()> {
+        let size = bs.remaining();
+        let bs = bs.bytes(size);
+
         let mut ftp_stream = self.backend.ftp_connect(Operation::Write).await?;
-        let mut data_stream = ftp_stream.append_with_stream(&self.path).await?;
+        let mut data_stream = ftp_stream
+            .append_with_stream(&self.path)
+            .await
+            .map_err(parse_error)?;
         data_stream.write_all(&bs).await.map_err(|err| {
             Error::new(ErrorKind::Unexpected, "copy from ftp stream").set_source(err)
         })?;
 
-        ftp_stream.finalize_put_stream(data_stream).await?;
-
-        Ok(())
-    }
-
-    async fn sink(&mut self, _size: u64, _s: oio::Streamer) -> Result<()> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "Write::sink is not supported",
-        ))
-    }
-
-    async fn abort(&mut self) -> Result<()> {
-        Ok(())
-    }
-
-    async fn close(&mut self) -> Result<()> {
+        ftp_stream
+            .finalize_put_stream(data_stream)
+            .await
+            .map_err(parse_error)?;
         Ok(())
     }
 }

@@ -6,10 +6,11 @@
 // copied, modified, or distributed except according to those terms.
 
 //! record type definitions
-#![allow(clippy::use_self)]
 
 use std::cmp::Ordering;
-use std::fmt::{self, Display, Formatter};
+use std::convert::From;
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 #[cfg(feature = "serde-config")]
@@ -197,7 +198,7 @@ impl FromStr for RecordType {
     /// ```
     fn from_str(str: &str) -> ProtoResult<Self> {
         // TODO missing stuff?
-        debug_assert!(str.chars().all(|x| !char::is_ascii_lowercase(&x)));
+        debug_assert!(str.chars().all(|x| char::is_digit(x, 36)));
         match str {
             "A" => Ok(Self::A),
             "AAAA" => Ok(Self::AAAA),
@@ -313,6 +314,7 @@ impl<'r> BinDecodable<'r> for RecordType {
 /// Convert from `RecordType` to `&str`
 ///
 /// ```
+/// use std::convert::From;
 /// use trust_dns_proto::rr::record_type::RecordType;
 ///
 /// let var: &'static str = From::from(RecordType::A);
@@ -368,6 +370,7 @@ impl From<RecordType> for &'static str {
 /// Convert from `RecordType` to `u16`
 ///
 /// ```
+/// use std::convert::From;
 /// use trust_dns_proto::rr::record_type::RecordType;
 ///
 /// let var: u16 = RecordType::A.into();
@@ -539,11 +542,5 @@ mod tests {
             assert_eq!(rtype.to_string().to_ascii_uppercase().as_str(), *name);
             assert!(rtypes.insert(rtype));
         }
-    }
-
-    #[test]
-    fn check_record_type_parse_wont_panic_with_symbols() {
-        let dns_class = "a-b-c".to_ascii_uppercase().parse::<RecordType>();
-        assert!(matches!(&dns_class, Err(ProtoError { .. })));
     }
 }

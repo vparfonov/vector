@@ -405,16 +405,16 @@ impl<A: Accessor> Debug for MetricsAccessor<A> {
     }
 }
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl<A: Accessor> LayeredAccessor for MetricsAccessor<A> {
     type Inner = A;
     type Reader = MetricWrapper<A::Reader>;
     type BlockingReader = MetricWrapper<A::BlockingReader>;
     type Writer = MetricWrapper<A::Writer>;
     type BlockingWriter = MetricWrapper<A::BlockingWriter>;
-    type Appender = A::Appender;
-    type Pager = A::Pager;
-    type BlockingPager = A::BlockingPager;
+    type Lister = A::Lister;
+    type BlockingLister = A::BlockingLister;
 
     fn inner(&self) -> &Self::Inner {
         &self.inner
@@ -510,10 +510,6 @@ impl<A: Accessor> LayeredAccessor for MetricsAccessor<A> {
             .await
     }
 
-    async fn append(&self, path: &str, args: OpAppend) -> Result<(RpAppend, Self::Appender)> {
-        self.inner.append(path, args).await
-    }
-
     async fn stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
         self.handle.requests_total_stat.increment(1);
 
@@ -552,7 +548,7 @@ impl<A: Accessor> LayeredAccessor for MetricsAccessor<A> {
             .await
     }
 
-    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Pager)> {
+    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
         self.handle.requests_total_list.increment(1);
 
         let start = Instant::now();
@@ -714,7 +710,7 @@ impl<A: Accessor> LayeredAccessor for MetricsAccessor<A> {
         })
     }
 
-    fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingPager)> {
+    fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingLister)> {
         self.handle.requests_total_blocking_list.increment(1);
 
         let start = Instant::now();
@@ -850,40 +846,29 @@ impl<R: oio::BlockingRead> oio::BlockingRead for MetricWrapper<R> {
     }
 }
 
-#[async_trait]
 impl<R: oio::Write> oio::Write for MetricWrapper<R> {
-    async fn write(&mut self, bs: Bytes) -> Result<()> {
-        let size = bs.len();
+    fn poll_write(&mut self, cx: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
         self.inner
-            .write(bs)
-            .await
-            .map(|_| self.bytes += size as u64)
+            .poll_write(cx, bs)
+            .map_ok(|n| {
+                self.bytes += n as u64;
+                n
+            })
             .map_err(|err| {
                 self.handle.increment_errors_total(self.op, err.kind());
                 err
             })
     }
 
-    async fn sink(&mut self, size: u64, s: oio::Streamer) -> Result<()> {
-        self.inner
-            .sink(size, s)
-            .await
-            .map(|_| self.bytes += size)
-            .map_err(|err| {
-                self.handle.increment_errors_total(self.op, err.kind());
-                err
-            })
-    }
-
-    async fn abort(&mut self) -> Result<()> {
-        self.inner.abort().await.map_err(|err| {
+    fn poll_abort(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
+        self.inner.poll_abort(cx).map_err(|err| {
             self.handle.increment_errors_total(self.op, err.kind());
             err
         })
     }
 
-    async fn close(&mut self) -> Result<()> {
-        self.inner.close().await.map_err(|err| {
+    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
+        self.inner.poll_close(cx).map_err(|err| {
             self.handle.increment_errors_total(self.op, err.kind());
             err
         })
@@ -891,11 +876,13 @@ impl<R: oio::Write> oio::Write for MetricWrapper<R> {
 }
 
 impl<R: oio::BlockingWrite> oio::BlockingWrite for MetricWrapper<R> {
-    fn write(&mut self, bs: Bytes) -> Result<()> {
-        let size = bs.len();
+    fn write(&mut self, bs: &dyn oio::WriteBuf) -> Result<usize> {
         self.inner
             .write(bs)
-            .map(|_| self.bytes += size as u64)
+            .map(|n| {
+                self.bytes += n as u64;
+                n
+            })
             .map_err(|err| {
                 self.handle.increment_errors_total(self.op, err.kind());
                 err

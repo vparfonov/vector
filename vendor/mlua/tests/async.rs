@@ -10,8 +10,15 @@ use mlua::{
     UserData, UserDataMethods, Value,
 };
 
+#[cfg(not(target_arch = "wasm32"))]
 async fn sleep_ms(ms: u64) {
     tokio::time::sleep(Duration::from_millis(ms)).await;
+}
+
+#[cfg(target_arch = "wasm32")]
+async fn sleep_ms(_ms: u64) {
+    // I was unable to make sleep() work in wasm32-emscripten target
+    tokio::task::yield_now().await;
 }
 
 #[tokio::test]
@@ -436,7 +443,7 @@ async fn test_async_userdata() -> Result<()> {
     let globals = lua.globals();
 
     let userdata = lua.create_userdata(MyUserData(11))?;
-    globals.set("userdata", userdata.clone())?;
+    globals.set("userdata", &userdata)?;
 
     lua.load(
         r#"

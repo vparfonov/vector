@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
+// Copyright 2015-2019 Benjamin Fry <benjaminfry@me.com>
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -12,11 +12,9 @@ use std::fmt;
 #[cfg(feature = "serde-config")]
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    error::{ProtoError, ProtoResult},
-    rr::{domain::Name, RData, RecordData, RecordType},
-    serialize::binary::*,
-};
+use crate::error::*;
+use crate::rr::domain::Name;
+use crate::serialize::binary::*;
 
 /// [RFC 3403 DDDS DNS Database, October 2002](https://tools.ietf.org/html/rfc3403#section-4)
 ///
@@ -169,7 +167,7 @@ impl NAPTR {
     ///      As stated in the DDDS algorithm, The regular expressions MUST NOT
     ///      be used in a cumulative fashion, that is, they should only be
     ///      applied to the original string held by the client, never to the
-    ///      domain name produced by a previous NAPTR rewrite.  The latter is
+    ///      domain name p  roduced by a previous NAPTR rewrite.  The latter is
     ///      tempting in some applications but experience has shown such use to
     ///      be extremely fault sensitive, very error prone, and extremely
     ///      difficult to debug.
@@ -205,60 +203,34 @@ pub fn verify_flags(flags: &[u8]) -> bool {
         .all(|c| matches!(c, b'0'..=b'9' | b'a'..=b'z' | b'A'..=b'Z'))
 }
 
-impl BinEncodable for NAPTR {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        self.order.emit(encoder)?;
-        self.preference.emit(encoder)?;
-        encoder.emit_character_data(&self.flags)?;
-        encoder.emit_character_data(&self.services)?;
-        encoder.emit_character_data(&self.regexp)?;
-
-        encoder.with_canonical_names(|encoder| self.replacement.emit(encoder))?;
-        Ok(())
-    }
+/// Read the RData from the given Decoder
+pub fn read(decoder: &mut BinDecoder<'_>) -> ProtoResult<NAPTR> {
+    Ok(NAPTR::new(
+        decoder.read_u16()?.unverified(/*any u16 is valid*/),
+        decoder.read_u16()?.unverified(/*any u16 is valid*/),
+        // must be 0-9a-z
+        decoder
+            .read_character_data()?
+            .verify_unwrap(|s| verify_flags(s))
+            .map_err(|_e| ProtoError::from("flags are not within range [a-zA-Z0-9]"))?
+            .to_vec()
+            .into_boxed_slice(),
+        decoder.read_character_data()?.unverified(/*any chardata*/).to_vec().into_boxed_slice(),
+        decoder.read_character_data()?.unverified(/*any chardata*/).to_vec().into_boxed_slice(),
+        Name::read(decoder)?,
+    ))
 }
 
-impl<'r> BinDecodable<'r> for NAPTR {
-    fn read(decoder: &mut BinDecoder<'r>) -> ProtoResult<Self> {
-        Ok(Self::new(
-            decoder.read_u16()?.unverified(/*any u16 is valid*/),
-            decoder.read_u16()?.unverified(/*any u16 is valid*/),
-            // must be 0-9a-z
-            decoder
-                .read_character_data()?
-                .verify_unwrap(|s| verify_flags(s))
-                .map_err(|_e| ProtoError::from("flags are not within range [a-zA-Z0-9]"))?
-                .to_vec()
-                .into_boxed_slice(),
-            decoder.read_character_data()?.unverified(/*any chardata*/).to_vec().into_boxed_slice(),
-            decoder.read_character_data()?.unverified(/*any chardata*/).to_vec().into_boxed_slice(),
-            Name::read(decoder)?,
-        ))
-    }
-}
+/// Declares the method for emitting this type
+pub fn emit(encoder: &mut BinEncoder<'_>, naptr: &NAPTR) -> ProtoResult<()> {
+    naptr.order.emit(encoder)?;
+    naptr.preference.emit(encoder)?;
+    encoder.emit_character_data(&naptr.flags)?;
+    encoder.emit_character_data(&naptr.services)?;
+    encoder.emit_character_data(&naptr.regexp)?;
 
-impl RecordData for NAPTR {
-    fn try_from_rdata(data: RData) -> Result<Self, RData> {
-        match data {
-            RData::NAPTR(csync) => Ok(csync),
-            _ => Err(data),
-        }
-    }
-
-    fn try_borrow(data: &RData) -> Option<&Self> {
-        match data {
-            RData::NAPTR(csync) => Some(csync),
-            _ => None,
-        }
-    }
-
-    fn record_type(&self) -> RecordType {
-        RecordType::NAPTR
-    }
-
-    fn into_rdata(self) -> RData {
-        RData::NAPTR(self)
-    }
+    encoder.with_canonical_names(|encoder| naptr.replacement.emit(encoder))?;
+    Ok(())
 }
 
 /// [RFC 2915](https://tools.ietf.org/html/rfc2915), NAPTR DNS RR, September 2000
@@ -314,13 +286,13 @@ mod tests {
 
         let mut bytes = Vec::new();
         let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        assert!(rdata.emit(&mut encoder).is_ok());
+        assert!(emit(&mut encoder, &rdata).is_ok());
         let bytes = encoder.into_bytes();
 
-        println!("bytes: {bytes:?}");
+        println!("bytes: {:?}", bytes);
 
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
-        let read_rdata = NAPTR::read(&mut decoder).expect("Decoding error");
+        let read_rdata = read(&mut decoder).expect("Decoding error");
         assert_eq!(rdata, read_rdata);
     }
 
@@ -339,13 +311,13 @@ mod tests {
 
         let mut bytes = Vec::new();
         let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        assert!(rdata.emit(&mut encoder).is_ok());
+        assert!(emit(&mut encoder, &rdata).is_ok());
         let bytes = encoder.into_bytes();
 
-        println!("bytes: {bytes:?}");
+        println!("bytes: {:?}", bytes);
 
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
-        let read_rdata = NAPTR::read(&mut decoder);
+        let read_rdata = read(&mut decoder);
         assert!(
             read_rdata.is_err(),
             "should have failed decoding with bad flag data"

@@ -228,11 +228,21 @@ extern "C-unwind" {
 //
 #[cfg_attr(all(windows, raw_dylib), link(name = "lua51", kind = "raw-dylib"))]
 extern "C-unwind" {
-    pub fn lua_error(L: *mut lua_State) -> !;
+    #[link_name = "lua_error"]
+    fn lua_error_(L: *mut lua_State) -> c_int;
     pub fn lua_next(L: *mut lua_State, idx: c_int) -> c_int;
     pub fn lua_concat(L: *mut lua_State, n: c_int);
     pub fn lua_getallocf(L: *mut lua_State, ud: *mut *mut c_void) -> lua_Alloc;
     pub fn lua_setallocf(L: *mut lua_State, f: lua_Alloc, ud: *mut c_void);
+}
+
+// lua_error does not return but is declared to return int, and Rust translates
+// ! to void which can cause link-time errors if the platform linker is aware
+// of return types and requires they match (for example: wasm does this).
+#[inline(always)]
+pub unsafe fn lua_error(L: *mut lua_State) -> ! {
+    lua_error_(L);
+    unreachable!();
 }
 
 //
@@ -316,6 +326,14 @@ pub unsafe fn lua_setglobal(L: *mut lua_State, var: *const c_char) {
 #[inline(always)]
 pub unsafe fn lua_getglobal_(L: *mut lua_State, var: *const c_char) {
     lua_getfield_(L, LUA_GLOBALSINDEX, var)
+}
+
+#[inline(always)]
+pub unsafe fn lua_tolightuserdata(L: *mut lua_State, idx: c_int) -> *mut c_void {
+    if lua_islightuserdata(L, idx) != 0 {
+        return lua_touserdata(L, idx);
+    }
+    ptr::null_mut()
 }
 
 #[inline(always)]

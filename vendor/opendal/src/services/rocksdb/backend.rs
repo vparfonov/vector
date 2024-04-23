@@ -22,15 +22,19 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use rocksdb::DB;
+use serde::Deserialize;
+use tokio::task;
 
 use crate::raw::adapters::kv;
+use crate::raw::*;
 use crate::Result;
 use crate::*;
 
-/// RocksDB service support.
-#[doc = include_str!("docs.md")]
-#[derive(Clone, Default, Debug)]
-pub struct RocksdbBuilder {
+#[derive(Default, Deserialize, Clone)]
+#[serde(default)]
+#[non_exhaustive]
+/// Config for Rocksdb Service.
+pub struct RocksdbConfig {
     /// The path to the rocksdb data directory.
     datadir: Option<String>,
     /// the working directory of the service. Can be "/path/to/dir"
@@ -39,10 +43,17 @@ pub struct RocksdbBuilder {
     root: Option<String>,
 }
 
+/// RocksDB service support.
+#[doc = include_str!("docs.md")]
+#[derive(Clone, Default)]
+pub struct RocksdbBuilder {
+    config: RocksdbConfig,
+}
+
 impl RocksdbBuilder {
     /// Set the path to the rocksdb data directory. Will create if not exists.
     pub fn datadir(&mut self, path: &str) -> &mut Self {
-        self.datadir = Some(path.into());
+        self.config.datadir = Some(path.into());
         self
     }
 
@@ -51,7 +62,7 @@ impl RocksdbBuilder {
     /// default: "/"
     pub fn root(&mut self, root: &str) -> &mut Self {
         if !root.is_empty() {
-            self.root = Some(root.to_owned());
+            self.config.root = Some(root.to_owned());
         }
         self
     }
@@ -62,15 +73,13 @@ impl Builder for RocksdbBuilder {
     type Accessor = RocksdbBackend;
 
     fn from_map(map: HashMap<String, String>) -> Self {
-        let mut builder = RocksdbBuilder::default();
-
-        map.get("datadir").map(|v| builder.datadir(v));
-
-        builder
+        let config = RocksdbConfig::deserialize(ConfigDeserializer::new(map))
+            .expect("config deserialize must succeed");
+        RocksdbBuilder { config }
     }
 
     fn build(&mut self) -> Result<Self::Accessor> {
-        let path = self.datadir.take().ok_or_else(|| {
+        let path = self.config.datadir.take().ok_or_else(|| {
             Error::new(ErrorKind::ConfigInvalid, "datadir is required but not set")
                 .with_context("service", Scheme::Rocksdb)
         })?;
@@ -110,38 +119,85 @@ impl kv::Adapter for Adapter {
             Capability {
                 read: true,
                 write: true,
+                list: true,
+                blocking: true,
                 ..Default::default()
             },
         )
     }
 
     async fn get(&self, path: &str) -> Result<Option<Vec<u8>>> {
-        self.blocking_get(path)
+        let cloned_self = self.clone();
+        let cloned_path = path.to_string();
+
+        task::spawn_blocking(move || cloned_self.blocking_get(cloned_path.as_str()))
+            .await
+            .map_err(new_task_join_error)?
     }
 
     fn blocking_get(&self, path: &str) -> Result<Option<Vec<u8>>> {
-        Ok(self.db.get(path)?)
+        self.db.get(path).map_err(parse_rocksdb_error)
     }
 
     async fn set(&self, path: &str, value: &[u8]) -> Result<()> {
-        self.blocking_set(path, value)
+        let cloned_self = self.clone();
+        let cloned_path = path.to_string();
+        let cloned_value = value.to_vec();
+
+        task::spawn_blocking(move || cloned_self.blocking_set(cloned_path.as_str(), &cloned_value))
+            .await
+            .map_err(new_task_join_error)?
     }
 
     fn blocking_set(&self, path: &str, value: &[u8]) -> Result<()> {
-        Ok(self.db.put(path, value)?)
+        self.db.put(path, value).map_err(parse_rocksdb_error)
     }
 
     async fn delete(&self, path: &str) -> Result<()> {
-        self.blocking_delete(path)
+        let cloned_self = self.clone();
+        let cloned_path = path.to_string();
+
+        task::spawn_blocking(move || cloned_self.blocking_delete(cloned_path.as_str()))
+            .await
+            .map_err(new_task_join_error)?
     }
 
     fn blocking_delete(&self, path: &str) -> Result<()> {
-        Ok(self.db.delete(path)?)
+        self.db.delete(path).map_err(parse_rocksdb_error)
+    }
+
+    async fn scan(&self, path: &str) -> Result<Vec<String>> {
+        let cloned_self = self.clone();
+        let cloned_path = path.to_string();
+
+        task::spawn_blocking(move || cloned_self.blocking_scan(cloned_path.as_str()))
+            .await
+            .map_err(new_task_join_error)?
+    }
+
+    /// TODO: we only need key here.
+    fn blocking_scan(&self, path: &str) -> Result<Vec<String>> {
+        let it = self.db.prefix_iterator(path).map(|r| r.map(|(k, _)| k));
+        let mut res = Vec::default();
+
+        for key in it {
+            let key = key.map_err(parse_rocksdb_error)?;
+            let key = String::from_utf8_lossy(&key);
+            // FIXME: it's must a bug that rocksdb returns key that not start with path.
+            if !key.starts_with(path) {
+                continue;
+            }
+            // List should skip the path itself.
+            if key == path {
+                continue;
+            }
+            res.push(key.to_string());
+        }
+
+        Ok(res)
     }
 }
 
-impl From<rocksdb::Error> for Error {
-    fn from(e: rocksdb::Error) -> Self {
-        Error::new(ErrorKind::Unexpected, "got rocksdb error").set_source(e)
-    }
+fn parse_rocksdb_error(e: rocksdb::Error) -> Error {
+    Error::new(ErrorKind::Unexpected, "got rocksdb error").set_source(e)
 }

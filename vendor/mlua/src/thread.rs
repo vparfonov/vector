@@ -1,4 +1,4 @@
-use std::os::raw::c_int;
+use std::os::raw::{c_int, c_void};
 
 use crate::error::{Error, Result};
 #[allow(unused)]
@@ -15,7 +15,7 @@ use crate::{
 
 #[cfg(feature = "async")]
 use {
-    crate::{lua::ASYNC_POLL_PENDING, value::MultiValue},
+    crate::value::MultiValue,
     futures_util::stream::Stream,
     std::{
         future::Future,
@@ -239,7 +239,7 @@ impl<'lua> Thread<'lua> {
     ///
     /// [Lua 5.4]: https://www.lua.org/manual/5.4/manual.html#lua_closethread
     #[cfg(any(feature = "lua54", feature = "luau"))]
-    #[cfg_attr(docsrs, doc(cfg(not(feature = "luau"))))]
+    #[cfg_attr(docsrs, doc(cfg(any(feature = "lua54", feature = "luau"))))]
     pub fn reset(&self, func: crate::function::Function<'lua>) -> Result<()> {
         let lua = self.0.lua;
         let thread_state = self.state();
@@ -373,6 +373,16 @@ impl<'lua> Thread<'lua> {
             check_stack(state, 3)?;
             protect_lua!(state, 0, 0, |_| ffi::luaL_sandboxthread(thread_state))
         }
+    }
+
+    /// Converts this thread to a generic C pointer.
+    ///
+    /// There is no way to convert the pointer back to its original value.
+    ///
+    /// Typically this function is used only for hashing and debug information.
+    #[inline]
+    pub fn to_pointer(&self) -> *const c_void {
+        self.0.to_pointer()
     }
 
     /// Convert this handle to owned version.
@@ -530,12 +540,7 @@ where
 #[cfg(feature = "async")]
 #[inline(always)]
 unsafe fn is_poll_pending(state: *mut ffi::lua_State) -> bool {
-    if ffi::lua_islightuserdata(state, -1) != 0 {
-        let stack_ptr = ffi::lua_touserdata(state, -1) as *const u8;
-        let pending_ptr = &ASYNC_POLL_PENDING as *const u8;
-        return std::ptr::eq(stack_ptr, pending_ptr);
-    }
-    false
+    ffi::lua_tolightuserdata(state, -1) == Lua::poll_pending().0
 }
 
 #[cfg(feature = "async")]

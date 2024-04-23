@@ -12,12 +12,11 @@
 [package]
 edition = "2021"
 name = "rkyv_derive"
-version = "0.7.42"
+version = "0.7.44"
 authors = ["David Koloski <djkoloski@gmail.com>"]
 description = "Derive macro for rkyv"
 license = "MIT"
 repository = "https://github.com/rkyv/rkyv"
-resolver = "1"
 
 [package.metadata.docs.rs]
 all-features = true

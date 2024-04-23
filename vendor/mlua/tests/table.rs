@@ -218,6 +218,74 @@ fn test_table_sequence_from() -> Result<()> {
 }
 
 #[test]
+fn test_table_pairs() -> Result<()> {
+    let lua = Lua::new();
+
+    let table = lua
+        .load(
+            r#"
+    {
+        foo = "bar",
+        baz = "baf",
+        [123] = 456,
+        [789] = 101112,
+        5,
+    }
+    "#,
+        )
+        .eval::<Table>()?;
+
+    let table2 = table.clone();
+    for (i, kv) in table.pairs::<String, Value>().enumerate() {
+        let (k, _v) = kv.unwrap();
+        match i {
+            // Try to add a new key
+            0 => table2.set("new_key", "new_value")?,
+            // Try to delete the 2nd key
+            1 => {
+                table2.set(k, Value::Nil)?;
+                lua.gc_collect()?;
+            }
+            _ => {}
+        }
+    }
+
+    Ok(())
+}
+
+#[test]
+fn test_table_for_each() -> Result<()> {
+    let lua = Lua::new();
+
+    let table = lua
+        .load(
+            r#"
+    {
+        foo = "bar",
+        baz = "baf",
+        [123] = 456,
+        [789] = 101112,
+        5,
+    }
+    "#,
+        )
+        .eval::<Table>()?;
+
+    let mut i = 0;
+    table.for_each::<String, Value>(|k, _| {
+        if i == 0 {
+            // Delete first key
+            table.set(k, Value::Nil)?;
+            lua.gc_collect()?;
+        }
+        Ok(i += 1)
+    })?;
+    assert_eq!(i, 5);
+
+    Ok(())
+}
+
+#[test]
 fn test_table_scope() -> Result<()> {
     let lua = Lua::new();
 
@@ -297,6 +365,19 @@ fn test_table_eq() -> Result<()> {
     assert!(table1.equals(&table3)?);
     assert!(table1 != table4);
     assert!(table1.equals(&table4)?);
+
+    Ok(())
+}
+
+#[test]
+fn test_table_pointer() -> Result<()> {
+    let lua = Lua::new();
+
+    let table1 = lua.create_table()?;
+    let table2 = lua.create_table()?;
+
+    assert_eq!(table1.to_pointer(), table1.clone().to_pointer());
+    assert_ne!(table1.to_pointer(), table2.to_pointer());
 
     Ok(())
 }

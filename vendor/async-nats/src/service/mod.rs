@@ -30,7 +30,6 @@ use futures::{
 use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use time::serde::rfc3339;
 use time::OffsetDateTime;
 use tokio::{sync::broadcast::Sender, task::JoinHandle};
@@ -58,6 +57,23 @@ static NAME: Lazy<Regex> = Lazy::new(|| Regex::new(r"^[A-Za-z0-9\-_]+$").unwrap(
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub(crate) struct Endpoints {
     pub(crate) endpoints: HashMap<String, endpoint::Inner>,
+}
+
+/// Response for `PING` requests.
+#[derive(Serialize, Deserialize)]
+pub struct PingResponse {
+    /// Response type.
+    #[serde(rename = "type")]
+    pub kind: String,
+    /// Service name.
+    pub name: String,
+    /// Service id.
+    pub id: String,
+    /// Service version.
+    pub version: String,
+    /// Additional metadata
+    #[serde(default, deserialize_with = "endpoint::null_meta_as_default")]
+    pub metadata: HashMap<String, String>,
 }
 
 /// Response for `STATS` requests.
@@ -90,17 +106,18 @@ pub struct Info {
     /// Service id.
     pub id: String,
     /// Service description.
-    pub description: Option<String>,
+    pub description: String,
     /// Service version.
     pub version: String,
-    /// All service endpoints.
-    pub subjects: Vec<String>,
     /// Additional metadata
+    #[serde(default, deserialize_with = "endpoint::null_meta_as_default")]
     pub metadata: HashMap<String, String>,
+    /// Info about all service endpoints.
+    pub endpoints: Vec<endpoint::Info>,
 }
 
 /// Configuration of the [Service].
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
     /// Really the kind of the service. Shared by all the services that have the same name.
     /// This name can only have A-Z, a-z, 0-9, dash, underscore
@@ -110,6 +127,7 @@ pub struct Config {
     /// A SemVer valid service version.
     pub version: String,
     /// Custom handler for providing the `EndpointStats.data` value.
+    #[serde(skip)]
     pub stats_handler: Option<StatsHandler>,
     /// Additional service metadata
     pub metadata: Option<HashMap<String, String>>,
@@ -145,7 +163,7 @@ impl ServiceBuilder {
     /// Handler for custom service statistics.
     pub fn stats_handler<F>(mut self, handler: F) -> Self
     where
-        F: FnMut(String, endpoint::Stats) -> String + Send + Sync + 'static,
+        F: FnMut(String, endpoint::Stats) -> serde_json::Value + Send + Sync + 'static,
     {
         self.stats_handler = Some(StatsHandler(Box::new(handler)));
         self
@@ -247,7 +265,7 @@ pub trait ServiceExt {
     /// let mut service = client
     ///     .service_builder()
     ///     .description("some service")
-    ///     .stats_handler(|endpoint, stats| format!("customstats"))
+    ///     .stats_handler(|endpoint, stats| serde_json::json!({ "endpoint": endpoint }))
     ///     .start("products", "1.0.0")
     ///     .await?;
     ///
@@ -322,6 +340,10 @@ impl Service {
                 "service name is not a valid string (only A-Z, a-z, 0-9, _, - are allowed)",
             )));
         }
+        let endpoints_state = Arc::new(Mutex::new(Endpoints {
+            endpoints: HashMap::new(),
+        }));
+
         let queue_group = config
             .queue_group
             .unwrap_or(DEFAULT_QUEUE_GROUP.to_string());
@@ -332,16 +354,13 @@ impl Service {
             kind: "io.nats.micro.v1.info_response".to_string(),
             name: config.name.clone(),
             id: id.clone(),
-            description: config.description.clone(),
+            description: config.description.clone().unwrap_or_default(),
             version: config.version.clone(),
-            subjects: Vec::default(),
             metadata: config.metadata.clone().unwrap_or_default(),
+            endpoints: Vec::new(),
         };
 
         let (shutdown_tx, _) = tokio::sync::broadcast::channel(1);
-
-        let endpoints = HashMap::new();
-        let endpoints_state = Arc::new(Mutex::new(Endpoints { endpoints }));
 
         // create subscriptions for all verbs.
         let mut pings =
@@ -355,26 +374,36 @@ impl Service {
         let handle = tokio::task::spawn({
             let mut stats_callback = config.stats_handler;
             let info = info.clone();
-            let subjects = subjects.clone();
             let endpoints_state = endpoints_state.clone();
             let client = client.clone();
             async move {
                 loop {
                     tokio::select! {
                         Some(ping) = pings.next() => {
-                            let pong = serde_json::to_vec(&json!({
-                                "type": "io.nats.micro.v1.ping_response",
-                                "name": info.name,
-                                "id": info.id,
-                                "version": info.version,
-                            }))?;
+                            let pong = serde_json::to_vec(&PingResponse{
+                                kind: "io.nats.micro.v1.ping_response".to_string(),
+                                name: info.name.clone(),
+                                id: info.id.clone(),
+                                version: info.version.clone(),
+                                metadata: info.metadata.clone(),
+                            })?;
                             client.publish(ping.reply.unwrap(), pong.into()).await?;
                         },
                         Some(info_request) = infos.next() => {
-                            let subjects = subjects.clone();
                             let info = info.clone();
+
+                            let endpoints: Vec<endpoint::Info> = {
+                                endpoints_state.lock().unwrap().endpoints.values().map(|value| {
+                                    endpoint::Info {
+                                        name: value.name.to_owned(),
+                                        subject: value.subject.to_owned(),
+                                        queue_group: value.queue_group.to_owned(),
+                                        metadata: value.metadata.to_owned()
+                                    }
+                                }).collect()
+                            };
                             let info = Info {
-                                subjects: subjects.lock().unwrap().to_vec(),
+                                endpoints,
                                 ..info
                             };
                             let info_json = serde_json::to_vec(&info).map(Bytes::from)?;
@@ -385,7 +414,7 @@ impl Service {
                                 let mut endpoint_stats_locked = endpoints_state.lock().unwrap();
                                 for (key, value) in &mut endpoint_stats_locked.endpoints {
                                     let data = stats_callback.0(key.to_string(), value.clone().into());
-                                    value.data = data;
+                                    value.data = Some(data);
                                 }
                             }
                             let stats = serde_json::to_vec(&Stats {
@@ -636,15 +665,15 @@ impl Group {
     /// # }
     /// ```
     pub async fn endpoint<S: ToString>(&self, subject: S) -> Result<Endpoint, Error> {
-        EndpointBuilder::new(
+        let mut endpoint = EndpointBuilder::new(
             self.client.clone(),
             self.stats.clone(),
             self.shutdown_tx.clone(),
             self.subjects.clone(),
             self.queue_group.clone(),
-        )
-        .add(format!("{}.{}", self.prefix, subject.to_string()))
-        .await
+        );
+        endpoint.prefix = Some(self.prefix.clone());
+        endpoint.add(subject.to_string()).await
     }
 
     /// Builder for customized [Endpoint] creation under current [Group]
@@ -664,13 +693,15 @@ impl Group {
     /// # }
     /// ```
     pub fn endpoint_builder(&self) -> EndpointBuilder {
-        EndpointBuilder::new(
+        let mut endpoint = EndpointBuilder::new(
             self.client.clone(),
             self.stats.clone(),
             self.shutdown_tx.clone(),
             self.subjects.clone(),
             self.queue_group.clone(),
-        )
+        );
+        endpoint.prefix = Some(self.prefix.clone());
+        endpoint
     }
 }
 
@@ -753,7 +784,10 @@ impl Request {
         let stats = stats.endpoints.get_mut(self.endpoint.as_str()).unwrap();
         stats.requests += 1;
         stats.processing_time += elapsed;
-        stats.average_processing_time = stats.processing_time.checked_div(2).unwrap();
+        stats.average_processing_time = {
+            let avg_nanos = (stats.processing_time.as_nanos() / stats.requests as u128) as u64;
+            Duration::from_nanos(avg_nanos)
+        };
         result
     }
 }
@@ -767,6 +801,7 @@ pub struct EndpointBuilder {
     metadata: Option<HashMap<String, String>>,
     subjects: Arc<Mutex<Vec<String>>>,
     queue_group: String,
+    prefix: Option<String>,
 }
 
 impl EndpointBuilder {
@@ -785,6 +820,7 @@ impl EndpointBuilder {
             name: None,
             metadata: None,
             queue_group,
+            prefix: None,
         }
     }
 
@@ -808,11 +844,18 @@ impl EndpointBuilder {
 
     /// Finalizes the builder and adds the [Endpoint].
     pub async fn add<S: ToString>(self, subject: S) -> Result<Endpoint, Error> {
-        let subject = subject.to_string();
-        let name = self.name.clone().unwrap_or_else(|| subject.clone());
+        let mut subject = subject.to_string();
+        if let Some(prefix) = self.prefix {
+            subject = format!("{}.{}", prefix, subject);
+        }
+        let endpoint_name = self.name.clone().unwrap_or_else(|| subject.clone());
+        let name = self
+            .name
+            .clone()
+            .unwrap_or_else(|| subject.clone().replace('.', "-"));
         let requests = self
             .client
-            .queue_subscribe(subject.clone(), self.queue_group.clone())
+            .queue_subscribe(subject.to_owned(), self.queue_group.to_string())
             .await?;
         debug!("created service for endpoint {subject}");
 
@@ -821,7 +864,7 @@ impl EndpointBuilder {
         let mut stats = self.stats.lock().unwrap();
         stats
             .endpoints
-            .entry(subject.clone())
+            .entry(endpoint_name.clone())
             .or_insert(endpoint::Inner {
                 name,
                 subject: subject.clone(),
@@ -834,14 +877,14 @@ impl EndpointBuilder {
             requests,
             stats: self.stats.clone(),
             client: self.client.clone(),
-            endpoint: subject.clone(),
+            endpoint: endpoint_name,
             shutdown: Some(shutdown_rx),
             shutdown_future: None,
         })
     }
 }
 
-pub struct StatsHandler(pub Box<dyn FnMut(String, endpoint::Stats) -> String + Send>);
+pub struct StatsHandler(pub Box<dyn FnMut(String, endpoint::Stats) -> serde_json::Value + Send>);
 
 impl std::fmt::Debug for StatsHandler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

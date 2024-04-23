@@ -18,27 +18,28 @@
 use async_trait::async_trait;
 use bytes::Bytes;
 use http::StatusCode;
+use std::sync::Arc;
 
-use super::backend::WebdavBackend;
+use super::core::*;
 use super::error::parse_error;
 use crate::raw::*;
 use crate::*;
 
 pub struct WebdavWriter {
-    backend: WebdavBackend,
+    core: Arc<WebdavCore>,
 
     op: OpWrite,
     path: String,
 }
 
 impl WebdavWriter {
-    pub fn new(backend: WebdavBackend, op: OpWrite, path: String) -> Self {
-        WebdavWriter { backend, op, path }
+    pub fn new(core: Arc<WebdavCore>, op: OpWrite, path: String) -> Self {
+        WebdavWriter { core, op, path }
     }
 
     async fn write_oneshot(&mut self, size: u64, body: AsyncBody) -> Result<()> {
         let resp = self
-            .backend
+            .core
             .webdav_put(
                 &self.path,
                 Some(size),

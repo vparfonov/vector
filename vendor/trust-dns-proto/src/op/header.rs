@@ -69,12 +69,10 @@ impl fmt::Display for Header {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         write!(
             f,
-            "{id}:{message_type}:{flags}:{code:?}:{op_code}:{answers}/{authorities}/{additionals}",
+            "{id}:{flags}:{code:?}:{answers}/{authorities}/{additionals}",
             id = self.id,
-            message_type = self.message_type,
             flags = self.flags(),
             code = self.response_code,
-            op_code = self.op_code,
             answers = self.answer_count,
             authorities = self.name_server_count,
             additionals = self.additional_count,
@@ -94,8 +92,8 @@ pub enum MessageType {
 impl fmt::Display for MessageType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         let s = match self {
-            Self::Query => "QUERY",
-            Self::Response => "RESPONSE",
+            MessageType::Query => "QUERY",
+            MessageType::Response => "RESPONSE",
         };
 
         f.write_str(s)
@@ -178,7 +176,7 @@ impl Header {
     /// Construct a new header based off the request header. This copies over the RD (recursion-desired)
     ///   and CD (checking-disabled), as well as the op_code and id of the request.
     ///
-    /// See <https://datatracker.ietf.org/doc/html/rfc6895#section-2>
+    /// See https://datatracker.ietf.org/doc/html/rfc6895#section-2
     ///
     /// ```text
     /// The AA, TC, RD, RA, and CD bits are each theoretically meaningful
@@ -262,13 +260,13 @@ impl Header {
         self
     }
 
-    /// Specifies that the data is authentic, i.e. the resolver believes all data to be valid through DNSSEC
+    /// Specifies that the data is authentic, i.e. the resolver believes all data to be valid through DNSSec
     pub fn set_authentic_data(&mut self, authentic_data: bool) -> &mut Self {
         self.authentic_data = authentic_data;
         self
     }
 
-    /// Used during recursive resolution to specified if a resolver should or should not validate DNSSEC signatures
+    /// Used during recursive resolution to specified if a resolver should or should not validate DNSSec signatures
     pub fn set_checking_disabled(&mut self, checking_disabled: bool) -> &mut Self {
         self.checking_disabled = checking_disabled;
         self

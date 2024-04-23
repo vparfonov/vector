@@ -10,7 +10,7 @@ use serde::Serialize;
 use crate::error::{Error, Result};
 use crate::function::Function;
 use crate::lua::Lua;
-use crate::types::{Callback, CallbackUpvalue, LuaRef, MaybeSend};
+use crate::types::{Callback, CallbackUpvalue, LuaRef, MaybeSend, SubtypeId};
 use crate::userdata::{
     AnyUserData, MetaMethod, UserData, UserDataCell, UserDataFields, UserDataMethods,
 };
@@ -19,7 +19,7 @@ use crate::util::{
     self, assert_stack, check_stack, init_userdata_metatable, push_string, push_table,
     rawset_field, short_type_name, take_userdata, StackGuard,
 };
-use crate::value::{FromLua, FromLuaMulti, IntoLua, IntoLuaMulti, Value};
+use crate::value::{FromLua, FromLuaMulti, IntoLua, IntoLuaMulti};
 
 #[cfg(feature = "lua54")]
 use crate::userdata::USER_VALUE_MAXSLOT;
@@ -405,7 +405,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
             let meta_methods_nrec = registry.meta_methods.len() + registry.meta_fields.len() + 1;
             push_table(state, 0, meta_methods_nrec, true)?;
             for (k, m) in registry.meta_methods {
-                lua.push_value(Value::Function(wrap_method(self, ud_ptr, &k, m)?))?;
+                lua.push(wrap_method(self, ud_ptr, &k, m)?)?;
                 rawset_field(state, -2, MetaMethod::validate(&k)?)?;
             }
             let mut has_name = false;
@@ -434,6 +434,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
                             push_table(state, 0, fields_nrec, true)?;
                         }
                         for (k, f) in registry.fields {
+                            #[rustfmt::skip]
                             let NonStaticMethod::Function(f) = f else { unreachable!() };
                             mlua_assert!(f(lua, 0)? == 1, "field function must return one value");
                             rawset_field(state, -2, &k)?;
@@ -454,7 +455,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
             if field_getters_nrec > 0 {
                 push_table(state, 0, field_getters_nrec, true)?;
                 for (k, m) in registry.field_getters {
-                    lua.push_value(Value::Function(wrap_method(self, ud_ptr, &k, m)?))?;
+                    lua.push(wrap_method(self, ud_ptr, &k, m)?)?;
                     rawset_field(state, -2, &k)?;
                 }
                 field_getters_index = Some(ffi::lua_absindex(state, -1));
@@ -465,7 +466,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
             if field_setters_nrec > 0 {
                 push_table(state, 0, field_setters_nrec, true)?;
                 for (k, m) in registry.field_setters {
-                    lua.push_value(Value::Function(wrap_method(self, ud_ptr, &k, m)?))?;
+                    lua.push(wrap_method(self, ud_ptr, &k, m)?)?;
                     rawset_field(state, -2, &k)?;
                 }
                 field_setters_index = Some(ffi::lua_absindex(state, -1));
@@ -477,7 +478,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
                 // Create table used for methods lookup
                 push_table(state, 0, methods_nrec, true)?;
                 for (k, m) in registry.methods {
-                    lua.push_value(Value::Function(wrap_method(self, ud_ptr, &k, m)?))?;
+                    lua.push(wrap_method(self, ud_ptr, &k, m)?)?;
                     rawset_field(state, -2, &k)?;
                 }
                 methods_index = Some(ffi::lua_absindex(state, -1));
@@ -510,7 +511,7 @@ impl<'lua, 'scope> Scope<'lua, 'scope> {
             #[cfg(not(feature = "luau"))]
             std::ptr::write(ud_ptr as _, UserDataCell::new(data));
             ffi::lua_setmetatable(state, -2);
-            let ud = AnyUserData(lua.pop_ref());
+            let ud = AnyUserData(lua.pop_ref(), SubtypeId::None);
             lua.register_raw_userdata_metatable(mt_ptr, None);
 
             #[cfg(any(feature = "lua51", feature = "luajit"))]

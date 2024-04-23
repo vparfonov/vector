@@ -52,6 +52,7 @@
     - [`JsValue`](./reference/types/jsvalue.md)
     - [`Box<[JsValue]>`](./reference/types/boxed-jsvalue-slice.md)
     - [`*const T` and `*mut T`](./reference/types/pointers.md)
+    - [`NonNull<T>`](./reference/types/non-null.md)
     - [Numbers](./reference/types/numbers.md)
     - [`bool`](./reference/types/bool.md)
     - [`char`](./reference/types/char.md)

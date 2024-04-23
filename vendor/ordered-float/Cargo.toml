@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.60"
 name = "ordered-float"
-version = "4.1.1"
+version = "4.2.0"
 authors = [
     "Jonathan Reem <jonathan.reem@gmail.com>",
     "Matt Brubeck <mbrubeck@limpet.net>",
@@ -38,6 +38,11 @@ repository = "https://github.com/reem/rust-ordered-float"
 [dependencies.arbitrary]
 version = "1.0.0"
 optional = true
+
+[dependencies.borsh]
+version = "1.2.0"
+optional = true
+default-features = false
 
 [dependencies.bytemuck]
 version = "1.12.2"

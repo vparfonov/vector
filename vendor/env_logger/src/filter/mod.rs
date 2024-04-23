@@ -59,7 +59,6 @@
 //! [`Filter::matches`]: struct.Filter.html#method.matches
 
 use log::{Level, LevelFilter, Metadata, Record};
-use std::collections::HashMap;
 use std::env;
 use std::fmt;
 use std::mem;
@@ -71,18 +70,6 @@ mod inner;
 #[cfg(not(feature = "regex"))]
 #[path = "string.rs"]
 mod inner;
-
-/// A log filter.
-///
-/// This struct can be used to determine whether or not a log record
-/// should be written to the output.
-/// Use the [`Builder`] type to parse and construct a `Filter`.
-///
-/// [`Builder`]: struct.Builder.html
-pub struct Filter {
-    directives: Vec<Directive>,
-    filter: Option<inner::Filter>,
-}
 
 /// A builder for a log filter.
 ///
@@ -108,15 +95,149 @@ pub struct Filter {
 ///
 /// [`Filter`]: struct.Filter.html
 pub struct Builder {
-    directives: HashMap<Option<String>, LevelFilter>,
+    directives: Vec<Directive>,
     filter: Option<inner::Filter>,
     built: bool,
+}
+
+impl Builder {
+    /// Initializes the filter builder with defaults.
+    pub fn new() -> Builder {
+        Builder {
+            directives: Vec::new(),
+            filter: None,
+            built: false,
+        }
+    }
+
+    /// Initializes the filter builder from an environment.
+    pub fn from_env(env: &str) -> Builder {
+        let mut builder = Builder::new();
+
+        if let Ok(s) = env::var(env) {
+            builder.parse(&s);
+        }
+
+        builder
+    }
+
+    /// Insert the directive replacing any directive with the same name.
+    fn insert_directive(&mut self, mut directive: Directive) {
+        if let Some(pos) = self
+            .directives
+            .iter()
+            .position(|d| d.name == directive.name)
+        {
+            mem::swap(&mut self.directives[pos], &mut directive);
+        } else {
+            self.directives.push(directive);
+        }
+    }
+
+    /// Adds a directive to the filter for a specific module.
+    pub fn filter_module(&mut self, module: &str, level: LevelFilter) -> &mut Self {
+        self.filter(Some(module), level)
+    }
+
+    /// Adds a directive to the filter for all modules.
+    pub fn filter_level(&mut self, level: LevelFilter) -> &mut Self {
+        self.filter(None, level)
+    }
+
+    /// Adds a directive to the filter.
+    ///
+    /// The given module (if any) will log at most the specified level provided.
+    /// If no module is provided then the filter will apply to all log messages.
+    pub fn filter(&mut self, module: Option<&str>, level: LevelFilter) -> &mut Self {
+        self.insert_directive(Directive {
+            name: module.map(|s| s.to_string()),
+            level,
+        });
+        self
+    }
+
+    /// Parses the directives string.
+    ///
+    /// See the [Enabling Logging] section for more details.
+    ///
+    /// [Enabling Logging]: ../index.html#enabling-logging
+    pub fn parse(&mut self, filters: &str) -> &mut Self {
+        let (directives, filter) = parse_spec(filters);
+
+        self.filter = filter;
+
+        for directive in directives {
+            self.insert_directive(directive);
+        }
+        self
+    }
+
+    /// Build a log filter.
+    pub fn build(&mut self) -> Filter {
+        assert!(!self.built, "attempt to re-use consumed builder");
+        self.built = true;
+
+        let mut directives = Vec::new();
+        if self.directives.is_empty() {
+            // Adds the default filter if none exist
+            directives.push(Directive {
+                name: None,
+                level: LevelFilter::Error,
+            });
+        } else {
+            // Consume directives.
+            directives = mem::take(&mut self.directives);
+            // Sort the directives by length of their name, this allows a
+            // little more efficient lookup at runtime.
+            directives.sort_by(|a, b| {
+                let alen = a.name.as_ref().map(|a| a.len()).unwrap_or(0);
+                let blen = b.name.as_ref().map(|b| b.len()).unwrap_or(0);
+                alen.cmp(&blen)
+            });
+        }
+
+        Filter {
+            directives: mem::take(&mut directives),
+            filter: mem::take(&mut self.filter),
+        }
+    }
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Builder::new()
+    }
+}
+
+impl fmt::Debug for Builder {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if self.built {
+            f.debug_struct("Filter").field("built", &true).finish()
+        } else {
+            f.debug_struct("Filter")
+                .field("filter", &self.filter)
+                .field("directives", &self.directives)
+                .finish()
+        }
+    }
 }
 
 #[derive(Debug)]
 struct Directive {
     name: Option<String>,
     level: LevelFilter,
+}
+
+/// A log filter.
+///
+/// This struct can be used to determine whether or not a log record
+/// should be written to the output.
+/// Use the [`Builder`] type to parse and construct a `Filter`.
+///
+/// [`Builder`]: struct.Builder.html
+pub struct Filter {
+    directives: Vec<Directive>,
+    filter: Option<inner::Filter>,
 }
 
 impl Filter {
@@ -168,122 +289,12 @@ impl Filter {
     }
 }
 
-impl Builder {
-    /// Initializes the filter builder with defaults.
-    pub fn new() -> Builder {
-        Builder {
-            directives: HashMap::new(),
-            filter: None,
-            built: false,
-        }
-    }
-
-    /// Initializes the filter builder from an environment.
-    pub fn from_env(env: &str) -> Builder {
-        let mut builder = Builder::new();
-
-        if let Ok(s) = env::var(env) {
-            builder.parse(&s);
-        }
-
-        builder
-    }
-
-    /// Adds a directive to the filter for a specific module.
-    pub fn filter_module(&mut self, module: &str, level: LevelFilter) -> &mut Self {
-        self.filter(Some(module), level)
-    }
-
-    /// Adds a directive to the filter for all modules.
-    pub fn filter_level(&mut self, level: LevelFilter) -> &mut Self {
-        self.filter(None, level)
-    }
-
-    /// Adds a directive to the filter.
-    ///
-    /// The given module (if any) will log at most the specified level provided.
-    /// If no module is provided then the filter will apply to all log messages.
-    pub fn filter(&mut self, module: Option<&str>, level: LevelFilter) -> &mut Self {
-        self.directives.insert(module.map(|s| s.to_string()), level);
-        self
-    }
-
-    /// Parses the directives string.
-    ///
-    /// See the [Enabling Logging] section for more details.
-    ///
-    /// [Enabling Logging]: ../index.html#enabling-logging
-    pub fn parse(&mut self, filters: &str) -> &mut Self {
-        let (directives, filter) = parse_spec(filters);
-
-        self.filter = filter;
-
-        for directive in directives {
-            self.directives.insert(directive.name, directive.level);
-        }
-        self
-    }
-
-    /// Build a log filter.
-    pub fn build(&mut self) -> Filter {
-        assert!(!self.built, "attempt to re-use consumed builder");
-        self.built = true;
-
-        let mut directives = Vec::new();
-        if self.directives.is_empty() {
-            // Adds the default filter if none exist
-            directives.push(Directive {
-                name: None,
-                level: LevelFilter::Error,
-            });
-        } else {
-            // Consume map of directives.
-            let directives_map = mem::take(&mut self.directives);
-            directives = directives_map
-                .into_iter()
-                .map(|(name, level)| Directive { name, level })
-                .collect();
-            // Sort the directives by length of their name, this allows a
-            // little more efficient lookup at runtime.
-            directives.sort_by(|a, b| {
-                let alen = a.name.as_ref().map(|a| a.len()).unwrap_or(0);
-                let blen = b.name.as_ref().map(|b| b.len()).unwrap_or(0);
-                alen.cmp(&blen)
-            });
-        }
-
-        Filter {
-            directives: mem::take(&mut directives),
-            filter: mem::replace(&mut self.filter, None),
-        }
-    }
-}
-
-impl Default for Builder {
-    fn default() -> Self {
-        Builder::new()
-    }
-}
-
 impl fmt::Debug for Filter {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Filter")
             .field("filter", &self.filter)
             .field("directives", &self.directives)
             .finish()
-    }
-}
-
-impl fmt::Debug for Builder {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        if self.built {
-            f.debug_struct("Filter").field("built", &true).finish()
-        } else {
-            f.debug_struct("Filter")
-                .field("filter", &self.filter)
-                .field("directives", &self.directives)
-                .finish()
-        }
     }
 }
 

@@ -1,11 +1,11 @@
 use winnow::combinator::cut_err;
 use winnow::combinator::delimited;
-use winnow::combinator::separated0;
+use winnow::combinator::separated;
+use winnow::combinator::trace;
 use winnow::token::one_of;
-use winnow::trace::trace;
 
 use crate::key::Key;
-use crate::parser::errors::CustomError;
+use crate::parser::error::CustomError;
 use crate::parser::key::key;
 use crate::parser::prelude::*;
 use crate::parser::trivia::ws;
@@ -124,7 +124,7 @@ fn inline_table_keyvals<'i>(
     move |input: &mut Input<'i>| {
         let check = check.recursing(input)?;
         (
-            separated0(keyval(check), INLINE_TABLE_SEP),
+            separated(0.., keyval(check), INLINE_TABLE_SEP),
             ws.span().map(RawString::with_span),
         )
             .parse_next(input)
@@ -165,6 +165,8 @@ fn keyval<'i>(
 }
 
 #[cfg(test)]
+#[cfg(feature = "parse")]
+#[cfg(feature = "display")]
 mod test {
     use super::*;
 

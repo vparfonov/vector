@@ -12,7 +12,9 @@
 /// 2. The type `T` we want to extend with custom behavior.
 /// 3. A function or macro taking a `&T` and returning a serializable type.
 /// 4. A function or macro taking a deserializable type and returning a `Result<T, E>`.
-///     The error type `E` must implement `Display`.
+///     The error type `E` must implement [`Display`].
+///
+/// [`Display`]: std::fmt::Display
 ///
 /// # Example
 ///
@@ -109,7 +111,6 @@ macro_rules! serde_conv {
         $vis struct $m;
 
         const _:() = {
-            #[allow(clippy::ptr_arg)]
             impl $m {
                 $vis fn serialize<S>(x: &$t, serializer: S) -> $crate::__private__::Result<S::Ok, S::Error>
                 where

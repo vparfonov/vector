@@ -1,9 +1,18 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
+/*
+ * Copyright (C) 2015 Benjamin Fry <benjaminfry@me.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 //! All record data structures and related serialization methods
 
@@ -15,8 +24,6 @@ use serde::{Deserialize, Serialize};
 // TODO: these should each be it's own struct, it would make parsing and decoding a little cleaner
 //  and also a little more ergonomic when accessing.
 // each of these module's has the parser for that rdata embedded, to keep the file sizes down...
-pub mod cdnskey;
-pub mod cds;
 pub mod dnskey;
 pub mod ds;
 #[allow(deprecated)]
@@ -24,28 +31,24 @@ pub mod key;
 pub mod nsec;
 pub mod nsec3;
 pub mod nsec3param;
-pub mod rrsig;
 pub mod sig;
 pub mod tsig;
 
 use enum_as_inner::EnumAsInner;
-use tracing::trace;
+use log::trace;
 
-use crate::{
-    error::*,
-    rr::{rdata::NULL, RData, RecordDataDecodable, RecordType},
-    serialize::binary::{BinDecodable, BinDecoder, BinEncodable, BinEncoder, Restrict},
-};
+use crate::error::*;
+use crate::rr::rdata::null;
+use crate::rr::rdata::NULL;
+use crate::rr::{RData, RecordType};
+use crate::serialize::binary::*;
 
-pub use self::cdnskey::CDNSKEY;
-pub use self::cds::CDS;
 pub use self::dnskey::DNSKEY;
 pub use self::ds::DS;
 pub use self::key::KEY;
 pub use self::nsec::NSEC;
 pub use self::nsec3::NSEC3;
 pub use self::nsec3param::NSEC3PARAM;
-pub use self::rrsig::RRSIG;
 pub use self::sig::SIG;
 pub use self::tsig::TSIG;
 
@@ -73,7 +76,7 @@ pub enum DNSSECRData {
     ///    resolvers, when serving or resolving.  For all practical purposes,
     ///    CDNSKEY is a regular RR type.
     /// ```
-    CDNSKEY(CDNSKEY),
+    CDNSKEY(DNSKEY),
 
     /// ```text
     /// RFC 7344              Delegation Trust Maintenance        September 2014
@@ -89,7 +92,7 @@ pub enum DNSSECRData {
     ///    resolvers, when serving or resolving.  For all practical purposes,
     ///    CDS is a regular RR type.
     /// ```
-    CDS(CDS),
+    CDS(DS),
 
     /// ```text
     /// RFC 4034                DNSSEC Resource Records               March 2005
@@ -414,40 +417,6 @@ pub enum DNSSECRData {
     ///    /                                                               /
     ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
     /// ```
-    RRSIG(RRSIG),
-
-    /// ```text
-    /// RFC 2535 & 2931   DNS Security Extensions               March 1999
-    /// RFC 4034          DNSSEC Resource Records               March 2005
-    ///
-    /// 3.1.  RRSIG RDATA Wire Format
-    ///
-    ///    The RDATA for an RRSIG RR consists of a 2 octet Type Covered field, a
-    ///    1 octet Algorithm field, a 1 octet Labels field, a 4 octet Original
-    ///    TTL field, a 4 octet Signature Expiration field, a 4 octet Signature
-    ///    Inception field, a 2 octet Key tag, the Signer's Name field, and the
-    ///    Signature field.
-    ///
-    ///                         1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
-    ///     0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///    |        Type Covered           |  Algorithm    |     Labels    |
-    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///    |                         Original TTL                          |
-    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///    |                      Signature Expiration                     |
-    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///    |                      Signature Inception                      |
-    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///    |            Key Tag            |                               /
-    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+         Signer's Name         /
-    ///    /                                                               /
-    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///    /                                                               /
-    ///    /                            Signature                          /
-    ///    /                                                               /
-    ///    +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    /// ```
     SIG(SIG),
 
     /// [RFC 8945, Secret Key Transaction Authentication for DNS](https://tools.ietf.org/html/rfc8945#section-4.2)
@@ -564,7 +533,7 @@ pub enum DNSSECRData {
     /// ```
     TSIG(TSIG),
 
-    /// Unknown or unsupported DNSSEC record data
+    /// Unknown or unsupported DNSSec record data
     Unknown {
         /// RecordType code
         code: u16,
@@ -582,47 +551,47 @@ impl DNSSECRData {
         match record_type {
             RecordType::CDNSKEY => {
                 trace!("reading CDNSKEY");
-                CDNSKEY::read_data(decoder, rdata_length).map(Self::CDNSKEY)
+                dnskey::read(decoder, rdata_length).map(Self::CDNSKEY)
             }
             RecordType::CDS => {
                 trace!("reading CDS");
-                CDS::read_data(decoder, rdata_length).map(Self::CDS)
+                ds::read(decoder, rdata_length).map(Self::CDS)
             }
             RecordType::DNSKEY => {
                 trace!("reading DNSKEY");
-                DNSKEY::read_data(decoder, rdata_length).map(Self::DNSKEY)
+                dnskey::read(decoder, rdata_length).map(Self::DNSKEY)
             }
             RecordType::DS => {
                 trace!("reading DS");
-                DS::read_data(decoder, rdata_length).map(Self::DS)
+                ds::read(decoder, rdata_length).map(Self::DS)
             }
             RecordType::KEY => {
                 trace!("reading KEY");
-                KEY::read_data(decoder, rdata_length).map(Self::KEY)
+                key::read(decoder, rdata_length).map(Self::KEY)
             }
             RecordType::NSEC => {
                 trace!("reading NSEC");
-                NSEC::read_data(decoder, rdata_length).map(Self::NSEC)
+                nsec::read(decoder, rdata_length).map(Self::NSEC)
             }
             RecordType::NSEC3 => {
                 trace!("reading NSEC3");
-                NSEC3::read_data(decoder, rdata_length).map(Self::NSEC3)
+                nsec3::read(decoder, rdata_length).map(Self::NSEC3)
             }
             RecordType::NSEC3PARAM => {
                 trace!("reading NSEC3PARAM");
-                NSEC3PARAM::read(decoder).map(Self::NSEC3PARAM)
+                nsec3param::read(decoder).map(Self::NSEC3PARAM)
             }
             RecordType::RRSIG => {
                 trace!("reading RRSIG");
-                RRSIG::read_data(decoder, rdata_length).map(Self::RRSIG)
+                sig::read(decoder, rdata_length).map(Self::SIG)
             }
             RecordType::SIG => {
                 trace!("reading SIG");
-                SIG::read_data(decoder, rdata_length).map(Self::SIG)
+                sig::read(decoder, rdata_length).map(Self::SIG)
             }
             RecordType::TSIG => {
                 trace!("reading TSIG");
-                TSIG::read_data(decoder, rdata_length).map(Self::TSIG)
+                tsig::read(decoder, rdata_length).map(Self::TSIG)
             }
             r => {
                 panic!("not a dnssec RecordType: {}", r);
@@ -633,24 +602,27 @@ impl DNSSECRData {
     pub(crate) fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
         match *self {
             Self::CDNSKEY(ref cdnskey) => {
-                encoder.with_canonical_names(|encoder| cdnskey.emit(encoder))
+                encoder.with_canonical_names(|encoder| dnskey::emit(encoder, cdnskey))
             }
-            Self::CDS(ref cds) => encoder.with_canonical_names(|encoder| cds.emit(encoder)),
-            Self::DS(ref ds) => encoder.with_canonical_names(|encoder| ds.emit(encoder)),
-            Self::KEY(ref key) => encoder.with_canonical_names(|encoder| key.emit(encoder)),
+            Self::CDS(ref cds) => encoder.with_canonical_names(|encoder| ds::emit(encoder, cds)),
+            Self::DS(ref ds) => encoder.with_canonical_names(|encoder| ds::emit(encoder, ds)),
+            Self::KEY(ref key) => encoder.with_canonical_names(|encoder| key::emit(encoder, key)),
             Self::DNSKEY(ref dnskey) => {
-                encoder.with_canonical_names(|encoder| dnskey.emit(encoder))
+                encoder.with_canonical_names(|encoder| dnskey::emit(encoder, dnskey))
             }
-            Self::NSEC(ref nsec) => encoder.with_canonical_names(|encoder| nsec.emit(encoder)),
-            Self::NSEC3(ref nsec3) => encoder.with_canonical_names(|encoder| nsec3.emit(encoder)),
+            Self::NSEC(ref nsec) => {
+                encoder.with_canonical_names(|encoder| nsec::emit(encoder, nsec))
+            }
+            Self::NSEC3(ref nsec3) => {
+                encoder.with_canonical_names(|encoder| nsec3::emit(encoder, nsec3))
+            }
             Self::NSEC3PARAM(ref nsec3param) => {
-                encoder.with_canonical_names(|encoder| nsec3param.emit(encoder))
+                encoder.with_canonical_names(|encoder| nsec3param::emit(encoder, nsec3param))
             }
-            Self::RRSIG(ref rrsig) => encoder.with_canonical_names(|encoder| rrsig.emit(encoder)),
-            Self::SIG(ref sig) => encoder.with_canonical_names(|encoder| sig.emit(encoder)),
-            Self::TSIG(ref tsig) => tsig.emit(encoder),
+            Self::SIG(ref sig) => encoder.with_canonical_names(|encoder| sig::emit(encoder, sig)),
+            Self::TSIG(ref tsig) => tsig::emit(encoder, tsig),
             Self::Unknown { ref rdata, .. } => {
-                encoder.with_canonical_names(|encoder| rdata.emit(encoder))
+                encoder.with_canonical_names(|encoder| null::emit(encoder, rdata))
             }
         }
     }
@@ -666,7 +638,6 @@ impl DNSSECRData {
             Self::NSEC3(..) => RecordType::NSEC3,
             Self::NSEC3PARAM(..) => RecordType::NSEC3PARAM,
             Self::SIG(..) => RecordType::SIG,
-            Self::RRSIG(..) => RecordType::RRSIG,
             Self::TSIG(..) => RecordType::TSIG,
             Self::Unknown { code, .. } => RecordType::Unknown(code),
         }
@@ -675,8 +646,8 @@ impl DNSSECRData {
 
 impl fmt::Display for DNSSECRData {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
-        fn w<D: fmt::Display>(f: &mut fmt::Formatter<'_>, rdata: D) -> Result<(), fmt::Error> {
-            write!(f, "{rdata}")
+        fn w<D: fmt::Display>(f: &mut fmt::Formatter<'_>, d: D) -> Result<(), fmt::Error> {
+            write!(f, "{rdata}", rdata = d)
         }
 
         match self {
@@ -689,7 +660,6 @@ impl fmt::Display for DNSSECRData {
             Self::NSEC3(nsec3) => w(f, nsec3),
             Self::NSEC3PARAM(nsec3param) => w(f, nsec3param),
             Self::SIG(sig) => w(f, sig),
-            Self::RRSIG(rrsig) => w(f, rrsig),
             Self::TSIG(ref tsig) => w(f, tsig),
             Self::Unknown { rdata, .. } => w(f, rdata),
         }

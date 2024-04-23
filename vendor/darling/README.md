@@ -118,11 +118,13 @@ Darling's features are built to work well for real-world projects.
     Additionally, `Option<T>` and `darling::util::Flag` fields are innately optional; you don't need to declare `#[darling(default)]` for those.
 -   **Field Renaming**: Fields can have different names in usage vs. the backing code.
 -   **Auto-populated fields**: Structs deriving `FromDeriveInput` and `FromField` can declare properties named `ident`, `vis`, `ty`, `attrs`, and `generics` to automatically get copies of the matching values from the input AST. `FromDeriveInput` additionally exposes `data` to get access to the body of the deriving type, and `FromVariant` exposes `fields`.
+    -   **Transformation of forwarded attributes**: You can add `#[darling(with=path)]` to the `attrs` field to use a custom function to transform the forwarded attributes before they're provided to your struct. The function signature is `fn(Vec<Attribute>) -> darling::Result<T>`, where `T` is the type you declared for the `attrs` field. Returning an error from this function will propagate with all other parsing errors.
 -   **Mapping function**: Use `#[darling(map="path")]` or `#[darling(and_then="path")]` to specify a function that runs on the result of parsing a meta-item field. This can change the return type, which enables you to parse to an intermediate form and convert that to the type you need in your struct.
 -   **Skip fields**: Use `#[darling(skip)]` to mark a field that shouldn't be read from attribute meta-items.
 -   **Multiple-occurrence fields**: Use `#[darling(multiple)]` on a `Vec` field to allow that field to appear multiple times in the meta-item. Each occurrence will be pushed into the `Vec`.
 -   **Span access**: Use `darling::util::SpannedValue` in a struct to get access to that meta item's source code span. This can be used to emit warnings that point at a specific field from your proc macro. In addition, you can use `darling::Error::write_errors` to automatically get precise error location details in most cases.
 -   **"Did you mean" suggestions**: Compile errors from derived darling trait impls include suggestions for misspelled fields.
+-   **Struct flattening**: Use `#[darling(flatten)]` to remove one level of structure when presenting your meta item to users. Fields that are not known to the parent struct will be forwarded to the `flatten` field.
 
 ## Shape Validation
 

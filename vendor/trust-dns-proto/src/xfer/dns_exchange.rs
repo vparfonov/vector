@@ -14,7 +14,7 @@ use std::task::{Context, Poll};
 use futures_channel::mpsc;
 use futures_util::future::{Future, FutureExt};
 use futures_util::stream::{Peekable, Stream, StreamExt};
-use tracing::{debug, warn};
+use log::{debug, warn};
 
 use crate::error::*;
 use crate::xfer::dns_handle::DnsHandle;
@@ -179,10 +179,7 @@ where
                     return Poll::Ready(Ok(()));
                 }
                 Poll::Ready(Some(Err(err))) => {
-                    debug!(
-                        error = err.as_dyn(),
-                        "io_stream hit an error, shutting down"
-                    );
+                    warn!("io_stream hit an error, shutting down: {}", err);
 
                     return Poll::Ready(Err(err));
                 }
@@ -223,7 +220,7 @@ where
 
 /// A wrapper for a future DnsExchange connection.
 ///
-/// DnsExchangeConnect is cloneable, making it possible to share this if the connection
+/// DnsExchangeConnect is clonable, making it possible to share this if the connection
 ///  will be shared across threads.
 ///
 /// The future will return a tuple of the DnsExchange (for sending messages) and a background
@@ -302,7 +299,7 @@ where
         loop {
             let next;
             match *self {
-                Self::Connecting {
+                DnsExchangeConnectInner::Connecting {
                     ref mut connect_future,
                     ref mut outbound_messages,
                     ref mut sender,
@@ -327,7 +324,7 @@ where
                         }
                         Poll::Pending => return Poll::Pending,
                         Poll::Ready(Err(error)) => {
-                            debug!(error = error.as_dyn(), "stream errored while connecting");
+                            debug!("stream errored while connecting: {:?}", error);
                             next = Self::FailAll {
                                 error,
                                 outbound_messages: outbound_messages
@@ -337,7 +334,7 @@ where
                         }
                     };
                 }
-                Self::Connected {
+                DnsExchangeConnectInner::Connected {
                     ref exchange,
                     ref mut background,
                 } => {
@@ -346,7 +343,7 @@ where
 
                     return Poll::Ready(Ok((exchange, background)));
                 }
-                Self::FailAll {
+                DnsExchangeConnectInner::FailAll {
                     ref error,
                     ref mut outbound_messages,
                 } => {

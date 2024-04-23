@@ -1,9 +1,18 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
+/*
+ * Copyright (C) 2016 Benjamin Fry <benjaminfry@me.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 //! pointer record from parent zone to child zone for dnskey proof
 
@@ -12,16 +21,12 @@ use std::fmt::{self, Display, Formatter};
 #[cfg(feature = "serde-config")]
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    error::{ProtoError, ProtoResult},
-    rr::{
-        dnssec::{rdata::DNSKEY, Algorithm, DigestType},
-        Name, RData, RecordData, RecordDataDecodable, RecordType,
-    },
-    serialize::binary::*,
-};
+use crate::error::*;
+use crate::rr::dnssec::{Algorithm, DigestType};
+use crate::serialize::binary::*;
 
-use super::DNSSECRData;
+use crate::rr::dnssec::rdata::DNSKEY;
+use crate::rr::Name;
 
 /// [RFC 4034, DNSSEC Resource Records, March 2005](https://tools.ietf.org/html/rfc4034#section-5)
 ///
@@ -192,61 +197,35 @@ impl DS {
     }
 }
 
-impl BinEncodable for DS {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        encoder.emit_u16(self.key_tag())?;
-        self.algorithm().emit(encoder)?; // always 3 for now
-        encoder.emit(self.digest_type().into())?;
-        encoder.emit_vec(self.digest())?;
+/// Read the RData from the given Decoder
+pub fn read(decoder: &mut BinDecoder<'_>, rdata_length: Restrict<u16>) -> ProtoResult<DS> {
+    let start_idx = decoder.index();
 
-        Ok(())
-    }
-}
+    let key_tag: u16 = decoder.read_u16()?.unverified(/*key_tag is valid as any u16*/);
+    let algorithm: Algorithm = Algorithm::read(decoder)?;
+    let digest_type: DigestType =
+        DigestType::from_u8(decoder.read_u8()?.unverified(/*DigestType is verified as safe*/))?;
 
-impl<'r> RecordDataDecodable<'r> for DS {
-    fn read_data(decoder: &mut BinDecoder<'r>, length: Restrict<u16>) -> ProtoResult<Self> {
-        let start_idx = decoder.index();
-
-        let key_tag: u16 = decoder.read_u16()?.unverified(/*key_tag is valid as any u16*/);
-        let algorithm: Algorithm = Algorithm::read(decoder)?;
-        let digest_type: DigestType =
-            DigestType::from_u8(decoder.read_u8()?.unverified(/*DigestType is verified as safe*/))?;
-
-        let bytes_read = decoder.index() - start_idx;
-        let left: usize = length
+    let bytes_read = decoder.index() - start_idx;
+    let left: usize = rdata_length
         .map(|u| u as usize)
         .checked_sub(bytes_read)
         .map_err(|_| ProtoError::from("invalid rdata length in DS"))?
         .unverified(/*used only as length safely*/);
-        let digest =
-            decoder.read_vec(left)?.unverified(/*the byte array will fail in usage if invalid*/);
+    let digest =
+        decoder.read_vec(left)?.unverified(/*the byte array will fail in usage if invalid*/);
 
-        Ok(Self::new(key_tag, algorithm, digest_type, digest))
-    }
+    Ok(DS::new(key_tag, algorithm, digest_type, digest))
 }
 
-impl RecordData for DS {
-    fn try_from_rdata(data: RData) -> Result<Self, RData> {
-        match data {
-            RData::DNSSEC(DNSSECRData::DS(csync)) => Ok(csync),
-            _ => Err(data),
-        }
-    }
+/// Write the RData from the given Decoder
+pub fn emit(encoder: &mut BinEncoder<'_>, rdata: &DS) -> ProtoResult<()> {
+    encoder.emit_u16(rdata.key_tag())?;
+    rdata.algorithm().emit(encoder)?; // always 3 for now
+    encoder.emit(rdata.digest_type().into())?;
+    encoder.emit_vec(rdata.digest())?;
 
-    fn try_borrow(data: &RData) -> Option<&Self> {
-        match data {
-            RData::DNSSEC(DNSSECRData::DS(csync)) => Some(csync),
-            _ => None,
-        }
-    }
-
-    fn record_type(&self) -> RecordType {
-        RecordType::DS
-    }
-
-    fn into_rdata(self) -> RData {
-        RData::DNSSEC(DNSSECRData::DS(self))
-    }
+    Ok(())
 }
 
 /// [RFC 4034, DNSSEC Resource Records, March 2005](https://tools.ietf.org/html/rfc4034#section-5.3)
@@ -322,14 +301,14 @@ mod tests {
 
         let mut bytes = Vec::new();
         let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        assert!(rdata.emit(&mut encoder).is_ok());
+        assert!(emit(&mut encoder, &rdata).is_ok());
         let bytes = encoder.into_bytes();
 
-        println!("bytes: {bytes:?}");
+        println!("bytes: {:?}", bytes);
 
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
         let restrict = Restrict::new(bytes.len() as u16);
-        let read_rdata = DS::read_data(&mut decoder, restrict).expect("Decoding error");
+        let read_rdata = read(&mut decoder, restrict).expect("Decoding error");
         assert_eq!(rdata, read_rdata);
     }
 

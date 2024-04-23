@@ -1,9 +1,13 @@
 //! Unix specific definitions
+#[cfg(feature = "buffer-redux")]
+use buffer_redux::BufReader;
 use std::cmp;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
-use std::io::{self, BufReader, ErrorKind, Read, Write};
-use std::os::unix::io::{AsRawFd, IntoRawFd, RawFd};
+#[cfg(not(feature = "buffer-redux"))]
+use std::io::BufReader;
+use std::io::{self, ErrorKind, Read, Write};
+use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, IntoRawFd, RawFd};
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, SyncSender};
@@ -11,10 +15,13 @@ use std::sync::{Arc, Mutex};
 
 use log::{debug, warn};
 use nix::errno::Errno;
-use nix::poll::{self, PollFlags};
+use nix::poll::{self, PollFlags, PollTimeout};
 use nix::sys::select::{self, FdSet};
-use nix::sys::termios::{self, SetArg, SpecialCharacterIndices as SCI, Termios};
+#[cfg(not(feature = "termios"))]
+use nix::sys::termios::Termios;
 use nix::unistd::{close, isatty, read, write};
+#[cfg(feature = "termios")]
+use termios::Termios;
 use unicode_segmentation::UnicodeSegmentation;
 use utf8parse::{Parser, Receiver};
 
@@ -88,6 +95,13 @@ fn is_a_tty(fd: RawFd) -> bool {
     isatty(fd).unwrap_or(false)
 }
 
+#[cfg(any(not(feature = "buffer-redux"), test))]
+pub type PosixBuffer = ();
+#[cfg(all(feature = "buffer-redux", not(test)))]
+pub type PosixBuffer = buffer_redux::Buffer;
+#[cfg(not(test))]
+pub type Buffer = PosixBuffer;
+
 pub type PosixKeyMap = HashMap<KeyEvent, Cmd>;
 #[cfg(not(test))]
 pub type KeyMap = PosixKeyMap;
@@ -106,7 +120,7 @@ pub type Mode = PosixMode;
 impl RawMode for PosixMode {
     /// Disable RAW mode for the terminal.
     fn disable_raw_mode(&self) -> Result<()> {
-        termios::tcsetattr(self.tty_in, SetArg::TCSADRAIN, &self.termios)?;
+        termios_::disable_raw_mode(self.tty_in, &self.termios)?;
         // disable bracketed paste
         if let Some(out) = self.tty_out {
             write_all(out, BRACKETED_PASTE_OFF)?;
@@ -176,17 +190,17 @@ type PipeWriter = (Arc<Mutex<File>>, SyncSender<String>);
 /// Console input reader
 pub struct PosixRawReader {
     tty_in: BufReader<TtyIn>,
-    timeout_ms: i32,
+    timeout_ms: PollTimeout,
     parser: Parser,
     key_map: PosixKeyMap,
     // external print reader
     pipe_reader: Option<PipeReader>,
-    fds: FdSet,
 }
 
-impl AsRawFd for PosixRawReader {
-    fn as_raw_fd(&self) -> RawFd {
-        self.tty_in.get_ref().fd
+impl AsFd for PosixRawReader {
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        let fd = self.tty_in.get_ref().fd;
+        unsafe { BorrowedFd::borrow_raw(fd) }
     }
 }
 
@@ -225,17 +239,26 @@ impl PosixRawReader {
     fn new(
         fd: RawFd,
         sigwinch_pipe: Option<RawFd>,
+        buffer: Option<PosixBuffer>,
         config: &Config,
         key_map: PosixKeyMap,
         pipe_reader: Option<PipeReader>,
     ) -> Self {
+        let inner = TtyIn { fd, sigwinch_pipe };
+        #[cfg(any(not(feature = "buffer-redux"), test))]
+        let (tty_in, _) = (BufReader::with_capacity(1024, inner), buffer);
+        #[cfg(all(feature = "buffer-redux", not(test)))]
+        let tty_in = if let Some(buffer) = buffer {
+            BufReader::with_buffer(buffer, inner)
+        } else {
+            BufReader::with_capacity(1024, inner)
+        };
         Self {
-            tty_in: BufReader::with_capacity(1024, TtyIn { fd, sigwinch_pipe }),
-            timeout_ms: config.keyseq_timeout(),
+            tty_in,
+            timeout_ms: config.keyseq_timeout().into(),
             parser: Parser::new(),
             key_map,
             pipe_reader,
-            fds: FdSet::new(),
         }
     }
 
@@ -275,8 +298,8 @@ impl PosixRawReader {
             if !allow_recurse {
                 return Ok(E::ESC);
             }
-            let timeout = if self.timeout_ms < 0 {
-                100
+            let timeout = if self.timeout_ms.is_none() {
+                100u8.into()
             } else {
                 self.timeout_ms
             };
@@ -679,12 +702,12 @@ impl PosixRawReader {
         })
     }
 
-    fn poll(&mut self, timeout_ms: i32) -> Result<i32> {
+    fn poll(&mut self, timeout_ms: PollTimeout) -> Result<i32> {
         let n = self.tty_in.buffer().len();
         if n > 0 {
             return Ok(n as i32);
         }
-        let mut fds = [poll::PollFd::new(self.as_raw_fd(), PollFlags::POLLIN)];
+        let mut fds = [poll::PollFd::new(self.as_fd(), PollFlags::POLLIN)];
         let r = poll::poll(&mut fds, timeout_ms);
         match r {
             Ok(n) => Ok(n),
@@ -700,15 +723,19 @@ impl PosixRawReader {
     }
 
     fn select(&mut self, single_esc_abort: bool) -> Result<Event> {
-        let tty_in = self.as_raw_fd();
-        let sigwinch_pipe = self.tty_in.get_ref().sigwinch_pipe;
+        let tty_in = self.as_fd();
+        let sigwinch_pipe = self
+            .tty_in
+            .get_ref()
+            .sigwinch_pipe
+            .map(|fd| unsafe { BorrowedFd::borrow_raw(fd) });
         let pipe_reader = self
             .pipe_reader
             .as_ref()
-            .map(|pr| pr.lock().unwrap().0.as_raw_fd());
+            .map(|pr| pr.lock().unwrap().0.as_raw_fd())
+            .map(|fd| unsafe { BorrowedFd::borrow_raw(fd) });
         loop {
-            let mut readfds = self.fds;
-            readfds.clear();
+            let mut readfds = FdSet::new();
             if let Some(sigwinch_pipe) = sigwinch_pipe {
                 readfds.insert(sigwinch_pipe);
             }
@@ -716,13 +743,7 @@ impl PosixRawReader {
             if let Some(pipe_reader) = pipe_reader {
                 readfds.insert(pipe_reader);
             }
-            if let Err(err) = select::select(
-                readfds.highest().map(|h| h + 1),
-                Some(&mut readfds),
-                None,
-                None,
-                None,
-            ) {
+            if let Err(err) = select::select(None, Some(&mut readfds), None, None, None) {
                 if err == Errno::EINTR && self.tty_in.get_ref().sigwinch()? {
                     return Err(ReadlineError::WindowResized);
                 } else if err != Errno::EINTR {
@@ -750,6 +771,8 @@ impl PosixRawReader {
 }
 
 impl RawReader for PosixRawReader {
+    type Buffer = PosixBuffer;
+
     #[cfg(not(feature = "signal-hook"))]
     fn wait_for_input(&mut self, single_esc_abort: bool) -> Result<Event> {
         match self.pipe_reader {
@@ -771,13 +794,13 @@ impl RawReader for PosixRawReader {
             if !self.tty_in.buffer().is_empty() {
                 debug!(target: "rustyline", "read buffer {:?}", self.tty_in.buffer());
             }
-            let timeout_ms = if single_esc_abort && self.timeout_ms == -1 {
-                0
+            let timeout_ms = if single_esc_abort && self.timeout_ms.is_none() {
+                PollTimeout::ZERO
             } else {
                 self.timeout_ms
             };
             match self.poll(timeout_ms) {
-                Ok(n) if n == 0 => {
+                Ok(0) => {
                     // single escape
                 }
                 Ok(_) => {
@@ -839,6 +862,17 @@ impl RawReader for PosixRawReader {
             debug!(target: "rustyline", "terminal key binding: {:?} => {:?}", key, cmd);
         }
         cmd
+    }
+
+    #[cfg(any(not(feature = "buffer-redux"), test))]
+    fn unbuffer(self) -> Option<PosixBuffer> {
+        None
+    }
+
+    #[cfg(all(feature = "buffer-redux", not(test)))]
+    fn unbuffer(self) -> Option<PosixBuffer> {
+        let (_, buffer) = self.tty_in.into_inner_with_buffer();
+        Some(buffer)
     }
 }
 
@@ -1085,14 +1119,14 @@ impl Renderer for PosixRenderer {
     }
 
     fn move_cursor_at_leftmost(&mut self, rdr: &mut PosixRawReader) -> Result<()> {
-        if rdr.poll(0)? != 0 {
+        if rdr.poll(PollTimeout::ZERO)? != 0 {
             debug!(target: "rustyline", "cannot request cursor location");
             return Ok(());
         }
         /* Report cursor location */
         self.write_and_flush("\x1b[6n")?;
         /* Read the response: ESC [ rows ; cols R */
-        if rdr.poll(100)? == 0
+        if rdr.poll(PollTimeout::from(100u8))? == 0
             || rdr.next_char()? != '\x1b'
             || rdr.next_char()? != '['
             || read_digits_until(rdr, ';')?.is_none()
@@ -1129,7 +1163,7 @@ fn read_digits_until(rdr: &mut PosixRawReader, sep: char) -> Result<Option<u32>>
 fn write_all(fd: RawFd, buf: &str) -> nix::Result<()> {
     let mut bytes = buf.as_bytes();
     while !bytes.is_empty() {
-        match write(fd, bytes) {
+        match write(unsafe { BorrowedFd::borrow_raw(fd) }, bytes) {
             Ok(0) => return Err(Errno::EIO),
             Ok(n) => bytes = &bytes[n..],
             Err(Errno::EINTR) => {}
@@ -1139,11 +1173,28 @@ fn write_all(fd: RawFd, buf: &str) -> nix::Result<()> {
     Ok(())
 }
 
+pub struct PosixCursorGuard(RawFd);
+
+impl Drop for PosixCursorGuard {
+    fn drop(&mut self) {
+        let _ = set_cursor_visibility(self.0, true);
+    }
+}
+
+fn set_cursor_visibility(fd: RawFd, visible: bool) -> Result<Option<PosixCursorGuard>> {
+    write_all(fd, if visible { "\x1b[?25h" } else { "\x1b[?25l" })?;
+    Ok(if visible {
+        None
+    } else {
+        Some(PosixCursorGuard(fd))
+    })
+}
+
 #[cfg(not(feature = "signal-hook"))]
 static mut SIGWINCH_PIPE: RawFd = -1;
 #[cfg(not(feature = "signal-hook"))]
 extern "C" fn sigwinch_handler(_: libc::c_int) {
-    let _ = unsafe { write(SIGWINCH_PIPE, &[b's']) };
+    let _ = unsafe { write(BorrowedFd::borrow_raw(SIGWINCH_PIPE), &[b's']) };
 }
 
 #[derive(Clone, Debug)]
@@ -1202,13 +1253,6 @@ impl SigWinCh {
     }
 }
 
-fn map_key(key_map: &mut HashMap<KeyEvent, Cmd>, raw: &Termios, index: SCI, name: &str, cmd: Cmd) {
-    let cc = char::from(raw.control_chars[index as usize]);
-    let key = KeyEvent::new(cc, M::NONE);
-    debug!(target: "rustyline", "{}: {:?}", name, key);
-    key_map.insert(key, cmd);
-}
-
 #[cfg(not(test))]
 pub type Terminal = PosixTerminal;
 
@@ -1230,6 +1274,7 @@ pub struct PosixTerminal {
     // external print writer
     pipe_writer: Option<PipeWriter>,
     sigwinch: Option<SigWinCh>,
+    enable_signals: bool,
 }
 
 impl PosixTerminal {
@@ -1243,6 +1288,8 @@ impl PosixTerminal {
 }
 
 impl Term for PosixTerminal {
+    type Buffer = PosixBuffer;
+    type CursorGuard = PosixCursorGuard;
     type ExternalPrinter = ExternalPrinter;
     type KeyMap = PosixKeyMap;
     type Mode = PosixMode;
@@ -1255,6 +1302,7 @@ impl Term for PosixTerminal {
         tab_stop: usize,
         bell_style: BellStyle,
         enable_bracketed_paste: bool,
+        enable_signals: bool,
     ) -> Result<Self> {
         let (tty_in, is_in_a_tty, tty_out, is_out_a_tty, close_on_drop) =
             if behavior == Behavior::PreferTerm {
@@ -1303,6 +1351,7 @@ impl Term for PosixTerminal {
             pipe_reader: None,
             pipe_writer: None,
             sigwinch,
+            enable_signals,
         })
     }
 
@@ -1326,38 +1375,10 @@ impl Term for PosixTerminal {
 
     fn enable_raw_mode(&mut self) -> Result<(Self::Mode, PosixKeyMap)> {
         use nix::errno::Errno::ENOTTY;
-        use nix::sys::termios::{ControlFlags, InputFlags, LocalFlags};
         if !self.is_in_a_tty {
             return Err(ENOTTY.into());
         }
-        let original_mode = termios::tcgetattr(self.tty_in)?;
-        let mut raw = original_mode.clone();
-        // disable BREAK interrupt, CR to NL conversion on input,
-        // input parity check, strip high bit (bit 8), output flow control
-        raw.input_flags &= !(InputFlags::BRKINT
-            | InputFlags::ICRNL
-            | InputFlags::INPCK
-            | InputFlags::ISTRIP
-            | InputFlags::IXON);
-        // we don't want raw output, it turns newlines into straight line feeds
-        // disable all output processing
-        // raw.c_oflag = raw.c_oflag & !(OutputFlags::OPOST);
-
-        // character-size mark (8 bits)
-        raw.control_flags |= ControlFlags::CS8;
-        // disable echoing, canonical mode, extended input processing and signals
-        raw.local_flags &=
-            !(LocalFlags::ECHO | LocalFlags::ICANON | LocalFlags::IEXTEN | LocalFlags::ISIG);
-        raw.control_chars[SCI::VMIN as usize] = 1; // One character-at-a-time input
-        raw.control_chars[SCI::VTIME as usize] = 0; // with blocking read
-
-        let mut key_map: HashMap<KeyEvent, Cmd> = HashMap::with_capacity(4);
-        map_key(&mut key_map, &raw, SCI::VEOF, "VEOF", Cmd::EndOfFile);
-        map_key(&mut key_map, &raw, SCI::VINTR, "VINTR", Cmd::Interrupt);
-        map_key(&mut key_map, &raw, SCI::VQUIT, "VQUIT", Cmd::Interrupt);
-        map_key(&mut key_map, &raw, SCI::VSUSP, "VSUSP", Cmd::Suspend);
-
-        termios::tcsetattr(self.tty_in, SetArg::TCSADRAIN, &raw)?;
+        let (original_mode, key_map) = termios_::enable_raw_mode(self.tty_in, self.enable_signals)?;
 
         self.raw_mode.store(true, Ordering::SeqCst);
         // enable bracketed paste
@@ -1388,10 +1409,16 @@ impl Term for PosixTerminal {
     }
 
     /// Create a RAW reader
-    fn create_reader(&self, config: &Config, key_map: PosixKeyMap) -> PosixRawReader {
+    fn create_reader(
+        &self,
+        buffer: Option<PosixBuffer>,
+        config: &Config,
+        key_map: PosixKeyMap,
+    ) -> PosixRawReader {
         PosixRawReader::new(
             self.tty_in,
             self.sigwinch.as_ref().map(|s| s.pipe),
+            buffer,
             config,
             key_map,
             self.pipe_reader.clone(),
@@ -1424,14 +1451,10 @@ impl Term for PosixTerminal {
             return Err(nix::Error::ENOTTY.into());
         }
         use nix::unistd::pipe;
-        use std::os::unix::io::FromRawFd;
         let (sender, receiver) = mpsc::sync_channel(1); // TODO validate: bound
         let (r, w) = pipe()?;
-        let reader = Arc::new(Mutex::new((unsafe { File::from_raw_fd(r) }, receiver)));
-        let writer = (
-            Arc::new(Mutex::new(unsafe { File::from_raw_fd(w) })),
-            sender,
-        );
+        let reader = Arc::new(Mutex::new((r.into(), receiver)));
+        let writer = (Arc::new(Mutex::new(w.into())), sender);
         self.pipe_reader.replace(reader);
         self.pipe_writer.replace(writer.clone());
         Ok(ExternalPrinter {
@@ -1439,6 +1462,14 @@ impl Term for PosixTerminal {
             raw_mode: self.raw_mode.clone(),
             tty_out: self.tty_out,
         })
+    }
+
+    fn set_cursor_visibility(&mut self, visible: bool) -> Result<Option<PosixCursorGuard>> {
+        if self.is_out_a_tty {
+            set_cursor_visibility(self.tty_out, visible)
+        } else {
+            Ok(None)
+        }
     }
 }
 
@@ -1488,6 +1519,127 @@ pub fn suspend() -> Result<()> {
     // suspend the whole process group
     signal::kill(Pid::from_raw(0), signal::SIGTSTP)?;
     Ok(())
+}
+
+#[cfg(not(feature = "termios"))]
+mod termios_ {
+    use super::PosixKeyMap;
+    use crate::keys::{KeyEvent, Modifiers as M};
+    use crate::{Cmd, Result};
+    use nix::sys::termios::{self, SetArg, SpecialCharacterIndices as SCI, Termios};
+    use std::collections::HashMap;
+    use std::os::unix::io::{BorrowedFd, RawFd};
+    pub fn disable_raw_mode(tty_in: RawFd, termios: &Termios) -> Result<()> {
+        let fd = unsafe { BorrowedFd::borrow_raw(tty_in) };
+        Ok(termios::tcsetattr(fd, SetArg::TCSADRAIN, termios)?)
+    }
+    pub fn enable_raw_mode(tty_in: RawFd, enable_signals: bool) -> Result<(Termios, PosixKeyMap)> {
+        use nix::sys::termios::{ControlFlags, InputFlags, LocalFlags};
+
+        let fd = unsafe { BorrowedFd::borrow_raw(tty_in) };
+        let original_mode = termios::tcgetattr(fd)?;
+        let mut raw = original_mode.clone();
+        // disable BREAK interrupt, CR to NL conversion on input,
+        // input parity check, strip high bit (bit 8), output flow control
+        raw.input_flags &= !(InputFlags::BRKINT
+            | InputFlags::ICRNL
+            | InputFlags::INPCK
+            | InputFlags::ISTRIP
+            | InputFlags::IXON);
+        // we don't want raw output, it turns newlines into straight line feeds
+        // disable all output processing
+        // raw.c_oflag = raw.c_oflag & !(OutputFlags::OPOST);
+
+        // character-size mark (8 bits)
+        raw.control_flags |= ControlFlags::CS8;
+        // disable echoing, canonical mode, extended input processing and signals
+        raw.local_flags &=
+            !(LocalFlags::ECHO | LocalFlags::ICANON | LocalFlags::IEXTEN | LocalFlags::ISIG);
+
+        if enable_signals {
+            raw.local_flags |= LocalFlags::ISIG;
+        }
+
+        raw.control_chars[SCI::VMIN as usize] = 1; // One character-at-a-time input
+        raw.control_chars[SCI::VTIME as usize] = 0; // with blocking read
+
+        let mut key_map: HashMap<KeyEvent, Cmd> = HashMap::with_capacity(4);
+        map_key(&mut key_map, &raw, SCI::VEOF, "VEOF", Cmd::EndOfFile);
+        map_key(&mut key_map, &raw, SCI::VINTR, "VINTR", Cmd::Interrupt);
+        map_key(&mut key_map, &raw, SCI::VQUIT, "VQUIT", Cmd::Interrupt);
+        map_key(&mut key_map, &raw, SCI::VSUSP, "VSUSP", Cmd::Suspend);
+
+        termios::tcsetattr(fd, SetArg::TCSADRAIN, &raw)?;
+        Ok((original_mode, key_map))
+    }
+    fn map_key(
+        key_map: &mut HashMap<KeyEvent, Cmd>,
+        raw: &Termios,
+        index: SCI,
+        name: &str,
+        cmd: Cmd,
+    ) {
+        let cc = char::from(raw.control_chars[index as usize]);
+        let key = KeyEvent::new(cc, M::NONE);
+        log::debug!(target: "rustyline", "{}: {:?}", name, key);
+        key_map.insert(key, cmd);
+    }
+}
+#[cfg(feature = "termios")]
+mod termios_ {
+    use super::PosixKeyMap;
+    use crate::keys::{KeyEvent, Modifiers as M};
+    use crate::{Cmd, Result};
+    use std::collections::HashMap;
+    use std::os::unix::io::RawFd;
+    use termios::{self, Termios};
+    pub fn disable_raw_mode(tty_in: RawFd, termios: &Termios) -> Result<()> {
+        Ok(termios::tcsetattr(tty_in, termios::TCSADRAIN, termios)?)
+    }
+    pub fn enable_raw_mode(tty_in: RawFd, enable_signals: bool) -> Result<(Termios, PosixKeyMap)> {
+        let original_mode = Termios::from_fd(tty_in)?;
+        let mut raw = original_mode;
+        // disable BREAK interrupt, CR to NL conversion on input,
+        // input parity check, strip high bit (bit 8), output flow control
+        raw.c_iflag &=
+            !(termios::BRKINT | termios::ICRNL | termios::INPCK | termios::ISTRIP | termios::IXON);
+        // we don't want raw output, it turns newlines into straight line feeds
+        // disable all output processing
+        // raw.c_oflag = raw.c_oflag & !(OutputFlags::OPOST);
+
+        // character-size mark (8 bits)
+        raw.c_cflag |= termios::CS8;
+        // disable echoing, canonical mode, extended input processing and signals
+        raw.c_lflag &= !(termios::ECHO | termios::ICANON | termios::IEXTEN | termios::ISIG);
+
+        if enable_signals {
+            raw.c_lflag |= termios::ISIG;
+        }
+
+        raw.c_cc[termios::VMIN] = 1; // One character-at-a-time input
+        raw.c_cc[termios::VTIME] = 0; // with blocking read
+
+        let mut key_map: HashMap<KeyEvent, Cmd> = HashMap::with_capacity(4);
+        map_key(&mut key_map, &raw, termios::VEOF, "VEOF", Cmd::EndOfFile);
+        map_key(&mut key_map, &raw, termios::VINTR, "VINTR", Cmd::Interrupt);
+        map_key(&mut key_map, &raw, termios::VQUIT, "VQUIT", Cmd::Interrupt);
+        map_key(&mut key_map, &raw, termios::VSUSP, "VSUSP", Cmd::Suspend);
+
+        termios::tcsetattr(tty_in, termios::TCSADRAIN, &raw)?;
+        Ok((original_mode, key_map))
+    }
+    fn map_key(
+        key_map: &mut HashMap<KeyEvent, Cmd>,
+        raw: &Termios,
+        index: usize,
+        name: &str,
+        cmd: Cmd,
+    ) {
+        let cc = char::from(raw.c_cc[index]);
+        let key = KeyEvent::new(cc, M::NONE);
+        log::debug!(target: "rustyline", "{}: {:?}", name, key);
+        key_map.insert(key, cmd);
+    }
 }
 
 #[cfg(test)]

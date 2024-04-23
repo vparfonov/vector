@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.7.0] - 2024-03-11
+
+### Fixed
+
+* Detect conflicting `schema_with` attributes on fields with `schemars` annotations by @swlynch99 (#715)
+    This extends the existing avoidance mechanism to a new variant fixing #712.
+
+## [3.6.1] - 2024-02-08
+
+No changes.
+
+## [3.6.0] - 2024-01-30
+
+No changes.
+
+## [3.5.1] - 2024-01-23
+
+### Fixed
+
+* The `serde_as` macro now better detects existing `schemars` attributes on fields and incorporates them (#682)
+    This avoids errors on existing `#[schemars(with = ...)]` annotations.
+
+## [3.5.0] - 2024-01-20
+
+### Added
+
+* Support for `schemars` integration added by @swlynch99 (#666)
+    The `serde_as` macro can now detect `schemars` usage and emits matching annotations for all fields with `serde_as` attribute.
+
 ## [3.4.0] - 2023-10-17
 
 No changes.
@@ -76,7 +105,7 @@ No changes.
     }
     ```
 
-    The `apply` attribute will expand into this, applying the attributs to the matching fields:
+    The `apply` attribute will expand into this, applying the attributes to the matching fields:
 
     ```rust
     #[derive(serde::Serialize)]
@@ -133,7 +162,7 @@ No changes compared to v2.0.0-rc.0.
     * `core::option::Option`, with or without leading `::`
 
     If an existing `default` attribute is detected, the attribute is not applied again.
-    This behavior can be supressed by using `#[serde_as(no_default)]` or `#[serde_as(as = "Option<S>", no_default)]`.
+    This behavior can be suppressed by using `#[serde_as(no_default)]` or `#[serde_as(as = "Option<S>", no_default)]`.
 
 ### Fixed
 
@@ -156,7 +185,7 @@ No changes compared to v2.0.0-rc.0.
     * `core::option::Option`, with or without leading `::`
 
     If an existing `default` attribute is detected, the attribute is not applied again.
-    This behavior can be supressed by using `#[serde_as(no_default)]` or `#[serde_as(as = "Option<S>", no_default)]`.
+    This behavior can be suppressed by using `#[serde_as(no_default)]` or `#[serde_as(as = "Option<S>", no_default)]`.
 
 ### Fixed
 
@@ -213,7 +242,7 @@ No changes compared to v2.0.0-rc.0.
 
     This should have no effect on the generated code and on the runtime behavior.
     It eases integration of third-party crates with `serde_with`, since they can now process the `#[serde_as(...)]` field attributes reliably.
-    Before this was impossible for derive macros and lead to awkward ordering constraints on the attribute macros.
+    Before this, it was impossible for derive macros and lead to awkward ordering constraints on the attribute macros.
 
     Thanks to @Lehona for reporting this problem and to @dtolnay for suggesting the dummy derive macro.
 
@@ -245,7 +274,7 @@ No changes compared to v2.0.0-rc.0.
     This solves conflicts with `Result` if `Result` is not `std::result::Result`, e.g., a type alias.
     Additionally, the code assumed that `FromStr` was in scope, which is now also not required.
 
-    Thanks goes to @adwhit for reporting and fixing the problem in #186.
+    Thanks to @adwhit for reporting and fixing the problem in #186.
 
 ## [1.2.0] - 2020-10-01
 
@@ -253,7 +282,7 @@ No changes compared to v2.0.0-rc.0.
 
 * Add `serde_as` macro. Refer to the `serde_with` crate for details.
 * Add two derive macros, `SerializeDisplay` and `DeserializeFromStr`, which implement the `Serialize`/`Deserialize` traits based on `Display` and `FromStr`.
-    This is in addition to the already existing methods like `DisplayFromStr`, which act locally, whereas the derive macros provide the traits expected by the rest of the ecosystem.
+  This is in addition to the pre-existing methods like `DisplayFromStr`, which act locally, whereas the derive macros provide the traits expected by the rest of the ecosystem.
 
 ### Changed
 
@@ -268,7 +297,7 @@ No changes compared to v2.0.0-rc.0.
 ### Added
 
 * Add two derive macros, `SerializeDisplay` and `DeserializeFromStr`, which implement the `Serialize`/`Deserialize` traits based on `Display` and `FromStr`.
-    This is in addition to the already existing methods like `DisplayFromStr`, which act locally, whereas the derive macros provide the traits expected by the rest of the ecosystem.
+  This is in addition to the pre-existing methods like `DisplayFromStr`, which act locally, whereas the derive macros provide the traits expected by the rest of the ecosystem.
 
 ## [1.2.0-alpha.2] - 2020-08-08
 

@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "async-graphql-parser"
-version = "6.0.7"
+version = "7.0.3"
 authors = [
     "sunli <scott_s829@163.com>",
     "Koxiaet",
@@ -33,10 +33,10 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/async-graphql/async-graphql"
 
 [dependencies.async-graphql-value]
-version = "6.0.7"
+version = "7.0.3"
 
 [dependencies.pest]
-version = "2.5.5"
+version = "2.7.4"
 
 [dependencies.serde]
 version = "1.0.125"
@@ -46,7 +46,7 @@ features = ["derive"]
 version = "1.0.64"
 
 [dev-dependencies.pest_generator]
-version = "2.6.0"
+version = "2.7.4"
 
 [dev-dependencies.proc-macro2]
 version = "1.0.37"

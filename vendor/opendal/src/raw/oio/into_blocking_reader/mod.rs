@@ -15,9 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! into_blocking_reader will provide different implementations to convert
-//! into [`oio::BlockingRead`][crate::raw::oio::BlockingRead]
+mod backend;
 
-mod from_fd;
-pub use from_fd::from_fd;
-pub use from_fd::FdReader;
+pub use backend::TikvBuilder as Tikv;
+pub use backend::TikvConfig;

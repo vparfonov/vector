@@ -95,7 +95,7 @@
 //! }
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/erased-serde/0.3.31")]
+#![doc(html_root_url = "https://docs.rs/erased-serde/0.4.0")]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_op_in_unsafe_fn)]
 #![allow(
@@ -106,23 +106,15 @@
     clippy::missing_errors_doc,
     clippy::needless_doctest_main,
     clippy::needless_pass_by_ref_mut,
+    clippy::needless_pass_by_value,
     clippy::semicolon_if_nothing_returned, // https://github.com/rust-lang/rust-clippy/issues/7324
+    clippy::similar_names,
+    clippy::struct_field_names,
     clippy::unused_self,
     clippy::wildcard_imports
 )]
 
-mod alloc {
-    #[cfg(not(feature = "std"))]
-    extern crate alloc;
-
-    #[cfg(feature = "std")]
-    use std as alloc;
-
-    pub use self::alloc::borrow::ToOwned;
-    pub use self::alloc::boxed::Box;
-    pub use self::alloc::string::{String, ToString};
-    pub use self::alloc::{vec, vec::Vec};
-}
+extern crate alloc;
 
 #[macro_use]
 mod macros;
@@ -132,6 +124,7 @@ mod de;
 mod error;
 mod features_check;
 mod map;
+mod sealed;
 mod ser;
 
 pub use crate::de::{deserialize, Deserializer};

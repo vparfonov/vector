@@ -12,23 +12,28 @@
 [package]
 edition = "2018"
 name = "tokio-openssl"
-version = "0.6.3"
+version = "0.6.4"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
-description = "An implementation of SSL streams for Tokio backed by OpenSSL\n"
+description = """
+An implementation of SSL streams for Tokio backed by OpenSSL
+"""
+readme = "README.md"
 license = "MIT/Apache-2.0"
-repository = "https://github.com/sfackler/tokio-openssl"
+repository = "https://github.com/tokio-rs/tokio-openssl"
+
 [dependencies.futures-util]
 version = "0.3"
 default-features = false
 
 [dependencies.openssl]
-version = "0.10.32"
+version = "0.10.61"
 
 [dependencies.openssl-sys]
 version = "0.9"
 
 [dependencies.tokio]
 version = "1.0"
+
 [dev-dependencies.tokio]
 version = "1.0"
 features = ["full"]

@@ -1,6 +1,5 @@
-#![cfg_attr(docsrs, doc(cfg(feature = "rustc-serialize")))]
-
-use super::{DateTime, SecondsFormat};
+use super::DateTime;
+use crate::format::SecondsFormat;
 #[cfg(feature = "clock")]
 use crate::offset::Local;
 use crate::offset::{FixedOffset, LocalResult, TimeZone, Utc};
@@ -82,7 +81,6 @@ impl Decodable for TsSeconds<Utc> {
 }
 
 #[cfg(feature = "clock")]
-#[cfg_attr(docsrs, doc(cfg(feature = "clock")))]
 impl Decodable for DateTime<Local> {
     fn decode<D: Decoder>(d: &mut D) -> Result<DateTime<Local>, D::Error> {
         match d.read_str()?.parse::<DateTime<FixedOffset>>() {
@@ -93,7 +91,6 @@ impl Decodable for DateTime<Local> {
 }
 
 #[cfg(feature = "clock")]
-#[cfg_attr(docsrs, doc(cfg(feature = "clock")))]
 #[allow(deprecated)]
 impl Decodable for TsSeconds<Local> {
     #[allow(deprecated)]

@@ -101,7 +101,7 @@ impl Opts {
 #[must_use]
 pub fn cmd(opts: &Opts, stdlib_functions: Vec<Box<dyn Function>>) -> exitcode::ExitCode {
     match run(opts, stdlib_functions) {
-        Ok(_) => exitcode::OK,
+        Ok(()) => exitcode::OK,
         Err(err) => {
             #[allow(clippy::print_stderr)]
             {
@@ -228,7 +228,7 @@ fn serde_to_vrl(value: serde_json::Value) -> Value {
         JsonValue::Null => crate::value::Value::Null,
         JsonValue::Object(v) => v
             .into_iter()
-            .map(|(k, v)| (k, serde_to_vrl(v)))
+            .map(|(k, v)| (k.into(), serde_to_vrl(v)))
             .collect::<BTreeMap<_, _>>()
             .into(),
         JsonValue::Bool(v) => v.into(),

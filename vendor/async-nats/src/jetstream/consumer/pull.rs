@@ -32,6 +32,8 @@ use crate::{
     StatusCode, SubscribeError, Subscriber,
 };
 
+use crate::subject::Subject;
+
 use super::{
     AckPolicy, Consumer, DeliverPolicy, FromConsumer, IntoConsumerConfig, ReplayPolicy,
     StreamError, StreamErrorKind,
@@ -60,9 +62,7 @@ impl Consumer<Config> {
     ///     })
     ///     .await?;
     ///
-    /// jetstream
-    ///     .publish("events".to_string(), "data".into())
-    ///     .await?;
+    /// jetstream.publish("events", "data".into()).await?;
     ///
     /// let consumer = stream
     ///     .get_or_create_consumer(
@@ -137,7 +137,7 @@ impl Consumer<Config> {
     pub(crate) async fn request_batch<I: Into<BatchConfig>>(
         &self,
         batch: I,
-        inbox: String,
+        inbox: Subject,
     ) -> Result<(), BatchRequestError> {
         debug!("sending batch");
         let subject = format!(
@@ -179,9 +179,7 @@ impl Consumer<Config> {
     ///     })
     ///     .await?;
     ///
-    /// jetstream
-    ///     .publish("events".to_string(), "data".into())
-    ///     .await?;
+    /// jetstream.publish("events", "data".into()).await?;
     ///
     /// let consumer = stream
     ///     .get_or_create_consumer(
@@ -194,9 +192,7 @@ impl Consumer<Config> {
     ///     .await?;
     ///
     /// for _ in 0..100 {
-    ///     jetstream
-    ///         .publish("events".to_string(), "data".into())
-    ///         .await?;
+    ///     jetstream.publish("events", "data".into()).await?;
     /// }
     ///
     /// let mut messages = consumer.fetch().max_messages(200).messages().await?;
@@ -234,9 +230,7 @@ impl Consumer<Config> {
     ///     })
     ///     .await?;
     ///
-    /// jetstream
-    ///     .publish("events".to_string(), "data".into())
-    ///     .await?;
+    /// jetstream.publish("events", "data".into()).await?;
     ///
     /// let consumer = stream
     ///     .get_or_create_consumer(
@@ -282,9 +276,7 @@ impl Consumer<Config> {
     ///     })
     ///     .await?;
     ///
-    /// jetstream
-    ///     .publish("events".to_string(), "data".into())
-    ///     .await?;
+    /// jetstream.publish("events", "data".into()).await?;
     ///
     /// let consumer = stream
     ///     .get_or_create_consumer(
@@ -340,7 +332,7 @@ pub struct Batch {
 
 impl<'a> Batch {
     async fn batch(batch: BatchConfig, consumer: &Consumer<Config>) -> Result<Batch, BatchError> {
-        let inbox = consumer.context.client.new_inbox();
+        let inbox = Subject::from(consumer.context.client.new_inbox());
         let subscription = consumer.context.client.subscribe(inbox.clone()).await?;
         consumer.request_batch(batch, inbox.clone()).await?;
 
@@ -524,9 +516,7 @@ impl<'a> Consumer<OrderedConfig> {
     ///     })
     ///     .await?;
     ///
-    /// jetstream
-    ///     .publish("events".to_string(), "data".into())
-    ///     .await?;
+    /// jetstream.publish("events", "data".into()).await?;
     ///
     /// let consumer = stream
     ///     .get_or_create_consumer(
@@ -864,7 +854,6 @@ impl Stream {
             let batch = batch_config;
             let consumer = consumer.clone();
             let mut context = consumer.context.clone();
-            let subject = subject;
             let inbox = inbox.clone();
             async move {
                 loop {

@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "mlua_derive"
-version = "0.9.0"
+version = "0.9.2"
 authors = ["Aleksandr Orlenko <zxteam@pm.me>"]
 description = "Procedural macros for the mlua crate."
 keywords = [
@@ -26,7 +26,7 @@ repository = "https://github.com/khvzak/mlua"
 proc-macro = true
 
 [dependencies.itertools]
-version = "0.11"
+version = "0.12"
 optional = true
 
 [dependencies.once_cell]

@@ -11,10 +11,10 @@
 
 [package]
 edition = "2021"
-rust-version = "1.62.1"
+rust-version = "1.63.0"
 name = "outref"
-version = "0.1.0"
-description = "Write-only references and slices"
+version = "0.5.1"
+description = "Out reference"
 readme = "README.md"
 keywords = [
     "write-only",
@@ -27,4 +27,3 @@ categories = [
 ]
 license = "MIT"
 repository = "https://github.com/Nugine/outref"
-resolver = "2"

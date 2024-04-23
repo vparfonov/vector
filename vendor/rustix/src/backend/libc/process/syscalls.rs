@@ -1,6 +1,6 @@
 //! libc syscalls supporting `rustix::process`.
 
-#[cfg(any(linux_kernel, target_os = "dragonfly", target_os = "fuchsia"))]
+#[cfg(any(freebsdlike, linux_kernel, target_os = "fuchsia"))]
 use super::types::RawCpuSet;
 use crate::backend::c;
 #[cfg(not(any(target_os = "wasi", target_os = "fuchsia")))]
@@ -61,6 +61,14 @@ use core::mem::MaybeUninit;
 use {
     super::super::conv::ret_owned_fd, crate::process::PidfdFlags, crate::process::PidfdGetfdFlags,
 };
+
+#[cfg(any(linux_kernel, target_os = "dragonfly"))]
+#[inline]
+pub(crate) fn sched_getcpu() -> usize {
+    let r = unsafe { libc::sched_getcpu() };
+    debug_assert!(r >= 0);
+    r as usize
+}
 
 #[cfg(feature = "fs")]
 #[cfg(not(target_os = "wasi"))]
@@ -171,7 +179,7 @@ pub(crate) fn getpgrp() -> Pid {
     }
 }
 
-#[cfg(any(linux_kernel, target_os = "dragonfly", target_os = "fuchsia"))]
+#[cfg(any(freebsdlike, linux_kernel, target_os = "fuchsia"))]
 #[inline]
 pub(crate) fn sched_getaffinity(pid: Option<Pid>, cpuset: &mut RawCpuSet) -> io::Result<()> {
     unsafe {
@@ -183,7 +191,7 @@ pub(crate) fn sched_getaffinity(pid: Option<Pid>, cpuset: &mut RawCpuSet) -> io:
     }
 }
 
-#[cfg(any(linux_kernel, target_os = "dragonfly", target_os = "fuchsia"))]
+#[cfg(any(freebsdlike, linux_kernel, target_os = "fuchsia"))]
 #[inline]
 pub(crate) fn sched_setaffinity(pid: Option<Pid>, cpuset: &RawCpuSet) -> io::Result<()> {
     unsafe {

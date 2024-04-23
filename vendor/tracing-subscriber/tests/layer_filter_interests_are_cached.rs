@@ -4,7 +4,7 @@ use std::{
     sync::{Arc, Mutex},
 };
 use tracing::{Level, Subscriber};
-use tracing_mock::{event, layer};
+use tracing_mock::{expect, layer};
 use tracing_subscriber::{filter, prelude::*};
 
 #[test]
@@ -21,9 +21,9 @@ fn layer_filter_interests_are_cached() {
     });
 
     let (expect, handle) = layer::mock()
-        .event(event::mock().at_level(Level::INFO))
-        .event(event::mock().at_level(Level::INFO))
-        .done()
+        .event(expect::event().at_level(Level::INFO))
+        .event(expect::event().at_level(Level::INFO))
+        .only()
         .run_with_handle();
 
     let subscriber = tracing_subscriber::registry().with(expect.with_filter(filter));

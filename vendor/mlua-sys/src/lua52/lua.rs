@@ -308,12 +308,22 @@ extern "C-unwind" {
     //
     // Miscellaneous functions
     //
-    pub fn lua_error(L: *mut lua_State) -> !;
+    #[link_name = "lua_error"]
+    fn lua_error_(L: *mut lua_State) -> c_int;
     pub fn lua_next(L: *mut lua_State, idx: c_int) -> c_int;
     pub fn lua_concat(L: *mut lua_State, n: c_int);
     pub fn lua_len(L: *mut lua_State, idx: c_int);
     pub fn lua_getallocf(L: *mut lua_State, ud: *mut *mut c_void) -> lua_Alloc;
     pub fn lua_setallocf(L: *mut lua_State, f: lua_Alloc, ud: *mut c_void);
+}
+
+// lua_error does not return but is declared to return int, and Rust translates
+// ! to void which can cause link-time errors if the platform linker is aware
+// of return types and requires they match (for example: wasm does this).
+#[inline(always)]
+pub unsafe fn lua_error(L: *mut lua_State) -> ! {
+    lua_error_(L);
+    unreachable!();
 }
 
 //
@@ -408,6 +418,14 @@ pub unsafe fn lua_pushglobaltable(L: *mut lua_State) {
 }
 
 #[inline(always)]
+pub unsafe fn lua_tolightuserdata(L: *mut lua_State, idx: c_int) -> *mut c_void {
+    if lua_islightuserdata(L, idx) != 0 {
+        return lua_touserdata(L, idx);
+    }
+    ptr::null_mut()
+}
+
+#[inline(always)]
 pub unsafe fn lua_tostring(L: *mut lua_State, i: c_int) -> *const c_char {
     lua_tolstring(L, i, ptr::null_mut())
 }
@@ -453,7 +471,12 @@ extern "C-unwind" {
     pub fn lua_upvalueid(L: *mut lua_State, fidx: c_int, n: c_int) -> *mut c_void;
     pub fn lua_upvaluejoin(L: *mut lua_State, fidx1: c_int, n1: c_int, fidx2: c_int, n2: c_int);
 
-    pub fn lua_sethook(L: *mut lua_State, func: Option<lua_Hook>, mask: c_int, count: c_int);
+    pub fn lua_sethook(
+        L: *mut lua_State,
+        func: Option<lua_Hook>,
+        mask: c_int,
+        count: c_int,
+    ) -> c_int;
     pub fn lua_gethook(L: *mut lua_State) -> Option<lua_Hook>;
     pub fn lua_gethookmask(L: *mut lua_State) -> c_int;
     pub fn lua_gethookcount(L: *mut lua_State) -> c_int;

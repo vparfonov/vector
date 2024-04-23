@@ -5,12 +5,12 @@ error[E0277]: the trait bound `Result<wasm_bindgen::JsValue, wasm_bindgen::JsVal
   |            ^^^ the trait `FromWasmAbi` is not implemented for `Result<wasm_bindgen::JsValue, wasm_bindgen::JsValue>`
   |
   = help: the following other types implement trait `FromWasmAbi`:
-            *const T
-            *mut T
-            Box<[T]>
-            Box<[f32]>
-            Box<[f64]>
-            Box<[i16]>
-            Box<[i32]>
-            Box<[i64]>
-          and 35 others
+            bool
+            char
+            isize
+            i8
+            i16
+            i32
+            i64
+            usize
+          and $N others

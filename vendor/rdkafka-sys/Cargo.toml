@@ -11,8 +11,9 @@
 
 [package]
 edition = "2018"
+rust-version = "1.61"
 name = "rdkafka-sys"
-version = "4.6.0+2.2.0"
+version = "4.7.0+2.3.0"
 authors = ["Federico Giraud <giraud.federico@gmail.com>"]
 build = "build.rs"
 links = "rdkafka"

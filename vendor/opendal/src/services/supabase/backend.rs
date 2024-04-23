@@ -28,56 +28,8 @@ use super::writer::*;
 use crate::raw::*;
 use crate::*;
 
-/// Supabase service
-///
-/// # Capabilities
-///
-/// - [x] stat
-/// - [x] read
-/// - [x] write
-/// - [x] create_dir
-/// - [x] delete
-/// - [ ] copy
-/// - [ ] rename
-/// - [ ] list
-/// - [ ] scan
-/// - [ ] presign
-/// - [ ] blocking
-///
-/// # Configuration
-///
-/// - `root`: Set the work dir for backend.
-/// - `bucket`: Set the container name for backend.
-/// - `endpoint`: Set the endpoint for backend.
-/// - `key`: Set the authorization key for the backend, do not set if you want to read public bucket
-///
-/// ## Authorization keys
-///
-/// There are two types of key in the Supabase, one is anon_key(Client key), another one is
-/// service_role_key(Secret key). The former one can only write public resources while the latter one
-/// can access all resources. Note that if you want to read public resources, do not set the key.
-///
-/// # Example
-///
-/// ```no_run
-/// use anyhow::Result;
-/// use opendal::services::Supabase;
-/// use opendal::Operator;
-///
-/// #[tokio::main]
-/// async fn main() -> Result<()> {
-///     let mut builder = Supabase::default();
-///     builder.root("/");
-///     builder.bucket("test_bucket");
-///     builder.endpoint("http://127.0.0.1:54321");
-///     // this sets up the anon_key, which means this operator can only write public resource
-///     builder.key("some_anon_key");
-///
-///     let op: Operator = Operator::new(builder)?.finish();
-///
-///     Ok(())
-/// }
-/// ```
+/// [Supabase](https://supabase.com/) service support
+#[doc = include_str!("docs.md")]
 #[derive(Default)]
 pub struct SupabaseBuilder {
     root: Option<String>,
@@ -205,26 +157,24 @@ pub struct SupabaseBackend {
 #[async_trait]
 impl Accessor for SupabaseBackend {
     type Reader = IncomingAsyncBody;
+    type Writer = oio::OneShotWriter<SupabaseWriter>;
+    // todo: implement Lister to support list and scan
+    type Lister = ();
     type BlockingReader = ();
-    type Writer = SupabaseWriter;
     type BlockingWriter = ();
-    type Appender = ();
-    // todo: implement Pager to support list and scan
-    type Pager = ();
-    type BlockingPager = ();
+    type BlockingLister = ();
 
     fn info(&self) -> AccessorInfo {
         let mut am = AccessorInfo::default();
         am.set_scheme(Scheme::Supabase)
             .set_root(&self.core.root)
             .set_name(&self.core.bucket)
-            .set_capability(Capability {
+            .set_native_capability(Capability {
                 stat: true,
 
                 read: true,
 
                 write: true,
-                create_dir: true,
                 delete: true,
 
                 ..Default::default()
@@ -233,65 +183,7 @@ impl Accessor for SupabaseBackend {
         am
     }
 
-    async fn create_dir(&self, path: &str, _: OpCreateDir) -> Result<RpCreateDir> {
-        let mut req =
-            self.core
-                .supabase_upload_object_request(path, Some(0), None, AsyncBody::Empty)?;
-
-        self.core.sign(&mut req)?;
-
-        let resp = self.core.send(req).await?;
-
-        let status = resp.status();
-
-        if status.is_success() {
-            resp.into_body().consume().await?;
-            Ok(RpCreateDir::default())
-        } else {
-            // create duplicate dir is ok
-            let e = parse_error(resp).await?;
-            if e.kind() == ErrorKind::AlreadyExists {
-                Ok(RpCreateDir::default())
-            } else {
-                Err(e)
-            }
-        }
-    }
-
-    async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
-        let resp = self.core.supabase_get_object(path, args.range()).await?;
-
-        let status = resp.status();
-
-        match status {
-            StatusCode::OK | StatusCode::PARTIAL_CONTENT => {
-                let meta = parse_into_metadata(path, resp.headers())?;
-                Ok((RpRead::with_metadata(meta), resp.into_body()))
-            }
-            _ => Err(parse_error(resp).await?),
-        }
-    }
-
-    async fn write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::Writer)> {
-        if args.content_length().is_none() {
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                "write without content length is not supported",
-            ));
-        }
-
-        Ok((
-            RpWrite::default(),
-            SupabaseWriter::new(self.core.clone(), path, args),
-        ))
-    }
-
     async fn stat(&self, path: &str, _args: OpStat) -> Result<RpStat> {
-        // Stat root always returns a DIR.
-        if path == "/" {
-            return Ok(RpStat::new(Metadata::new(EntryMode::DIR)));
-        }
-
         // The get_object_info does not contain the file size. Therefore
         // we first try the get the metadata through head, if we fail,
         // we then use get_object_info to get the actual error info
@@ -309,6 +201,24 @@ impl Accessor for SupabaseBackend {
                 }
             }
         }
+    }
+
+    async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
+        let resp = self.core.supabase_get_object(path, args.range()).await?;
+
+        let status = resp.status();
+
+        match status {
+            StatusCode::OK | StatusCode::PARTIAL_CONTENT => Ok((RpRead::new(), resp.into_body())),
+            _ => Err(parse_error(resp).await?),
+        }
+    }
+
+    async fn write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::Writer)> {
+        Ok((
+            RpWrite::default(),
+            oio::OneShotWriter::new(SupabaseWriter::new(self.core.clone(), path, args)),
+        ))
     }
 
     async fn delete(&self, path: &str, _: OpDelete) -> Result<RpDelete> {

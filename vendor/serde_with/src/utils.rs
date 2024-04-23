@@ -128,13 +128,13 @@ pub(crate) fn duration_signed_from_secs_f64(secs: f64) -> Result<DurationSigned,
     if nanos >= MAX_NANOS_F64 {
         return Err("overflow when converting float to duration");
     }
-    let mut sign = self::duration::Sign::Positive;
+    let mut sign = Sign::Positive;
     if nanos < 0.0 {
         nanos = -nanos;
-        sign = self::duration::Sign::Negative;
+        sign = Sign::Negative;
     }
     let nanos = nanos as u128;
-    Ok(self::duration::DurationSigned::new(
+    Ok(DurationSigned::new(
         sign,
         (nanos / (NANOS_PER_SEC as u128)) as u64,
         (nanos % (NANOS_PER_SEC as u128)) as u32,
@@ -171,9 +171,6 @@ where
     // TODO could be simplified with nightly maybe_uninit_uninit_array feature
     // https://doc.rust-lang.org/nightly/std/mem/union.MaybeUninit.html#method.uninit_array
 
-    // Clippy is broken and has a false positive here
-    // https://github.com/rust-lang/rust-clippy/issues/10551
-    #[allow(clippy::uninit_assumed_init)]
     let mut arr: [MaybeUninit<T>; N] = unsafe { MaybeUninit::uninit().assume_init() };
 
     // Dropping a `MaybeUninit` does nothing. Thus using raw pointer

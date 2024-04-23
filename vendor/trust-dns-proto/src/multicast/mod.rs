@@ -7,14 +7,10 @@
 
 //! Multicast protocol related components for DNS
 
-#[cfg(feature = "tokio-runtime")]
 mod mdns_client_stream;
-#[cfg(feature = "tokio-runtime")]
 mod mdns_stream;
 
-#[cfg(feature = "tokio-runtime")]
 pub use self::mdns_client_stream::{MdnsClientConnect, MdnsClientStream};
-#[cfg(feature = "tokio-runtime")]
 pub use self::mdns_stream::{MdnsStream, MDNS_IPV4, MDNS_IPV6};
 
 /// See [rfc6762](https://tools.ietf.org/html/rfc6762#section-5) details on these different types.
@@ -48,25 +44,25 @@ impl MdnsQueryType {
     /// This will be sending packets, i.e. a standard UDP socket will be created
     pub fn sender(self) -> bool {
         match self {
-            Self::Passive => false,
-            Self::OneShot | Self::OneShotJoin => true,
-            Self::Continuous => true,
+            MdnsQueryType::Passive => false,
+            MdnsQueryType::OneShot | MdnsQueryType::OneShotJoin => true,
+            MdnsQueryType::Continuous => true,
         }
     }
 
     /// Returns true if this process can bind to *:5353
     pub fn bind_on_5353(self) -> bool {
         match self {
-            Self::OneShot | Self::OneShotJoin | Self::Passive => false,
-            Self::Continuous => true,
+            MdnsQueryType::OneShot | MdnsQueryType::OneShotJoin | MdnsQueryType::Passive => false,
+            MdnsQueryType::Continuous => true,
         }
     }
 
     /// Returns true if this mDNS client should join, listen, on the multicast address
     pub fn join_multicast(self) -> bool {
         match self {
-            Self::OneShot => false,
-            Self::Continuous | Self::OneShotJoin | Self::Passive => true,
+            MdnsQueryType::OneShot => false,
+            MdnsQueryType::Continuous | MdnsQueryType::OneShotJoin | MdnsQueryType::Passive => true,
         }
     }
 }

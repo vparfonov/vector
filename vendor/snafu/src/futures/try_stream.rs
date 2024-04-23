@@ -141,7 +141,7 @@ pub trait TryStreamExt: TryStream + Sized {
     ///
     /// fn example(symbol: &'static str) -> impl TryStream<Ok = i32, Error = Whatever> {
     ///     stock_prices(symbol)
-    ///         .with_whatever_context(move |_| format!("Couldn't get stock prices for {}", symbol))
+    ///         .with_whatever_context(move |_| format!("Couldn't get stock prices for {symbol}"))
     /// }
     ///
     /// # type ApiError = Box<dyn std::error::Error>;
@@ -233,7 +233,7 @@ where
 {
     type Item = Result<St::Ok, E>;
 
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn poll_next(self: Pin<&mut Self>, ctx: &mut TaskContext) -> Poll<Option<Self::Item>> {
         let this = self.project();
         let inner = this.inner;
@@ -273,7 +273,7 @@ where
 {
     type Item = Result<St::Ok, E>;
 
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn poll_next(self: Pin<&mut Self>, ctx: &mut TaskContext) -> Poll<Option<Self::Item>> {
         let this = self.project();
         let inner = this.inner;
@@ -315,7 +315,7 @@ where
 {
     type Item = Result<St::Ok, E>;
 
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn poll_next(self: Pin<&mut Self>, ctx: &mut TaskContext) -> Poll<Option<Self::Item>> {
         let this = self.project();
         let inner = this.inner;
@@ -359,7 +359,7 @@ where
 {
     type Item = Result<St::Ok, E>;
 
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn poll_next(self: Pin<&mut Self>, ctx: &mut TaskContext) -> Poll<Option<Self::Item>> {
         let this = self.project();
         let inner = this.inner;

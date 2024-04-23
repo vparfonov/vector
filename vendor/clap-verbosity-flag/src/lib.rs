@@ -53,12 +53,16 @@
 //! }
 //! ```
 //!
-//! Or implement [`LogLevel`] yourself for more control.
+//! Or implement our [`LogLevel`] trait to customize the default log level and help output.
+
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 pub use log::Level;
 pub use log::LevelFilter;
 
-#[derive(clap::Args, Debug, Clone)]
+/// Logging flags to `#[command(flatten)]` into your CLI
+#[derive(clap::Args, Debug, Clone, Default)]
+#[command(about = None, long_about = None)]
 pub struct Verbosity<L: LogLevel = ErrorLevel> {
     #[arg(
         long,
@@ -93,6 +97,12 @@ impl<L: LogLevel> Verbosity<L> {
             quiet,
             phantom: std::marker::PhantomData,
         }
+    }
+
+    /// Whether any verbosity flags (either `--verbose` or `--quiet`)
+    /// are present on the command line.
+    pub fn is_present(&self) -> bool {
+        self.verbose != 0 || self.quiet != 0
     }
 
     /// Get the log level.
@@ -149,11 +159,12 @@ impl<L: LogLevel> fmt::Display for Verbosity<L> {
     }
 }
 
+/// Customize the default log-level and associated help
 pub trait LogLevel {
     fn default() -> Option<log::Level>;
 
     fn verbose_help() -> Option<&'static str> {
-        Some("More output per occurrence")
+        Some("Increase logging verbosity")
     }
 
     fn verbose_long_help() -> Option<&'static str> {
@@ -161,7 +172,7 @@ pub trait LogLevel {
     }
 
     fn quiet_help() -> Option<&'static str> {
-        Some("Less output per occurrence")
+        Some("Decrease logging verbosity")
     }
 
     fn quiet_long_help() -> Option<&'static str> {
@@ -169,6 +180,7 @@ pub trait LogLevel {
     }
 }
 
+/// Default to [`log::Level::Error`]
 #[derive(Copy, Clone, Debug, Default)]
 pub struct ErrorLevel;
 
@@ -178,6 +190,7 @@ impl LogLevel for ErrorLevel {
     }
 }
 
+/// Default to [`log::Level::Warn`]
 #[derive(Copy, Clone, Debug, Default)]
 pub struct WarnLevel;
 
@@ -187,6 +200,7 @@ impl LogLevel for WarnLevel {
     }
 }
 
+/// Default to [`log::Level::Info`]
 #[derive(Copy, Clone, Debug, Default)]
 pub struct InfoLevel;
 
@@ -204,7 +218,7 @@ mod test {
     fn verify_app() {
         #[derive(Debug, clap::Parser)]
         struct Cli {
-            #[clap(flatten)]
+            #[command(flatten)]
             verbose: Verbosity,
         }
 

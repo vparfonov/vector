@@ -444,8 +444,9 @@ mod cluster_client;
 #[cfg(feature = "cluster")]
 mod cluster_pipeline;
 
+/// Routing information for cluster commands.
 #[cfg(feature = "cluster")]
-mod cluster_routing;
+pub mod cluster_routing;
 
 #[cfg(feature = "r2d2")]
 #[cfg_attr(docsrs, doc(cfg(feature = "r2d2")))]
@@ -460,6 +461,12 @@ pub mod cluster_async;
 
 #[cfg(feature = "sentinel")]
 pub mod sentinel;
+
+#[cfg(feature = "tls-rustls")]
+mod tls;
+
+#[cfg(feature = "tls-rustls")]
+pub use crate::tls::{ClientTlsConfig, TlsCertificates};
 
 mod client;
 mod cmd;

@@ -31,6 +31,7 @@ of un-cached arguments, specify `#[cached(sync_writes = true)]` / `#[once(sync_w
 - `redis_connection_manager`: Enable the optional `connection-manager` feature of `redis`. Any async redis caches created
                               will use a connection manager instead of a `MultiplexedConnection`
 - `redis_ahash`: Enable the optional `ahash` feature of `redis`
+- `disk_store`: Include disk cache store
 - `wasm`: Enable WASM support. Note that this feature is incompatible with `tokio`'s multi-thread
    runtime (`async_tokio_rt_multi_thread`) and all Redis features (`redis_store`, `redis_async_std`, `redis_tokio`, `redis_ahash`)
 
@@ -138,6 +139,35 @@ async fn async_cached_sleep_secs(secs: u64) -> Result<String, ExampleError> {
 }
 ```
 
+----
+
+```rust,no_run,ignore
+use cached::proc_macro::io_cached;
+use cached::DiskCache;
+use thiserror::Error;
+
+#[derive(Error, Debug, PartialEq, Clone)]
+enum ExampleError {
+    #[error("error with disk cache `{0}`")]
+    DiskError(String),
+}
+
+/// Cache the results of a function on disk.
+/// Cache files will be stored under the system cache dir
+/// unless otherwise specified with `disk_dir` or the `create` argument.
+/// A `map_error` closure must be specified to convert any
+/// disk cache errors into the same type of error returned
+/// by your function. All `io_cached` functions must return `Result`s.
+#[io_cached(
+    map_error = r##"|e| ExampleError::DiskError(format!("{:?}", e))"##,
+    disk = true
+)]
+fn cached_sleep_secs(secs: u64) -> Result<String, ExampleError> {
+    std::thread::sleep(std::time::Duration::from_secs(secs));
+    Ok(secs.to_string())
+}
+```
+
 
 Functions defined via macros will have their results cached using the
 function's arguments as a key, a `convert` expression specified on a procedural macros,
@@ -185,6 +215,9 @@ pub use stores::AsyncRedisCache;
 pub use stores::{
     CanExpire, ExpiringValueCache, SizedCache, TimedCache, TimedSizedCache, UnboundCache,
 };
+#[cfg(feature = "disk_store")]
+#[cfg_attr(docsrs, doc(cfg(feature = "disk_store")))]
+pub use stores::{DiskCache, DiskCacheError};
 #[cfg(feature = "redis_store")]
 #[cfg_attr(docsrs, doc(cfg(feature = "redis_store")))]
 pub use stores::{RedisCache, RedisCacheError};
@@ -323,6 +356,15 @@ pub trait Cached<K, V> {
     fn cache_set_lifespan(&mut self, _seconds: u64) -> Option<u64> {
         None
     }
+}
+
+/// Extra cache operations for types that implement `Clone`
+pub trait CloneCached<K, V> {
+    /// Attempt to retrieve a cached value and indicate whether that value was evicted.
+    fn cache_get_expired<Q>(&mut self, _key: &Q) -> (Option<V>, bool)
+    where
+        K: std::borrow::Borrow<Q>,
+        Q: std::hash::Hash + Eq + ?Sized;
 }
 
 #[cfg(feature = "async")]

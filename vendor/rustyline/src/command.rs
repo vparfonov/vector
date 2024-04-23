@@ -25,10 +25,12 @@ pub fn execute<H: Helper>(
 
     match cmd {
         Cmd::EndOfFile | Cmd::AcceptLine | Cmd::AcceptOrInsertLine { .. } | Cmd::Newline => {
-            if s.has_hint() || !s.is_default_prompt() {
+            if s.has_hint() || !s.is_default_prompt() || s.highlight_char {
                 // Force a refresh without hints to leave the previous
                 // line as the user typed it after a newline.
+                s.forced_refresh = true;
                 s.refresh_line_with_msg(None)?;
+                s.forced_refresh = false;
             }
         }
         _ => {}
@@ -124,6 +126,9 @@ pub fn execute<H: Helper>(
         }
         Cmd::Newline => {
             s.edit_insert('\n', 1)?;
+        }
+        Cmd::Repaint => {
+            s.refresh_line()?;
         }
         Cmd::AcceptLine | Cmd::AcceptOrInsertLine { .. } => {
             let validation_result = s.validate()?;

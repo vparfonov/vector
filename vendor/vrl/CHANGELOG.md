@@ -1,6 +1,96 @@
 # Changelog
 
-## unreleased
+ This project uses [*towncrier*](https://towncrier.readthedocs.io/) for changelog generation.
+
+<!-- changelog start -->
+
+## [0.13.0 (2024-03-18)]
+
+
+### Breaking Changes & Upgrade Guide
+
+- fixed `parse_logfmt` handling of escapes in values that could cause spurious keys to be created. As a result of this fix, the breaking change has been made to no longer allow empty keys in key-value pair formats (https://github.com/vectordotdev/vrl/pull/725)
+
+### New Features
+
+- Added the `return` expression as per [RFC 7496](https://github.com/vectordotdev/vector/blob/4671ccbf0a6359ef8b752fa99fae9eb9c60fdee5/rfcs/2023-02-08-7496-vrl-return.md). This expression can be used to terminate the VRL program early while still emitting a value. (https://github.com/vectordotdev/vrl/pull/712)
+- Added `sieve` string function, which can remove unwanted characters from a string using a regex of
+  allowed patterns. (https://github.com/vectordotdev/vrl/pull/724)
+- Add VRL function `uuid_v7` that generates UUIDv7 timestamp-based unique identifiers. (https://github.com/vectordotdev/vrl/pull/738)
+- Added `encode_proto` and `parse_proto` functions, which can be used to encode and decode protobufs.
+
+  `parse_proto` accepts a bytes value, a proto descriptor file path and a message type and returns the VRL value as parsed from the proto. `encode_proto` does the reverse and converts a VRL value into a protobuf bytes value. (https://github.com/vectordotdev/vrl/pull/739)
+
+### Fixes
+
+- `parse_nginx` now accepts empty values for http referer (https://github.com/vectordotdev/vrl/pull/643)
+
+
+## [0.12.0 (2024-03-08)]
+
+
+### New Features
+
+- Added `validate` option to `encode_punycode` and `decode_punycode`, which defaults to true, but can
+  be used to skip validation when set to false. (https://github.com/vectordotdev/vrl/pull/709)
+
+
+## [0.11.0 (2024-02-07)]
+
+
+### New Features
+
+- Added `parse_etld` function for extracting eTLD and eTLD+1 (https://github.com/vectordotdev/vrl/pull/669)
+- Added `encode_punycode` and `decode_punycode` functions (https://github.com/vectordotdev/vrl/pull/672)
+
+### Enhancements
+
+- Introduced a `redactor` option in `redact` function to enable the substitution of redacted content with either a custom string or a hash representation. (https://github.com/vectordotdev/vrl/pull/633)
+- Add VRL function `get_timezone_name` to return the configured/resolved IANA timezone name.
+
+  authors: klondikedragon (https://github.com/vectordotdev/vrl/pull/671)
+
+### Fixes
+
+- Fixed a bug in exporting paths containing more than one "coalesce" segment. (https://github.com/vectordotdev/vrl/pull/679)
+
+
+## [0.10.0 (2024-01-24)]
+
+
+### New Features
+
+- Introduced an unused expression checker. It's designed to detect and report unused expressions,
+  helping users to clean up and optimize their VRL scripts. Note that this checker will not catch everything, 
+  but it does aim to eliminate false positives. For example, shadowed variables are not reported as unused.
+  (https://github.com/vectordotdev/vrl/pull/622)
+- Add a `replace_with` function that is similar to `replace` but takes a closure instead of a
+  replacement string. (https://github.com/vectordotdev/vrl/pull/628)
+
+### Enhancements
+
+- Added the `alias_sources` parameter for `parse_groks` to read sources from files. (https://github.com/vectordotdev/vrl/pull/194)
+
+
+## `0.9.1` (2023-12-21)
+
+#### Bug Fixes
+* Support for WASM features using `chrono` was readded. This was accidentally dropped in 0.9.0.
+
+## `0.9.0` (2023-12-12)
+* `parse_regex_all` `pattern` param  can now be resolved from a variable
+* fixed `parse_json` data corruption issue for numbers greater or equal to `i64::MAX` 
+* support timestamp comparison using operators <, <=, >, >=
+
+## `0.8.0` (2023-10-31)
+
+#### Features
+- added `contains_all` function (https://github.com/vectordotdev/vrl/pull/468)
+- `from_unix_timestamp` now accepts a new unit: Microseconds. (https://github.com/vectordotdev/vrl/pull/492)
+- `parse_nginx_log` no longer fails if `upstream_response_length`, `upstream_response_time`, `upstream_status` are missing (https://github.com/vectordotdev/vrl/pull/498)
+- added `parse_float` function (https://github.com/vectordotdev/vrl/pull/484)
+- improved fallibility diagnostics (https://github.com/vectordotdev/vrl/pull/523)
+- added `encode_snappy` and `decode_snappy` functions (https://github.com/vectordotdev/vrl/pull/543)
 
 ## `0.7.0` (2023-09-25)
 
@@ -8,7 +98,7 @@
 - `parse_nginx_log` doesn't fail if the values of key-value pairs in error logs is missing (https://github.com/vectordotdev/vrl/pull/442)
 - `encode_gzip` and `encode_zlib` now correctly check the compression level (preventing a panic) (https://github.com/vectordotdev/vrl/pull/393)
 - fix the type definition of array/object literal expressions where one of the values is undefined (https://github.com/vectordotdev/vrl/pull/401)
-- `parse_aws_vpc_flow_log` now handles account-id value as a string, avoiding loss of leading zeros and case where value is `unknown` (https://github.com/vectordotdev/vrl/issues/263) 
+- `parse_aws_vpc_flow_log` now handles account-id value as a string, avoiding loss of leading zeros and case where value is `unknown` (https://github.com/vectordotdev/vrl/issues/263)
 
 #### Features
 - `parse_key_value` can now parse values enclosed in single quote characters (https://github.com/vectordotdev/vrl/pull/382)
@@ -16,7 +106,7 @@
 - added `community_id` function for generation of [V1 Community IDs](https://github.com/corelight/community-id-spec) (https://github.com/vectordotdev/vrl/pull/360)
 - updated aws vpc flow log parsing to include version 5 fields (https://github.com/vectordotdev/vrl/issues/227)
 - removed deprecated `to_timestamp` function (https://github.com/vectordotdev/vrl/pull/452)
-- changed `truncate` arguments, it now accepts a suffix string instead of a boolean (https://github.com/vectordotdev/vrl/pull/454) 
+- changed `truncate` arguments, it now accepts a suffix string instead of a boolean (https://github.com/vectordotdev/vrl/pull/454)
 
 ## `0.6.0` (2023-08-02)
 

@@ -270,13 +270,11 @@ pub mod context_selector {
             let transfer_user_fields = self.transfer_user_fields();
             let construct_implicit_fields = self.construct_implicit_fields();
 
-            let track_caller = track_caller();
-
             quote! {
                 impl<#(#user_field_generics,)*> #parameterized_selector_name {
                     #[doc = "Consume the selector and return the associated error"]
                     #[must_use]
-                    #track_caller
+                    #[track_caller]
                     #visibility fn build<#(#original_generics_without_defaults,)*>(self) -> #parameterized_error_name
                     where
                         #(#extended_where_clauses),*
@@ -288,7 +286,7 @@ pub mod context_selector {
                     }
 
                     #[doc = "Consume the selector and return a `Result` with the associated error"]
-                    #track_caller
+                    #[track_caller]
                     #visibility fn fail<#(#original_generics_without_defaults,)* __T>(self) -> ::core::result::Result<__T, #parameterized_error_name>
                     where
                         #(#extended_where_clauses),*
@@ -330,8 +328,6 @@ pub mod context_selector {
                 None => (quote! { #crate_root::NoneError }, None, None),
             };
 
-            let track_caller = track_caller();
-
             quote! {
                 impl<#(#original_generics_without_defaults,)* #(#user_field_generics,)*> #crate_root::IntoError<#parameterized_error_name> for #parameterized_selector_name
                 where
@@ -340,7 +336,7 @@ pub mod context_selector {
                 {
                     type Source = #source_ty;
 
-                    #track_caller
+                    #[track_caller]
                     fn into_error(self, error: Self::Source) -> #parameterized_error_name {
                         #transform_source;
                         #error_constructor_name {
@@ -384,13 +380,11 @@ pub mod context_selector {
 
             let message_field_name = &message_field.name;
 
-            let track_caller = track_caller();
-
             quote! {
                 impl #crate_root::FromString for #parameterized_error_name {
                     type Source = #source_ty;
 
-                    #track_caller
+                    #[track_caller]
                     fn without_source(message: String) -> Self {
                         #error_constructor_name {
                             #construct_implicit_fields
@@ -399,7 +393,7 @@ pub mod context_selector {
                         }
                     }
 
-                    #track_caller
+                    #[track_caller]
                     fn with_source(error: Self::Source, message: String) -> Self {
                         #error_constructor_name {
                             #construct_implicit_fields_with_source
@@ -426,14 +420,12 @@ pub mod context_selector {
                 transfer_source_field,
             } = build_source_info(source_field);
 
-            let track_caller = track_caller();
-
             quote! {
                 impl<#(#original_generics_without_defaults,)* #(#user_field_generics,)*> ::core::convert::From<#source_field_type> for #parameterized_error_name
                 where
                     #(#where_clauses),*
                 {
-                    #track_caller
+                    #[track_caller]
                     fn from(error: #source_field_type) -> Self {
                         #transform_source;
                         #error_constructor_name {
@@ -467,14 +459,6 @@ pub mod context_selector {
             source_field_type,
             transform_source,
             transfer_source_field,
-        }
-    }
-
-    fn track_caller() -> proc_macro2::TokenStream {
-        if cfg!(feature = "rust_1_46") {
-            quote::quote! { #[track_caller] }
-        } else {
-            quote::quote! {}
         }
     }
 }
@@ -544,26 +528,36 @@ pub mod display {
 
             let source_field = selector_kind.source_field();
 
+            if field_container.is_transparent {
+                // transparent errors always have a source field
+                let source_field_name = source_field.unwrap().name();
+
+                let match_arm = quote! {
+                    #pattern_ident { ref #source_field_name, .. } => {
+                        ::core::fmt::Display::fmt(#source_field_name, #FORMATTER_ARG)
+                    }
+                };
+
+                stream.extend(match_arm);
+                return;
+            }
+
             let mut shorthand_names = &BTreeSet::new();
             let mut assigned_names = &BTreeSet::new();
 
-            let format = match (display_format, doc_comment, source_field) {
-                (Some(v), _, _) => {
+            let format = match (display_format, doc_comment) {
+                (Some(v), _) => {
                     let exprs = &v.exprs;
                     shorthand_names = &v.shorthand_names;
                     assigned_names = &v.assigned_names;
                     quote! { #(#exprs),* }
                 }
-                (_, Some(d), _) => {
+                (_, Some(d)) => {
                     let content = &d.content;
                     shorthand_names = &d.shorthand_names;
                     quote! { #content }
                 }
-                (_, _, Some(f)) => {
-                    let field_name = &f.name;
-                    quote! { concat!(stringify!(#default_name), ": {}"), #field_name }
-                }
-                _ => quote! { stringify!(#default_name)},
+                _ => quote! { stringify!(#default_name) },
             };
 
             let field_names = super::AllFieldNames(field_container).field_names();
@@ -644,19 +638,9 @@ pub mod error {
                 }
             };
 
-            let std_backtrace_fn = if cfg!(feature = "unstable-backtraces-impl-std") {
-                Some(quote! {
-                    fn backtrace(&self) -> ::core::option::Option<&::std::backtrace::Backtrace> {
-                        #crate_root::ErrorCompat::backtrace(self)
-                    }
-                })
-            } else {
-                None
-            };
-
             let provide_fn = if cfg!(feature = "unstable-provider-api") {
                 Some(quote! {
-                    fn provide<'a>(&'a self, #PROVIDE_ARG: &mut core::any::Demand<'a>) {
+                    fn provide<'a>(&'a self, #PROVIDE_ARG: &mut #crate_root::error::Request<'a>) {
                         match *self {
                             #(#provide_arms,)*
                         };
@@ -676,7 +660,6 @@ pub mod error {
                     #description_fn
                     #cause_fn
                     #source_fn
-                    #std_backtrace_fn
                     #provide_fn
                 }
             };
@@ -693,7 +676,12 @@ pub mod error {
     impl ToTokens for ErrorSourceMatchArm<'_> {
         fn to_tokens(&self, stream: &mut TokenStream) {
             let Self {
-                field_container: FieldContainer { selector_kind, .. },
+                field_container:
+                    FieldContainer {
+                        selector_kind,
+                        is_transparent,
+                        ..
+                    },
                 pattern_ident,
             } = *self;
 
@@ -708,6 +696,10 @@ pub mod error {
                     let convert_to_error_source = if selector_kind.is_whatever() {
                         quote! {
                             #field_name.as_ref().map(|e| e.as_error_source())
+                        }
+                    } else if *is_transparent {
+                        quote! {
+                            #field_name.as_error_source().source()
                         }
                     } else {
                         quote! {
@@ -788,7 +780,7 @@ pub mod error {
                 }
             });
 
-            let user_chained = quote_chained(&provides);
+            let user_chained = quote_chained(crate_root, &provides);
 
             let shorthand_calls = provide_refs.map(|(ty, name)| {
                 quote! { #PROVIDE_ARG.provide_ref::<#ty>(#name) }
@@ -826,7 +818,7 @@ pub mod error {
         }
     }
 
-    pub(crate) fn enhance_provider_list<'a>(provides: &'a [Provide]) -> Vec<ProvidePlus<'a>> {
+    pub(crate) fn enhance_provider_list(provides: &[Provide]) -> Vec<ProvidePlus<'_>> {
         provides
             .iter()
             .enumerate()
@@ -854,22 +846,26 @@ pub mod error {
     }
 
     pub(crate) fn quote_chained<'a>(
+        crate_root: &'a dyn ToTokens,
         provides: &'a [ProvidePlus<'a>],
     ) -> impl Iterator<Item = proc_macro2::TokenStream> + 'a {
-        provides.iter().filter(|pp| pp.provide.is_chain).map(|pp| {
-            let arm = if pp.provide.is_opt {
-                quote! { ::core::option::Option::Some(chained_item) }
-            } else {
-                quote! { chained_item }
-            };
-            let cached_name = &pp.cached_name;
+        provides
+            .iter()
+            .filter(|pp| pp.provide.is_chain)
+            .map(move |pp| {
+                let arm = if pp.provide.is_opt {
+                    quote! { ::core::option::Option::Some(chained_item) }
+                } else {
+                    quote! { chained_item }
+                };
+                let cached_name = &pp.cached_name;
 
-            quote! {
-                if let #arm = #cached_name {
-                    ::core::any::Provider::provide(chained_item, #PROVIDE_ARG);
+                quote! {
+                    if let #arm = #cached_name {
+                        #crate_root::Error::provide(chained_item, #PROVIDE_ARG);
+                    }
                 }
-            }
-        })
+            })
     }
 
     fn quote_provides<'a, I>(provides: I) -> impl Iterator<Item = proc_macro2::TokenStream> + 'a

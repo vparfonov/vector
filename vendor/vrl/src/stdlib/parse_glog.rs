@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 fn parse_glog(bytes: Value) -> Resolved {
     let bytes = bytes.try_bytes()?;
     let message = String::from_utf8_lossy(&bytes);
-    let mut log: BTreeMap<String, Value> = BTreeMap::new();
+    let mut log = ObjectMap::new();
     let captures = REGEX_GLOG
         .captures(&message)
         .ok_or("failed parsing glog message")?;
@@ -27,7 +27,7 @@ fn parse_glog(bytes: Value) -> Resolved {
             "timestamp".into(),
             Value::Timestamp(
                 Utc.datetime_from_str(timestamp, "%Y%m%d %H:%M:%S%.f")
-                    .map_err(|error| format!(r#"failed parsing timestamp {timestamp}: {error}"#))?,
+                    .map_err(|error| format!("failed parsing timestamp {timestamp}: {error}"))?,
             ),
         );
     }

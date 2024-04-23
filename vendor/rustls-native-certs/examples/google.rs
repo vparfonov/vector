@@ -1,19 +1,14 @@
-use std::convert::TryInto;
-use std::sync::Arc;
-
 use std::io::{stdout, Read, Write};
 use std::net::TcpStream;
+use std::sync::Arc;
 
 fn main() {
     let mut roots = rustls::RootCertStore::empty();
     for cert in rustls_native_certs::load_native_certs().expect("could not load platform certs") {
-        roots
-            .add(&rustls::Certificate(cert.0))
-            .unwrap();
+        roots.add(cert).unwrap();
     }
 
     let config = rustls::ClientConfig::builder()
-        .with_safe_defaults()
         .with_root_certificates(roots)
         .with_no_client_auth();
 

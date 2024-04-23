@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "strum"
-version = "0.25.0"
+version = "0.26.1"
 authors = ["Peter Glotfelty <peter.glotfelty@microsoft.com>"]
 description = "Helpful macros for working with enums and strings"
 homepage = "https://github.com/Peternator7/strum"
@@ -31,10 +31,10 @@ features = ["macros"]
 optional = true
 
 [dependencies.strum_macros]
-version = "0.25"
+version = "0.26"
 optional = true
 [dev-dependencies.strum_macros]
-version = "0.25"
+version = "0.26"
 
 [features]
 default = ["std"]

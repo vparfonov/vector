@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.64"
+rust-version = "1.65"
 name = "serde_with_macros"
-version = "3.4.0"
+version = "3.7.0"
 authors = ["Jonas Bushart"]
 include = [
     "src/**/*",
@@ -102,5 +102,28 @@ version = "1.0.80"
 [dev-dependencies.version-sync]
 version = "0.9.1"
 
+[features]
+schemars_0_8 = []
+
 [badges.maintenance]
 status = "actively-developed"
+
+[lints.clippy]
+cloned_instead_of_copied = "warn"
+default_trait_access = "warn"
+doc_markdown = "warn"
+explicit_auto_deref = "allow"
+redundant_closure_for_method_calls = "warn"
+semicolon_if_nothing_returned = "warn"
+
+[lints.rust]
+missing_docs = "warn"
+rust_2018_idioms = "warn"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+unused_extern_crates = "warn"
+unused_import_braces = "warn"
+variant_size_differences = "warn"
+
+[lints.rustdoc]
+missing_crate_level_docs = "warn"

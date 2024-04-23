@@ -34,76 +34,65 @@ service Heartbeat {
 
 message HeartbeatRequest {
   RequestHeader header = 1;
-
   // Self peer
   Peer peer = 2;
-  // Leader node
-  bool is_leader = 3;
   // Actually reported time interval
-  TimeInterval report_interval = 4;
-  // Node stat
-  NodeStat node_stat = 5;
+  TimeInterval report_interval = 3;
   // Region stats on this node
-  repeated RegionStat region_stats = 6;
-  // Follower nodes and stats, empty on follower nodes
-  repeated ReplicaStat replica_stats = 7;
-  MailboxMessage mailbox_message = 8;
+  repeated RegionStat region_stats = 4;
+  // Mailbox send message to Metasrv
+  MailboxMessage mailbox_message = 5;
+  // The duration since the heartbeat task's epoch in milliseconds.
+  uint64 duration_since_epoch = 6;
+  // The node's epoch
+  uint64 node_epoch = 7;
 }
 
-message NodeStat {
-  // The read capacity units during this period
-  int64 rcus = 1;
-  // The write capacity units during this period
-  int64 wcus = 2;
-  // How many tables on this node
-  int64 table_num = 3;
-  // How many regions on this node
-  int64 region_num = 4;
-
-  double cpu_usage = 5;
-  double load = 6;
-  // Read disk IO on this node
-  double read_io_rate = 7;
-  // Write disk IO on this node
-  double write_io_rate = 8;
-
-  // Others
-  map<string, string> attrs = 100;
+enum RegionRole {
+  // Writable region(mito2), Readonly region(file).
+  Leader = 0;
+  // Readonly region.
+  Follower = 1;
 }
 
 message RegionStat {
   uint64 region_id = 1;
-  TableName table_name = 2;
   // The read capacity units during this period
-  int64 rcus = 3;
+  int64 rcus = 2;
   // The write capacity units during this period
-  int64 wcus = 4;
+  int64 wcus = 3;
   // Approximate bytes of this region
-  int64 approximate_bytes = 5;
+  int64 approximate_bytes = 4;
   // Approximate number of rows in this region
-  int64 approximate_rows = 6;
-
-  // Others
-  map<string, string> attrs = 100;
-}
-
-message ReplicaStat {
-  Peer peer = 1;
-  bool in_sync = 2;
-  bool is_learner = 3;
+  int64 approximate_rows = 5;
+  // Engine name
+  string engine = 6;
+  // Region role
+  RegionRole role = 7;
 }
 
 message HeartbeatResponse {
   ResponseHeader header = 1;
-
   MailboxMessage mailbox_message = 2;
+  RegionLease region_lease = 3;
+}
+
+message GrantedRegion {
+  uint64 region_id = 1;
+  RegionRole role = 2;
+}
+
+message RegionLease {
+  repeated GrantedRegion regions = 1;
+  uint64 duration_since_epoch = 2;
+  uint64 lease_seconds = 3;
+  repeated uint64 closeable_region_ids = 4;
 }
 
 message AskLeaderRequest { RequestHeader header = 1; }
 
 message AskLeaderResponse {
   ResponseHeader header = 1;
-
   Peer leader = 2;
 }
 
@@ -117,7 +106,6 @@ message MailboxMessage {
   string to = 4;
   // The unix timestamp in milliseconds.
   int64 timestamp_millis = 5;
-
   // The message body.
   oneof payload { string json = 6; }
 }

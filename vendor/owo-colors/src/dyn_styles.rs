@@ -65,7 +65,7 @@ pub struct Styled<T> {
 }
 
 /// A pre-computed style that can be applied to a struct using [`OwoColorize::style`]. Its
-/// interface mimicks that of [`OwoColorize`], but instead of chaining methods on your
+/// interface mimics that of [`OwoColorize`], but instead of chaining methods on your
 /// object, you instead chain them on the `Style` object before applying it.
 ///
 /// ```rust
@@ -294,7 +294,7 @@ impl Style {
 
     fn set_effects(&mut self, effects: &[Effect], to: bool) {
         for e in effects {
-            self.set_effect(*e, to)
+            self.set_effect(*e, to);
         }
     }
 

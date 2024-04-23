@@ -61,7 +61,7 @@ struct Context {
     rng: Cell<Option<FastRand>>,
 
     /// Tracks the amount of "work" a task may still do before yielding back to
-    /// the sheduler
+    /// the scheduler
     budget: Cell<coop::Budget>,
 
     #[cfg(all(
@@ -178,7 +178,9 @@ cfg_rt! {
 
     #[track_caller]
     pub(super) fn with_scheduler<R>(f: impl FnOnce(Option<&scheduler::Context>) -> R) -> R {
-        CONTEXT.with(|c| c.scheduler.with(f))
+        let mut f = Some(f);
+        CONTEXT.try_with(|c| c.scheduler.with(f.take().unwrap()))
+            .unwrap_or_else(|_| (f.take().unwrap())(None))
     }
 
     cfg_taskdump! {

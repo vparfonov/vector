@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "async-graphql"
-version = "6.0.7"
+version = "7.0.3"
 authors = [
     "sunli <scott_s829@163.com>",
     "Koxiaet",
@@ -45,13 +45,13 @@ name = "static_schema"
 harness = false
 
 [dependencies.async-graphql-derive]
-version = "6.0.7"
+version = "7.0.3"
 
 [dependencies.async-graphql-parser]
-version = "6.0.7"
+version = "7.0.3"
 
 [dependencies.async-graphql-value]
-version = "6.0.7"
+version = "7.0.3"
 
 [dependencies.async-stream]
 version = "0.3.0"
@@ -60,10 +60,10 @@ version = "0.3.0"
 version = "0.1.51"
 
 [dependencies.base64]
-version = "0.13.0"
+version = "0.21.0"
 
 [dependencies.bigdecimal]
-version = "0.3.0"
+version = ">=0.3.0, <0.5.0"
 optional = true
 
 [dependencies.blocking]
@@ -130,7 +130,8 @@ version = "0.12.0"
 optional = true
 
 [dependencies.http]
-version = "0.2.3"
+version = "1.0.0"
+package = "http"
 
 [dependencies.indexmap]
 version = "2"
@@ -152,7 +153,7 @@ optional = true
 version = "0.3.15"
 
 [dependencies.multer]
-version = "2.0.0"
+version = "3.0.0"
 
 [dependencies.num-traits]
 version = "0.2.14"
@@ -161,7 +162,7 @@ version = "0.2.14"
 version = "1.7.2"
 
 [dependencies.opentelemetry]
-version = "0.19.0"
+version = "0.21.0"
 features = ["trace"]
 optional = true
 default-features = false
@@ -202,8 +203,8 @@ optional = true
 version = "0.1.21"
 optional = true
 
-[dependencies.static_assertions]
-version = "1.1.0"
+[dependencies.static_assertions_next]
+version = "1.1.1"
 
 [dependencies.tempfile]
 version = "3.2.0"
@@ -250,15 +251,6 @@ features = [
     "serde",
 ]
 optional = true
-
-[dependencies.uuid08]
-version = "0.8"
-features = [
-    "v4",
-    "serde",
-]
-optional = true
-package = "uuid"
 
 [dependencies.zxcvbn]
 version = "2.1.2"

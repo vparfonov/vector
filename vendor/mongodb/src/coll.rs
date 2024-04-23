@@ -15,7 +15,7 @@ use serde::{
 
 use self::options::*;
 use crate::{
-    bson::{doc, to_document_with_options, Bson, Document, SerializerOptions},
+    bson::{doc, Bson, Document},
     bson_util,
     change_stream::{
         event::ChangeStreamEvent,
@@ -135,7 +135,7 @@ impl<T> Clone for Collection<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct CollectionInner {
     client: Client,
     db: Database,
@@ -179,6 +179,16 @@ impl<T> Collection<T> {
     pub fn clone_with_type<U>(&self) -> Collection<U> {
         Collection {
             inner: self.inner.clone(),
+            _phantom: Default::default(),
+        }
+    }
+
+    pub(crate) fn clone_unconcerned(&self) -> Self {
+        let mut new_inner = CollectionInner::clone(&self.inner);
+        new_inner.write_concern = None;
+        new_inner.read_concern = None;
+        Self {
+            inner: Arc::new(new_inner),
             _phantom: Default::default(),
         }
     }
@@ -402,8 +412,7 @@ impl<T> Collection<T> {
 
     /// Gets the number of documents matching `filter`.
     ///
-    /// Note that using [`Collection::estimated_document_count`](#method.estimated_document_count)
-    /// is recommended instead of this method is most cases.
+    /// Note that this method returns an accurate count.
     pub async fn count_documents(
         &self,
         filter: impl Into<Option<Document>>,
@@ -414,8 +423,7 @@ impl<T> Collection<T> {
 
     /// Gets the number of documents matching `filter` using the provided `ClientSession`.
     ///
-    /// Note that using [`Collection::estimated_document_count`](#method.estimated_document_count)
-    /// is recommended instead of this method is most cases.
+    /// Note that this method returns an accurate count.
     pub async fn count_documents_with_session(
         &self,
         filter: impl Into<Option<Document>>,
@@ -754,7 +762,14 @@ impl<T> Collection<T> {
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let update = Update::new(self.namespace(), query, update, true, options);
+        let update = Update::with_update(
+            self.namespace(),
+            query,
+            update,
+            true,
+            options,
+            self.inner.human_readable_serialization,
+        );
         self.client().execute_operation(update, session).await
     }
 
@@ -807,7 +822,14 @@ impl<T> Collection<T> {
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let update = Update::new(self.namespace(), query, update, false, options);
+        let update = Update::with_update(
+            self.namespace(),
+            query,
+            update,
+            false,
+            options,
+            self.inner.human_readable_serialization,
+        );
         self.client().execute_operation(update, session).await
     }
 
@@ -1019,7 +1041,7 @@ where
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let op = FindAndModify::<T>::with_delete(self.namespace(), filter, options);
+        let op = FindAndModify::with_delete(self.namespace(), filter, options);
         self.client().execute_operation(op, session).await
     }
 
@@ -1068,7 +1090,7 @@ where
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let op = FindAndModify::<T>::with_update(self.namespace(), filter, update, options)?;
+        let op = FindAndModify::with_update(self.namespace(), filter, update, options)?;
         self.client().execute_operation(op, session).await
     }
 
@@ -1124,18 +1146,16 @@ where
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<Option<T>> {
         let mut options = options.into();
-        let replacement = to_document_with_options(
-            replacement.borrow(),
-            SerializerOptions::builder()
-                .human_readable(self.inner.human_readable_serialization)
-                .build(),
-        )?;
-
         let session = session.into();
-
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let op = FindAndModify::<T>::with_replace(self.namespace(), filter, replacement, options)?;
+        let op = FindAndModify::with_replace(
+            self.namespace(),
+            filter,
+            replacement.borrow(),
+            options,
+            self.inner.human_readable_serialization,
+        )?;
         self.client().execute_operation(op, session).await
     }
 
@@ -1211,7 +1231,7 @@ where
 
         while n_attempted < ds.len() {
             let docs: Vec<&T> = ds.iter().skip(n_attempted).map(Borrow::borrow).collect();
-            let insert = Insert::new_encrypted(
+            let insert = Insert::new(
                 self.namespace(),
                 docs,
                 options.clone(),
@@ -1340,10 +1360,16 @@ where
         let mut options = options.into();
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
+        #[cfg(feature = "in-use-encryption-unstable")]
+        let encrypted = self.client().auto_encryption_opts().await.is_some();
+        #[cfg(not(feature = "in-use-encryption-unstable"))]
+        let encrypted = false;
+
         let insert = Insert::new(
             self.namespace(),
             vec![doc],
             options.map(InsertManyOptions::from_insert_one_options),
+            encrypted,
             self.inner.human_readable_serialization,
         );
         self.client()
@@ -1396,25 +1422,18 @@ where
         session: impl Into<Option<&mut ClientSession>>,
     ) -> Result<UpdateResult> {
         let mut options = options.into();
-        let replacement = to_document_with_options(
-            replacement.borrow(),
-            SerializerOptions::builder()
-                .human_readable(self.inner.human_readable_serialization)
-                .build(),
-        )?;
-
-        bson_util::replacement_document_check(&replacement)?;
 
         let session = session.into();
 
         resolve_write_concern_with_session!(self, options, session.as_ref())?;
 
-        let update = Update::new(
+        let update = Update::with_replace(
             self.namespace(),
             query,
-            UpdateModifications::Document(replacement),
+            replacement.borrow(),
             false,
             options.map(UpdateOptions::from_replace_options),
+            self.inner.human_readable_serialization,
         );
         self.client().execute_operation(update, session).await
     }

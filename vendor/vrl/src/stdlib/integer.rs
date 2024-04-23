@@ -3,7 +3,7 @@ use crate::compiler::prelude::*;
 fn int(value: Value) -> Resolved {
     match value {
         v @ Value::Integer(_) => Ok(v),
-        v => Err(format!(r#"expected integer, got {}"#, v.kind()).into()),
+        v => Err(format!("expected integer, got {}", v.kind()).into()),
     }
 }
 
@@ -27,7 +27,7 @@ impl Function for Integer {
         &[
             Example {
                 title: "valid",
-                source: r#"int(42)"#,
+                source: "int(42)",
                 result: Ok("42"),
             },
             Example {
@@ -65,6 +65,6 @@ impl FunctionExpression for IntegerFn {
     fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let non_integer = !self.value.type_def(state).is_integer();
 
-        TypeDef::integer().with_fallibility(non_integer)
+        TypeDef::integer().maybe_fallible(non_integer)
     }
 }

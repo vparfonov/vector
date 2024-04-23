@@ -253,6 +253,7 @@ impl Debug for Matcher {
 /// [`register`]: MockServer::register
 /// [`mount`]: Mock::mount
 /// [`mount_as_scoped`]: Mock::mount_as_scoped
+#[must_use = "`Mock`s have to be mounted or registered with a `MockServer` to become effective"]
 pub struct Mock {
     pub(crate) matchers: Vec<Matcher>,
     pub(crate) response: Box<dyn Respond>,
@@ -539,7 +540,7 @@ impl Mock {
     /// # Limitations
     ///
     /// When expectations of a scoped [`Mock`] are not verified, it will trigger a panic - just like a normal [`Mock`].
-    /// Due to [limitations](https://internals.rust-lang.org/t/should-drop-glue-use-track-caller/13682) in Rust's [`Drop`](std::ops::Drop) trait,
+    /// Due to [limitations](https://internals.rust-lang.org/t/should-drop-glue-use-track-caller/13682) in Rust's [`Drop`] trait,
     /// the panic message will not include the filename and the line location
     /// where the corresponding [`MockGuard`] was dropped - it will point into `wiremock`'s source code.  
     ///
@@ -626,7 +627,7 @@ impl Mock {
         server.register_as_scoped(self).await
     }
 
-    /// Given a [`Request`](crate::Request) build an instance a [`ResponseTemplate`] using
+    /// Given a [`Request`] build an instance a [`ResponseTemplate`] using
     /// the responder associated with the `Mock`.
     pub(crate) fn response_template(&self, request: &Request) -> ResponseTemplate {
         self.response.respond(request)

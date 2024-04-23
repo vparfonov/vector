@@ -2,7 +2,6 @@ use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use bson::Document;
 use serde::Deserialize;
-use tokio::sync::{RwLockReadGuard, RwLockWriteGuard};
 
 use super::TestSdamEvent;
 
@@ -25,6 +24,7 @@ use crate::{
     },
     selection_criteria::TagSet,
     test::{
+        get_client_options,
         log_uncaptured,
         run_spec_test,
         Event,
@@ -35,8 +35,6 @@ use crate::{
         FailPointMode,
         SdamEvent,
         TestClient,
-        CLIENT_OPTIONS,
-        LOCK,
     },
 };
 
@@ -599,8 +597,6 @@ async fn load_balanced() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn topology_closed_event_last() {
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
-
     let event_handler = EventHandler::new();
     let mut subscriber = event_handler.subscribe();
     let client = EventClient::with_additional_options(
@@ -642,9 +638,7 @@ async fn topology_closed_event_last() {
 #[cfg_attr(feature = "tokio-runtime", tokio::test(flavor = "multi_thread"))]
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 async fn heartbeat_events() {
-    let _guard: RwLockWriteGuard<_> = LOCK.run_exclusively().await;
-
-    let mut options = CLIENT_OPTIONS.get().await.clone();
+    let mut options = get_client_options().await.clone();
     options.hosts.drain(1..);
     options.heartbeat_freq = Some(Duration::from_millis(50));
     options.app_name = "heartbeat_events".to_string().into();
@@ -713,8 +707,6 @@ async fn heartbeat_events() {
 #[cfg_attr(feature = "async-std-runtime", async_std::test)]
 #[function_name::named]
 async fn direct_connection() {
-    let _guard: RwLockReadGuard<_> = LOCK.run_concurrently().await;
-
     let test_client = TestClient::new().await;
     if !test_client.is_replica_set() {
         log_uncaptured("Skipping direct_connection test due to non-replica set topology");
@@ -729,7 +721,7 @@ async fn direct_connection() {
         .await
         .expect("failed to select secondary");
 
-    let mut secondary_options = CLIENT_OPTIONS.get().await.clone();
+    let mut secondary_options = get_client_options().await.clone();
     secondary_options.hosts = vec![secondary_address];
 
     let mut direct_false_options = secondary_options.clone();

@@ -66,10 +66,9 @@ struct UserIdInvalidSnafu<I> {
     user_id: I,
 }
 
-struct ConfigValidationFailedSnafu {
-    checksum: u64,
-    key: String,
-    source: crypto::Error,
+struct ConfigValidationFailedSnafu<I, S> {
+    checksum: I,
+    key: S,
 }
 ```
 
@@ -157,8 +156,7 @@ impl std::fmt::Display for Error {
 ```
 
 If no display format is specified, the variant's name will be used
-by default. If the field is an underlying error, that error's
-`Display` implementation will also be included.
+by default.
 
 #### `ErrorCompat`
 

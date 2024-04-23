@@ -61,9 +61,7 @@ macro_rules! impl_partial_ord {
 
 #[cfg(feature = "alloc")]
 mod bstring {
-    use core::{
-        cmp::Ordering, convert::TryFrom, fmt, iter::FromIterator, ops,
-    };
+    use core::{cmp::Ordering, fmt, ops, str::FromStr};
 
     use alloc::{
         borrow::{Borrow, BorrowMut, Cow, ToOwned},
@@ -87,6 +85,15 @@ mod bstring {
         #[inline]
         fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
             fmt::Debug::fmt(self.as_bstr(), f)
+        }
+    }
+
+    impl FromStr for BString {
+        type Err = crate::Utf8Error;
+
+        #[inline]
+        fn from_str(s: &str) -> Result<BString, crate::Utf8Error> {
+            Ok(BString::from(s))
         }
     }
 
@@ -383,7 +390,6 @@ mod bstr {
     use core::{
         borrow::{Borrow, BorrowMut},
         cmp::Ordering,
-        convert::TryFrom,
         fmt, ops,
     };
 
@@ -1063,6 +1069,8 @@ mod bstring_serde {
 
 #[cfg(all(test, feature = "std"))]
 mod display {
+    use alloc::format;
+
     #[cfg(not(miri))]
     use crate::bstring::BString;
     use crate::ByteSlice;
@@ -1071,6 +1079,12 @@ mod display {
     fn clean() {
         assert_eq!(&format!("{}", &b"abc".as_bstr()), "abc");
         assert_eq!(&format!("{}", &b"\xf0\x28\x8c\xbc".as_bstr()), "�(��");
+    }
+
+    #[test]
+    fn from_str() {
+        let s: BString = "abc".parse().unwrap();
+        assert_eq!(s, BString::new(b"abc".to_vec()));
     }
 
     #[test]
@@ -1174,6 +1188,8 @@ mod display {
 
 #[cfg(all(test, feature = "alloc"))]
 mod bstring_arbitrary {
+    use alloc::{boxed::Box, vec::Vec};
+
     use crate::bstring::BString;
 
     use quickcheck::{Arbitrary, Gen};
@@ -1192,6 +1208,8 @@ mod bstring_arbitrary {
 #[test]
 #[cfg(feature = "std")]
 fn test_debug() {
+    use alloc::format;
+
     use crate::{ByteSlice, B};
 
     assert_eq!(

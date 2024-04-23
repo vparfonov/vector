@@ -107,20 +107,17 @@ fn tls_client_stream_test(server_addr: IpAddr, mtls: bool) {
         .name("test_tls_client_stream:server".to_string())
         .spawn(move || {
             let pkcs12 = Pkcs12::from_der(&server_pkcs12_der)
-                .and_then(|p| p.parse2("mypass"))
+                .and_then(|p| p.parse("mypass"))
                 .expect("Pkcs12::from_der");
             let mut tls =
                 SslAcceptor::mozilla_modern(SslMethod::tls()).expect("mozilla_modern failed");
 
-            if let Some(pkey) = pkcs12.pkey.as_ref() {
-                tls.set_private_key(pkey).expect("failed to associated key");
-            }
-            if let Some(cert) = pkcs12.cert.as_ref() {
-                tls.set_certificate(cert)
-                    .expect("failed to associated cert");
-            }
+            tls.set_private_key(&pkcs12.pkey)
+                .expect("failed to associated key");
+            tls.set_certificate(&pkcs12.cert)
+                .expect("failed to associated cert");
 
-            if let Some(ref chain) = pkcs12.ca {
+            if let Some(ref chain) = pkcs12.chain {
                 for cert in chain {
                     tls.add_extra_chain_cert(cert.to_owned())
                         .expect("failed to add chain");
@@ -363,11 +360,9 @@ fn cert(
     x509_build.sign(ca_pkey, MessageDigest::sha256()).unwrap();
     let cert = x509_build.build();
 
-    let mut pkcs12_builder = Pkcs12::builder();
+    let pkcs12_builder = Pkcs12::builder();
     let pkcs12 = pkcs12_builder
-        .pkey(&pkey)
-        .cert(&cert)
-        .build2("mypass")
+        .build("mypass", subject_name, &pkey, &cert)
         .unwrap();
 
     (pkey, cert, pkcs12)

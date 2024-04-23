@@ -17,24 +17,33 @@
 
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::fmt::Formatter;
 
 use async_trait::async_trait;
 use dashmap::DashMap;
+use serde::Deserialize;
 
 use crate::raw::adapters::typed_kv;
+use crate::raw::ConfigDeserializer;
 use crate::*;
+
+/// [dashmap](https://github.com/xacrimon/dashmap) backend support.
+#[derive(Default, Deserialize, Clone, Debug)]
+pub struct DashmapConfig {
+    root: Option<String>,
+}
 
 /// [dashmap](https://github.com/xacrimon/dashmap) backend support.
 #[doc = include_str!("docs.md")]
 #[derive(Default)]
 pub struct DashmapBuilder {
-    root: Option<String>,
+    config: DashmapConfig,
 }
 
 impl DashmapBuilder {
     /// Set the root for dashmap.
     pub fn root(&mut self, path: &str) -> &mut Self {
-        self.root = Some(path.into());
+        self.config.root = Some(path.into());
         self
     }
 }
@@ -44,27 +53,34 @@ impl Builder for DashmapBuilder {
     type Accessor = DashmapBackend;
 
     fn from_map(map: HashMap<String, String>) -> Self {
-        let mut builder = Self::default();
+        let config = DashmapConfig::deserialize(ConfigDeserializer::new(map))
+            .expect("config deserialize must succeed");
 
-        map.get("root").map(|v| builder.root(v));
-
-        builder
+        Self { config }
     }
 
     fn build(&mut self) -> Result<Self::Accessor> {
         Ok(DashmapBackend::new(Adapter {
             inner: DashMap::default(),
         })
-        .with_root(self.root.as_deref().unwrap_or_default()))
+        .with_root(self.config.root.as_deref().unwrap_or_default()))
     }
 }
 
 /// Backend is used to serve `Accessor` support in dashmap.
 pub type DashmapBackend = typed_kv::Backend<Adapter>;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Adapter {
     inner: DashMap<String, typed_kv::Value>,
+}
+
+impl Debug for Adapter {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DashmapAdapter")
+            .field("size", &self.inner.len())
+            .finish_non_exhaustive()
+    }
 }
 
 #[async_trait]
@@ -122,7 +138,7 @@ impl typed_kv::Adapter for Adapter {
         if path.is_empty() {
             Ok(keys.collect())
         } else {
-            Ok(keys.filter(|k| k.starts_with(path)).collect())
+            Ok(keys.filter(|k| k.starts_with(path) && k != path).collect())
         }
     }
 }

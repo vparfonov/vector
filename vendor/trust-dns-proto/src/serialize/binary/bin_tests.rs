@@ -21,9 +21,9 @@ use std::fmt::Debug;
 
 fn get_character_data() -> Vec<(&'static str, Vec<u8>)> {
     vec![
-        ("", vec![0]),                    // base case, only the root
-        ("a", vec![1, b'a']),             // a single 'a' label
-        ("bc", vec![2, b'b', b'c']),      // two labels, 'a.bc'
+        ("", vec![0]),                      // base case, only the root
+        ("a", vec![1, b'a']),               // a single 'a' label
+        ("bc", vec![2, b'b', b'c']),        // two labels, 'a.bc'
         ("♥", vec![3, 0xE2, 0x99, 0xA5]), // two labels utf8, 'a.♥'
     ]
 }
@@ -42,7 +42,7 @@ fn read_character_data() {
 #[test]
 fn emit_character_data() {
     test_emit_data_set(get_character_data(), |ref mut e, d| {
-        e.emit_character_data(d)
+        e.emit_character_data(&d)
     });
 }
 
@@ -124,7 +124,7 @@ where
     F: Fn(BinDecoder<'_>) -> ProtoResult<E>,
 {
     for (test_pass, (expect, binary)) in data_set.into_iter().enumerate() {
-        println!("test {test_pass}: {binary:?}");
+        println!("test {}: {:?}", test_pass, binary);
 
         let decoder = BinDecoder::new(&binary);
         assert_eq!(read_func(decoder).unwrap(), expect);
@@ -137,7 +137,7 @@ where
     S: Debug,
 {
     for (test_pass, (data, expect)) in data_set.into_iter().enumerate() {
-        println!("test {test_pass}: {data:?}");
+        println!("test {}: {:?}", test_pass, data);
 
         let mut bytes: Vec<u8> = Vec::with_capacity(512);
         {

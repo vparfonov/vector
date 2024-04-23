@@ -1,7 +1,7 @@
 #![cfg(feature = "cluster-async")]
 mod support;
 use std::sync::{
-    atomic::{self, AtomicI32},
+    atomic::{self, AtomicI32, AtomicU16},
     atomic::{AtomicBool, Ordering},
     Arc,
 };
@@ -13,9 +13,13 @@ use redis::{
     aio::{ConnectionLike, MultiplexedConnection},
     cluster::ClusterClient,
     cluster_async::Connect,
+    cluster_routing::{MultipleNodeRoutingInfo, RoutingInfo},
     cmd, parse_redis_value, AsyncCommands, Cmd, ErrorKind, InfoDict, IntoConnectionInfo,
     RedisError, RedisFuture, RedisResult, Script, Value,
 };
+
+#[cfg(feature = "tls-rustls")]
+use support::build_single_client;
 
 use crate::support::*;
 
@@ -79,6 +83,112 @@ fn test_async_cluster_basic_script() {
     .unwrap();
 }
 
+#[test]
+fn test_async_cluster_route_flush_to_specific_node() {
+    let cluster = TestClusterContext::new(3, 0);
+
+    block_on_all(async move {
+        let mut connection = cluster.async_connection().await;
+        let _: () = connection.set("foo", "bar").await.unwrap();
+        let _: () = connection.set("bar", "foo").await.unwrap();
+
+        let res: String = connection.get("foo").await.unwrap();
+        assert_eq!(res, "bar".to_string());
+        let res2: Option<String> = connection.get("bar").await.unwrap();
+        assert_eq!(res2, Some("foo".to_string()));
+
+        let route = redis::cluster_routing::Route::new(1, redis::cluster_routing::SlotAddr::Master);
+        let single_node_route = redis::cluster_routing::SingleNodeRoutingInfo::SpecificNode(route);
+        let routing = RoutingInfo::SingleNode(single_node_route);
+        assert_eq!(
+            connection
+                .route_command(&redis::cmd("FLUSHALL"), routing)
+                .await
+                .unwrap(),
+            Value::Okay
+        );
+        let res: String = connection.get("foo").await.unwrap();
+        assert_eq!(res, "bar".to_string());
+        let res2: Option<String> = connection.get("bar").await.unwrap();
+        assert_eq!(res2, None);
+        Ok::<_, RedisError>(())
+    })
+    .unwrap();
+}
+
+#[test]
+fn test_async_cluster_route_info_to_nodes() {
+    let cluster = TestClusterContext::new(12, 1);
+
+    let split_to_addresses_and_info = |res| -> (Vec<String>, Vec<String>) {
+        if let Value::Bulk(values) = res {
+            let mut pairs: Vec<_> = values
+                .into_iter()
+                .map(|value| redis::from_redis_value::<(String, String)>(&value).unwrap())
+                .collect();
+            pairs.sort_by(|(address1, _), (address2, _)| address1.cmp(address2));
+            pairs.into_iter().unzip()
+        } else {
+            unreachable!("{:?}", res);
+        }
+    };
+
+    block_on_all(async move {
+        let cluster_addresses: Vec<_> = cluster
+            .cluster
+            .servers
+            .iter()
+            .map(|server| server.connection_info())
+            .collect();
+        let client = ClusterClient::builder(cluster_addresses.clone())
+            .read_from_replicas()
+            .build()?;
+        let mut connection = client.get_async_connection().await?;
+
+        let route_to_all_nodes = redis::cluster_routing::MultipleNodeRoutingInfo::AllNodes;
+        let routing = RoutingInfo::MultiNode((route_to_all_nodes, None));
+        let res = connection
+            .route_command(&redis::cmd("INFO"), routing)
+            .await
+            .unwrap();
+        let (addresses, infos) = split_to_addresses_and_info(res);
+
+        let mut cluster_addresses: Vec<_> = cluster_addresses
+            .into_iter()
+            .map(|info| info.addr.to_string())
+            .collect();
+        cluster_addresses.sort();
+
+        assert_eq!(addresses.len(), 12);
+        assert_eq!(addresses, cluster_addresses);
+        assert_eq!(infos.len(), 12);
+        for i in 0..12 {
+            let split: Vec<_> = addresses[i].split(':').collect();
+            assert!(infos[i].contains(&format!("tcp_port:{}", split[1])));
+        }
+
+        let route_to_all_primaries = redis::cluster_routing::MultipleNodeRoutingInfo::AllMasters;
+        let routing = RoutingInfo::MultiNode((route_to_all_primaries, None));
+        let res = connection
+            .route_command(&redis::cmd("INFO"), routing)
+            .await
+            .unwrap();
+        let (addresses, infos) = split_to_addresses_and_info(res);
+        assert_eq!(addresses.len(), 6);
+        assert_eq!(infos.len(), 6);
+        // verify that all primaries have the correct port & host, and are marked as primaries.
+        for i in 0..6 {
+            assert!(cluster_addresses.contains(&addresses[i]));
+            let split: Vec<_> = addresses[i].split(':').collect();
+            assert!(infos[i].contains(&format!("tcp_port:{}", split[1])));
+            assert!(infos[i].contains("role:primary") || infos[i].contains("role:master"));
+        }
+
+        Ok::<_, RedisError>(())
+    })
+    .unwrap();
+}
+
 #[ignore] // TODO Handle pipe where the keys do not all go to the same node
 #[test]
 fn test_async_cluster_basic_pipe() {
@@ -100,9 +210,27 @@ fn test_async_cluster_basic_pipe() {
 }
 
 #[test]
+fn test_async_cluster_multi_shard_commands() {
+    let cluster = TestClusterContext::new(3, 0);
+
+    block_on_all(async move {
+        let mut connection = cluster.async_connection().await;
+
+        let res: String = connection
+            .mset(&[("foo", "bar"), ("bar", "foo"), ("baz", "bazz")])
+            .await?;
+        assert_eq!(res, "OK");
+        let res: Vec<String> = connection.mget(&["baz", "foo", "bar"]).await?;
+        assert_eq!(res, vec!["bazz", "bar", "foo"]);
+        Ok::<_, RedisError>(())
+    })
+    .unwrap()
+}
+
+#[test]
 fn test_async_cluster_basic_failover() {
     block_on_all(async move {
-        test_failover(&TestClusterContext::new(6, 1), 10, 123).await;
+        test_failover(&TestClusterContext::new(6, 1), 10, 123, false).await;
         Ok::<_, RedisError>(())
     })
     .unwrap()
@@ -113,7 +241,9 @@ async fn do_failover(redis: &mut redis::aio::MultiplexedConnection) -> Result<()
     Ok(())
 }
 
-async fn test_failover(env: &TestClusterContext, requests: i32, value: i32) {
+// parameter `mtls_enabled` can only be used if `feature = tls-rustls` is active
+#[allow(dead_code)]
+async fn test_failover(env: &TestClusterContext, requests: i32, value: i32, mtls_enabled: bool) {
     let completed = Arc::new(AtomicI32::new(0));
 
     let connection = env.async_connection().await;
@@ -124,8 +254,16 @@ async fn test_failover(env: &TestClusterContext, requests: i32, value: i32) {
         let cleared_nodes = async {
             for server in env.cluster.iter_servers() {
                 let addr = server.client_addr();
+
+                #[cfg(feature = "tls-rustls")]
+                let client =
+                    build_single_client(server.connection_info(), &server.tls_paths, mtls_enabled)
+                        .unwrap_or_else(|e| panic!("Failed to connect to '{addr}': {e}"));
+
+                #[cfg(not(feature = "tls-rustls"))]
                 let client = redis::Client::open(server.connection_info())
                     .unwrap_or_else(|e| panic!("Failed to connect to '{addr}': {e}"));
+
                 let mut conn = client
                     .get_multiplexed_async_connection()
                     .await
@@ -762,6 +900,56 @@ fn test_cluster_fan_out_once_even_if_primary_has_multiple_slot_ranges() {
 }
 
 #[test]
+fn test_async_cluster_route_according_to_passed_argument() {
+    let name = "node";
+
+    let touched_ports = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let cloned_ports = touched_ports.clone();
+
+    // requests should route to replica
+    let MockEnv {
+        runtime,
+        async_connection: mut connection,
+        handler: _handler,
+        ..
+    } = MockEnv::with_client_builder(
+        ClusterClient::builder(vec![&*format!("redis://{name}")])
+            .retries(0)
+            .read_from_replicas(),
+        name,
+        move |cmd: &[u8], port| {
+            respond_startup_with_replica(name, cmd)?;
+            cloned_ports.lock().unwrap().push(port);
+            Err(Ok(Value::Nil))
+        },
+    );
+
+    let mut cmd = cmd("GET");
+    cmd.arg("test");
+    let _ = runtime.block_on(connection.route_command(
+        &cmd,
+        RoutingInfo::MultiNode((MultipleNodeRoutingInfo::AllMasters, None)),
+    ));
+    {
+        let mut touched_ports = touched_ports.lock().unwrap();
+        touched_ports.sort();
+        assert_eq!(*touched_ports, vec![6379, 6381]);
+        touched_ports.clear();
+    }
+
+    let _ = runtime.block_on(connection.route_command(
+        &cmd,
+        RoutingInfo::MultiNode((MultipleNodeRoutingInfo::AllNodes, None)),
+    ));
+    {
+        let mut touched_ports = touched_ports.lock().unwrap();
+        touched_ports.sort();
+        assert_eq!(*touched_ports, vec![6379, 6380, 6381, 6382]);
+        touched_ports.clear();
+    }
+}
+
+#[test]
 fn test_cluster_fan_out_and_aggregate_numeric_response_with_min() {
     let name = "test_cluster_fan_out_and_aggregate_numeric_response";
     let mut cmd = Cmd::new();
@@ -1064,18 +1252,108 @@ fn test_cluster_fan_out_and_combine_arrays_of_values() {
     result.sort();
     assert_eq!(
         result,
-        vec![format!("key:6379"), format!("key:6381"),],
+        vec!["key:6379".to_string(), "key:6381".to_string(),],
         "{result:?}"
     );
 }
 
 #[test]
+fn test_cluster_split_multi_shard_command_and_combine_arrays_of_values() {
+    let name = "test_cluster_split_multi_shard_command_and_combine_arrays_of_values";
+    let mut cmd = cmd("MGET");
+    cmd.arg("foo").arg("bar").arg("baz");
+    let MockEnv {
+        runtime,
+        async_connection: mut connection,
+        handler: _handler,
+        ..
+    } = MockEnv::with_client_builder(
+        ClusterClient::builder(vec![&*format!("redis://{name}")])
+            .retries(0)
+            .read_from_replicas(),
+        name,
+        move |received_cmd: &[u8], port| {
+            respond_startup_with_replica_using_config(name, received_cmd, None)?;
+            let cmd_str = std::str::from_utf8(received_cmd).unwrap();
+            let results = ["foo", "bar", "baz"]
+                .iter()
+                .filter_map(|expected_key| {
+                    if cmd_str.contains(expected_key) {
+                        Some(Value::Data(format!("{expected_key}-{port}").into_bytes()))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            Err(Ok(Value::Bulk(results)))
+        },
+    );
+
+    let result = runtime
+        .block_on(cmd.query_async::<_, Vec<String>>(&mut connection))
+        .unwrap();
+    assert_eq!(result, vec!["foo-6382", "bar-6380", "baz-6380"]);
+}
+
+#[test]
+fn test_cluster_handle_asking_error_in_split_multi_shard_command() {
+    let name = "test_cluster_handle_asking_error_in_split_multi_shard_command";
+    let mut cmd = cmd("MGET");
+    cmd.arg("foo").arg("bar").arg("baz");
+    let asking_called = Arc::new(AtomicU16::new(0));
+    let asking_called_cloned = asking_called.clone();
+    let MockEnv {
+        runtime,
+        async_connection: mut connection,
+        handler: _handler,
+        ..
+    } = MockEnv::with_client_builder(
+        ClusterClient::builder(vec![&*format!("redis://{name}")]).read_from_replicas(),
+        name,
+        move |received_cmd: &[u8], port| {
+            respond_startup_with_replica_using_config(name, received_cmd, None)?;
+            let cmd_str = std::str::from_utf8(received_cmd).unwrap();
+            if cmd_str.contains("ASKING") && port == 6382 {
+                asking_called_cloned.fetch_add(1, Ordering::Relaxed);
+            }
+            if port == 6380 && cmd_str.contains("baz") {
+                return Err(parse_redis_value(
+                    format!("-ASK 14000 {name}:6382\r\n").as_bytes(),
+                ));
+            }
+            let results = ["foo", "bar", "baz"]
+                .iter()
+                .filter_map(|expected_key| {
+                    if cmd_str.contains(expected_key) {
+                        Some(Value::Data(format!("{expected_key}-{port}").into_bytes()))
+                    } else {
+                        None
+                    }
+                })
+                .collect();
+            Err(Ok(Value::Bulk(results)))
+        },
+    );
+
+    let result = runtime
+        .block_on(cmd.query_async::<_, Vec<String>>(&mut connection))
+        .unwrap();
+    assert_eq!(result, vec!["foo-6382", "bar-6380", "baz-6382"]);
+    assert_eq!(asking_called.load(Ordering::Relaxed), 1);
+}
+
+#[test]
 fn test_async_cluster_with_username_and_password() {
-    let cluster = TestClusterContext::new_with_cluster_client_builder(3, 0, |builder| {
-        builder
-            .username(RedisCluster::username().to_string())
-            .password(RedisCluster::password().to_string())
-    });
+    let cluster = TestClusterContext::new_with_cluster_client_builder(
+        3,
+        0,
+        |builder| {
+            builder
+                .username(RedisCluster::username().to_string())
+                .password(RedisCluster::password().to_string())
+        },
+        false,
+    );
     cluster.disable_default_user();
 
     block_on_all(async move {
@@ -1172,4 +1450,59 @@ fn test_async_cluster_non_retryable_error_should_not_retry() {
         },
     }
     assert_eq!(completed.load(Ordering::SeqCst), 1);
+}
+
+#[cfg(feature = "tls-rustls")]
+mod mtls_test {
+    use crate::support::mtls_test::create_cluster_client_from_cluster;
+    use redis::ConnectionInfo;
+
+    use super::*;
+
+    #[test]
+    fn test_async_cluster_basic_cmd_with_mtls() {
+        let cluster = TestClusterContext::new_with_mtls(3, 0);
+        block_on_all(async move {
+            let client = create_cluster_client_from_cluster(&cluster, true).unwrap();
+            let mut connection = client.get_async_connection().await.unwrap();
+            cmd("SET")
+                .arg("test")
+                .arg("test_data")
+                .query_async(&mut connection)
+                .await?;
+            let res: String = cmd("GET")
+                .arg("test")
+                .clone()
+                .query_async(&mut connection)
+                .await?;
+            assert_eq!(res, "test_data");
+            Ok::<_, RedisError>(())
+        })
+        .unwrap();
+    }
+
+    #[test]
+    fn test_async_cluster_should_not_connect_without_mtls_enabled() {
+        let cluster = TestClusterContext::new_with_mtls(3, 0);
+        block_on_all(async move {
+            let client = create_cluster_client_from_cluster(&cluster, false).unwrap();
+            let connection = client.get_async_connection().await;
+            match cluster.cluster.servers.get(0).unwrap().connection_info() {
+                ConnectionInfo {
+                    addr: redis::ConnectionAddr::TcpTls { .. },
+                    ..
+            } => {
+                if connection.is_ok() {
+                    panic!("Must NOT be able to connect without client credentials if server accepts TLS");
+                }
+            }
+            _ => {
+                if let Err(e) = connection {
+                    panic!("Must be able to connect without client credentials if server does NOT accept TLS: {e:?}");
+                }
+            }
+            }
+            Ok::<_, RedisError>(())
+        }).unwrap();
+    }
 }

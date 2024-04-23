@@ -16,12 +16,14 @@
 
 //! bitmap for expressing the set of supported algorithms in edns.
 
-use std::fmt::{self, Display, Formatter};
+use std::convert::From;
+use std::fmt;
+use std::fmt::{Display, Formatter};
 
 #[cfg(feature = "serde-config")]
 use serde::{Deserialize, Serialize};
 
-use tracing::warn;
+use log::warn;
 
 use crate::error::*;
 use crate::rr::dnssec::Algorithm;

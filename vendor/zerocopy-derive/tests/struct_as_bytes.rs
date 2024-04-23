@@ -76,6 +76,18 @@ struct CPacked {
 assert_impl_all!(CPacked: AsBytes);
 
 #[derive(AsBytes)]
+#[repr(C, packed(2))]
+// The same caveats as for CPacked apply - we're assuming u64 is at least
+// 4-byte aligned by default. Without packed(2), this should fail, as there
+// would be padding between a/b assuming u64 is 4+ byte aligned.
+struct CPacked2 {
+    a: u16,
+    b: u64,
+}
+
+assert_impl_all!(CPacked2: AsBytes);
+
+#[derive(AsBytes)]
 #[repr(C, packed)]
 struct CPackedGeneric<T, U: ?Sized> {
     t: T,
@@ -128,3 +140,18 @@ struct Unsized {
 }
 
 assert_impl_all!(Unsized: AsBytes);
+
+// Deriving `AsBytes` should work if the struct has bounded parameters.
+
+#[derive(AsBytes)]
+#[repr(transparent)]
+struct WithParams<'a: 'b, 'b: 'a, const N: usize, T: 'a + 'b + AsBytes>(
+    [T; N],
+    PhantomData<&'a &'b ()>,
+)
+where
+    'a: 'b,
+    'b: 'a,
+    T: 'a + 'b + AsBytes;
+
+assert_impl_all!(WithParams<'static, 'static, 42, u8>: AsBytes);

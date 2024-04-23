@@ -3,7 +3,7 @@
 
 This repository contains the officially supported MongoDB Rust driver, a client side library that can be used to interact with MongoDB deployments in Rust applications. It uses the [`bson`](https://docs.rs/bson/latest) crate for BSON support. The driver contains a fully async API that supports either [`tokio`](https://crates.io/crates/tokio) (default) or [`async-std`](https://crates.io/crates/async-std), depending on the feature flags set. The driver also has a sync API that may be enabled via feature flags.
 
-For more detailed documentation, see [the manual](https://mongodb.github.io/mongo-rust-driver/manual/).
+For more detailed documentation, see https://www.mongodb.com/docs/drivers/rust/current/. This documentation includes detailed content about features, runnable examples, troubleshooting resources, and more.
 
 ## Index
 - [Installation](#installation)
@@ -33,7 +33,7 @@ For more detailed documentation, see [the manual](https://mongodb.github.io/mong
 
 ## Installation
 ### Requirements
-- Rust 1.60+ (See the [MSRV policy](#minimum-supported-rust-version-msrv-policy) for more information)
+- Rust 1.61+ (See the [MSRV policy](#minimum-supported-rust-version-msrv-policy) for more information)
 - MongoDB 3.6+
 
 #### Supported Platforms
@@ -44,7 +44,7 @@ The driver tests against Linux, MacOS, and Windows in CI.
 The driver is available on [crates.io](https://crates.io/crates/mongodb). To use the driver in your application, simply add it to your project's `Cargo.toml`.
 ```toml
 [dependencies]
-mongodb = "2.7.0"
+mongodb = "2.8.2"
 ```
 
 Version 1 of this crate has reached end of life and will no longer be receiving any updates or bug fixes, so all users are recommended to always depend on the latest 2.x release. See the [2.0.0 release notes](https://github.com/mongodb/mongo-rust-driver/releases/tag/v2.0.0) for migration information if upgrading from a 1.x version.
@@ -55,7 +55,7 @@ The driver supports both of the most popular async runtime crates, namely [`toki
 For example, to instruct the driver to work with [`async-std`](https://crates.io/crates/async-std), add the following to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.7.0"
+version = "2.8.2"
 default-features = false
 features = ["async-std-runtime"]
 ```
@@ -64,7 +64,7 @@ features = ["async-std-runtime"]
 The driver also provides a blocking sync API. To enable this, add the `"sync"` or `"tokio-sync"` feature to your `Cargo.toml`:
 ```toml
 [dependencies.mongodb]
-version = "2.7.0"
+version = "2.8.2"
 features = ["tokio-sync"]
 ```
 Using the `"sync"` feature also requires using `default-features = false`.
@@ -372,7 +372,7 @@ Commits to main are run automatically on [evergreen](https://evergreen.mongodb.c
 
 ## Minimum supported Rust version (MSRV) policy
 
-The MSRV for this crate is currently 1.60.0. This will rarely be increased, and if it ever is,
+The MSRV for this crate is currently 1.61.0. This will rarely be increased, and if it ever is,
 it will only happen in a minor or major version release.
 
 ## License

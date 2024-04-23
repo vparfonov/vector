@@ -1,3 +1,4 @@
+use std::collections::VecDeque;
 use std::fmt;
 use std::io::{self, Write};
 use std::net::{self, SocketAddr, TcpStream, ToSocketAddrs};
@@ -31,14 +32,29 @@ use rustls::OwnedTrustAnchor;
 #[cfg(feature = "tls-rustls-webpki-roots")]
 use webpki_roots::TLS_SERVER_ROOTS;
 
-#[cfg(all(feature = "tls-rustls", not(feature = "tls-rustls-webpki-roots")))]
+#[cfg(all(
+    feature = "tls-rustls",
+    not(feature = "tls-native-tls"),
+    not(feature = "tls-rustls-webpki-roots")
+))]
 use rustls_native_certs::load_native_certs;
+
+#[cfg(feature = "tls-rustls")]
+use crate::tls::TlsConnParams;
+
+// Non-exhaustive to prevent construction outside this crate
+#[cfg(not(feature = "tls-rustls"))]
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct TlsConnParams;
 
 static DEFAULT_PORT: u16 = 6379;
 
 #[inline(always)]
 fn connect_tcp(addr: (&str, u16)) -> io::Result<TcpStream> {
     let socket = TcpStream::connect(addr)?;
+    #[cfg(feature = "tcp_nodelay")]
+    socket.set_nodelay(true)?;
     #[cfg(feature = "keep-alive")]
     {
         //For now rely on system defaults
@@ -57,6 +73,8 @@ fn connect_tcp(addr: (&str, u16)) -> io::Result<TcpStream> {
 #[inline(always)]
 fn connect_tcp_timeout(addr: &SocketAddr, timeout: Duration) -> io::Result<TcpStream> {
     let socket = TcpStream::connect_timeout(addr, timeout)?;
+    #[cfg(feature = "tcp_nodelay")]
+    socket.set_nodelay(true)?;
     #[cfg(feature = "keep-alive")]
     {
         //For now rely on system defaults
@@ -100,7 +118,7 @@ pub enum TlsMode {
 /// Not all connection addresses are supported on all platforms.  For instance
 /// to connect to a unix socket you need to run this on an operating system
 /// that supports them.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug)]
 pub enum ConnectionAddr {
     /// Format for this is `(host, port)`.
     Tcp(String, u16),
@@ -119,10 +137,41 @@ pub enum ConnectionAddr {
         /// trusted for use from any other. This introduces a significant
         /// vulnerability to man-in-the-middle attacks.
         insecure: bool,
+
+        /// TLS certificates and client key.
+        tls_params: Option<TlsConnParams>,
     },
     /// Format for this is the path to the unix socket.
     Unix(PathBuf),
 }
+
+impl PartialEq for ConnectionAddr {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (ConnectionAddr::Tcp(host1, port1), ConnectionAddr::Tcp(host2, port2)) => {
+                host1 == host2 && port1 == port2
+            }
+            (
+                ConnectionAddr::TcpTls {
+                    host: host1,
+                    port: port1,
+                    insecure: insecure1,
+                    tls_params: _,
+                },
+                ConnectionAddr::TcpTls {
+                    host: host2,
+                    port: port2,
+                    insecure: insecure2,
+                    tls_params: _,
+                },
+            ) => port1 == port2 && host1 == host2 && insecure1 == insecure2,
+            (ConnectionAddr::Unix(path1), ConnectionAddr::Unix(path2)) => path1 == path2,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for ConnectionAddr {}
 
 impl ConnectionAddr {
     /// Checks if this address is supported.
@@ -197,6 +246,14 @@ impl IntoConnectionInfo for ConnectionInfo {
     }
 }
 
+/// URL format: `{redis|rediss}://[<username>][:<password>@]<hostname>[:port][/<db>]`
+///
+/// - Basic: `redis://127.0.0.1:6379`
+/// - Username & Password: `redis://user:password@127.0.0.1:6379`
+/// - Password only: `redis://:password@127.0.0.1:6379`
+/// - Specifying DB: `redis://127.0.0.1:6379/0`
+/// - Enabling TLS: `rediss://127.0.0.1:6379`
+/// - Enabling Insecure TLS: `rediss://127.0.0.1:6379/#insecure`
 impl<'a> IntoConnectionInfo for &'a str {
     fn into_connection_info(self) -> RedisResult<ConnectionInfo> {
         match parse_redis_url(self) {
@@ -218,6 +275,14 @@ where
     }
 }
 
+/// URL format: `{redis|rediss}://[<username>][:<password>@]<hostname>[:port][/<db>]`
+///
+/// - Basic: `redis://127.0.0.1:6379`
+/// - Username & Password: `redis://user:password@127.0.0.1:6379`
+/// - Password only: `redis://:password@127.0.0.1:6379`
+/// - Specifying DB: `redis://127.0.0.1:6379/0`
+/// - Enabling TLS: `rediss://127.0.0.1:6379`
+/// - Enabling Insecure TLS: `rediss://127.0.0.1:6379/#insecure`
 impl IntoConnectionInfo for String {
     fn into_connection_info(self) -> RedisResult<ConnectionInfo> {
         match parse_redis_url(&self) {
@@ -258,6 +323,7 @@ fn url_to_tcp_connection_info(url: url::Url) -> RedisResult<ConnectionInfo> {
                     host,
                     port,
                     insecure: true,
+                    tls_params: None,
                 },
                 Some(_) => fail!((
                     ErrorKind::InvalidClientConfig,
@@ -267,6 +333,7 @@ fn url_to_tcp_connection_info(url: url::Url) -> RedisResult<ConnectionInfo> {
                     host,
                     port,
                     insecure: false,
+                    tls_params: None,
                 },
             }
         }
@@ -424,6 +491,7 @@ pub struct Connection {
 /// Represents a pubsub connection.
 pub struct PubSub<'a> {
     con: &'a mut Connection,
+    waiting_messages: VecDeque<Msg>,
 }
 
 /// Represents a pubsub message.
@@ -479,6 +547,7 @@ impl ActualConnection {
                 ref host,
                 port,
                 insecure,
+                ..
             } => {
                 let tls_connector = if insecure {
                     TlsConnector::builder()
@@ -538,9 +607,10 @@ impl ActualConnection {
                 ref host,
                 port,
                 insecure,
+                ref tls_params,
             } => {
                 let host: &str = host;
-                let config = create_rustls_config(insecure)?;
+                let config = create_rustls_config(insecure, tls_params.clone())?;
                 let conn = rustls::ClientConnection::new(Arc::new(config), host.try_into()?)?;
                 let reader = match timeout {
                     None => {
@@ -717,7 +787,13 @@ impl ActualConnection {
 }
 
 #[cfg(feature = "tls-rustls")]
-pub(crate) fn create_rustls_config(insecure: bool) -> RedisResult<rustls::ClientConfig> {
+pub(crate) fn create_rustls_config(
+    insecure: bool,
+    tls_params: Option<TlsConnParams>,
+) -> RedisResult<rustls::ClientConfig> {
+    use crate::tls::ClientTlsParams;
+
+    #[allow(unused_mut)]
     let mut root_store = RootCertStore::empty();
     #[cfg(feature = "tls-rustls-webpki-roots")]
     root_store.add_trust_anchors(TLS_SERVER_ROOTS.0.iter().map(|ta| {
@@ -727,7 +803,11 @@ pub(crate) fn create_rustls_config(insecure: bool) -> RedisResult<rustls::Client
             ta.name_constraints,
         )
     }));
-    #[cfg(all(feature = "tls-rustls", not(feature = "tls-rustls-webpki-roots")))]
+    #[cfg(all(
+        feature = "tls-rustls",
+        not(feature = "tls-native-tls"),
+        not(feature = "tls-rustls-webpki-roots")
+    ))]
     for cert in load_native_certs()? {
         root_store.add(&rustls::Certificate(cert.0))?;
     }
@@ -735,9 +815,34 @@ pub(crate) fn create_rustls_config(insecure: bool) -> RedisResult<rustls::Client
     let config = rustls::ClientConfig::builder()
         .with_safe_default_cipher_suites()
         .with_safe_default_kx_groups()
-        .with_protocol_versions(rustls::ALL_VERSIONS)?
-        .with_root_certificates(root_store)
-        .with_no_client_auth();
+        .with_protocol_versions(rustls::ALL_VERSIONS)?;
+
+    let config = if let Some(tls_params) = tls_params {
+        let config_builder =
+            config.with_root_certificates(tls_params.root_cert_store.unwrap_or(root_store));
+
+        if let Some(ClientTlsParams {
+            client_cert_chain: client_cert,
+            client_key,
+        }) = tls_params.client_tls_params
+        {
+            config_builder
+                .with_client_auth_cert(client_cert, client_key)
+                .map_err(|err| {
+                    RedisError::from((
+                        ErrorKind::InvalidClientConfig,
+                        "Unable to build client with TLS parameters provided.",
+                        err.to_string(),
+                    ))
+                })?
+        } else {
+            config_builder.with_no_client_auth()
+        }
+    } else {
+        config
+            .with_root_certificates(root_store)
+            .with_no_client_auth()
+    };
 
     match (insecure, cfg!(feature = "tls-rustls-insecure")) {
         #[cfg(feature = "tls-rustls-insecure")]
@@ -806,6 +911,23 @@ pub fn connect(
     setup_connection(con, &connection_info.redis)
 }
 
+pub(crate) fn client_set_info_pipeline() -> Pipeline {
+    let mut pipeline = crate::pipe();
+    pipeline
+        .cmd("CLIENT")
+        .arg("SETINFO")
+        .arg("LIB-NAME")
+        .arg("redis-rs")
+        .ignore();
+    pipeline
+        .cmd("CLIENT")
+        .arg("SETINFO")
+        .arg("LIB-VER")
+        .arg(env!("CARGO_PKG_VERSION"))
+        .ignore();
+    pipeline
+}
+
 fn setup_connection(
     con: ActualConnection,
     connection_info: &RedisConnectionInfo,
@@ -833,6 +955,10 @@ fn setup_connection(
             )),
         }
     }
+
+    // result is ignored, as per the command's instructions.
+    // https://redis.io/commands/client-setinfo/
+    let _: RedisResult<()> = client_set_info_pipeline().query(&mut rv);
 
     Ok(rv)
 }
@@ -862,7 +988,7 @@ pub trait ConnectionLike {
         count: usize,
     ) -> RedisResult<Vec<Value>>;
 
-    /// Sends a [Cmd](Cmd) into the TCP socket and reads a single response from it.
+    /// Sends a [Cmd] into the TCP socket and reads a single response from it.
     fn req_command(&mut self, cmd: &Cmd) -> RedisResult<Value> {
         let pcmd = cmd.get_packed_command();
         self.req_packed_command(&pcmd)
@@ -1179,27 +1305,42 @@ where
 /// ```
 impl<'a> PubSub<'a> {
     fn new(con: &'a mut Connection) -> Self {
-        Self { con }
+        Self {
+            con,
+            waiting_messages: VecDeque::new(),
+        }
+    }
+
+    fn cache_messages_until_received_response(&mut self, cmd: &Cmd) -> RedisResult<()> {
+        let mut response = self.con.req_packed_command(&cmd.get_packed_command())?;
+        loop {
+            if let Some(msg) = Msg::from_value(&response) {
+                self.waiting_messages.push_back(msg);
+            } else {
+                return Ok(());
+            }
+            response = self.con.recv_response()?;
+        }
     }
 
     /// Subscribes to a new channel.
     pub fn subscribe<T: ToRedisArgs>(&mut self, channel: T) -> RedisResult<()> {
-        cmd("SUBSCRIBE").arg(channel).query(self.con)
+        self.cache_messages_until_received_response(cmd("SUBSCRIBE").arg(channel))
     }
 
     /// Subscribes to a new channel with a pattern.
     pub fn psubscribe<T: ToRedisArgs>(&mut self, pchannel: T) -> RedisResult<()> {
-        cmd("PSUBSCRIBE").arg(pchannel).query(self.con)
+        self.cache_messages_until_received_response(cmd("PSUBSCRIBE").arg(pchannel))
     }
 
     /// Unsubscribes from a channel.
     pub fn unsubscribe<T: ToRedisArgs>(&mut self, channel: T) -> RedisResult<()> {
-        cmd("UNSUBSCRIBE").arg(channel).query(self.con)
+        self.cache_messages_until_received_response(cmd("UNSUBSCRIBE").arg(channel))
     }
 
     /// Unsubscribes from a channel with a pattern.
     pub fn punsubscribe<T: ToRedisArgs>(&mut self, pchannel: T) -> RedisResult<()> {
-        cmd("PUNSUBSCRIBE").arg(pchannel).query(self.con)
+        self.cache_messages_until_received_response(cmd("PUNSUBSCRIBE").arg(pchannel))
     }
 
     /// Fetches the next message from the pubsub connection.  Blocks until
@@ -1209,6 +1350,9 @@ impl<'a> PubSub<'a> {
     /// The message itself is still generic and can be converted into an
     /// appropriate type through the helper methods on it.
     pub fn get_message(&mut self) -> RedisResult<Msg> {
+        if let Some(msg) = self.waiting_messages.pop_front() {
+            return Ok(msg);
+        }
         loop {
             if let Some(msg) = Msg::from_value(&self.con.recv_response()?) {
                 return Ok(msg);

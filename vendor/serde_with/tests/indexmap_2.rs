@@ -1,15 +1,6 @@
-#![allow(
-  // clippy is broken and shows wrong warnings
-  // clippy on stable does not know yet about the lint name
-  unknown_lints,
-  // https://github.com/rust-lang/rust-clippy/issues/8867
-  clippy::derive_partial_eq_without_eq,
-)]
-
 mod utils;
 
 use crate::utils::{check_deserialization, check_error_deserialization, is_equal};
-use core::iter::FromIterator;
 use expect_test::expect;
 use indexmap_2::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
@@ -24,7 +15,7 @@ fn test_indexmap() {
 
     // Normal
     is_equal(
-        S([(1, 1), (3, 3), (111, 111)].iter().cloned().collect()),
+        S([(1, 1), (3, 3), (111, 111)].iter().copied().collect()),
         expect![[r#"
             {
               "1": "1",
@@ -43,7 +34,7 @@ fn test_indexset() {
 
     // Normal
     is_equal(
-        S([1, 2, 3, 4, 5].iter().cloned().collect()),
+        S([1, 2, 3, 4, 5].iter().copied().collect()),
         expect![[r#"
             [
               "1",
@@ -196,7 +187,7 @@ fn duplicate_value_last_wins_indexset() {
         where
             H: std::hash::Hasher,
         {
-            self.0.hash(state)
+            self.0.hash(state);
         }
     }
 

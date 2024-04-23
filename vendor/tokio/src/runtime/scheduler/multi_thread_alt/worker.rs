@@ -9,19 +9,19 @@
 //! Shutting down the runtime involves the following steps:
 //!
 //!  1. The Shared::close method is called. This closes the inject queue and
-//!     OwnedTasks instance and wakes up all worker threads.
+//!     `OwnedTasks` instance and wakes up all worker threads.
 //!
 //!  2. Each worker thread observes the close signal next time it runs
 //!     Core::maintenance by checking whether the inject queue is closed.
-//!     The Core::is_shutdown flag is set to true.
+//!     The `Core::is_shutdown` flag is set to true.
 //!
 //!  3. The worker thread calls `pre_shutdown` in parallel. Here, the worker
-//!     will keep removing tasks from OwnedTasks until it is empty. No new
-//!     tasks can be pushed to the OwnedTasks during or after this step as it
+//!     will keep removing tasks from `OwnedTasks` until it is empty. No new
+//!     tasks can be pushed to the `OwnedTasks` during or after this step as it
 //!     was closed in step 1.
 //!
 //!  5. The workers call Shared::shutdown to enter the single-threaded phase of
-//!     shutdown. These calls will push their core to Shared::shutdown_cores,
+//!     shutdown. These calls will push their core to `Shared::shutdown_cores`,
 //!     and the last thread to push its core will finish the shutdown procedure.
 //!
 //!  6. The local run queue of each core is emptied, then the inject queue is
@@ -35,22 +35,22 @@
 //!
 //! When spawning tasks during shutdown, there are two cases:
 //!
-//!  * The spawner observes the OwnedTasks being open, and the inject queue is
+//!  * The spawner observes the `OwnedTasks` being open, and the inject queue is
 //!    closed.
-//!  * The spawner observes the OwnedTasks being closed and doesn't check the
+//!  * The spawner observes the `OwnedTasks` being closed and doesn't check the
 //!    inject queue.
 //!
-//! The first case can only happen if the OwnedTasks::bind call happens before
+//! The first case can only happen if the `OwnedTasks::bind` call happens before
 //! or during step 1 of shutdown. In this case, the runtime will clean up the
 //! task in step 3 of shutdown.
 //!
 //! In the latter case, the task was not spawned and the task is immediately
 //! cancelled by the spawner.
 //!
-//! The correctness of shutdown requires both the inject queue and OwnedTasks
+//! The correctness of shutdown requires both the inject queue and `OwnedTasks`
 //! collection to have a closed bit. With a close bit on only the inject queue,
 //! spawning could run in to a situation where a task is successfully bound long
-//! after the runtime has shut down. With a close bit on only the OwnedTasks,
+//! after the runtime has shut down. With a close bit on only the `OwnedTasks`,
 //! the first spawning situation could result in the notification being pushed
 //! to the inject queue after step 6 of shutdown, which would leave a task in
 //! the inject queue indefinitely. This would be a ref-count cycle and a memory
@@ -157,7 +157,7 @@ pub(crate) struct Shared {
     driver: AtomicCell<Driver>,
 
     /// Condition variables used to unblock worker threads. Each worker thread
-    /// has its own condvar it waits on.
+    /// has its own `condvar` it waits on.
     pub(super) condvars: Vec<Condvar>,
 
     /// The number of cores that have observed the trace signal.
@@ -174,7 +174,7 @@ pub(crate) struct Shared {
     /// Only held to trigger some code on drop. This is used to get internal
     /// runtime metrics that can be useful when doing performance
     /// investigations. This does nothing (empty struct, no drop impl) unless
-    /// the `tokio_internal_mt_counters` cfg flag is set.
+    /// the `tokio_internal_mt_counters` `cfg` flag is set.
     _counters: Counters,
 }
 
@@ -248,7 +248,7 @@ type Task = task::Task<Arc<Handle>>;
 type Notified = task::Notified<Arc<Handle>>;
 
 /// Value picked out of thin-air. Running the LIFO slot a handful of times
-/// seemms sufficient to benefit from locality. More than 3 times probably is
+/// seems sufficient to benefit from locality. More than 3 times probably is
 /// overweighing. The value can be tuned in the future with data that shows
 /// improvements.
 const MAX_LIFO_POLLS_PER_TICK: usize = 3;
@@ -307,7 +307,7 @@ pub(super) fn create(
             remotes: remotes.into_boxed_slice(),
             inject,
             idle,
-            owned: OwnedTasks::new(),
+            owned: OwnedTasks::new(num_cores),
             synced: Mutex::new(Synced {
                 assigned_cores: (0..num_workers).map(|_| None).collect(),
                 shutdown_cores: Vec::with_capacity(num_cores),
@@ -563,7 +563,7 @@ impl Worker {
                     let maybe_task = cx.shared().next_remote_task_synced(&mut synced);
                     (maybe_task, core)
                 } else {
-                    // block the thread to wait for a core to be assinged to us
+                    // block the thread to wait for a core to be assigned to us
                     self.wait_for_core(cx, synced)?
                 }
             }
@@ -801,7 +801,7 @@ impl Worker {
         // safety: passing in the correct `inject::Synced`.
         let mut tasks = unsafe { cx.shared().inject.pop_n(&mut synced.inject, n) };
 
-        // Pop the first task to return immedietly
+        // Pop the first task to return immediately
         let ret = tasks.next();
 
         // Push the rest of the on the run queue
@@ -1460,7 +1460,9 @@ impl Shared {
     }
 
     pub(super) fn shutdown_core(&self, handle: &Handle, mut core: Box<Core>) {
-        self.owned.close_and_shutdown_all();
+        // Start from a random inner list
+        let start = core.rand.fastrand_n(self.owned.get_shard_size() as u32);
+        self.owned.close_and_shutdown_all(start as usize);
 
         core.stats.submit(&self.worker_metrics[core.index]);
 

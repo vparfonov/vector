@@ -1,5 +1,6 @@
 use crate::compiler::prelude::*;
 use crate::core::encode_key_value;
+use crate::value::KeyString;
 
 /// Also used by `encode_logfmt`.
 pub(crate) fn encode_key_value(
@@ -112,7 +113,7 @@ impl Function for EncodeKeyValue {
             Example {
                 title: "custom delimiters",
                 source: r#"encode_key_value({"start": "ool", "end": "kul", "stop1": "yyc", "stop2" : "gdx"}, key_value_delimiter: ":", field_delimiter: ",")"#,
-                result: Ok(r#"s'end:kul,start:ool,stop1:yyc,stop2:gdx'"#),
+                result: Ok("s'end:kul,start:ool,stop1:yyc,stop2:gdx'"),
             },
         ]
     }
@@ -127,13 +128,13 @@ pub(crate) struct EncodeKeyValueFn {
     pub(crate) flatten_boolean: Box<dyn Expression>,
 }
 
-fn resolve_fields(fields: Value) -> ExpressionResult<Vec<String>> {
+fn resolve_fields(fields: Value) -> ExpressionResult<Vec<KeyString>> {
     let arr = fields.try_array()?;
     arr.iter()
         .enumerate()
         .map(|(idx, v)| {
             v.try_bytes_utf8_lossy()
-                .map(|v| v.to_string())
+                .map(|v| v.to_string().into())
                 .map_err(|e| format!("invalid field value type at index {idx}: {e}").into())
         })
         .collect()
@@ -161,14 +162,15 @@ impl FunctionExpression for EncodeKeyValueFn {
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
-        TypeDef::bytes().with_fallibility(self.fields.is_some())
+        TypeDef::bytes().maybe_fallible(self.fields.is_some())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::{btreemap, value};
+
+    use super::*;
 
     test_function![
         encode_key_value  => EncodeKeyValue;
@@ -253,7 +255,7 @@ mod tests {
                 field_delimiter: value!(","),
                 flatten_boolean: value!(true)
             ],
-            want: Ok(r#"tag_a:val_a,tag_b:val_b,tag_c"#),
+            want: Ok("tag_a:val_a,tag_b:val_b,tag_c"),
             tdef: TypeDef::bytes().infallible(),
         }
         string_with_characters_to_escape {

@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.64"
 name = "serde_yaml"
-version = "0.9.25"
+version = "0.9.33"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 description = "YAML data format for Serde"
 documentation = "https://docs.rs/serde_yaml/"
@@ -38,7 +38,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 doc-scrape-examples = false
 
 [dependencies.indexmap]
-version = "2"
+version = "2.2.1"
 
 [dependencies.itoa]
 version = "1.0"
@@ -47,16 +47,16 @@ version = "1.0"
 version = "1.0"
 
 [dependencies.serde]
-version = "1.0.139"
+version = "1.0.195"
 
 [dependencies.unsafe-libyaml]
-version = "0.2.7"
+version = "0.2.11"
 
 [dev-dependencies.anyhow]
-version = "1.0"
+version = "1.0.79"
 
 [dev-dependencies.indoc]
 version = "2.0"
 
 [dev-dependencies.serde_derive]
-version = "1.0"
+version = "1.0.195"

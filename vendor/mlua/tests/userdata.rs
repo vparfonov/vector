@@ -58,7 +58,7 @@ fn test_methods() -> Result<()> {
 
     fn check_methods(lua: &Lua, userdata: AnyUserData) -> Result<()> {
         let globals = lua.globals();
-        globals.set("userdata", userdata.clone())?;
+        globals.set("userdata", &userdata)?;
         lua.load(
             r#"
             function get_it()
@@ -342,7 +342,7 @@ fn test_userdata_take() -> Result<()> {
     }
 
     fn check_userdata_take(lua: &Lua, userdata: AnyUserData, rc: Arc<i64>) -> Result<()> {
-        lua.globals().set("userdata", userdata.clone())?;
+        lua.globals().set("userdata", &userdata)?;
         assert_eq!(Arc::strong_count(&rc), 3);
         {
             let _value = userdata.borrow::<MyUserdata>()?;
@@ -474,7 +474,7 @@ fn test_functions() -> Result<()> {
     let lua = Lua::new();
     let globals = lua.globals();
     let userdata = lua.create_userdata(MyUserData(42))?;
-    globals.set("userdata", userdata.clone())?;
+    globals.set("userdata", &userdata)?;
     lua.load(
         r#"
         function get_it()
@@ -506,6 +506,9 @@ fn test_functions() -> Result<()> {
 
 #[test]
 fn test_fields() -> Result<()> {
+    let lua = Lua::new();
+    let globals = lua.globals();
+
     #[derive(Copy, Clone)]
     struct MyUserData(i64);
 
@@ -533,8 +536,6 @@ fn test_fields() -> Result<()> {
         }
     }
 
-    let lua = Lua::new();
-    let globals = lua.globals();
     globals.set("ud", MyUserData(7))?;
     lua.load(
         r#"
@@ -551,6 +552,33 @@ fn test_fields() -> Result<()> {
 
         ud.unknown = 789
         assert(unknown == 789)
+    "#,
+    )
+    .exec()?;
+
+    // Case: fields + __index metamethod (function)
+    struct MyUserData2(i64);
+
+    impl UserData for MyUserData2 {
+        fn add_fields<'lua, F: UserDataFields<'lua, Self>>(fields: &mut F) {
+            fields.add_field("z", 0);
+            fields.add_field_method_get("x", |_, data| Ok(data.0));
+        }
+
+        fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+            methods.add_meta_method(MetaMethod::Index, |_, _, name: StdString| match &*name {
+                "y" => Ok(Some(-1)),
+                _ => Ok(None),
+            });
+        }
+    }
+
+    globals.set("ud", MyUserData2(1))?;
+    lua.load(
+        r#"
+        assert(ud.x == 1)
+        assert(ud.y == -1)
+        assert(ud.z == 0)
     "#,
     )
     .exec()?;
@@ -923,6 +951,20 @@ fn test_userdata_method_errors() -> Result<()> {
     Ok(())
 }
 
+#[test]
+fn test_userdata_pointer() -> Result<()> {
+    let lua = Lua::new();
+
+    let ud1 = lua.create_any_userdata("hello")?;
+    let ud2 = lua.create_any_userdata("hello")?;
+
+    assert_eq!(ud1.to_pointer(), ud1.clone().to_pointer());
+    // Different userdata objects with the same value should have different pointers
+    assert_ne!(ud1.to_pointer(), ud2.to_pointer());
+
+    Ok(())
+}
+
 #[cfg(all(feature = "unstable", not(feature = "send")))]
 #[test]
 fn test_owned_userdata() -> Result<()> {
@@ -963,9 +1005,9 @@ fn test_userdata_derive() -> Result<()> {
     // More complex struct where generics and where clause
 
     #[derive(Clone, Copy, mlua::FromLua)]
-    struct MyUserData2<'a, T>(&'a T)
+    struct MyUserData2<'a, T: ?Sized>(&'a T)
     where
-        T: ?Sized;
+        T: Copy;
 
     lua.register_userdata_type::<MyUserData2<'static, i32>>(|reg| {
         reg.add_function("val", |_, this: MyUserData2<'static, i32>| Ok(*this.0));

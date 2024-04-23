@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.60"
 name = "rust_decimal"
-version = "1.32.0"
+version = "1.33.1"
 authors = ["Paul Mason <paul@form1.co.nz>"]
 build = "build.rs"
 exclude = ["tests/generated/*"]
@@ -53,7 +53,11 @@ version = "0.7"
 default-features = false
 
 [dependencies.borsh]
-version = "0.10.0"
+version = "1.1.1"
+features = [
+    "derive",
+    "unstable__schema",
+]
 optional = true
 default-features = false
 

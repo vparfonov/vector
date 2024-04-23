@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
+// Copyright 2019 Benjamin Fry <benjaminfry@me.com>
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -6,31 +6,28 @@
 // copied, modified, or distributed except according to those terms.
 
 //! SSHFP records for SSH public key fingerprints
-#![allow(clippy::use_self)]
-
 use std::fmt;
 
 #[cfg(feature = "serde-config")]
 use serde::{Deserialize, Serialize};
 
 use data_encoding::{Encoding, Specification};
-use once_cell::sync::Lazy;
+use lazy_static::lazy_static;
 
-use crate::{
-    error::{ProtoError, ProtoResult},
-    rr::{RData, RecordData, RecordDataDecodable, RecordType},
-    serialize::binary::{BinDecoder, BinEncodable, BinEncoder, Restrict, RestrictedMath},
-};
+use crate::error::*;
+use crate::serialize::binary::*;
 
-/// HEX formatting specific to TLSA and SSHFP encodings
-pub static HEX: Lazy<Encoding> = Lazy::new(|| {
-    let mut spec = Specification::new();
-    spec.symbols.push_str("0123456789abcdef");
-    spec.ignore.push_str(" \t\r\n");
-    spec.translate.from.push_str("ABCDEF");
-    spec.translate.to.push_str("abcdef");
-    spec.encoding().expect("error in sshfp HEX encoding")
-});
+lazy_static! {
+    /// HEX formatting specific to TLSA and SSHFP encodings
+    pub static ref HEX: Encoding = {
+        let mut spec = Specification::new();
+        spec.symbols.push_str("0123456789abcdef");
+        spec.ignore.push_str(" \t\r\n");
+        spec.translate.from.push_str("ABCDEF");
+        spec.translate.to.push_str("abcdef");
+        spec.encoding().expect("error in sshfp HEX encoding")
+    };
+}
 
 /// [RFC 4255](https://tools.ietf.org/html/rfc4255#section-3.1)
 ///
@@ -233,50 +230,24 @@ impl From<FingerprintType> for u8 {
     }
 }
 
-impl BinEncodable for SSHFP {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        encoder.emit_u8(self.algorithm().into())?;
-        encoder.emit_u8(self.fingerprint_type().into())?;
-        encoder.emit_vec(self.fingerprint())
-    }
+/// Read the RData from the given decoder.
+pub fn read(decoder: &mut BinDecoder<'_>, rdata_length: Restrict<u16>) -> ProtoResult<SSHFP> {
+    let algorithm = decoder.read_u8()?.unverified().into();
+    let fingerprint_type = decoder.read_u8()?.unverified().into();
+    let fingerprint_len = rdata_length
+        .map(|l| l as usize)
+        .checked_sub(2)
+        .map_err(|_| ProtoError::from("invalid rdata length in SSHFP"))?
+        .unverified();
+    let fingerprint = decoder.read_vec(fingerprint_len)?.unverified();
+    Ok(SSHFP::new(algorithm, fingerprint_type, fingerprint))
 }
 
-impl<'r> RecordDataDecodable<'r> for SSHFP {
-    fn read_data(decoder: &mut BinDecoder<'r>, length: Restrict<u16>) -> ProtoResult<Self> {
-        let algorithm = decoder.read_u8()?.unverified().into();
-        let fingerprint_type = decoder.read_u8()?.unverified().into();
-        let fingerprint_len = length
-            .map(|l| l as usize)
-            .checked_sub(2)
-            .map_err(|_| ProtoError::from("invalid rdata length in SSHFP"))?
-            .unverified();
-        let fingerprint = decoder.read_vec(fingerprint_len)?.unverified();
-        Ok(SSHFP::new(algorithm, fingerprint_type, fingerprint))
-    }
-}
-
-impl RecordData for SSHFP {
-    fn try_from_rdata(data: RData) -> Result<Self, RData> {
-        match data {
-            RData::SSHFP(data) => Ok(data),
-            _ => Err(data),
-        }
-    }
-
-    fn try_borrow(data: &RData) -> Option<&Self> {
-        match data {
-            RData::SSHFP(data) => Some(data),
-            _ => None,
-        }
-    }
-
-    fn record_type(&self) -> RecordType {
-        RecordType::SSHFP
-    }
-
-    fn into_rdata(self) -> RData {
-        RData::SSHFP(self)
-    }
+/// Write the RData using the given encoder.
+pub fn emit(encoder: &mut BinEncoder<'_>, sshfp: &SSHFP) -> ProtoResult<()> {
+    encoder.emit_u8(sshfp.algorithm().into())?;
+    encoder.emit_u8(sshfp.fingerprint_type().into())?;
+    encoder.emit_vec(sshfp.fingerprint())
 }
 
 /// [RFC 4255](https://tools.ietf.org/html/rfc4255#section-3.2)
@@ -347,13 +318,13 @@ mod tests {
     fn test_encode_decode(rdata: SSHFP, result: &[u8]) {
         let mut bytes = Vec::new();
         let mut encoder = BinEncoder::new(&mut bytes);
-        rdata.emit(&mut encoder).expect("failed to emit SSHFP");
+        emit(&mut encoder, &rdata).expect("failed to emit SSHFP");
         let bytes = encoder.into_bytes();
         assert_eq!(bytes, &result);
 
         let mut decoder = BinDecoder::new(result);
-        let read_rdata = SSHFP::read_data(&mut decoder, Restrict::new(result.len() as u16))
-            .expect("failed to read SSHFP");
+        let read_rdata =
+            read(&mut decoder, Restrict::new(result.len() as u16)).expect("failed to read SSHFP");
         assert_eq!(read_rdata, rdata)
     }
 

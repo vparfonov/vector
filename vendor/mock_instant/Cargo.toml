@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "mock_instant"
-version = "0.3.1"
+version = "0.3.2"
 authors = ["museun <museun@outlook.com>"]
 description = "a simple way to mock an std::time::Instant"
 documentation = "https://docs.rs/mock_instant"

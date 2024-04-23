@@ -4,6 +4,7 @@
 use tokio::runtime::Runtime;
 
 #[test]
+#[cfg_attr(panic = "abort", ignore)]
 fn basic_enter() {
     let rt1 = rt();
     let rt2 = rt();
@@ -17,6 +18,7 @@ fn basic_enter() {
 
 #[test]
 #[should_panic]
+#[cfg_attr(panic = "abort", ignore)]
 fn interleave_enter_different_rt() {
     let rt1 = rt();
     let rt2 = rt();
@@ -30,6 +32,7 @@ fn interleave_enter_different_rt() {
 
 #[test]
 #[should_panic]
+#[cfg_attr(panic = "abort", ignore)]
 fn interleave_enter_same_rt() {
     let rt1 = rt();
 
@@ -43,6 +46,7 @@ fn interleave_enter_same_rt() {
 
 #[test]
 #[cfg(not(target_os = "wasi"))]
+#[cfg_attr(panic = "abort", ignore)]
 fn interleave_then_enter() {
     let _ = std::panic::catch_unwind(|| {
         let rt1 = rt();

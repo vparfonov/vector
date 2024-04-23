@@ -1,5 +1,32 @@
 # Changelog
 
+## v0.20.8 (February 23, 2024)
+
+-  Add `#[darling(with = ...)]` support to `attrs` magic field to allow using custom receiver types for `attrs` [#273](https://github.com/TedDriggs/darling/issues/273)
+
+## v0.20.7 (February 22, 2024)
+
+-  Add `#[darling(flatten)]` to allow forwarding unknown fields to another struct [#146](https://github.com/TedDriggs/darling/issues/146)
+-  Don't suggest names of skipped fields in derived impls [#268](https://github.com/TedDriggs/darling/issues/268)
+
+## v0.20.6 (February 14, 2024)
+
+-  Fix some missing syn invisible group handling in `FromMeta` impls [#263](https://github.com/TedDriggs/darling/pull/263)
+-  Fix misleading error message on `Error::unexpected_type` so it no longer implies the type was a literal [#264](https://github.com/TedDriggs/darling/pull/264)
+-  Impl `FromMeta` `Vec` of literals, e.g. `LitStr` [#265](https://github.com/TedDriggs/pull/265)
+
+## v0.20.5 (January 30, 2024)
+
+- Add `Flag::span` inherent method, as `Flag` can no longer impl `syn::spanned::Spanned` [#242](https://github.com/TedDriggs/darling/issues/242)
+
+## v0.20.4 (January 29, 2024)
+
+- Accept bare paths in `#[darling(default = ...)]` [#258](https://github.com/TedDriggs/darling/pull/258)
+- Add `FromMeta` impl for `PathBuf` [#259](https://github.com/TedDriggs/darling/pull/259)
+- Improve `FromMeta` implementation for enums [#260](https://github.com/TedDriggs/darling/pull/260)
+  - Properly implement unit arms in `FromMeta::from_list` to provide a consistent API for heterogeneous enums that include a mix of unit, newtype and struct variants
+  - Add `#[darling(word)]` attribute for unit enum variants (See [#63](https://github.com/TedDriggs/darling/issues/63) for details)
+
 ## v0.20.3 (July 12, 2023)
 
 - Add `FromMeta` impl for `u128` and `i128` [#243](https://github.com/TedDriggs/darling/pull/243)

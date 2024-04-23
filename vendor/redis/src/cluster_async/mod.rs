@@ -28,7 +28,7 @@ use std::{
     marker::Unpin,
     mem,
     pin::Pin,
-    sync::Arc,
+    sync::{Arc, Mutex},
     task::{self, Poll},
 };
 
@@ -36,10 +36,16 @@ use crate::{
     aio::{ConnectionLike, MultiplexedConnection},
     cluster::{get_connection_info, parse_slots, slot_cmd},
     cluster_client::{ClusterParams, RetryParams},
-    cluster_routing::{Redirect, ResponsePolicy, Route, RoutingInfo, Slot, SlotMap},
+    cluster_routing::{
+        MultipleNodeRoutingInfo, Redirect, ResponsePolicy, Route, RoutingInfo,
+        SingleNodeRoutingInfo, Slot, SlotAddr, SlotMap,
+    },
     Cmd, ConnectionInfo, ErrorKind, IntoConnectionInfo, RedisError, RedisFuture, RedisResult,
     Value,
 };
+
+#[cfg(not(feature = "tls-rustls"))]
+use crate::connection::TlsConnParams;
 
 #[cfg(all(not(feature = "tokio-comp"), feature = "async-std-comp"))]
 use crate::aio::{async_std::AsyncStd, RedisRuntime};
@@ -87,6 +93,71 @@ where
                 ClusterConnection(tx)
             })
     }
+
+    /// Send a command to the given `routing`, and aggregate the response according to `response_policy`.
+    /// If `routing` is [None], the request will be sent to a random node.
+    pub async fn route_command(&mut self, cmd: &Cmd, routing: RoutingInfo) -> RedisResult<Value> {
+        trace!("send_packed_command");
+        let (sender, receiver) = oneshot::channel();
+        self.0
+            .send(Message {
+                cmd: CmdArg::Cmd {
+                    cmd: Arc::new(cmd.clone()), // TODO Remove this clone?
+                    routing: CommandRouting::Route(routing),
+                },
+                sender,
+            })
+            .await
+            .map_err(|_| {
+                RedisError::from(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "redis_cluster: Unable to send command",
+                ))
+            })?;
+        receiver
+            .await
+            .unwrap_or_else(|_| {
+                Err(RedisError::from(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "redis_cluster: Unable to receive command",
+                )))
+            })
+            .map(|response| match response {
+                Response::Single(value) => value,
+                Response::Multiple(_) => unreachable!(),
+            })
+    }
+
+    /// Send commands in `pipeline` to the given `route`. If `route` is [None], it will be sent to a random node.
+    pub async fn route_pipeline<'a>(
+        &'a mut self,
+        pipeline: &'a crate::Pipeline,
+        offset: usize,
+        count: usize,
+        route: SingleNodeRoutingInfo,
+    ) -> RedisResult<Vec<Value>> {
+        let (sender, receiver) = oneshot::channel();
+        self.0
+            .send(Message {
+                cmd: CmdArg::Pipeline {
+                    pipeline: Arc::new(pipeline.clone()), // TODO Remove this clone?
+                    offset,
+                    count,
+                    route,
+                },
+                sender,
+            })
+            .await
+            .map_err(|_| RedisError::from(io::Error::from(io::ErrorKind::BrokenPipe)))?;
+
+        receiver
+            .await
+            .unwrap_or_else(|_| Err(RedisError::from(io::Error::from(io::ErrorKind::BrokenPipe))))
+            .map(|response| match response {
+                Response::Multiple(values) => values,
+                Response::Single(_) => unreachable!(),
+            })
+    }
 }
 
 type ConnectionFuture<C> = future::Shared<BoxFuture<'static, C>>;
@@ -95,6 +166,7 @@ type ConnectionMap<C> = HashMap<String, ConnectionFuture<C>>;
 struct InnerCore<C> {
     conn_lock: RwLock<(ConnectionMap<C>, SlotMap)>,
     cluster_params: ClusterParams,
+    pending_requests: Mutex<Vec<PendingRequest<Response, C>>>,
 }
 
 type Core<C> = Arc<InnerCore<C>>;
@@ -109,43 +181,61 @@ struct ClusterConnInner<C> {
         >,
     >,
     refresh_error: Option<RedisError>,
-    pending_requests: Vec<PendingRequest<Response, C>>,
+}
+
+#[derive(Clone)]
+enum CommandRouting<C> {
+    Route(RoutingInfo),
+    Connection {
+        addr: String,
+        conn: ConnectionFuture<C>,
+    },
 }
 
 #[derive(Clone)]
 enum CmdArg<C> {
     Cmd {
         cmd: Arc<Cmd>,
-        func: fn(C, Arc<Cmd>) -> RedisFuture<'static, Response>,
-        routing: Option<RoutingInfo>,
-        response_policy: Option<ResponsePolicy>,
+        routing: CommandRouting<C>,
     },
     Pipeline {
         pipeline: Arc<crate::Pipeline>,
         offset: usize,
         count: usize,
-        func: fn(C, Arc<crate::Pipeline>, usize, usize) -> RedisFuture<'static, Response>,
-        route: Option<Route>,
+        route: SingleNodeRoutingInfo,
     },
 }
 
-fn route_pipeline(pipeline: &crate::Pipeline) -> Option<Route> {
+fn route_for_pipeline(pipeline: &crate::Pipeline) -> RedisResult<Option<Route>> {
     fn route_for_command(cmd: &Cmd) -> Option<Route> {
         match RoutingInfo::for_routable(cmd) {
-            Some(RoutingInfo::Random) => None,
-            Some(RoutingInfo::SpecificNode(route)) => Some(route),
-            Some(RoutingInfo::AllNodes) | Some(RoutingInfo::AllMasters) => None,
-            _ => None,
+            Some(RoutingInfo::SingleNode(SingleNodeRoutingInfo::Random)) => None,
+            Some(RoutingInfo::SingleNode(SingleNodeRoutingInfo::SpecificNode(route))) => {
+                Some(route)
+            }
+            Some(RoutingInfo::MultiNode(_)) => None,
+            None => None,
         }
     }
 
     // Find first specific slot and send to it. There's no need to check If later commands
     // should be routed to a different slot, since the server will return an error indicating this.
-    pipeline
-        .cmd_iter()
-        .map(route_for_command)
-        .find(|route| route.is_some())
-        .flatten()
+    pipeline.cmd_iter().map(route_for_command).try_fold(
+        None,
+        |chosen_route, next_cmd_route| match (chosen_route, next_cmd_route) {
+            (None, _) => Ok(next_cmd_route),
+            (_, None) => Ok(chosen_route),
+            (Some(chosen_route), Some(next_cmd_route)) => {
+                if chosen_route.slot() != next_cmd_route.slot() {
+                    Err((ErrorKind::CrossSlot, "Received crossed slots in pipeline").into())
+                } else if chosen_route.slot_addr() == &SlotAddr::Replica {
+                    Ok(Some(next_cmd_route))
+                } else {
+                    Ok(Some(chosen_route))
+                }
+            }
+        },
+    )
 }
 enum Response {
     Single(Value),
@@ -234,7 +324,7 @@ enum Next<I, C> {
     },
     Reconnect {
         request: PendingRequest<I, C>,
-        target: OperationTarget,
+        target: String,
     },
     RefreshSlots {
         request: PendingRequest<I, C>,
@@ -245,7 +335,6 @@ enum Next<I, C> {
 impl<F, I, C> Future for Request<F, I, C>
 where
     F: Future<Output = (OperationTarget, RedisResult<I>)>,
-    C: ConnectionLike,
 {
     type Output = Next<I, C>;
 
@@ -277,7 +366,7 @@ where
                 let address = match target {
                     OperationTarget::Node { address } => address,
                     OperationTarget::FanOut => {
-                        // TODO - implement retries on fan-out operations
+                        // Fanout operation are retried per internal request, and don't need additional retries.
                         self.respond(Err(err));
                         return Next::Done.into();
                     }
@@ -320,7 +409,7 @@ where
                     }
                     ErrorKind::IoError => Next::Reconnect {
                         request: this.request.take().unwrap(),
-                        target: OperationTarget::Node { address },
+                        target: address,
                     }
                     .into(),
                     _ => {
@@ -343,7 +432,6 @@ where
 impl<F, I, C> Request<F, I, C>
 where
     F: Future<Output = (OperationTarget, RedisResult<I>)>,
-    C: ConnectionLike,
 {
     fn respond(self: Pin<&mut Self>, msg: RedisResult<I>) {
         // If `send` errors the receiver has dropped and thus does not care about the message
@@ -369,12 +457,12 @@ where
         let inner = Arc::new(InnerCore {
             conn_lock: RwLock::new((connections, Default::default())),
             cluster_params,
+            pending_requests: Mutex::new(Vec::new()),
         });
         let mut connection = ClusterConnInner {
             inner,
             in_flight_requests: Default::default(),
             refresh_error: None,
-            pending_requests: Vec::new(),
             state: ConnectionState::PollComplete,
         };
         connection.refresh_slots().await?;
@@ -534,56 +622,43 @@ where
         Ok(())
     }
 
-    async fn execute_on_multiple_nodes(
-        func: fn(C, Arc<Cmd>) -> RedisFuture<'static, Response>,
-        cmd: &Arc<Cmd>,
-        only_primaries: bool,
-        core: Core<C>,
+    async fn aggregate_results(
+        receivers: Vec<(String, oneshot::Receiver<RedisResult<Response>>)>,
+        routing: &MultipleNodeRoutingInfo,
         response_policy: Option<ResponsePolicy>,
-    ) -> (OperationTarget, RedisResult<Response>) {
-        let read_guard = core.conn_lock.read().await;
-        let connections: Vec<(String, ConnectionFuture<C>)> = read_guard
-            .1
-            .all_unique_addresses(only_primaries)
-            .into_iter()
-            .filter_map(|addr| {
-                read_guard
-                    .0
-                    .get(addr)
-                    .cloned()
-                    .map(|conn| (addr.to_string(), conn))
-            })
-            .collect();
-        drop(read_guard);
-
+    ) -> RedisResult<Value> {
         let extract_result = |response| match response {
             Response::Single(value) => value,
             Response::Multiple(_) => unreachable!(),
         };
 
-        let run_func = |(_, conn)| {
-            Box::pin(async move {
-                let conn = conn.await;
-                Ok(extract_result(func(conn, cmd.clone()).await?))
-            })
+        let convert_result = |res: Result<RedisResult<Response>, _>| {
+            res.map_err(|_| RedisError::from((ErrorKind::ResponseError, "request wasn't handled due to internal failure"))) // this happens only if the result sender is dropped before usage.
+            .and_then(|res| res.map(extract_result))
+        };
+
+        let get_receiver = |(_, receiver): (_, oneshot::Receiver<RedisResult<Response>>)| async {
+            convert_result(receiver.await)
         };
 
         // TODO - once Value::Error will be merged, these will need to be updated to handle this new value.
-        let result = match response_policy {
+        match response_policy {
             Some(ResponsePolicy::AllSucceeded) => {
-                future::try_join_all(connections.into_iter().map(run_func))
+                future::try_join_all(receivers.into_iter().map(get_receiver))
                     .await
                     .map(|mut results| results.pop().unwrap()) // unwrap is safe, since at least one function succeeded
             }
-            Some(ResponsePolicy::OneSucceeded) => {
-                future::select_ok(connections.into_iter().map(run_func))
-                    .await
-                    .map(|(result, _)| result)
-            }
+            Some(ResponsePolicy::OneSucceeded) => future::select_ok(
+                receivers
+                    .into_iter()
+                    .map(|tuple| Box::pin(get_receiver(tuple))),
+            )
+            .await
+            .map(|(result, _)| result),
             Some(ResponsePolicy::OneSucceededNonEmpty) => {
-                future::select_ok(connections.into_iter().map(|tuple| {
+                future::select_ok(receivers.into_iter().map(|(_, receiver)| {
                     Box::pin(async move {
-                        let result = run_func(tuple).await?;
+                        let result = convert_result(receiver.await)?;
                         match result {
                             Value::Nil => Err((ErrorKind::ResponseError, "no value found").into()),
                             _ => Ok(result),
@@ -594,63 +669,138 @@ where
                 .map(|(result, _)| result)
             }
             Some(ResponsePolicy::Aggregate(op)) => {
-                future::try_join_all(connections.into_iter().map(run_func))
+                future::try_join_all(receivers.into_iter().map(get_receiver))
                     .await
                     .and_then(|results| crate::cluster_routing::aggregate(results, op))
             }
             Some(ResponsePolicy::AggregateLogical(op)) => {
-                future::try_join_all(connections.into_iter().map(run_func))
+                future::try_join_all(receivers.into_iter().map(get_receiver))
                     .await
                     .and_then(|results| crate::cluster_routing::logical_aggregate(results, op))
             }
             Some(ResponsePolicy::CombineArrays) => {
-                future::try_join_all(connections.into_iter().map(run_func))
+                future::try_join_all(receivers.into_iter().map(get_receiver))
                     .await
-                    .and_then(crate::cluster_routing::combine_array_results)
+                    .and_then(|results| match routing {
+                        MultipleNodeRoutingInfo::MultiSlot(vec) => {
+                            crate::cluster_routing::combine_and_sort_array_results(
+                                results,
+                                vec.iter().map(|(_, indices)| indices),
+                            )
+                        }
+                        _ => crate::cluster_routing::combine_array_results(results),
+                    })
             }
             Some(ResponsePolicy::Special) | None => {
                 // This is our assumption - if there's no coherent way to aggregate the responses, we just map each response to the sender, and pass it to the user.
                 // TODO - once RESP3 is merged, return a map value here.
                 // TODO - once Value::Error is merged, we can use join_all and report separate errors and also pass successes.
-                future::try_join_all(connections.into_iter().map(|(addr, conn)| async move {
-                    let conn = conn.await;
-                    Ok(Value::Bulk(vec![
-                        Value::Data(addr.into_bytes()),
-                        extract_result(func(conn, cmd.clone()).await?),
-                    ]))
+                future::try_join_all(receivers.into_iter().map(|(addr, receiver)| async move {
+                    let result = convert_result(receiver.await)?;
+                    Ok(Value::Bulk(vec![Value::Data(addr.into_bytes()), result]))
                 }))
                 .await
                 .map(Value::Bulk)
             }
         }
-        .map(Response::Single);
+    }
+
+    async fn execute_on_multiple_nodes<'a>(
+        cmd: &'a Arc<Cmd>,
+        routing: &'a MultipleNodeRoutingInfo,
+        core: Core<C>,
+        response_policy: Option<ResponsePolicy>,
+    ) -> (OperationTarget, RedisResult<Response>) {
+        let read_guard = core.conn_lock.read().await;
+        let (receivers, requests): (Vec<_>, Vec<_>) = read_guard
+            .1
+            .addresses_for_multi_routing(routing)
+            .into_iter()
+            .enumerate()
+            .filter_map(|(index, addr)| {
+                read_guard.0.get(addr).cloned().map(|conn| {
+                    let cmd = match routing {
+                        MultipleNodeRoutingInfo::MultiSlot(vec) => {
+                            let (_, indices) = vec.get(index).unwrap();
+                            Arc::new(crate::cluster_routing::command_for_multi_slot_indices(
+                                cmd.as_ref(),
+                                indices.iter(),
+                            ))
+                        }
+                        _ => cmd.clone(),
+                    };
+                    let (sender, receiver) = oneshot::channel();
+                    let addr = addr.to_string();
+                    (
+                        (addr.clone(), receiver),
+                        PendingRequest {
+                            retry: 0,
+                            sender,
+                            info: RequestInfo {
+                                cmd: CmdArg::Cmd {
+                                    cmd,
+                                    routing: CommandRouting::Connection { addr, conn },
+                                },
+                                redirect: None,
+                            },
+                        },
+                    )
+                })
+            })
+            .unzip();
+        drop(read_guard);
+        core.pending_requests.lock().unwrap().extend(requests);
+
+        let result = Self::aggregate_results(receivers, routing, response_policy)
+            .await
+            .map(Response::Single);
 
         (OperationTarget::FanOut, result)
     }
 
     async fn try_cmd_request(
         cmd: Arc<Cmd>,
-        func: fn(C, Arc<Cmd>) -> RedisFuture<'static, Response>,
         redirect: Option<Redirect>,
-        routing: Option<RoutingInfo>,
-        response_policy: Option<ResponsePolicy>,
+        routing: CommandRouting<C>,
         core: Core<C>,
         asking: bool,
     ) -> (OperationTarget, RedisResult<Response>) {
-        let route_option = match routing.as_ref().unwrap_or(&RoutingInfo::Random) {
-            RoutingInfo::AllNodes => {
-                return Self::execute_on_multiple_nodes(func, &cmd, false, core, response_policy)
-                    .await
+        let route = if redirect.is_some() {
+            // if we have a redirect, we don't take info from `routing`.
+            // TODO - combine the info in `routing` and `redirect` and `asking` into a single structure, so there won't be this question of which field takes precedence.
+            SingleNodeRoutingInfo::Random
+        } else {
+            match routing {
+                // commands that are sent to multiple nodes are handled here.
+                CommandRouting::Route(RoutingInfo::MultiNode((
+                    multi_node_routing,
+                    response_policy,
+                ))) => {
+                    assert!(!asking);
+                    assert!(redirect.is_none());
+                    return Self::execute_on_multiple_nodes(
+                        &cmd,
+                        &multi_node_routing,
+                        core,
+                        response_policy,
+                    )
+                    .await;
+                }
+                CommandRouting::Route(RoutingInfo::SingleNode(single_node_routing)) => {
+                    single_node_routing
+                }
+
+                // commands that have concrete connections, and don't require redirection, are handled here.
+                CommandRouting::Connection { addr, conn } => {
+                    let mut conn = conn.await;
+                    let result = conn.req_packed_command(&cmd).await.map(Response::Single);
+                    return (addr.into(), result);
+                }
             }
-            RoutingInfo::AllMasters => {
-                return Self::execute_on_multiple_nodes(func, &cmd, true, core, response_policy)
-                    .await
-            }
-            RoutingInfo::Random => None,
-            RoutingInfo::SpecificNode(route) => Some(route),
         };
-        let (addr, conn) = Self::get_connection(redirect, route_option, core, asking).await;
-        let result = func(conn, cmd).await;
+
+        let (addr, mut conn) = Self::get_connection(redirect, route, core, asking).await;
+        let result = conn.req_packed_command(&cmd).await.map(Response::Single);
         (addr.into(), result)
     }
 
@@ -658,11 +808,13 @@ where
         pipeline: Arc<crate::Pipeline>,
         offset: usize,
         count: usize,
-        func: fn(C, Arc<crate::Pipeline>, usize, usize) -> RedisFuture<'static, Response>,
         conn: impl Future<Output = (String, C)>,
     ) -> (OperationTarget, RedisResult<Response>) {
-        let (addr, conn) = conn.await;
-        let result = func(conn, pipeline, offset, count).await;
+        let (addr, mut conn) = conn.await;
+        let result = conn
+            .req_packed_commands(&pipeline, offset, count)
+            .await
+            .map(Response::Multiple);
         (OperationTarget::Node { address: addr }, result)
     }
 
@@ -673,36 +825,20 @@ where
         let asking = matches!(&info.redirect, Some(Redirect::Ask(_)));
 
         match info.cmd {
-            CmdArg::Cmd {
-                cmd,
-                func,
-                routing,
-                response_policy,
-            } => {
-                Self::try_cmd_request(
-                    cmd,
-                    func,
-                    info.redirect,
-                    routing,
-                    response_policy,
-                    core,
-                    asking,
-                )
-                .await
+            CmdArg::Cmd { cmd, routing } => {
+                Self::try_cmd_request(cmd, info.redirect, routing, core, asking).await
             }
             CmdArg::Pipeline {
                 pipeline,
                 offset,
                 count,
-                func,
                 route,
             } => {
                 Self::try_pipeline_request(
                     pipeline,
                     offset,
                     count,
-                    func,
-                    Self::get_connection(info.redirect, route.as_ref(), core, asking),
+                    Self::get_connection(info.redirect, route, core, asking),
                 )
                 .await
             }
@@ -711,7 +847,7 @@ where
 
     async fn get_connection(
         mut redirect: Option<Redirect>,
-        route: Option<&Route>,
+        route: SingleNodeRoutingInfo,
         core: Core<C>,
         asking: bool,
     ) -> (String, C) {
@@ -720,10 +856,13 @@ where
         let conn = match redirect.take() {
             Some(Redirect::Moved(moved_addr)) => Some(moved_addr),
             Some(Redirect::Ask(ask_addr)) => Some(ask_addr),
-            None => route
-                .as_ref()
-                .and_then(|route| read_guard.1.slot_addr_for_route(route))
-                .map(|addr| addr.to_string()),
+            None => match route {
+                SingleNodeRoutingInfo::Random => None,
+                SingleNodeRoutingInfo::SpecificNode(route) => read_guard
+                    .1
+                    .slot_addr_for_route(&route)
+                    .map(|addr| addr.to_string()),
+            },
         }
         .map(|addr| {
             let conn = read_guard.0.get(&addr).cloned();
@@ -797,8 +936,9 @@ where
     fn poll_complete(&mut self, cx: &mut task::Context<'_>) -> Poll<PollFlushAction> {
         let mut poll_flush_action = PollFlushAction::None;
 
-        if !self.pending_requests.is_empty() {
-            let mut pending_requests = mem::take(&mut self.pending_requests);
+        let mut pending_requests_guard = self.inner.pending_requests.lock().unwrap();
+        if !pending_requests_guard.is_empty() {
+            let mut pending_requests = mem::take(&mut *pending_requests_guard);
             for request in pending_requests.drain(..) {
                 // Drop the request if noone is waiting for a response to free up resources for
                 // requests callers care about (load shedding). It will be ambigous whether the
@@ -814,8 +954,9 @@ where
                     future: RequestState::Future { future },
                 }));
             }
-            self.pending_requests = pending_requests;
+            *pending_requests_guard = pending_requests;
         }
+        drop(pending_requests_guard);
 
         loop {
             let result = match Pin::new(&mut self.in_flight_requests).poll_next(cx) {
@@ -849,14 +990,9 @@ where
                 Next::Reconnect {
                     request, target, ..
                 } => {
-                    poll_flush_action = match target {
-                        OperationTarget::Node { address } => poll_flush_action
-                            .change_state(PollFlushAction::Reconnect(vec![address])),
-                        OperationTarget::FanOut => {
-                            poll_flush_action.change_state(PollFlushAction::RebuildSlots)
-                        }
-                    };
-                    self.pending_requests.push(request);
+                    poll_flush_action =
+                        poll_flush_action.change_state(PollFlushAction::Reconnect(vec![target]));
+                    self.inner.pending_requests.lock().unwrap().push(request);
                 }
             }
         }
@@ -883,7 +1019,7 @@ where
                 (*request)
                     .as_mut()
                     .respond(Err(self.refresh_error.take().unwrap()));
-            } else if let Some(request) = self.pending_requests.pop() {
+            } else if let Some(request) = self.inner.pending_requests.lock().unwrap().pop() {
                 let _ = request.sender.send(Err(self.refresh_error.take().unwrap()));
             }
         }
@@ -963,18 +1099,22 @@ where
         }
     }
 
-    fn start_send(mut self: Pin<&mut Self>, msg: Message<C>) -> Result<(), Self::Error> {
+    fn start_send(self: Pin<&mut Self>, msg: Message<C>) -> Result<(), Self::Error> {
         trace!("start_send");
         let Message { cmd, sender } = msg;
 
         let redirect = None;
         let info = RequestInfo { cmd, redirect };
 
-        self.pending_requests.push(PendingRequest {
-            retry: 0,
-            sender,
-            info,
-        });
+        self.inner
+            .pending_requests
+            .lock()
+            .unwrap()
+            .push(PendingRequest {
+                retry: 0,
+                sender,
+                info,
+            });
         Ok(())
     }
 
@@ -1045,46 +1185,12 @@ where
 
 impl<C> ConnectionLike for ClusterConnection<C>
 where
-    C: ConnectionLike + Send + 'static,
+    C: ConnectionLike + Send + Clone + Unpin + Sync + Connect + 'static,
 {
     fn req_packed_command<'a>(&'a mut self, cmd: &'a Cmd) -> RedisFuture<'a, Value> {
-        trace!("req_packed_command");
-        let (sender, receiver) = oneshot::channel();
-        Box::pin(async move {
-            self.0
-                .send(Message {
-                    cmd: CmdArg::Cmd {
-                        cmd: Arc::new(cmd.clone()), // TODO Remove this clone?
-                        func: |mut conn, cmd| {
-                            Box::pin(async move {
-                                conn.req_packed_command(&cmd).await.map(Response::Single)
-                            })
-                        },
-                        routing: RoutingInfo::for_routable(cmd),
-                        response_policy: RoutingInfo::response_policy(cmd),
-                    },
-                    sender,
-                })
-                .await
-                .map_err(|_| {
-                    RedisError::from(io::Error::new(
-                        io::ErrorKind::BrokenPipe,
-                        "redis_cluster: Unable to send command",
-                    ))
-                })?;
-            receiver
-                .await
-                .unwrap_or_else(|_| {
-                    Err(RedisError::from(io::Error::new(
-                        io::ErrorKind::BrokenPipe,
-                        "redis_cluster: Unable to receive command",
-                    )))
-                })
-                .map(|response| match response {
-                    Response::Single(value) => value,
-                    Response::Multiple(_) => unreachable!(),
-                })
-        })
+        let routing = RoutingInfo::for_routable(cmd)
+            .unwrap_or(RoutingInfo::SingleNode(SingleNodeRoutingInfo::Random));
+        self.route_command(cmd, routing).boxed()
     }
 
     fn req_packed_commands<'a>(
@@ -1093,38 +1199,12 @@ where
         offset: usize,
         count: usize,
     ) -> RedisFuture<'a, Vec<Value>> {
-        let (sender, receiver) = oneshot::channel();
-        Box::pin(async move {
-            self.0
-                .send(Message {
-                    cmd: CmdArg::Pipeline {
-                        pipeline: Arc::new(pipeline.clone()), // TODO Remove this clone?
-                        offset,
-                        count,
-                        func: |mut conn, pipeline, offset, count| {
-                            Box::pin(async move {
-                                conn.req_packed_commands(&pipeline, offset, count)
-                                    .await
-                                    .map(Response::Multiple)
-                            })
-                        },
-                        route: route_pipeline(pipeline),
-                    },
-                    sender,
-                })
+        async move {
+            let route = route_for_pipeline(pipeline)?;
+            self.route_pipeline(pipeline, offset, count, route.into())
                 .await
-                .map_err(|_| RedisError::from(io::Error::from(io::ErrorKind::BrokenPipe)))?;
-
-            receiver
-                .await
-                .unwrap_or_else(|_| {
-                    Err(RedisError::from(io::Error::from(io::ErrorKind::BrokenPipe)))
-                })
-                .map(|response| match response {
-                    Response::Multiple(values) => values,
-                    Response::Single(_) => unreachable!(),
-                })
-        })
+        }
+        .boxed()
     }
 
     fn get_db(&self) -> i64 {
@@ -1204,7 +1284,7 @@ where
 
 #[cfg(test)]
 mod pipeline_routing_tests {
-    use super::route_pipeline;
+    use super::route_for_pipeline;
     use crate::{
         cluster_routing::{Route, SlotAddr},
         cmd,
@@ -1220,13 +1300,40 @@ mod pipeline_routing_tests {
             .add_command(cmd("EVAL")); // route randomly
 
         assert_eq!(
-            route_pipeline(&pipeline),
-            Some(Route::new(12182, SlotAddr::Replica))
+            route_for_pipeline(&pipeline),
+            Ok(Some(Route::new(12182, SlotAddr::Replica)))
         );
     }
 
     #[test]
-    fn test_ignore_conflicting_slots() {
+    fn test_return_none_if_no_route_is_found() {
+        let mut pipeline = crate::Pipeline::new();
+
+        pipeline
+            .add_command(cmd("FLUSHALL")) // route to all masters
+            .add_command(cmd("EVAL")); // route randomly
+
+        assert_eq!(route_for_pipeline(&pipeline), Ok(None));
+    }
+
+    #[test]
+    fn test_prefer_primary_route_over_replica() {
+        let mut pipeline = crate::Pipeline::new();
+
+        pipeline
+            .get("foo") // route to replica of slot 12182
+            .add_command(cmd("FLUSHALL")) // route to all masters
+            .add_command(cmd("EVAL"))// route randomly
+            .set("foo", "bar"); // route to primary of slot 12182
+
+        assert_eq!(
+            route_for_pipeline(&pipeline),
+            Ok(Some(Route::new(12182, SlotAddr::Master)))
+        );
+    }
+
+    #[test]
+    fn test_raise_cross_slot_error_on_conflicting_slots() {
         let mut pipeline = crate::Pipeline::new();
 
         pipeline
@@ -1235,8 +1342,8 @@ mod pipeline_routing_tests {
             .get("foo"); // route to slot 12182
 
         assert_eq!(
-            route_pipeline(&pipeline),
-            Some(Route::new(4813, SlotAddr::Master))
+            route_for_pipeline(&pipeline).unwrap_err().kind(),
+            crate::ErrorKind::CrossSlot
         );
     }
 }

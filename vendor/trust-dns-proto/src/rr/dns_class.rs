@@ -6,10 +6,11 @@
 // copied, modified, or distributed except according to those terms.
 
 //! class of DNS operations, in general always IN for internet
-#![allow(clippy::use_self)]
 
 use std::cmp::Ordering;
-use std::fmt::{self, Display, Formatter};
+use std::convert::From;
+use std::fmt;
+use std::fmt::{Display, Formatter};
 use std::str::FromStr;
 
 #[cfg(feature = "serde-config")]
@@ -51,7 +52,7 @@ impl FromStr for DNSClass {
     /// assert_eq!(DNSClass::IN, var);
     /// ```
     fn from_str(str: &str) -> ProtoResult<Self> {
-        debug_assert!(str.chars().all(|x| !char::is_ascii_lowercase(&x)));
+        debug_assert!(str.chars().all(|x| char::is_ascii_uppercase(&x)));
         match str {
             "IN" => Ok(Self::IN),
             "CH" => Ok(Self::CH),
@@ -168,34 +169,24 @@ impl Display for DNSClass {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    #[test]
-    fn test_order() {
-        let ordered = vec![
-            DNSClass::IN,
-            DNSClass::CH,
-            DNSClass::HS,
-            DNSClass::NONE,
-            DNSClass::ANY,
-        ];
-        let mut unordered = vec![
-            DNSClass::NONE,
-            DNSClass::HS,
-            DNSClass::CH,
-            DNSClass::IN,
-            DNSClass::ANY,
-        ];
+#[test]
+fn test_order() {
+    let ordered = vec![
+        DNSClass::IN,
+        DNSClass::CH,
+        DNSClass::HS,
+        DNSClass::NONE,
+        DNSClass::ANY,
+    ];
+    let mut unordered = vec![
+        DNSClass::NONE,
+        DNSClass::HS,
+        DNSClass::CH,
+        DNSClass::IN,
+        DNSClass::ANY,
+    ];
 
-        unordered.sort();
+    unordered.sort();
 
-        assert_eq!(unordered, ordered);
-    }
-
-    #[test]
-    fn check_dns_class_parse_wont_panic_with_symbols() {
-        let dns_class = "a-b-c".to_ascii_uppercase().parse::<DNSClass>();
-        assert!(matches!(&dns_class, Err(ProtoError { .. })));
-    }
+    assert_eq!(unordered, ordered);
 }

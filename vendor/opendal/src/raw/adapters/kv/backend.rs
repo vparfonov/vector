@@ -16,11 +16,19 @@
 // under the License.
 
 use std::sync::Arc;
+use std::task::ready;
+use std::task::Context;
+use std::task::Poll;
+use std::vec::IntoIter;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use bytes::BytesMut;
+use futures::future::BoxFuture;
+use futures::FutureExt;
 
 use super::Adapter;
+use crate::raw::oio::HierarchyLister;
 use crate::raw::*;
 use crate::*;
 
@@ -56,21 +64,21 @@ where
     }
 }
 
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl<S: Adapter> Accessor for Backend<S> {
     type Reader = oio::Cursor;
     type BlockingReader = oio::Cursor;
     type Writer = KvWriter<S>;
     type BlockingWriter = KvWriter<S>;
-    type Appender = ();
-    type Pager = KvPager;
-    type BlockingPager = KvPager;
+    type Lister = HierarchyLister<KvLister>;
+    type BlockingLister = HierarchyLister<KvLister>;
 
     fn info(&self) -> AccessorInfo {
         let mut am: AccessorInfo = self.kv.metadata().into();
         am.set_root(&self.root);
 
-        let cap = am.capability_mut();
+        let mut cap = am.native_capability();
         if cap.read {
             cap.read_can_seek = true;
             cap.read_can_next = true;
@@ -79,36 +87,17 @@ impl<S: Adapter> Accessor for Backend<S> {
         }
 
         if cap.write {
-            cap.create_dir = true;
+            cap.write_can_empty = true;
             cap.delete = true;
         }
 
-        if cap.read && cap.write {
-            cap.copy = true;
-        }
-
-        if cap.read && cap.write && cap.delete {
-            cap.rename = true;
-        }
-
         if cap.list {
-            cap.list_without_delimiter = true;
+            cap.list_with_recursive = true;
         }
+
+        am.set_native_capability(cap);
 
         am
-    }
-
-    async fn create_dir(&self, path: &str, _: OpCreateDir) -> Result<RpCreateDir> {
-        let p = build_abs_path(&self.root, path);
-        self.kv.set(&p, &[]).await?;
-        Ok(RpCreateDir::default())
-    }
-
-    fn blocking_create_dir(&self, path: &str, _: OpCreateDir) -> Result<RpCreateDir> {
-        let p = build_abs_path(&self.root, path);
-        self.kv.blocking_set(&p, &[])?;
-
-        Ok(RpCreateDir::default())
     }
 
     async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
@@ -121,8 +110,7 @@ impl<S: Adapter> Accessor for Backend<S> {
 
         let bs = self.apply_range(bs, args.range());
 
-        let length = bs.len();
-        Ok((RpRead::new(length as u64), oio::Cursor::from(bs)))
+        Ok((RpRead::new(), oio::Cursor::from(bs)))
     }
 
     fn blocking_read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::BlockingReader)> {
@@ -134,30 +122,16 @@ impl<S: Adapter> Accessor for Backend<S> {
         };
 
         let bs = self.apply_range(bs, args.range());
-        Ok((RpRead::new(bs.len() as u64), oio::Cursor::from(bs)))
+        Ok((RpRead::new(), oio::Cursor::from(bs)))
     }
 
-    async fn write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::Writer)> {
-        if args.content_length().is_none() {
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                "write without content length is not supported",
-            ));
-        }
-
+    async fn write(&self, path: &str, _: OpWrite) -> Result<(RpWrite, Self::Writer)> {
         let p = build_abs_path(&self.root, path);
 
         Ok((RpWrite::new(), KvWriter::new(self.kv.clone(), p)))
     }
 
-    fn blocking_write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::BlockingWriter)> {
-        if args.content_length().is_none() {
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                "write without content length is not supported",
-            ));
-        }
-
+    fn blocking_write(&self, path: &str, _: OpWrite) -> Result<(RpWrite, Self::BlockingWriter)> {
         let p = build_abs_path(&self.root, path);
 
         Ok((RpWrite::new(), KvWriter::new(self.kv.clone(), p)))
@@ -166,7 +140,7 @@ impl<S: Adapter> Accessor for Backend<S> {
     async fn stat(&self, path: &str, _: OpStat) -> Result<RpStat> {
         let p = build_abs_path(&self.root, path);
 
-        if p.is_empty() || p.ends_with('/') {
+        if p == build_abs_path(&self.root, "") {
             Ok(RpStat::new(Metadata::new(EntryMode::DIR)))
         } else {
             let bs = self.kv.get(&p).await?;
@@ -182,7 +156,7 @@ impl<S: Adapter> Accessor for Backend<S> {
     fn blocking_stat(&self, path: &str, _: OpStat) -> Result<RpStat> {
         let p = build_abs_path(&self.root, path);
 
-        if p.is_empty() || p.ends_with('/') {
+        if p == build_abs_path(&self.root, "") {
             Ok(RpStat::new(Metadata::new(EntryMode::DIR)))
         } else {
             let bs = self.kv.blocking_get(&p)?;
@@ -209,96 +183,22 @@ impl<S: Adapter> Accessor for Backend<S> {
         Ok(RpDelete::default())
     }
 
-    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Pager)> {
-        if !args.delimiter().is_empty() {
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                "kv doesn't support delimiter",
-            ));
-        }
-
+    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
         let p = build_abs_path(&self.root, path);
         let res = self.kv.scan(&p).await?;
-        let pager = KvPager::new(&self.root, res);
+        let lister = KvLister::new(&self.root, res);
+        let lister = HierarchyLister::new(lister, path, args.recursive());
 
-        Ok((RpList::default(), pager))
+        Ok((RpList::default(), lister))
     }
 
-    fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingPager)> {
-        if !args.delimiter().is_empty() {
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                "kv doesn't support delimiter",
-            ));
-        }
-
+    fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingLister)> {
         let p = build_abs_path(&self.root, path);
         let res = self.kv.blocking_scan(&p)?;
-        let pager = KvPager::new(&self.root, res);
+        let lister = KvLister::new(&self.root, res);
+        let lister = HierarchyLister::new(lister, path, args.recursive());
 
-        Ok((RpList::default(), pager))
-    }
-
-    async fn rename(&self, from: &str, to: &str, _: OpRename) -> Result<RpRename> {
-        let from = build_abs_path(&self.root, from);
-        let to = build_abs_path(&self.root, to);
-
-        let bs = match self.kv.get(&from).await? {
-            // TODO: we can reuse the metadata in value to build content range.
-            Some(bs) => bs,
-            None => return Err(Error::new(ErrorKind::NotFound, "kv doesn't have this path")),
-        };
-
-        self.kv.set(&to, &bs).await?;
-
-        self.kv.delete(&from).await?;
-        Ok(RpRename::default())
-    }
-
-    fn blocking_rename(&self, from: &str, to: &str, _: OpRename) -> Result<RpRename> {
-        let from = build_abs_path(&self.root, from);
-        let to = build_abs_path(&self.root, to);
-
-        let bs = match self.kv.blocking_get(&from)? {
-            // TODO: we can reuse the metadata in value to build content range.
-            Some(bs) => bs,
-            None => return Err(Error::new(ErrorKind::NotFound, "kv doesn't have this path")),
-        };
-
-        self.kv.blocking_set(&to, &bs)?;
-
-        self.kv.blocking_delete(&from)?;
-        Ok(RpRename::default())
-    }
-
-    async fn copy(&self, from: &str, to: &str, _: OpCopy) -> Result<RpCopy> {
-        let from = build_abs_path(&self.root, from);
-        let to = build_abs_path(&self.root, to);
-
-        let bs = match self.kv.get(&from).await? {
-            // TODO: we can reuse the metadata in value to build content range.
-            Some(bs) => bs,
-            None => return Err(Error::new(ErrorKind::NotFound, "kv doesn't have this path")),
-        };
-
-        self.kv.set(&to, &bs).await?;
-
-        Ok(RpCopy::default())
-    }
-
-    fn blocking_copy(&self, from: &str, to: &str, _: OpCopy) -> Result<RpCopy> {
-        let from = build_abs_path(&self.root, from);
-        let to = build_abs_path(&self.root, to);
-
-        let bs = match self.kv.blocking_get(&from)? {
-            // TODO: we can reuse the metadata in value to build content range.
-            Some(bs) => bs,
-            None => return Err(Error::new(ErrorKind::NotFound, "kv doesn't have this path")),
-        };
-
-        self.kv.blocking_set(&to, &bs)?;
-
-        Ok(RpCopy::default())
+        Ok((RpList::default(), lister))
     }
 }
 
@@ -322,49 +222,41 @@ where
     }
 }
 
-pub struct KvPager {
+pub struct KvLister {
     root: String,
-    inner: Option<Vec<String>>,
+    inner: IntoIter<String>,
 }
 
-impl KvPager {
+impl KvLister {
     fn new(root: &str, inner: Vec<String>) -> Self {
         Self {
             root: root.to_string(),
-            inner: Some(inner),
+            inner: inner.into_iter(),
         }
     }
 
-    fn inner_next_page(&mut self) -> Option<Vec<oio::Entry>> {
-        let res = self
-            .inner
-            .take()?
-            .into_iter()
-            .map(|v| {
-                let mode = if v.ends_with('/') {
-                    EntryMode::DIR
-                } else {
-                    EntryMode::FILE
-                };
+    fn inner_next(&mut self) -> Option<oio::Entry> {
+        self.inner.next().map(|v| {
+            let mode = if v.ends_with('/') {
+                EntryMode::DIR
+            } else {
+                EntryMode::FILE
+            };
 
-                oio::Entry::new(&build_rel_path(&self.root, &v), Metadata::new(mode))
-            })
-            .collect();
-
-        Some(res)
+            oio::Entry::new(&build_rel_path(&self.root, &v), Metadata::new(mode))
+        })
     }
 }
 
-#[async_trait]
-impl oio::Page for KvPager {
-    async fn next(&mut self) -> Result<Option<Vec<oio::Entry>>> {
-        Ok(self.inner_next_page())
+impl oio::List for KvLister {
+    fn poll_next(&mut self, _: &mut Context<'_>) -> Poll<Result<Option<oio::Entry>>> {
+        Poll::Ready(Ok(self.inner_next()))
     }
 }
 
-impl oio::BlockingPage for KvPager {
-    fn next(&mut self) -> Result<Option<Vec<oio::Entry>>> {
-        Ok(self.inner_next_page())
+impl oio::BlockingList for KvLister {
+    fn next(&mut self) -> Result<Option<oio::Entry>> {
+        Ok(self.inner_next())
     }
 }
 
@@ -372,8 +264,8 @@ pub struct KvWriter<S> {
     kv: Arc<S>,
     path: String,
 
-    /// TODO: if kv supports append, we can use them directly.
-    buf: Option<Vec<u8>>,
+    buffer: Buffer,
+    future: Option<BoxFuture<'static, Result<()>>>,
 }
 
 impl<S> KvWriter<S> {
@@ -381,55 +273,104 @@ impl<S> KvWriter<S> {
         KvWriter {
             kv,
             path,
-            buf: None,
+            buffer: Buffer::Active(BytesMut::new()),
+            future: None,
         }
     }
 }
 
-#[async_trait]
+enum Buffer {
+    Active(BytesMut),
+    Frozen(Bytes),
+}
+
+/// # Safety
+///
+/// We will only take `&mut Self` reference for KvWriter.
+unsafe impl<S: Adapter> Sync for KvWriter<S> {}
+
 impl<S: Adapter> oio::Write for KvWriter<S> {
-    // TODO: we need to support append in the future.
-    async fn write(&mut self, bs: Bytes) -> Result<()> {
-        self.buf = Some(bs.into());
-
-        Ok(())
-    }
-
-    async fn sink(&mut self, _size: u64, _s: oio::Streamer) -> Result<()> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "Write::sink is not supported",
-        ))
-    }
-
-    async fn abort(&mut self) -> Result<()> {
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "output writer doesn't support abort",
-        ))
-    }
-
-    async fn close(&mut self) -> Result<()> {
-        if let Some(buf) = self.buf.as_deref() {
-            self.kv.set(&self.path, buf).await?;
+    fn poll_write(&mut self, _: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
+        if self.future.is_some() {
+            self.future = None;
+            return Poll::Ready(Err(Error::new(
+                ErrorKind::Unexpected,
+                "there is a future on going, it's maybe a bug to go into this case",
+            )));
         }
 
-        Ok(())
+        match &mut self.buffer {
+            Buffer::Active(buf) => {
+                buf.extend_from_slice(bs.chunk());
+                Poll::Ready(Ok(bs.chunk().len()))
+            }
+            Buffer::Frozen(_) => unreachable!("KvWriter should not be frozen during poll_write"),
+        }
+    }
+
+    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
+        loop {
+            match self.future.as_mut() {
+                Some(fut) => {
+                    let res = ready!(fut.poll_unpin(cx));
+                    self.future = None;
+                    return Poll::Ready(res);
+                }
+                None => {
+                    let kv = self.kv.clone();
+                    let path = self.path.clone();
+                    let buf = match &mut self.buffer {
+                        Buffer::Active(buf) => {
+                            let buf = buf.split().freeze();
+                            self.buffer = Buffer::Frozen(buf.clone());
+                            buf
+                        }
+                        Buffer::Frozen(buf) => buf.clone(),
+                    };
+
+                    let fut = async move { kv.set(&path, &buf).await };
+                    self.future = Some(Box::pin(fut));
+                }
+            }
+        }
+    }
+
+    fn poll_abort(&mut self, _: &mut Context<'_>) -> Poll<Result<()>> {
+        if self.future.is_some() {
+            self.future = None;
+            return Poll::Ready(Err(Error::new(
+                ErrorKind::Unexpected,
+                "there is a future on going, it's maybe a bug to go into this case",
+            )));
+        }
+
+        self.buffer = Buffer::Active(BytesMut::new());
+        Poll::Ready(Ok(()))
     }
 }
 
 impl<S: Adapter> oio::BlockingWrite for KvWriter<S> {
-    fn write(&mut self, bs: Bytes) -> Result<()> {
-        self.buf = Some(bs.into());
-
-        Ok(())
+    fn write(&mut self, bs: &dyn oio::WriteBuf) -> Result<usize> {
+        match &mut self.buffer {
+            Buffer::Active(buf) => {
+                buf.extend_from_slice(bs.chunk());
+                Ok(bs.chunk().len())
+            }
+            Buffer::Frozen(_) => unreachable!("KvWriter should not be frozen during poll_write"),
+        }
     }
 
     fn close(&mut self) -> Result<()> {
-        if let Some(buf) = self.buf.as_deref() {
-            self.kv.blocking_set(&self.path, buf)?;
-        }
+        let buf = match &mut self.buffer {
+            Buffer::Active(buf) => {
+                let buf = buf.split().freeze();
+                self.buffer = Buffer::Frozen(buf.clone());
+                buf
+            }
+            Buffer::Frozen(buf) => buf.clone(),
+        };
 
+        self.kv.blocking_set(&self.path, &buf)?;
         Ok(())
     }
 }

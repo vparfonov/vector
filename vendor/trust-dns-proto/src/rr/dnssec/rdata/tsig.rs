@@ -1,4 +1,4 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
+// Copyright 2015-2017 Benjamin Fry <benjaminfry@me.com>
 //
 // Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
 // http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
@@ -6,22 +6,22 @@
 // copied, modified, or distributed except according to those terms.
 
 //! TSIG for secret key authentication of transaction
-#![allow(clippy::use_self)]
-
-use std::{convert::TryInto, fmt};
+use std::convert::TryInto;
+use std::fmt;
 
 #[cfg(feature = "serde-config")]
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    error::{ProtoError, ProtoErrorKind, ProtoResult},
-    op::{Header, Message, Query},
-    rr::{
-        dns_class::DNSClass, dnssec::rdata::DNSSECRData, rdata::sshfp, record_data::RData,
-        record_type::RecordType, Name, Record, RecordData, RecordDataDecodable,
-    },
-    serialize::binary::*,
-};
+use crate::rr::rdata::sshfp;
+
+use crate::error::*;
+use crate::op::{Header, Message, Query};
+use crate::rr::dns_class::DNSClass;
+use crate::rr::dnssec::rdata::DNSSECRData;
+use crate::rr::record_data::RData;
+use crate::rr::record_type::RecordType;
+use crate::rr::{Name, Record};
+use crate::serialize::binary::*;
 
 /// [RFC 8945, Secret Key Transaction Authentication for DNS](https://tools.ietf.org/html/rfc8945#section-4.2)
 ///
@@ -320,139 +320,115 @@ impl TSIG {
     }
 }
 
-impl BinEncodable for TSIG {
-    /// Write the RData from the given Encoder
-    ///
-    /// ```text
-    ///                       1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
-    ///   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///  /                         Algorithm Name                        /
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///  |                                                               |
-    ///  |          Time Signed          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///  |                               |            Fudge              |
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///  |          MAC Size             |                               /
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+             MAC               /
-    ///  /                                                               /
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///  |          Original ID          |            Error              |
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///  |          Other Len            |                               /
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+           Other Data          /
-    ///  /                                                               /
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    /// ```
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        self.algorithm.emit(encoder)?;
-        encoder.emit_u16(
-            (self.time >> 32)
-                .try_into()
-                .map_err(|_| ProtoError::from("invalid time, overflow 48 bit counter in TSIG"))?,
-        )?;
-        encoder.emit_u32(self.time as u32)?; // this cast is supposed to truncate
-        encoder.emit_u16(self.fudge)?;
-        encoder.emit_u16(
-            self.mac
-                .len()
-                .try_into()
-                .map_err(|_| ProtoError::from("invalid mac, longer than 65535 B in TSIG"))?,
-        )?;
-        encoder.emit_vec(&self.mac)?;
-        encoder.emit_u16(self.oid)?;
-        encoder.emit_u16(self.error)?;
-        encoder.emit_u16(self.other.len().try_into().map_err(|_| {
-            ProtoError::from("invalid other_buffer, longer than 65535 B in TSIG")
-        })?)?;
-        encoder.emit_vec(&self.other)?;
-        Ok(())
-    }
-}
-
-impl<'r> RecordDataDecodable<'r> for TSIG {
-    /// Read the RData from the given Decoder
-    ///
-    /// ```text
-    ///                       1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
-    ///   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///  /                         Algorithm Name                        /
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///  |                                                               |
-    ///  |          Time Signed          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///  |                               |            Fudge              |
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///  |          MAC Size             |                               /
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+             MAC               /
-    ///  /                                                               /
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///  |          Original ID          |            Error              |
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    ///  |          Other Len            |                               /
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+           Other Data          /
-    ///  /                                                               /
-    ///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
-    /// ```
-    fn read_data(decoder: &mut BinDecoder<'r>, length: Restrict<u16>) -> ProtoResult<Self> {
-        let end_idx = length.map(|rdl| rdl as usize)
+/// Read the RData from the given Decoder
+///
+/// ```text
+///                       1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
+///   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///  /                         Algorithm Name                        /
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///  |                                                               |
+///  |          Time Signed          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///  |                               |            Fudge              |
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///  |          MAC Size             |                               /
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+             MAC               /
+///  /                                                               /
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///  |          Original ID          |            Error              |
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///  |          Other Len            |                               /
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+           Other Data          /
+///  /                                                               /
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+pub fn read(decoder: &mut BinDecoder<'_>, rdata_length: Restrict<u16>) -> ProtoResult<TSIG> {
+    let end_idx = rdata_length.map(|rdl| rdl as usize)
         .checked_add(decoder.index())
         .map_err(|_| ProtoError::from("rdata end position overflow"))? // no legal message is long enough to trigger that
         .unverified(/*used only as length safely*/);
 
-        let algorithm = TsigAlgorithm::read(decoder)?;
-        let time_high = decoder.read_u16()?.unverified(/*valid as any u16*/) as u64;
-        let time_low = decoder.read_u32()?.unverified(/*valid as any u32*/) as u64;
-        let time = (time_high << 32) | time_low;
-        let fudge = decoder.read_u16()?.unverified(/*valid as any u16*/);
-        let mac_size = decoder
-            .read_u16()?
-            .verify_unwrap(|&size| decoder.index() + size as usize + 6 /* 3 u16 */ <= end_idx)
-            .map_err(|_| ProtoError::from("invalid mac length in TSIG"))?;
-        let mac =
-            decoder.read_vec(mac_size as usize)?.unverified(/*valid as any vec of the right size*/);
-        let oid = decoder.read_u16()?.unverified(/*valid as any u16*/);
-        let error = decoder.read_u16()?.unverified(/*valid as any u16*/);
-        let other_len = decoder
-            .read_u16()?
-            .verify_unwrap(|&size| decoder.index() + size as usize == end_idx)
-            .map_err(|_| ProtoError::from("invalid other length in TSIG"))?;
-        let other = decoder.read_vec(other_len as usize)?.unverified(/*valid as any vec of the right size*/);
+    let algorithm = TsigAlgorithm::read(decoder)?;
+    let time_high = decoder.read_u16()?.unverified(/*valid as any u16*/) as u64;
+    let time_low = decoder.read_u32()?.unverified(/*valid as any u32*/) as u64;
+    let time = (time_high << 32) | time_low;
+    let fudge = decoder.read_u16()?.unverified(/*valid as any u16*/);
+    let mac_size = decoder
+        .read_u16()?
+        .verify_unwrap(|&size| decoder.index() + size as usize + 6 /* 3 u16 */ <= end_idx)
+        .map_err(|_| ProtoError::from("invalid mac length in TSIG"))?;
+    let mac =
+        decoder.read_vec(mac_size as usize)?.unverified(/*valid as any vec of the right size*/);
+    let oid = decoder.read_u16()?.unverified(/*valid as any u16*/);
+    let error = decoder.read_u16()?.unverified(/*valid as any u16*/);
+    let other_len = decoder
+        .read_u16()?
+        .verify_unwrap(|&size| decoder.index() + size as usize == end_idx)
+        .map_err(|_| ProtoError::from("invalid other length in TSIG"))?;
+    let other =
+        decoder.read_vec(other_len as usize)?.unverified(/*valid as any vec of the right size*/);
 
-        Ok(Self {
-            algorithm,
-            time,
-            fudge,
-            mac,
-            oid,
-            error,
-            other,
-        })
-    }
+    Ok(TSIG {
+        algorithm,
+        time,
+        fudge,
+        mac,
+        oid,
+        error,
+        other,
+    })
 }
 
-impl RecordData for TSIG {
-    fn try_from_rdata(data: RData) -> Result<Self, RData> {
-        match data {
-            RData::DNSSEC(DNSSECRData::TSIG(csync)) => Ok(csync),
-            _ => Err(data),
-        }
-    }
-
-    fn try_borrow(data: &RData) -> Option<&Self> {
-        match data {
-            RData::DNSSEC(DNSSECRData::TSIG(csync)) => Some(csync),
-            _ => None,
-        }
-    }
-
-    fn record_type(&self) -> RecordType {
-        RecordType::TSIG
-    }
-
-    fn into_rdata(self) -> RData {
-        RData::DNSSEC(DNSSECRData::TSIG(self))
-    }
+/// Write the RData from the given Encoder
+///
+/// ```text
+///                       1 1 1 1 1 1 1 1 1 1 2 2 2 2 2 2 2 2 2 2 3 3
+///   0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///  /                         Algorithm Name                        /
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///  |                                                               |
+///  |          Time Signed          +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///  |                               |            Fudge              |
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///  |          MAC Size             |                               /
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+             MAC               /
+///  /                                                               /
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///  |          Original ID          |            Error              |
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+///  |          Other Len            |                               /
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+           Other Data          /
+///  /                                                               /
+///  +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+/// ```
+pub fn emit(encoder: &mut BinEncoder<'_>, tsig: &TSIG) -> ProtoResult<()> {
+    tsig.algorithm.emit(encoder)?;
+    encoder.emit_u16(
+        (tsig.time >> 32)
+            .try_into()
+            .map_err(|_| ProtoError::from("invalid time, overflow 48 bit counter in TSIG"))?,
+    )?;
+    encoder.emit_u32(tsig.time as u32)?; // this cast is supposed to truncate
+    encoder.emit_u16(tsig.fudge)?;
+    encoder.emit_u16(
+        tsig.mac
+            .len()
+            .try_into()
+            .map_err(|_| ProtoError::from("invalid mac, longer than 65535 B in TSIG"))?,
+    )?;
+    encoder.emit_vec(&tsig.mac)?;
+    encoder.emit_u16(tsig.oid)?;
+    encoder.emit_u16(tsig.error)?;
+    encoder.emit_u16(
+        tsig.other
+            .len()
+            .try_into()
+            .map_err(|_| ProtoError::from("invalid other_buffer, longer than 65535 B in TSIG"))?,
+    )?;
+    encoder.emit_vec(&tsig.other)?;
+    Ok(())
 }
 
 // Does not appear to have a normalized text representation
@@ -544,7 +520,7 @@ impl TsigAlgorithm {
             HmacSha256 => hmac::Key::new(hmac::HMAC_SHA256, key),
             HmacSha384 => hmac::Key::new(hmac::HMAC_SHA384, key),
             HmacSha512 => hmac::Key::new(hmac::HMAC_SHA512, key),
-            _ => return Err(ProtoErrorKind::TsigUnsupportedMacAlgorithm(self.clone()).into()),
+            _ => return Err(ProtoError::from("unsupported mac algorithm")),
         };
 
         let mac = hmac::sign(&key, message);
@@ -569,7 +545,7 @@ impl TsigAlgorithm {
             HmacSha256 => Signer::new(MessageDigest::sha256(), &key)?,
             HmacSha384 => Signer::new(MessageDigest::sha384(), &key)?,
             HmacSha512 => Signer::new(MessageDigest::sha512(), &key)?,
-            _ => return Err(ProtoErrorKind::TsigUnsupportedMacAlgorithm(self.clone()).into()),
+            _ => return Err(ProtoError::from("unsupported mac algorithm")),
         };
 
         signer.update(message)?;
@@ -597,7 +573,7 @@ impl TsigAlgorithm {
             HmacSha256 => hmac::Key::new(hmac::HMAC_SHA256, key),
             HmacSha384 => hmac::Key::new(hmac::HMAC_SHA384, key),
             HmacSha512 => hmac::Key::new(hmac::HMAC_SHA512, key),
-            _ => return Err(ProtoErrorKind::TsigUnsupportedMacAlgorithm(self.clone()).into()),
+            _ => return Err(ProtoError::from("unsupported mac algorithm")),
         };
 
         hmac::verify(&key, message, tag).map_err(|_| ProtoErrorKind::HmacInvalid().into())
@@ -638,7 +614,7 @@ impl TsigAlgorithm {
             HmacSha256 => hmac::HMAC_SHA256.digest_algorithm().output_len,
             HmacSha384 => hmac::HMAC_SHA384.digest_algorithm().output_len,
             HmacSha512 => hmac::HMAC_SHA512.digest_algorithm().output_len,
-            _ => return Err(ProtoErrorKind::TsigUnsupportedMacAlgorithm(self.clone()).into()),
+            _ => return Err(ProtoError::from("unsupported mac algorithm")),
         };
 
         Ok(len)
@@ -655,21 +631,14 @@ impl TsigAlgorithm {
             HmacSha256 => MessageDigest::sha256().size(),
             HmacSha384 => MessageDigest::sha384().size(),
             HmacSha512 => MessageDigest::sha512().size(),
-            _ => return Err(ProtoErrorKind::TsigUnsupportedMacAlgorithm(self.clone()).into()),
+            _ => return Err(ProtoError::from("unsupported mac algorithm")),
         };
 
         Ok(len)
     }
 
-    /// Return `true` if cryptographic operations needed for using this algorithm are supported,
-    /// `false` otherwise
-    ///
-    /// ## Supported
-    ///
-    /// - HmacSha256
-    /// - HmacSha384
-    /// - HmacSha512
-    /// - HmacSha512_256
+    /// Return true if cryptographic operations needed for using this algorithm are supported,
+    /// false otherwise
     pub fn supported(&self) -> bool {
         use TsigAlgorithm::*;
         matches!(self, HmacSha256 | HmacSha384 | HmacSha512)
@@ -691,7 +660,7 @@ impl fmt::Display for TsigAlgorithm {
 /// * `message` - the message to authenticate. Should not be modified after calling message_tbs
 /// except for adding the TSIG record
 /// * `pre_tsig` - TSIG rrdata, possibly with missing mac. Should not be modified in any other way
-/// after calling message_tbs
+/// after callin message_tbs
 /// * `key_name` - name of they key, should be the same as the name known by the remove
 /// server/client
 pub fn message_tbs<M: BinEncodable>(
@@ -757,7 +726,7 @@ pub fn signed_bitmessage_to_buf(
     // parse a tsig record
     let sig = Record::read(&mut decoder)?;
     let tsig = if let (RecordType::TSIG, Some(RData::DNSSEC(DNSSECRData::TSIG(tsig_data)))) =
-        (sig.record_type(), sig.data())
+        (sig.rr_type(), sig.data())
     {
         tsig_data
     } else {
@@ -819,14 +788,14 @@ mod tests {
     fn test_encode_decode(rdata: TSIG) {
         let mut bytes = Vec::new();
         let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        rdata.emit(&mut encoder).expect("failed to emit tsig");
+        emit(&mut encoder, &rdata).expect("failed to emit tsig");
         let bytes = encoder.into_bytes();
 
-        println!("bytes: {bytes:?}");
+        println!("bytes: {:?}", bytes);
 
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
-        let read_rdata = TSIG::read_data(&mut decoder, Restrict::new(bytes.len() as u16))
-            .expect("failed to read back");
+        let read_rdata =
+            read(&mut decoder, Restrict::new(bytes.len() as u16)).expect("failed to read back");
         assert_eq!(rdata, read_rdata);
     }
 
@@ -851,7 +820,7 @@ mod tests {
             vec![],
         ));
         test_encode_decode(TSIG::new(
-            TsigAlgorithm::Unknown(Name::from_ascii("unknown_algorithm").unwrap()),
+            TsigAlgorithm::Unknown(Name::from_ascii("unkown_algorithm").unwrap()),
             123456789,
             60,
             vec![],

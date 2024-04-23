@@ -3,8 +3,6 @@ mod test;
 
 use std::{collections::HashMap, fmt, ops::Deref, sync::Arc, time::Duration};
 
-use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
-
 use super::TopologyDescription;
 use crate::{
     error::{ErrorKind, Result},
@@ -61,13 +59,20 @@ pub(crate) fn attempt_to_select_server<'a>(
     criteria: &'a SelectionCriteria,
     topology_description: &'a TopologyDescription,
     servers: &'a HashMap<ServerAddress, Arc<Server>>,
+    deprioritized: Option<&ServerAddress>,
 ) -> Result<Option<SelectedServer>> {
-    let in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
+    let mut in_window = topology_description.suitable_servers_in_latency_window(criteria)?;
+    if let Some(addr) = deprioritized {
+        if in_window.len() > 1 {
+            in_window.retain(|d| &d.address != addr);
+        }
+    }
     let in_window_servers = in_window
         .into_iter()
         .flat_map(|desc| servers.get(&desc.address))
         .collect();
-    Ok(select_server_in_latency_window(in_window_servers).map(SelectedServer::new))
+    let selected = select_server_in_latency_window(in_window_servers);
+    Ok(selected.map(SelectedServer::new))
 }
 
 /// Choose a server from several suitable choices within the latency window according to
@@ -79,9 +84,7 @@ fn select_server_in_latency_window(in_window: Vec<&Arc<Server>>) -> Option<Arc<S
         return Some(in_window[0].clone());
     }
 
-    let mut rng = SmallRng::from_entropy();
-    in_window
-        .choose_multiple(&mut rng, 2)
+    super::choose_n(&in_window, 2)
         .min_by_key(|s| s.operation_count())
         .map(|server| (*server).clone())
 }
@@ -288,7 +291,7 @@ impl TopologyDescription {
         primary: &ServerDescription,
         max_staleness: Duration,
     ) {
-        let max_staleness_ms = max_staleness.as_millis() as i64;
+        let max_staleness_ms = max_staleness.as_millis().try_into().unwrap_or(i64::MAX);
 
         servers.retain(|server| {
             let server_staleness = self.calculate_secondary_staleness_with_primary(server, primary);
@@ -304,7 +307,7 @@ impl TopologyDescription {
         servers: &mut Vec<&ServerDescription>,
         max_staleness: Duration,
     ) {
-        let max_staleness = max_staleness.as_millis() as i64;
+        let max_staleness = max_staleness.as_millis().try_into().unwrap_or(i64::MAX);
         let max_write_date = self
             .servers
             .values()
@@ -344,7 +347,11 @@ impl TopologyDescription {
         let secondary_last_update = secondary.last_update_time?.timestamp_millis();
         let secondary_last_write = secondary.last_write_date().ok()??.timestamp_millis();
 
-        let heartbeat_frequency = self.heartbeat_frequency().as_millis() as i64;
+        let heartbeat_frequency = self
+            .heartbeat_frequency()
+            .as_millis()
+            .try_into()
+            .unwrap_or(i64::MAX);
 
         let staleness = (secondary_last_update - secondary_last_write)
             - (primary_last_update - primary_last_write)
@@ -359,7 +366,11 @@ impl TopologyDescription {
         max_last_write_date: i64,
     ) -> Option<i64> {
         let secondary_last_write = secondary.last_write_date().ok()??.timestamp_millis();
-        let heartbeat_frequency = self.heartbeat_frequency().as_millis() as i64;
+        let heartbeat_frequency = self
+            .heartbeat_frequency()
+            .as_millis()
+            .try_into()
+            .unwrap_or(i64::MAX);
 
         let staleness = max_last_write_date - secondary_last_write + heartbeat_frequency;
         Some(staleness)

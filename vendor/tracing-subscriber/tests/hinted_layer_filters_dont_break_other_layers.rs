@@ -1,9 +1,9 @@
 #![cfg(feature = "registry")]
 use tracing::{Level, Metadata, Subscriber};
 use tracing_mock::{
-    event,
-    layer::{self, MockLayer},
-    subscriber,
+    expect, layer,
+    layer::MockLayer,
+    subscriber::{self},
 };
 use tracing_subscriber::{filter::DynFilterFn, layer::Context, prelude::*};
 
@@ -115,20 +115,20 @@ fn filter<S>() -> DynFilterFn<S> {
 
 fn unfiltered(name: &str) -> (MockLayer, subscriber::MockHandle) {
     layer::named(name)
-        .event(event::mock().at_level(Level::TRACE))
-        .event(event::mock().at_level(Level::DEBUG))
-        .event(event::mock().at_level(Level::INFO))
-        .event(event::mock().at_level(Level::WARN))
-        .event(event::mock().at_level(Level::ERROR))
-        .done()
+        .event(expect::event().at_level(Level::TRACE))
+        .event(expect::event().at_level(Level::DEBUG))
+        .event(expect::event().at_level(Level::INFO))
+        .event(expect::event().at_level(Level::WARN))
+        .event(expect::event().at_level(Level::ERROR))
+        .only()
         .run_with_handle()
 }
 
 fn filtered(name: &str) -> (MockLayer, subscriber::MockHandle) {
     layer::named(name)
-        .event(event::mock().at_level(Level::INFO))
-        .event(event::mock().at_level(Level::WARN))
-        .event(event::mock().at_level(Level::ERROR))
-        .done()
+        .event(expect::event().at_level(Level::INFO))
+        .event(expect::event().at_level(Level::WARN))
+        .event(expect::event().at_level(Level::ERROR))
+        .only()
         .run_with_handle()
 }

@@ -15,6 +15,12 @@ use std::pin::Pin;
 #[cfg_attr(docsrs, doc(cfg(feature = "async-std-comp")))]
 pub mod async_std;
 
+#[cfg(feature = "tls-rustls")]
+use crate::tls::TlsConnParams;
+
+#[cfg(all(feature = "tls-native-tls", not(feature = "tls-rustls")))]
+use crate::connection::TlsConnParams;
+
 /// Enables the tokio compatibility
 #[cfg(feature = "tokio-comp")]
 #[cfg_attr(docsrs, doc(cfg(feature = "tokio-comp")))]
@@ -32,6 +38,7 @@ pub(crate) trait RedisRuntime: AsyncStream + Send + Sync + Sized + 'static {
         hostname: &str,
         socket_addr: SocketAddr,
         insecure: bool,
+        tls_params: &Option<TlsConnParams>,
     ) -> RedisResult<Self>;
 
     /// Performs a UNIX connection
@@ -72,7 +79,8 @@ pub trait ConnectionLike {
     fn get_db(&self) -> i64;
 }
 
-async fn authenticate<C>(connection_info: &RedisConnectionInfo, con: &mut C) -> RedisResult<()>
+// Initial setup for every connection.
+async fn setup_connection<C>(connection_info: &RedisConnectionInfo, con: &mut C) -> RedisResult<()>
 where
     C: ConnectionLike,
 {
@@ -125,6 +133,12 @@ where
             )),
         }
     }
+
+    // result is ignored, as per the command's instructions.
+    // https://redis.io/commands/client-setinfo/
+    let _: RedisResult<()> = crate::connection::client_set_info_pipeline()
+        .query_async(con)
+        .await;
 
     Ok(())
 }

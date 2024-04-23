@@ -53,6 +53,7 @@ struct EnumInfo {
     module: Option<ModuleName>,
 }
 
+/// A struct or enum variant, with named fields.
 struct FieldContainer {
     name: syn::Ident,
     backtrace_field: Option<Field>,
@@ -63,6 +64,7 @@ struct FieldContainer {
     visibility: Option<UserInput>,
     module: Option<ModuleName>,
     provides: Vec<Provide>,
+    is_transparent: bool,
 }
 
 impl FieldContainer {
@@ -121,10 +123,7 @@ enum ContextSelectorKind {
 
 impl ContextSelectorKind {
     fn is_whatever(&self) -> bool {
-        match self {
-            ContextSelectorKind::Whatever { .. } => true,
-            _ => false,
-        }
+        matches!(self, ContextSelectorKind::Whatever { .. })
     }
 
     fn user_fields(&self) -> &[Field] {
@@ -299,6 +298,7 @@ enum ErrorLocation {
     OnNamedStruct,
     InNamedStruct,
     OnTupleStruct,
+    OnTupleStructField,
 }
 
 impl fmt::Display for ErrorLocation {
@@ -313,6 +313,7 @@ impl fmt::Display for ErrorLocation {
             OnNamedStruct => "on a named struct".fmt(f),
             InNamedStruct => "within a named struct".fmt(f),
             OnTupleStruct => "on a tuple struct".fmt(f),
+            OnTupleStructField => "on a tuple struct field".fmt(f),
         }
     }
 }
@@ -332,6 +333,20 @@ impl SyntaxErrorsScoped<'_> {
     fn add(&mut self, tokens: impl quote::ToTokens, description: impl ErrorForLocation) {
         let description = description.for_location(self.scope);
         self.errors.add(tokens, description)
+    }
+}
+
+/// Helper structure to handle cases where an attribute is
+/// syntactically valid but semantically invalid.
+#[derive(Debug)]
+struct DoesNothing {
+    /// The name of the attribute that was misused.
+    attribute: &'static str,
+}
+
+impl ErrorForLocation for DoesNothing {
+    fn for_location(&self, _location: ErrorLocation) -> String {
+        format!("`{}` attribute has no effect", self.attribute)
     }
 }
 
@@ -575,9 +590,8 @@ const ATTR_IMPLICIT: OnlyValidOn = OnlyValidOn {
     valid_on: "enum variant or struct fields with a name",
 };
 
-const ATTR_IMPLICIT_FALSE: WrongField = WrongField {
+const ATTR_IMPLICIT_FALSE: DoesNothing = DoesNothing {
     attribute: "implicit(false)",
-    valid_field: "location",
 };
 
 const ATTR_VISIBILITY: OnlyValidOn = OnlyValidOn {
@@ -623,6 +637,15 @@ const ATTR_WHATEVER: OnlyValidOn = OnlyValidOn {
 const ATTR_CRATE_ROOT: OnlyValidOn = OnlyValidOn {
     attribute: "crate_root",
     valid_on: "an enum or a struct",
+};
+
+const ATTR_TRANSPARENT: OnlyValidOn = OnlyValidOn {
+    attribute: "transparent",
+    valid_on: "enum variants or structs with named fields",
+};
+
+const ATTR_TRANSPARENT_FALSE: DoesNothing = DoesNothing {
+    attribute: "transparent(false)",
 };
 
 const SOURCE_BOOL_FROM_INCOMPATIBLE: IncompatibleAttributes =
@@ -673,6 +696,7 @@ fn parse_snafu_enum(
             }
             Att::Backtrace(tokens, ..) => enum_errors.add(tokens, ATTR_BACKTRACE),
             Att::Implicit(tokens, ..) => enum_errors.add(tokens, ATTR_IMPLICIT),
+            Att::Transparent(tokens, ..) => enum_errors.add(tokens, ATTR_TRANSPARENT),
             Att::Whatever(tokens) => enum_errors.add(tokens, ATTR_WHATEVER),
             Att::DocComment(..) => { /* Just a regular doc comment. */ }
         }
@@ -758,6 +782,8 @@ fn field_container(
 
     let mut contexts = AtMostOne::new("context", outer_error_location);
     let mut whatevers = AtMostOne::new("whatever", outer_error_location);
+    let mut transparents = AtMostOne::new("transparent", outer_error_location);
+
     let mut doc_comment = DocComment::default();
     let mut reached_end_of_doc_comment = false;
 
@@ -770,6 +796,13 @@ fn field_container(
             Att::Visibility(tokens, v) => visibilities.add(v, tokens),
             Att::Context(tokens, c) => contexts.add(c, tokens),
             Att::Whatever(tokens) => whatevers.add((), tokens),
+            Att::Transparent(tokens, t) => {
+                if t {
+                    transparents.add((), tokens)
+                } else {
+                    outer_errors.add(tokens, ATTR_TRANSPARENT_FALSE)
+                }
+            }
             Att::Source(tokens, ..) => outer_errors.add(tokens, ATTR_SOURCE),
             Att::Backtrace(tokens, ..) => outer_errors.add(tokens, ATTR_BACKTRACE),
             Att::Implicit(tokens, ..) => outer_errors.add(tokens, ATTR_IMPLICIT),
@@ -827,7 +860,6 @@ fn field_container(
         // exclude fields even if they have the "source" or "backtrace" name.
         let mut source_opt_out = false;
         let mut backtrace_opt_out = false;
-        let mut implicit_opt_out = false;
         let mut provide_opt_out = false;
 
         let mut field_errors = errors.scoped(ErrorLocation::OnField);
@@ -878,8 +910,6 @@ fn field_container(
                 Att::Implicit(tokens, v) => {
                     if v {
                         implicit_attrs.add((), tokens);
-                    } else if is_implicit_location(name) {
-                        implicit_opt_out = true;
                     } else {
                         field_errors.add(tokens, ATTR_IMPLICIT_FALSE);
                     }
@@ -900,6 +930,7 @@ fn field_container(
                 Att::Visibility(tokens, ..) => field_errors.add(tokens, ATTR_VISIBILITY),
                 Att::Display(tokens, ..) => field_errors.add(tokens, ATTR_DISPLAY),
                 Att::Context(tokens, ..) => field_errors.add(tokens, ATTR_CONTEXT),
+                Att::Transparent(tokens, ..) => field_errors.add(tokens, ATTR_TRANSPARENT),
                 Att::Whatever(tokens) => field_errors.add(tokens, ATTR_WHATEVER),
                 Att::CrateRoot(tokens, ..) => field_errors.add(tokens, ATTR_CRATE_ROOT),
                 Att::DocComment(..) => { /* Just a regular doc comment. */ }
@@ -921,7 +952,7 @@ fn field_container(
         let field = Field {
             name: name.clone(),
             ty: syn_field.ty.clone(),
-            provide: provide_attr.is_some() || (is_implicit_provide(&name) && !provide_opt_out),
+            provide: provide_attr.is_some() || (is_implicit_provide(name) && !provide_opt_out),
             original,
         };
 
@@ -941,8 +972,7 @@ fn field_container(
             }
         });
 
-        let implicit_attr =
-            implicit_attr.is_some() || (is_implicit_location(&field.name) && !implicit_opt_out);
+        let implicit_attr = implicit_attr.is_some();
 
         if let Some((maybe_transformation, location)) = source_attr {
             let Field {
@@ -1001,18 +1031,47 @@ fn field_container(
     let (module, errs) = modules.finish();
     errors.extend(errs);
 
-    let (display_format, errs) = display_formats.finish();
+    let (display_format, errs) = display_formats.finish_with_location();
     errors.extend(errs);
 
     let (visibility, errs) = visibilities.finish();
     errors.extend(errs);
 
     let (is_context, errs) = contexts.finish_with_location();
-    let is_context = is_context.map(|(c, tt)| (c.into_enabled(), tt));
+    let mut is_context = is_context.map(|(c, tt)| (c.into_enabled(), tt));
+    let mut is_context_false_checks_source = "Context selectors without context";
     errors.extend(errs);
 
     let (is_whatever, errs) = whatevers.finish_with_location();
     errors.extend(errs);
+
+    let (is_transparent, errs) = transparents.finish_with_location();
+    errors.extend(errs);
+
+    if let (Some((_, d_tt)), Some((_, t_tt))) = (&display_format, &is_transparent) {
+        let txt = "`transparent` errors cannot have a display format because they delegate `Display` to their source";
+        errors.extend([
+            syn::Error::new_spanned(d_tt, txt),
+            syn::Error::new_spanned(t_tt, txt),
+        ]);
+    }
+
+    match (&is_context, &is_transparent) {
+        (Some(((true, _), c_tt)), Some((_, t_tt))) => {
+            let txt = "`transparent` errors cannot have context";
+            errors.extend([
+                syn::Error::new_spanned(c_tt, txt),
+                syn::Error::new_spanned(t_tt, txt),
+            ]);
+        }
+        (None, Some((_, t_tt))) => {
+            // `transparent` implies `context(false)`. Treat `transparent` as if setting
+            // `context(false)` as well.
+            is_context = Some(((false, SuffixKind::Default), t_tt.clone()));
+            is_context_false_checks_source = "`transparent` errors";
+        }
+        (Some(((false, _), _)), Some(_)) | (_, None) => {}
+    }
 
     let source_field = source.map(|(val, _tts)| val);
 
@@ -1073,14 +1132,20 @@ fn field_container(
             errors.extend(user_fields.into_iter().map(|Field { original, .. }| {
                 syn::Error::new_spanned(
                     original,
-                    "Context selectors without context must not have context fields",
+                    format_args!(
+                        "{} must not have context fields",
+                        is_context_false_checks_source
+                    ),
                 )
             }));
 
             let source_field = source_field.ok_or_else(|| {
                 vec![syn::Error::new(
                     variant_span,
-                    "Context selectors without context must have a source field",
+                    format_args!(
+                        "{} must have a source field",
+                        is_context_false_checks_source
+                    ),
                 )]
             })?;
 
@@ -1093,18 +1158,18 @@ fn field_container(
         backtrace_field: backtrace.map(|(val, _tts)| val),
         implicit_fields,
         selector_kind,
-        display_format,
+        display_format: display_format.map(|(d, _)| d),
         doc_comment: doc_comment.finish(),
         visibility,
         module,
         provides,
+        is_transparent: is_transparent.is_some(),
     })
 }
 
 const IMPLICIT_SOURCE_FIELD_NAME: &str = "source";
 const IMPLICIT_BACKTRACE_FIELD_NAME: &str = "backtrace";
 const IMPLICIT_MESSAGE_FIELD_NAME: &str = "message";
-const IMPLICIT_LOCATION_FIELD_NAME: &str = "location";
 
 fn is_implicit_source(name: &proc_macro2::Ident) -> bool {
     name == IMPLICIT_SOURCE_FIELD_NAME
@@ -1116,10 +1181,6 @@ fn is_implicit_backtrace(name: &proc_macro2::Ident) -> bool {
 
 fn is_implicit_message(name: &proc_macro2::Ident) -> bool {
     name == IMPLICIT_MESSAGE_FIELD_NAME
-}
-
-fn is_implicit_location(name: &proc_macro2::Ident) -> bool {
-    name == IMPLICIT_LOCATION_FIELD_NAME
 }
 
 fn is_implicit_provide(name: &proc_macro2::Ident) -> bool {
@@ -1233,7 +1294,8 @@ fn parse_snafu_tuple_struct(
             Att::Backtrace(tokens, ..) => struct_errors.add(tokens, ATTR_BACKTRACE),
             Att::Implicit(tokens, ..) => struct_errors.add(tokens, ATTR_IMPLICIT),
             Att::Context(tokens, ..) => struct_errors.add(tokens, ATTR_CONTEXT),
-            Att::Whatever(tokens) => struct_errors.add(tokens, ATTR_CONTEXT),
+            Att::Whatever(tokens) => struct_errors.add(tokens, ATTR_WHATEVER),
+            Att::Transparent(tokens, ..) => struct_errors.add(tokens, ATTR_TRANSPARENT),
             Att::CrateRoot(tokens, root) => crate_roots.add(root, tokens),
             Att::DocComment(..) => { /* Just a regular doc comment. */ }
         }
@@ -1254,7 +1316,30 @@ fn parse_snafu_tuple_struct(
         return Err(vec![one_field_error(span)]);
     }
 
-    let ty = inner.into_value().ty;
+    let inner = inner.into_value();
+
+    let mut field_errors = errors.scoped(ErrorLocation::OnTupleStructField);
+
+    for attr in attributes_from_syn(inner.attrs)? {
+        use SnafuAttribute as Att;
+
+        match attr {
+            Att::Backtrace(tokens, ..) => field_errors.add(tokens, ATTR_BACKTRACE),
+            Att::Context(tokens, ..) => field_errors.add(tokens, ATTR_CONTEXT),
+            Att::CrateRoot(tokens, ..) => field_errors.add(tokens, ATTR_CRATE_ROOT),
+            Att::Display(tokens, ..) => field_errors.add(tokens, ATTR_DISPLAY),
+            Att::Implicit(tokens, ..) => field_errors.add(tokens, ATTR_IMPLICIT),
+            Att::Module(tokens, ..) => field_errors.add(tokens, ATTR_MODULE),
+            Att::Provide(tokens, ..) => field_errors.add(tokens, ATTR_PROVIDE_FLAG),
+            Att::Source(tokens, ..) => field_errors.add(tokens.clone(), ATTR_SOURCE),
+            Att::Transparent(tokens, ..) => field_errors.add(tokens, ATTR_TRANSPARENT),
+            Att::Visibility(tokens, ..) => field_errors.add(tokens, ATTR_VISIBILITY),
+            Att::Whatever(tokens) => field_errors.add(tokens, ATTR_WHATEVER),
+            Att::DocComment(..) => { /* Just a regular doc comment. */ }
+        }
+    }
+
+    let ty = inner.ty;
     let (maybe_transformation, errs) = transformations.finish();
     let transformation = maybe_transformation
         .map(|(source_ty, expr)| Transformation::Transform {
@@ -1314,7 +1399,7 @@ struct DocComment {
 impl DocComment {
     fn push_str(&mut self, s: &str) {
         if !self.content.is_empty() {
-            self.content.push_str(" ");
+            self.content.push(' ');
         }
         self.content.push_str(s);
     }
@@ -1350,6 +1435,7 @@ enum SnafuAttribute {
     Module(proc_macro2::TokenStream, ModuleName),
     Provide(proc_macro2::TokenStream, ProvideKind),
     Source(proc_macro2::TokenStream, Vec<Source>),
+    Transparent(proc_macro2::TokenStream, bool),
     Visibility(proc_macro2::TokenStream, UserInput),
     Whatever(proc_macro2::TokenStream),
 }
@@ -1433,32 +1519,34 @@ trait GenericAwareNames {
     fn provided_generics_without_defaults(&self) -> Vec<proc_macro2::TokenStream> {
         self.provided_generic_lifetimes()
             .into_iter()
-            .chain(self.provided_generic_types_without_defaults().into_iter())
+            .chain(self.provided_generic_types_without_defaults())
             .collect()
     }
 
     fn provided_generic_lifetimes(&self) -> Vec<proc_macro2::TokenStream> {
-        use syn::{GenericParam, LifetimeDef};
+        use syn::{GenericParam, LifetimeParam};
 
         self.generics()
             .params
             .iter()
             .flat_map(|p| match p {
-                GenericParam::Lifetime(LifetimeDef { lifetime, .. }) => Some(quote! { #lifetime }),
+                GenericParam::Lifetime(LifetimeParam { lifetime, .. }) => {
+                    Some(quote! { #lifetime })
+                }
                 _ => None,
             })
             .collect()
     }
 
     fn provided_generic_names(&self) -> Vec<proc_macro2::TokenStream> {
-        use syn::{ConstParam, GenericParam, LifetimeDef, TypeParam};
+        use syn::{ConstParam, GenericParam, LifetimeParam, TypeParam};
 
         self.generics()
             .params
             .iter()
             .map(|p| match p {
                 GenericParam::Type(TypeParam { ident, .. }) => quote! { #ident },
-                GenericParam::Lifetime(LifetimeDef { lifetime, .. }) => quote! { #lifetime },
+                GenericParam::Lifetime(LifetimeParam { lifetime, .. }) => quote! { #lifetime },
                 GenericParam::Const(ConstParam { ident, .. }) => quote! { #ident },
             })
             .collect()
@@ -1575,9 +1663,9 @@ impl<'a> quote::ToTokens for ContextSelector<'a> {
             original_generics_without_defaults: &self.0.provided_generics_without_defaults(),
             parameterized_error_name: &self.0.parameterized_name(),
             selector_doc_string: &selector_doc_string,
-            selector_kind: &selector_kind,
+            selector_kind,
             selector_name: variant_name,
-            user_fields: &selector_kind.user_fields(),
+            user_fields: selector_kind.user_fields(),
             visibility: selector_visibility,
             where_clauses: &self.0.provided_where_clauses(),
             default_suffix,
@@ -1762,7 +1850,7 @@ impl NamedStructInfo {
         };
 
         let error_source_match_arm = ErrorSourceMatchArm {
-            field_container: &field_container,
+            field_container,
             pattern_ident,
         };
         let error_source_match_arm = quote! { #error_source_match_arm };
@@ -1810,7 +1898,7 @@ impl NamedStructInfo {
             display_format: display_format.as_ref(),
             doc_comment: doc_comment.as_ref(),
             pattern_ident: &quote! { Self },
-            selector_kind: &selector_kind,
+            selector_kind,
         };
         let arm = quote! { #arm };
 
@@ -1837,15 +1925,15 @@ impl NamedStructInfo {
 
         let context_selector = ContextSelector {
             backtrace_field: backtrace_field.as_ref(),
-            implicit_fields: implicit_fields,
+            implicit_fields,
             crate_root: &crate_root,
             error_constructor_name: &name,
             original_generics_without_defaults: &original_generics,
             parameterized_error_name: &parameterized_struct_name,
             selector_doc_string: &selector_doc_string,
-            selector_kind: &selector_kind,
+            selector_kind,
             selector_name: &field_container.name,
-            user_fields: &user_fields,
+            user_fields,
             visibility: selector_visibility,
             where_clauses: &where_clauses,
             default_suffix: &SuffixKind::Default,
@@ -1931,28 +2019,18 @@ impl TupleStructInfo {
             }
         };
 
-        let std_backtrace_fn = if cfg!(feature = "unstable-backtraces-impl-std") {
-            quote! {
-                fn backtrace(&self) -> ::core::option::Option<&std::backtrace::Backtrace> {
-                    #crate_root::ErrorCompat::backtrace(self)
-                }
-            }
-        } else {
-            quote! {}
-        };
-
         let provide_fn = if cfg!(feature = "unstable-provider-api") {
             use shared::error::PROVIDE_ARG;
 
             let provides = shared::error::enhance_provider_list(&provides);
             let cached_expressions = shared::error::quote_cached_expressions(&provides);
-            let user_chained = shared::error::quote_chained(&provides);
+            let user_chained = shared::error::quote_chained(&crate_root, &provides);
 
             let (hi_explicit_calls, lo_explicit_calls) =
                 shared::error::build_explicit_provide_calls(&provides);
 
             Some(quote! {
-                fn provide<'a>(&'a self, #PROVIDE_ARG: &mut core::any::Demand<'a>) {
+                fn provide<'a>(&'a self, #PROVIDE_ARG: &mut #crate_root::error::Request<'a>) {
                     match self {
                         Self(v) => {
                             #(#cached_expressions;)*
@@ -1977,7 +2055,6 @@ impl TupleStructInfo {
                 #description_fn
                 #cause_fn
                 #source_fn
-                #std_backtrace_fn
                 #provide_fn
             }
         };
@@ -2031,20 +2108,6 @@ impl GenericAwareNames for TupleStructInfo {
 
     fn generics(&self) -> &syn::Generics {
         &self.generics
-    }
-}
-
-trait Transpose<T, E> {
-    fn my_transpose(self) -> Result<Option<T>, E>;
-}
-
-impl<T, E> Transpose<T, E> for Option<Result<T, E>> {
-    fn my_transpose(self) -> Result<Option<T>, E> {
-        match self {
-            Some(Ok(v)) => Ok(Some(v)),
-            Some(Err(e)) => Err(e),
-            None => Ok(None),
-        }
     }
 }
 

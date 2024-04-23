@@ -1,44 +1,73 @@
-pub use error_code::{SystemError, PlainError, PosixError};
+use error_code::{ErrorCode, defs};
+
+use core::mem;
+
+#[test]
+fn check_would_block() {
+    let mut error = ErrorCode::new_posix(defs::EAGAIN);
+    assert!(error.is_would_block());
+    error = ErrorCode::new_posix(defs::EWOULDBLOCK);
+    assert!(error.is_would_block());
+
+    error = ErrorCode::new_system(defs::EAGAIN);
+    assert!(error.is_would_block());
+    error = ErrorCode::new_system(defs::EWOULDBLOCK);
+    assert!(error.is_would_block());
+
+    #[cfg(windows)]
+    {
+        error = ErrorCode::new_system(10035);
+        assert!(error.is_would_block());
+    }
+}
+
+#[cfg(target_pointer_width = "64")]
+#[test]
+fn size_check_64bit() {
+    //On 64bit we suffer from alignment, but Rust optimizes enums quite well so ErrorCode benefits
+    //of this optimization, letting its padding to be consumed by Result
+    assert_eq!(mem::size_of::<ErrorCode>(), 16);
+    //This optimization is enabled in latest rust compiler
+    //assert_eq!(mem::size_of::<Result<bool, ErrorCode>>(), 16);
+}
 
 #[test]
 fn it_works() {
-    let error = PosixError::new(11);
+    let error = ErrorCode::new_posix(11);
     eprintln!("{:?}", error.to_string());
     eprintln!("{:?}", error);
 
-    let error = PosixError::last();
+    let error = ErrorCode::last_posix();
     eprintln!("{}", error);
 
-    let error = PlainError::new(11);
-    eprintln!("{}", error);
-
-    let error = SystemError::new(11);
+    let error = ErrorCode::new_system(11);
     eprintln!("{:?}", error.to_string());
 
-    let error = SystemError::last();
+    let error = ErrorCode::last_system();
     eprintln!("{}", error);
-
-    let error = PlainError::new(11);
-    eprintln!("{}", error);
-
-    let error = SystemError::unimplemented();
-    eprintln!("{:?}", error);
-    eprintln!("{:?}", error.to_string());
 }
 
-#[cfg(feature = "std")]
 #[test]
-fn convert_io_error() {
-    use std::io::{ErrorKind, Error};
-    let code = SystemError::unimplemented();
-    let error: Error = code.into();
-    assert_eq!(code, error);
-    assert!(error.raw_os_error().is_some());
-    let code2: SystemError = error.into();
-    assert_eq!(code, code2);
+fn check_error_code_range() {
+    for code in 0..=15999 {
+        let error = ErrorCode::new_posix(code);
+        eprintln!("{:?}", error.to_string());
 
-    let error = Error::new(ErrorKind::Other, "lolka");
-    let code: SystemError = error.into();
-    assert_eq!(code.raw_code(), -1);
-    assert_ne!(code, Error::new(ErrorKind::Other, "lolka"));
+        let error = ErrorCode::new_system(code);
+        eprintln!("{:?}", error.to_string());
+
+        if code == defs::EWOULDBLOCK || code == defs::EAGAIN {
+            assert!(error.is_would_block());
+        } else {
+            #[cfg(windows)]
+            if code == 10035 {
+                assert!(error.is_would_block());
+            } else {
+                assert!(!error.is_would_block());
+            }
+
+            #[cfg(not(windows))]
+            assert!(!error.is_would_block());
+        }
+    }
 }

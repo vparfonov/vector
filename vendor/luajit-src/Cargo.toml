@@ -12,15 +12,14 @@
 [package]
 edition = "2021"
 name = "luajit-src"
-version = "210.4.8+resty107baaf"
+version = "210.5.2+113a168"
 authors = ["Aleksandr Orlenko <zxteam@protonmail.com>"]
 exclude = [
     "/luajit2/doc",
     "/luajit2/etc",
-    "/luajit2/t",
 ]
 description = """
-Sources of LuaJIT 2.1 (OpenResty's branch) and logic to build it.
+Sources of LuaJIT 2.1 and logic to build it.
 """
 readme = "README.md"
 keywords = [
@@ -34,4 +33,4 @@ repository = "https://github.com/khvzak/luajit-src-rs"
 version = "1.0"
 
 [dependencies.which]
-version = "4.4"
+version = "5.0"

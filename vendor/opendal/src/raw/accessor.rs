@@ -53,25 +53,22 @@ use crate::*;
 /// - Operations with capability requirement like `presign` are optional operations.
 ///   - Services can implement them based on services capabilities.
 ///   - The default implementation should return [`ErrorKind::Unsupported`].
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 pub trait Accessor: Send + Sync + Debug + Unpin + 'static {
-    /// Reader is the associated reader the could return in `read` operation.
+    /// Reader is the associated reader returned in `read` operation.
     type Reader: oio::Read;
-    /// BlockingReader is the associated reader that could return in
-    /// `blocking_read` operation.
-    type BlockingReader: oio::BlockingRead;
-    /// Writer is the associated writer the could return in `write` operation.
+    /// Writer is the associated writer returned in `write` operation.
     type Writer: oio::Write;
-    /// BlockingWriter is the associated writer the could return in
-    /// `blocking_write` operation.
+    /// Lister is the associated lister returned in `list` operation.
+    type Lister: oio::List;
+
+    /// BlockingReader is the associated reader returned `blocking_read` operation.
+    type BlockingReader: oio::BlockingRead;
+    /// BlockingWriter is the associated writer returned `blocking_write` operation.
     type BlockingWriter: oio::BlockingWrite;
-    /// Pager is the associated page that return in `list` operation.
-    type Pager: oio::Page;
-    /// BlockingPager is the associated pager that could return in
-    /// `blocking_list` operation.
-    type BlockingPager: oio::BlockingPage;
-    /// Appender is the associated appender that could return in `append` operation.
-    type Appender: oio::Append;
+    /// BlockingLister is the associated lister returned `blocking_list` operation.
+    type BlockingLister: oio::BlockingList;
 
     /// Invoke the `info` operation to get metadata of accessor.
     ///
@@ -95,6 +92,24 @@ pub trait Accessor: Send + Sync + Debug + Unpin + 'static {
     /// - Input path MUST match with EntryMode, DON'T NEED to check mode.
     /// - Create on existing dir SHOULD succeed.
     async fn create_dir(&self, path: &str, args: OpCreateDir) -> Result<RpCreateDir> {
+        let (_, _) = (path, args);
+
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "operation is not supported",
+        ))
+    }
+
+    /// Invoke the `stat` operation on the specified path.
+    ///
+    /// Require [`Capability::stat`]
+    ///
+    /// # Behavior
+    ///
+    /// - `stat` empty path means stat backend's root path.
+    /// - `stat` a path endswith "/" means stating a dir.
+    /// - `mode` and `content_length` must be set.
+    async fn stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
         let (_, _) = (path, args);
 
         Err(Error::new(
@@ -138,15 +153,32 @@ pub trait Accessor: Send + Sync + Debug + Unpin + 'static {
         ))
     }
 
-    /// Invoke the `append` operation on the specified path, returns a
-    /// appended size if operate successful.
+    /// Invoke the `delete` operation on the specified path.
     ///
-    ///  Require [`Capability::append`]
+    /// Require [`Capability::delete`]
     ///
     /// # Behavior
     ///
-    /// - Input path MUST be file path, DON'T NEED to check mode.
-    async fn append(&self, path: &str, args: OpAppend) -> Result<(RpAppend, Self::Appender)> {
+    /// - `delete` is an idempotent operation, it's safe to call `Delete` on the same path multiple times.
+    /// - `delete` SHOULD return `Ok(())` if the path is deleted successfully or not exist.
+    async fn delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
+        let (_, _) = (path, args);
+
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "operation is not supported",
+        ))
+    }
+
+    /// Invoke the `list` operation on the specified path.
+    ///
+    /// Require [`Capability::list`]
+    ///
+    /// # Behavior
+    ///
+    /// - Input path MUST be dir path, DON'T NEED to check mode.
+    /// - List non-exist dir should return Empty.
+    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
         let (_, _) = (path, args);
 
         Err(Error::new(
@@ -178,58 +210,6 @@ pub trait Accessor: Send + Sync + Debug + Unpin + 'static {
     /// Require [Capability::rename]
     async fn rename(&self, from: &str, to: &str, args: OpRename) -> Result<RpRename> {
         let (_, _, _) = (from, to, args);
-
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "operation is not supported",
-        ))
-    }
-
-    /// Invoke the `stat` operation on the specified path.
-    ///
-    /// Require [`Capability::stat`]
-    ///
-    /// # Behavior
-    ///
-    /// - `stat` empty path means stat backend's root path.
-    /// - `stat` a path endswith "/" means stating a dir.
-    /// - `mode` and `content_length` must be set.
-    async fn stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
-        let (_, _) = (path, args);
-
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "operation is not supported",
-        ))
-    }
-
-    /// Invoke the `delete` operation on the specified path.
-    ///
-    /// Require [`Capability::delete`]
-    ///
-    /// # Behavior
-    ///
-    /// - `delete` is an idempotent operation, it's safe to call `Delete` on the same path multiple times.
-    /// - `delete` SHOULD return `Ok(())` if the path is deleted successfully or not exist.
-    async fn delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
-        let (_, _) = (path, args);
-
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "operation is not supported",
-        ))
-    }
-
-    /// Invoke the `list` operation on the specified path.
-    ///
-    /// Require [`Capability::list`]
-    ///
-    /// # Behavior
-    ///
-    /// - Input path MUST be dir path, DON'T NEED to check mode.
-    /// - List non-exist dir should return Empty.
-    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Pager)> {
-        let (_, _) = (path, args);
 
         Err(Error::new(
             ErrorKind::Unsupported,
@@ -279,6 +259,20 @@ pub trait Accessor: Send + Sync + Debug + Unpin + 'static {
         ))
     }
 
+    /// Invoke the `blocking_stat` operation on the specified path.
+    ///
+    /// This operation is the blocking version of [`Accessor::stat`]
+    ///
+    /// Require [`Capability::stat`] and [`Capability::blocking`]
+    fn blocking_stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
+        let (_, _) = (path, args);
+
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "operation is not supported",
+        ))
+    }
+
     /// Invoke the `blocking_read` operation on the specified path.
     ///
     /// This operation is the blocking version of [`Accessor::read`]
@@ -299,6 +293,38 @@ pub trait Accessor: Send + Sync + Debug + Unpin + 'static {
     ///
     /// Require [`Capability::write`] and [`Capability::blocking`]
     fn blocking_write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::BlockingWriter)> {
+        let (_, _) = (path, args);
+
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "operation is not supported",
+        ))
+    }
+
+    /// Invoke the `blocking_delete` operation on the specified path.
+    ///
+    /// This operation is the blocking version of [`Accessor::delete`]
+    ///
+    /// Require [`Capability::write`] and [`Capability::blocking`]
+    fn blocking_delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
+        let (_, _) = (path, args);
+
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "operation is not supported",
+        ))
+    }
+
+    /// Invoke the `blocking_list` operation on the specified path.
+    ///
+    /// This operation is the blocking version of [`Accessor::list`]
+    ///
+    /// Require [`Capability::list`] and [`Capability::blocking`]
+    ///
+    /// # Behavior
+    ///
+    /// - List non-exist dir should return Empty.
+    fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingLister)> {
         let (_, _) = (path, args);
 
         Err(Error::new(
@@ -334,86 +360,41 @@ pub trait Accessor: Send + Sync + Debug + Unpin + 'static {
             "operation is not supported",
         ))
     }
-
-    /// Invoke the `blocking_stat` operation on the specified path.
-    ///
-    /// This operation is the blocking version of [`Accessor::stat`]
-    ///
-    /// Require [`Capability::stat`] and [`Capability::blocking`]
-    fn blocking_stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
-        let (_, _) = (path, args);
-
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "operation is not supported",
-        ))
-    }
-
-    /// Invoke the `blocking_delete` operation on the specified path.
-    ///
-    /// This operation is the blocking version of [`Accessor::delete`]
-    ///
-    /// Require [`Capability::write`] and [`Capability::blocking`]
-    fn blocking_delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
-        let (_, _) = (path, args);
-
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "operation is not supported",
-        ))
-    }
-
-    /// Invoke the `blocking_list` operation on the specified path.
-    ///
-    /// This operation is the blocking version of [`Accessor::list`]
-    ///
-    /// Require [`Capability::list`] and [`Capability::blocking`]
-    ///
-    /// # Behavior
-    ///
-    /// - List non-exist dir should return Empty.
-    fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingPager)> {
-        let (_, _) = (path, args);
-
-        Err(Error::new(
-            ErrorKind::Unsupported,
-            "operation is not supported",
-        ))
-    }
 }
 
 /// Dummy implementation of accessor.
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl Accessor for () {
     type Reader = ();
-    type BlockingReader = ();
     type Writer = ();
+    type Lister = ();
+    type BlockingReader = ();
     type BlockingWriter = ();
-    type Appender = ();
-    type Pager = ();
-    type BlockingPager = ();
+    type BlockingLister = ();
 
     fn info(&self) -> AccessorInfo {
         AccessorInfo {
             scheme: Scheme::Custom("dummy"),
             root: "".to_string(),
             name: "dummy".to_string(),
-            capability: Capability::default(),
+            native_capability: Capability::default(),
+            full_capability: Capability::default(),
         }
     }
 }
 
 /// All functions in `Accessor` only requires `&self`, so it's safe to implement
 /// `Accessor` for `Arc<dyn Accessor>`.
-#[async_trait]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
+#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl<T: Accessor + ?Sized> Accessor for Arc<T> {
     type Reader = T::Reader;
-    type BlockingReader = T::BlockingReader;
     type Writer = T::Writer;
+    type Lister = T::Lister;
+    type BlockingReader = T::BlockingReader;
     type BlockingWriter = T::BlockingWriter;
-    type Appender = T::Appender;
-    type Pager = T::Pager;
-    type BlockingPager = T::BlockingPager;
+    type BlockingLister = T::BlockingLister;
 
     fn info(&self) -> AccessorInfo {
         self.as_ref().info()
@@ -423,69 +404,65 @@ impl<T: Accessor + ?Sized> Accessor for Arc<T> {
         self.as_ref().create_dir(path, args).await
     }
 
+    async fn stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
+        self.as_ref().stat(path, args).await
+    }
     async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
         self.as_ref().read(path, args).await
     }
+
     async fn write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::Writer)> {
         self.as_ref().write(path, args).await
     }
 
-    async fn append(&self, path: &str, args: OpAppend) -> Result<(RpAppend, Self::Appender)> {
-        self.as_ref().append(path, args).await
-    }
-
-    async fn copy(&self, from: &str, to: &str, args: OpCopy) -> Result<RpCopy> {
-        self.as_ref().copy(from, to, args).await
-    }
-
-    async fn rename(&self, from: &str, to: &str, args: OpRename) -> Result<RpRename> {
-        self.as_ref().rename(from, to, args).await
-    }
-
-    async fn stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
-        self.as_ref().stat(path, args).await
-    }
     async fn delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
         self.as_ref().delete(path, args).await
     }
-    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Pager)> {
+
+    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
         self.as_ref().list(path, args).await
     }
-
-    async fn batch(&self, args: OpBatch) -> Result<RpBatch> {
-        self.as_ref().batch(args).await
+    async fn copy(&self, from: &str, to: &str, args: OpCopy) -> Result<RpCopy> {
+        self.as_ref().copy(from, to, args).await
+    }
+    async fn rename(&self, from: &str, to: &str, args: OpRename) -> Result<RpRename> {
+        self.as_ref().rename(from, to, args).await
     }
 
     async fn presign(&self, path: &str, args: OpPresign) -> Result<RpPresign> {
         self.as_ref().presign(path, args).await
     }
 
+    async fn batch(&self, args: OpBatch) -> Result<RpBatch> {
+        self.as_ref().batch(args).await
+    }
+
     fn blocking_create_dir(&self, path: &str, args: OpCreateDir) -> Result<RpCreateDir> {
         self.as_ref().blocking_create_dir(path, args)
+    }
+    fn blocking_stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
+        self.as_ref().blocking_stat(path, args)
     }
     fn blocking_read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::BlockingReader)> {
         self.as_ref().blocking_read(path, args)
     }
+
     fn blocking_write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::BlockingWriter)> {
         self.as_ref().blocking_write(path, args)
     }
 
-    fn blocking_copy(&self, from: &str, to: &str, args: OpCopy) -> Result<RpCopy> {
-        self.as_ref().blocking_copy(from, to, args)
-    }
-
-    fn blocking_rename(&self, from: &str, to: &str, args: OpRename) -> Result<RpRename> {
-        self.as_ref().blocking_rename(from, to, args)
-    }
-
-    fn blocking_stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
-        self.as_ref().blocking_stat(path, args)
-    }
     fn blocking_delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
         self.as_ref().blocking_delete(path, args)
     }
-    fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingPager)> {
+
+    fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingLister)> {
         self.as_ref().blocking_list(path, args)
+    }
+    fn blocking_copy(&self, from: &str, to: &str, args: OpCopy) -> Result<RpCopy> {
+        self.as_ref().blocking_copy(from, to, args)
+    }
+    fn blocking_rename(&self, from: &str, to: &str, args: OpRename) -> Result<RpRename> {
+        self.as_ref().blocking_rename(from, to, args)
     }
 }
 
@@ -496,9 +473,8 @@ pub type FusedAccessor = Arc<
         BlockingReader = oio::BlockingReader,
         Writer = oio::Writer,
         BlockingWriter = oio::BlockingWriter,
-        Appender = oio::Appender,
-        Pager = oio::Pager,
-        BlockingPager = oio::BlockingPager,
+        Lister = oio::Lister,
+        BlockingLister = oio::BlockingLister,
     >,
 >;
 
@@ -509,7 +485,8 @@ pub struct AccessorInfo {
     root: String,
     name: String,
 
-    capability: Capability,
+    native_capability: Capability,
+    full_capability: Capability,
 }
 
 impl AccessorInfo {
@@ -553,19 +530,30 @@ impl AccessorInfo {
         self
     }
 
-    /// Get backend's capabilities.
-    pub fn capability(&self) -> Capability {
-        self.capability
+    /// Get backend's native capabilities.
+    pub fn native_capability(&self) -> Capability {
+        self.native_capability
     }
 
-    /// Get backend's capabilities.
-    pub fn capability_mut(&mut self) -> &mut Capability {
-        &mut self.capability
-    }
-
-    /// Set capabilities for backend.
-    pub fn set_capability(&mut self, capability: Capability) -> &mut Self {
-        self.capability = capability;
+    /// Set native capabilities for service.
+    ///
+    /// # NOTES
+    ///
+    /// Set native capability will also flush the full capability. The only way to change
+    /// full_capability is via `full_capability_mut`.
+    pub fn set_native_capability(&mut self, capability: Capability) -> &mut Self {
+        self.native_capability = capability;
+        self.full_capability = capability;
         self
+    }
+
+    /// Get service's full capabilities.
+    pub fn full_capability(&self) -> Capability {
+        self.full_capability
+    }
+
+    /// Get service's full capabilities.
+    pub fn full_capability_mut(&mut self) -> &mut Capability {
+        &mut self.full_capability
     }
 }

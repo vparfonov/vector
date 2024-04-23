@@ -15,11 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-//! into_stream will provide different implementations to convert into
-//! [`oio::Stream`][crate::raw::oio::Stream]
+mod utils;
+mod write;
 
-mod from_futures_stream;
-pub use from_futures_stream::from_futures_stream;
+use criterion::criterion_group;
+use criterion::criterion_main;
 
-mod from_futures_reader;
-pub use from_futures_reader::from_futures_reader;
+criterion_group!(benches, write::bench_exact_buf_write);
+criterion_main!(benches);

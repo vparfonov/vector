@@ -58,7 +58,7 @@ cfg_net! {
 
 impl TcpListener {
     cfg_not_wasi! {
-        /// Creates a new TcpListener, which will be bound to the specified address.
+        /// Creates a new `TcpListener`, which will be bound to the specified address.
         ///
         /// The returned listener is ready for accepting connections.
         ///
@@ -268,7 +268,7 @@ impl TcpListener {
             use std::os::unix::io::{FromRawFd, IntoRawFd};
             self.io
                 .into_inner()
-                .map(|io| io.into_raw_fd())
+                .map(IntoRawFd::into_raw_fd)
                 .map(|raw_fd| unsafe { std::net::TcpListener::from_raw_fd(raw_fd) })
         }
 

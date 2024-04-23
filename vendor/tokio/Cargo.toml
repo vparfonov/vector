@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.63"
 name = "tokio"
-version = "1.33.0"
+version = "1.36.0"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 description = """
 An event-driven, non-blocking I/O platform for writing asynchronous I/O
@@ -33,6 +33,13 @@ categories = [
 ]
 license = "MIT"
 repository = "https://github.com/tokio-rs/tokio"
+
+[package.metadata.cargo_check_external_types]
+allowed_external_types = [
+    "bytes::buf::buf_impl::Buf",
+    "bytes::buf::buf_mut::BufMut",
+    "tokio_macros::*",
+]
 
 [package.metadata.docs.rs]
 all-features = true
@@ -62,7 +69,7 @@ version = "1.0.0"
 optional = true
 
 [dependencies.mio]
-version = "0.8.6"
+version = "0.8.9"
 optional = true
 default-features = false
 
@@ -78,7 +85,7 @@ optional = true
 version = "0.2.11"
 
 [dependencies.tokio-macros]
-version = "~2.1.0"
+version = "~2.2.0"
 optional = true
 
 [dev-dependencies.async-stream]
@@ -176,18 +183,18 @@ features = [
 version = "0.8.0"
 
 [target."cfg(not(target_family = \"wasm\"))".dependencies.socket2]
-version = "0.5.3"
+version = "0.5.5"
 features = ["all"]
 optional = true
 
 [target."cfg(not(target_family = \"wasm\"))".dev-dependencies.socket2]
-version = "0.5.3"
+version = "0.5.5"
 
 [target."cfg(not(target_family = \"wasm\"))".dev-dependencies.tempfile]
 version = "3.1.0"
 
 [target."cfg(target_os = \"freebsd\")".dev-dependencies.mio-aio]
-version = "0.7.0"
+version = "0.8.0"
 features = ["tokio"]
 
 [target."cfg(tokio_taskdump)".dependencies.backtrace]
@@ -200,7 +207,7 @@ optional = true
 default-features = false
 
 [target."cfg(unix)".dependencies.libc]
-version = "0.2.145"
+version = "0.2.149"
 optional = true
 
 [target."cfg(unix)".dependencies.signal-hook-registry]
@@ -208,10 +215,10 @@ version = "1.1.1"
 optional = true
 
 [target."cfg(unix)".dev-dependencies.libc]
-version = "0.2.145"
+version = "0.2.149"
 
 [target."cfg(unix)".dev-dependencies.nix]
-version = "0.26"
+version = "0.27.1"
 features = [
     "fs",
     "socket",

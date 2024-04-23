@@ -96,8 +96,8 @@
 //! Support for each of these crates can be enabled with a feature of the same name. Additionally,
 //! the following external crate features are available:
 //!
-//! - `tinyvec_alloc`: Supports types behind the `alloc` feature in `tinyvec`.
-//! - `uuid_std`: Enables the `std` feature in `uuid`.
+//! - `alloc` with `tinyvec/alloc`: Supports types behind the `alloc` feature in `tinyvec`.
+//! - `std` with `uuid/std`: Enables the `std` feature in `uuid`.
 //!
 //! ## Examples
 //!
@@ -131,6 +131,8 @@
     viewBox="0 0 26.458 26.458"%3E%3Cpath d="M0 0v26.458h26.458V0zm9.175 3.772l8.107 8.106
     2.702-2.702 2.702 13.512-13.512-2.702 2.703-2.702-8.107-8.107z"/%3E%3C/svg%3E
 "#)]
+// Only use this feature if you know what you're doing!
+#![cfg_attr(feature = "copy", allow(internal_features))]
 
 #[cfg(all(feature = "alloc", not(feature = "std")))]
 extern crate alloc;

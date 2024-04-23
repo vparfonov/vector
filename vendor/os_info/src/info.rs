@@ -208,6 +208,7 @@ mod tests {
     #[test]
     fn with_type() {
         let types = [
+            Type::AIX,
             Type::Redox,
             Type::Alpaquita,
             Type::Alpine,
@@ -237,6 +238,8 @@ mod tests {
             Type::Solus,
             Type::SUSE,
             Type::Ubuntu,
+            Type::Ultramarine,
+            Type::Void,
             Type::Mint,
             Type::Unknown,
             Type::Windows,

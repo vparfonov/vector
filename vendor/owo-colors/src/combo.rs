@@ -100,8 +100,8 @@ macro_rules! color_methods {
             pub fn on_color<NewBg: DynColor>(
                 self,
                 bg: NewBg,
-            ) -> ComboDynColorDisplay<'a, Fg::DynEquivelant, NewBg, T> {
-                ComboDynColorDisplay(self.0, Fg::DYN_EQUIVELANT, bg)
+            ) -> ComboDynColorDisplay<'a, Fg::DynEquivalent, NewBg, T> {
+                ComboDynColorDisplay(self.0, Fg::DYN_EQUIVALENT, bg)
             }
 
             /// Set the foreground color generically
@@ -159,8 +159,8 @@ macro_rules! color_methods {
             pub fn color<NewFg: DynColor>(
                 self,
                 fg: NewFg,
-            ) -> ComboDynColorDisplay<'a, NewFg, Bg::DynEquivelant, T> {
-                ComboDynColorDisplay(self.0, fg, Bg::DYN_EQUIVELANT)
+            ) -> ComboDynColorDisplay<'a, NewFg, Bg::DynEquivalent, T> {
+                ComboDynColorDisplay(self.0, fg, Bg::DYN_EQUIVALENT)
             }
 
             /// Set the background color at runtime. Only use if you do not know what color to use at
@@ -235,8 +235,8 @@ macro_rules! color_methods {
             pub fn on_color<NewBg: DynColor>(
                 self,
                 bg: NewBg,
-            ) -> ComboDynColorDisplay<'a, Fg::DynEquivelant, NewBg, T> {
-                ComboDynColorDisplay(self.0, Fg::DYN_EQUIVELANT, bg)
+            ) -> ComboDynColorDisplay<'a, Fg::DynEquivalent, NewBg, T> {
+                ComboDynColorDisplay(self.0, Fg::DYN_EQUIVALENT, bg)
             }
 
             /// Set the foreground color at runtime. Only use if you do not know which color will be used at
@@ -251,8 +251,8 @@ macro_rules! color_methods {
             pub fn color<NewFg: DynColor>(
                 self,
                 fg: NewFg,
-            ) -> ComboDynColorDisplay<'a, NewFg, Bg::DynEquivelant, T> {
-                ComboDynColorDisplay(self.0, fg, Bg::DYN_EQUIVELANT)
+            ) -> ComboDynColorDisplay<'a, NewFg, Bg::DynEquivalent, T> {
+                ComboDynColorDisplay(self.0, fg, Bg::DYN_EQUIVALENT)
             }
 
             /// Set the foreground color generically

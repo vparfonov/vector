@@ -27,7 +27,7 @@ impl Function for Boolean {
         &[
             Example {
                 title: "valid",
-                source: r#"bool(false)"#,
+                source: "bool(false)",
                 result: Ok("false"),
             },
             Example {
@@ -65,6 +65,6 @@ impl FunctionExpression for BooleanFn {
     fn type_def(&self, state: &state::TypeState) -> TypeDef {
         let non_boolean = !self.value.type_def(state).is_boolean();
 
-        TypeDef::boolean().with_fallibility(non_boolean)
+        TypeDef::boolean().maybe_fallible(non_boolean)
     }
 }

@@ -54,10 +54,16 @@ pub(crate) fn hello_command(
 
     if let Some(opts) = awaitable_options {
         command.insert("topologyVersion", opts.topology_version);
-        command.insert("maxAwaitTimeMS", opts.max_await_time.as_millis() as i64);
+        command.insert(
+            "maxAwaitTimeMS",
+            opts.max_await_time
+                .as_millis()
+                .try_into()
+                .unwrap_or(i64::MAX),
+        );
     }
 
-    let mut command = Command::new(command_name.into(), "admin".into(), command);
+    let mut command = Command::new(command_name, "admin", command);
     if let Some(server_api) = server_api {
         command.set_server_api(server_api);
     }
@@ -179,7 +185,26 @@ pub(crate) struct HelloCommandResponse {
 
     /// The server-generated ID for the connection the "hello" command was run on.
     /// Present on server versions 4.2+.
+    #[serde(deserialize_with = "deserialize_connection_id", default)]
     pub connection_id: Option<i64>,
+}
+
+#[allow(clippy::cast_possible_truncation)]
+fn deserialize_connection_id<'de, D: serde::Deserializer<'de>>(
+    de: D,
+) -> std::result::Result<Option<i64>, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum Helper {
+        Int32(i32),
+        Int64(i64),
+        Double(f64),
+    }
+    Ok(Some(match Helper::deserialize(de)? {
+        Helper::Int32(v) => v as i64,
+        Helper::Int64(v) => v,
+        Helper::Double(v) => v as i64,
+    }))
 }
 
 impl HelloCommandResponse {

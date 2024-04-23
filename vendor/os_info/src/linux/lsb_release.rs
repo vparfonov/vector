@@ -11,7 +11,7 @@ pub fn get() -> Option<Info> {
 
     let version = match release.version.as_deref() {
         Some("rolling") => Version::Rolling(None),
-        Some(v) => Version::Custom(v.to_owned()),
+        Some(v) => Version::from_string(v.to_owned()),
         None => Version::Unknown,
     };
 
@@ -26,6 +26,7 @@ pub fn get() -> Option<Info> {
         Some("Fedora") | Some("Fedora Linux") => Type::Fedora,
         Some("Garuda") => Type::Garuda,
         Some("Gentoo") => Type::Gentoo,
+        Some("Kali") => Type::Kali,
         Some("Linuxmint") => Type::Mint,
         Some("MaboxLinux") => Type::Mabox,
         Some("ManjaroLinux") => Type::Manjaro,
@@ -41,6 +42,8 @@ pub fn get() -> Option<Info> {
         Some("Solus") => Type::Solus,
         Some("SUSE") => Type::SUSE,
         Some("Ubuntu") => Type::Ubuntu,
+        Some("UltramarineLinux") => Type::Ultramarine,
+        Some("VoidLinux") => Type::Void,
         _ => Type::Linux,
     };
 
@@ -143,6 +146,14 @@ mod tests {
         assert_eq!(parse_results.distribution, Some("Fedora".to_string()));
         assert_eq!(parse_results.version, Some("26".to_string()));
         assert_eq!(parse_results.codename, Some("TwentySix".to_string()));
+    }
+
+    #[test]
+    fn kali_2023_2() {
+        let parse_results = parse(kali_2023_2_file());
+        assert_eq!(parse_results.distribution, Some("Kali".to_string()));
+        assert_eq!(parse_results.version, Some("2023.2".to_string()));
+        assert_eq!(parse_results.codename, Some("kali-rolling".to_string()));
     }
 
     #[test]
@@ -302,6 +313,24 @@ mod tests {
     }
 
     #[test]
+    fn ultramarine() {
+        let parse_results = parse(ultramarine_file());
+        assert_eq!(
+            parse_results.distribution,
+            Some("UltramarineLinux".to_string())
+        );
+        assert_eq!(parse_results.version, Some("39".to_string()));
+        assert_eq!(parse_results.codename, Some("kuma".to_string()));
+    }
+
+    #[test]
+    fn void_linux() {
+        let parse_results = parse(void_file());
+        assert_eq!(parse_results.distribution, Some("Void".to_string()));
+        assert_eq!(parse_results.version, Some("rolling".to_string()));
+    }
+
+    #[test]
     fn raspbian() {
         let parse_results = parse(raspberry_os_file());
         assert_eq!(parse_results.distribution, Some("Raspbian".to_string()));
@@ -346,6 +375,14 @@ mod tests {
          Description:    Fedora release 26 (Twenty Six)\n\
          Release:    26\n\
          Codename:   TwentySix\n\
+         "
+    }
+
+    fn kali_2023_2_file() -> &'static str {
+        "\nDistributor ID: Kali\n\
+         Description:    Kali GNU/Linux Rolling\n\
+         Release:        2023.2\n\
+         Codename:       kali-rolling\n\
          "
     }
 
@@ -514,5 +551,23 @@ mod tests {
         Release:	rolling\n\
         Codename:	n/a\n\
         "
+    }
+
+    fn ultramarine_file() -> &'static str {
+        "LSB Version:    n/a\n\
+        Distributor ID: UltramarineLinux\n\
+        Description:    Ultramarine Linux 39 (Kuma)\n\
+        Release:        39\n\
+        Codename:       kuma\n\
+        "
+    }
+
+    fn void_file() -> &'static str {
+        "LSB Version:        n/a\n\
+          Distributor ID:        Void\n\
+          Description:        Void Linux\n\
+          Release:        rolling\n\
+          Codename:        n/a\n\
+          "
     }
 }

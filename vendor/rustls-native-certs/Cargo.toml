@@ -13,37 +13,41 @@
 edition = "2021"
 rust-version = "1.60"
 name = "rustls-native-certs"
-version = "0.6.3"
+version = "0.7.0"
 description = "rustls-native-certs allows rustls to use the platform native certificate store"
-homepage = "https://github.com/ctz/rustls-native-certs"
+homepage = "https://github.com/rustls/rustls-native-certs"
 readme = "README.md"
 categories = [
     "network-programming",
     "cryptography",
 ]
 license = "Apache-2.0 OR ISC OR MIT"
-repository = "https://github.com/ctz/rustls-native-certs"
+repository = "https://github.com/rustls/rustls-native-certs"
+
+[dependencies.pki-types]
+version = "1"
+package = "rustls-pki-types"
 
 [dependencies.rustls-pemfile]
-version = "1"
+version = "2"
 
 [dev-dependencies.ring]
 version = "0.16.5"
 
 [dev-dependencies.rustls]
-version = "0.21.0"
+version = "0.22"
 
 [dev-dependencies.rustls-webpki]
-version = "0.100"
+version = "0.102"
 
 [dev-dependencies.serial_test]
 version = "2"
 
 [dev-dependencies.untrusted]
-version = "0.7.0"
+version = "0.7"
 
 [dev-dependencies.webpki-roots]
-version = "0.23"
+version = "0.26"
 
 [dev-dependencies.x509-parser]
 version = "0.15"
@@ -52,7 +56,7 @@ version = "0.15"
 version = "0.1.2"
 
 [target."cfg(target_os = \"macos\")".dependencies.security-framework]
-version = "2.0.0"
+version = "2"
 
 [target."cfg(windows)".dependencies.schannel]
 version = "0.1.15"

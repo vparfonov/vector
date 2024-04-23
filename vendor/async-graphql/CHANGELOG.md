@@ -4,6 +4,57 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+# [7.0.3] 2024-03-16
+
+- Sort schema fields & enums if required [#1475](https://github.com/async-graphql/async-graphql/pull/1475)
+- Change the `type_name` of `EmptySubscription` fix [#1435](https://github.com/async-graphql/async-graphql/issues/1435) [#1475](https://github.com/async-graphql/async-graphql/pull/1475)
+- add `Request::set_parsed_query` method [#1483](https://github.com/async-graphql/async-graphql/pull/1483)
+- Upgrade strum to 0.26 [#1485](https://github.com/async-graphql/async-graphql/pull/1485)
+- Fix validation of non-nullable variables with default values [#1491](https://github.com/async-graphql/async-graphql/pull/1491)
+- add `NextExecute::run_with_data` method to attach context data before execution
+- feat: add registry method in dynamic::Registry [#1492](https://github.com/async-graphql/async-graphql/pull/1492)
+- Allow non-scalars to be used as directive arguments [#1493](https://github.com/async-graphql/async-graphql/pull/1493)
+- fix: add description to __schema introspection result [#1489](https://github.com/async-graphql/async-graphql/pull/1489)
+
+# [7.0.2] 2024-02-18
+
+- Fix `#[derive(OneofObject)]` rejecting enums where the type comes from a macro subsitution [#1473](https://github.com/async-graphql/async-graphql/pull/1473)
+- Optimize object proc-macro codegen [#1470](https://github.com/async-graphql/async-graphql/pull/1470)
+- Use `impl Future` instead of `async-trait` in most traits. [#1468](https://github.com/async-graphql/async-graphql/pull/1468)
+- Upgrade `base64` to `0.21` [#1466](https://github.com/async-graphql/async-graphql/pull/1466)
+- Standardize space between Args, Lists and Binary items [#1392](https://github.com/async-graphql/async-graphql/pull/1392)
+- feat: support bigdecimal 0.4.x  [#1358](https://github.com/async-graphql/async-graphql/pull/1358)
+
+# [7.0.1] 2024-01-21
+
+- Add `Shareable` Attribute To InputObjectField [#1459](https://github.com/async-graphql/async-graphql/pull/1459)
+- Feature Generic Unions [#1424](https://github.com/async-graphql/async-graphql/pull/1424)
+- Address axum integration compilation error with non-Sync body [#1460](https://github.com/async-graphql/async-graphql/pull/1460)
+- fix: date cursor precision string format [#1462](https://github.com/async-graphql/async-graphql/pull/1462)
+
+# [7.0.0] 2024-01-06
+
+- upgrade to `http1`
+- Feature extend ResolveInfo with field attribute [#1428](https://github.com/async-graphql/async-graphql/pull/1428)
+
+# [6.0.11] 2023-11-19
+
+- Clean up example docs [#1411](https://github.com/async-graphql/async-graphql/pull/1411)
+- Run batch requests concurrently [#1420](https://github.com/async-graphql/async-graphql/pull/1420)
+- Update opentelemetry to `v0.21.x` [#1422](https://github.com/async-graphql/async-graphql/pull/1422)
+
+# [6.0.10] 2023-11-04
+
+- bump opentelemetry `0.20.0` [#1406](https://github.com/async-graphql/async-graphql/pull/1406)
+- fix check for serial [#1405](https://github.com/async-graphql/async-graphql/pull/1405)
+- fixes complexity visitor
+- bump Rocket from `0.5.0-rc.2` to `0.5.0-rc.4`
+
+# [6.0.9] 2023-10-21
+
+- add support uploading files in dynamic schema [#1384](https://github.com/async-graphql/async-graphql/discussions/1384)
+- Include `@composeDirective` in Federation's `_service` field and document `#[TypeDirective]` [#1400](https://github.com/async-graphql/async-graphql/pull/1400)
+
 # [6.0.7] 2023-09-23
 
 - initialize source field in tracing extension parse_query method [#1367](https://github.com/async-graphql/async-graphql/pull/1367)
@@ -21,7 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `ValueAccessor::as_value` and `ListAccessor::as_values_slice` methods [#1353](https://github.com/async-graphql/async-graphql/pull/1353)
 - dynamic: fixes key not found when using entity resolver [#1362](https://github.com/async-graphql/async-graphql/issues/1362)
 - fix panic in complexity visitor [#1359](https://github.com/async-graphql/async-graphql/pull/1359)
-- update MSRV to `1.68.0`
+- update MSRV to `1.70.0`
 
 # [6.0.4] 2023-08-18
 

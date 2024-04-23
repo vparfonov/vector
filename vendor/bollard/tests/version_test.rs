@@ -20,6 +20,7 @@ fn test_version_named_pipe() {
 
 #[cfg(all(unix, not(feature = "test_http")))]
 #[test]
+#[allow(clippy::redundant_closure_call)]
 fn test_version_unix() {
     rt_exec!(
         Docker::connect_with_unix_defaults().unwrap().version(),
@@ -74,4 +75,19 @@ fn test_downversioning() {
         assert_eq!(docker.client_version().to_string(), "1.24".to_string());
     };
     rt.block_on(fut);
+}
+
+#[test]
+#[allow(clippy::redundant_closure_call)]
+fn test_connect_with_defaults() {
+    #[cfg(unix)]
+    rt_exec!(
+        Docker::connect_with_defaults().unwrap().version(),
+        |version: Version| assert_eq!(version.os.unwrap(), "linux")
+    );
+    #[cfg(windows)]
+    rt_exec!(
+        Docker::connect_with_defaults().unwrap().version(),
+        |version: Version| assert_eq!(version.os.unwrap(), "windows")
+    )
 }

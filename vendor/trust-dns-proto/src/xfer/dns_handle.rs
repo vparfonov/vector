@@ -9,12 +9,12 @@
 use std::error::Error;
 
 use futures_util::stream::Stream;
+use log::debug;
 use rand;
-use tracing::debug;
 
+use crate::error::*;
 use crate::op::{Message, MessageType, OpCode, Query};
 use crate::xfer::{DnsRequest, DnsRequestOptions, DnsResponse, SerialMessage};
-use crate::{error::*, op::Edns};
 
 // TODO: this should be configurable
 // > An EDNS buffer size of 1232 bytes will avoid fragmentation on nearly all current networks.
@@ -34,7 +34,7 @@ pub trait DnsHandle: 'static + Clone + Send + Sync + Unpin {
     /// Error of the response, generally this will be `ProtoError`
     type Error: From<ProtoError> + Error + Clone + Send + Unpin + 'static;
 
-    /// Only returns true if and only if this DNS handle is validating DNSSEC.
+    /// Only returns true if and only if this DNS handle is validating DNSSec.
     ///
     /// If the DnsHandle impl is wrapping other clients, then the correct option is to delegate the question to the wrapped client.
     fn is_verifying_dnssec(&self) -> bool {
@@ -80,13 +80,12 @@ fn build_message(query: Query, options: DnsRequestOptions) -> Message {
         .set_id(id)
         .set_message_type(MessageType::Query)
         .set_op_code(OpCode::Query)
-        .set_recursion_desired(options.recursion_desired);
+        .set_recursion_desired(true);
 
     // Extended dns
     if options.use_edns {
         message
-            .extensions_mut()
-            .get_or_insert_with(Edns::new)
+            .edns_mut()
             .set_max_payload(MAX_PAYLOAD_LEN)
             .set_version(0);
     }

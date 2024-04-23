@@ -15,6 +15,7 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::fmt::Write;
@@ -22,11 +23,10 @@ use std::time::Duration;
 
 use backon::ExponentialBuilder;
 use backon::Retryable;
-use bytes::Bytes;
-use bytes::BytesMut;
 use http::header::CONTENT_LENGTH;
 use http::header::CONTENT_RANGE;
 use http::header::CONTENT_TYPE;
+use http::header::HOST;
 use http::header::IF_MATCH;
 use http::header::IF_NONE_MATCH;
 use http::Request;
@@ -37,6 +37,8 @@ use reqsign::GoogleCredentialLoader;
 use reqsign::GoogleSigner;
 use reqsign::GoogleToken;
 use reqsign::GoogleTokenLoader;
+use serde::Deserialize;
+use serde_json::json;
 
 use super::uri::percent_encode_path;
 use crate::raw::*;
@@ -54,8 +56,6 @@ pub struct GcsCore {
 
     pub predefined_acl: Option<String>,
     pub default_storage_class: Option<String>,
-
-    pub write_fixed_size: usize,
 }
 
 impl Debug for GcsCore {
@@ -107,7 +107,19 @@ impl GcsCore {
     pub async fn sign<T>(&self, req: &mut Request<T>) -> Result<()> {
         let cred = self.load_token().await?;
 
-        self.signer.sign(req, &cred).map_err(new_request_sign_error)
+        self.signer
+            .sign(req, &cred)
+            .map_err(new_request_sign_error)?;
+
+        // Always remove host header, let users' client to set it based on HTTP
+        // version.
+        //
+        // As discussed in <https://github.com/seanmonstar/reqwest/issues/1809>,
+        // google server could send RST_STREAM of PROTOCOL_ERROR if our request
+        // contains host header.
+        req.headers_mut().remove(HOST);
+
+        Ok(())
     }
 
     pub async fn sign_query<T>(&self, req: &mut Request<T>, duration: Duration) -> Result<()> {
@@ -115,7 +127,17 @@ impl GcsCore {
 
         self.signer
             .sign_query(req, duration, &cred)
-            .map_err(new_request_sign_error)
+            .map_err(new_request_sign_error)?;
+
+        // Always remove host header, let users' client to set it based on HTTP
+        // version.
+        //
+        // As discussed in <https://github.com/seanmonstar/reqwest/issues/1809>,
+        // google server could send RST_STREAM of PROTOCOL_ERROR if our request
+        // contains host header.
+        req.headers_mut().remove(HOST);
+
+        Ok(())
     }
 
     #[inline]
@@ -125,13 +147,7 @@ impl GcsCore {
 }
 
 impl GcsCore {
-    pub fn gcs_get_object_request(
-        &self,
-        path: &str,
-        range: BytesRange,
-        if_match: Option<&str>,
-        if_none_match: Option<&str>,
-    ) -> Result<Request<AsyncBody>> {
+    pub fn gcs_get_object_request(&self, path: &str, args: &OpRead) -> Result<Request<AsyncBody>> {
         let p = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -143,14 +159,14 @@ impl GcsCore {
 
         let mut req = Request::get(&url);
 
-        if let Some(if_match) = if_match {
+        if let Some(if_match) = args.if_match() {
             req = req.header(IF_MATCH, if_match);
         }
-        if let Some(if_none_match) = if_none_match {
+        if let Some(if_none_match) = args.if_none_match() {
             req = req.header(IF_NONE_MATCH, if_none_match);
         }
-        if !range.is_full() {
-            req = req.header(http::header::RANGE, range.to_header());
+        if !args.range().is_full() {
+            req = req.header(http::header::RANGE, args.range().to_header());
         }
 
         let req = req
@@ -164,9 +180,7 @@ impl GcsCore {
     pub fn gcs_get_object_xml_request(
         &self,
         path: &str,
-        range: BytesRange,
-        if_match: Option<&str>,
-        if_none_match: Option<&str>,
+        args: &OpRead,
     ) -> Result<Request<AsyncBody>> {
         let p = build_abs_path(&self.root, path);
 
@@ -174,14 +188,14 @@ impl GcsCore {
 
         let mut req = Request::get(&url);
 
-        if let Some(if_match) = if_match {
+        if let Some(if_match) = args.if_match() {
             req = req.header(IF_MATCH, if_match);
         }
-        if let Some(if_none_match) = if_none_match {
+        if let Some(if_none_match) = args.if_none_match() {
             req = req.header(IF_NONE_MATCH, if_none_match);
         }
-        if !range.is_full() {
-            req = req.header(http::header::RANGE, range.to_header());
+        if !args.range().is_full() {
+            req = req.header(http::header::RANGE, args.range().to_header());
         }
 
         let req = req
@@ -194,11 +208,9 @@ impl GcsCore {
     pub async fn gcs_get_object(
         &self,
         path: &str,
-        range: BytesRange,
-        if_match: Option<&str>,
-        if_none_match: Option<&str>,
+        args: &OpRead,
     ) -> Result<Response<IncomingAsyncBody>> {
-        let mut req = self.gcs_get_object_request(path, range, if_match, if_none_match)?;
+        let mut req = self.gcs_get_object_request(path, args)?;
 
         self.sign(&mut req).await?;
         self.send(req).await
@@ -208,19 +220,27 @@ impl GcsCore {
         &self,
         path: &str,
         size: Option<u64>,
-        content_type: Option<&str>,
+        op: &OpWrite,
         body: AsyncBody,
     ) -> Result<Request<AsyncBody>> {
         let p = build_abs_path(&self.root, path);
+
+        let mut metadata = HashMap::new();
+        if let Some(storage_class) = &self.default_storage_class {
+            metadata.insert("storageClass", storage_class.as_str());
+        }
+        if let Some(cache_control) = op.cache_control() {
+            metadata.insert("cacheControl", cache_control);
+        }
 
         let mut url = format!(
             "{}/upload/storage/v1/b/{}/o?uploadType={}&name={}",
             self.endpoint,
             self.bucket,
-            if self.default_storage_class.is_some() {
-                "multipart"
-            } else {
+            if metadata.is_empty() {
                 "media"
+            } else {
+                "multipart"
             },
             percent_encode_path(&p)
         );
@@ -233,36 +253,52 @@ impl GcsCore {
 
         req = req.header(CONTENT_LENGTH, size.unwrap_or_default());
 
-        if let Some(storage_class) = &self.default_storage_class {
-            req = req.header(CONTENT_TYPE, "multipart/related; boundary=my-boundary");
-
-            let mut req_body = BytesMut::with_capacity(100);
-            write!(
-                &mut req_body,
-                "--my-boundary\nContent-Type: application/json; charset=UTF-8\n\n{{\"storageClass\": \"{}\"}}\n\n--my-boundary\n",
-                storage_class
-            ).unwrap();
-
-            if let Some(mime) = content_type {
-                write!(&mut req_body, "Content-Type: {}\n\n", mime).unwrap();
-            } else {
-                write!(&mut req_body, "Content-Type: application/octet-stream\n\n").unwrap();
-            }
-
-            if let AsyncBody::Bytes(bytes) = body {
-                req_body.extend_from_slice(&bytes);
-            }
-            write!(&mut req_body, "\n--my-boundary").unwrap();
-
-            let req_body = AsyncBody::Bytes(req_body.freeze());
-            let req = req.body(req_body).map_err(new_request_build_error)?;
-            Ok(req)
-        } else {
-            if let Some(content_type) = content_type {
+        if metadata.is_empty() {
+            if let Some(content_type) = op.content_type() {
                 req = req.header(CONTENT_TYPE, content_type);
             }
 
             let req = req.body(body).map_err(new_request_build_error)?;
+            Ok(req)
+        } else {
+            let mut multipart = Multipart::new();
+
+            multipart = multipart.part(
+                FormDataPart::new("metadata")
+                    .header(
+                        CONTENT_TYPE,
+                        "application/json; charset=UTF-8".parse().unwrap(),
+                    )
+                    .content(json!(metadata).to_string()),
+            );
+
+            let mut media_part = FormDataPart::new("media");
+
+            if let Some(content_type) = op.content_type() {
+                media_part = media_part.header(
+                    CONTENT_TYPE,
+                    content_type
+                        .parse()
+                        .map_err(|_| Error::new(ErrorKind::Unexpected, "invalid header value"))?,
+                );
+            }
+
+            match body {
+                AsyncBody::Empty => {}
+                AsyncBody::Bytes(bytes) => {
+                    media_part = media_part.content(bytes);
+                }
+                AsyncBody::ChunkedBytes(bs) => {
+                    media_part = media_part.stream(bs.len() as u64, Box::new(bs));
+                }
+                AsyncBody::Stream(stream) => {
+                    media_part = media_part.stream(size.unwrap(), stream);
+                }
+            }
+
+            multipart = multipart.part(media_part);
+
+            let req = multipart.apply(Request::post(url))?;
             Ok(req)
         }
     }
@@ -271,7 +307,7 @@ impl GcsCore {
     pub fn gcs_insert_object_xml_request(
         &self,
         path: &str,
-        content_type: Option<&str>,
+        args: &OpWrite,
         body: AsyncBody,
     ) -> Result<Request<AsyncBody>> {
         let p = build_abs_path(&self.root, path);
@@ -280,7 +316,7 @@ impl GcsCore {
 
         let mut req = Request::put(&url);
 
-        if let Some(content_type) = content_type {
+        if let Some(content_type) = args.content_type() {
             req = req.header(CONTENT_TYPE, content_type);
         }
 
@@ -297,12 +333,7 @@ impl GcsCore {
         Ok(req)
     }
 
-    pub fn gcs_head_object_request(
-        &self,
-        path: &str,
-        if_match: Option<&str>,
-        if_none_match: Option<&str>,
-    ) -> Result<Request<AsyncBody>> {
+    pub fn gcs_head_object_request(&self, path: &str, args: &OpStat) -> Result<Request<AsyncBody>> {
         let p = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -314,11 +345,11 @@ impl GcsCore {
 
         let mut req = Request::get(&url);
 
-        if let Some(if_none_match) = if_none_match {
+        if let Some(if_none_match) = args.if_none_match() {
             req = req.header(IF_NONE_MATCH, if_none_match);
         }
 
-        if let Some(if_match) = if_match {
+        if let Some(if_match) = args.if_match() {
             req = req.header(IF_MATCH, if_match);
         }
 
@@ -333,8 +364,7 @@ impl GcsCore {
     pub fn gcs_head_object_xml_request(
         &self,
         path: &str,
-        if_match: Option<&str>,
-        if_none_match: Option<&str>,
+        args: &OpStat,
     ) -> Result<Request<AsyncBody>> {
         let p = build_abs_path(&self.root, path);
 
@@ -342,11 +372,11 @@ impl GcsCore {
 
         let mut req = Request::head(&url);
 
-        if let Some(if_none_match) = if_none_match {
+        if let Some(if_none_match) = args.if_none_match() {
             req = req.header(IF_NONE_MATCH, if_none_match);
         }
 
-        if let Some(if_match) = if_match {
+        if let Some(if_match) = args.if_match() {
             req = req.header(IF_MATCH, if_match);
         }
 
@@ -360,10 +390,9 @@ impl GcsCore {
     pub async fn gcs_get_object_metadata(
         &self,
         path: &str,
-        if_match: Option<&str>,
-        if_none_match: Option<&str>,
+        args: &OpStat,
     ) -> Result<Response<IncomingAsyncBody>> {
-        let mut req = self.gcs_head_object_request(path, if_match, if_none_match)?;
+        let mut req = self.gcs_head_object_request(path, args)?;
 
         self.sign(&mut req).await?;
 
@@ -513,21 +542,11 @@ impl GcsCore {
         location: &str,
         size: u64,
         written: u64,
-        is_last_part: bool,
         body: AsyncBody,
     ) -> Result<Request<AsyncBody>> {
         let mut req = Request::put(location);
 
-        let range_header = if is_last_part {
-            format!(
-                "bytes {}-{}/{}",
-                written,
-                written + size - 1,
-                written + size
-            )
-        } else {
-            format!("bytes {}-{}/*", written, written + size - 1)
-        };
+        let range_header = format!("bytes {}-{}/*", written, written + size - 1);
 
         req = req
             .header(CONTENT_LENGTH, size)
@@ -542,22 +561,22 @@ impl GcsCore {
     pub async fn gcs_complete_resumable_upload(
         &self,
         location: &str,
-        written_bytes: u64,
-        bs: Bytes,
+        written: u64,
+        size: u64,
+        body: AsyncBody,
     ) -> Result<Response<IncomingAsyncBody>> {
-        let size = bs.len() as u64;
         let mut req = Request::post(location)
             .header(CONTENT_LENGTH, size)
             .header(
                 CONTENT_RANGE,
                 format!(
                     "bytes {}-{}/{}",
-                    written_bytes,
-                    written_bytes + size - 1,
-                    written_bytes + size
+                    written,
+                    written + size - 1,
+                    written + size
                 ),
             )
-            .body(AsyncBody::Bytes(bs))
+            .body(body)
             .map_err(new_request_build_error)?;
 
         self.sign(&mut req).await?;
@@ -577,5 +596,179 @@ impl GcsCore {
         self.sign(&mut req).await?;
 
         self.send(req).await
+    }
+}
+
+/// Response JSON from GCS list objects API.
+///
+/// refer to https://cloud.google.com/storage/docs/json_api/v1/objects/list for details
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ListResponse {
+    /// The continuation token.
+    ///
+    /// If this is the last page of results, then no continuation token is returned.
+    pub next_page_token: Option<String>,
+    /// Object name prefixes for objects that matched the listing request
+    /// but were excluded from [items] because of a delimiter.
+    pub prefixes: Vec<String>,
+    /// The list of objects, ordered lexicographically by name.
+    pub items: Vec<ListResponseItem>,
+}
+
+#[derive(Default, Debug, Eq, PartialEq, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct ListResponseItem {
+    pub name: String,
+    pub size: String,
+    // metadata
+    pub etag: String,
+    pub md5_hash: String,
+    pub updated: String,
+    pub content_type: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deserialize_list_response() {
+        let content = r#"
+    {
+  "kind": "storage#objects",
+  "prefixes": [
+    "dir/",
+    "test/"
+  ],
+  "items": [
+    {
+      "kind": "storage#object",
+      "id": "example/1.png/1660563214863653",
+      "selfLink": "https://www.googleapis.com/storage/v1/b/example/o/1.png",
+      "mediaLink": "https://content-storage.googleapis.com/download/storage/v1/b/example/o/1.png?generation=1660563214863653&alt=media",
+      "name": "1.png",
+      "bucket": "example",
+      "generation": "1660563214863653",
+      "metageneration": "1",
+      "contentType": "image/png",
+      "storageClass": "STANDARD",
+      "size": "56535",
+      "md5Hash": "fHcEH1vPwA6eTPqxuasXcg==",
+      "crc32c": "j/un9g==",
+      "etag": "CKWasoTgyPkCEAE=",
+      "timeCreated": "2022-08-15T11:33:34.866Z",
+      "updated": "2022-08-15T11:33:34.866Z",
+      "timeStorageClassUpdated": "2022-08-15T11:33:34.866Z"
+    },
+    {
+      "kind": "storage#object",
+      "id": "example/2.png/1660563214883337",
+      "selfLink": "https://www.googleapis.com/storage/v1/b/example/o/2.png",
+      "mediaLink": "https://content-storage.googleapis.com/download/storage/v1/b/example/o/2.png?generation=1660563214883337&alt=media",
+      "name": "2.png",
+      "bucket": "example",
+      "generation": "1660563214883337",
+      "metageneration": "1",
+      "contentType": "image/png",
+      "storageClass": "STANDARD",
+      "size": "45506",
+      "md5Hash": "e6LsGusU7pFJZk+114NV1g==",
+      "crc32c": "L00QAg==",
+      "etag": "CIm0s4TgyPkCEAE=",
+      "timeCreated": "2022-08-15T11:33:34.886Z",
+      "updated": "2022-08-15T11:33:34.886Z",
+      "timeStorageClassUpdated": "2022-08-15T11:33:34.886Z"
+    }
+  ]
+}
+    "#;
+
+        let output: ListResponse =
+            serde_json::from_str(content).expect("JSON deserialize must succeed");
+        assert!(output.next_page_token.is_none());
+        assert_eq!(output.items.len(), 2);
+        assert_eq!(output.items[0].name, "1.png");
+        assert_eq!(output.items[0].size, "56535");
+        assert_eq!(output.items[0].md5_hash, "fHcEH1vPwA6eTPqxuasXcg==");
+        assert_eq!(output.items[0].etag, "CKWasoTgyPkCEAE=");
+        assert_eq!(output.items[0].updated, "2022-08-15T11:33:34.866Z");
+        assert_eq!(output.items[1].name, "2.png");
+        assert_eq!(output.items[1].size, "45506");
+        assert_eq!(output.items[1].md5_hash, "e6LsGusU7pFJZk+114NV1g==");
+        assert_eq!(output.items[1].etag, "CIm0s4TgyPkCEAE=");
+        assert_eq!(output.items[1].updated, "2022-08-15T11:33:34.886Z");
+        assert_eq!(output.items[1].content_type, "image/png");
+        assert_eq!(output.prefixes, vec!["dir/", "test/"])
+    }
+
+    #[test]
+    fn test_deserialize_list_response_with_next_page_token() {
+        let content = r#"
+    {
+  "kind": "storage#objects",
+  "prefixes": [
+    "dir/",
+    "test/"
+  ],
+  "nextPageToken": "CgYxMC5wbmc=",
+  "items": [
+    {
+      "kind": "storage#object",
+      "id": "example/1.png/1660563214863653",
+      "selfLink": "https://www.googleapis.com/storage/v1/b/example/o/1.png",
+      "mediaLink": "https://content-storage.googleapis.com/download/storage/v1/b/example/o/1.png?generation=1660563214863653&alt=media",
+      "name": "1.png",
+      "bucket": "example",
+      "generation": "1660563214863653",
+      "metageneration": "1",
+      "contentType": "image/png",
+      "storageClass": "STANDARD",
+      "size": "56535",
+      "md5Hash": "fHcEH1vPwA6eTPqxuasXcg==",
+      "crc32c": "j/un9g==",
+      "etag": "CKWasoTgyPkCEAE=",
+      "timeCreated": "2022-08-15T11:33:34.866Z",
+      "updated": "2022-08-15T11:33:34.866Z",
+      "timeStorageClassUpdated": "2022-08-15T11:33:34.866Z"
+    },
+    {
+      "kind": "storage#object",
+      "id": "example/2.png/1660563214883337",
+      "selfLink": "https://www.googleapis.com/storage/v1/b/example/o/2.png",
+      "mediaLink": "https://content-storage.googleapis.com/download/storage/v1/b/example/o/2.png?generation=1660563214883337&alt=media",
+      "name": "2.png",
+      "bucket": "example",
+      "generation": "1660563214883337",
+      "metageneration": "1",
+      "contentType": "image/png",
+      "storageClass": "STANDARD",
+      "size": "45506",
+      "md5Hash": "e6LsGusU7pFJZk+114NV1g==",
+      "crc32c": "L00QAg==",
+      "etag": "CIm0s4TgyPkCEAE=",
+      "timeCreated": "2022-08-15T11:33:34.886Z",
+      "updated": "2022-08-15T11:33:34.886Z",
+      "timeStorageClassUpdated": "2022-08-15T11:33:34.886Z"
+    }
+  ]
+}
+    "#;
+
+        let output: ListResponse =
+            serde_json::from_str(content).expect("JSON deserialize must succeed");
+        assert_eq!(output.next_page_token, Some("CgYxMC5wbmc=".to_string()));
+        assert_eq!(output.items.len(), 2);
+        assert_eq!(output.items[0].name, "1.png");
+        assert_eq!(output.items[0].size, "56535");
+        assert_eq!(output.items[0].md5_hash, "fHcEH1vPwA6eTPqxuasXcg==");
+        assert_eq!(output.items[0].etag, "CKWasoTgyPkCEAE=");
+        assert_eq!(output.items[0].updated, "2022-08-15T11:33:34.866Z");
+        assert_eq!(output.items[1].name, "2.png");
+        assert_eq!(output.items[1].size, "45506");
+        assert_eq!(output.items[1].md5_hash, "e6LsGusU7pFJZk+114NV1g==");
+        assert_eq!(output.items[1].etag, "CIm0s4TgyPkCEAE=");
+        assert_eq!(output.items[1].updated, "2022-08-15T11:33:34.886Z");
+        assert_eq!(output.prefixes, vec!["dir/", "test/"])
     }
 }

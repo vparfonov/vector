@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "async-recursion"
-version = "1.0.5"
+version = "1.1.0"
 authors = ["Robert Usher <266585+dcchut@users.noreply.github.com>"]
 description = "Recursion for async functions"
 documentation = "https://docs.rs/async-recursion"
@@ -35,15 +35,15 @@ default-features = false
 version = "2.0"
 features = [
     "full",
-    "parsing",
-    "printing",
-    "proc-macro",
-    "clone-impls",
+    "visit-mut",
 ]
 default-features = false
 
 [dev-dependencies.futures-executor]
 version = "0.3"
+
+[dev-dependencies.macrotest]
+version = "1.0"
 
 [dev-dependencies.trybuild]
 version = "1.0"

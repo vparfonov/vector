@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "arc-swap"
-version = "1.6.0"
+version = "1.7.0"
 authors = ["Michal 'vorner' Vaner <vorner@vorner.cz>"]
 description = "Atomically swappable Arc"
 documentation = "https://docs.rs/arc-swap"
@@ -32,7 +32,7 @@ repository = "https://github.com/vorner/arc-swap"
 all-features = true
 
 [profile.bench]
-debug = true
+debug = 2
 
 [[bench]]
 name = "background"
@@ -55,13 +55,13 @@ optional = true
 version = "~1"
 
 [dev-dependencies.criterion]
-version = "~0.4"
+version = "~0.5"
 
 [dev-dependencies.crossbeam-utils]
 version = "~0.8"
 
 [dev-dependencies.itertools]
-version = "0.10"
+version = "0.12"
 
 [dev-dependencies.num_cpus]
 version = "~1"
@@ -83,6 +83,7 @@ version = "1.0.130"
 
 [features]
 experimental-strategies = []
+experimental-thread-local = []
 internal-test-strategies = []
 weak = []
 

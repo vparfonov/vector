@@ -11,7 +11,7 @@ use std::str::FromStr;
 
 use http::header::{ACCEPT, CONTENT_LENGTH, CONTENT_TYPE};
 use http::{header, uri, Request, Uri, Version};
-use tracing::debug;
+use log::debug;
 
 use crate::error::ProtoError;
 use crate::https::HttpsResult;
@@ -45,11 +45,11 @@ pub fn new(name_server_name: &str, message_len: usize) -> HttpsResult<Request<()
     parts.scheme = Some(uri::Scheme::HTTPS);
     parts.authority = Some(
         uri::Authority::from_str(name_server_name)
-            .map_err(|e| ProtoError::from(format!("invalid authority: {e}")))?,
+            .map_err(|e| ProtoError::from(format!("invalid authority: {}", e)))?,
     );
 
     let url =
-        Uri::from_parts(parts).map_err(|e| ProtoError::from(format!("uri parse error: {e}")))?;
+        Uri::from_parts(parts).map_err(|e| ProtoError::from(format!("uri parse error: {}", e)))?;
 
     // TODO: add user agent to TypedHeaders
     let request = Request::builder()
@@ -60,13 +60,13 @@ pub fn new(name_server_name: &str, message_len: usize) -> HttpsResult<Request<()
         .header(ACCEPT, crate::https::MIME_APPLICATION_DNS)
         .header(CONTENT_LENGTH, message_len)
         .body(())
-        .map_err(|e| ProtoError::from(format!("h2 stream errored: {e}")))?;
+        .map_err(|e| ProtoError::from(format!("h2 stream errored: {}", e)))?;
 
     Ok(request)
 }
 
 /// Verifies the request is something we know what to deal with
-pub fn verify<T>(name_server: Option<&str>, request: &Request<T>) -> HttpsResult<()> {
+pub fn verify<T>(name_server: &str, request: &Request<T>) -> HttpsResult<()> {
     // Verify all HTTP parameters
     let uri = request.uri();
 
@@ -86,14 +86,12 @@ pub fn verify<T>(name_server: Option<&str>, request: &Request<T>) -> HttpsResult
     }
 
     // the authority must match our nameserver name
-    if let Some(name_server) = name_server {
-        if let Some(authority) = uri.authority() {
-            if authority.host() != name_server {
-                return Err("incorrect authority".into());
-            }
-        } else {
-            return Err("no authority in HTTPS request".into());
+    if let Some(authority) = uri.authority() {
+        if authority.host() != name_server {
+            return Err("incorrect authority".into());
         }
+    } else {
+        return Err("no authority in HTTPS request".into());
     }
 
     // TODO: switch to mime::APPLICATION_DNS when that stabilizes
@@ -152,6 +150,6 @@ mod tests {
     #[test]
     fn test_new_verify() {
         let request = new("ns.example.com", 512).expect("error converting to http");
-        assert!(verify(Some("ns.example.com"), &request).is_ok());
+        assert!(verify("ns.example.com", &request).is_ok());
     }
 }

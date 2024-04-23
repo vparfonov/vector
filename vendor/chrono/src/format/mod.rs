@@ -30,7 +30,7 @@
 //! # Ok::<(), chrono::ParseError>(())
 //! ```
 
-#[cfg(feature = "alloc")]
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
 use alloc::boxed::Box;
 use core::fmt;
 use core::str::FromStr;
@@ -48,27 +48,22 @@ pub(crate) mod scan;
 
 pub mod strftime;
 
-#[cfg(any(feature = "alloc", feature = "std"))]
+#[allow(unused)]
+// TODO: remove '#[allow(unused)]' once we use this module for parsing or something else that does
+// not require `alloc`.
 pub(crate) mod locales;
 
 pub(crate) use formatting::write_hundreds;
-#[cfg(any(feature = "alloc", feature = "std"))]
+#[cfg(feature = "alloc")]
 pub(crate) use formatting::write_rfc2822;
-#[cfg(any(
-    feature = "alloc",
-    feature = "std",
-    feature = "serde",
-    feature = "rustc-serialize"
-))]
+#[cfg(any(feature = "alloc", feature = "serde", feature = "rustc-serialize"))]
 pub(crate) use formatting::write_rfc3339;
-#[cfg(any(feature = "alloc", feature = "std"))]
+pub use formatting::SecondsFormat;
+#[cfg(feature = "alloc")]
+#[allow(deprecated)]
 pub use formatting::{format, format_item, DelayedFormat};
 #[cfg(feature = "unstable-locales")]
-pub use formatting::{format_item_localized, format_localized};
-#[cfg(all(feature = "unstable-locales", any(feature = "alloc", feature = "std")))]
 pub use locales::Locale;
-#[cfg(all(not(feature = "unstable-locales"), any(feature = "alloc", feature = "std")))]
-pub(crate) use locales::Locale;
 pub(crate) use parse::parse_rfc3339;
 pub use parse::{parse, parse_and_remainder};
 pub use parsed::Parsed;
@@ -332,14 +327,12 @@ pub enum Item<'a> {
     /// A literally printed and parsed text.
     Literal(&'a str),
     /// Same as `Literal` but with the string owned by the item.
-    #[cfg(any(feature = "alloc", feature = "std"))]
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "alloc", feature = "std"))))]
+    #[cfg(feature = "alloc")]
     OwnedLiteral(Box<str>),
     /// Whitespace. Prints literally but reads zero or more whitespace.
     Space(&'a str),
     /// Same as `Space` but with the string owned by the item.
-    #[cfg(any(feature = "alloc", feature = "std"))]
-    #[cfg_attr(docsrs, doc(cfg(any(feature = "alloc", feature = "std"))))]
+    #[cfg(feature = "alloc")]
     OwnedSpace(Box<str>),
     /// Numeric item. Can be optionally padded to the maximal length (if any) when formatting;
     /// the parser simply ignores any padded whitespace and zeroes.
@@ -368,6 +361,22 @@ const fn fixed(fixed: Fixed) -> Item<'static> {
 
 const fn internal_fixed(val: InternalInternal) -> Item<'static> {
     Item::Fixed(Fixed::Internal(InternalFixed { val }))
+}
+
+impl<'a> Item<'a> {
+    /// Convert items that contain a reference to the format string into an owned variant.
+    #[cfg(any(feature = "alloc", feature = "std"))]
+    pub fn to_owned(self) -> Item<'static> {
+        match self {
+            Item::Literal(s) => Item::OwnedLiteral(Box::from(s)),
+            Item::Space(s) => Item::OwnedSpace(Box::from(s)),
+            Item::Numeric(n, p) => Item::Numeric(n, p),
+            Item::Fixed(f) => Item::Fixed(f),
+            Item::OwnedLiteral(l) => Item::OwnedLiteral(l),
+            Item::OwnedSpace(s) => Item::OwnedSpace(s),
+            Item::Error => Item::Error,
+        }
+    }
 }
 
 /// An error from the `parse` function.
@@ -437,7 +446,6 @@ impl fmt::Display for ParseError {
 }
 
 #[cfg(feature = "std")]
-#[cfg_attr(docsrs, doc(cfg(feature = "std")))]
 impl Error for ParseError {
     #[allow(deprecated)]
     fn description(&self) -> &str {

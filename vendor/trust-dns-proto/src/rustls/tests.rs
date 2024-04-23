@@ -88,14 +88,14 @@ fn tls_client_stream_test(server_addr: IpAddr, mtls: bool) {
         .unwrap();
 
     let server_path = env::var("TDNS_WORKSPACE_ROOT").unwrap_or_else(|_| "../..".to_owned());
-    println!("using server src path: {server_path}");
+    println!("using server src path: {}", server_path);
 
-    let root_cert_der = read_file(&format!("{server_path}/tests/test-data/ca.der"));
+    let root_cert_der = read_file(&format!("{}/tests/test-data/ca.der", server_path));
     let root_cert_der_copy = root_cert_der.clone();
 
     // Generate X509 certificate
     let dns_name = "ns.example.com";
-    let server_pkcs12_der = read_file(&format!("{server_path}/tests/test-data/cert.p12"));
+    let server_pkcs12_der = read_file(&format!("{}/tests/test-data/cert.p12", server_path));
 
     // TODO: need a timeout on listen
     let server = std::net::TcpListener::bind(SocketAddr::new(server_addr, 0)).unwrap();
@@ -107,19 +107,17 @@ fn tls_client_stream_test(server_addr: IpAddr, mtls: bool) {
         .name("test_tls_client_stream:server".to_string())
         .spawn(move || {
             let pkcs12 = Pkcs12::from_der(&server_pkcs12_der)
-                .and_then(|p| p.parse2("mypass"))
+                .and_then(|p| p.parse("mypass"))
                 .expect("Pkcs12::from_der");
             let mut tls =
                 SslAcceptor::mozilla_modern(SslMethod::tls()).expect("mozilla_modern failed");
-            if let Some(pkey) = pkcs12.pkey.as_ref() {
-                tls.set_private_key(pkey).expect("failed to associated key");
-            }
-            if let Some(cert) = &pkcs12.cert {
-                tls.set_certificate(cert)
-                    .expect("failed to associated cert");
-            }
 
-            if let Some(ref chain) = pkcs12.ca {
+            tls.set_private_key(&pkcs12.pkey)
+                .expect("failed to associated key");
+            tls.set_certificate(&pkcs12.cert)
+                .expect("failed to associated cert");
+
+            if let Some(ref chain) = pkcs12.chain {
                 for cert in chain {
                     tls.add_extra_chain_cert(cert.to_owned())
                         .expect("failed to add chain");

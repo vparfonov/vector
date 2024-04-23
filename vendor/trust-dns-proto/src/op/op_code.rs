@@ -47,10 +47,10 @@ pub enum OpCode {
 impl fmt::Display for OpCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         let s = match self {
-            Self::Query => "QUERY",
-            Self::Status => "STATUS",
-            Self::Notify => "NOTIFY",
-            Self::Update => "UPDATE",
+            OpCode::Query => "QUERY",
+            OpCode::Status => "STATUS",
+            OpCode::Notify => "NOTIFY",
+            OpCode::Update => "UPDATE",
         };
 
         f.write_str(s)
@@ -60,6 +60,7 @@ impl fmt::Display for OpCode {
 /// Convert from `OpCode` to `u8`
 ///
 /// ```
+/// use std::convert::From;
 /// use trust_dns_proto::op::op_code::OpCode;
 ///
 /// let var: u8 = From::from(OpCode::Query);
@@ -85,6 +86,7 @@ impl From<OpCode> for u8 {
 /// Convert from `u8` to `OpCode`
 ///
 /// ```
+/// use std::convert::From;
 /// use trust_dns_proto::op::op_code::OpCode;
 ///
 /// let var: OpCode = OpCode::from_u8(0).unwrap();
@@ -98,7 +100,7 @@ impl OpCode {
             2 => Ok(Self::Status),
             4 => Ok(Self::Notify),
             5 => Ok(Self::Update),
-            _ => Err(format!("unknown OpCode: {value}").into()),
+            _ => Err(format!("unknown OpCode: {}", value).into()),
         }
     }
 }

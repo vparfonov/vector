@@ -13,6 +13,8 @@ use wasm_bindgen_test::wasm_bindgen_test;
 
 const SERIALIZER: Serializer = Serializer::new();
 
+const JSON_SERIALIZER: Serializer = Serializer::json_compatible();
+
 const BIGINT_SERIALIZER: Serializer =
     Serializer::new().serialize_large_number_types_as_bigints(true);
 
@@ -647,6 +649,30 @@ fn enums() {
 }
 
 #[wasm_bindgen_test]
+fn serde_json_value_with_json() {
+    test_via_round_trip_with_config(
+        serde_json::from_str::<serde_json::Value>("[0, \"foo\"]").unwrap(),
+        &JSON_SERIALIZER,
+    );
+    test_via_round_trip_with_config(
+        serde_json::from_str::<serde_json::Value>(r#"{"foo": "bar"}"#).unwrap(),
+        &JSON_SERIALIZER,
+    );
+}
+
+#[wasm_bindgen_test]
+fn serde_json_value_with_default() {
+    test_via_round_trip_with_config(
+        serde_json::from_str::<serde_json::Value>("[0, \"foo\"]").unwrap(),
+        &SERIALIZER,
+    );
+    test_via_round_trip_with_config(
+        serde_json::from_str::<serde_json::Value>(r#"{"foo": "bar"}"#).unwrap(),
+        &SERIALIZER,
+    );
+}
+
+#[wasm_bindgen_test]
 fn preserved_value() {
     #[derive(serde::Deserialize, serde::Serialize, PartialEq, Clone, Debug)]
     #[serde(bound = "T: JsCast")]
@@ -718,7 +744,7 @@ fn sequences() {
     test_via_json((100, "xyz".to_string(), true));
 
     // Sets are currently indistinguishable from other sequences for
-    // Serde serialisers, so this will become an array on the JS side.
+    // Serde serializers, so this will become an array on the JS side.
     test_via_json(hashset! {false, true});
 }
 
@@ -854,4 +880,16 @@ fn serde_default_fields() {
 
     // Check that it parses successfully despite the missing field.
     let _struct: Struct = from_value(obj).unwrap();
+}
+
+#[wasm_bindgen_test]
+fn field_aliases() {
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct Struct {
+        #[serde(alias = "b")]
+        a: i32,
+        c: i32,
+    }
+
+    test_via_round_trip_with_config(Struct { a: 42, c: 84 }, &SERIALIZER);
 }

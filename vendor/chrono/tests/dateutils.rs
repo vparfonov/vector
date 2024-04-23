@@ -94,7 +94,7 @@ fn try_verify_against_date_command() {
             let end = NaiveDate::from_ymd_opt(*year + 1, 1, 1).unwrap().and_time(NaiveTime::MIN);
             while date <= end {
                 verify_against_date_command_local(DATE_PATH, date);
-                date += chrono::Duration::hours(1);
+                date += chrono::TimeDelta::hours(1);
             }
         }));
     }
@@ -121,6 +121,7 @@ fn verify_against_date_command_format_local(path: &'static str, dt: NaiveDateTim
 
     let output = process::Command::new(path)
         .env("LANG", "c")
+        .env("LC_ALL", "c")
         .arg("-d")
         .arg(format!(
             "{}-{:02}-{:02} {:02}:{:02}:{:02}",
@@ -156,6 +157,6 @@ fn try_verify_against_date_command_format() {
     let mut date = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap().and_hms_opt(12, 11, 13).unwrap();
     while date.year() < 2008 {
         verify_against_date_command_format_local(DATE_PATH, date);
-        date += chrono::Duration::days(55);
+        date += chrono::TimeDelta::days(55);
     }
 }

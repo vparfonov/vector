@@ -274,10 +274,8 @@ impl Display for Query {
         {
             write!(
                 f,
-                "{name} {class} {ty}",
-                name = self.name,
-                class = self.query_class,
-                ty = self.query_type,
+                "name: {} type: {} class: {}",
+                self.name, self.query_type, self.query_class
             )
         }
 
@@ -285,11 +283,8 @@ impl Display for Query {
         {
             write!(
                 f,
-                "{name} {class} {ty}; mdns_unicast_response: {mdns}",
-                name = self.name,
-                class = self.query_class,
-                ty = self.query_type,
-                mdns = self.mdns_unicast_response
+                "name: {} type: {} class: {} mdns_unicast_response: {}",
+                self.name, self.query_type, self.query_class, self.mdns_unicast_response
             )
         }
     }

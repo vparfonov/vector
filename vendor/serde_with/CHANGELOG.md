@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.7.0] - 2024-03-11
+
+### Added
+
+* Implement `JsonSchemaAs` for `EnumMap` by @swlynch99 (#697)
+* Implement `JsonSchemaAs` for `IfIsHumanReadable` by @swlynch99 (#717)
+* Implement `JsonSchemaAs` for `KeyValueMap` by @swlynch99 (#713)
+* Implement `JsonSchemaAs` for `OneOrMany` by @swlynch99 (#719)
+
+### Fixed
+
+* Detect conflicting `schema_with` attributes on fields with `schemars` annotations by @swlynch99 (#715)
+    This extends the existing avoidance mechanism to a new variant fixing #712.
+
+## [3.6.1] - 2024-02-08
+
+### Changed
+
+* Eliminate dependency on serde's "derive" feature by @dtolnay (#694)
+    This allows parallel compilation of `serde` and `serde_derive` which can speed up the wallclock time.
+    It requires that downstream crates do not use the "derive" feature either.
+
+## [3.6.0] - 2024-01-30
+
+### Added
+
+* Add `IfIsHumanReadable` for conditional implementation by @irriden (#690)
+    Used to specify different transformations for text-based and binary formats.
+* Add more `JsonSchemaAs` impls for all `Duration*` and `Timestamp*` adaptors by @swlynch99 (#685)
+
+### Changed
+
+* Bump MSRV to 1.65, since that is required for the `regex` dependency.
+
+## [3.5.1] - 2024-01-23
+
+### Fixed
+
+* The `serde_as` macro now better detects existing `schemars` attributes on fields and incorporates them (#682)
+    This avoids errors on existing `#[schemars(with = ...)]` annotations.
+
+## [3.5.0] - 2024-01-20
+
+### Added
+
+* Support for `schemars` integration added by @swlynch99 (#666)
+    The support uses a new `Schema` top-level item which implements `JsonSchema`
+    The `serde_as` macro can now detect `schemars` usage and emits matching annotations for all fields with `serde_as` attribute.
+    Many types of this crate come already with support for the `schemars`, but support is not complete and will be extended over time.
+
 ## [3.4.0] - 2023-10-17
 
 * Lower minimum required serde version to 1.0.152 (#653)
@@ -30,7 +80,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 * Generalize some trait bounds for `DeserializeAs` implementations
 
-    While working on #637 it came to light that some of the macros for generating `DeserializeAs` implementations were not as generic as they could.
+    While working on #637, it came to light that some macros for generating `DeserializeAs` implementations were not as generic as they could.
     This means they didn't work with custom hasher types, but only the default hashers.
     This has now been fixed and custom hashers should work better, as long as they implement `BuildHasher + Default`.
 
@@ -128,9 +178,9 @@ It only affects custom character sets used for base64 of which there are no inst
 
 * Undo the changes to the trait bound for `Seq`. (#570, #571)
     The new implementation caused issues with serialization formats that require the sequence length beforehand.
-    It also caused problems, that certain attributes which worked before no longer worked, due to mismatching number of references.
+    It also caused problems such as that certain attributes which worked before no longer worked, due to a mismatching number of references.
 
-    Thanks to  @stefunctional for reporting and for @stephaneyfx for providing a test case.
+    Thanks to @stefunctional for reporting and for @stephaneyfx for providing a test case.
 
 ## [2.3.0] - 2023-03-09
 
@@ -194,7 +244,7 @@ It only affects custom character sets used for base64 of which there are no inst
 ### Changed
 
 * Pin the `serde_with_macros` dependency to the same version as the main crate.
-    This simplifies publishing and ensures that always a compatible version is picked.
+    This simplifies publishing and ensures a compatible version is always picked.
 
 ### Fixed
 
@@ -277,7 +327,7 @@ However, tools consuming `Cargo.lock` or `cargo metadata` might give wrong resul
 ### Added
 
 * Make `JsonString<T>` smarter by allowing nesting `serde_as` definitions.
-    This allows applying custom serialization logic, before the value gets converted into a JSON string.
+    This allows applying custom serialization logic before the value gets converted into a JSON string.
 
     ```rust
     // Rust
@@ -315,7 +365,7 @@ However, tools consuming `Cargo.lock` or `cargo metadata` might give wrong resul
 
 ### Removed
 
-* Remove old module based conversions.
+* Remove old module-based conversions.
 
     The newer `serde_as` based conversions are preferred.
 
@@ -384,7 +434,7 @@ A diff of the lock-file makes it seem that `serde_with` depends on new crates, e
 
 ### Removed
 
-* Remove old module based conversions.
+* Remove old module-based conversions.
 
     The newer `serde_as` based conversions are preferred.
 
@@ -654,7 +704,7 @@ A diff of the lock-file makes it seem that `serde_with` depends on new crates, e
     cow_array: Cow<'a, [u8; 15]>,
     ```
 
-    Note: For borrowed arrays the used Deserializer needs to support Serde's 0-copy deserialization.
+    Note: For borrowed arrays, the used Deserializer needs to support Serde's 0-copy deserialization.
 
 ## [1.9.2] - 2021-06-07
 
@@ -788,7 +838,7 @@ A diff of the lock-file makes it seem that `serde_with` depends on new crates, e
 [serde-big-array-copy]: https://github.com/est31/serde-big-array/issues/6
 [serde-big-array-nested]: https://github.com/est31/serde-big-array/issues/7
 
-* Arrays with tuple elements can now be deserialized from  a map. ([#272])
+* Arrays with tuple elements can now be deserialized from a map. ([#272])
     This feature requires Rust 1.51+.
 
     ```rust
@@ -866,7 +916,7 @@ A diff of the lock-file makes it seem that `serde_with` depends on new crates, e
 ### Changed
 
 * Release `Sized` trait bound from `As`, `Same`, `SerializeAs`, and `SerializeAsWrap`.
-    Only the serialize part is relaxed.
+    Only the `serialize` part is relaxed.
 
 ## [1.6.0] - 2020-11-22
 
@@ -895,16 +945,16 @@ A diff of the lock-file makes it seem that `serde_with` depends on new crates, e
 ### Added
 
 * The largest addition to this release is the addition of the `serde_as` de/serialization scheme.
-    It's goal is it to be a more flexible replacement to serde's with-annotation, by being more composable than before.
+    Its goal is to be a more flexible replacement to serde's `with` annotation, by being more composable than before.
     No longer is it a problem to add a custom de/serialization adapter is the type is within an `Option` or a `Vec`.
 
     Thanks to `@markazmierczak` for the design of the trait without whom this wouldn't be possible.
 
     More details about this new scheme can be found in the also new [user guide](https://docs.rs/serde_with/1.5.0/serde_with/guide/index.html)
 * This release also features a detailed user guide.
-    The guide focusses more on how to use this crate by providing examples.
+    The guide focuses more on how to use this crate by providing examples.
     For example, it includes a section about the available feature flags of this crate and how you can migrate to the shiny new `serde_as` scheme.
-* The crate now features de/serialization adaptors for the std and chrono's `Duration` types. #56 #104
+* The crate now features de/serialization adaptors for the std and `chrono` `Duration` types. #56 #104
 * Add a `hex` module, which allows formatting bytes (i.e. `Vec<u8>`) as a hexadecimal string.
     The formatting supports different arguments how the formatting is happening.
 * Add two derive macros, `SerializeDisplay` and `DeserializeFromStr`, which implement the `Serialize`/`Deserialize` traits based on `Display` and `FromStr`.
@@ -916,11 +966,11 @@ A diff of the lock-file makes it seem that `serde_with` depends on new crates, e
     The functions simply pass through to the underlying `Serialize` implementation.
     This affects `sets_duplicate_value_is_error`, `maps_duplicate_key_is_error`, `maps_first_key_wins`, `default_on_error`, and `default_on_null`.
 * Added `sets_last_value_wins` as a replacement for `sets_first_value_wins` which is deprecated now.
-    The default behavior of serde is to prefer the first value of a set so the opposite is taking the last value.
+    The default behavior of serde is to prefer the first value of a set, so the opposite is taking the last value.
 * Added `#[serde_as]` compatible conversion methods for serializing durations and timestamps as numbers.
-    The four types `DurationSeconds`, `DurationSecondsWithFrac`, `TimestampSeconds`, `TimestampSecondsWithFrac` provide the serialization conversion with optional subsecond precision.
+    The four types `DurationSeconds`, `DurationSecondsWithFrac`, `TimestampSeconds`, `TimestampSecondsWithFrac` provide the serialization conversion with optional sub-second precision.
     There is support for `std::time::Duration`, `chrono::Duration`, `std::time::SystemTime` and `chrono::DateTime`.
-    Timestamps are serialized as a duration since the UNIX epoch.
+    Timestamps are serialized as durations since the UNIX epoch.
     The serialization can be customized.
     It supports multiple formats, such as `i64`, `f64`, or `String`, and the deserialization can be tweaked if it should be strict or lenient when accepting formats.
 
@@ -961,16 +1011,16 @@ A diff of the lock-file makes it seem that `serde_with` depends on new crates, e
 ### Added
 
 * The largest addition to this release is the addition of the `serde_as` de/serialization scheme.
-    It's goal is it to be a more flexible replacement to serde's with-annotation, by being more composable than before.
+    Its goal is to be a more flexible replacement to serde's with annotation, by being more composable than before.
     No longer is it a problem to add a custom de/serialization adapter is the type is within an `Option` or a `Vec`.
 
     Thanks to `@markazmierczak` for the design of the trait without whom this wouldn't be possible.
 
     More details about this new scheme can be found in the also new [user guide](https://docs.rs/serde_with/1.5.0-alpha.1/serde_with/guide/index.html)
 * This release also features a detailed user guide.
-    The guide focusses more on how to use this crate by providing examples.
+    The guide focuses more on how to use this crate by providing examples.
     For example, it includes a section about the available feature flags of this crate and how you can migrate to the shiny new `serde_as` scheme.
-* The crate now features de/serialization adaptors for the std and chrono's `Duration` types. #56 #104
+* The crate now features de/serialization adaptors for the std and `chrono`'s `Duration` types. #56 #104
 
 ### Changed
 
@@ -993,7 +1043,7 @@ A diff of the lock-file makes it seem that `serde_with` depends on new crates, e
 
 * Bump minimal Rust version to 1.36.0
     * Supports Rust Edition 2018
-    * version-sync depends on smallvec which requires 1.36
+    * version-sync depends on smallvec, which requires 1.36
 * Improved CI pipeline by running `cargo audit` and `tarpaulin` in all configurations now.
 
 ## [1.3.1] - 2019-04-09
@@ -1026,7 +1076,7 @@ A diff of the lock-file makes it seem that `serde_with` depends on new crates, e
 
 ### Added
 
-* Serialize HashMap/BTreeMap as list of tuples
+* Serialize HashMap/BTreeMap as a list of tuples
 
 ## [1.0.0] - 2019-01-17
 
@@ -1067,8 +1117,8 @@ A diff of the lock-file makes it seem that `serde_with` depends on new crates, e
 * Add deserialization helper for sets and maps, inspired by [comment](https://github.com/serde-rs/serde/issues/553#issuecomment-299711855)
     * Create an error if duplicate values for a set are detected
     * Create an error if duplicate keys for a map are detected
-    * Implement a first-value wins strategy for sets/maps. This is different to serde's default
-        which implements a last value wins strategy.
+    * Implement a "first value wins" strategy for sets/maps.
+      This is different to serde's default, which implements a "last value wins" strategy.
 
 ## [0.2.1] - 2018-06-05
 

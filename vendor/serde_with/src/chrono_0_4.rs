@@ -28,7 +28,7 @@ fn unix_epoch_naive() -> NaiveDateTime {
     NaiveDateTime::from_timestamp_opt(0, 0).unwrap()
 }
 
-/// Deserialize a Unix timestamp with optional subsecond precision into a `DateTime<Utc>`.
+/// Deserialize a Unix timestamp with optional sub-second precision into a `DateTime<Utc>`.
 ///
 /// The `DateTime<Utc>` can be serialized from an integer, a float, or a string representing a number.
 ///
@@ -46,6 +46,8 @@ fn unix_epoch_naive() -> NaiveDateTime {
 ///
 /// // Deserializes integers
 /// assert!(serde_json::from_str::<S>(r#"{ "date": 1478563200 }"#).is_ok());
+/// # // Ensure the date field is not dead code
+/// # assert_eq!(serde_json::from_str::<S>(r#"{ "date": 1478563200 }"#).unwrap().date.timestamp(), 1478563200);
 /// // floats
 /// assert!(serde_json::from_str::<S>(r#"{ "date": 1478563200.123 }"#).is_ok());
 /// // and strings with numbers, for high-precision values

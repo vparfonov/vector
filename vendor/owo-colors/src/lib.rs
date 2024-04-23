@@ -95,7 +95,7 @@ use core::fmt;
 use core::marker::PhantomData;
 
 /// A trait for describing a type which can be used with [`FgColorDisplay`](FgColorDisplay) or
-/// [`BgCBgColorDisplay`](BgColorDisplay)
+/// [`BgColorDisplay`](BgColorDisplay)
 pub trait Color {
     /// The ANSI format code for setting this color as the foreground
     const ANSI_FG: &'static str;
@@ -112,10 +112,10 @@ pub trait Color {
     const RAW_ANSI_BG: &'static str;
 
     #[doc(hidden)]
-    type DynEquivelant: DynColor;
+    type DynEquivalent: DynColor;
 
     #[doc(hidden)]
-    const DYN_EQUIVELANT: Self::DynEquivelant;
+    const DYN_EQUIVALENT: Self::DynEquivalent;
 
     #[doc(hidden)]
     fn into_dyncolors() -> crate::DynColors;
@@ -172,7 +172,7 @@ macro_rules! style_methods {
             #[$meta]
             #[must_use]
             #[inline(always)]
-            fn $name<'a>(&'a self) -> styles::$ty<'a, Self> {
+            fn $name(&self) -> styles::$ty<'_, Self> {
                 styles::$ty(self)
             }
          )*
@@ -189,14 +189,14 @@ macro_rules! color_methods {
             #[$fg_meta]
             #[must_use]
             #[inline(always)]
-            fn $fg_method<'a>(&'a self) -> FgColorDisplay<'a, colors::$color, Self> {
+            fn $fg_method(&self) -> FgColorDisplay<'_, colors::$color, Self> {
                 FgColorDisplay(self, PhantomData)
             }
 
             #[$bg_meta]
             #[must_use]
             #[inline(always)]
-            fn $bg_method<'a>(&'a self) -> BgColorDisplay<'a, colors::$color, Self> {
+            fn $bg_method(&self) -> BgColorDisplay<'_, colors::$color, Self> {
                 BgColorDisplay(self, PhantomData)
             }
          )*
@@ -440,7 +440,7 @@ pub trait OwoColorize: Sized {
     /// Requires the `supports-colors` feature.
     ///
     /// ```rust
-    /// use owo_colors::{OwoColorize, Stream};
+    /// use owo_colors::{Stream, OwoColorize};
     ///
     /// println!(
     ///     "{}",
@@ -448,17 +448,31 @@ pub trait OwoColorize: Sized {
     ///         .if_supports_color(Stream::Stdout, |text| text.bright_blue())
     /// );
     /// ```
+    ///
+    /// This function also accepts `supports_color` version 2's `Stream`, and also the deprecated
+    /// `supports_color` version 1's `Stream`.
+    ///
+    /// ```rust
+    /// use owo_colors::OwoColorize;
+    /// #[cfg(feature = "supports-colors")]
+    /// use supports_color::Stream;
+    ///
+    /// println!(
+    ///    "{}",
+    ///    "woah! error! if this terminal supports colors, it's blue"
+    ///       .if_supports_color(Stream::Stdout, |text| text.bright_blue())
+    /// );
     #[must_use]
     #[cfg(feature = "supports-colors")]
     fn if_supports_color<'a, Out, ApplyFn>(
         &'a self,
-        stream: Stream,
+        stream: impl Into<Stream>,
         apply: ApplyFn,
     ) -> SupportsColorsDisplay<'a, Self, Out, ApplyFn>
     where
         ApplyFn: Fn(&'a Self) -> Out,
     {
-        SupportsColorsDisplay(self, apply, stream)
+        SupportsColorsDisplay(self, apply, stream.into())
     }
 }
 
@@ -467,10 +481,13 @@ mod supports_colors;
 
 #[cfg(feature = "supports-colors")]
 pub use {
-    overrides::{set_override, unset_override},
-    supports_color::Stream,
+    overrides::{set_override, unset_override, with_override},
     supports_colors::SupportsColorsDisplay,
 };
+
+#[cfg(feature = "supports-colors")]
+#[doc(no_inline)]
+pub use supports_colors::Stream;
 
 pub use colors::{
     ansi_colors::AnsiColors, css::dynamic::CssColors, dynamic::Rgb, xterm::dynamic::XtermColors,

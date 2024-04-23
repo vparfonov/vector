@@ -19,19 +19,21 @@ fn widgets_table_column_spacing_can_be_changed() {
         terminal
             .draw(|f| {
                 let size = f.size();
-                let table = Table::new(vec![
-                    Row::new(vec!["Row11", "Row12", "Row13"]),
-                    Row::new(vec!["Row21", "Row22", "Row23"]),
-                    Row::new(vec!["Row31", "Row32", "Row33"]),
-                    Row::new(vec!["Row41", "Row42", "Row43"]),
-                ])
+                let table = Table::new(
+                    vec![
+                        Row::new(vec!["Row11", "Row12", "Row13"]),
+                        Row::new(vec!["Row21", "Row22", "Row23"]),
+                        Row::new(vec!["Row31", "Row32", "Row33"]),
+                        Row::new(vec!["Row41", "Row42", "Row43"]),
+                    ],
+                    [
+                        Constraint::Length(5),
+                        Constraint::Length(5),
+                        Constraint::Length(5),
+                    ],
+                )
                 .header(Row::new(vec!["Head1", "Head2", "Head3"]).bottom_margin(1))
                 .block(Block::default().borders(Borders::ALL))
-                .widths(&[
-                    Constraint::Length(5),
-                    Constraint::Length(5),
-                    Constraint::Length(5),
-                ])
                 .column_spacing(column_spacing);
                 f.render_widget(table, size);
             })
@@ -95,12 +97,12 @@ fn widgets_table_column_spacing_can_be_changed() {
         7,
         Buffer::with_lines(vec![
             "┌────────────────────────────┐",
-            "│Head1       Head2       Head│",
+            "│Head1       Head       Head3│",
             "│                            │",
-            "│Row11       Row12       Row1│",
-            "│Row21       Row22       Row2│",
-            "│Row31       Row32       Row3│",
-            "│Row41       Row42       Row4│",
+            "│Row11       Row1       Row13│",
+            "│Row21       Row2       Row23│",
+            "│Row31       Row3       Row33│",
+            "│Row41       Row4       Row43│",
             "│                            │",
             "│                            │",
             "└────────────────────────────┘",
@@ -117,15 +119,17 @@ fn widgets_table_columns_widths_can_use_fixed_length_constraints() {
         terminal
             .draw(|f| {
                 let size = f.size();
-                let table = Table::new(vec![
-                    Row::new(vec!["Row11", "Row12", "Row13"]),
-                    Row::new(vec!["Row21", "Row22", "Row23"]),
-                    Row::new(vec!["Row31", "Row32", "Row33"]),
-                    Row::new(vec!["Row41", "Row42", "Row43"]),
-                ])
+                let table = Table::new(
+                    vec![
+                        Row::new(vec!["Row11", "Row12", "Row13"]),
+                        Row::new(vec!["Row21", "Row22", "Row23"]),
+                        Row::new(vec!["Row31", "Row32", "Row33"]),
+                        Row::new(vec!["Row41", "Row42", "Row43"]),
+                    ],
+                    widths,
+                )
                 .header(Row::new(vec!["Head1", "Head2", "Head3"]).bottom_margin(1))
-                .block(Block::default().borders(Borders::ALL))
-                .widths(widths);
+                .block(Block::default().borders(Borders::ALL));
                 f.render_widget(table, size);
             })
             .unwrap();
@@ -198,28 +202,31 @@ fn widgets_table_columns_widths_can_use_fixed_length_constraints() {
 
 #[test]
 fn widgets_table_columns_widths_can_use_percentage_constraints() {
-    let test_case = |widths, expected| {
+    #[track_caller]
+    fn test_case(widths: &[Constraint], expected: Buffer) {
         let backend = TestBackend::new(30, 10);
         let mut terminal = Terminal::new(backend).unwrap();
 
         terminal
             .draw(|f| {
                 let size = f.size();
-                let table = Table::new(vec![
-                    Row::new(vec!["Row11", "Row12", "Row13"]),
-                    Row::new(vec!["Row21", "Row22", "Row23"]),
-                    Row::new(vec!["Row31", "Row32", "Row33"]),
-                    Row::new(vec!["Row41", "Row42", "Row43"]),
-                ])
+                let table = Table::new(
+                    vec![
+                        Row::new(vec!["Row11", "Row12", "Row13"]),
+                        Row::new(vec!["Row21", "Row22", "Row23"]),
+                        Row::new(vec!["Row31", "Row32", "Row33"]),
+                        Row::new(vec!["Row41", "Row42", "Row43"]),
+                    ],
+                    widths,
+                )
                 .header(Row::new(vec!["Head1", "Head2", "Head3"]).bottom_margin(1))
                 .block(Block::default().borders(Borders::ALL))
-                .widths(widths)
                 .column_spacing(0);
                 f.render_widget(table, size);
             })
             .unwrap();
         terminal.backend().assert_buffer(&expected);
-    };
+    }
 
     // columns of zero width show nothing
     test_case(
@@ -312,15 +319,17 @@ fn widgets_table_columns_widths_can_use_mixed_constraints() {
         terminal
             .draw(|f| {
                 let size = f.size();
-                let table = Table::new(vec![
-                    Row::new(vec!["Row11", "Row12", "Row13"]),
-                    Row::new(vec!["Row21", "Row22", "Row23"]),
-                    Row::new(vec!["Row31", "Row32", "Row33"]),
-                    Row::new(vec!["Row41", "Row42", "Row43"]),
-                ])
+                let table = Table::new(
+                    vec![
+                        Row::new(vec!["Row11", "Row12", "Row13"]),
+                        Row::new(vec!["Row21", "Row22", "Row23"]),
+                        Row::new(vec!["Row31", "Row32", "Row33"]),
+                        Row::new(vec!["Row41", "Row42", "Row43"]),
+                    ],
+                    widths,
+                )
                 .header(Row::new(vec!["Head1", "Head2", "Head3"]).bottom_margin(1))
-                .block(Block::default().borders(Borders::ALL))
-                .widths(widths);
+                .block(Block::default().borders(Borders::ALL));
                 f.render_widget(table, size);
             })
             .unwrap();
@@ -399,12 +408,12 @@ fn widgets_table_columns_widths_can_use_mixed_constraints() {
         ],
         Buffer::with_lines(vec![
             "┌────────────────────────────┐",
-            "│Head1             Head2     │",
+            "│Head1      Head2      Head3 │",
             "│                            │",
-            "│Row11             Row12     │",
-            "│Row21             Row22     │",
-            "│Row31             Row32     │",
-            "│Row41             Row42     │",
+            "│Row11      Row12      Row13 │",
+            "│Row21      Row22      Row23 │",
+            "│Row31      Row32      Row33 │",
+            "│Row41      Row42      Row43 │",
             "│                            │",
             "│                            │",
             "└────────────────────────────┘",
@@ -422,15 +431,17 @@ fn widgets_table_columns_widths_can_use_ratio_constraints() {
         terminal
             .draw(|f| {
                 let size = f.size();
-                let table = Table::new(vec![
-                    Row::new(vec!["Row11", "Row12", "Row13"]),
-                    Row::new(vec!["Row21", "Row22", "Row23"]),
-                    Row::new(vec!["Row31", "Row32", "Row33"]),
-                    Row::new(vec!["Row41", "Row42", "Row43"]),
-                ])
+                let table = Table::new(
+                    vec![
+                        Row::new(vec!["Row11", "Row12", "Row13"]),
+                        Row::new(vec!["Row21", "Row22", "Row23"]),
+                        Row::new(vec!["Row31", "Row32", "Row33"]),
+                        Row::new(vec!["Row41", "Row42", "Row43"]),
+                    ],
+                    widths,
+                )
                 .header(Row::new(vec!["Head1", "Head2", "Head3"]).bottom_margin(1))
                 .block(Block::default().borders(Borders::ALL))
-                .widths(widths)
                 .column_spacing(0);
                 f.render_widget(table, size);
             })
@@ -527,20 +538,22 @@ fn widgets_table_can_have_rows_with_multi_lines() {
         terminal
             .draw(|f| {
                 let size = f.size();
-                let table = Table::new(vec![
-                    Row::new(vec!["Row11", "Row12", "Row13"]),
-                    Row::new(vec!["Row21", "Row22", "Row23"]).height(2),
-                    Row::new(vec!["Row31", "Row32", "Row33"]),
-                    Row::new(vec!["Row41", "Row42", "Row43"]).height(2),
-                ])
+                let table = Table::new(
+                    vec![
+                        Row::new(vec!["Row11", "Row12", "Row13"]),
+                        Row::new(vec!["Row21", "Row22", "Row23"]).height(2),
+                        Row::new(vec!["Row31", "Row32", "Row33"]),
+                        Row::new(vec!["Row41", "Row42", "Row43"]).height(2),
+                    ],
+                    [
+                        Constraint::Length(5),
+                        Constraint::Length(5),
+                        Constraint::Length(5),
+                    ],
+                )
                 .header(Row::new(vec!["Head1", "Head2", "Head3"]).bottom_margin(1))
                 .block(Block::default().borders(Borders::ALL))
                 .highlight_symbol(">> ")
-                .widths(&[
-                    Constraint::Length(5),
-                    Constraint::Length(5),
-                    Constraint::Length(5),
-                ])
                 .column_spacing(1);
                 f.render_stateful_widget(table, size, state);
             })
@@ -621,21 +634,23 @@ fn widgets_table_enable_always_highlight_spacing() {
         terminal
             .draw(|f| {
                 let size = f.size();
-                let table = Table::new(vec![
-                    Row::new(vec!["Row11", "Row12", "Row13"]),
-                    Row::new(vec!["Row21", "Row22", "Row23"]).height(2),
-                    Row::new(vec!["Row31", "Row32", "Row33"]),
-                    Row::new(vec!["Row41", "Row42", "Row43"]).height(2),
-                ])
+                let table = Table::new(
+                    vec![
+                        Row::new(vec!["Row11", "Row12", "Row13"]),
+                        Row::new(vec!["Row21", "Row22", "Row23"]).height(2),
+                        Row::new(vec!["Row31", "Row32", "Row33"]),
+                        Row::new(vec!["Row41", "Row42", "Row43"]).height(2),
+                    ],
+                    [
+                        Constraint::Length(5),
+                        Constraint::Length(5),
+                        Constraint::Length(5),
+                    ],
+                )
                 .header(Row::new(vec!["Head1", "Head2", "Head3"]).bottom_margin(1))
                 .block(Block::default().borders(Borders::ALL))
                 .highlight_symbol(">> ")
                 .highlight_spacing(space)
-                .widths(&[
-                    Constraint::Length(5),
-                    Constraint::Length(5),
-                    Constraint::Length(5),
-                ])
                 .column_spacing(1);
                 f.render_stateful_widget(table, size, state);
             })
@@ -755,28 +770,31 @@ fn widgets_table_can_have_elements_styled_individually() {
     terminal
         .draw(|f| {
             let size = f.size();
-            let table = Table::new(vec![
-                Row::new(vec!["Row11", "Row12", "Row13"]).style(Style::default().fg(Color::Green)),
-                Row::new(vec![
-                    Cell::from("Row21"),
-                    Cell::from("Row22").style(Style::default().fg(Color::Yellow)),
-                    Cell::from(Line::from(vec![
-                        Span::raw("Row"),
-                        Span::styled("23", Style::default().fg(Color::Blue)),
-                    ]))
-                    .style(Style::default().fg(Color::Red)),
-                ])
-                .style(Style::default().fg(Color::LightGreen)),
-            ])
+            let table = Table::new(
+                vec![
+                    Row::new(vec!["Row11", "Row12", "Row13"])
+                        .style(Style::default().fg(Color::Green)),
+                    Row::new(vec![
+                        Cell::from("Row21"),
+                        Cell::from("Row22").style(Style::default().fg(Color::Yellow)),
+                        Cell::from(Line::from(vec![
+                            Span::raw("Row"),
+                            Span::styled("23", Style::default().fg(Color::Blue)),
+                        ]))
+                        .style(Style::default().fg(Color::Red)),
+                    ])
+                    .style(Style::default().fg(Color::LightGreen)),
+                ],
+                [
+                    Constraint::Length(6),
+                    Constraint::Length(6),
+                    Constraint::Length(6),
+                ],
+            )
             .header(Row::new(vec!["Head1", "Head2", "Head3"]).bottom_margin(1))
             .block(Block::default().borders(Borders::LEFT | Borders::RIGHT))
             .highlight_symbol(">> ")
             .highlight_style(Style::default().add_modifier(Modifier::BOLD))
-            .widths(&[
-                Constraint::Length(6),
-                Constraint::Length(6),
-                Constraint::Length(6),
-            ])
             .column_spacing(1);
             f.render_stateful_widget(table, size, &mut state);
         })
@@ -830,15 +848,17 @@ fn widgets_table_should_render_even_if_empty() {
     terminal
         .draw(|f| {
             let size = f.size();
-            let table = Table::new(vec![])
-                .header(Row::new(vec!["Head1", "Head2", "Head3"]))
-                .block(Block::default().borders(Borders::LEFT | Borders::RIGHT))
-                .widths(&[
+            let table = Table::new(
+                Vec::<Row>::new(),
+                [
                     Constraint::Length(6),
                     Constraint::Length(6),
                     Constraint::Length(6),
-                ])
-                .column_spacing(1);
+                ],
+            )
+            .header(Row::new(vec!["Head1", "Head2", "Head3"]))
+            .block(Block::default().borders(Borders::LEFT | Borders::RIGHT))
+            .column_spacing(1);
             f.render_widget(table, size);
         })
         .unwrap();
@@ -868,17 +888,19 @@ fn widgets_table_columns_dont_panic() {
 
     // based on https://github.com/fdehau/tui-rs/issues/470#issuecomment-852562848
     let table1_width = 98;
-    let table1 = Table::new(vec![Row::new(vec!["r1", "r2", "r3", "r4"])])
-        .header(Row::new(vec!["h1", "h2", "h3", "h4"]))
-        .block(Block::default().borders(Borders::ALL))
-        .highlight_symbol(">> ")
-        .column_spacing(1)
-        .widths(&[
+    let table1 = Table::new(
+        vec![Row::new(vec!["r1", "r2", "r3", "r4"])],
+        [
             Constraint::Percentage(15),
             Constraint::Percentage(15),
             Constraint::Percentage(25),
             Constraint::Percentage(45),
-        ]);
+        ],
+    )
+    .header(Row::new(vec!["h1", "h2", "h3", "h4"]))
+    .block(Block::default().borders(Borders::ALL))
+    .highlight_symbol(">> ")
+    .column_spacing(1);
 
     let mut state = TableState::default();
 
@@ -898,21 +920,23 @@ fn widgets_table_should_clamp_offset_if_rows_are_removed() {
     terminal
         .draw(|f| {
             let size = f.size();
-            let table = Table::new(vec![
-                Row::new(vec!["Row01", "Row02", "Row03"]),
-                Row::new(vec!["Row11", "Row12", "Row13"]),
-                Row::new(vec!["Row21", "Row22", "Row23"]),
-                Row::new(vec!["Row31", "Row32", "Row33"]),
-                Row::new(vec!["Row41", "Row42", "Row43"]),
-                Row::new(vec!["Row51", "Row52", "Row53"]),
-            ])
+            let table = Table::new(
+                vec![
+                    Row::new(vec!["Row01", "Row02", "Row03"]),
+                    Row::new(vec!["Row11", "Row12", "Row13"]),
+                    Row::new(vec!["Row21", "Row22", "Row23"]),
+                    Row::new(vec!["Row31", "Row32", "Row33"]),
+                    Row::new(vec!["Row41", "Row42", "Row43"]),
+                    Row::new(vec!["Row51", "Row52", "Row53"]),
+                ],
+                [
+                    Constraint::Length(5),
+                    Constraint::Length(5),
+                    Constraint::Length(5),
+                ],
+            )
             .header(Row::new(vec!["Head1", "Head2", "Head3"]).bottom_margin(1))
             .block(Block::default().borders(Borders::ALL))
-            .widths(&[
-                Constraint::Length(5),
-                Constraint::Length(5),
-                Constraint::Length(5),
-            ])
             .column_spacing(1);
             f.render_stateful_widget(table, size, &mut state);
         })
@@ -934,15 +958,17 @@ fn widgets_table_should_clamp_offset_if_rows_are_removed() {
     terminal
         .draw(|f| {
             let size = f.size();
-            let table = Table::new(vec![Row::new(vec!["Row31", "Row32", "Row33"])])
-                .header(Row::new(vec!["Head1", "Head2", "Head3"]).bottom_margin(1))
-                .block(Block::default().borders(Borders::ALL))
-                .widths(&[
+            let table = Table::new(
+                vec![Row::new(vec!["Row31", "Row32", "Row33"])],
+                [
                     Constraint::Length(5),
                     Constraint::Length(5),
                     Constraint::Length(5),
-                ])
-                .column_spacing(1);
+                ],
+            )
+            .header(Row::new(vec!["Head1", "Head2", "Head3"]).bottom_margin(1))
+            .block(Block::default().borders(Borders::ALL))
+            .column_spacing(1);
             f.render_stateful_widget(table, size, &mut state);
         })
         .unwrap();

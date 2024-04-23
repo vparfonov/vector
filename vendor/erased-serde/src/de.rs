@@ -1,8 +1,13 @@
-use crate::alloc::*;
 use crate::any::Any;
-use crate::error::Error;
+use crate::error::{erase_de as erase, unerase_de as unerase, Error};
 use crate::map::{OptionExt, ResultExt};
-use core::fmt::{self, Display};
+use crate::sealed::deserializer::Sealed;
+use alloc::boxed::Box;
+#[cfg(feature = "alloc")]
+use alloc::string::String;
+#[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+use core::fmt;
 
 /// Deserialize a value of type `T` from the given trait object.
 ///
@@ -42,7 +47,10 @@ where
 // TRAITS //////////////////////////////////////////////////////////////////////
 
 pub trait DeserializeSeed<'de> {
-    fn erased_deserialize_seed(&mut self, d: &mut dyn Deserializer<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_seed(
+        &mut self,
+        deserializer: &mut dyn Deserializer<'de>,
+    ) -> Result<Out, Error>;
 }
 
 /// An object-safe equivalent of Serde's `Deserializer` trait.
@@ -77,65 +85,75 @@ pub trait DeserializeSeed<'de> {
 ///     println!("{}", data["A"] + data["B"]);
 /// }
 /// ```
-pub trait Deserializer<'de> {
-    fn erased_deserialize_any(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_bool(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_i8(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_i16(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_i32(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_i64(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_i128(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_u8(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_u16(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_u32(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_u64(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_u128(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_f32(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_f64(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_char(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_str(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_string(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_bytes(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_byte_buf(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_option(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
-    fn erased_deserialize_unit(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+///
+/// This trait is sealed and can only be implemented via a
+/// `serde::Deserializer<'de>` impl.
+pub trait Deserializer<'de>: Sealed {
+    fn erased_deserialize_any(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_bool(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_i8(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_i16(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_i32(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_i64(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_i128(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_u8(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_u16(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_u32(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_u64(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_u128(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_f32(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_f64(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_char(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_str(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_string(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_bytes(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_byte_buf(&mut self, visitor: &mut dyn Visitor<'de>)
+        -> Result<Out, Error>;
+    fn erased_deserialize_option(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_unit(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
     fn erased_deserialize_unit_struct(
         &mut self,
         name: &'static str,
-        v: &mut dyn Visitor<'de>,
+        visitor: &mut dyn Visitor<'de>,
     ) -> Result<Out, Error>;
     fn erased_deserialize_newtype_struct(
         &mut self,
         name: &'static str,
-        v: &mut dyn Visitor<'de>,
+        visitor: &mut dyn Visitor<'de>,
     ) -> Result<Out, Error>;
-    fn erased_deserialize_seq(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_seq(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
     fn erased_deserialize_tuple(
         &mut self,
         len: usize,
-        v: &mut dyn Visitor<'de>,
+        visitor: &mut dyn Visitor<'de>,
     ) -> Result<Out, Error>;
     fn erased_deserialize_tuple_struct(
         &mut self,
         name: &'static str,
         len: usize,
-        v: &mut dyn Visitor<'de>,
+        visitor: &mut dyn Visitor<'de>,
     ) -> Result<Out, Error>;
-    fn erased_deserialize_map(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_map(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error>;
     fn erased_deserialize_struct(
         &mut self,
         name: &'static str,
         fields: &'static [&'static str],
-        v: &mut dyn Visitor<'de>,
+        visitor: &mut dyn Visitor<'de>,
     ) -> Result<Out, Error>;
-    fn erased_deserialize_identifier(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_identifier(
+        &mut self,
+        visitor: &mut dyn Visitor<'de>,
+    ) -> Result<Out, Error>;
     fn erased_deserialize_enum(
         &mut self,
         name: &'static str,
         variants: &'static [&'static str],
-        v: &mut dyn Visitor<'de>,
+        visitor: &mut dyn Visitor<'de>,
     ) -> Result<Out, Error>;
-    fn erased_deserialize_ignored_any(&mut self, v: &mut dyn Visitor<'de>) -> Result<Out, Error>;
+    fn erased_deserialize_ignored_any(
+        &mut self,
+        visitor: &mut dyn Visitor<'de>,
+    ) -> Result<Out, Error>;
     fn erased_is_human_readable(&self) -> bool;
 }
 
@@ -157,32 +175,39 @@ pub trait Visitor<'de> {
     fn erased_visit_char(&mut self, v: char) -> Result<Out, Error>;
     fn erased_visit_str(&mut self, v: &str) -> Result<Out, Error>;
     fn erased_visit_borrowed_str(&mut self, v: &'de str) -> Result<Out, Error>;
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     fn erased_visit_string(&mut self, v: String) -> Result<Out, Error>;
     fn erased_visit_bytes(&mut self, v: &[u8]) -> Result<Out, Error>;
     fn erased_visit_borrowed_bytes(&mut self, v: &'de [u8]) -> Result<Out, Error>;
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     fn erased_visit_byte_buf(&mut self, v: Vec<u8>) -> Result<Out, Error>;
     fn erased_visit_none(&mut self) -> Result<Out, Error>;
-    fn erased_visit_some(&mut self, d: &mut dyn Deserializer<'de>) -> Result<Out, Error>;
+    fn erased_visit_some(&mut self, deserializer: &mut dyn Deserializer<'de>)
+        -> Result<Out, Error>;
     fn erased_visit_unit(&mut self) -> Result<Out, Error>;
-    fn erased_visit_newtype_struct(&mut self, d: &mut dyn Deserializer<'de>) -> Result<Out, Error>;
-    fn erased_visit_seq(&mut self, s: &mut dyn SeqAccess<'de>) -> Result<Out, Error>;
-    fn erased_visit_map(&mut self, m: &mut dyn MapAccess<'de>) -> Result<Out, Error>;
-    fn erased_visit_enum(&mut self, e: &mut dyn EnumAccess<'de>) -> Result<Out, Error>;
+    fn erased_visit_newtype_struct(
+        &mut self,
+        deserializer: &mut dyn Deserializer<'de>,
+    ) -> Result<Out, Error>;
+    fn erased_visit_seq(&mut self, seq: &mut dyn SeqAccess<'de>) -> Result<Out, Error>;
+    fn erased_visit_map(&mut self, map: &mut dyn MapAccess<'de>) -> Result<Out, Error>;
+    fn erased_visit_enum(&mut self, data: &mut dyn EnumAccess<'de>) -> Result<Out, Error>;
 }
 
 pub trait SeqAccess<'de> {
     fn erased_next_element(
         &mut self,
-        d: &mut dyn DeserializeSeed<'de>,
+        seed: &mut dyn DeserializeSeed<'de>,
     ) -> Result<Option<Out>, Error>;
     fn erased_size_hint(&self) -> Option<usize>;
 }
 
 pub trait MapAccess<'de> {
-    fn erased_next_key(&mut self, d: &mut dyn DeserializeSeed<'de>) -> Result<Option<Out>, Error>;
-    fn erased_next_value(&mut self, d: &mut dyn DeserializeSeed<'de>) -> Result<Out, Error>;
+    fn erased_next_key(
+        &mut self,
+        seed: &mut dyn DeserializeSeed<'de>,
+    ) -> Result<Option<Out>, Error>;
+    fn erased_next_value(&mut self, seed: &mut dyn DeserializeSeed<'de>) -> Result<Out, Error>;
     fn erased_next_entry(
         &mut self,
         key: &mut dyn DeserializeSeed<'de>,
@@ -194,7 +219,7 @@ pub trait MapAccess<'de> {
 pub trait EnumAccess<'de> {
     fn erased_variant_seed(
         &mut self,
-        d: &mut dyn DeserializeSeed<'de>,
+        seed: &mut dyn DeserializeSeed<'de>,
     ) -> Result<(Out, Variant<'de>), Error>;
 }
 
@@ -227,13 +252,11 @@ impl<'de> dyn Deserializer<'de> {
     ///     println!("{}", data["A"] + data["B"]);
     /// }
     /// ```
-    pub fn erase<D>(deserializer: D) -> erase::Deserializer<D>
+    pub fn erase<D>(deserializer: D) -> impl Deserializer<'de>
     where
         D: serde::Deserializer<'de>,
     {
-        erase::Deserializer {
-            state: Some(deserializer),
-        }
+        erase::Deserializer::new(deserializer)
     }
 }
 
@@ -255,72 +278,106 @@ impl Out {
 
 mod erase {
     pub struct DeserializeSeed<D> {
-        pub(crate) state: Option<D>,
+        state: Option<D>,
     }
 
     impl<D> DeserializeSeed<D> {
+        pub(crate) fn new(seed: D) -> Self {
+            DeserializeSeed { state: Some(seed) }
+        }
+
         pub(crate) fn take(&mut self) -> D {
             self.state.take().unwrap()
         }
     }
 
     pub struct Deserializer<D> {
-        pub(crate) state: Option<D>,
+        state: Option<D>,
     }
 
     impl<D> Deserializer<D> {
+        pub(crate) fn new(deserializer: D) -> Self {
+            Deserializer {
+                state: Some(deserializer),
+            }
+        }
+
         pub(crate) fn take(&mut self) -> D {
             self.state.take().unwrap()
         }
+
         pub(crate) fn as_ref(&self) -> &D {
             self.state.as_ref().unwrap()
         }
     }
 
     pub struct Visitor<D> {
-        pub(crate) state: Option<D>,
+        state: Option<D>,
     }
 
     impl<D> Visitor<D> {
+        pub(crate) fn new(visitor: D) -> Self {
+            Visitor {
+                state: Some(visitor),
+            }
+        }
+
         pub(crate) fn take(&mut self) -> D {
             self.state.take().unwrap()
         }
+
         pub(crate) fn as_ref(&self) -> &D {
             self.state.as_ref().unwrap()
         }
     }
 
     pub struct SeqAccess<D> {
-        pub(crate) state: D,
+        state: D,
     }
 
     impl<D> SeqAccess<D> {
+        pub(crate) fn new(seq_access: D) -> Self {
+            SeqAccess { state: seq_access }
+        }
+
         pub(crate) fn as_ref(&self) -> &D {
             &self.state
         }
+
         pub(crate) fn as_mut(&mut self) -> &mut D {
             &mut self.state
         }
     }
 
     pub struct MapAccess<D> {
-        pub(crate) state: D,
+        state: D,
     }
 
     impl<D> MapAccess<D> {
+        pub(crate) fn new(map_access: D) -> Self {
+            MapAccess { state: map_access }
+        }
+
         pub(crate) fn as_ref(&self) -> &D {
             &self.state
         }
+
         pub(crate) fn as_mut(&mut self) -> &mut D {
             &mut self.state
         }
     }
 
     pub struct EnumAccess<D> {
-        pub(crate) state: Option<D>,
+        state: Option<D>,
     }
 
     impl<D> EnumAccess<D> {
+        pub(crate) fn new(enum_access: D) -> Self {
+            EnumAccess {
+                state: Some(enum_access),
+            }
+        }
+
         pub(crate) fn take(&mut self) -> D {
             self.state.take().unwrap()
         }
@@ -518,6 +575,8 @@ where
     }
 }
 
+impl<'de, T> Sealed for erase::Deserializer<T> where T: serde::Deserializer<'de> {}
+
 impl<'de, T> Visitor<'de> for erase::Visitor<T>
 where
     T: serde::de::Visitor<'de>,
@@ -590,7 +649,7 @@ where
         unsafe { self.take().visit_borrowed_str(v).unsafe_map(Out::new) }
     }
 
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     fn erased_visit_string(&mut self, v: String) -> Result<Out, Error> {
         unsafe { self.take().visit_string(v).unsafe_map(Out::new) }
     }
@@ -603,7 +662,7 @@ where
         unsafe { self.take().visit_borrowed_bytes(v).unsafe_map(Out::new) }
     }
 
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     fn erased_visit_byte_buf(&mut self, v: Vec<u8>) -> Result<Out, Error> {
         unsafe { self.take().visit_byte_buf(v).unsafe_map(Out::new) }
     }
@@ -680,10 +739,10 @@ where
 
     fn erased_next_entry(
         &mut self,
-        k: &mut dyn DeserializeSeed<'de>,
-        v: &mut dyn DeserializeSeed<'de>,
+        kseed: &mut dyn DeserializeSeed<'de>,
+        vseed: &mut dyn DeserializeSeed<'de>,
     ) -> Result<Option<(Out, Out)>, Error> {
-        self.as_mut().next_entry_seed(k, v).map_err(erase)
+        self.as_mut().next_entry_seed(kseed, vseed).map_err(erase)
     }
 
     fn erased_size_hint(&self) -> Option<usize> {
@@ -779,9 +838,7 @@ impl<'de> serde::de::DeserializeSeed<'de> for &mut (dyn DeserializeSeed<'de> + '
     where
         D: serde::Deserializer<'de>,
     {
-        let mut erased = erase::Deserializer {
-            state: Some(deserializer),
-        };
+        let mut erased = erase::Deserializer::new(deserializer);
         self.erased_deserialize_seed(&mut erased).map_err(unerase)
     }
 }
@@ -795,7 +852,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_any(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -803,7 +860,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_bool(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -811,7 +868,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_i8(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -819,7 +876,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_i16(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -827,7 +884,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_i32(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -835,7 +892,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_i64(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -843,7 +900,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_i128(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -851,7 +908,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_u8(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -859,7 +916,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_u16(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -867,7 +924,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_u32(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -875,7 +932,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_u64(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -883,7 +940,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_u128(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -891,7 +948,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_f32(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -899,7 +956,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_f64(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -907,7 +964,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_char(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -915,7 +972,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_str(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -923,7 +980,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_string(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -931,7 +988,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_bytes(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -939,7 +996,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_byte_buf(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -947,7 +1004,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_option(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -955,7 +1012,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_unit(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -963,7 +1020,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_unit_struct(name, &mut erased).unsafe_map(Out::take) }
             }
 
@@ -971,7 +1028,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_newtype_struct(name, &mut erased).unsafe_map(Out::take) }
             }
 
@@ -979,7 +1036,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_seq(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -987,7 +1044,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_tuple(len, &mut erased).unsafe_map(Out::take) }
             }
 
@@ -995,7 +1052,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_tuple_struct(name, len, &mut erased).unsafe_map(Out::take) }
             }
 
@@ -1003,7 +1060,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_map(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -1011,7 +1068,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_struct(name, fields, &mut erased).unsafe_map(Out::take) }
             }
 
@@ -1019,7 +1076,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_identifier(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -1027,7 +1084,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_enum(name, variants, &mut erased).unsafe_map(Out::take) }
             }
 
@@ -1035,7 +1092,7 @@ macro_rules! impl_deserializer_for_trait_object {
             where
                 V: serde::de::Visitor<'de>,
             {
-                let mut erased = erase::Visitor { state: Some(visitor) };
+                let mut erased = erase::Visitor::new(visitor);
                 unsafe { self.erased_deserialize_ignored_any(&mut erased).unsafe_map(Out::take) }
             }
 
@@ -1174,7 +1231,7 @@ impl<'de> serde::de::Visitor<'de> for &mut (dyn Visitor<'de> + '_) {
         self.erased_visit_borrowed_str(v).map_err(unerase)
     }
 
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     fn visit_string<E>(self, v: String) -> Result<Out, E>
     where
         E: serde::de::Error,
@@ -1196,7 +1253,7 @@ impl<'de> serde::de::Visitor<'de> for &mut (dyn Visitor<'de> + '_) {
         self.erased_visit_borrowed_bytes(v).map_err(unerase)
     }
 
-    #[cfg(any(feature = "std", feature = "alloc"))]
+    #[cfg(feature = "alloc")]
     fn visit_byte_buf<E>(self, v: Vec<u8>) -> Result<Out, E>
     where
         E: serde::de::Error,
@@ -1215,9 +1272,7 @@ impl<'de> serde::de::Visitor<'de> for &mut (dyn Visitor<'de> + '_) {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut erased = erase::Deserializer {
-            state: Some(deserializer),
-        };
+        let mut erased = erase::Deserializer::new(deserializer);
         self.erased_visit_some(&mut erased).map_err(unerase)
     }
 
@@ -1232,9 +1287,7 @@ impl<'de> serde::de::Visitor<'de> for &mut (dyn Visitor<'de> + '_) {
     where
         D: serde::Deserializer<'de>,
     {
-        let mut erased = erase::Deserializer {
-            state: Some(deserializer),
-        };
+        let mut erased = erase::Deserializer::new(deserializer);
         self.erased_visit_newtype_struct(&mut erased)
             .map_err(unerase)
     }
@@ -1243,7 +1296,7 @@ impl<'de> serde::de::Visitor<'de> for &mut (dyn Visitor<'de> + '_) {
     where
         V: serde::de::SeqAccess<'de>,
     {
-        let mut erased = erase::SeqAccess { state: seq };
+        let mut erased = erase::SeqAccess::new(seq);
         self.erased_visit_seq(&mut erased).map_err(unerase)
     }
 
@@ -1251,7 +1304,7 @@ impl<'de> serde::de::Visitor<'de> for &mut (dyn Visitor<'de> + '_) {
     where
         V: serde::de::MapAccess<'de>,
     {
-        let mut erased = erase::MapAccess { state: map };
+        let mut erased = erase::MapAccess::new(map);
         self.erased_visit_map(&mut erased).map_err(unerase)
     }
 
@@ -1259,7 +1312,7 @@ impl<'de> serde::de::Visitor<'de> for &mut (dyn Visitor<'de> + '_) {
     where
         V: serde::de::EnumAccess<'de>,
     {
-        let mut erased = erase::EnumAccess { state: Some(data) };
+        let mut erased = erase::EnumAccess::new(data);
         self.erased_visit_enum(&mut erased).map_err(unerase)
     }
 }
@@ -1271,7 +1324,7 @@ impl<'de> serde::de::SeqAccess<'de> for &mut (dyn SeqAccess<'de> + '_) {
     where
         T: serde::de::DeserializeSeed<'de>,
     {
-        let mut seed = erase::DeserializeSeed { state: Some(seed) };
+        let mut seed = erase::DeserializeSeed::new(seed);
         unsafe {
             (**self)
                 .erased_next_element(&mut seed)
@@ -1291,7 +1344,7 @@ impl<'de> serde::de::MapAccess<'de> for &mut (dyn MapAccess<'de> + '_) {
     where
         K: serde::de::DeserializeSeed<'de>,
     {
-        let mut erased = erase::DeserializeSeed { state: Some(seed) };
+        let mut erased = erase::DeserializeSeed::new(seed);
         unsafe {
             (**self)
                 .erased_next_key(&mut erased)
@@ -1303,7 +1356,7 @@ impl<'de> serde::de::MapAccess<'de> for &mut (dyn MapAccess<'de> + '_) {
     where
         V: serde::de::DeserializeSeed<'de>,
     {
-        let mut erased = erase::DeserializeSeed { state: Some(seed) };
+        let mut erased = erase::DeserializeSeed::new(seed);
         unsafe {
             (**self)
                 .erased_next_value(&mut erased)
@@ -1324,7 +1377,7 @@ impl<'de> serde::de::EnumAccess<'de> for &mut (dyn EnumAccess<'de> + '_) {
     where
         V: serde::de::DeserializeSeed<'de>,
     {
-        let mut erased = erase::DeserializeSeed { state: Some(seed) };
+        let mut erased = erase::DeserializeSeed::new(seed);
         match self.erased_variant_seed(&mut erased) {
             Ok((out, variant)) => Ok((unsafe { out.take() }, variant)),
             Err(err) => Err(err),
@@ -1355,7 +1408,7 @@ impl<'de> serde::de::VariantAccess<'de> for Variant<'de> {
     where
         T: serde::de::DeserializeSeed<'de>,
     {
-        let mut erased = erase::DeserializeSeed { state: Some(seed) };
+        let mut erased = erase::DeserializeSeed::new(seed);
         unsafe { (self.visit_newtype)(self.data, &mut erased).unsafe_map(Out::take) }
     }
 
@@ -1363,9 +1416,7 @@ impl<'de> serde::de::VariantAccess<'de> for Variant<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        let mut erased = erase::Visitor {
-            state: Some(visitor),
-        };
+        let mut erased = erase::Visitor::new(visitor);
         unsafe { (self.tuple_variant)(self.data, len, &mut erased).unsafe_map(Out::take) }
     }
 
@@ -1377,9 +1428,7 @@ impl<'de> serde::de::VariantAccess<'de> for Variant<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        let mut erased = erase::Visitor {
-            state: Some(visitor),
-        };
+        let mut erased = erase::Visitor::new(visitor);
         unsafe { (self.struct_variant)(self.data, fields, &mut erased).unsafe_map(Out::take) }
     }
 }
@@ -1387,8 +1436,8 @@ impl<'de> serde::de::VariantAccess<'de> for Variant<'de> {
 // IMPL ERASED SERDE FOR ERASED SERDE //////////////////////////////////////////
 
 macro_rules! deref_erased_deserializer {
-    ($($imp:tt)+) => {
-        impl $($imp)+ {
+    (<'de $(, $T:ident)*> Deserializer<'de> for $ty:ty $(where $($where:tt)*)?) => {
+        impl<'de $(, $T)*> Deserializer<'de> for $ty $(where $($where)*)? {
             fn erased_deserialize_any(&mut self, visitor: &mut dyn Visitor<'de>) -> Result<Out, Error> {
                 (**self).erased_deserialize_any(visitor)
             }
@@ -1517,37 +1566,20 @@ macro_rules! deref_erased_deserializer {
                 (**self).erased_is_human_readable()
             }
         }
+
+        impl<'de $(, $T)*> Sealed for $ty $(where $($where)*)? {}
     };
 }
 
-deref_erased_deserializer!(<'de> Deserializer<'de> for Box<dyn Deserializer<'de> + '_>);
-deref_erased_deserializer!(<'de> Deserializer<'de> for Box<dyn Deserializer<'de> + Send + '_>);
-deref_erased_deserializer!(<'de> Deserializer<'de> for Box<dyn Deserializer<'de> + Sync + '_>);
-deref_erased_deserializer!(<'de> Deserializer<'de> for Box<dyn Deserializer<'de> + Send + Sync + '_>);
-deref_erased_deserializer!(<'de, T: ?Sized + Deserializer<'de>> Deserializer<'de> for &mut T);
-
-// ERROR ///////////////////////////////////////////////////////////////////////
-
-fn erase<E>(e: E) -> Error
-where
-    E: Display,
-{
-    serde::de::Error::custom(e)
-}
-
-fn unerase<E>(e: Error) -> E
-where
-    E: serde::de::Error,
-{
-    E::custom(e)
-}
+deref_erased_deserializer!(<'de, T> Deserializer<'de> for &mut T where T: ?Sized + Deserializer<'de>);
+deref_erased_deserializer!(<'de, T> Deserializer<'de> for Box<T> where T: ?Sized + Deserializer<'de>);
 
 // TEST ////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::alloc::ToOwned;
+    use alloc::borrow::ToOwned;
     use core::fmt::Debug;
     use serde_derive::Deserialize;
 

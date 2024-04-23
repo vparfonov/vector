@@ -78,7 +78,7 @@ pub struct Builder {
     /// To run after each thread is unparked.
     pub(super) after_unpark: Option<Callback>,
 
-    /// Customizable keep alive timeout for BlockingPool
+    /// Customizable keep alive timeout for `BlockingPool`
     pub(super) keep_alive: Option<Duration>,
 
     /// How many ticks before pulling a task from the global/remote queue?
@@ -312,7 +312,7 @@ impl Builder {
 
             metrics_poll_count_histogram_enable: false,
 
-            metrics_poll_count_histogram: Default::default(),
+            metrics_poll_count_histogram: HistogramBuilder::default(),
 
             disable_lifo_slot: false,
         }
@@ -723,7 +723,7 @@ impl Builder {
     /// Sets a custom timeout for a thread in the blocking pool.
     ///
     /// By default, the timeout for a thread is set to 10 seconds. This can
-    /// be overridden using .thread_keep_alive().
+    /// be overridden using `.thread_keep_alive()`.
     ///
     /// # Example
     ///
@@ -746,10 +746,8 @@ impl Builder {
     ///
     /// A scheduler "tick" roughly corresponds to one `poll` invocation on a task.
     ///
-    /// By default the global queue interval is:
-    ///
-    /// * `31` for the current-thread scheduler.
-    /// * `61` for the multithreaded scheduler.
+    /// By default the global queue interval is 31 for the current-thread scheduler. Please see
+    /// [the module documentation] for the default behavior of the multi-thread scheduler.
     ///
     /// Schedulers have a local queue of already-claimed tasks, and a global queue of incoming
     /// tasks. Setting the interval to a smaller value increases the fairness of the scheduler,
@@ -757,6 +755,8 @@ impl Builder {
     /// getting started on new work, especially if tasks frequently yield rather than complete
     /// or await on further I/O. Conversely, a higher value prioritizes existing work, and
     /// is a good choice when most tasks quickly complete polling.
+    ///
+    /// [the module documentation]: crate::runtime#multi-threaded-runtime-behavior-at-the-time-of-writing
     ///
     /// # Examples
     ///
@@ -1279,7 +1279,6 @@ cfg_rt_multi_thread! {
                 use crate::runtime::scheduler::MultiThreadAlt;
 
                 let core_threads = self.worker_threads.unwrap_or_else(num_cpus);
-
                 let (driver, driver_handle) = driver::Driver::new(self.get_cfg())?;
 
                 // Create the blocking pool

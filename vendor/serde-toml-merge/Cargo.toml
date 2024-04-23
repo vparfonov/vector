@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "serde-toml-merge"
-version = "0.3.3"
+version = "0.3.6"
 authors = ["Jeremie Drouet <jeremie.drouet@gmail.com>"]
 description = "Merge your toml values."
 readme = "readme.md"

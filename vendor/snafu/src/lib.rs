@@ -1,10 +1,9 @@
 #![deny(missing_docs)]
 #![cfg_attr(not(any(feature = "std", test)), no_std)]
-#![cfg_attr(feature = "unstable-backtraces-impl-std", feature(backtrace))]
 #![cfg_attr(feature = "unstable-core-error", feature(error_in_core))]
 #![cfg_attr(
     feature = "unstable-provider-api",
-    feature(error_generic_member_access, provide_any)
+    feature(error_generic_member_access)
 )]
 #![cfg_attr(feature = "unstable-try-trait", feature(try_trait_v2))]
 
@@ -42,7 +41,7 @@
 //!
 //! fn is_valid_id(id: u16) -> Result<(), Whatever> {
 //!     if id < 10 {
-//!         whatever!("ID may not be less than 10, but it was {}", id);
+//!         whatever!("ID may not be less than 10, but it was {id}");
 //!     }
 //!     Ok(())
 //! }
@@ -55,7 +54,7 @@
 //!
 //! fn read_config_file(path: &str) -> Result<String, Whatever> {
 //!     std::fs::read_to_string(path)
-//!         .with_whatever_context(|_| format!("Could not read file {}", path))
+//!         .with_whatever_context(|_| format!("Could not read file {path}"))
 //! }
 //! ```
 //!
@@ -65,14 +64,12 @@
 //! ```rust
 //! use snafu::{prelude::*, ErrorCompat, Whatever};
 //!
-//! fn main() {
 //! # fn returns_an_error() -> Result<(), Whatever> { Ok(()) }
-//!     if let Err(e) = returns_an_error() {
-//!         eprintln!("An error occurred: {}", e);
-//!         if let Some(bt) = ErrorCompat::backtrace(&e) {
-//! #           #[cfg(not(feature = "backtraces-impl-backtrace-crate"))]
-//!             eprintln!("{}", bt);
-//!         }
+//! if let Err(e) = returns_an_error() {
+//!     eprintln!("An error occurred: {e}");
+//!     if let Some(bt) = ErrorCompat::backtrace(&e) {
+//! #       #[cfg(not(feature = "backtraces-impl-backtrace-crate"))]
+//!         eprintln!("{bt}");
 //!     }
 //! }
 //! ```
@@ -218,10 +215,10 @@ pub mod prelude {
     pub use crate::{ensure, OptionExt as _, ResultExt as _};
 
     // https://github.com/rust-lang/rust/issues/89020
-    doc_comment::doc_comment! {
-        include_str!("Snafu.md"),
-        pub use snafu_derive::Snafu;
-    }
+    #[doc = include_str!("Snafu.md")]
+    // Links are reported as broken, but don't appear to be
+    #[allow(rustdoc::broken_intra_doc_links)]
+    pub use snafu_derive::Snafu;
 
     #[cfg(any(feature = "std", test))]
     pub use crate::{ensure_whatever, whatever};
@@ -230,40 +227,29 @@ pub mod prelude {
     pub use crate::futures::{TryFutureExt as _, TryStreamExt as _};
 }
 
-#[cfg(all(
-    not(feature = "backtraces"),
-    not(feature = "backtraces-impl-backtrace-crate"),
-    not(feature = "backtraces-impl-std"),
-))]
-mod backtrace_inert;
-#[cfg(all(
-    not(feature = "backtraces"),
-    not(feature = "backtraces-impl-backtrace-crate"),
-    not(feature = "backtraces-impl-std"),
-))]
-pub use crate::backtrace_inert::*;
+#[cfg(not(any(
+    all(feature = "std", feature = "rust_1_65"),
+    feature = "backtraces-impl-backtrace-crate"
+)))]
+#[path = "backtrace_impl_inert.rs"]
+mod backtrace_impl;
+
+#[cfg(feature = "backtraces-impl-backtrace-crate")]
+#[path = "backtrace_impl_backtrace_crate.rs"]
+mod backtrace_impl;
 
 #[cfg(all(
-    feature = "backtraces",
-    not(feature = "backtraces-impl-backtrace-crate"),
-    not(feature = "backtraces-impl-std"),
+    feature = "std",
+    feature = "rust_1_65",
+    not(feature = "backtraces-impl-backtrace-crate")
 ))]
-mod backtrace_shim;
-#[cfg(all(
-    feature = "backtraces",
-    not(feature = "backtraces-impl-backtrace-crate"),
-    not(feature = "backtraces-impl-std"),
-))]
-pub use crate::backtrace_shim::*;
+#[path = "backtrace_impl_std.rs"]
+mod backtrace_impl;
+
+pub use backtrace_impl::*;
 
 #[cfg(any(feature = "std", test))]
 mod once_bool;
-
-#[cfg(feature = "backtraces-impl-backtrace-crate")]
-pub use backtrace::Backtrace;
-
-#[cfg(feature = "backtraces-impl-std")]
-pub use std::backtrace::Backtrace;
 
 #[cfg(feature = "futures")]
 pub mod futures;
@@ -276,15 +262,24 @@ mod report;
 pub use report::CleanedErrorText;
 pub use report::{Report, __InternalExtractErrorType};
 
-doc_comment::doc_comment! {
-    include_str!("Snafu.md"),
-    pub use snafu_derive::Snafu;
-}
+#[doc = include_str!("Snafu.md")]
+#[doc(alias(
+    "backtrace",
+    "context",
+    "crate_root",
+    "display",
+    "implicit",
+    "module",
+    "provide",
+    "source",
+    "transparent",
+    "visibility",
+    "whatever",
+))]
+pub use snafu_derive::Snafu;
 
-doc_comment::doc_comment! {
-    include_str!("report.md"),
-    pub use snafu_derive::report;
-}
+#[doc = include_str!("report.md")]
+pub use snafu_derive::report;
 
 macro_rules! generate_guide {
     (pub mod $name:ident { $($children:tt)* } $($rest:tt)*) => {
@@ -306,11 +301,10 @@ macro_rules! generate_guide {
     };
     (@gen $prefix:expr, pub mod $name:ident { $($children:tt)* } $($rest:tt)*) => {
         #[cfg(feature = "guide")]
-        doc_comment::doc_comment! {
-            include_str!(concat!($prefix, "/", stringify!($name), ".md")),
-            pub mod $name {
-                generate_guide!(@gen concat!($prefix, "/", stringify!($name)), $($children)*);
-            }
+        #[doc = include_str!(concat!($prefix, "/", stringify!($name), ".md"))]
+        pub mod $name {
+            use crate::*;
+            generate_guide!(@gen concat!($prefix, "/", stringify!($name)), $($children)*);
         }
         #[cfg(not(feature = "guide"))]
         /// Not currently built; please add the `guide` feature flag.
@@ -343,11 +337,17 @@ generate_guide! {
     }
 }
 
-doc_comment::doctest!("../README.md", readme_tests);
+#[cfg(feature = "unstable-core-error")]
+#[doc(hidden)]
+pub use core::error;
 
 #[cfg(feature = "unstable-core-error")]
 #[doc(hidden)]
 pub use core::error::Error;
+
+#[cfg(all(not(feature = "unstable-core-error"), any(feature = "std", test)))]
+#[doc(hidden)]
+pub use std::error;
 
 #[cfg(all(not(feature = "unstable-core-error"), any(feature = "std", test)))]
 #[doc(hidden)]
@@ -510,8 +510,7 @@ macro_rules! whatever {
 /// # fn moon_is_rising() -> bool { false }
 ///     ensure_whatever!(
 ///         moon_is_rising(),
-///         "We are recalibrating the dynamos for account {}, sorry",
-///         account_id,
+///         "We are recalibrating the dynamos for account {account_id}, sorry",
 ///     );
 ///
 ///     Ok(100)
@@ -527,7 +526,7 @@ macro_rules! ensure_whatever {
     };
 }
 
-/// Additions to [`Result`](std::result::Result).
+/// Additions to [`Result`][].
 pub trait ResultExt<T, E>: Sized {
     /// Extend a [`Result`]'s error with additional context-sensitive information.
     ///
@@ -560,9 +559,8 @@ pub trait ResultExt<T, E>: Sized {
     /// }
     /// ```
     ///
-    /// Note that the context selector will call
-    /// [`Into::into`](std::convert::Into::into) on each field, so the types
-    /// are not required to exactly match.
+    /// Note that the context selector will call [`Into::into`][] on each field,
+    /// so the types are not required to exactly match.
     fn context<C, E2>(self, context: C) -> Result<T, E2>
     where
         C: IntoError<E2, Source = E>,
@@ -600,8 +598,7 @@ pub trait ResultExt<T, E>: Sized {
     /// ```
     ///
     /// Note that this *may not* be needed in many cases because the context
-    /// selector will call [`Into::into`](std::convert::Into::into) on each
-    /// field.
+    /// selector will call [`Into::into`][] on each field.
     fn with_context<F, C, E2>(self, context: F) -> Result<T, E2>
     where
         F: FnOnce(&mut E) -> C,
@@ -654,7 +651,7 @@ pub trait ResultExt<T, E>: Sized {
     /// fn example() -> Result<(), Whatever> {
     ///     let filename = "/this/does/not/exist";
     ///     std::fs::read_to_string(filename)
-    ///         .with_whatever_context(|_| format!("couldn't open the file {}", filename))?;
+    ///         .with_whatever_context(|_| format!("couldn't open the file {filename}"))?;
     ///     Ok(())
     /// }
     ///
@@ -684,10 +681,125 @@ pub trait ResultExt<T, E>: Sized {
         S: Into<String>,
         E2: FromString,
         E: Into<E2::Source>;
+
+    /// Convert a [`Result`]'s error into a boxed trait object
+    /// compatible with multiple threads.
+    ///
+    /// This is useful when you have errors of multiple types that you
+    /// wish to treat as one type. This may occur when dealing with
+    /// errors in a generic context, such as when the error is a
+    /// trait's associated type.
+    ///
+    /// In cases like this, you cannot name the original error type
+    /// without making the outer error type generic as well. Using an
+    /// error trait object offers an alternate solution.
+    ///
+    /// ```rust
+    /// # use std::convert::TryInto;
+    /// use snafu::prelude::*;
+    ///
+    /// fn convert_value_into_u8<V>(v: V) -> Result<u8, ConversionFailedError>
+    /// where
+    ///     V: TryInto<u8>,
+    ///     V::Error: snafu::Error + Send + Sync + 'static,
+    /// {
+    ///     v.try_into().boxed().context(ConversionFailedSnafu)
+    /// }
+    ///
+    /// #[derive(Debug, Snafu)]
+    /// struct ConversionFailedError {
+    ///     source: Box<dyn snafu::Error + Send + Sync + 'static>,
+    /// }
+    /// ```
+    ///
+    /// ## Avoiding misapplication
+    ///
+    /// We recommended **against** using this to create fewer error
+    /// variants which in turn would group unrelated errors. While
+    /// convenient for the programmer, doing so usually makes lower
+    /// quality error messages for the user.
+    ///
+    /// ```rust
+    /// use snafu::prelude::*;
+    /// use std::fs;
+    ///
+    /// fn do_not_do_this() -> Result<i32, UselessError> {
+    ///     let content = fs::read_to_string("/path/to/config/file")
+    ///         .boxed()
+    ///         .context(UselessSnafu)?;
+    ///     content.parse().boxed().context(UselessSnafu)
+    /// }
+    ///
+    /// #[derive(Debug, Snafu)]
+    /// struct UselessError {
+    ///     source: Box<dyn snafu::Error + Send + Sync + 'static>,
+    /// }
+    /// ```
+    #[cfg(any(feature = "std", test))]
+    fn boxed<'a>(self) -> Result<T, Box<dyn Error + Send + Sync + 'a>>
+    where
+        E: Error + Send + Sync + 'a;
+
+    /// Convert a [`Result`]'s error into a boxed trait object.
+    ///
+    /// This is useful when you have errors of multiple types that you
+    /// wish to treat as one type. This may occur when dealing with
+    /// errors in a generic context, such as when the error is a
+    /// trait's associated type.
+    ///
+    /// In cases like this, you cannot name the original error type
+    /// without making the outer error type generic as well. Using an
+    /// error trait object offers an alternate solution.
+    ///
+    /// ```rust
+    /// # use std::convert::TryInto;
+    /// use snafu::prelude::*;
+    ///
+    /// fn convert_value_into_u8<V>(v: V) -> Result<u8, ConversionFailedError>
+    /// where
+    ///     V: TryInto<u8>,
+    ///     V::Error: snafu::Error + 'static,
+    /// {
+    ///     v.try_into().boxed_local().context(ConversionFailedSnafu)
+    /// }
+    ///
+    /// #[derive(Debug, Snafu)]
+    /// struct ConversionFailedError {
+    ///     source: Box<dyn snafu::Error + 'static>,
+    /// }
+    /// ```
+    ///
+    /// ## Avoiding misapplication
+    ///
+    /// We recommended **against** using this to create fewer error
+    /// variants which in turn would group unrelated errors. While
+    /// convenient for the programmer, doing so usually makes lower
+    /// quality error messages for the user.
+    ///
+    /// ```rust
+    /// use snafu::prelude::*;
+    /// use std::fs;
+    ///
+    /// fn do_not_do_this() -> Result<i32, UselessError> {
+    ///     let content = fs::read_to_string("/path/to/config/file")
+    ///         .boxed_local()
+    ///         .context(UselessSnafu)?;
+    ///     content.parse().boxed_local().context(UselessSnafu)
+    /// }
+    ///
+    /// #[derive(Debug, Snafu)]
+    /// struct UselessError {
+    ///     source: Box<dyn snafu::Error + 'static>,
+    /// }
+    /// ```
+    #[cfg(any(feature = "std", test))]
+    fn boxed_local<'a>(self) -> Result<T, Box<dyn Error + 'a>>
+    where
+        E: Error + 'a;
 }
 
 impl<T, E> ResultExt<T, E> for Result<T, E> {
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn context<C, E2>(self, context: C) -> Result<T, E2>
     where
         C: IntoError<E2, Source = E>,
@@ -700,7 +812,7 @@ impl<T, E> ResultExt<T, E> for Result<T, E> {
         }
     }
 
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn with_context<F, C, E2>(self, context: F) -> Result<T, E2>
     where
         F: FnOnce(&mut E) -> C,
@@ -718,7 +830,7 @@ impl<T, E> ResultExt<T, E> for Result<T, E> {
     }
 
     #[cfg(any(feature = "std", test))]
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn whatever_context<S, E2>(self, context: S) -> Result<T, E2>
     where
         S: Into<String>,
@@ -733,7 +845,7 @@ impl<T, E> ResultExt<T, E> for Result<T, E> {
     }
 
     #[cfg(any(feature = "std", test))]
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn with_whatever_context<F, S, E2>(self, context: F) -> Result<T, E2>
     where
         F: FnOnce(&mut E) -> S,
@@ -750,6 +862,22 @@ impl<T, E> ResultExt<T, E> for Result<T, E> {
             }
         }
     }
+
+    #[cfg(any(feature = "std", test))]
+    fn boxed<'a>(self) -> Result<T, Box<dyn Error + Send + Sync + 'a>>
+    where
+        E: Error + Send + Sync + 'a,
+    {
+        self.map_err(|e| Box::new(e) as _)
+    }
+
+    #[cfg(any(feature = "std", test))]
+    fn boxed_local<'a>(self) -> Result<T, Box<dyn Error + 'a>>
+    where
+        E: Error + 'a,
+    {
+        self.map_err(|e| Box::new(e) as _)
+    }
 }
 
 /// A temporary error type used when converting an [`Option`][] into a
@@ -759,7 +887,7 @@ impl<T, E> ResultExt<T, E> for Result<T, E> {
 /// [`Result`]: std::result::Result
 pub struct NoneError;
 
-/// Additions to [`Option`](std::option::Option).
+/// Additions to [`Option`][].
 pub trait OptionExt<T>: Sized {
     /// Convert an [`Option`][] into a [`Result`][] with additional
     /// context-sensitive information.
@@ -777,7 +905,7 @@ pub trait OptionExt<T>: Sized {
     ///
     /// fn example(user_id: i32) -> Result<(), Error> {
     ///     let name = username(user_id).context(UserLookupSnafu { user_id })?;
-    ///     println!("Username was {}", name);
+    ///     println!("Username was {name}");
     ///     Ok(())
     /// }
     ///
@@ -787,9 +915,8 @@ pub trait OptionExt<T>: Sized {
     /// }
     /// ```
     ///
-    /// Note that the context selector will call
-    /// [`Into::into`](std::convert::Into::into) on each field, so the types
-    /// are not required to exactly match.
+    /// Note that the context selector will call [`Into::into`][] on each field,
+    /// so the types are not required to exactly match.
     fn context<C, E>(self, context: C) -> Result<T, E>
     where
         C: IntoError<E, Source = NoneError>,
@@ -817,7 +944,7 @@ pub trait OptionExt<T>: Sized {
     ///         user_id,
     ///         previous_ids: Vec::new(),
     ///     })?;
-    ///     println!("Username was {}", name);
+    ///     println!("Username was {name}");
     ///     Ok(())
     /// }
     ///
@@ -828,8 +955,7 @@ pub trait OptionExt<T>: Sized {
     /// ```
     ///
     /// Note that this *may not* be needed in many cases because the context
-    /// selector will call [`Into::into`](std::convert::Into::into) on each
-    /// field.
+    /// selector will call [`Into::into`][] on each field.
     fn with_context<F, C, E>(self, context: F) -> Result<T, E>
     where
         F: FnOnce() -> C,
@@ -879,7 +1005,7 @@ pub trait OptionExt<T>: Sized {
     ///
     /// fn example(env_var_name: &str) -> Result<(), Whatever> {
     ///     std::env::var_os(env_var_name).with_whatever_context(|| {
-    ///         format!("couldn't get the environment variable {}", env_var_name)
+    ///         format!("couldn't get the environment variable {env_var_name}")
     ///     })?;
     ///     Ok(())
     /// }
@@ -912,7 +1038,7 @@ pub trait OptionExt<T>: Sized {
 }
 
 impl<T> OptionExt<T> for Option<T> {
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn context<C, E>(self, context: C) -> Result<T, E>
     where
         C: IntoError<E, Source = NoneError>,
@@ -925,7 +1051,7 @@ impl<T> OptionExt<T> for Option<T> {
         }
     }
 
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn with_context<F, C, E>(self, context: F) -> Result<T, E>
     where
         F: FnOnce() -> C,
@@ -940,7 +1066,7 @@ impl<T> OptionExt<T> for Option<T> {
     }
 
     #[cfg(any(feature = "std", test))]
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn whatever_context<S, E>(self, context: S) -> Result<T, E>
     where
         S: Into<String>,
@@ -953,7 +1079,7 @@ impl<T> OptionExt<T> for Option<T> {
     }
 
     #[cfg(any(feature = "std", test))]
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn with_whatever_context<F, S, E>(self, context: F) -> Result<T, E>
     where
         F: FnOnce() -> S,
@@ -970,8 +1096,8 @@ impl<T> OptionExt<T> for Option<T> {
     }
 }
 
-/// Backports changes to the [`Error`](std::error::Error) trait to
-/// versions of Rust lacking them.
+/// Backports changes to the [`Error`][] trait to versions of Rust
+/// lacking them.
 ///
 /// It is recommended to always call these methods explicitly so that
 /// it is easy to replace usages of this trait when you start
@@ -986,7 +1112,7 @@ impl<T> OptionExt<T> for Option<T> {
 /// # }
 /// ```
 pub trait ErrorCompat {
-    /// Returns a [`Backtrace`](Backtrace) that may be printed.
+    /// Returns a [`Backtrace`][] that may be printed.
     fn backtrace(&self) -> Option<&Backtrace> {
         None
     }
@@ -1145,7 +1271,7 @@ pub trait GenerateImplicitData {
     fn generate() -> Self;
 
     /// Build the data using the given source
-    #[cfg_attr(feature = "rust_1_46", track_caller)]
+    #[track_caller]
     fn generate_with_source(source: &dyn crate::Error) -> Self
     where
         Self: Sized,
@@ -1193,11 +1319,9 @@ impl GenerateImplicitData for Option<Backtrace> {
     fn generate_with_source(source: &dyn crate::Error) -> Self {
         #[cfg(feature = "unstable-provider-api")]
         {
-            use core::any;
-
             if !backtrace_collection_enabled() {
                 None
-            } else if any::request_ref::<Backtrace>(source).is_some() {
+            } else if error::request_ref::<Backtrace>(source).is_some() {
                 None
             } else {
                 Some(Backtrace::generate_with_source(source))
@@ -1234,51 +1358,30 @@ fn backtrace_collection_enabled() -> bool {
     })
 }
 
-#[cfg(feature = "backtraces-impl-backtrace-crate")]
-impl GenerateImplicitData for Backtrace {
-    fn generate() -> Self {
-        Backtrace::new()
-    }
-}
-
-#[cfg(feature = "backtraces-impl-backtrace-crate")]
-impl AsBacktrace for Backtrace {
-    fn as_backtrace(&self) -> Option<&Backtrace> {
-        Some(self)
-    }
-}
-
-#[cfg(feature = "backtraces-impl-std")]
-impl GenerateImplicitData for Backtrace {
-    fn generate() -> Self {
-        Backtrace::force_capture()
-    }
-}
-
-#[cfg(feature = "backtraces-impl-std")]
-impl AsBacktrace for Backtrace {
-    fn as_backtrace(&self) -> Option<&Backtrace> {
-        Some(self)
-    }
-}
-
 /// The source code location where the error was reported.
 ///
-/// To use it, add a field `location: Location` to your error. This
-/// will automatically register it as [implicitly generated
-/// data][implicit].
+/// To use it, add a field of type `Location` to your error and
+/// register it as [implicitly generated data][implicit]. When
+/// constructing the error, you do not need to provide the location:
+///
+/// ```rust
+/// # use snafu::prelude::*;
+/// #[derive(Debug, Snafu)]
+/// struct NeighborhoodError {
+///     #[snafu(implicit)]
+///     loc: snafu::Location,
+/// }
+///
+/// fn check_next_door() -> Result<(), NeighborhoodError> {
+///     ensure!(everything_quiet(), NeighborhoodSnafu);
+///     Ok(())
+/// }
+/// # fn everything_quiet() -> bool { false }
+/// ```
 ///
 /// [implicit]: Snafu#controlling-implicitly-generated-data
 ///
 /// ## Limitations
-///
-/// ### Rust 1.46
-///
-/// You need to enable the [`rust_1_46` feature flag][flag] for
-/// implicit location capture. If you cannot enable that, you can
-/// still use the [`location!`] macro at the expense of more typing.
-///
-/// [flag]: guide::compatibility#rust_1_46
 ///
 /// ### Disabled context selectors
 ///
@@ -1329,18 +1432,19 @@ impl AsBacktrace for Backtrace {
 /// #[derive(Debug, Snafu)]
 /// struct ImplicitLocationError {
 ///     source: AnotherError,
+///     #[snafu(implicit)]
 ///     location: Location,
 /// }
 ///
 /// #[derive(Debug, Snafu)]
 /// struct ExplicitLocationError {
 ///     source: AnotherError,
-///     #[snafu(implicit(false))]
 ///     location: Location,
 /// }
 /// # }
 /// ```
 #[derive(Copy, Clone)]
+#[non_exhaustive]
 pub struct Location {
     /// The file where the error was reported
     pub file: &'static str,
@@ -1348,24 +1452,15 @@ pub struct Location {
     pub line: u32,
     /// The column where the error was reported
     pub column: u32,
-
-    // Use `#[non_exhaustive]` when we upgrade to Rust 1.40
-    _other: (),
 }
 
 impl Location {
     /// Constructs a `Location` using the given information
     pub fn new(file: &'static str, line: u32, column: u32) -> Self {
-        Self {
-            file,
-            line,
-            column,
-            _other: (),
-        }
+        Self { file, line, column }
     }
 }
 
-#[cfg(feature = "rust_1_46")]
 impl Default for Location {
     #[track_caller]
     fn default() -> Self {
@@ -1374,12 +1469,10 @@ impl Default for Location {
             file: loc.file(),
             line: loc.line(),
             column: loc.column(),
-            _other: (),
         }
     }
 }
 
-#[cfg(feature = "rust_1_46")]
 impl GenerateImplicitData for Location {
     #[inline]
     #[track_caller]
@@ -1438,7 +1531,7 @@ macro_rules! location {
 ///     if a > b {
 ///         Ok(a - b)
 ///     } else {
-///         whatever!("Can't subtract {} - {}", a, b)
+///         whatever!("Can't subtract {a} - {b}")
 ///     }
 /// }
 ///
@@ -1493,4 +1586,10 @@ impl Whatever {
 
         Some(best_backtrace)
     }
+}
+
+mod tests {
+    #[cfg(doc)]
+    #[doc = include_str!("../README.md")]
+    fn readme_tests() {}
 }

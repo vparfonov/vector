@@ -1,5 +1,21 @@
 # `supports-color` Release Changelog
 
+<a name="2.1.0"></a>
+## 2.1.0 (2023-09-20)
+
+### Features
+
+* **ignore_is_terminal:** Allow the is_terminal check to be overridden by environment variable. (#13) ([ff0a31a6](https://github.com/zkat/supports-color/commit/ff0a31a672da89a48ad1978220184b91218fde32))
+* **truecolor:** improve check for truecolor (#14) ([736c044a](https://github.com/zkat/supports-color/commit/736c044a9aa36e259fef25cd790c466f1bf7b011))
+
+<a name="2.0.0"></a>
+## 2.0.0 (2022-12-15)
+
+### Bug Fixes
+
+* **deps:** Replace atty with is_terminal (#10) ([edf565e5](https://github.com/zkat/supports-color/commit/edf565e553a2ad8b429a0b54ecec4128b6430e2b))
+    * **BREAKING CHANGE**: Exported stream types are no longer atty's getting re-exported.
+
 <a name="1.3.1"></a>
 ## 1.3.1 (2022-11-05)
 

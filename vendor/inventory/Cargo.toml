@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.62"
 name = "inventory"
-version = "0.3.12"
+version = "0.3.15"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 description = "Typed distributed plugin registration"
 documentation = "https://docs.rs/inventory"
@@ -39,5 +39,5 @@ doc-scrape-examples = false
 version = "1.0"
 
 [dev-dependencies.trybuild]
-version = "1.0.66"
+version = "1.0.89"
 features = ["diff"]

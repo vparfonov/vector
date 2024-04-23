@@ -41,7 +41,7 @@ fn test_decoder() {
 
     let r = Reader::open_readfile("test-data/test-data/MaxMind-DB-test-decoder.mmdb");
     if let Err(err) = r {
-        panic!("error opening mmdb: {:?}", err);
+        panic!("error opening mmdb: {err:?}");
     }
     let r = r.unwrap();
     let ip: IpAddr = FromStr::from_str("1.1.1.0").unwrap();
@@ -84,7 +84,7 @@ fn test_pointers_in_metadata() {
 
     let r = Reader::open_readfile("test-data/test-data/MaxMind-DB-test-metadata-pointers.mmdb");
     if let Err(err) = r {
-        panic!("error opening mmdb: {:?}", err);
+        panic!("error opening mmdb: {err:?}");
     }
 }
 
@@ -149,10 +149,8 @@ fn test_reader() {
     for record_size in &sizes {
         let versions = [4_usize, 6];
         for ip_version in &versions {
-            let filename = format!(
-                "test-data/test-data/MaxMind-DB-test-ipv{}-{}.mmdb",
-                ip_version, record_size
-            );
+            let filename =
+                format!("test-data/test-data/MaxMind-DB-test-ipv{ip_version}-{record_size}.mmdb");
             let reader = Reader::open_readfile(filename).ok().unwrap();
 
             check_metadata(&reader, *ip_version, *record_size);
@@ -170,10 +168,8 @@ fn test_reader_readfile() {
     for record_size in &sizes {
         let versions = [4_usize, 6];
         for ip_version in &versions {
-            let filename = format!(
-                "test-data/test-data/MaxMind-DB-test-ipv{}-{}.mmdb",
-                ip_version, record_size
-            );
+            let filename =
+                format!("test-data/test-data/MaxMind-DB-test-ipv{ip_version}-{record_size}.mmdb");
             let reader = Reader::open_readfile(filename).ok().unwrap();
 
             check_metadata(&reader, *ip_version, *record_size);
@@ -382,7 +378,7 @@ fn test_within_city() {
     // Make sure the first is what we expect it to be
     let item = iter.next().unwrap().unwrap();
     assert_eq!(item.ip_net, IpNetwork::V4("2.2.3.0/24".parse().unwrap()));
-    assert_eq!(item.info.city.unwrap().geoname_id, Some(2655045));
+    assert_eq!(item.info.city.unwrap().geoname_id, Some(2_655_045));
 
     let mut n = 1;
     for _ in iter {
@@ -403,8 +399,7 @@ fn test_within_city() {
         IpNetwork::V4("81.2.69.144/28".parse().unwrap()),
         IpNetwork::V4("81.2.69.142/31".parse().unwrap()),
     ];
-    while !expected.is_empty() {
-        let e = expected.pop().unwrap();
+    while let Some(e) = expected.pop() {
         let item = iter.next().unwrap().unwrap();
         assert_eq!(item.ip_net, e);
     }
@@ -480,7 +475,7 @@ fn check_ip<T: AsRef<[u8]>>(reader: &Reader<T>, ip_version: usize) {
     for &address in &no_record {
         let ip: IpAddr = FromStr::from_str(address).unwrap();
         match reader.lookup::<IpType>(ip) {
-            Ok(v) => panic!("received an unexpected value: {:?}", v),
+            Ok(v) => panic!("received an unexpected value: {v:?}"),
             Err(e) => assert_eq!(
                 e,
                 MaxMindDBError::AddressNotFoundError("Address not found in database".to_string())

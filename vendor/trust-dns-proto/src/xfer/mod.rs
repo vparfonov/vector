@@ -14,7 +14,7 @@ use futures_channel::oneshot;
 use futures_util::future::Future;
 use futures_util::ready;
 use futures_util::stream::{Fuse, Peekable, Stream, StreamExt};
-use tracing::{debug, warn};
+use log::{debug, warn};
 
 use crate::error::*;
 use crate::Time;
@@ -44,13 +44,8 @@ pub use self::retry_dns_handle::RetryDnsHandle;
 pub use self::serial_message::SerialMessage;
 
 /// Ignores the result of a send operation and logs and ignores errors
-fn ignore_send<M, T>(result: Result<M, mpsc::TrySendError<T>>) {
+fn ignore_send<M, E: Debug>(result: Result<M, E>) {
     if let Err(error) = result {
-        if error.is_disconnected() {
-            debug!("ignoring send error on disconnected stream");
-            return;
-        }
-
         warn!("error notifying wait, possible future leak: {:?}", error);
     }
 }
@@ -116,7 +111,7 @@ impl DnsStreamHandle for BufDnsStreamHandle {
         let sender: &mut _ = &mut self.sender;
         sender
             .try_send(SerialMessage::new(buffer.into_parts().0, remote_addr))
-            .map_err(|e| ProtoError::from(format!("mpsc::SendError {e}")))
+            .map_err(|e| ProtoError::from(format!("mpsc::SendError {}", e)))
     }
 }
 
@@ -168,11 +163,7 @@ impl DnsHandle for BufDnsRequestStreamHandle {
 
     fn send<R: Into<DnsRequest>>(&mut self, request: R) -> Self::Response {
         let request: DnsRequest = request.into();
-        debug!(
-            "enqueueing message:{}:{:?}",
-            request.op_code(),
-            request.queries()
-        );
+        debug!("enqueueing message: {:?}", request.queries());
 
         let (request, oneshot) = OneshotDnsRequest::oneshot(request);
         try_oneshot!(self.sender.try_send(request).map_err(|_| {
@@ -236,17 +227,17 @@ impl Stream for DnsResponseReceiver {
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         loop {
             *self = match *self.as_mut() {
-                Self::Receiver(ref mut receiver) => {
+                DnsResponseReceiver::Receiver(ref mut receiver) => {
                     let receiver = Pin::new(receiver);
                     let future = ready!(receiver
                         .poll(cx)
                         .map_err(|_| ProtoError::from("receiver was canceled")))?;
                     Self::Received(future)
                 }
-                Self::Received(ref mut stream) => {
+                DnsResponseReceiver::Received(ref mut stream) => {
                     return stream.poll_next_unpin(cx);
                 }
-                Self::Err(ref mut err) => return Poll::Ready(err.take().map(Err)),
+                DnsResponseReceiver::Err(ref mut err) => return Poll::Ready(err.take().map(Err)),
             };
         }
     }

@@ -1,6 +1,5 @@
 #![cfg(feature = "luau")]
 
-use std::env;
 use std::fmt::Debug;
 use std::fs;
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -8,7 +7,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
 use mlua::{
-    Compiler, CoverageInfo, Error, Lua, Result, Table, ThreadStatus, Value, Vector, VmState,
+    Compiler, CoverageInfo, Error, Lua, LuaOptions, Result, StdLib, Table, ThreadStatus, Value,
+    Vector, VmState,
 };
 
 #[test]
@@ -23,7 +23,18 @@ fn test_version() -> Result<()> {
 
 #[test]
 fn test_require() -> Result<()> {
-    let lua = Lua::new();
+    // Ensure that require() is not available if package module is not loaded
+    let mut lua = Lua::new_with(StdLib::NONE, LuaOptions::default())?;
+    assert!(lua.globals().get::<_, Option<Value>>("require")?.is_none());
+    assert!(lua.globals().get::<_, Option<Value>>("package")?.is_none());
+
+    if cfg!(target_arch = "wasm32") {
+        // TODO: figure out why emscripten fails on file operations
+        // Also see https://github.com/rust-lang/rust/issues/119250
+        return Ok(());
+    }
+
+    lua = Lua::new();
 
     let temp_dir = tempfile::tempdir().unwrap();
     fs::write(
@@ -37,7 +48,10 @@ fn test_require() -> Result<()> {
     "#,
     )?;
 
-    env::set_var("LUAU_PATH", temp_dir.path().join("?.luau"));
+    lua.globals()
+        .get::<_, Table>("package")?
+        .set("path", temp_dir.path().join("?.luau").to_string_lossy())?;
+
     lua.load(
         r#"
         local module = require("module")
@@ -49,7 +63,28 @@ fn test_require() -> Result<()> {
         assert(not ok and string.find(err, "module.luau") ~= nil)
     "#,
     )
-    .exec()
+    .exec()?;
+
+    // Require non-existent module
+    match lua.load("require('non-existent')").exec() {
+        Err(Error::RuntimeError(e)) if e.contains("module 'non-existent' not found") => {}
+        r => panic!("expected RuntimeError(...) with a specific message, got {r:?}"),
+    }
+
+    // Require binary module in safe mode
+    lua.globals()
+        .get::<_, Table>("package")?
+        .set("cpath", temp_dir.path().join("?.so").to_string_lossy())?;
+    fs::write(temp_dir.path().join("dylib.so"), "")?;
+    match lua.load("require('dylib')").exec() {
+        Err(Error::RuntimeError(e)) if cfg!(unix) && e.contains("module 'dylib' not found") => {
+            assert!(e.contains("dynamic libraries are disabled in safe mode"))
+        }
+        Err(Error::RuntimeError(e)) if e.contains("module 'dylib' not found") => {}
+        r => panic!("expected RuntimeError(...) with a specific message, got {r:?}"),
+    }
+
+    Ok(())
 }
 
 #[cfg(not(feature = "luau-vector4"))]
@@ -241,6 +276,22 @@ fn test_sandbox() -> Result<()> {
 }
 
 #[test]
+fn test_sandbox_nolibs() -> Result<()> {
+    let lua = Lua::new_with(StdLib::NONE, LuaOptions::default()).unwrap();
+
+    lua.sandbox(true)?;
+    lua.load("global = 123").exec()?;
+    let n: i32 = lua.load("return global").eval()?;
+    assert_eq!(n, 123);
+    assert_eq!(lua.globals().get::<_, Option<i32>>("global")?, Some(123));
+
+    lua.sandbox(false)?;
+    assert_eq!(lua.globals().get::<_, Option<i32>>("global")?, None);
+
+    Ok(())
+}
+
+#[test]
 fn test_sandbox_threads() -> Result<()> {
     let lua = Lua::new();
 
@@ -404,6 +455,32 @@ fn test_coverage() -> Result<()> {
             hits: vec![-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, 1, -1, -1],
         }
     );
+
+    Ok(())
+}
+
+#[test]
+fn test_buffer() -> Result<()> {
+    let lua = Lua::new();
+
+    let buf1 = lua
+        .load(
+            r#"
+        local buf = buffer.fromstring("hello")
+        assert(buffer.len(buf) == 5)
+        return buf
+    "#,
+        )
+        .eval::<Value>()?;
+    assert!(buf1.is_userdata() && buf1.is_buffer());
+    assert_eq!(buf1.type_name(), "buffer");
+
+    let buf2 = lua.load("buffer.fromstring('hello')").eval::<Value>()?;
+    assert_ne!(buf1, buf2);
+
+    // Check that we can pass buffer type to Lua
+    let func = lua.create_function(|_, buf: Value| return buf.to_string())?;
+    assert!(func.call::<_, String>(buf1)?.starts_with("buffer:"));
 
     Ok(())
 }

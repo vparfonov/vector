@@ -1,7 +1,5 @@
-use std::collections::BTreeMap;
-
 use crate::compiler::TimeZone;
-use crate::value::Value;
+use crate::value::{ObjectMap, Value};
 use chrono::prelude::{DateTime, Utc};
 use once_cell::sync::Lazy;
 use regex::{Captures, Regex};
@@ -135,7 +133,7 @@ pub(crate) static REGEX_INGRESS_NGINX_UPSTREAMINFO_LOG: Lazy<Regex> = Lazy::new(
         "(?P<request>[^"]*)"\s+                             # Match any non double-quote character
         (?P<status>\d+)\s+                                  # Match numbers
         (?P<body_bytes_size>\d+)\s+                         # Match numbers
-        "(-|(?P<http_referer>[^"]+))"\s+                    # Match `-` or any non double-quote character
+        "(-|(?P<http_referer>[^"]*))"\s+                    # Match `-` or any non double-quote character
         "(-|(?P<http_user_agent>[^"]+))"\s+                 # Match `-` or any non double-quote character
         (?P<request_length>\d+)\s+                          # Match numbers
         (?P<request_time>\d+\.\d+)\s+                       # Match numbers with dot
@@ -232,13 +230,13 @@ pub(crate) fn log_fields(
             name.and_then(|name| {
                 captures.name(name).map(|value| {
                     Ok((
-                        name.to_string(),
+                        name.to_string().into(),
                         capture_value(name, value.as_str(), timestamp_format, timezone)?,
                     ))
                 })
             })
         })
-        .collect::<std::result::Result<BTreeMap<String, Value>, String>>()?
+        .collect::<std::result::Result<ObjectMap, String>>()?
         .into())
 }
 

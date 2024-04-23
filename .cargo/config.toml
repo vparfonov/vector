@@ -40,14 +40,14 @@ rustflags = ["-C", "codegen-units=1"]
 [source.crates-io]
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/GreptimeTeam/greptime-proto.git?tag=0.2.1"]
+[source."git+https://github.com/GreptimeTeam/greptime-proto.git?tag=v0.4.1"]
 git = "https://github.com/GreptimeTeam/greptime-proto.git"
-tag = "0.2.1"
+tag = "v0.4.1"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/GreptimeTeam/greptimedb-client-rust.git?rev=bc32362adf0df17a41a95bae4221d6d8f1775656"]
-git = "https://github.com/GreptimeTeam/greptimedb-client-rust.git"
-rev = "bc32362adf0df17a41a95bae4221d6d8f1775656"
+[source."git+https://github.com/GreptimeTeam/greptimedb-ingester-rust.git?rev=d21dbcff680139ed2065b62100bac3123da7c789"]
+git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust.git"
+rev = "d21dbcff680139ed2065b62100bac3123da7c789"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/MSxDOS/ntapi.git?rev=24fc1e47677fc9f6e38e5f154e6011dc9b270da6"]

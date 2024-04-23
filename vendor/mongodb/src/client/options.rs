@@ -586,6 +586,10 @@ pub struct ClientOptions {
     #[builder(default)]
     pub write_concern: Option<WriteConcern>,
 
+    /// Limit on the number of mongos connections that may be created for sharded topologies.
+    #[builder(default)]
+    pub srv_max_hosts: Option<u32>,
+
     /// Information from the SRV URI that generated these client options, if applicable.
     #[builder(default, setter(skip))]
     #[serde(skip)]
@@ -708,6 +712,8 @@ impl Serialize for ClientOptions {
             zlibcompressionlevel: &'a Option<i32>,
 
             loadbalanced: &'a Option<bool>,
+
+            srvmaxhosts: Option<i32>,
         }
 
         let client_options = ClientOptionsHelper {
@@ -732,6 +738,11 @@ impl Serialize for ClientOptions {
             writeconcern: &self.write_concern,
             loadbalanced: &self.load_balanced,
             zlibcompressionlevel: &None,
+            srvmaxhosts: self
+                .srv_max_hosts
+                .map(|v| v.try_into())
+                .transpose()
+                .map_err(serde::ser::Error::custom)?,
         };
 
         client_options.serialize(serializer)
@@ -802,7 +813,7 @@ pub struct ConnectionString {
     /// `max_pool_size` connections are checked out, the operation will block until an in-progress
     /// operation finishes and its connection is checked back into the pool.
     ///
-    /// The default value is 100.
+    /// The default value is 10.
     pub max_pool_size: Option<u32>,
 
     /// The minimum number of connections that should be available in a server's connection pool at
@@ -874,6 +885,9 @@ pub struct ConnectionString {
     /// driver; client code can use this when deserializing relevant values with
     /// [`Binary::to_uuid_with_representation`](bson::binary::Binary::to_uuid_with_representation).
     pub uuid_representation: Option<UuidRepresentation>,
+
+    /// Limit on the number of mongos connections that may be created for sharded topologies.
+    pub srv_max_hosts: Option<u32>,
 
     wait_queue_timeout: Option<Duration>,
     tls_insecure: Option<bool>,
@@ -1252,6 +1266,24 @@ impl ClientOptions {
                     options.load_balanced = config.load_balanced;
                 }
 
+                if let Some(max) = options.srv_max_hosts {
+                    if max > 0 {
+                        if options.repl_set_name.is_some() {
+                            return Err(Error::invalid_argument(
+                                "srvMaxHosts and replicaSet cannot both be present",
+                            ));
+                        }
+                        if options.load_balanced == Some(true) {
+                            return Err(Error::invalid_argument(
+                                "srvMaxHosts and loadBalanced=true cannot both be present",
+                            ));
+                        }
+                        config.hosts = crate::sdam::choose_n(&config.hosts, max as usize)
+                            .cloned()
+                            .collect();
+                    }
+                }
+
                 // Set the ClientOptions hosts to those found during the SRV lookup.
                 config.hosts
             }
@@ -1338,6 +1370,7 @@ impl ClientOptions {
             test_options: None,
             #[cfg(feature = "tracing-unstable")]
             tracing_max_document_length_bytes: None,
+            srv_max_hosts: conn_str.srv_max_hosts,
         }
     }
 
@@ -1418,6 +1451,29 @@ impl ClientOptions {
                     ),
                 }
                 .into());
+            }
+        }
+
+        #[cfg(feature = "tracing-unstable")]
+        {
+            let hostnames = if let Some(info) = &self.original_srv_info {
+                vec![info.hostname.to_ascii_lowercase()]
+            } else {
+                self.hosts
+                    .iter()
+                    .filter_map(|addr| match addr {
+                        ServerAddress::Tcp { host, .. } => Some(host.to_ascii_lowercase()),
+                        _ => None,
+                    })
+                    .collect()
+            };
+            if hostnames.iter().any(|s| s.ends_with(".cosmos.azure.com")) {
+                tracing::info!("You appear to be connected to a CosmosDB cluster. For more information regarding feature compatibility and support please visit https://www.mongodb.com/supportability/cosmosdb");
+            }
+            if hostnames.iter().any(|s| {
+                s.ends_with(".docdb.amazonaws.com") || s.ends_with(".docdb-elastic.amazonaws.com")
+            }) {
+                tracing::info!("You appear to be connected to a DocumentDB cluster. For more information regarding feature compatibility and support please visit https://www.mongodb.com/supportability/documentdb");
             }
         }
 
@@ -1697,6 +1753,26 @@ impl ConnectionString {
         } else {
             ConnectionStringParts::default()
         };
+
+        if let Some(srv_max_hosts) = conn_str.srv_max_hosts {
+            if !srv {
+                return Err(Error::invalid_argument(
+                    "srvMaxHosts cannot be specified with a non-SRV URI",
+                ));
+            }
+            if srv_max_hosts > 0 {
+                if conn_str.replica_set.is_some() {
+                    return Err(Error::invalid_argument(
+                        "srvMaxHosts and replicaSet cannot both be present",
+                    ));
+                }
+                if conn_str.load_balanced == Some(true) {
+                    return Err(Error::invalid_argument(
+                        "srvMaxHosts and loadBalanced=true cannot both be present",
+                    ));
+                }
+            }
+        }
 
         // Set username and password.
         if let Some(u) = username {
@@ -2123,6 +2199,9 @@ impl ConnectionString {
             }
             k @ "sockettimeoutms" => {
                 self.socket_timeout = Some(Duration::from_millis(get_duration!(value, k)));
+            }
+            k @ "srvmaxhosts" => {
+                self.srv_max_hosts = Some(get_u32!(value, k));
             }
             k @ "tls" | k @ "ssl" => {
                 let tls = get_bool!(value, k);

@@ -122,11 +122,12 @@ pub mod country {
     #[derive(Deserialize, Serialize, Clone, Debug)]
     pub struct Traits {
         pub is_anonymous_proxy: Option<bool>,
+        pub is_anycast: Option<bool>,
         pub is_satellite_provider: Option<bool>,
     }
 }
 
-/// Country model structs
+/// City model structs
 pub mod city {
     use serde::{Deserialize, Serialize};
     use std::collections::BTreeMap;
@@ -218,6 +219,7 @@ pub mod enterprise {
         pub is_anonymous: Option<bool>,
         pub is_anonymous_proxy: Option<bool>,
         pub is_anonymous_vpn: Option<bool>,
+        pub is_anycast: Option<bool>,
         pub is_hosting_provider: Option<bool>,
         pub isp: Option<&'a str>,
         pub is_public_proxy: Option<bool>,

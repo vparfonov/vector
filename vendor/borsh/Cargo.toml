@@ -11,13 +11,15 @@
 
 [package]
 edition = "2018"
+rust-version = "1.66.0"
 name = "borsh"
-version = "0.10.3"
+version = "1.2.0"
 authors = ["Near Inc <hello@near.org>"]
+exclude = ["tests/snapshots"]
 description = """
 Binary Object Representation Serializer for Hashing
 """
-homepage = "http://borsh.io"
+homepage = "https://borsh.io"
 readme = "README.md"
 categories = [
     "encoding",
@@ -26,6 +28,13 @@ categories = [
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/near/borsh-rs"
 
+[package.metadata.docs.rs]
+features = [
+    "derive",
+    "unstable__schema",
+]
+targets = ["x86_64-unknown-linux-gnu"]
+
 [lib]
 name = "borsh"
 path = "src/lib.rs"
@@ -33,22 +42,50 @@ path = "src/lib.rs"
 [[bin]]
 name = "generate_schema_schema"
 path = "src/generate_schema_schema.rs"
+required-features = [
+    "std",
+    "unstable__schema",
+]
+
+[dependencies.ascii]
+version = "1.1"
+optional = true
 
 [dependencies.borsh-derive]
-version = "=0.10.3"
+version = "~1.2.0"
+optional = true
+
+[dependencies.bson]
+version = "2"
+optional = true
 
 [dependencies.bytes]
 version = "1"
 optional = true
 
 [dependencies.hashbrown]
-version = ">=0.11,<0.14"
+version = ">=0.11,<0.15.0"
+optional = true
+
+[dev-dependencies.bson]
+version = "2"
 
 [dev-dependencies.bytes]
 version = "1"
 
+[dev-dependencies.insta]
+version = "1.29.0"
+
+[build-dependencies.cfg_aliases]
+version = "0.1.0"
+
 [features]
-const-generics = []
+de_strict_order = []
 default = ["std"]
+derive = ["borsh-derive"]
 rc = []
 std = []
+unstable__schema = [
+    "derive",
+    "borsh-derive/schema",
+]

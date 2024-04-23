@@ -25,12 +25,9 @@ use std::task::Poll;
 use bytes::Buf;
 use bytes::BufMut;
 use bytes::Bytes;
-use futures::StreamExt;
 
 use crate::raw::*;
-use crate::Error;
-use crate::ErrorKind;
-use crate::Result;
+use crate::*;
 
 /// Body used in async HTTP requests.
 #[derive(Default)]
@@ -74,6 +71,16 @@ impl IncomingAsyncBody {
         }
     }
 
+    /// Create an empty IncomingAsyncBody.
+    pub(crate) fn empty() -> Self {
+        Self {
+            inner: Box::new(()),
+            size: Some(0),
+            consumed: 0,
+            chunk: None,
+        }
+    }
+
     /// Consume the entire body.
     pub async fn consume(mut self) -> Result<()> {
         use oio::ReadExt;
@@ -91,12 +98,12 @@ impl IncomingAsyncBody {
 
     /// Consume the response to bytes.
     ///
-    /// This code is Inspired from hyper's [`to_bytes`](https://docs.rs/hyper/latest/hyper/body/fn.to_bytes.html).
+    /// This code is inspired from hyper's [`to_bytes`](https://docs.rs/hyper/0.14.23/hyper/body/fn.to_bytes.html).
     pub async fn bytes(mut self) -> Result<Bytes> {
         use oio::ReadExt;
 
         // If there's only 1 chunk, we can just return Buf::to_bytes()
-        let mut first = if let Some(buf) = self.next().await {
+        let first = if let Some(buf) = self.next().await {
             buf?
         } else {
             return Ok(Bytes::new());
@@ -105,11 +112,19 @@ impl IncomingAsyncBody {
         let second = if let Some(buf) = self.next().await {
             buf?
         } else {
-            return Ok(first.copy_to_bytes(first.remaining()));
+            return Ok(first);
         };
 
         // With more than 1 buf, we gotta flatten into a Vec first.
-        let cap = first.remaining() + second.remaining() + self.size.unwrap_or_default() as usize;
+        let cap = if let Some(size) = self.size {
+            // The convert from u64 to usize could fail, but it's unlikely.
+            // Let's just make it overflow.
+            size as usize
+        } else {
+            // It's highly possible that we have more data to read.
+            // Add extra 16K buffer to avoid another allocation.
+            first.remaining() + second.remaining() + 16 * 1024
+        };
         let mut vec = Vec::with_capacity(cap);
         vec.put(first);
         vec.put(second);
@@ -127,7 +142,7 @@ impl IncomingAsyncBody {
             Ordering::Equal => Ok(()),
             Ordering::Less => Err(Error::new(
                 ErrorKind::ContentIncomplete,
-                &format!("reader got too less data, expect: {expect}, actual: {actual}"),
+                &format!("reader got too little data, expect: {expect}, actual: {actual}"),
             )
             .set_temporary()),
             Ordering::Greater => Err(Error::new(
@@ -141,17 +156,31 @@ impl IncomingAsyncBody {
 
 impl oio::Read for IncomingAsyncBody {
     fn poll_read(&mut self, cx: &mut Context<'_>, mut buf: &mut [u8]) -> Poll<Result<usize>> {
-        if buf.is_empty() {
+        if buf.is_empty() || self.size == Some(0) {
             return Poll::Ready(Ok(0));
         }
 
-        // We must get a valid bytes from underlying stream
-        let mut bs = loop {
-            match ready!(self.poll_next(cx)) {
-                Some(Ok(bs)) if bs.is_empty() => continue,
-                Some(Ok(bs)) => break bs,
-                Some(Err(err)) => return Poll::Ready(Err(err)),
-                None => return Poll::Ready(Ok(0)),
+        // Avoid extra poll of next if we already have chunks.
+        let mut bs = if let Some(chunk) = self.chunk.take() {
+            chunk
+        } else {
+            loop {
+                match ready!(self.inner.poll_next(cx)) {
+                    // It's possible for underlying stream to return empty bytes, we should continue
+                    // to fetch next one.
+                    Some(Ok(bs)) if bs.is_empty() => continue,
+                    Some(Ok(bs)) => {
+                        self.consumed += bs.len() as u64;
+                        break bs;
+                    }
+                    Some(Err(err)) => return Poll::Ready(Err(err)),
+                    None => {
+                        if let Some(size) = self.size {
+                            Self::check(size, self.consumed)?;
+                        }
+                        return Poll::Ready(Ok(0));
+                    }
+                }
             }
         };
 
@@ -175,11 +204,15 @@ impl oio::Read for IncomingAsyncBody {
     }
 
     fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Bytes>>> {
+        if self.size == Some(0) {
+            return Poll::Ready(None);
+        }
+
         if let Some(bs) = self.chunk.take() {
             return Poll::Ready(Some(Ok(bs)));
         }
 
-        let res = match ready!(self.inner.poll_next_unpin(cx)) {
+        let res = match ready!(self.inner.poll_next(cx)) {
             Some(Ok(bs)) => {
                 self.consumed += bs.len() as u64;
                 Some(Ok(bs))

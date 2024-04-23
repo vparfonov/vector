@@ -26,37 +26,52 @@ use log::debug;
 use reqsign::TencentCosConfig;
 use reqsign::TencentCosCredentialLoader;
 use reqsign::TencentCosSigner;
+use serde::Deserialize;
 
-use super::core::CosCore;
+use super::core::*;
 use super::error::parse_error;
-use super::pager::CosPager;
+use super::lister::CosLister;
 use super::writer::CosWriter;
 use crate::raw::*;
-use crate::services::cos::appender::CosAppender;
+use crate::services::cos::writer::CosWriters;
 use crate::*;
 
-/// Huawei Cloud COS services support.
-#[doc = include_str!("docs.md")]
-#[derive(Default, Clone)]
-pub struct CosBuilder {
+/// Tencent-Cloud COS services support.
+#[derive(Default, Deserialize, Clone)]
+#[serde(default)]
+pub struct CosConfig {
     root: Option<String>,
     endpoint: Option<String>,
     secret_id: Option<String>,
     secret_key: Option<String>,
     bucket: Option<String>,
-    http_client: Option<HttpClient>,
-
     disable_config_load: bool,
 }
 
-impl Debug for CosBuilder {
+impl Debug for CosConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Builder")
+        f.debug_struct("CosConfig")
             .field("root", &self.root)
             .field("endpoint", &self.endpoint)
             .field("secret_id", &"<redacted>")
             .field("secret_key", &"<redacted>")
             .field("bucket", &self.bucket)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Tencent-Cloud COS services support.
+#[doc = include_str!("docs.md")]
+#[derive(Default, Clone)]
+pub struct CosBuilder {
+    config: CosConfig,
+    http_client: Option<HttpClient>,
+}
+
+impl Debug for CosBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CosBuilder")
+            .field("config", &self.config)
             .finish()
     }
 }
@@ -67,7 +82,7 @@ impl CosBuilder {
     /// All operations will happen under this root.
     pub fn root(&mut self, root: &str) -> &mut Self {
         if !root.is_empty() {
-            self.root = Some(root.to_string())
+            self.config.root = Some(root.to_string())
         }
 
         self
@@ -82,7 +97,7 @@ impl CosBuilder {
     /// - `https://cos.ap-singapore.myqcloud.com`
     pub fn endpoint(&mut self, endpoint: &str) -> &mut Self {
         if !endpoint.is_empty() {
-            self.endpoint = Some(endpoint.trim_end_matches('/').to_string());
+            self.config.endpoint = Some(endpoint.trim_end_matches('/').to_string());
         }
 
         self
@@ -93,7 +108,7 @@ impl CosBuilder {
     /// - If not, we will try to load it from environment.
     pub fn secret_id(&mut self, secret_id: &str) -> &mut Self {
         if !secret_id.is_empty() {
-            self.secret_id = Some(secret_id.to_string());
+            self.config.secret_id = Some(secret_id.to_string());
         }
 
         self
@@ -104,7 +119,7 @@ impl CosBuilder {
     /// - If not, we will try to load it from environment.
     pub fn secret_key(&mut self, secret_key: &str) -> &mut Self {
         if !secret_key.is_empty() {
-            self.secret_key = Some(secret_key.to_string());
+            self.config.secret_key = Some(secret_key.to_string());
         }
 
         self
@@ -114,7 +129,7 @@ impl CosBuilder {
     /// The param is required.
     pub fn bucket(&mut self, bucket: &str) -> &mut Self {
         if !bucket.is_empty() {
-            self.bucket = Some(bucket.to_string());
+            self.config.bucket = Some(bucket.to_string());
         }
 
         self
@@ -127,7 +142,7 @@ impl CosBuilder {
     ///
     /// - envs like `TENCENTCLOUD_SECRET_ID`
     pub fn disable_config_load(&mut self) -> &mut Self {
-        self.disable_config_load = true;
+        self.config.disable_config_load = true;
         self
     }
 
@@ -148,24 +163,22 @@ impl Builder for CosBuilder {
     type Accessor = CosBackend;
 
     fn from_map(map: HashMap<String, String>) -> Self {
-        let mut builder = CosBuilder::default();
+        let config = CosConfig::deserialize(ConfigDeserializer::new(map))
+            .expect("config deserialize must succeed");
 
-        map.get("root").map(|v| builder.root(v));
-        map.get("bucket").map(|v| builder.bucket(v));
-        map.get("endpoint").map(|v| builder.endpoint(v));
-        map.get("secret_id").map(|v| builder.secret_id(v));
-        map.get("secret_key").map(|v| builder.secret_key(v));
-
-        builder
+        Self {
+            config,
+            http_client: None,
+        }
     }
 
     fn build(&mut self) -> Result<Self::Accessor> {
         debug!("backend build started: {:?}", &self);
 
-        let root = normalize_root(&self.root.take().unwrap_or_default());
+        let root = normalize_root(&self.config.root.take().unwrap_or_default());
         debug!("backend use root {}", root);
 
-        let bucket = match &self.bucket {
+        let bucket = match &self.config.bucket {
             Some(bucket) => Ok(bucket.to_string()),
             None => Err(
                 Error::new(ErrorKind::ConfigInvalid, "The bucket is misconfigured")
@@ -174,7 +187,7 @@ impl Builder for CosBuilder {
         }?;
         debug!("backend use bucket {}", &bucket);
 
-        let uri = match &self.endpoint {
+        let uri = match &self.config.endpoint {
             Some(endpoint) => endpoint.parse::<Uri>().map_err(|err| {
                 Error::new(ErrorKind::ConfigInvalid, "endpoint is invalid")
                     .with_context("service", Scheme::Cos)
@@ -204,14 +217,14 @@ impl Builder for CosBuilder {
         };
 
         let mut cfg = TencentCosConfig::default();
-        if !self.disable_config_load {
+        if !self.config.disable_config_load {
             cfg = cfg.from_env();
         }
 
-        if let Some(v) = self.secret_id.take() {
+        if let Some(v) = self.config.secret_id.take() {
             cfg.secret_id = Some(v);
         }
-        if let Some(v) = self.secret_key.take() {
+        if let Some(v) = self.config.secret_key.take() {
             cfg.secret_key = Some(v);
         }
 
@@ -233,7 +246,7 @@ impl Builder for CosBuilder {
     }
 }
 
-/// Backend for Huaweicloud COS services.
+/// Backend for Tencent-Cloud COS services.
 #[derive(Debug, Clone)]
 pub struct CosBackend {
     core: Arc<CosCore>,
@@ -242,19 +255,18 @@ pub struct CosBackend {
 #[async_trait]
 impl Accessor for CosBackend {
     type Reader = IncomingAsyncBody;
+    type Writer = CosWriters;
+    type Lister = oio::PageLister<CosLister>;
     type BlockingReader = ();
-    type Writer = CosWriter;
     type BlockingWriter = ();
-    type Appender = CosAppender;
-    type Pager = CosPager;
-    type BlockingPager = ();
+    type BlockingLister = ();
 
     fn info(&self) -> AccessorInfo {
         let mut am = AccessorInfo::default();
         am.set_scheme(Scheme::Cos)
             .set_root(&self.core.root)
             .set_name(&self.core.bucket)
-            .set_capability(Capability {
+            .set_native_capability(Capability {
                 stat: true,
                 stat_with_if_match: true,
                 stat_with_if_none_match: true,
@@ -266,22 +278,30 @@ impl Accessor for CosBackend {
                 read_with_if_none_match: true,
 
                 write: true,
-                write_can_sink: true,
+                write_can_empty: true,
+                write_can_append: true,
+                write_can_multi: true,
                 write_with_content_type: true,
                 write_with_cache_control: true,
-
-                append: true,
-                append_with_cache_control: true,
-                append_with_content_disposition: true,
-                append_with_content_type: true,
+                write_with_content_disposition: true,
+                // The min multipart size of COS is 1 MiB.
+                //
+                // ref: <https://www.tencentcloud.com/document/product/436/14112>
+                write_multi_min_size: Some(1024 * 1024),
+                // The max multipart size of COS is 5 GiB.
+                //
+                // ref: <https://www.tencentcloud.com/document/product/436/14112>
+                write_multi_max_size: if cfg!(target_pointer_width = "64") {
+                    Some(5 * 1024 * 1024 * 1024)
+                } else {
+                    Some(usize::MAX)
+                },
 
                 delete: true,
-                create_dir: true,
                 copy: true,
 
                 list: true,
-                list_with_delimiter_slash: true,
-                list_without_delimiter: true,
+                list_with_recursive: true,
 
                 presign: true,
                 presign_stat: true,
@@ -294,62 +314,67 @@ impl Accessor for CosBackend {
         am
     }
 
-    async fn create_dir(&self, path: &str, _: OpCreateDir) -> Result<RpCreateDir> {
-        let mut req =
-            self.core
-                .cos_put_object_request(path, Some(0), None, None, AsyncBody::Empty)?;
-
-        self.core.sign(&mut req).await?;
-
-        let resp = self.core.send(req).await?;
+    async fn stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
+        let resp = self.core.cos_head_object(path, &args).await?;
 
         let status = resp.status();
 
         match status {
-            StatusCode::CREATED | StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(RpCreateDir::default())
-            }
+            StatusCode::OK => parse_into_metadata(path, resp.headers()).map(RpStat::new),
             _ => Err(parse_error(resp).await?),
         }
     }
 
     async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
-        let resp = self
-            .core
-            .cos_get_object(path, args.range(), args.if_match(), args.if_none_match())
-            .await?;
+        let resp = self.core.cos_get_object(path, &args).await?;
 
         let status = resp.status();
 
         match status {
             StatusCode::OK | StatusCode::PARTIAL_CONTENT => {
-                let meta = parse_into_metadata(path, resp.headers())?;
-                Ok((RpRead::with_metadata(meta), resp.into_body()))
+                let size = parse_content_length(resp.headers())?;
+                let range = parse_content_range(resp.headers())?;
+                Ok((
+                    RpRead::new().with_size(size).with_range(range),
+                    resp.into_body(),
+                ))
+            }
+            StatusCode::RANGE_NOT_SATISFIABLE => {
+                resp.into_body().consume().await?;
+                Ok((RpRead::new().with_size(Some(0)), IncomingAsyncBody::empty()))
             }
             _ => Err(parse_error(resp).await?),
         }
     }
 
     async fn write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::Writer)> {
-        if args.content_length().is_none() {
-            return Err(Error::new(
-                ErrorKind::Unsupported,
-                "write without content length is not supported",
-            ));
-        }
+        let writer = CosWriter::new(self.core.clone(), path, args.clone());
 
-        Ok((
-            RpWrite::default(),
-            CosWriter::new(self.core.clone(), args, path.to_string()),
-        ))
+        let w = if args.append() {
+            CosWriters::Two(oio::AppendWriter::new(writer))
+        } else {
+            CosWriters::One(oio::MultipartWriter::new(writer, args.concurrent()))
+        };
+
+        Ok((RpWrite::default(), w))
     }
 
-    async fn append(&self, path: &str, args: OpAppend) -> Result<(RpAppend, Self::Appender)> {
-        Ok((
-            RpAppend::default(),
-            CosAppender::new(self.core.clone(), path, args),
-        ))
+    async fn delete(&self, path: &str, _: OpDelete) -> Result<RpDelete> {
+        let resp = self.core.cos_delete_object(path).await?;
+
+        let status = resp.status();
+
+        match status {
+            StatusCode::NO_CONTENT | StatusCode::ACCEPTED | StatusCode::NOT_FOUND => {
+                Ok(RpDelete::default())
+            }
+            _ => Err(parse_error(resp).await?),
+        }
+    }
+
+    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
+        let l = CosLister::new(self.core.clone(), path, args.recursive(), args.limit());
+        Ok((RpList::default(), oio::PageLister::new(l)))
     }
 
     async fn copy(&self, from: &str, to: &str, _args: OpCopy) -> Result<RpCopy> {
@@ -366,61 +391,14 @@ impl Accessor for CosBackend {
         }
     }
 
-    async fn stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
-        // Stat root always returns a DIR.
-        if path == "/" {
-            return Ok(RpStat::new(Metadata::new(EntryMode::DIR)));
-        }
-
-        let resp = self
-            .core
-            .cos_head_object(path, args.if_match(), args.if_none_match())
-            .await?;
-
-        let status = resp.status();
-
-        // The response is very similar to azblob.
-        match status {
-            StatusCode::OK => parse_into_metadata(path, resp.headers()).map(RpStat::new),
-            StatusCode::NOT_FOUND if path.ends_with('/') => {
-                Ok(RpStat::new(Metadata::new(EntryMode::DIR)))
-            }
-            _ => Err(parse_error(resp).await?),
-        }
-    }
-
-    async fn delete(&self, path: &str, _: OpDelete) -> Result<RpDelete> {
-        let resp = self.core.cos_delete_object(path).await?;
-
-        let status = resp.status();
-
-        match status {
-            StatusCode::NO_CONTENT | StatusCode::ACCEPTED | StatusCode::NOT_FOUND => {
-                Ok(RpDelete::default())
-            }
-            _ => Err(parse_error(resp).await?),
-        }
-    }
-
     async fn presign(&self, path: &str, args: OpPresign) -> Result<RpPresign> {
         let mut req = match args.operation() {
-            PresignOperation::Stat(v) => {
+            PresignOperation::Stat(v) => self.core.cos_head_object_request(path, v)?,
+            PresignOperation::Read(v) => self.core.cos_get_object_request(path, v)?,
+            PresignOperation::Write(v) => {
                 self.core
-                    .cos_head_object_request(path, v.if_match(), v.if_none_match())?
+                    .cos_put_object_request(path, None, v, AsyncBody::Empty)?
             }
-            PresignOperation::Read(v) => self.core.cos_get_object_request(
-                path,
-                v.range(),
-                v.if_match(),
-                v.if_none_match(),
-            )?,
-            PresignOperation::Write(v) => self.core.cos_put_object_request(
-                path,
-                None,
-                v.content_type(),
-                v.cache_control(),
-                AsyncBody::Empty,
-            )?,
         };
         self.core.sign_query(&mut req, args.expire()).await?;
 
@@ -432,12 +410,5 @@ impl Accessor for CosBackend {
             parts.uri,
             parts.headers,
         )))
-    }
-
-    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Pager)> {
-        Ok((
-            RpList::default(),
-            CosPager::new(self.core.clone(), path, args.delimiter(), args.limit()),
-        ))
     }
 }

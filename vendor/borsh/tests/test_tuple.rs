@@ -1,9 +1,12 @@
-use borsh::{BorshDeserialize, BorshSerialize};
+#![cfg_attr(not(feature = "std"), no_std)]
+use borsh::{from_slice, to_vec};
 
 #[test]
 fn test_unary_tuple() {
     let expected = (true,);
-    let buf = expected.try_to_vec().unwrap();
-    let actual = <(bool,)>::try_from_slice(&buf).expect("failed to deserialize");
+    let buf = to_vec(&expected).unwrap();
+    #[cfg(feature = "std")]
+    insta::assert_debug_snapshot!(buf);
+    let actual = from_slice::<(bool,)>(&buf).expect("failed to deserialize");
     assert_eq!(actual, expected);
 }

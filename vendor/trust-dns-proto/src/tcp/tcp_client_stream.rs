@@ -6,6 +6,7 @@
 // copied, modified, or distributed except according to those terms.
 
 use std::fmt::{self, Display};
+#[cfg(feature = "tokio-runtime")]
 use std::io;
 use std::net::SocketAddr;
 use std::pin::Pin;
@@ -15,7 +16,7 @@ use std::time::Duration;
 #[cfg(feature = "tokio-runtime")]
 use async_trait::async_trait;
 use futures_util::{future::Future, stream::Stream, StreamExt, TryFutureExt};
-use tracing::warn;
+use log::warn;
 
 use crate::error::ProtoError;
 #[cfg(feature = "tokio-runtime")]
@@ -93,30 +94,6 @@ impl<S: DnsTcpStream> TcpClientStream<S> {
     /// Wraps the TcpStream in TcpClientStream
     pub fn from_stream(tcp_stream: TcpStream<S>) -> Self {
         Self { tcp_stream }
-    }
-
-    /// Constructs a new TcpStream for a client to the specified SocketAddr.
-    ///
-    /// # Arguments
-    ///
-    /// * `future` - a future of a connecting tcp
-    /// * `name_server` - the IP and Port of the DNS server to connect to
-    /// * `timeout` - connection timeout
-    #[allow(clippy::new_ret_no_self)]
-    pub fn with_future<F: Future<Output = io::Result<S>> + Send + 'static>(
-        future: F,
-        name_server: SocketAddr,
-        timeout: Duration,
-    ) -> (TcpClientConnect<S>, BufDnsStreamHandle) {
-        let (stream_future, sender) = TcpStream::<S>::with_future(future, name_server, timeout);
-
-        let new_future = Box::pin(
-            stream_future
-                .map_ok(move |tcp_stream| Self { tcp_stream })
-                .map_err(ProtoError::from),
-        );
-
-        (TcpClientConnect(new_future), sender)
     }
 }
 
@@ -200,10 +177,11 @@ mod tests {
     use tokio::runtime::Runtime;
 
     use crate::tests::tcp_client_stream_test;
+    use crate::TokioTime;
     #[test]
     fn test_tcp_stream_ipv4() {
         let io_loop = Runtime::new().expect("failed to create tokio runtime");
-        tcp_client_stream_test::<AsyncIoTokioAsStd<TokioTcpStream>, Runtime>(
+        tcp_client_stream_test::<AsyncIoTokioAsStd<TokioTcpStream>, Runtime, TokioTime>(
             IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
             io_loop,
         )
@@ -213,7 +191,7 @@ mod tests {
     #[cfg(not(target_os = "linux"))] // ignored until Travis-CI fixes IPv6
     fn test_tcp_stream_ipv6() {
         let io_loop = Runtime::new().expect("failed to create tokio runtime");
-        tcp_client_stream_test::<AsyncIoTokioAsStd<TokioTcpStream>, Runtime>(
+        tcp_client_stream_test::<AsyncIoTokioAsStd<TokioTcpStream>, Runtime, TokioTime>(
             IpAddr::V6(Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1)),
             io_loop,
         )

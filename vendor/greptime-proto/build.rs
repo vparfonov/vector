@@ -22,16 +22,28 @@ fn main() {
 
     tonic_build::configure()
         .file_descriptor_set_path(out_dir.join("greptime_grpc_desc.bin"))
+        .enum_attribute(
+            "SemanticType",
+            "#[derive(::serde::Serialize, ::serde::Deserialize)]",
+        )
+        .enum_attribute(
+            "region.RegionRequest.body",
+            "#[derive(strum_macros::AsRefStr)]",
+        )
         .compile(
             &[
                 "proto/greptime/v1/database.proto",
                 "proto/greptime/v1/health.proto",
+                "proto/greptime/v1/wal.proto",
                 "proto/greptime/v1/meta/common.proto",
                 "proto/greptime/v1/meta/heartbeat.proto",
                 "proto/greptime/v1/meta/route.proto",
+                "proto/greptime/v1/meta/ddl.proto",
                 "proto/greptime/v1/meta/store.proto",
                 "proto/greptime/v1/meta/lock.proto",
                 "proto/greptime/v1/meta/cluster.proto",
+                "proto/greptime/v1/region/server.proto",
+                "proto/greptime/v1/index/inverted_index.proto",
                 "proto/prometheus/remote/remote.proto",
                 "proto/substrait_extension/promql_plan.proto",
             ],

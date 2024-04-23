@@ -5,8 +5,11 @@ mod basics {
 
     #[derive(Debug, Snafu)]
     enum Error {
-        #[snafu(display("Created at {}", location))]
-        Usage { location: Location },
+        #[snafu(display("Created at {location}"))]
+        Usage {
+            #[snafu(implicit)]
+            location: Location,
+        },
     }
 
     #[test]
@@ -14,28 +17,15 @@ mod basics {
         let one = UsageSnafu.build();
         let two = UsageSnafu.build();
 
-        assert_eq!(one.to_string(), "Created at tests/location.rs:14:30");
-        assert_eq!(two.to_string(), "Created at tests/location.rs:15:30");
-    }
-}
-
-mod opt_out {
-    use super::*;
-
-    #[derive(Debug, Snafu)]
-    enum Error {
-        #[snafu(display("Created at {}", location))]
-        Usage {
-            #[snafu(implicit(false))]
-            location: String,
-        },
-    }
-
-    #[test]
-    fn opting_out_of_automatic_implicit_data() {
-        let error = UsageSnafu { location: "junk" }.build();
-
-        assert_eq!(error.to_string(), "Created at junk");
+        let sep = std::path::MAIN_SEPARATOR;
+        assert_eq!(
+            one.to_string(),
+            format!("Created at tests{sep}location.rs:17:30")
+        );
+        assert_eq!(
+            two.to_string(),
+            format!("Created at tests{sep}location.rs:18:30")
+        );
     }
 }
 
@@ -44,12 +34,14 @@ mod track_caller {
 
     #[derive(Debug, Copy, Clone, Snafu)]
     struct InnerError {
+        #[snafu(implicit)]
         location: Location,
     }
 
     #[derive(Debug, Snafu)]
     struct WrapNoUserFieldsError {
         source: InnerError,
+        #[snafu(implicit)]
         location: Location,
     }
 
@@ -57,16 +49,18 @@ mod track_caller {
     #[snafu(context(false))]
     struct WrapNoContext {
         source: InnerError,
+        #[snafu(implicit)]
         location: Location,
     }
 
     #[derive(Debug, Snafu)]
-    #[snafu(display("{}", message))]
+    #[snafu(display("{message}"))]
     #[snafu(whatever)]
     pub struct MyWhatever {
         #[snafu(source(from(Box<dyn std::error::Error>, Some)))]
         source: Option<Box<dyn std::error::Error>>,
         message: String,
+        #[snafu(implicit)]
         location: Location,
     }
 

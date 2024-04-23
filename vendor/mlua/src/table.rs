@@ -591,7 +591,7 @@ impl<'lua> Table<'lua> {
         unsafe { ffi::lua_getreadonly(ref_thread, self.0.index) != 0 }
     }
 
-    /// Converts the table to a generic C pointer.
+    /// Converts this table to a generic C pointer.
     ///
     /// Different tables will give different pointers.
     /// There is no way to convert the pointer back to its original value.
@@ -651,6 +651,34 @@ impl<'lua> Table<'lua> {
         }
     }
 
+    /// Iterates over the pairs of the table, invoking the given closure on each pair.
+    ///
+    /// This method is similar to [`Table::pairs`], but optimized for performance.
+    /// It does not invoke the `__pairs` metamethod.
+    pub fn for_each<K, V>(&self, mut f: impl FnMut(K, V) -> Result<()>) -> Result<()>
+    where
+        K: FromLua<'lua>,
+        V: FromLua<'lua>,
+    {
+        let lua = self.0.lua;
+        let state = lua.state();
+        unsafe {
+            let _sg = StackGuard::new(state);
+            check_stack(state, 5)?;
+
+            lua.push_ref(&self.0);
+            ffi::lua_pushnil(state);
+            while ffi::lua_next(state, -2) != 0 {
+                let k = K::from_stack(-2, lua)?;
+                let v = V::from_stack(-1, lua)?;
+                f(k, v)?;
+                // Keep key for next iteration
+                ffi::lua_pop(state, 1);
+            }
+        }
+        Ok(())
+    }
+
     /// Consume this table and return an iterator over all values in the sequence part of the table.
     ///
     /// The iterator will yield all values `t[1]`, `t[2]` and so on, until a `nil` value is
@@ -692,8 +720,7 @@ impl<'lua> Table<'lua> {
     pub fn sequence_values<V: FromLua<'lua>>(self) -> TableSequence<'lua, V> {
         TableSequence {
             table: self.0,
-            index: Some(1),
-            len: None,
+            index: 1,
             _phantom: PhantomData,
         }
     }
@@ -705,22 +732,30 @@ impl<'lua> Table<'lua> {
     }
 
     #[cfg(feature = "serialize")]
-    pub(crate) fn sequence_values_by_len<V: FromLua<'lua>>(
-        self,
-        len: Option<usize>,
-    ) -> TableSequence<'lua, V> {
-        let len = len.unwrap_or_else(|| self.raw_len()) as Integer;
-        TableSequence {
-            table: self.0,
-            index: Some(1),
-            len: Some(len),
-            _phantom: PhantomData,
+    pub(crate) fn for_each_value<V>(&self, mut f: impl FnMut(V) -> Result<()>) -> Result<()>
+    where
+        V: FromLua<'lua>,
+    {
+        let lua = self.0.lua;
+        let state = lua.state();
+        unsafe {
+            let _sg = StackGuard::new(state);
+            check_stack(state, 4)?;
+
+            lua.push_ref(&self.0);
+            let len = ffi::lua_rawlen(state, -1);
+            for i in 1..=len {
+                ffi::lua_rawgeti(state, -1, i as _);
+                f(V::from_stack(-1, lua)?)?;
+                ffi::lua_pop(state, 1);
+            }
         }
+        Ok(())
     }
 
     /// Sets element value at position `idx` without invoking metamethods.
-    #[allow(dead_code)]
-    pub(crate) fn raw_seti<V: IntoLua<'lua>>(&self, idx: usize, value: V) -> Result<()> {
+    #[doc(hidden)]
+    pub fn raw_seti<V: IntoLua<'lua>>(&self, idx: usize, value: V) -> Result<()> {
         #[cfg(feature = "luau")]
         self.check_readonly_write()?;
 
@@ -1057,6 +1092,13 @@ impl<'a, 'lua> Serialize for SerializableTable<'a, 'lua> {
         use crate::serde::de::{check_value_for_skip, MapPairs};
         use crate::value::SerializableValue;
 
+        let convert_result = |res: Result<()>, serialize_err: Option<S::Error>| match res {
+            Ok(v) => Ok(v),
+            Err(Error::SerializeError(_)) if serialize_err.is_some() => Err(serialize_err.unwrap()),
+            Err(Error::SerializeError(msg)) => Err(serde::ser::Error::custom(msg)),
+            Err(err) => Err(serde::ser::Error::custom(err.to_string())),
+        };
+
         let options = self.options;
         let visited = &self.visited;
         visited.borrow_mut().insert(self.table.to_pointer());
@@ -1065,36 +1107,58 @@ impl<'a, 'lua> Serialize for SerializableTable<'a, 'lua> {
         let len = self.table.raw_len();
         if len > 0 || self.table.is_array() {
             let mut seq = serializer.serialize_seq(Some(len))?;
-            for value in self.table.clone().sequence_values_by_len::<Value>(None) {
-                let value = &value.map_err(serde::ser::Error::custom)?;
-                let skip = check_value_for_skip(value, self.options, &self.visited)
-                    .map_err(serde::ser::Error::custom)?;
+            let mut serialize_err = None;
+            let res = self.table.for_each_value::<Value>(|value| {
+                let skip = check_value_for_skip(&value, self.options, &self.visited)
+                    .map_err(|err| Error::SerializeError(err.to_string()))?;
                 if skip {
-                    continue;
+                    // continue iteration
+                    return Ok(());
                 }
-                seq.serialize_element(&SerializableValue::new(value, options, Some(visited)))?;
-            }
+                seq.serialize_element(&SerializableValue::new(&value, options, Some(visited)))
+                    .map_err(|err| {
+                        serialize_err = Some(err);
+                        Error::SerializeError(String::new())
+                    })
+            });
+            convert_result(res, serialize_err)?;
             return seq.end();
         }
 
         // HashMap
         let mut map = serializer.serialize_map(None)?;
-        let pairs = MapPairs::new(self.table.clone(), self.options.sort_keys)
-            .map_err(serde::ser::Error::custom)?;
-        for kv in pairs {
-            let (key, value) = kv.map_err(serde::ser::Error::custom)?;
+        let mut serialize_err = None;
+        let mut process_pair = |key, value| {
             let skip_key = check_value_for_skip(&key, self.options, &self.visited)
-                .map_err(serde::ser::Error::custom)?;
+                .map_err(|err| Error::SerializeError(err.to_string()))?;
             let skip_value = check_value_for_skip(&value, self.options, &self.visited)
-                .map_err(serde::ser::Error::custom)?;
+                .map_err(|err| Error::SerializeError(err.to_string()))?;
             if skip_key || skip_value {
-                continue;
+                // continue iteration
+                return Ok(());
             }
             map.serialize_entry(
                 &SerializableValue::new(&key, options, Some(visited)),
                 &SerializableValue::new(&value, options, Some(visited)),
-            )?;
-        }
+            )
+            .map_err(|err| {
+                serialize_err = Some(err);
+                Error::SerializeError(String::new())
+            })
+        };
+
+        let res = if !self.options.sort_keys {
+            // Fast track
+            self.table.for_each(process_pair)
+        } else {
+            MapPairs::new(self.table.clone(), self.options.sort_keys)
+                .map_err(serde::ser::Error::custom)?
+                .try_for_each(|kv| {
+                    let (key, value) = kv?;
+                    process_pair(key, value)
+                })
+        };
+        convert_result(res, serialize_err)?;
         map.end()
     }
 }
@@ -1129,16 +1193,15 @@ where
                 lua.push_ref(&self.table);
                 lua.push_value(prev_key)?;
 
-                let next = protect_lua!(state, 2, ffi::LUA_MULTRET, |state| {
-                    ffi::lua_next(state, -2)
-                })?;
-                if next != 0 {
-                    let value = lua.pop_value();
-                    let key = lua.pop_value();
+                // It must be safe to call `lua_next` unprotected as deleting a key from a table is
+                // a permitted operation.
+                // It fails only if the key is not found (never existed) which seems impossible scenario.
+                if ffi::lua_next(state, -2) != 0 {
+                    let key = lua.stack_value(-2);
                     Ok(Some((
                         key.clone(),
                         K::from_lua(key, lua)?,
-                        V::from_lua(value, lua)?,
+                        V::from_stack(-1, lua)?,
                     )))
                 } else {
                     Ok(None)
@@ -1165,9 +1228,9 @@ where
 ///
 /// [`Table::sequence_values`]: crate::Table::sequence_values
 pub struct TableSequence<'lua, V> {
+    // TODO: Use `&Table`
     table: LuaRef<'lua>,
-    index: Option<Integer>,
-    len: Option<Integer>,
+    index: Integer,
     _phantom: PhantomData<V>,
 }
 
@@ -1178,31 +1241,22 @@ where
     type Item = Result<V>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(index) = self.index.take() {
-            let lua = self.table.lua;
-            let state = lua.state();
-
-            let res = (|| unsafe {
-                let _sg = StackGuard::new(state);
-                check_stack(state, 1)?;
-
-                lua.push_ref(&self.table);
-                match ffi::lua_rawgeti(state, -1, index) {
-                    ffi::LUA_TNIL if index > self.len.unwrap_or(0) => Ok(None),
-                    _ => Ok(Some((index, lua.pop_value()))),
-                }
-            })();
-
-            match res {
-                Ok(Some((index, r))) => {
-                    self.index = Some(index + 1);
-                    Some(V::from_lua(r, lua))
-                }
-                Ok(None) => None,
-                Err(err) => Some(Err(err)),
+        let lua = self.table.lua;
+        let state = lua.state();
+        unsafe {
+            let _sg = StackGuard::new(state);
+            if let Err(err) = check_stack(state, 1) {
+                return Some(Err(err));
             }
-        } else {
-            None
+
+            lua.push_ref(&self.table);
+            match ffi::lua_rawgeti(state, -1, self.index) {
+                ffi::LUA_TNIL => None,
+                _ => {
+                    self.index += 1;
+                    Some(V::from_stack(-1, lua))
+                }
+            }
         }
     }
 }

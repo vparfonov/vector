@@ -1,6 +1,7 @@
 #![warn(rust_2018_idioms)]
 #![cfg(feature = "full")]
 #![cfg(not(target_os = "wasi"))] // Wasi doesn't support panic recovery
+#![cfg(panic = "unwind")]
 
 use futures::future;
 use std::error::Error;

@@ -1,25 +1,29 @@
-// Copyright 2015-2023 Benjamin Fry <benjaminfry@me.com>
-//
-// Licensed under the Apache License, Version 2.0, <LICENSE-APACHE or
-// http://apache.org/licenses/LICENSE-2.0> or the MIT license <LICENSE-MIT or
-// http://opensource.org/licenses/MIT>, at your option. This file may not be
-// copied, modified, or distributed except according to those terms.
+/*
+ * Copyright (C) 2016 Benjamin Fry <benjaminfry@me.com>
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 
 //! public key record data for signing zone records
-#![allow(clippy::use_self)]
-
 use std::fmt;
 
 #[cfg(feature = "serde-config")]
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    error::{ProtoError, ProtoResult},
-    rr::{dnssec::Algorithm, record_data::RData, RecordData, RecordDataDecodable, RecordType},
-    serialize::binary::*,
-};
-
-use super::DNSSECRData;
+use crate::error::*;
+use crate::rr::dnssec::Algorithm;
+use crate::rr::record_data::RData;
+use crate::serialize::binary::*;
 
 /// [RFC 2535](https://tools.ietf.org/html/rfc2535#section-3), Domain Name System Security Extensions, March 1999
 ///
@@ -105,7 +109,7 @@ use super::DNSSECRData;
 ///            11: If both bits are one, the "no key" value, there is no key
 ///                information and the RR stops after the algorithm octet.
 ///                By the use of this "no key" value, a signed KEY RR can
-///                authentically assert that, for example, a zone is not
+///                authenticatably assert that, for example, a zone is not
 ///                secured.  See section 3.4 below.
 ///
 ///    Bits 2 is reserved and must be zero.
@@ -572,8 +576,8 @@ pub enum Protocol {
     /// Reserved for use with email
     #[deprecated = "Deprecated by RFC3445"]
     Email,
-    /// Reserved for use with DNSSEC (Trust-DNS only supports DNSKEY with DNSSEC)
-    DNSSEC,
+    /// Reserved for use with DNSSec (Trust-DNS only supports DNSKEY with DNSSec)
+    DNSSec,
     /// Reserved to refer to the Oakley/IPSEC
     #[deprecated = "Deprecated by RFC3445"]
     IPSec,
@@ -587,7 +591,7 @@ pub enum Protocol {
 
 impl Default for Protocol {
     fn default() -> Self {
-        Self::DNSSEC
+        Self::DNSSec
     }
 }
 
@@ -597,7 +601,7 @@ impl From<u8> for Protocol {
             0 => Self::Reserved,
             1 => Self::TLS,
             2 => Self::Email,
-            3 => Self::DNSSEC,
+            3 => Self::DNSSec,
             4 => Self::IPSec,
             255 => Self::All,
             _ => Self::Other(field),
@@ -611,7 +615,7 @@ impl From<Protocol> for u8 {
             Protocol::Reserved => 0,
             Protocol::TLS => 1,
             Protocol::Email => 2,
-            Protocol::DNSSEC => 3,
+            Protocol::DNSSec => 3,
             Protocol::IPSec => 4,
             Protocol::All => 255,
             Protocol::Other(field) => field,
@@ -761,87 +765,60 @@ impl From<KEY> for RData {
     }
 }
 
-impl BinEncodable for KEY {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
-        encoder.emit_u16(self.flags())?;
-        encoder.emit(u8::from(self.protocol))?;
-        self.algorithm().emit(encoder)?;
-        encoder.emit_vec(self.public_key())?;
+/// Read the RData from the given Decoder
+pub fn read(decoder: &mut BinDecoder<'_>, rdata_length: Restrict<u16>) -> ProtoResult<KEY> {
+    //      0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5
+    //    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+    //    |  A/C  | Z | XT| Z | Z | NAMTYP| Z | Z | Z | Z |      SIG      |
+    //    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
+    let flags: u16 = decoder
+        .read_u16()?
+        .verify_unwrap(|flags| {
+            //    Bits 2 is reserved and must be zero.
+            //    Bits 4-5 are reserved and must be zero.
+            //    Bits 8-11 are reserved and must be zero.
+            flags & 0b0010_1100_1111_0000 == 0
+        })
+        .map_err(|_| ProtoError::from("flag 2, 4-5, and 8-11 are reserved, must be zero"))?;
 
-        Ok(())
+    let key_trust = KeyTrust::from(flags);
+    let extended_flags: bool = flags & 0b0001_0000_0000_0000 != 0;
+    let key_usage = KeyUsage::from(flags);
+    let signatory = UpdateScope::from(flags);
+
+    if extended_flags {
+        // TODO: add an optional field to return the raw u16?
+        return Err("extended flags currently not supported".into());
     }
-}
 
-impl<'r> RecordDataDecodable<'r> for KEY {
-    fn read_data(decoder: &mut BinDecoder<'r>, length: Restrict<u16>) -> ProtoResult<KEY> {
-        //      0   1   2   3   4   5   6   7   8   9   0   1   2   3   4   5
-        //    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-        //    |  A/C  | Z | XT| Z | Z | NAMTYP| Z | Z | Z | Z |      SIG      |
-        //    +---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+---+
-        let flags: u16 = decoder
-            .read_u16()?
-            .verify_unwrap(|flags| {
-                //    Bits 2 is reserved and must be zero.
-                //    Bits 4-5 are reserved and must be zero.
-                //    Bits 8-11 are reserved and must be zero.
-                flags & 0b0010_1100_1111_0000 == 0
-            })
-            .map_err(|_| ProtoError::from("flag 2, 4-5, and 8-11 are reserved, must be zero"))?;
+    // TODO: protocol my be infallible
+    let protocol = Protocol::from(decoder.read_u8()?.unverified(/*Protocol is verified as safe*/));
 
-        let key_trust = KeyTrust::from(flags);
-        let extended_flags: bool = flags & 0b0001_0000_0000_0000 != 0;
-        let key_usage = KeyUsage::from(flags);
-        let signatory = UpdateScope::from(flags);
+    let algorithm: Algorithm = Algorithm::read(decoder)?;
 
-        if extended_flags {
-            // TODO: add an optional field to return the raw u16?
-            return Err("extended flags currently not supported".into());
-        }
-
-        // TODO: protocol my be infallible
-        let protocol =
-            Protocol::from(decoder.read_u8()?.unverified(/*Protocol is verified as safe*/));
-
-        let algorithm: Algorithm = Algorithm::read(decoder)?;
-
-        // the public key is the left-over bytes minus 4 for the first fields
-        // TODO: decode the key here?
-        let key_len = length
+    // the public key is the left-over bytes minus 4 for the first fields
+    // TODO: decode the key here?
+    let key_len = rdata_length
         .map(|u| u as usize)
         .checked_sub(4)
         .map_err(|_| ProtoError::from("invalid rdata length in KEY"))?
         .unverified(/*used only as length safely*/);
-        let public_key: Vec<u8> =
-            decoder.read_vec(key_len)?.unverified(/*the byte array will fail in usage if invalid*/);
+    let public_key: Vec<u8> =
+        decoder.read_vec(key_len)?.unverified(/*the byte array will fail in usage if invalid*/);
 
-        Ok(Self::new(
-            key_trust, key_usage, signatory, protocol, algorithm, public_key,
-        ))
-    }
+    Ok(KEY::new(
+        key_trust, key_usage, signatory, protocol, algorithm, public_key,
+    ))
 }
 
-impl RecordData for KEY {
-    fn try_from_rdata(data: RData) -> Result<Self, RData> {
-        match data {
-            RData::DNSSEC(DNSSECRData::KEY(csync)) => Ok(csync),
-            _ => Err(data),
-        }
-    }
+/// Write the RData from the given Decoder
+pub fn emit(encoder: &mut BinEncoder<'_>, rdata: &KEY) -> ProtoResult<()> {
+    encoder.emit_u16(rdata.flags())?;
+    encoder.emit(u8::from(rdata.protocol))?;
+    rdata.algorithm().emit(encoder)?;
+    encoder.emit_vec(rdata.public_key())?;
 
-    fn try_borrow(data: &RData) -> Option<&Self> {
-        match data {
-            RData::DNSSEC(DNSSECRData::KEY(csync)) => Some(csync),
-            _ => None,
-        }
-    }
-
-    fn record_type(&self) -> RecordType {
-        RecordType::KEY
-    }
-
-    fn into_rdata(self) -> RData {
-        RData::DNSSEC(DNSSECRData::KEY(self))
-    }
+    Ok(())
 }
 
 /// Note that KEY is a deprecated type in DNS
@@ -855,7 +832,7 @@ impl RecordData for KEY {
 ///    [RFC 1033].
 ///
 ///    The flag field is represented as an unsigned integer or a sequence of
-///    mnemonics as follows separated by instances of the vertical bar ("|")
+///    mnemonics as follows separated by instances of the verticle bar ("|")
 ///    character:
 ///
 ///      BIT  Mnemonic  Explanation
@@ -883,7 +860,7 @@ impl RecordData for KEY {
 ///    zero.
 ///
 ///    The protocol octet can be represented as either an unsigned integer
-///    or symbolically.  The following initial symbols are defined:
+///    or symbolicly.  The following initial symbols are defined:
 ///
 ///         000    NONE
 ///         001    TLS
@@ -940,14 +917,14 @@ mod tests {
 
         let mut bytes = Vec::new();
         let mut encoder: BinEncoder<'_> = BinEncoder::new(&mut bytes);
-        assert!(rdata.emit(&mut encoder).is_ok());
+        assert!(emit(&mut encoder, &rdata).is_ok());
         let bytes = encoder.into_bytes();
 
-        println!("bytes: {bytes:?}");
+        println!("bytes: {:?}", bytes);
 
         let mut decoder: BinDecoder<'_> = BinDecoder::new(bytes);
         let restrict = Restrict::new(bytes.len() as u16);
-        let read_rdata = KEY::read_data(&mut decoder, restrict).expect("Decoding error");
+        let read_rdata = read(&mut decoder, restrict).expect("Decoding error");
         assert_eq!(rdata, read_rdata);
         // #[cfg(any(feature = "openssl", feature = "ring"))]
         // assert!(rdata

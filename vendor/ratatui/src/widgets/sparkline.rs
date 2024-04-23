@@ -2,15 +2,21 @@ use std::cmp::min;
 
 use strum::{Display, EnumString};
 
-use crate::{
-    buffer::Buffer,
-    layout::Rect,
-    style::{Style, Styled},
-    symbols,
-    widgets::{Block, Widget},
-};
+use crate::{prelude::*, widgets::Block};
 
 /// Widget to render a sparkline over one or more lines.
+///
+/// You can create a `Sparkline` using [`Sparkline::default`].
+///
+/// `Sparkline` can be styled either using [`Sparkline::style`] or preferably using the methods
+/// provided by the [`Stylize`](crate::style::Stylize) trait.
+///
+/// # Setter methods
+///
+/// - [`Sparkline::block`] wraps the sparkline in a [`Block`]
+/// - [`Sparkline::data`] defines the dataset, you'll almost always want to use it
+/// - [`Sparkline::max`] sets the maximum value of bars
+/// - [`Sparkline::direction`] sets the render direction
 ///
 /// # Examples
 ///
@@ -21,7 +27,8 @@ use crate::{
 ///     .block(Block::default().title("Sparkline").borders(Borders::ALL))
 ///     .data(&[0, 2, 3, 4, 1, 4, 10])
 ///     .max(5)
-///     .style(Style::default().fg(Color::Red).bg(Color::White));
+///     .direction(RenderDirection::RightToLeft)
+///     .style(Style::default().red().on_white());
 /// ```
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Sparkline<'a> {
@@ -40,10 +47,15 @@ pub struct Sparkline<'a> {
     direction: RenderDirection,
 }
 
+/// Defines the direction in which sparkline will be rendered.
+///
+/// See [`Sparkline::direction`].
 #[derive(Debug, Default, Display, EnumString, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum RenderDirection {
+    /// The first value is on the left, going to the right
     #[default]
     LeftToRight,
+    /// The first value is on the right, going to the left
     RightToLeft,
 }
 
@@ -61,31 +73,67 @@ impl<'a> Default for Sparkline<'a> {
 }
 
 impl<'a> Sparkline<'a> {
+    /// Wraps the sparkline with the given `block`.
+    #[must_use = "method moves the value of self and returns the modified value"]
     pub fn block(mut self, block: Block<'a>) -> Sparkline<'a> {
         self.block = Some(block);
         self
     }
 
-    pub fn style(mut self, style: Style) -> Sparkline<'a> {
-        self.style = style;
+    /// Sets the style of the entire widget.
+    ///
+    /// `style` accepts any type that is convertible to [`Style`] (e.g. [`Style`], [`Color`], or
+    /// your own type that implements [`Into<Style>`]).
+    ///
+    /// The foreground corresponds to the bars while the background is everything else.
+    #[must_use = "method moves the value of self and returns the modified value"]
+    pub fn style<S: Into<Style>>(mut self, style: S) -> Sparkline<'a> {
+        self.style = style.into();
         self
     }
 
+    /// Sets the dataset for the sparkline.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// # use ratatui::{prelude::*, widgets::*};
+    /// # fn ui(frame: &mut Frame) {
+    /// # let area = Rect::default();
+    /// let sparkline = Sparkline::default().data(&[1, 2, 3]);
+    /// frame.render_widget(sparkline, area);
+    /// # }
+    /// ```
+    #[must_use = "method moves the value of self and returns the modified value"]
     pub fn data(mut self, data: &'a [u64]) -> Sparkline<'a> {
         self.data = data;
         self
     }
 
+    /// Sets the maximum value of bars.
+    ///
+    /// Every bar will be scaled accordingly. If no max is given, this will be the max in the
+    /// dataset.
+    #[must_use = "method moves the value of self and returns the modified value"]
     pub fn max(mut self, max: u64) -> Sparkline<'a> {
         self.max = Some(max);
         self
     }
 
+    /// Sets the characters used to display the bars.
+    ///
+    /// Can be [`symbols::bar::THREE_LEVELS`], [`symbols::bar::NINE_LEVELS`] (default) or a custom
+    /// [`Set`](symbols::bar::Set).
+    #[must_use = "method moves the value of self and returns the modified value"]
     pub fn bar_set(mut self, bar_set: symbols::bar::Set) -> Sparkline<'a> {
         self.bar_set = bar_set;
         self
     }
 
+    /// Sets the direction of the sparkline.
+    ///
+    /// [`RenderDirection::LeftToRight`] by default.
+    #[must_use = "method moves the value of self and returns the modified value"]
     pub fn direction(mut self, direction: RenderDirection) -> Sparkline<'a> {
         self.direction = direction;
         self
@@ -99,23 +147,28 @@ impl<'a> Styled for Sparkline<'a> {
         self.style
     }
 
-    fn set_style(self, style: Style) -> Self::Item {
+    fn set_style<S: Into<Style>>(self, style: S) -> Self::Item {
         self.style(style)
     }
 }
 
-impl<'a> Widget for Sparkline<'a> {
-    fn render(mut self, area: Rect, buf: &mut Buffer) {
-        let spark_area = match self.block.take() {
-            Some(b) => {
-                let inner_area = b.inner(area);
-                b.render(area, buf);
-                inner_area
-            }
-            None => area,
-        };
+impl Widget for Sparkline<'_> {
+    fn render(self, area: Rect, buf: &mut Buffer) {
+        self.render_ref(area, buf);
+    }
+}
 
-        if spark_area.height < 1 {
+impl WidgetRef for Sparkline<'_> {
+    fn render_ref(&self, area: Rect, buf: &mut Buffer) {
+        self.block.render_ref(area, buf);
+        let inner = self.block.inner_if_some(area);
+        self.render_sparkline(inner, buf);
+    }
+}
+
+impl Sparkline<'_> {
+    fn render_sparkline(&self, spark_area: Rect, buf: &mut Buffer) {
+        if spark_area.is_empty() {
             return;
         }
 

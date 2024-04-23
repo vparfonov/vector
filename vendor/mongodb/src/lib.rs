@@ -8,7 +8,7 @@
 //! # Installation
 //!
 //! ## Requirements
-//! - Rust 1.60+
+//! - Rust 1.61+
 //! - MongoDB 3.6+
 //!
 //! ## Importing
@@ -16,7 +16,7 @@
 //! your application, simply add it to your project's `Cargo.toml`.
 //! ```toml
 //! [dependencies]
-//! mongodb = "2.7.0"
+//! mongodb = "2.8.2"
 //! ```
 //!
 //! ### Configuring the async runtime
@@ -30,7 +30,7 @@
 //! add the following to your `Cargo.toml`:
 //! ```toml
 //! [dependencies.mongodb]
-//! version = "2.7.0"
+//! version = "2.8.2"
 //! default-features = false
 //! features = ["async-std-runtime"]
 //! ```
@@ -40,7 +40,7 @@
 //! feature to your `Cargo.toml`:
 //! ```toml
 //! [dependencies.mongodb]
-//! version = "2.7.0"
+//! version = "2.8.2"
 //! features = ["tokio-sync"]
 //! ```
 //! Using the `"sync"` feature also requires using `default-features = false`.
@@ -289,11 +289,13 @@
 //!
 //! ## Minimum supported Rust version (MSRV)
 //!
-//! The MSRV for this crate is currently 1.60.0. This will be rarely be increased, and if it ever is,
+//! The MSRV for this crate is currently 1.61.0. This will be rarely be increased, and if it ever is,
 //! it will only happen in a minor or major version release.
 
 #![warn(missing_docs)]
 #![warn(rustdoc::missing_crate_level_docs)]
+#![warn(clippy::cast_possible_truncation)]
+#![warn(clippy::cast_possible_wrap)]
 #![cfg_attr(
     feature = "cargo-clippy",
     allow(
@@ -306,7 +308,7 @@
 )]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
 #![cfg_attr(test, type_length_limit = "80000000")]
-#![doc(html_root_url = "https://docs.rs/mongodb/2.7.0")]
+#![doc(html_root_url = "https://docs.rs/mongodb/2.8.2")]
 
 #[cfg(all(feature = "aws-auth", feature = "async-std-runtime"))]
 compile_error!("The `aws-auth` feature flag is only supported on the tokio runtime.");
@@ -320,6 +322,7 @@ pub use ::mongocrypt;
 
 mod bson_util;
 pub mod change_stream;
+pub(crate) mod checked;
 mod client;
 mod cmap;
 mod coll;
@@ -337,6 +340,7 @@ mod index;
 mod operation;
 pub mod results;
 pub(crate) mod runtime;
+mod search_index;
 mod sdam;
 mod selection_criteria;
 mod serde_util;
@@ -362,7 +366,7 @@ pub use crate::{
     gridfs::{GridFsBucket, GridFsDownloadStream, GridFsUploadStream},
 };
 
-pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*};
+pub use {client::session::ClusterTime, coll::Namespace, index::IndexModel, sdam::public::*, search_index::SearchIndexModel};
 
 #[cfg(all(feature = "tokio-runtime", feature = "sync",))]
 compile_error!(

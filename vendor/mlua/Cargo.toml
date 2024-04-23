@@ -13,10 +13,10 @@
 edition = "2021"
 rust-version = "1.71"
 name = "mlua"
-version = "0.9.1"
+version = "0.9.6"
 authors = [
     "Aleksandr Orlenko <zxteam@pm.me>",
-    "kyren <catherine@chucklefish.org>",
+    "kyren <catherine@kyju.org>",
 ]
 description = """
 High level bindings to Lua 5.4/5.3/5.2/5.1 (including LuaJIT) and Roblox Luau
@@ -100,17 +100,22 @@ name = "benchmark"
 harness = false
 required-features = ["async"]
 
+[[bench]]
+name = "serde"
+harness = false
+required-features = ["serialize"]
+
 [dependencies.bstr]
 version = "1.0"
 features = ["std"]
 default_features = false
 
 [dependencies.erased-serde]
-version = "0.3"
+version = "0.4"
 optional = true
 
 [dependencies.ffi]
-version = "0.3.2"
+version = "0.5.1"
 package = "mlua-sys"
 
 [dependencies.futures-util]
@@ -120,7 +125,7 @@ optional = true
 default-features = false
 
 [dependencies.mlua_derive]
-version = "=0.9.0"
+version = "=0.9.2"
 optional = true
 
 [dependencies.num-traits]
@@ -144,10 +149,6 @@ optional = true
 version = "0.7"
 optional = true
 
-[dev-dependencies.criterion]
-version = "0.5"
-features = ["async_tokio"]
-
 [dev-dependencies.futures]
 version = "0.3.5"
 
@@ -165,9 +166,6 @@ version = "1.0"
 version = "0.11"
 features = ["json"]
 
-[dev-dependencies.rustyline]
-version = "12.0"
-
 [dev-dependencies.serde]
 version = "1.0"
 features = ["derive"]
@@ -183,7 +181,11 @@ version = "3"
 
 [dev-dependencies.tokio]
 version = "1.0"
-features = ["full"]
+features = [
+    "macros",
+    "rt",
+    "time",
+]
 
 [dev-dependencies.trybuild]
 version = "1.0"
@@ -199,7 +201,10 @@ luajit52 = [
     "luajit",
     "ffi/luajit52",
 ]
-luau = ["ffi/luau"]
+luau = [
+    "ffi/luau",
+    "libloading",
+]
 luau-jit = [
     "luau",
     "ffi/luau-codegen",
@@ -221,3 +226,18 @@ serialize = [
 ]
 unstable = []
 vendored = ["ffi/vendored"]
+
+[target."cfg(not(target_arch = \"wasm32\"))".dev-dependencies.criterion]
+version = "0.5"
+features = ["async_tokio"]
+
+[target."cfg(not(target_arch = \"wasm32\"))".dev-dependencies.rustyline]
+version = "13.0"
+
+[target."cfg(not(target_arch = \"wasm32\"))".dev-dependencies.tokio]
+version = "1.0"
+features = ["full"]
+
+[target."cfg(unix)".dependencies.libloading]
+version = "0.8"
+optional = true

@@ -18,10 +18,11 @@ use crate::header::{IntoHeaderName, IntoHeaderValue};
 use crate::jetstream::account::Account;
 use crate::jetstream::publish::PublishAck;
 use crate::jetstream::response::Response;
-use crate::{header, Client, HeaderMap, HeaderValue, StatusCode};
+use crate::subject::ToSubject;
+use crate::{header, Client, Command, HeaderMap, HeaderValue, Message, StatusCode};
 use bytes::Bytes;
 use futures::future::BoxFuture;
-use futures::{Future, StreamExt, TryFutureExt};
+use futures::{Future, TryFutureExt};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{self, json};
@@ -33,6 +34,7 @@ use std::pin::Pin;
 use std::str::from_utf8;
 use std::task::Poll;
 use std::time::Duration;
+use tokio::sync::oneshot;
 use tracing::debug;
 
 use super::consumer::{Consumer, FromConsumer, IntoConsumerConfig};
@@ -95,14 +97,9 @@ impl Context {
     /// let client = async_nats::connect("localhost:4222").await?;
     /// let jetstream = async_nats::jetstream::new(client);
     ///
-    /// let ack = jetstream
-    ///     .publish("events".to_string(), "data".into())
-    ///     .await?;
+    /// let ack = jetstream.publish("events", "data".into()).await?;
     /// ack.await?;
-    /// jetstream
-    ///     .publish("events".to_string(), "data".into())
-    ///     .await?
-    ///     .await?;
+    /// jetstream.publish("events", "data".into()).await?.await?;
     /// # Ok(())
     /// # }
     /// ```
@@ -116,20 +113,16 @@ impl Context {
     /// let client = async_nats::connect("localhost:4222").await?;
     /// let jetstream = async_nats::jetstream::new(client);
     ///
-    /// let first_ack = jetstream
-    ///     .publish("events".to_string(), "data".into())
-    ///     .await?;
-    /// let second_ack = jetstream
-    ///     .publish("events".to_string(), "data".into())
-    ///     .await?;
+    /// let first_ack = jetstream.publish("events", "data".into()).await?;
+    /// let second_ack = jetstream.publish("events", "data".into()).await?;
     /// first_ack.await?;
     /// second_ack.await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn publish(
+    pub async fn publish<S: ToSubject>(
         &self,
-        subject: String,
+        subject: S,
         payload: Bytes,
     ) -> Result<PublishAckFuture, PublishError> {
         self.send_publish(subject, Publish::build().payload(payload))
@@ -152,14 +145,14 @@ impl Context {
     /// let mut headers = async_nats::HeaderMap::new();
     /// headers.append("X-key", "Value");
     /// let ack = jetstream
-    ///     .publish_with_headers("events".to_string(), headers, "data".into())
+    ///     .publish_with_headers("events", headers, "data".into())
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn publish_with_headers(
+    pub async fn publish_with_headers<S: ToSubject>(
         &self,
-        subject: String,
+        subject: S,
         headers: crate::header::HeaderMap,
         payload: Bytes,
     ) -> Result<PublishAckFuture, PublishError> {
@@ -182,53 +175,48 @@ impl Context {
     ///
     /// let ack = jetstream
     ///     .send_publish(
-    ///         "events".to_string(),
+    ///         "events",
     ///         Publish::build().payload("data".into()).message_id("uuid"),
     ///     )
     ///     .await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn send_publish(
+    pub async fn send_publish<S: ToSubject>(
         &self,
-        subject: String,
+        subject: S,
         publish: Publish,
     ) -> Result<PublishAckFuture, PublishError> {
-        let inbox = self.client.new_inbox();
-        let response = self
+        let subject = subject.to_subject();
+        let (sender, receiver) = oneshot::channel();
+
+        let respond = self.client.new_inbox().into();
+
+        let send_fut = self
             .client
-            .subscribe(inbox.clone())
-            .await
-            .map_err(|err| PublishError::with_source(PublishErrorKind::Other, err))?;
-        tokio::time::timeout(self.timeout, async {
-            if let Some(headers) = publish.headers {
-                self.client
-                    .publish_with_reply_and_headers(
-                        subject,
-                        inbox.clone(),
-                        headers,
-                        publish.payload,
-                    )
-                    .await
-            } else {
-                self.client
-                    .publish_with_reply(subject, inbox.clone(), publish.payload)
-                    .await
-            }
-        })
-        .map_err(|_| PublishError::new(PublishErrorKind::TimedOut))
-        .await?
-        .map_err(|err| PublishError::with_source(PublishErrorKind::Other, err))?;
+            .sender
+            .send(Command::Request {
+                subject,
+                payload: publish.payload,
+                respond,
+                headers: publish.headers,
+                sender,
+            })
+            .map_err(|err| PublishError::with_source(PublishErrorKind::Other, err));
+
+        tokio::time::timeout(self.timeout, send_fut)
+            .map_err(|_elapsed| PublishError::new(PublishErrorKind::TimedOut))
+            .await??;
 
         Ok(PublishAckFuture {
             timeout: self.timeout,
-            subscription: response,
+            subscription: receiver,
         })
     }
 
     /// Query the server for account information
     pub async fn query_account(&self) -> Result<Account, AccountError> {
-        let response: Response<Account> = self.request("INFO".into(), b"").await?;
+        let response: Response<Account> = self.request("INFO", b"").await?;
 
         match response {
             Response::Err { error } => Err(AccountError::new(AccountErrorKind::JetStream(error))),
@@ -656,6 +644,12 @@ impl Context {
                 num_replicas,
                 discard: stream::DiscardPolicy::New,
                 mirror_direct: config.mirror_direct,
+                #[cfg(feature = "server_2_10")]
+                compression: if config.compression {
+                    Some(stream::Compression::S2)
+                } else {
+                    None
+                },
                 ..Default::default()
             })
             .await
@@ -805,17 +799,17 @@ impl Context {
     /// let client = async_nats::connect("localhost:4222").await?;
     /// let jetstream = async_nats::jetstream::new(client);
     ///
-    /// let response: Response<Info> = jetstream
-    ///     .request("STREAM.INFO.events".to_string(), &())
-    ///     .await?;
+    /// let response: Response<Info> = jetstream.request("STREAM.INFO.events", &()).await?;
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn request<T, V>(&self, subject: String, payload: &T) -> Result<V, RequestError>
+    pub async fn request<S, T, V>(&self, subject: S, payload: &T) -> Result<V, RequestError>
     where
+        S: ToSubject,
         T: ?Sized + Serialize,
         V: DeserializeOwned,
     {
+        let subject = subject.to_subject();
         let request = serde_json::to_vec(&payload)
             .map(Bytes::from)
             .map_err(|err| RequestError::with_source(RequestErrorKind::Other, err))?;
@@ -824,7 +818,7 @@ impl Context {
 
         let message = self
             .client
-            .request(format!("{}.{}", self.prefix, subject), request)
+            .request(format!("{}.{}", self.prefix, subject.as_ref()), request)
             .await;
         let message = message?;
         debug!(
@@ -982,16 +976,16 @@ pub type PublishError = Error<PublishErrorKind>;
 #[derive(Debug)]
 pub struct PublishAckFuture {
     timeout: Duration,
-    subscription: crate::Subscriber,
+    subscription: oneshot::Receiver<Message>,
 }
 
 impl PublishAckFuture {
-    async fn next_with_timeout(mut self) -> Result<PublishAck, PublishError> {
-        let next = tokio::time::timeout(self.timeout, self.subscription.next())
+    async fn next_with_timeout(self) -> Result<PublishAck, PublishError> {
+        let next = tokio::time::timeout(self.timeout, self.subscription)
             .await
             .map_err(|_| PublishError::new(PublishErrorKind::TimedOut))?;
         next.map_or_else(
-            || Err(PublishError::new(PublishErrorKind::BrokenPipe)),
+            |_| Err(PublishError::new(PublishErrorKind::BrokenPipe)),
             |m| {
                 if m.status == Some(StatusCode::NO_RESPONDERS) {
                     return Err(PublishError::new(PublishErrorKind::StreamNotFound));
@@ -1091,7 +1085,7 @@ impl futures::Stream for StreamNames<'_> {
                     self.page_request = Some(Box::pin(async move {
                         match context
                             .request(
-                                "STREAM.NAMES".to_string(),
+                                "STREAM.NAMES",
                                 &json!({
                                     "offset": offset,
                                 }),
@@ -1165,7 +1159,7 @@ impl futures::Stream for Streams<'_> {
                     self.page_request = Some(Box::pin(async move {
                         match context
                             .request(
-                                "STREAM.LIST".to_string(),
+                                "STREAM.LIST",
                                 &json!({
                                     "offset": offset,
                                 }),

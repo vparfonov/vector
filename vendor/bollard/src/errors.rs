@@ -39,6 +39,7 @@ pub enum Error {
     #[error("Could not load native certs")]
     NoNativeCertsError {
         /// The original error emitted.
+        #[from]
         err: rustls::Error,
     },
     /// Generic error emitted by the docker server.
@@ -83,6 +84,9 @@ pub enum Error {
     /// Error emitted when a session is not provided to the buildkit engine
     #[error("Buildkit requires a unique session")]
     MissingSessionBuildkitError {},
+    /// Error emitted when a session is not provided to the buildkit engine
+    #[error("Buildkit requires a builder version set")]
+    MissingVersionBuildkitError {},
     /// Error emitted when JSON fails to serialize.
     #[error(transparent)]
     JsonSerdeError {
@@ -145,5 +149,18 @@ pub enum Error {
         /// The original error emitted.
         #[from]
         err: http::uri::InvalidUri,
+    },
+    /// Error that is never emitted
+    #[error("Error in the hyper legacy client: {}", err)]
+    HyperLegacyError {
+        /// The original error emitted.
+        #[from]
+        err: hyper_util::client::legacy::Error,
+    },
+    /// Error emitted when connecting to a URI with an unsupported scheme
+    #[error("URI scheme is not supported: {uri}")]
+    UnsupportedURISchemeError {
+        /// The URI that was attempted to be connected to
+        uri: String,
     },
 }

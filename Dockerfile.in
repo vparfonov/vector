@@ -1,7 +1,7 @@
 #@follow_tag(registry.redhat.io/ubi9:latest)
 FROM registry.redhat.io/ubi9/ubi:9.1.0-1817 AS builder
 
-ENV BUILD_VERSION=v0.33.0-rh
+ENV BUILD_VERSION=v0.37.1-rh
 ENV SOURCE_GIT_COMMIT=${CI_VECTOR_UPSTREAM_COMMIT}
 ENV SOURCE_GIT_URL=${CI_VECTOR_UPSTREAM_URL}
 

@@ -44,3 +44,9 @@ ignore = [
     # https://github.com/vectordotdev/vector/issues/19262
     "RUSTSEC-2023-0071"
 ]
+
+[bans]
+multiple-versions = "allow"
+deny = [
+    { name = "ring", wrappers = ["rustls", "sct", "rustls-webpki"] },
+]

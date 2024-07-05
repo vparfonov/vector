@@ -9,6 +9,7 @@ use crate::{config::SecretBackend, signal};
 #[cfg(feature = "secrets-aws-secrets-manager")]
 mod aws_secrets_manager;
 mod exec;
+mod file;
 mod test;
 
 /// Configurable secret backends in Vector.
@@ -25,6 +26,9 @@ pub enum SecretBackends {
     #[cfg(feature = "secrets-aws-secrets-manager")]
     AwsSecretsManager(aws_secrets_manager::AwsSecretsManagerBackend),
 
+    /// File.
+    File(file::FileBackend),
+
     /// Test.
     #[configurable(metadata(docs::hidden))]
     Test(test::TestBackend),
@@ -37,6 +41,7 @@ impl NamedComponent for SecretBackends {
             Self::Exec(config) => config.get_component_name(),
             #[cfg(feature = "secrets-aws-secrets-manager")]
             Self::AwsSecretsManager(config) => config.get_component_name(),
+            Self::File(config) => config.get_component_name(),
             Self::Test(config) => config.get_component_name(),
         }
     }

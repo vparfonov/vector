@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.60"
 name = "ordered-float"
-version = "4.2.0"
+version = "4.2.2"
 authors = [
     "Jonathan Reem <jonathan.reem@gmail.com>",
     "Matt Brubeck <mbrubeck@limpet.net>",

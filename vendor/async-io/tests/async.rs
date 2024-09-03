@@ -1,4 +1,3 @@
-use std::future::Future;
 use std::io;
 use std::net::{Shutdown, TcpListener, TcpStream, UdpSocket};
 #[cfg(unix)]
@@ -178,7 +177,8 @@ fn udp_connect() -> io::Result<()> {
     })
 }
 
-#[cfg(unix)]
+// This test is broken for now on OpenBSD: https://github.com/rust-lang/rust/issues/116523
+#[cfg(all(unix, not(target_os = "openbsd")))]
 #[test]
 fn uds_connect() -> io::Result<()> {
     future::block_on(async {
@@ -351,6 +351,89 @@ fn shutdown() -> io::Result<()> {
             writer.get_ref().shutdown(Shutdown::Write)
         })
         .await?;
+
+        Ok(())
+    })
+}
+
+// prevent source from unregistering by trying to register it twice
+#[test]
+fn duplicate_socket_insert() -> io::Result<()> {
+    future::block_on(async {
+        let listener = Async::<TcpListener>::bind(([127, 0, 0, 1], 0))?;
+        let addr = listener.as_ref().local_addr()?;
+
+        // attempt to register twice
+        assert!(Async::new(&listener).is_err(), "fails upon second insert");
+
+        // Read and Write to confirm socket did not deregister on duplication attempt
+        // Write to stream_w
+        let mut stream_w = Async::<TcpStream>::connect(addr).await?;
+        stream_w.write(LOREM_IPSUM).await?;
+        stream_w.get_ref().shutdown(Shutdown::Write)?;
+
+        // Read from stream_r
+        let mut stream_r = listener.accept().await?.0;
+        let mut buffer = vec![0; LOREM_IPSUM.len()];
+        stream_r.read_exact(&mut buffer).await?;
+
+        assert_eq!(buffer, LOREM_IPSUM);
+
+        Ok(())
+    })
+}
+
+#[cfg(any(target_os = "linux", target_os = "android"))]
+#[test]
+fn abstract_socket() -> io::Result<()> {
+    use std::ffi::OsStr;
+    #[cfg(target_os = "android")]
+    use std::os::android::net::SocketAddrExt;
+    #[cfg(target_os = "linux")]
+    use std::os::linux::net::SocketAddrExt;
+    use std::os::unix::ffi::OsStrExt;
+    use std::os::unix::net::{SocketAddr, UnixListener, UnixStream};
+
+    future::block_on(async {
+        // Bind a listener to a socket.
+        let path = OsStr::from_bytes(b"\0smolabstract");
+        let addr = SocketAddr::from_abstract_name(b"smolabstract")?;
+        let listener = Async::new(UnixListener::bind_addr(&addr)?)?;
+
+        // Future that connects to the listener.
+        let connector = async {
+            // Connect to the socket.
+            let mut stream = Async::<UnixStream>::connect(path).await?;
+
+            // Write some bytes to the stream.
+            stream.write_all(LOREM_IPSUM).await?;
+
+            // Read some bytes from the stream.
+            let mut buf = vec![0; LOREM_IPSUM.len()];
+            stream.read_exact(&mut buf).await?;
+            assert_eq!(buf.as_slice(), LOREM_IPSUM);
+
+            io::Result::Ok(())
+        };
+
+        // Future that drives the listener.
+        let driver = async {
+            // Wait for a new connection.
+            let (mut stream, _) = listener.accept().await?;
+
+            // Read some bytes from the stream.
+            let mut buf = vec![0; LOREM_IPSUM.len()];
+            stream.read_exact(&mut buf).await?;
+            assert_eq!(buf.as_slice(), LOREM_IPSUM);
+
+            // Write some bytes to the stream.
+            stream.write_all(LOREM_IPSUM).await?;
+
+            io::Result::Ok(())
+        };
+
+        // Run both in parallel.
+        future::try_zip(connector, driver).await?;
 
         Ok(())
     })

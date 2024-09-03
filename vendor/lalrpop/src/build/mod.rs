@@ -14,13 +14,14 @@ use crate::session::{ColorConfig, Session};
 use crate::tls::Tls;
 use crate::tok;
 use crate::util::Sep;
-use is_terminal::IsTerminal;
 use itertools::Itertools;
 use lalrpop_util::ParseError;
 use tiny_keccak::{Hasher, Sha3};
+use walkdir::WalkDir;
 
+use std::ffi::OsStr;
 use std::fs;
-use std::io::{self, BufRead, Read, Write};
+use std::io::{self, BufRead, IsTerminal, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::exit;
 use std::rc::Rc;
@@ -86,6 +87,36 @@ fn gen_resolve_file(session: &Session, lalrpop_file: &Path, ext: &str) -> io::Re
     } else {
         in_dir
     };
+
+    // Ideally we do something like syn::parse_str::<syn::Ident>(lalrpop_file.file_name())?;
+    // But I don't think we want a full blown syn dependency unless fully converting to proc macros.
+    if lalrpop_file
+        .file_name()
+        .ok_or(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "LALRPOP could not extract a valid file name: {}",
+                lalrpop_file.display()
+            ),
+        ))?
+        .to_str()
+        .ok_or(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "LALRPOP file names must be valid UTF-8: {}",
+                lalrpop_file.display()
+            ),
+        ))?
+        .contains(char::is_whitespace)
+    {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!(
+                "LALRPOP file names cannot contain whitespace: {}",
+                lalrpop_file.display()
+            ),
+        ));
+    }
 
     // If the lalrpop file is not in in_dir, the result is that the
     // .rs file is created in the same directory as the lalrpop file
@@ -174,34 +205,65 @@ fn needs_rebuild(lalrpop_file: &Path, rs_file: &Path) -> io::Result<bool> {
     }
 }
 
+/// Handles a [walkdir::Error] if the root cause is a dangling symlink.
+///
+/// Returns `Ok` if the error could be handled, otherwise returns `Err(err)`.
+fn handle_dangling_symlink_error(err: walkdir::Error) -> Result<(), walkdir::Error> {
+    let is_not_found = err.io_error().map(|io_err| io_err.kind()) == Some(io::ErrorKind::NotFound);
+    if !is_not_found {
+        return Err(err);
+    }
+
+    // As of now on Linux, this is the path of the symlink (not where it points to) in case of a
+    // dangling symlink:
+    let path = match err.path() {
+        Some(path) => path,
+        None => {
+            return Err(err);
+        }
+    };
+
+    if !path.is_symlink() {
+        return Err(err);
+    }
+
+    eprintln!(
+        "Warning: ignoring dangling/erroneous symlink {}",
+        path.display()
+    );
+    Ok(())
+}
+
 fn lalrpop_files<P: AsRef<Path>>(root_dir: P) -> io::Result<Vec<PathBuf>> {
     let mut result = vec![];
-    for entry in fs::read_dir(root_dir)? {
-        let entry = entry?;
-        let file_type = entry.file_type()?;
 
-        let path = entry.path();
-
-        if file_type.is_dir() {
-            result.extend(lalrpop_files(&path)?);
-        }
-
-        let is_symlink_file = || -> io::Result<bool> {
-            if !file_type.is_symlink() {
-                Ok(false)
-            } else {
-                // Ensure all symlinks are resolved
-                Ok(fs::metadata(&path)?.is_file())
+    let walkdir = WalkDir::new(root_dir)
+        .follow_links(true)
+        // Use deterministic ordering:
+        .sort_by_file_name();
+    for entry in walkdir {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(err) => {
+                handle_dangling_symlink_error(err)?;
+                continue;
             }
         };
 
-        if (file_type.is_file() || is_symlink_file()?)
-            && path.extension().is_some()
-            && path.extension().unwrap() == "lalrpop"
-        {
-            result.push(path);
+        // `file_type` follows symlinks, so if `entry` points to a symlink to a file, then
+        // `is_file` returns true.
+        if !entry.file_type().is_file() {
+            continue;
         }
+
+        let path = entry.path();
+        if path.extension() != Some(OsStr::new("lalrpop")) {
+            continue;
+        }
+
+        result.push(PathBuf::from(path));
     }
+
     Ok(result)
 }
 
@@ -265,6 +327,9 @@ fn parse_and_normalize_grammar(session: &Session, file_text: &FileText) -> io::R
                 tok::ErrorCode::ExpectedStringLiteral => "expected string literal; missing `\"`?",
                 tok::ErrorCode::UnterminatedCode => {
                     "unterminated code block; perhaps a missing `;`, `)`, `]` or `}`?"
+                }
+                tok::ErrorCode::UnterminatedBlockComment => {
+                    "unterminated block comment; missing `*/`?"
                 }
             };
 
@@ -365,7 +430,19 @@ fn emit_recursive_ascent(
         exit(1);
     }
 
+    // Find a better visibility for some generated items.
+    // This will be the maximum of the visibility of all starting nonterminals.
+    let mut max_start_nt_visibility = pt::Visibility::Priv;
     for (user_nt, start_nt) in &grammar.start_nonterminals {
+        match (
+            &max_start_nt_visibility,
+            &grammar.nonterminals[start_nt].visibility,
+        ) {
+            (r::Visibility::Pub(None), _) | (_, r::Visibility::Priv) => {}
+            (v1, v2) if v1 == v2 => {}
+            (r::Visibility::Priv, v) => max_start_nt_visibility = v.clone(),
+            _ => max_start_nt_visibility = r::Visibility::Pub(None),
+        };
         // We generate these, so there should always be exactly 1
         // production. Otherwise the LR(1) algorithm doesn't know
         // where to stop!
@@ -421,6 +498,7 @@ fn emit_recursive_ascent(
             )?,
         }
 
+        rust!(rust, "#[allow(unused_imports)]");
         rust!(
             rust,
             "{}use self::{}parse{}::{}Parser;",
@@ -442,8 +520,8 @@ fn emit_recursive_ascent(
 
     action::emit_action_code(grammar, &mut rust)?;
 
-    rust!(rust, "#[allow(clippy::type_complexity)]");
-    emit_to_triple_trait(grammar, &mut rust)?;
+    rust!(rust, "#[allow(clippy::type_complexity, dead_code)]");
+    emit_to_triple_trait(grammar, max_start_nt_visibility, &mut rust)?;
 
     Ok(rust.into_inner())
 }
@@ -460,7 +538,11 @@ fn write_where_clause<W: Write>(
     Ok(())
 }
 
-fn emit_to_triple_trait<W: Write>(grammar: &r::Grammar, rust: &mut RustWrite<W>) -> io::Result<()> {
+fn emit_to_triple_trait<W: Write>(
+    grammar: &r::Grammar,
+    max_start_nt_visibility: r::Visibility,
+    rust: &mut RustWrite<W>,
+) -> io::Result<()> {
     #[allow(non_snake_case)]
     let (L, T, E) = (
         grammar.types.terminal_loc_type(),
@@ -487,7 +569,8 @@ fn emit_to_triple_trait<W: Write>(grammar: &r::Grammar, rust: &mut RustWrite<W>)
     rust!(rust, "");
     rust!(
         rust,
-        "pub trait {}ToTriple<{}>",
+        "{} trait {}ToTriple<{}>",
+        max_start_nt_visibility,
         grammar.prefix,
         user_type_parameters,
     );

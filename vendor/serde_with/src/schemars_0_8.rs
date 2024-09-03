@@ -567,10 +567,8 @@ where
 
         let properties = &mut object.object().properties;
         for schema in one_of {
-            let mut schema = schema.into_object();
-
-            if let Some(object) = &mut schema.object {
-                properties.append(&mut object.properties);
+            if let Some(object) = schema.into_object().object {
+                properties.extend(object.properties.into_iter());
             }
         }
 
@@ -794,9 +792,9 @@ map_first_last_wins_schema!(=> S indexmap_1::IndexMap<K, V, S>);
 #[cfg(feature = "indexmap_2")]
 map_first_last_wins_schema!(=> S indexmap_2::IndexMap<K, V, S>);
 
-impl<T, TA> JsonSchema for WrapSchema<Vec<T>, OneOrMany<TA, PreferOne>>
+impl<T, TA> JsonSchemaAs<Vec<T>> for OneOrMany<TA, PreferOne>
 where
-    WrapSchema<T, TA>: JsonSchema,
+    TA: JsonSchemaAs<T>,
 {
     fn schema_name() -> String {
         std::format!(
@@ -835,9 +833,9 @@ where
     }
 }
 
-impl<T, TA> JsonSchema for WrapSchema<Vec<T>, OneOrMany<TA, PreferMany>>
+impl<T, TA> JsonSchemaAs<Vec<T>> for OneOrMany<TA, PreferMany>
 where
-    WrapSchema<T, TA>: JsonSchema,
+    TA: JsonSchemaAs<T>,
 {
     fn schema_name() -> String {
         std::format!(
@@ -886,6 +884,79 @@ where
         .into()
     }
 }
+
+macro_rules! schema_for_pickfirst {
+    ($( $param:ident )+) => {
+        impl<T, $($param,)+> JsonSchemaAs<T> for PickFirst<($( $param, )+)>
+        where
+            $( $param: JsonSchemaAs<T>, )+
+        {
+            fn schema_name() -> String {
+                std::format!(
+                    concat!(
+                        "PickFirst<(",
+                        $( "{", stringify!($param), "}", )+
+                        ")>"
+                    ),
+                    $( $param = <WrapSchema<T, $param>>::schema_name(), )+
+                )
+            }
+
+            fn schema_id() -> Cow<'static, str> {
+                std::format!(
+                    concat!(
+                        "serde_with::PickFirst<(",
+                        $( "{", stringify!($param), "}", )+
+                        ")>"
+                    ),
+                    $( $param = <WrapSchema<T, $param>>::schema_id(), )+
+                )
+                .into()
+            }
+
+            fn json_schema(gen: &mut SchemaGenerator) -> Schema {
+                let mut first = true;
+                let subschemas = std::vec![$(
+                    {
+                        let is_first = std::mem::replace(&mut first, false);
+                        let schema = gen.subschema_for::<WrapSchema<T, $param>>();
+
+                        if !is_first {
+                            SchemaObject {
+                                metadata: Some(Box::new(Metadata {
+                                    write_only: true,
+                                    ..Default::default()
+                                })),
+                                subschemas: Some(Box::new(SubschemaValidation {
+                                    all_of: Some(std::vec![schema]),
+                                    ..Default::default()
+                                })),
+                                ..Default::default()
+                            }
+                            .into()
+                        } else {
+                            schema
+                        }
+                    }
+                ),+];
+
+                SchemaObject {
+                    subschemas: Some(Box::new(SubschemaValidation {
+                        any_of: Some(subschemas),
+                        ..Default::default()
+                    })),
+                    ..Default::default()
+                }
+                .into()
+            }
+        }
+    }
+}
+
+schema_for_pickfirst!(A);
+schema_for_pickfirst!(A B);
+schema_for_pickfirst!(A B C);
+schema_for_pickfirst!(A B C D);
 
 impl<T, TA> JsonSchemaAs<T> for SetLastValueWins<TA>
 where

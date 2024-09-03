@@ -1,5 +1,22 @@
 # CHANGELOG
 
+## 6.0.3
+
+- Enhance `tracing` feature with some `debug` level logs for higher level logic.
+
+## 6.0.2
+
+- Add `tracing` feature which outputs debugging information to the [`tracing`](https://crates.io/crates/tracing) ecosystem.
+
+## 6.0.1
+
+- Remove dependency on `once_cell` for Windows users, replace with `std::sync::OnceLock`.
+
+## 6.0.0
+
+- MSRV is now 1.70
+- Upgraded all dependencies to latest version
+
 ## 5.0.0
 
 - Remove several unused error messages

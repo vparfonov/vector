@@ -51,7 +51,7 @@ where
 
     /// Returns a raw representation.
     #[cfg(feature = "display")]
-    pub fn display_repr(&self) -> Cow<str> {
+    pub fn display_repr(&self) -> Cow<'_, str> {
         self.as_repr()
             .and_then(|r| r.as_raw().as_str())
             .map(Cow::Borrowed)
@@ -60,8 +60,10 @@ where
             })
     }
 
-    /// Returns the location within the original document
-    pub(crate) fn span(&self) -> Option<std::ops::Range<usize>> {
+    /// The location within the original document
+    ///
+    /// This generally requires an [`ImDocument`][crate::ImDocument].
+    pub fn span(&self) -> Option<std::ops::Range<usize>> {
         self.repr.as_ref().and_then(|r| r.span())
     }
 
@@ -150,13 +152,15 @@ impl Repr {
         &self.raw_value
     }
 
-    /// Returns the location within the original document
-    pub(crate) fn span(&self) -> Option<std::ops::Range<usize>> {
+    /// The location within the original document
+    ///
+    /// This generally requires an [`ImDocument`][crate::ImDocument].
+    pub fn span(&self) -> Option<std::ops::Range<usize>> {
         self.raw_value.span()
     }
 
     pub(crate) fn despan(&mut self, input: &str) {
-        self.raw_value.despan(input)
+        self.raw_value.despan(input);
     }
 
     #[cfg(feature = "display")]

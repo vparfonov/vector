@@ -268,8 +268,25 @@ fn registry_value_create(c: &mut Criterion) {
     });
 }
 
+fn registry_value_get(c: &mut Criterion) {
+    let lua = Lua::new();
+    lua.gc_stop();
+
+    let value = lua.create_registry_value("hello").unwrap();
+
+    c.bench_function("registry value [get]", |b| {
+        b.iter_batched(
+            || collect_gc_twice(&lua),
+            |_| {
+                assert_eq!(lua.registry_value::<LuaString>(&value).unwrap(), "hello");
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn userdata_create(c: &mut Criterion) {
-    struct UserData(i64);
+    struct UserData(#[allow(unused)] i64);
     impl LuaUserData for UserData {}
 
     let lua = Lua::new();
@@ -286,7 +303,7 @@ fn userdata_create(c: &mut Criterion) {
 }
 
 fn userdata_call_index(c: &mut Criterion) {
-    struct UserData(i64);
+    struct UserData(#[allow(unused)] i64);
     impl LuaUserData for UserData {
         fn add_methods<'lua, M: LuaUserDataMethods<'lua, Self>>(methods: &mut M) {
             methods.add_meta_method(LuaMetaMethod::Index, move |_, _, key: LuaString| Ok(key));
@@ -406,6 +423,7 @@ criterion_group! {
         function_async_call_sum,
 
         registry_value_create,
+        registry_value_get,
 
         userdata_create,
         userdata_call_index,

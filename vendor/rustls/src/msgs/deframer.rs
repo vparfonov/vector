@@ -1,15 +1,16 @@
 use alloc::vec::Vec;
 use core::ops::Range;
 use core::slice::SliceIndex;
+#[cfg(feature = "std")]
 use std::io;
 
-use super::base::Payload;
 use super::codec::Codec;
-use super::message::PlainMessage;
 use crate::enums::{ContentType, ProtocolVersion};
 use crate::error::{Error, InvalidMessage, PeerMisbehaved};
 use crate::msgs::codec;
-use crate::msgs::message::{MessageError, OpaqueMessage};
+#[cfg(feature = "std")]
+use crate::msgs::message::MAX_WIRE_SIZE;
+use crate::msgs::message::{InboundOpaqueMessage, InboundPlainMessage, MessageError};
 use crate::record_layer::{Decrypted, RecordLayer};
 
 /// This deframer works to reconstruct TLS messages from a stream of arbitrary-sized reads.
@@ -25,6 +26,10 @@ pub struct MessageDeframer {
 
     /// If we're in the middle of joining a handshake payload, this is the metadata.
     joining_hs: Option<HandshakePayloadMeta>,
+
+    /// We limit consecutive empty fragments to avoid a route for the peer to send
+    /// us significant but fruitless traffic.
+    seen_consecutive_empty_fragments: u8,
 }
 
 impl MessageDeframer {
@@ -33,12 +38,12 @@ impl MessageDeframer {
     /// Returns an `Error` if the deframer failed to parse some message contents or if decryption
     /// failed, `Ok(None)` if no full message is buffered or if trial decryption failed, and
     /// `Ok(Some(_))` if a valid message was found and decrypted successfully.
-    pub fn pop(
+    pub fn pop<'b>(
         &mut self,
         record_layer: &mut RecordLayer,
         negotiated_version: Option<ProtocolVersion>,
-        buffer: &mut DeframerSliceBuffer,
-    ) -> Result<Option<Deframed>, Error> {
+        buffer: &mut DeframerSliceBuffer<'b>,
+    ) -> Result<Option<Deframed<'b>>, Error> {
         if let Some(last_err) = self.last_error.clone() {
             return Err(last_err);
         } else if buffer.is_empty() {
@@ -66,8 +71,8 @@ impl MessageDeframer {
             // Does our `buf` contain a full message?  It does if it is big enough to
             // contain a header, and that header has a length which falls within `buf`.
             // If so, deframe it and place the message onto the frames output queue.
-            let mut rd = codec::Reader::init(buffer.filled_get(start..));
-            let m = match OpaqueMessage::read(&mut rd) {
+            let mut rd = codec::ReaderMut::init(buffer.filled_get_mut(start..));
+            let m = match InboundOpaqueMessage::read(&mut rd) {
                 Ok(m) => m,
                 Err(msg_err) => {
                     let err_kind = match msg_err {
@@ -101,7 +106,7 @@ impl MessageDeframer {
                 ContentType::Alert
                     if version_is_tls13
                         && !record_layer.has_decrypted()
-                        && m.payload().len() <= 2 =>
+                        && m.payload.len() <= 2 =>
                 {
                     true
                 }
@@ -109,25 +114,41 @@ impl MessageDeframer {
                 _ => false,
             };
             if self.joining_hs.is_none() && allowed_plaintext {
+                let InboundOpaqueMessage {
+                    typ,
+                    version,
+                    payload,
+                } = m;
+                let raw_payload_slice = RawSlice::from(&*payload);
                 // This is unencrypted. We check the contents later.
                 buffer.queue_discard(end);
+                let message = InboundPlainMessage {
+                    typ,
+                    version,
+                    payload: buffer.take(raw_payload_slice),
+                };
                 return Ok(Some(Deframed {
                     want_close_before_decrypt: false,
                     aligned: true,
                     trial_decryption_finished: false,
-                    message: m.into_plain_message(),
+                    message,
                 }));
             }
 
             // Decrypt the encrypted message (if necessary).
-            let msg = match record_layer.decrypt_incoming(m) {
+            let (typ, version, plain_payload_slice) = match record_layer.decrypt_incoming(m) {
                 Ok(Some(decrypted)) => {
                     let Decrypted {
                         want_close_before_decrypt,
-                        plaintext,
+                        plaintext:
+                            InboundPlainMessage {
+                                typ,
+                                version,
+                                payload,
+                            },
                     } = decrypted;
                     debug_assert!(!want_close_before_decrypt);
-                    plaintext
+                    (typ, version, RawSlice::from(payload))
                 }
                 // This was rejected early data, discard it. If we currently have a handshake
                 // payload in progress, this counts as interleaved, so we error out.
@@ -143,7 +164,7 @@ impl MessageDeframer {
                 Err(e) => return Err(e),
             };
 
-            if self.joining_hs.is_some() && msg.typ != ContentType::Handshake {
+            if self.joining_hs.is_some() && typ != ContentType::Handshake {
                 // "Handshake messages MUST NOT be interleaved with other record
                 // types.  That is, if a handshake message is split over two or more
                 // records, there MUST NOT be any other records between them."
@@ -151,21 +172,40 @@ impl MessageDeframer {
                 return Err(self.set_err(PeerMisbehaved::MessageInterleavedWithHandshakeMessage));
             }
 
+            match plain_payload_slice.len {
+                0 => {
+                    if self.seen_consecutive_empty_fragments
+                        == ALLOWED_CONSECUTIVE_EMPTY_FRAGMENTS_MAX
+                    {
+                        return Err(self.set_err(PeerMisbehaved::TooManyEmptyFragments));
+                    }
+                    self.seen_consecutive_empty_fragments += 1;
+                }
+                _ => {
+                    self.seen_consecutive_empty_fragments = 0;
+                }
+            }
+
             // If it's not a handshake message, just return it -- no joining necessary.
-            if msg.typ != ContentType::Handshake {
-                let end = start + rd.used();
+            if typ != ContentType::Handshake {
                 buffer.queue_discard(end);
+                let message = InboundPlainMessage {
+                    typ,
+                    version,
+                    payload: buffer.take(plain_payload_slice),
+                };
                 return Ok(Some(Deframed {
                     want_close_before_decrypt: false,
                     aligned: true,
                     trial_decryption_finished: false,
-                    message: msg,
+                    message,
                 }));
             }
 
             // If we don't know the payload size yet or if the payload size is larger
             // than the currently buffered payload, we need to wait for more data.
-            match self.append_hs::<_, false>(msg.version, &msg.payload.0, end, buffer)? {
+            let src = buffer.raw_slice_to_filled_range(plain_payload_slice);
+            match self.append_hs(version, InternalPayload(src), end, buffer)? {
                 HandshakePayloadState::Blocked => return Ok(None),
                 HandshakePayloadState::Complete(len) => break len,
                 HandshakePayloadState::Continue => continue,
@@ -175,13 +215,11 @@ impl MessageDeframer {
         let meta = self.joining_hs.as_mut().unwrap(); // safe after calling `append_hs()`
 
         // We can now wrap the complete handshake payload in a `PlainMessage`, to be returned.
-        let message = PlainMessage {
-            typ: ContentType::Handshake,
-            version: meta.version,
-            payload: Payload::new(
-                buffer.filled_get(meta.payload.start..meta.payload.start + expected_len),
-            ),
-        };
+        let typ = ContentType::Handshake;
+        let version = meta.version;
+        let raw_payload = RawSlice::from(
+            buffer.filled_get(meta.payload.start..meta.payload.start + expected_len),
+        );
 
         // But before we return, update the `joining_hs` state to skip past this payload.
         if meta.payload.len() > expected_len {
@@ -198,6 +236,12 @@ impl MessageDeframer {
             self.joining_hs = None;
             buffer.queue_discard(end);
         }
+
+        let message = InboundPlainMessage {
+            typ,
+            version,
+            payload: buffer.take(raw_payload),
+        };
 
         Ok(Some(Deframed {
             want_close_before_decrypt: false,
@@ -216,6 +260,67 @@ impl MessageDeframer {
         err
     }
 
+    /// Write the handshake message contents into the buffer and update the metadata.
+    ///
+    /// Returns true if a complete message is found.
+    fn append_hs<'a, P: AppendPayload<'a>, B: DeframerBuffer<'a, P>>(
+        &mut self,
+        version: ProtocolVersion,
+        payload: P,
+        end: usize,
+        buffer: &mut B,
+    ) -> Result<HandshakePayloadState, Error> {
+        let meta = match &mut self.joining_hs {
+            Some(meta) => {
+                debug_assert_eq!(meta.quic, P::QUIC);
+
+                // We're joining a handshake message to the previous one here.
+                // Write it into the buffer and update the metadata.
+
+                buffer.copy(&payload, meta.payload.end);
+                meta.message.end = end;
+                meta.payload.end += payload.len();
+
+                // If we haven't parsed the payload size yet, try to do so now.
+                if meta.expected_len.is_none() {
+                    meta.expected_len =
+                        payload_size(buffer.filled_get(meta.payload.start..meta.payload.end))?;
+                }
+
+                meta
+            }
+            None => {
+                // We've found a new handshake message here.
+                // Write it into the buffer and create the metadata.
+
+                let expected_len = payload.size(buffer)?;
+                buffer.copy(&payload, 0);
+                self.joining_hs
+                    .insert(HandshakePayloadMeta {
+                        message: Range { start: 0, end },
+                        payload: Range {
+                            start: 0,
+                            end: payload.len(),
+                        },
+                        version,
+                        expected_len,
+                        quic: P::QUIC,
+                    })
+            }
+        };
+
+        Ok(match meta.expected_len {
+            Some(len) if len <= meta.payload.len() => HandshakePayloadState::Complete(len),
+            _ => match buffer.len() > meta.message.end {
+                true => HandshakePayloadState::Continue,
+                false => HandshakePayloadState::Blocked,
+            },
+        })
+    }
+}
+
+#[cfg(feature = "std")]
+impl MessageDeframer {
     /// Allow pushing handshake messages directly into the buffer.
     pub(crate) fn push(
         &mut self,
@@ -232,70 +337,11 @@ impl MessageDeframer {
         }
 
         let end = buffer.len() + payload.len();
-        self.append_hs::<_, true>(version, payload, end, buffer)?;
+        self.append_hs(version, ExternalPayload(payload), end, buffer)?;
         Ok(())
     }
 
-    /// Write the handshake message contents into the buffer and update the metadata.
-    ///
-    /// Returns true if a complete message is found.
-    fn append_hs<T: DeframerBuffer<QUIC>, const QUIC: bool>(
-        &mut self,
-        version: ProtocolVersion,
-        payload: &[u8],
-        end: usize,
-        buffer: &mut T,
-    ) -> Result<HandshakePayloadState, Error> {
-        let meta = match &mut self.joining_hs {
-            Some(meta) => {
-                debug_assert_eq!(meta.quic, QUIC);
-
-                // We're joining a handshake message to the previous one here.
-                // Write it into the buffer and update the metadata.
-
-                DeframerBuffer::<QUIC>::copy(buffer, payload, meta.payload.end);
-                meta.message.end = end;
-                meta.payload.end += payload.len();
-
-                // If we haven't parsed the payload size yet, try to do so now.
-                if meta.expected_len.is_none() {
-                    meta.expected_len =
-                        payload_size(buffer.filled_get(meta.payload.start..meta.payload.end))?;
-                }
-
-                meta
-            }
-            None => {
-                // We've found a new handshake message here.
-                // Write it into the buffer and create the metadata.
-
-                let expected_len = payload_size(payload)?;
-                DeframerBuffer::<QUIC>::copy(buffer, payload, 0);
-                self.joining_hs
-                    .insert(HandshakePayloadMeta {
-                        message: Range { start: 0, end },
-                        payload: Range {
-                            start: 0,
-                            end: payload.len(),
-                        },
-                        version,
-                        expected_len,
-                        quic: QUIC,
-                    })
-            }
-        };
-
-        Ok(match meta.expected_len {
-            Some(len) if len <= meta.payload.len() => HandshakePayloadState::Complete(len),
-            _ => match buffer.len() > meta.message.end {
-                true => HandshakePayloadState::Continue,
-                false => HandshakePayloadState::Blocked,
-            },
-        })
-    }
-
     /// Read some bytes from `rd`, and add them to our internal buffer.
-    #[allow(clippy::comparison_chain)]
     pub fn read(
         &mut self,
         rd: &mut dyn io::Read,
@@ -315,6 +361,48 @@ impl MessageDeframer {
     }
 }
 
+trait AppendPayload<'a>: Sized {
+    const QUIC: bool;
+
+    fn len(&self) -> usize;
+
+    fn size<B: DeframerBuffer<'a, Self>>(
+        &self,
+        internal_buffer: &B,
+    ) -> Result<Option<usize>, Error>;
+}
+
+struct ExternalPayload<'a>(&'a [u8]);
+
+impl<'a> AppendPayload<'a> for ExternalPayload<'a> {
+    const QUIC: bool = true;
+
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    fn size<B: DeframerBuffer<'a, Self>>(&self, _: &B) -> Result<Option<usize>, Error> {
+        payload_size(self.0)
+    }
+}
+
+struct InternalPayload(Range<usize>);
+
+impl<'a> AppendPayload<'a> for InternalPayload {
+    const QUIC: bool = false;
+
+    fn len(&self) -> usize {
+        self.0.end - self.0.start
+    }
+
+    fn size<B: DeframerBuffer<'a, Self>>(
+        &self,
+        internal_buffer: &B,
+    ) -> Result<Option<usize>, Error> {
+        payload_size(internal_buffer.filled_get(self.0.clone()))
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct DeframerVecBuffer {
     /// Buffer of data read from the socket, in the process of being parsed into messages.
@@ -329,47 +417,8 @@ pub struct DeframerVecBuffer {
 impl DeframerVecBuffer {
     /// Borrows the initialized contents of this buffer and tracks pending discard operations via
     /// the `discard` reference
-    pub fn borrow(&mut self) -> DeframerSliceBuffer {
+    pub fn borrow(&mut self) -> DeframerSliceBuffer<'_> {
         DeframerSliceBuffer::new(&mut self.buf[..self.used])
-    }
-
-    /// Returns true if there are messages for the caller to process
-    pub fn has_pending(&self) -> bool {
-        !self.is_empty()
-    }
-
-    /// Resize the internal `buf` if necessary for reading more bytes.
-    fn prepare_read(&mut self, is_joining_hs: bool) -> Result<(), &'static str> {
-        // We allow a maximum of 64k of buffered data for handshake messages only. Enforce this
-        // by varying the maximum allowed buffer size here based on whether a prefix of a
-        // handshake payload is currently being buffered. Given that the first read of such a
-        // payload will only ever be 4k bytes, the next time we come around here we allow a
-        // larger buffer size. Once the large message and any following handshake messages in
-        // the same flight have been consumed, `pop()` will call `discard()` to reset `used`.
-        // At this point, the buffer resizing logic below should reduce the buffer size.
-        let allow_max = match is_joining_hs {
-            true => MAX_HANDSHAKE_SIZE as usize,
-            false => OpaqueMessage::MAX_WIRE_SIZE,
-        };
-
-        if self.used >= allow_max {
-            return Err("message buffer full");
-        }
-
-        // If we can and need to increase the buffer size to allow a 4k read, do so. After
-        // dealing with a large handshake message (exceeding `OpaqueMessage::MAX_WIRE_SIZE`),
-        // make sure to reduce the buffer size again (large messages should be rare).
-        // Also, reduce the buffer size if there are neither full nor partial messages in it,
-        // which usually means that the other side suspended sending data.
-        let need_capacity = Ord::min(allow_max, self.used + READ_SIZE);
-        if need_capacity > self.buf.len() {
-            self.buf.resize(need_capacity, 0);
-        } else if self.used == 0 || self.buf.len() > allow_max {
-            self.buf.resize(need_capacity, 0);
-            self.buf.shrink_to(need_capacity);
-        }
-
-        Ok(())
     }
 
     /// Discard `taken` bytes from the start of our buffer.
@@ -396,6 +445,48 @@ impl DeframerVecBuffer {
             self.used = 0;
         }
     }
+}
+
+#[cfg(feature = "std")]
+impl DeframerVecBuffer {
+    /// Returns true if there are messages for the caller to process
+    pub fn has_pending(&self) -> bool {
+        !self.is_empty()
+    }
+
+    /// Resize the internal `buf` if necessary for reading more bytes.
+    fn prepare_read(&mut self, is_joining_hs: bool) -> Result<(), &'static str> {
+        // We allow a maximum of 64k of buffered data for handshake messages only. Enforce this
+        // by varying the maximum allowed buffer size here based on whether a prefix of a
+        // handshake payload is currently being buffered. Given that the first read of such a
+        // payload will only ever be 4k bytes, the next time we come around here we allow a
+        // larger buffer size. Once the large message and any following handshake messages in
+        // the same flight have been consumed, `pop()` will call `discard()` to reset `used`.
+        // At this point, the buffer resizing logic below should reduce the buffer size.
+        let allow_max = match is_joining_hs {
+            true => MAX_HANDSHAKE_SIZE as usize,
+            false => MAX_WIRE_SIZE,
+        };
+
+        if self.used >= allow_max {
+            return Err("message buffer full");
+        }
+
+        // If we can and need to increase the buffer size to allow a 4k read, do so. After
+        // dealing with a large handshake message (exceeding `OutboundOpaqueMessage::MAX_WIRE_SIZE`),
+        // make sure to reduce the buffer size again (large messages should be rare).
+        // Also, reduce the buffer size if there are neither full nor partial messages in it,
+        // which usually means that the other side suspended sending data.
+        let need_capacity = Ord::min(allow_max, self.used + READ_SIZE);
+        if need_capacity > self.buf.len() {
+            self.buf.resize(need_capacity, 0);
+        } else if self.used == 0 || self.buf.len() > allow_max {
+            self.buf.resize(need_capacity, 0);
+            self.buf.shrink_to(need_capacity);
+        }
+
+        Ok(())
+    }
 
     fn is_empty(&self) -> bool {
         self.len() == 0
@@ -410,6 +501,7 @@ impl DeframerVecBuffer {
     }
 }
 
+#[cfg(feature = "std")]
 impl FilledDeframerBuffer for DeframerVecBuffer {
     fn filled_mut(&mut self) -> &mut [u8] {
         &mut self.buf[..self.used]
@@ -420,30 +512,39 @@ impl FilledDeframerBuffer for DeframerVecBuffer {
     }
 }
 
-impl DeframerBuffer<true> for DeframerVecBuffer {
-    fn copy(&mut self, src: &[u8], at: usize) {
-        copy_into_buffer(self.unfilled(), src, at);
-        self.advance(src.len());
+#[cfg(feature = "std")]
+impl DeframerBuffer<'_, InternalPayload> for DeframerVecBuffer {
+    fn copy(&mut self, payload: &InternalPayload, at: usize) {
+        self.borrow().copy(payload, at)
     }
 }
 
-impl DeframerBuffer<false> for DeframerVecBuffer {
-    fn copy(&mut self, src: &[u8], at: usize) {
-        self.borrow().copy(src, at)
+#[cfg(feature = "std")]
+impl<'a> DeframerBuffer<'a, ExternalPayload<'a>> for DeframerVecBuffer {
+    fn copy(&mut self, payload: &ExternalPayload<'a>, _at: usize) {
+        let len = payload.len();
+        self.unfilled()[..len].copy_from_slice(payload.0);
+        self.advance(len);
     }
 }
 
 /// A borrowed version of [`DeframerVecBuffer`] that tracks discard operations
+#[derive(Debug)]
 pub struct DeframerSliceBuffer<'a> {
     // a fully initialized buffer that will be deframed
     buf: &'a mut [u8],
     // number of bytes to discard from the front of `buf` at a later time
     discard: usize,
+    taken: usize,
 }
 
 impl<'a> DeframerSliceBuffer<'a> {
     pub fn new(buf: &'a mut [u8]) -> Self {
-        Self { buf, discard: 0 }
+        Self {
+            buf,
+            discard: 0,
+            taken: 0,
+        }
     }
 
     /// Tracks a pending discard operation of `num_bytes`
@@ -459,38 +560,84 @@ impl<'a> DeframerSliceBuffer<'a> {
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
+
+    /// Remove a `RawSlice` range from the deframer buffer, returning a mutable reference to the
+    /// removed portion.
+    ///
+    /// Safety: the caller *must* ensure that the `RawSlice` refers to a range from the same
+    /// allocation as the deframer's buffer.
+    fn take(&mut self, raw: RawSlice) -> &'a mut [u8] {
+        let start = (raw.ptr as usize)
+            .checked_sub(self.buf.as_ptr() as usize)
+            .unwrap();
+        let end = start + raw.len;
+
+        let (taken, rest) = core::mem::take(&mut self.buf).split_at_mut(end);
+        self.buf = rest;
+        self.taken += end;
+
+        &mut taken[start..]
+    }
+
+    /// Converts a raw slice to a filled range based on the offset and length.
+    ///
+    /// Safety: the caller *must* ensure that the `RawSlice` refers to a range from the same
+    /// allocation as the deframer's buffer.
+    fn raw_slice_to_filled_range(&self, raw: RawSlice) -> Range<usize> {
+        let adjust = self.discard - self.taken;
+        let start = ((raw.ptr as usize).checked_sub(self.buf.as_ptr() as usize)).unwrap() - adjust;
+        let end = start + raw.len;
+        start..end
+    }
 }
 
 impl FilledDeframerBuffer for DeframerSliceBuffer<'_> {
     fn filled_mut(&mut self) -> &mut [u8] {
-        &mut self.buf[self.discard..]
+        &mut self.buf[self.discard - self.taken..]
     }
 
     fn filled(&self) -> &[u8] {
-        &self.buf[self.discard..]
+        &self.buf[self.discard - self.taken..]
     }
 }
 
-impl DeframerBuffer<false> for DeframerSliceBuffer<'_> {
-    fn copy(&mut self, src: &[u8], at: usize) {
-        copy_into_buffer(self.filled_mut(), src, at)
+impl DeframerBuffer<'_, InternalPayload> for DeframerSliceBuffer<'_> {
+    fn copy(&mut self, payload: &InternalPayload, at: usize) {
+        let buf = self.filled_mut();
+        buf.copy_within(payload.0.clone(), at)
     }
 }
 
-trait DeframerBuffer<const QUIC: bool>: FilledDeframerBuffer {
+pub(crate) struct RawSlice {
+    ptr: *const u8,
+    len: usize,
+}
+
+impl From<&'_ [u8]> for RawSlice {
+    fn from(value: &'_ [u8]) -> Self {
+        Self {
+            ptr: value.as_ptr(),
+            len: value.len(),
+        }
+    }
+}
+
+trait DeframerBuffer<'a, P: AppendPayload<'a>>: FilledDeframerBuffer {
     /// Copies from the `src` buffer into this buffer at the requested index
     ///
     /// If `QUIC` is true the data will be copied into the *un*filled section of the buffer
     ///
     /// If `QUIC` is false the data will be copied into the filled section of the buffer
-    fn copy(&mut self, src: &[u8], at: usize);
+    fn copy(&mut self, payload: &P, at: usize);
 }
 
-fn copy_into_buffer(buf: &mut [u8], src: &[u8], at: usize) {
-    buf[at..at + src.len()].copy_from_slice(src);
-}
+pub(crate) trait FilledDeframerBuffer {
+    fn filled_get_mut<I: SliceIndex<[u8]>>(&mut self, index: I) -> &mut I::Output {
+        self.filled_mut()
+            .get_mut(index)
+            .unwrap()
+    }
 
-trait FilledDeframerBuffer {
     fn filled_mut(&mut self) -> &mut [u8];
 
     fn filled_get<I>(&self, index: I) -> &I::Output
@@ -544,44 +691,51 @@ struct HandshakePayloadMeta {
 /// (`MAX_HANDSHAKE_SIZE`), `Ok(None)` if the buffer is too small to contain a complete header,
 /// and `Ok(Some(len))` otherwise.
 fn payload_size(buf: &[u8]) -> Result<Option<usize>, Error> {
-    if buf.len() < HEADER_SIZE {
+    if buf.len() < HANDSHAKE_HEADER_SIZE {
         return Ok(None);
     }
 
-    let (header, _) = buf.split_at(HEADER_SIZE);
+    let (header, _) = buf.split_at(HANDSHAKE_HEADER_SIZE);
     match codec::u24::read_bytes(&header[1..]) {
         Ok(len) if len.0 > MAX_HANDSHAKE_SIZE => Err(Error::InvalidMessage(
             InvalidMessage::HandshakePayloadTooLarge,
         )),
-        Ok(len) => Ok(Some(HEADER_SIZE + usize::from(len))),
+        Ok(len) => Ok(Some(HANDSHAKE_HEADER_SIZE + usize::from(len))),
         _ => Ok(None),
     }
 }
 
 #[derive(Debug)]
-pub struct Deframed {
+pub struct Deframed<'a> {
     pub(crate) want_close_before_decrypt: bool,
     pub(crate) aligned: bool,
     pub(crate) trial_decryption_finished: bool,
-    pub message: PlainMessage,
+    pub message: InboundPlainMessage<'a>,
 }
 
-const HEADER_SIZE: usize = 1 + 3;
+const HANDSHAKE_HEADER_SIZE: usize = 1 + 3;
 
 /// TLS allows for handshake messages of up to 16MB.  We
 /// restrict that to 64KB to limit potential for denial-of-
 /// service.
 const MAX_HANDSHAKE_SIZE: u32 = 0xffff;
 
+#[cfg(feature = "std")]
 const READ_SIZE: usize = 4096;
 
+/// cf. BoringSSL's `kMaxEmptyRecords`
+/// <https://github.com/google/boringssl/blob/dec5989b793c56ad4dd32173bd2d8595ca78b398/ssl/tls_record.cc#L124-L128>
+const ALLOWED_CONSECUTIVE_EMPTY_FRAGMENTS_MAX: u8 = 32;
+
+#[cfg(feature = "std")]
 #[cfg(test)]
 mod tests {
-    use std::io;
-
-    use crate::msgs::message::Message;
+    use std::prelude::v1::*;
+    use std::vec;
 
     use super::*;
+    use crate::crypto::cipher::PlainMessage;
+    use crate::msgs::message::Message;
 
     #[test]
     fn check_incremental() {
@@ -695,7 +849,7 @@ mod tests {
 
         let mut rl = RecordLayer::new();
         assert_eq!(
-            d.pop(&mut rl, None).unwrap_err(),
+            d.pop_error(&mut rl, None),
             Error::InvalidMessage(InvalidMessage::InvalidContentType)
         );
     }
@@ -710,7 +864,7 @@ mod tests {
 
         let mut rl = RecordLayer::new();
         assert_eq!(
-            d.pop(&mut rl, None).unwrap_err(),
+            d.pop_error(&mut rl, None),
             Error::InvalidMessage(InvalidMessage::UnknownProtocolVersion)
         );
     }
@@ -725,7 +879,7 @@ mod tests {
 
         let mut rl = RecordLayer::new();
         assert_eq!(
-            d.pop(&mut rl, None).unwrap_err(),
+            d.pop_error(&mut rl, None),
             Error::InvalidMessage(InvalidMessage::MessageTooLarge)
         );
     }
@@ -739,13 +893,9 @@ mod tests {
         );
 
         let mut rl = RecordLayer::new();
-        let m = d
-            .pop(&mut rl, None)
-            .unwrap()
-            .unwrap()
-            .message;
+        let m = d.pop_message(&mut rl, None);
         assert_eq!(m.typ, ContentType::ApplicationData);
-        assert_eq!(m.payload.0.len(), 0);
+        assert_eq!(m.payload.bytes().len(), 0);
         assert!(!d.has_pending());
         assert!(d.last_error.is_none());
     }
@@ -760,12 +910,12 @@ mod tests {
 
         let mut rl = RecordLayer::new();
         assert_eq!(
-            d.pop(&mut rl, None).unwrap_err(),
+            d.pop_error(&mut rl, None),
             Error::InvalidMessage(InvalidMessage::InvalidEmptyPayload)
         );
         // CorruptMessage has been fused
         assert_eq!(
-            d.pop(&mut rl, None).unwrap_err(),
+            d.pop_error(&mut rl, None),
             Error::InvalidMessage(InvalidMessage::InvalidEmptyPayload)
         );
     }
@@ -784,10 +934,7 @@ mod tests {
         assert_len(4096, d.input_bytes(&message));
         assert_len(4096, d.input_bytes(&message));
         assert_len(4096, d.input_bytes(&message));
-        assert_len(
-            OpaqueMessage::MAX_WIRE_SIZE - 16_384,
-            d.input_bytes(&message),
-        );
+        assert_len(MAX_WIRE_SIZE - 16_384, d.input_bytes(&message));
         assert!(d.input_bytes(&message).is_err());
     }
 
@@ -810,21 +957,13 @@ mod tests {
     }
 
     fn pop_first(d: &mut BufferedDeframer, rl: &mut RecordLayer) {
-        let m = d
-            .pop(rl, None)
-            .unwrap()
-            .unwrap()
-            .message;
+        let m = d.pop_message(rl, None);
         assert_eq!(m.typ, ContentType::Handshake);
         Message::try_from(m).unwrap();
     }
 
     fn pop_second(d: &mut BufferedDeframer, rl: &mut RecordLayer) {
-        let m = d
-            .pop(rl, None)
-            .unwrap()
-            .unwrap()
-            .message;
+        let m = d.pop_message(rl, None);
         assert_eq!(m.typ, ContentType::Alert);
         Message::try_from(m).unwrap();
     }
@@ -850,18 +989,37 @@ mod tests {
             self.read(&mut rd)
         }
 
-        fn pop(
+        fn pop_error(
             &mut self,
             record_layer: &mut RecordLayer,
             negotiated_version: Option<ProtocolVersion>,
-        ) -> Result<Option<Deframed>, Error> {
+        ) -> Error {
             let mut deframer_buffer = self.buffer.borrow();
-            let res = self
+            let err = self
                 .inner
-                .pop(record_layer, negotiated_version, &mut deframer_buffer);
+                .pop(record_layer, negotiated_version, &mut deframer_buffer)
+                .unwrap_err();
             let discard = deframer_buffer.pending_discard();
             self.buffer.discard(discard);
-            res
+            err
+        }
+
+        fn pop_message(
+            &mut self,
+            record_layer: &mut RecordLayer,
+            negotiated_version: Option<ProtocolVersion>,
+        ) -> PlainMessage {
+            let mut deframer_buffer = self.buffer.borrow();
+            let m = self
+                .inner
+                .pop(record_layer, negotiated_version, &mut deframer_buffer)
+                .unwrap()
+                .unwrap()
+                .message
+                .into_owned();
+            let discard = deframer_buffer.pending_discard();
+            self.buffer.discard(discard);
+            m
         }
 
         fn read(&mut self, rd: &mut dyn io::Read) -> io::Result<usize> {

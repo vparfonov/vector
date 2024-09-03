@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "smpl_jwt"
-version = "0.7.1"
+version = "0.8.0"
 authors = ["Drazen Urch <github@drazenur.ch>"]
 description = "Very simple JWT generation lib."
 documentation = "https://durch.github.io/rust-jwt"
@@ -23,10 +23,9 @@ repository = "https://github.com/durch/rust-jwt"
 
 [lib]
 name = "smpl_jwt"
-path = "src/lib.rs"
 
 [dependencies.base64]
-version = "0.13"
+version = "0.21"
 
 [dependencies.log]
 version = "0.4"

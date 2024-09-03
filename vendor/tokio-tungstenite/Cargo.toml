@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.63"
 name = "tokio-tungstenite"
-version = "0.20.1"
+version = "0.21.0"
 authors = [
     "Daniel Abramov <dabramov@snapview.de>",
     "Alexey Galakhov <agalakhov@snapview.de>",
@@ -27,7 +27,7 @@ include = [
 ]
 description = "Tokio binding for Tungstenite, the Lightweight stream-based WebSocket implementation"
 homepage = "https://github.com/snapview/tokio-tungstenite"
-documentation = "https://docs.rs/tokio-tungstenite/0.20.1"
+documentation = "https://docs.rs/tokio-tungstenite/0.21.0"
 readme = "README.md"
 keywords = [
     "websocket",
@@ -98,11 +98,15 @@ optional = true
 package = "native-tls"
 
 [dependencies.rustls]
-version = "0.21.6"
+version = "0.22.0"
 optional = true
 
 [dependencies.rustls-native-certs]
-version = "0.6.2"
+version = "0.7.0"
+optional = true
+
+[dependencies.rustls-pki-types]
+version = "1.0"
 optional = true
 
 [dependencies.tokio]
@@ -115,15 +119,15 @@ version = "0.3.1"
 optional = true
 
 [dependencies.tokio-rustls]
-version = "0.24.1"
+version = "0.25.0"
 optional = true
 
 [dependencies.tungstenite]
-version = "0.20.1"
+version = "0.21.0"
 default-features = false
 
 [dependencies.webpki-roots]
-version = "0.25.2"
+version = "0.26.0"
 optional = true
 
 [dev-dependencies.env_logger]
@@ -158,6 +162,7 @@ version = "2.3.1"
 [features]
 __rustls-tls = [
     "rustls",
+    "rustls-pki-types",
     "tokio-rustls",
     "stream",
     "tungstenite/__rustls-tls",

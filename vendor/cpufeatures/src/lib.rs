@@ -18,6 +18,30 @@
 //! - `sha2`*
 //! - `sha3`*
 //!
+//! Linux only
+//!
+//! - `sm4`*
+//!
+//! ## `loongarch64`
+//!
+//! Linux only (LoongArch64 does not support OS-independent feature detection)
+//!
+//! Target features:
+//!
+//! - `lam`*
+//! - `ual`*
+//! - `fpu`*
+//! - `lsx`*
+//! - `lasx`*
+//! - `crc32`*
+//! - `complex`*
+//! - `crypto`*
+//! - `lvz`*
+//! - `lbt.x86`*
+//! - `lbt.arm`*
+//! - `lbt.mips`*
+//! - `ptw`*
+//!
 //! ## `x86`/`x86_64`
 //!
 //! OS independent and `no_std`-friendly
@@ -103,9 +127,14 @@
 )]
 
 #[cfg(not(miri))]
-#[cfg(all(target_arch = "aarch64"))]
+#[cfg(target_arch = "aarch64")]
 #[doc(hidden)]
 pub mod aarch64;
+
+#[cfg(not(miri))]
+#[cfg(target_arch = "loongarch64")]
+#[doc(hidden)]
+pub mod loongarch64;
 
 #[cfg(not(miri))]
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -114,8 +143,13 @@ mod x86;
 #[cfg(miri)]
 mod miri;
 
-#[cfg(not(any(target_arch = "aarch64", target_arch = "x86", target_arch = "x86_64")))]
-compile_error!("This crate works only on `aarch64`, `x86`, and `x86-64` targets.");
+#[cfg(not(any(
+    target_arch = "aarch64",
+    target_arch = "loongarch64",
+    target_arch = "x86",
+    target_arch = "x86_64"
+)))]
+compile_error!("This crate works only on `aarch64`, `loongarch64`, `x86`, and `x86-64` targets.");
 
 /// Create module with CPU feature detection code.
 #[macro_export]
@@ -143,19 +177,24 @@ macro_rules! new {
                 }
             }
 
-            /// Initialize underlying storage if needed and get
-            /// stored value and initialization token.
+            /// Get stored value and initialization token,
+            /// initializing underlying storage if needed.
             #[inline]
             pub fn init_get() -> (InitToken, bool) {
                 let res = $crate::__unless_target_features! {
                     $($tf),+ => {
+                        #[cold]
+                        fn init_inner() -> bool {
+                            let res = $crate::__detect_target_features!($($tf),+);
+                            STORAGE.store(res as u8, Relaxed);
+                            res
+                        }
+
                         // Relaxed ordering is fine, as we only have a single atomic variable.
                         let val = STORAGE.load(Relaxed);
 
                         if val == UNINIT {
-                            let res = $crate::__detect_target_features!($($tf),+);
-                            STORAGE.store(res as u8, Relaxed);
-                            res
+                            init_inner()
                         } else {
                             val == 1
                         }
@@ -165,15 +204,13 @@ macro_rules! new {
                 (InitToken(()), res)
             }
 
-            /// Initialize underlying storage if needed and get
-            /// initialization token.
+            /// Initialize underlying storage if needed and get initialization token.
             #[inline]
             pub fn init() -> InitToken {
                 init_get().0
             }
 
-            /// Initialize underlying storage if needed and get
-            /// stored value.
+            /// Initialize underlying storage if needed and get stored value.
             #[inline]
             pub fn get() -> bool {
                 init_get().1

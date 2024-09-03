@@ -154,7 +154,7 @@ fn collect_service_field<'a>(
                     sdl: Some(
                         ctx.schema_env
                             .registry
-                            .export_sdl(SDLExportOptions::new().federation()),
+                            .export_sdl(SDLExportOptions::new().federation().compose_directive()),
                     ),
                 },
                 &ctx_obj,
@@ -234,8 +234,8 @@ fn collect_field<'a>(
     fields.push(
         async move {
             let ctx_field = ctx.with_field(field);
-            let arguments = ObjectAccessor(Cow::Owned(
-                field
+            let arguments = ObjectAccessor(Cow::Owned({
+                let mut args = field
                     .node
                     .arguments
                     .iter()
@@ -244,8 +244,16 @@ fn collect_field<'a>(
                             .resolve_input_value(value.clone())
                             .map(|value| (name.node.clone(), value))
                     })
-                    .collect::<ServerResult<IndexMap<Name, Value>>>()?,
-            ));
+                    .collect::<ServerResult<IndexMap<Name, Value>>>()?;
+                field_def.arguments.iter().for_each(|(name, arg)| {
+                    if let Some(def) = &arg.default_value {
+                        if !args.contains_key(name.as_str()) {
+                            args.insert(Name::new(name), def.clone());
+                        }
+                    }
+                });
+                args
+            }));
 
             let resolve_info = ResolveInfo {
                 path_node: ctx_field.path_node.as_ref().unwrap(),
@@ -256,7 +264,6 @@ fn collect_field<'a>(
                 is_for_introspection: ctx_field.is_for_introspection,
                 field: &field.node,
             };
-
             let resolve_fut = async {
                 let field_future = (field_def.resolver_fn)(ResolverContext {
                     ctx: &ctx_field,
@@ -654,13 +661,16 @@ async fn resolve_value(
             ))
             .into_server_error(ctx.item.pos),
         )),
-
         (Type::Subscription(subscription), _) => Err(ctx.set_error_path(
             Error::new(format!(
                 "internal: cannot use subscription \"{}\" as output value",
                 subscription.name
             ))
             .into_server_error(ctx.item.pos),
+        )),
+        (Type::Upload, _) => Err(ctx.set_error_path(
+            Error::new("internal: cannot use upload as output value")
+                .into_server_error(ctx.item.pos),
         )),
     }
 }

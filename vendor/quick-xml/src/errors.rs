@@ -12,12 +12,14 @@ use std::sync::Arc;
 /// The error type used by this crate.
 #[derive(Clone, Debug)]
 pub enum Error {
-    /// IO error.
+    /// XML document cannot be read from or written to underlying source.
     ///
-    /// `Arc<IoError>` instead of `IoError` since `IoError` is not `Clone`.
+    /// Contains the reference-counted I/O error to make the error type `Clone`able.
     Io(Arc<IoError>),
-    /// Input decoding error. If `encoding` feature is disabled, contains `None`,
+    /// Input decoding error. If [`encoding`] feature is disabled, contains `None`,
     /// otherwise contains the UTF-8 decoding error
+    ///
+    /// [`encoding`]: index.html#encoding
     NonDecodable(Option<Utf8Error>),
     /// Unexpected End of File
     UnexpectedEof(String),
@@ -47,6 +49,22 @@ pub enum Error {
     EscapeError(EscapeError),
     /// Specified namespace prefix is unknown, cannot resolve namespace for it
     UnknownPrefix(Vec<u8>),
+    /// Error for when a reserved namespace is set incorrectly.
+    ///
+    /// This error returned in following cases:
+    /// - the XML document attempts to bind `xml` prefix to something other than
+    ///   `http://www.w3.org/XML/1998/namespace`
+    /// - the XML document attempts to bind `xmlns` prefix
+    /// - the XML document attempts to bind some prefix (except `xml`) to
+    ///   `http://www.w3.org/XML/1998/namespace`
+    /// - the XML document attempts to bind some prefix to
+    ///   `http://www.w3.org/2000/xmlns/`
+    InvalidPrefixBind {
+        /// The prefix that is tried to be bound
+        prefix: Vec<u8>,
+        /// Namespace to which prefix tried to be bound
+        namespace: Vec<u8>,
+    },
 }
 
 impl From<IoError> for Error {
@@ -119,6 +137,13 @@ impl fmt::Display for Error {
             Error::UnknownPrefix(prefix) => {
                 f.write_str("Unknown namespace prefix '")?;
                 write_byte_string(f, prefix)?;
+                f.write_str("'")
+            }
+            Error::InvalidPrefixBind { prefix, namespace } => {
+                f.write_str("The namespace prefix '")?;
+                write_byte_string(f, prefix)?;
+                f.write_str("' cannot be bound to '")?;
+                write_byte_string(f, namespace)?;
                 f.write_str("'")
             }
         }

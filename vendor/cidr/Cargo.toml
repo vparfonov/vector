@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "cidr"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Stefan Bühler <stbuehler@web.de>"]
 exclude = ["CHECKLIST.md"]
 description = "IP network and IP host within network types"
@@ -53,7 +53,12 @@ version = "0.9.1"
 
 [features]
 default = ["std"]
+no_unsafe = []
 std = []
 
 [badges.appveyor]
 repository = "stbuehler/rust-cidr"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+priority = 0

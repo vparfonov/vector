@@ -5,8 +5,8 @@
 //! A _task_ is a light weight, non-blocking unit of execution. A task is similar
 //! to an OS thread, but rather than being managed by the OS scheduler, they are
 //! managed by the [Tokio runtime][rt]. Another name for this general pattern is
-//! [green threads]. If you are familiar with [`Go's goroutines`], [`Kotlin's
-//! coroutines`], or [`Erlang's processes`], you can think of Tokio's tasks as
+//! [green threads]. If you are familiar with [Go's goroutines], [Kotlin's
+//! coroutines], or [Erlang's processes], you can think of Tokio's tasks as
 //! something similar.
 //!
 //! Key points about tasks include:
@@ -132,6 +132,12 @@
 //! not yield to the runtime at any point between the call to `abort` and the
 //! end of the task, then the [`JoinHandle`] will instead report that the task
 //! exited normally.
+//!
+//! Be aware that tasks spawned using [`spawn_blocking`] cannot be aborted
+//! because they are not async. If you call `abort` on a `spawn_blocking`
+//! task, then this *will not have any effect*, and the task will continue
+//! running normally. The exception is if the task has not started running
+//! yet; in that case, calling `abort` may prevent the task from starting.
 //!
 //! Be aware that calls to [`JoinHandle::abort`] just schedule the task for
 //! cancellation, and will return before the cancellation has completed. To wait
@@ -318,10 +324,8 @@
 cfg_rt! {
     pub use crate::runtime::task::{JoinError, JoinHandle};
 
-    cfg_not_wasi! {
-        mod blocking;
-        pub use blocking::spawn_blocking;
-    }
+    mod blocking;
+    pub use blocking::spawn_blocking;
 
     mod spawn;
     pub use spawn::spawn;
@@ -333,10 +337,8 @@ cfg_rt! {
     mod yield_now;
     pub use yield_now::yield_now;
 
-    cfg_unstable! {
-        mod consume_budget;
-        pub use consume_budget::consume_budget;
-    }
+    mod consume_budget;
+    pub use consume_budget::consume_budget;
 
     mod local;
     pub use local::{spawn_local, LocalSet, LocalEnterGuard};

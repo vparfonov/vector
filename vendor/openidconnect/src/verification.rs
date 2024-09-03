@@ -30,7 +30,7 @@ pub(crate) trait IssuerClaim {
 ///
 /// Error verifying claims.
 ///
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ClaimsVerificationError {
     /// Claims have expired.
@@ -71,7 +71,7 @@ pub enum ClaimsVerificationError {
 ///
 /// Error verifying claims signature.
 ///
-#[derive(Clone, Debug, Error, PartialEq)]
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SignatureVerificationError {
     /// More than one key matches the supplied key constraints (e.g., key ID).
@@ -265,10 +265,10 @@ where
             if let JsonWebTokenAlgorithm::Encryption(ref encryption_alg) = jose_header.alg {
                 return Err(ClaimsVerificationError::Unsupported(format!(
                     "JWE encryption is not currently supported (found algorithm `{}`)",
-                    serde_plain::to_string(encryption_alg).unwrap_or_else(|err| panic!(format!(
+                    serde_plain::to_string(encryption_alg).unwrap_or_else(|err| panic!(
                         "encryption alg {:?} failed to serialize to a string: {}",
                         encryption_alg, err
-                    ))),
+                    )),
                 )));
             }
         }
@@ -370,19 +370,15 @@ where
                     SignatureVerificationError::DisallowedAlg(format!(
                         "algorithm `{}` is not one of: {}",
                         serde_plain::to_string(&signature_alg).unwrap_or_else(|err| panic!(
-                            format!(
-                                "signature alg {:?} failed to serialize to a string: {}",
-                                signature_alg, err
-                            )
+                            "signature alg {:?} failed to serialize to a string: {}",
+                            signature_alg, err,
                         )),
                         allowed_algs
                             .iter()
                             .map(
                                 |alg| serde_plain::to_string(alg).unwrap_or_else(|err| panic!(
-                                    format!(
-                                        "signature alg {:?} failed to serialize to a string: {}",
-                                        alg, err
-                                    )
+                                    "signature alg {:?} failed to serialize to a string: {}",
+                                    alg, err,
                                 ))
                             )
                             .collect::<Vec<_>>()
@@ -424,24 +420,8 @@ where
 
         // See if any key has a matching key ID (if supplied) and compatible type.
         let public_keys = {
-            let jose_header = jwt.unverified_header();
-            self.signature_keys
-                .keys()
-                .iter()
-                .filter(|key|
-                    // The key must be of the type expected for this signature algorithm.
-                    Some(key.key_type()) == signature_alg.key_type().as_ref() &&
-                        // Either the key hasn't specified it's allowed usage (in which case
-                        // any usage is acceptable), or the key supports signing.
-                        (key.key_use().is_none() ||
-                            key.key_use().iter().any(
-                                |key_use| key_use.allows_signature()
-                            )) &&
-                        // Either the JWT doesn't include a 'kid' (in which case any 'kid'
-                        // is acceptable), or the 'kid' matches the key's ID.
-                        (jose_header.kid.is_none() ||
-                            jose_header.kid.as_ref() == key.key_id()))
-                .collect::<Vec<&K>>()
+            let key_id = &jwt.unverified_header().kid;
+            self.signature_keys.filter_keys(key_id, &signature_alg)
         };
         if public_keys.is_empty() {
             return Err(ClaimsVerificationError::SignatureVerification(
@@ -461,11 +441,9 @@ where
                                 .map(|kid| format!("`{}`", **kid))
                                 .unwrap_or_else(|| "null ID".to_string()),
                             serde_plain::to_string(key.key_type()).unwrap_or_else(|err| panic!(
-                                format!(
-                                    "key type {:?} failed to serialize to a string: {}",
-                                    key.key_type(),
-                                    err
-                                )
+                                "key type {:?} failed to serialize to a string: {}",
+                                key.key_type(),
+                                err,
                             ))
                         ))
                         .collect::<Vec<_>>()
@@ -1423,6 +1401,8 @@ mod tests {
                 x: None,
                 y: None,
                 d: None,
+                #[cfg(feature = "jwk-alg")]
+                alg: None,
             }]),
         )
         .verified_claims(valid_rs256_jwt.clone())
@@ -1448,6 +1428,8 @@ mod tests {
                 x: None,
                 y: None,
                 d: None,
+                #[cfg(feature = "jwk-alg")]
+                alg: None,
             }]),
         )
         .verified_claims(valid_rs256_jwt.clone())
@@ -1873,14 +1855,22 @@ mod tests {
             CoreIdTokenClaims::new(
                 issuer.clone(),
                 vec![Audience::new((*client_id).clone())],
-                Utc.timestamp(1544932149, 0),
-                Utc.timestamp(1544928549, 0),
+                Utc.timestamp_opt(1544932149, 0)
+                    .single()
+                    .expect("valid timestamp"),
+                Utc.timestamp_opt(1544928549, 0)
+                    .single()
+                    .expect("valid timestamp"),
                 StandardClaims::new(SubjectIdentifier::new("subject".to_string())),
                 Default::default(),
             )
             .set_nonce(Some(nonce.clone()))
             .set_auth_context_ref(Some(AuthenticationContextClass::new("the_acr".to_string())))
-            .set_auth_time(Some(Utc.timestamp(1544928548, 0))),
+            .set_auth_time(Some(
+                Utc.timestamp_opt(1544928548, 0)
+                    .single()
+                    .expect("valid timestamp"),
+            )),
             &rsa_priv_key,
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,
             Some(&AccessToken::new("the_access_token".to_string())),
@@ -1951,7 +1941,7 @@ mod tests {
 
         // JSON response (default args)
         assert_eq!(
-            CoreUserInfoClaims::from_json::<crate::reqwest::HttpClientError>(
+            CoreUserInfoClaims::from_json::<crate::reqwest::AsyncHttpClientError>(
                 json_claims.as_bytes(),
                 Some(&sub)
             )
@@ -1964,7 +1954,7 @@ mod tests {
         );
 
         // Invalid subject
-        match CoreUserInfoClaims::from_json::<crate::reqwest::HttpClientError>(
+        match CoreUserInfoClaims::from_json::<crate::reqwest::AsyncHttpClientError>(
             json_claims.as_bytes(),
             Some(&SubjectIdentifier::new("wrong_subject".to_string())),
         ) {
@@ -2079,12 +2069,17 @@ mod tests {
                 email_verified: None,
                 gender: None,
                 birthday: None,
+                birthdate: None,
                 zoneinfo: None,
                 locale: None,
                 phone_number: None,
                 phone_number_verified: None,
                 address: None,
-                updated_at: Some(Utc.timestamp(1544928548, 0)),
+                updated_at: Some(
+                    Utc.timestamp_opt(1544928548, 0)
+                        .single()
+                        .expect("valid timestamp"),
+                ),
             },
             Default::default(),
         );
@@ -2108,7 +2103,7 @@ mod tests {
              ZD4A4aIn0K7z5J9RvrR3L7DWnc3fJQ0VU2v5QLePyqNWnFxks5eyl8Ios8JrZhwr4Q8GES8Q4Iw8Sz6W9vYpHK\
              2r1YdaACMM4g_TTtV91lpjn-Li2-HxW9NERdLvYvF6HwGIwbss26trp2yjNTARlxBUT6LR7y82oPIJKXIKL1GD\
              YeSLeErhb6oTQ0a5gQ",
-            serde_json::to_value(&claims_jwt).unwrap().as_str().unwrap()
+            serde_json::to_value(claims_jwt).unwrap().as_str().unwrap()
         );
     }
 }

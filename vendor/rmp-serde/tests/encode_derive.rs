@@ -1,9 +1,4 @@
-#[macro_use]
-extern crate serde_derive;
-
-extern crate rmp_serde as rmps;
-
-use crate::rmps::Serializer;
+use rmp_serde::Serializer;
 use serde::Serialize;
 
 #[test]
@@ -74,8 +69,8 @@ fn pass_untagged_newtype_variant() {
         C,
     }
 
-    let buf1 = rmps::to_vec(&Enum1::A(123)).unwrap();
-    let buf2 = rmps::to_vec(&Enum1::B(Enum2::C)).unwrap();
+    let buf1 = rmp_serde::to_vec(&Enum1::A(123)).unwrap();
+    let buf2 = rmp_serde::to_vec(&Enum1::B(Enum2::C)).unwrap();
 
     assert_eq!(buf1, [123]);
     // Expect: "C"
@@ -157,15 +152,13 @@ fn serialize_struct_variant() {
 fn serialize_struct_variant_as_map() {
     #[derive(Serialize)]
     enum Enum {
-        V1 {
-            f1: u32,
-        }
+        V1 { f1: u32 },
     }
 
     let mut se = Serializer::new(Vec::new()).with_struct_map();
     Enum::V1 { f1: 42 }.serialize(&mut se).unwrap();
 
-     // Expect: {"V1" => {"f1": 42}}.
+    // Expect: {"V1" => {"f1": 42}}.
     assert_eq!(
         vec![0x81, 0xa2, 0x56, 0x31, 0x81, 0xa2, 0x66, 0x31, 0x2a],
         se.into_inner()

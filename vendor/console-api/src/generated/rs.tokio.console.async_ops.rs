@@ -1,4 +1,4 @@
-/// An `AsyncOp` state update. 
+/// An `AsyncOp` state update.
 ///
 /// This includes a list of any new async ops, and updates to the associated statistics
 /// for any async ops that have changed since the last update.
@@ -30,7 +30,7 @@ pub struct AsyncOpUpdate {
 /// An async operation.
 ///
 /// An async operation is an operation that is associated with a resource
-/// This could, for example, be a a read or write on a TCP stream, or a receive operation on
+/// This could, for example, be a read or write on a TCP stream, or a receive operation on
 /// a channel.
 #[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]

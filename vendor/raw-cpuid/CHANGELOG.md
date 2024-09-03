@@ -5,6 +5,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [11.1.0] - 2024-07-17
+ - Support for more AVX512 Extended Features 
+
+## [11.0.2] - 2024-04-29
+ - Fix bug in `has_waitpkg` using wrong bit flag.
+
+## [11.0.1] - 2023-05-03
+ - Fix a regression from v10.7.0. CpuIdReader was falsely required to 
+   implement Debug for `CpuId::debug()` which is too strict.
+
+## [11.0.0] - 2023-04-17
+
+### Breaking changes
+
+- The `CpuId` type now takes a generic reader argument `CpuId<R: CpuIdReader>`:
+  which allows for more flexibility on how cpuid is queried and better support
+  for using the library on non-x86 targets. This is a breaking change for users
+  of `with_cpuid_fn` and potentially when specifying `CpuId` as a type argument
+  somewhere. To make existing code compile again, whenever a generic type
+  argument for CpuId is needed, you can use the `cpuid::NativeCpuIdReader` type
+  which provides the default behavior of execution the `cpuid` instruction.
+
+  For example, in your code there might be cases where the compiler now asks you
+  to specify the generic type of CpuId: e.g., `fn take_cpuid(cpuid: CpuId)`
+  would become: `fn take_cpuid(cpuid: CpuId<NativeCpuIdReader>)`
+
+  See also [#140](https://github.com/gz/rust-cpuid/pull/140) and
+  [#138](https://github.com/gz/rust-cpuid/pull/138) for the original discussion.
+
+- If you're using the `serialization` feature: It go revamped by fixing some
+  long-standing problems with it that made it difficult to use
+  [#87](https://github.com/gz/rust-cpuid/issues/87). All types except
+  `CpuIdResult` types lost their `Serialize` and `Deserialize` derives. Check
+  the [new example](examples/serialize_deserialize.rs) on how to serialize and
+  deserialize cpuid information.
+
+## Other changes
+
+- Updated bitflags to v2.
+
 ## [10.7.0] - 2023-02-27
 
 - Include the pretty printing code in the library (instead of only having it in

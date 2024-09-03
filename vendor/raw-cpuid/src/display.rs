@@ -1,181 +1,33 @@
 use std::fmt::Display;
 
 use crate::{
-    cpuid, Associativity, CacheType, CpuId, CpuIdResult, DatType, ExtendedRegisterStateLocation,
-    SgxSectionInfo, SoCVendorBrand, TopologyType,
+    Associativity, CacheType, CpuIdResult, DatType, ExtendedRegisterStateLocation, SgxSectionInfo,
+    SoCVendorBrand, TopologyType,
 };
 
 use termimad::{minimad::TextTemplate, minimad::TextTemplateExpander, MadSkin};
 
-pub fn raw() {
+pub fn raw<R: crate::CpuIdReader>(cpuid: R) {
     let _leafs_with_subleafs = &[0x04, 0x0d, 0x0f, 0x10, 0x12];
 
-    let max_leafs = cpuid!(0x0).eax;
+    let max_leafs = cpuid.cpuid1(0x0).eax;
     for idx in 0..max_leafs {
-        let res = cpuid!(idx);
+        let res = cpuid.cpuid1(idx);
         println!("({:#x}, {:#x}) => {:?}", idx, 0x0, res);
     }
 
-    let max_hypervisor_leafs = cpuid!(0x4000_0000).eax;
+    let max_hypervisor_leafs = cpuid.cpuid1(0x4000_0000).eax;
     for idx in 0x4000_0000..max_hypervisor_leafs {
-        println!("({:#x}, {:#x}) => {:?}", idx, 0x0, cpuid!(idx));
+        println!("({:#x}, {:#x}) => {:?}", idx, 0x0, cpuid.cpuid1(idx));
     }
 
-    let max_extended_leafs = cpuid!(0x8000_0000).eax;
+    let max_extended_leafs = cpuid.cpuid1(0x8000_0000).eax;
     for idx in 0x8000_0000..max_extended_leafs {
-        println!("({:#x}, {:#x}) => {:?}", idx, 0x0, cpuid!(idx));
+        println!("({:#x}, {:#x}) => {:?}", idx, 0x0, cpuid.cpuid1(idx));
     }
 }
 
-pub fn json(cpuid: CpuId) {
-    if let Some(info) = cpuid.get_vendor_info() {
-        println!("VendorInfo {}", serde_json::to_string(&info).unwrap());
-    }
-    if let Some(info) = cpuid.get_feature_info() {
-        println!("FeatureInfo {}", serde_json::to_string(&info).unwrap());
-    }
-    if let Some(info) = cpuid.get_cache_info() {
-        println!("CacheInfoIter {}", serde_json::to_string(&info).unwrap());
-    }
-    if let Some(info) = cpuid.get_processor_serial() {
-        println!("ProcessorSerial {}", serde_json::to_string(&info).unwrap());
-    }
-    if let Some(iter) = cpuid.get_cache_parameters() {
-        println!(
-            "CacheParametersIter {}",
-            serde_json::to_string(&iter).unwrap()
-        );
-    }
-    if let Some(info) = cpuid.get_monitor_mwait_info() {
-        println!("MonitorMwaitInfo {}", serde_json::to_string(&info).unwrap());
-    }
-    if let Some(info) = cpuid.get_thermal_power_info() {
-        println!("ThermalPowerInfo {}", serde_json::to_string(&info).unwrap());
-    }
-    if let Some(info) = cpuid.get_extended_feature_info() {
-        println!("ExtendedFeatures {}", serde_json::to_string(&info).unwrap());
-    }
-    if let Some(info) = cpuid.get_direct_cache_access_info() {
-        println!(
-            "DirectCacheAccessInfo {}",
-            serde_json::to_string(&info).unwrap()
-        );
-    }
-    if let Some(info) = cpuid.get_performance_monitoring_info() {
-        println!(
-            "PerformanceMonitoringInfo {}",
-            serde_json::to_string(&info).unwrap()
-        );
-    }
-    if let Some(info) = cpuid.get_extended_topology_info() {
-        println!(
-            "ExtendedTopologyIter {}",
-            serde_json::to_string(&info).unwrap()
-        );
-    }
-    if let Some(info) = cpuid.get_extended_state_info() {
-        println!(
-            "ExtendedStateInfo {}",
-            serde_json::to_string(&info).unwrap()
-        );
-    }
-    if let Some(info) = cpuid.get_rdt_monitoring_info() {
-        println!(
-            "RdtMonitoringInfo {}",
-            serde_json::to_string(&info).unwrap()
-        );
-        if let Some(rmid) = info.l3_monitoring() {
-            println!("L3MonitoringInfo {}", serde_json::to_string(&rmid).unwrap());
-        }
-    }
-    if let Some(info) = cpuid.get_rdt_allocation_info() {
-        println!(
-            "RdtAllocationInfo {}",
-            serde_json::to_string(&info).unwrap()
-        );
-        if let Some(l3_cat) = info.l3_cat() {
-            println!("L3CatInfo {}", serde_json::to_string(&l3_cat).unwrap());
-        }
-        if let Some(l2_cat) = info.l2_cat() {
-            println!("L2CatInfo {}", serde_json::to_string(&l2_cat).unwrap());
-        }
-        if let Some(mem) = info.memory_bandwidth_allocation() {
-            println!(
-                "MemBwAllocationInfo {}",
-                serde_json::to_string(&mem).unwrap()
-            );
-        }
-    }
-    if let Some(info) = cpuid.get_sgx_info() {
-        println!("SgxInfo {}", serde_json::to_string(&info).unwrap());
-    }
-    if let Some(info) = cpuid.get_processor_trace_info() {
-        println!(
-            "ProcessorTraceInfo {}",
-            serde_json::to_string(&info).unwrap()
-        );
-    }
-    if let Some(info) = cpuid.get_tsc_info() {
-        println!("TscInfo {}", serde_json::to_string(&info).unwrap());
-    }
-    if let Some(info) = cpuid.get_processor_frequency_info() {
-        println!(
-            "ProcessorFrequencyInfo {}",
-            serde_json::to_string(&info).unwrap()
-        );
-    }
-    if let Some(dat_iter) = cpuid.get_deterministic_address_translation_info() {
-        println!("DatIter {}", serde_json::to_string(&dat_iter).unwrap());
-    }
-    if let Some(info) = cpuid.get_soc_vendor_info() {
-        println!("SocVendorInfo {}", serde_json::to_string(&info).unwrap());
-        if let Some(iter) = info.get_vendor_attributes() {
-            println!(
-                "SocVendorAttributesIter {}",
-                serde_json::to_string(&iter).unwrap()
-            );
-        }
-    }
-    if let Some(info) = cpuid.get_processor_brand_string() {
-        println!(
-            "ProcessorBrandString {}",
-            serde_json::to_string(&info).unwrap()
-        );
-    }
-    if let Some(info) = cpuid.get_l1_cache_and_tlb_info() {
-        println!("L1CacheTlbInfo {}", serde_json::to_string(&info).unwrap());
-    }
-    if let Some(info) = cpuid.get_l2_l3_cache_and_tlb_info() {
-        println!(
-            "L2And3CacheTlbInfo {}",
-            serde_json::to_string(&info).unwrap()
-        );
-    }
-    if let Some(info) = cpuid.get_advanced_power_mgmt_info() {
-        println!("ApmInfo {}", serde_json::to_string(&info).unwrap());
-    }
-    if let Some(info) = cpuid.get_processor_capacity_feature_info() {
-        println!(
-            "ProcessorCapacityAndFeatureInfo {}",
-            serde_json::to_string(&info).unwrap()
-        );
-    }
-    if let Some(info) = cpuid.get_svm_info() {
-        println!("SvmFeatures {}", serde_json::to_string(&info).unwrap());
-    }
-    if let Some(info) = cpuid.get_memory_encryption_info() {
-        println!(
-            "MemoryEncryptionInfo {}",
-            serde_json::to_string(&info).unwrap()
-        );
-    }
-}
-
-fn string_to_static_str(s: String) -> &'static str {
-    Box::leak(s.into_boxed_str())
-}
-
-fn table2(skin: &MadSkin, attrs: &[(&'static str, String)]) {
+fn table2(skin: &MadSkin, attrs: &[(&str, String)]) {
     let table_template = TextTemplate::from(
         r#"
 |-:|-:|
@@ -186,18 +38,17 @@ ${feature-rows
     "#,
     );
 
-    fn make_table_display<'a, 'b, D: Display>(
+    fn make_table_display<'a, 'b>(
         text_template: &'a TextTemplate<'b>,
-        attrs: &[(&'b str, D)],
+        attrs: &'b [(&'b str, String)],
     ) -> TextTemplateExpander<'a, 'b> {
         let mut expander = text_template.expander();
 
         for (attr, desc) in attrs {
-            let sdesc = string_to_static_str(format!("{}", desc));
             expander
                 .sub("feature-rows")
                 .set("attr-name", attr)
-                .set("attr-avail", sdesc);
+                .set("attr-avail", desc);
         }
 
         expander
@@ -218,19 +69,18 @@ ${feature-rows
     "#,
     );
 
-    fn make_table_display3<'a, 'b, D: Display>(
+    fn make_table_display3<'a, 'b>(
         text_template: &'a TextTemplate<'b>,
-        attrs: &[(&'b str, &'b str, D)],
+        attrs: &'b [(&'b str, &'b str, String)],
     ) -> TextTemplateExpander<'a, 'b> {
         let mut expander = text_template.expander();
 
         for (cat, attr, desc) in attrs {
-            let sdesc = string_to_static_str(format!("{}", desc));
             expander
                 .sub("feature-rows")
                 .set("category-name", cat)
                 .set("attr-name", attr)
-                .set("attr-avail", sdesc);
+                .set("attr-avail", desc);
         }
 
         expander
@@ -285,14 +135,14 @@ fn bool_repr(x: bool) -> String {
 trait RowGen {
     fn fmt(attr: &Self) -> String;
 
-    fn tuple(t: &'static str, attr: Self) -> (&'static str, String)
+    fn tuple<'a>(t: &'a str, attr: Self) -> (&'a str, String)
     where
         Self: Sized,
     {
         (t, RowGen::fmt(&attr))
     }
 
-    fn triple(c: &'static str, t: &'static str, attr: Self) -> (&'static str, &'static str, String)
+    fn triple<'a>(c: &'a str, t: &'a str, attr: Self) -> (&'a str, &'a str, String)
     where
         Self: Sized,
     {
@@ -383,7 +233,7 @@ impl RowGen for Option<SoCVendorBrand> {
     }
 }
 
-pub fn markdown(cpuid: CpuId) {
+pub fn markdown<R: crate::CpuIdReader>(cpuid: crate::CpuId<R>) {
     let skin = MadSkin::default();
     skin.print_text("# CpuId\n");
 
@@ -492,13 +342,13 @@ pub fn markdown(cpuid: CpuId) {
 
     if let Some(info) = cpuid.get_cache_info() {
         print_title(&skin, "Cache and TLB information (0x02):");
+        let nums: Vec<String> = info
+            .clone()
+            .map(|cache| format!("{:#x}", cache.num))
+            .collect();
         let attrs: Vec<(&str, String)> = info
-            .map(|cache| {
-                RowGen::tuple(
-                    string_to_static_str(format!("{:#x}", cache.num)),
-                    cache.desc().to_string(),
-                )
-            })
+            .zip(nums.iter())
+            .map(|(cache, n)| RowGen::tuple(n, cache.desc().to_string()))
             .collect();
         table2(&skin, &attrs);
     }
@@ -677,6 +527,25 @@ pub fn markdown(cpuid: CpuId) {
                 RowGen::tuple(
                     "AVX512F: AVX-512 foundation instructions",
                     info.has_avx512f(),
+                ),
+                RowGen::tuple("AVX512-4NNIW: 4NNIW instructions", info.has_avx512_4vnniw()),
+                RowGen::tuple(
+                    "AVX512-4FMAPS: 4FMAPS instructions",
+                    info.has_avx512_4fmaps(),
+                ),
+                RowGen::tuple(
+                    "AVX512-VP2INTERSECT: VP2INTERSECT instructions",
+                    info.has_avx512_vp2intersect(),
+                ),
+                RowGen::tuple("AMX_BF16: AMX_BF16 instructions", info.has_amx_bf16()),
+                RowGen::tuple(
+                    "AVX512_FP16: AVX512_FP16 instructions",
+                    info.has_avx512_fp16(),
+                ),
+                RowGen::tuple("AMX_TILE: Tile Architecture support", info.has_amx_tile()),
+                RowGen::tuple(
+                    "AMX_INT8: Tile Computational Operation on 8-bit integers",
+                    info.has_amx_tile(),
                 ),
                 RowGen::tuple(
                     "AVX512DQ: double & quadword instructions",

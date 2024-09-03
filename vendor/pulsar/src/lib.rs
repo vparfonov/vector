@@ -160,6 +160,11 @@ extern crate prost_derive;
 #[macro_use]
 extern crate serde;
 
+#[cfg(all(feature = "tokio-rustls-runtime", feature = "tokio-runtime"))]
+compile_error!("You have selected both features \"tokio-rustls-runtime\" and \"tokio-runtime\" which are exclusive, please choose one of them");
+#[cfg(all(feature = "async-std-rustls-runtime", feature = "async-std-runtime"))]
+compile_error!("You have selected both features \"async-std-rustls-runtime\" and \"async-std-runtime\" which are exclusive, please choose one of them");
+
 pub use client::{DeserializeMessage, Pulsar, PulsarBuilder, SerializeMessage};
 pub use connection::Authentication;
 pub use connection_manager::{
@@ -167,10 +172,10 @@ pub use connection_manager::{
 };
 pub use consumer::{Consumer, ConsumerBuilder, ConsumerOptions};
 pub use error::Error;
-#[cfg(feature = "async-std-runtime")]
+#[cfg(any(feature = "async-std-runtime", feature = "async-std-rustls-runtime"))]
 pub use executor::AsyncStdExecutor;
 pub use executor::Executor;
-#[cfg(feature = "tokio-runtime")]
+#[cfg(any(feature = "tokio-runtime", feature = "tokio-rustls-runtime"))]
 pub use executor::TokioExecutor;
 pub use message::{
     proto::{self, command_subscribe::SubType, CommandSendReceipt},
@@ -201,11 +206,11 @@ mod tests {
 
     use futures::{future::try_join_all, StreamExt};
     use log::{LevelFilter, Metadata, Record};
-    #[cfg(feature = "tokio-runtime")]
+    #[cfg(any(feature = "tokio-runtime", feature = "tokio-rustls-runtime"))]
     use tokio::time::timeout;
 
     use super::*;
-    #[cfg(feature = "tokio-runtime")]
+    #[cfg(any(feature = "tokio-runtime", feature = "tokio-rustls-runtime"))]
     use crate::executor::TokioExecutor;
     use crate::{
         client::SerializeMessage,
@@ -309,7 +314,7 @@ mod tests {
     pub static TEST_LOGGER: SimpleLogger = SimpleLogger { tag: "" };
 
     #[tokio::test]
-    #[cfg(feature = "tokio-runtime")]
+    #[cfg(any(feature = "tokio-runtime", feature = "tokio-rustls-runtime"))]
     async fn round_trip() {
         let _result = log::set_logger(&TEST_LOGGER);
         log::set_max_level(LevelFilter::Debug);
@@ -332,7 +337,7 @@ mod tests {
                 data: "data".to_string(),
                 id,
             };
-            sends.push(producer.send(&message).await.unwrap());
+            sends.push(producer.send_non_blocking(&message).await.unwrap());
         }
         try_join_all(sends).await.unwrap();
 
@@ -374,7 +379,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "tokio-runtime")]
+    #[cfg(any(feature = "tokio-runtime", feature = "tokio-rustls-runtime"))]
     async fn unsized_data() {
         let _result = log::set_logger(&TEST_LOGGER);
         log::set_max_level(LevelFilter::Debug);
@@ -460,7 +465,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "tokio-runtime")]
+    #[cfg(any(feature = "tokio-runtime", feature = "tokio-rustls-runtime"))]
     async fn redelivery() {
         let _result = log::set_logger(&TEST_LOGGER);
         log::set_max_level(LevelFilter::Debug);
@@ -506,7 +511,7 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg(feature = "tokio-runtime")]
+    #[cfg(any(feature = "tokio-runtime", feature = "tokio-rustls-runtime"))]
     async fn batching() {
         let _result = log::set_logger(&TEST_LOGGER);
         log::set_max_level(LevelFilter::Debug);
@@ -531,13 +536,13 @@ mod tests {
 
         let mut send_receipts = Vec::new();
         for i in 0..4 {
-            send_receipts.push(producer.send(i.to_string()).await.unwrap());
+            send_receipts.push(producer.send_non_blocking(i.to_string()).await.unwrap());
         }
         assert!(timeout(Duration::from_millis(100), consumer.next())
             .await
             .is_err());
 
-        send_receipts.push(producer.send(5.to_string()).await.unwrap());
+        send_receipts.push(producer.send_non_blocking(5.to_string()).await.unwrap());
 
         timeout(Duration::from_millis(100), try_join_all(send_receipts))
             .await
@@ -560,7 +565,7 @@ mod tests {
         assert_eq!(count, 5);
         let mut send_receipts = Vec::new();
         for i in 5..9 {
-            send_receipts.push(producer.send(i.to_string()).await.unwrap());
+            send_receipts.push(producer.send_non_blocking(i.to_string()).await.unwrap());
         }
         producer.send_batch().await.unwrap();
         timeout(Duration::from_millis(100), try_join_all(send_receipts))

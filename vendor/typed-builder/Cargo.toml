@@ -10,9 +10,9 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
+edition = "2021"
 name = "typed-builder"
-version = "0.14.0"
+version = "0.16.2"
 authors = [
     "IdanArye <idanarye@gmail.com>",
     "Chris Morgan <me@chrismorgan.info>",
@@ -25,18 +25,5 @@ categories = ["rust-patterns"]
 license = "MIT/Apache-2.0"
 repository = "https://github.com/idanarye/rust-typed-builder"
 
-[lib]
-proc-macro = true
-
-[dependencies.proc-macro2]
-version = "1"
-
-[dependencies.quote]
-version = "1"
-
-[dependencies.syn]
-version = "1"
-features = [
-    "full",
-    "extra-traits",
-]
+[dependencies.typed-builder-macro]
+version = "=0.16.2"

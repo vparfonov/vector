@@ -20,11 +20,18 @@ cfg_if! {
     if #[cfg(all(
         target_feature = "sse2",
         any(target_arch = "x86", target_arch = "x86_64"),
-        not(miri)
+        not(miri),
     ))] {
         mod sse2;
         use sse2 as imp;
-    } else if #[cfg(all(target_arch = "aarch64", target_feature = "neon"))] {
+    } else if #[cfg(all(
+        target_arch = "aarch64",
+        target_feature = "neon",
+        // NEON intrinsics are currently broken on big-endian targets.
+        // See https://github.com/rust-lang/stdarch/issues/1484.
+        target_endian = "little",
+        not(miri),
+    ))] {
         mod neon;
         use neon as imp;
     } else {
@@ -903,10 +910,33 @@ impl<T, A: Allocator> RawTable<T, A> {
         &self.alloc
     }
 
-    /// Returns pointer to one past last element of data table.
+    /// Returns pointer to one past last `data` element in the table as viewed from
+    /// the start point of the allocation.
+    ///
+    /// The caller must ensure that the `RawTable` outlives the returned [`NonNull<T>`],
+    /// otherwise using it may result in [`undefined behavior`].
+    ///
+    /// [`undefined behavior`]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     #[inline]
-    pub unsafe fn data_end(&self) -> NonNull<T> {
-        NonNull::new_unchecked(self.table.ctrl.as_ptr().cast())
+    pub fn data_end(&self) -> NonNull<T> {
+        //                        `self.table.ctrl.cast()` returns pointer that
+        //                        points here (to the end of `T0`)
+        //                          ∨
+        // [Pad], T_n, ..., T1, T0, |CT0, CT1, ..., CT_n|, CTa_0, CTa_1, ..., CTa_m
+        //                           \________  ________/
+        //                                    \/
+        //       `n = buckets - 1`, i.e. `RawTable::buckets() - 1`
+        //
+        // where: T0...T_n  - our stored data;
+        //        CT0...CT_n - control bytes or metadata for `data`.
+        //        CTa_0...CTa_m - additional control bytes, where `m = Group::WIDTH - 1` (so that the search
+        //                        with loading `Group` bytes from the heap works properly, even if the result
+        //                        of `h1(hash) & self.bucket_mask` is equal to `self.bucket_mask`). See also
+        //                        `RawTableInner::set_ctrl` function.
+        //
+        // P.S. `h1(hash) & self.bucket_mask` is the same as `hash as usize % self.buckets()` because the number
+        // of buckets is a power of two, and `self.bucket_mask = self.buckets() - 1`.
+        self.table.ctrl.cast()
     }
 
     /// Returns pointer to start of data table.
@@ -938,8 +968,55 @@ impl<T, A: Allocator> RawTable<T, A> {
     }
 
     /// Returns a pointer to an element in the table.
+    ///
+    /// The caller must ensure that the `RawTable` outlives the returned [`Bucket<T>`],
+    /// otherwise using it may result in [`undefined behavior`].
+    ///
+    /// # Safety
+    ///
+    /// If `mem::size_of::<T>() != 0`, then the caller of this function must observe the
+    /// following safety rules:
+    ///
+    /// * The table must already be allocated;
+    ///
+    /// * The `index` must not be greater than the number returned by the [`RawTable::buckets`]
+    ///   function, i.e. `(index + 1) <= self.buckets()`.
+    ///
+    /// It is safe to call this function with index of zero (`index == 0`) on a table that has
+    /// not been allocated, but using the returned [`Bucket`] results in [`undefined behavior`].
+    ///
+    /// If `mem::size_of::<T>() == 0`, then the only requirement is that the `index` must
+    /// not be greater than the number returned by the [`RawTable::buckets`] function, i.e.
+    /// `(index + 1) <= self.buckets()`.
+    ///
+    /// [`RawTable::buckets`]: RawTable::buckets
+    /// [`undefined behavior`]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     #[inline]
     pub unsafe fn bucket(&self, index: usize) -> Bucket<T> {
+        // If mem::size_of::<T>() != 0 then return a pointer to the `element` in the `data part` of the table
+        // (we start counting from "0", so that in the expression T[n], the "n" index actually one less than
+        // the "buckets" number of our `RawTable`, i.e. "n = RawTable::buckets() - 1"):
+        //
+        //           `table.bucket(3).as_ptr()` returns a pointer that points here in the `data`
+        //           part of the `RawTable`, i.e. to the start of T3 (see `Bucket::as_ptr`)
+        //                  |
+        //                  |               `base = self.data_end()` points here
+        //                  |               (to the start of CT0 or to the end of T0)
+        //                  v                 v
+        // [Pad], T_n, ..., |T3|, T2, T1, T0, |CT0, CT1, CT2, CT3, ..., CT_n, CTa_0, CTa_1, ..., CTa_m
+        //                     ^                                              \__________  __________/
+        //        `table.bucket(3)` returns a pointer that points                        \/
+        //         here in the `data` part of the `RawTable` (to              additional control bytes
+        //         the end of T3)                                              `m = Group::WIDTH - 1`
+        //
+        // where: T0...T_n  - our stored data;
+        //        CT0...CT_n - control bytes or metadata for `data`;
+        //        CTa_0...CTa_m - additional control bytes (so that the search with loading `Group` bytes from
+        //                        the heap works properly, even if the result of `h1(hash) & self.table.bucket_mask`
+        //                        is equal to `self.table.bucket_mask`). See also `RawTableInner::set_ctrl` function.
+        //
+        // P.S. `h1(hash) & self.table.bucket_mask` is the same as `hash as usize % self.buckets()` because the number
+        // of buckets is a power of two, and `self.table.bucket_mask = self.buckets() - 1`.
         debug_assert_ne!(self.table.bucket_mask, 0);
         debug_assert!(index < self.buckets());
         Bucket::from_base_index(self.data_end(), index)
@@ -1950,7 +2027,7 @@ impl RawTableInner {
     /// if this function returns an `index` it will be in the range `0..=self.buckets()`.
     ///
     /// This function does not make any changes to the `data` parts of the table,
-    /// or any changes to the the `items` or `growth_left` field of the table.
+    /// or any changes to the `items` or `growth_left` field of the table.
     ///
     /// # Safety
     ///
@@ -2134,7 +2211,7 @@ impl RawTableInner {
     /// - `FULL` control bytes    -> `DELETED`.
     ///
     /// This function does not make any changes to the `data` parts of the table,
-    /// or any changes to the the `items` or `growth_left` field of the table.
+    /// or any changes to the `items` or `growth_left` field of the table.
     ///
     /// # Safety
     ///
@@ -2210,6 +2287,9 @@ impl RawTableInner {
     ///
     /// * The [`RawTableInner`] must have properly initialized control bytes.
     ///
+    /// The type `T` must be the actual type of the elements stored in the table,
+    /// otherwise using the returned [`RawIter`] results in [`undefined behavior`].
+    ///
     /// [`undefined behavior`]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     #[inline]
     unsafe fn iter<T>(&self) -> RawIter<T> {
@@ -2226,13 +2306,20 @@ impl RawTableInner {
         //                         `ctrl` points here (to the start
         //                         of the first control byte `CT0`)
         //                          ∨
-        // [Pad], T_n, ..., T1, T0, |CT0, CT1, ..., CT_n|, Group::WIDTH
+        // [Pad], T_n, ..., T1, T0, |CT0, CT1, ..., CT_n|, CTa_0, CTa_1, ..., CTa_m
         //                           \________  ________/
         //                                    \/
-        //       `n = buckets - 1`, i.e. `RawIndexTableInner::buckets() - 1`
+        //       `n = buckets - 1`, i.e. `RawTableInner::buckets() - 1`
         //
         // where: T0...T_n  - our stored data;
         //        CT0...CT_n - control bytes or metadata for `data`.
+        //        CTa_0...CTa_m - additional control bytes, where `m = Group::WIDTH - 1` (so that the search
+        //                        with loading `Group` bytes from the heap works properly, even if the result
+        //                        of `h1(hash) & self.bucket_mask` is equal to `self.bucket_mask`). See also
+        //                        `RawTableInner::set_ctrl` function.
+        //
+        // P.S. `h1(hash) & self.bucket_mask` is the same as `hash as usize % self.buckets()` because the number
+        // of buckets is a power of two, and `self.bucket_mask = self.buckets() - 1`.
         let data = Bucket::from_base_index(self.data_end(), 0);
         RawIter {
             // SAFETY: See explanation above
@@ -2255,6 +2342,9 @@ impl RawTableInner {
     /// state.
     ///
     /// # Safety
+    ///
+    /// The type `T` must be the actual type of the elements stored in the table,
+    /// otherwise calling this function may result in [`undefined behavior`].
     ///
     /// If `T` is a type that should be dropped and **the table is not empty**,
     /// calling this function more than once results in [`undefined behavior`].
@@ -2307,6 +2397,8 @@ impl RawTableInner {
     ///
     /// * Calling this function more than once;
     ///
+    /// * The type `T` must be the actual type of the elements stored in the table.
+    ///
     /// * The `alloc` must be the same [`Allocator`] as the `Allocator` that was used
     ///   to allocate this table.
     ///
@@ -2346,6 +2438,63 @@ impl RawTableInner {
         }
     }
 
+    /// Returns a pointer to an element in the table (convenience for
+    /// `Bucket::from_base_index(self.data_end::<T>(), index)`).
+    ///
+    /// The caller must ensure that the `RawTableInner` outlives the returned [`Bucket<T>`],
+    /// otherwise using it may result in [`undefined behavior`].
+    ///
+    /// # Safety
+    ///
+    /// If `mem::size_of::<T>() != 0`, then the safety rules are directly derived from the
+    /// safety rules of the [`Bucket::from_base_index`] function. Therefore, when calling
+    /// this function, the following safety rules must be observed:
+    ///
+    /// * The table must already be allocated;
+    ///
+    /// * The `index` must not be greater than the number returned by the [`RawTableInner::buckets`]
+    ///   function, i.e. `(index + 1) <= self.buckets()`.
+    ///
+    /// * The type `T` must be the actual type of the elements stored in the table, otherwise
+    ///   using the returned [`Bucket`] may result in [`undefined behavior`].
+    ///
+    /// It is safe to call this function with index of zero (`index == 0`) on a table that has
+    /// not been allocated, but using the returned [`Bucket`] results in [`undefined behavior`].
+    ///
+    /// If `mem::size_of::<T>() == 0`, then the only requirement is that the `index` must
+    /// not be greater than the number returned by the [`RawTable::buckets`] function, i.e.
+    /// `(index + 1) <= self.buckets()`.
+    ///
+    /// ```none
+    /// If mem::size_of::<T>() != 0 then return a pointer to the `element` in the `data part` of the table
+    /// (we start counting from "0", so that in the expression T[n], the "n" index actually one less than
+    /// the "buckets" number of our `RawTableInner`, i.e. "n = RawTableInner::buckets() - 1"):
+    ///
+    ///           `table.bucket(3).as_ptr()` returns a pointer that points here in the `data`
+    ///           part of the `RawTableInner`, i.e. to the start of T3 (see [`Bucket::as_ptr`])
+    ///                  |
+    ///                  |               `base = table.data_end::<T>()` points here
+    ///                  |               (to the start of CT0 or to the end of T0)
+    ///                  v                 v
+    /// [Pad], T_n, ..., |T3|, T2, T1, T0, |CT0, CT1, CT2, CT3, ..., CT_n, CTa_0, CTa_1, ..., CTa_m
+    ///                     ^                                              \__________  __________/
+    ///        `table.bucket(3)` returns a pointer that points                        \/
+    ///         here in the `data` part of the `RawTableInner`             additional control bytes
+    ///         (to the end of T3)                                          `m = Group::WIDTH - 1`
+    ///
+    /// where: T0...T_n  - our stored data;
+    ///        CT0...CT_n - control bytes or metadata for `data`;
+    ///        CTa_0...CTa_m - additional control bytes (so that the search with loading `Group` bytes from
+    ///                        the heap works properly, even if the result of `h1(hash) & self.bucket_mask`
+    ///                        is equal to `self.bucket_mask`). See also `RawTableInner::set_ctrl` function.
+    ///
+    /// P.S. `h1(hash) & self.bucket_mask` is the same as `hash as usize % self.buckets()` because the number
+    /// of buckets is a power of two, and `self.bucket_mask = self.buckets() - 1`.
+    /// ```
+    ///
+    /// [`Bucket::from_base_index`]: Bucket::from_base_index
+    /// [`RawTableInner::buckets`]: RawTableInner::buckets
+    /// [`undefined behavior`]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     #[inline]
     unsafe fn bucket<T>(&self, index: usize) -> Bucket<T> {
         debug_assert_ne!(self.bucket_mask, 0);
@@ -2353,6 +2502,52 @@ impl RawTableInner {
         Bucket::from_base_index(self.data_end(), index)
     }
 
+    /// Returns a raw `*mut u8` pointer to the start of the `data` element in the table
+    /// (convenience for `self.data_end::<u8>().as_ptr().sub((index + 1) * size_of)`).
+    ///
+    /// The caller must ensure that the `RawTableInner` outlives the returned `*mut u8`,
+    /// otherwise using it may result in [`undefined behavior`].
+    ///
+    /// # Safety
+    ///
+    /// If any of the following conditions are violated, the result is [`undefined behavior`]:
+    ///
+    /// * The table must already be allocated;
+    ///
+    /// * The `index` must not be greater than the number returned by the [`RawTableInner::buckets`]
+    ///   function, i.e. `(index + 1) <= self.buckets()`;
+    ///
+    /// * The `size_of` must be equal to the size of the elements stored in the table;
+    ///
+    /// ```none
+    /// If mem::size_of::<T>() != 0 then return a pointer to the `element` in the `data part` of the table
+    /// (we start counting from "0", so that in the expression T[n], the "n" index actually one less than
+    /// the "buckets" number of our `RawTableInner`, i.e. "n = RawTableInner::buckets() - 1"):
+    ///
+    ///           `table.bucket_ptr(3, mem::size_of::<T>())` returns a pointer that points here in the
+    ///           `data` part of the `RawTableInner`, i.e. to the start of T3
+    ///                  |
+    ///                  |               `base = table.data_end::<u8>()` points here
+    ///                  |               (to the start of CT0 or to the end of T0)
+    ///                  v                 v
+    /// [Pad], T_n, ..., |T3|, T2, T1, T0, |CT0, CT1, CT2, CT3, ..., CT_n, CTa_0, CTa_1, ..., CTa_m
+    ///                                                                    \__________  __________/
+    ///                                                                               \/
+    ///                                                                    additional control bytes
+    ///                                                                     `m = Group::WIDTH - 1`
+    ///
+    /// where: T0...T_n  - our stored data;
+    ///        CT0...CT_n - control bytes or metadata for `data`;
+    ///        CTa_0...CTa_m - additional control bytes (so that the search with loading `Group` bytes from
+    ///                        the heap works properly, even if the result of `h1(hash) & self.bucket_mask`
+    ///                        is equal to `self.bucket_mask`). See also `RawTableInner::set_ctrl` function.
+    ///
+    /// P.S. `h1(hash) & self.bucket_mask` is the same as `hash as usize % self.buckets()` because the number
+    /// of buckets is a power of two, and `self.bucket_mask = self.buckets() - 1`.
+    /// ```
+    ///
+    /// [`RawTableInner::buckets`]: RawTableInner::buckets
+    /// [`undefined behavior`]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     #[inline]
     unsafe fn bucket_ptr(&self, index: usize, size_of: usize) -> *mut u8 {
         debug_assert_ne!(self.bucket_mask, 0);
@@ -2361,9 +2556,44 @@ impl RawTableInner {
         base.sub((index + 1) * size_of)
     }
 
+    /// Returns pointer to one past last `data` element in the table as viewed from
+    /// the start point of the allocation (convenience for `self.ctrl.cast()`).
+    ///
+    /// This function actually returns a pointer to the end of the `data element` at
+    /// index "0" (zero).
+    ///
+    /// The caller must ensure that the `RawTableInner` outlives the returned [`NonNull<T>`],
+    /// otherwise using it may result in [`undefined behavior`].
+    ///
+    /// # Note
+    ///
+    /// The type `T` must be the actual type of the elements stored in the table, otherwise
+    /// using the returned [`NonNull<T>`] may result in [`undefined behavior`].
+    ///
+    /// ```none
+    ///                        `table.data_end::<T>()` returns pointer that points here
+    ///                        (to the end of `T0`)
+    ///                          ∨
+    /// [Pad], T_n, ..., T1, T0, |CT0, CT1, ..., CT_n|, CTa_0, CTa_1, ..., CTa_m
+    ///                           \________  ________/
+    ///                                    \/
+    ///       `n = buckets - 1`, i.e. `RawTableInner::buckets() - 1`
+    ///
+    /// where: T0...T_n  - our stored data;
+    ///        CT0...CT_n - control bytes or metadata for `data`.
+    ///        CTa_0...CTa_m - additional control bytes, where `m = Group::WIDTH - 1` (so that the search
+    ///                        with loading `Group` bytes from the heap works properly, even if the result
+    ///                        of `h1(hash) & self.bucket_mask` is equal to `self.bucket_mask`). See also
+    ///                        `RawTableInner::set_ctrl` function.
+    ///
+    /// P.S. `h1(hash) & self.bucket_mask` is the same as `hash as usize % self.buckets()` because the number
+    /// of buckets is a power of two, and `self.bucket_mask = self.buckets() - 1`.
+    /// ```
+    ///
+    /// [`undefined behavior`]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     #[inline]
-    unsafe fn data_end<T>(&self) -> NonNull<T> {
-        NonNull::new_unchecked(self.ctrl.as_ptr().cast())
+    fn data_end<T>(&self) -> NonNull<T> {
+        self.ctrl.cast()
     }
 
     /// Returns an iterator-like object for a probe sequence on the table.
@@ -2415,7 +2645,7 @@ impl RawTableInner {
     /// the end of the array.
     ///
     /// This function does not make any changes to the `data` parts of the table,
-    /// or any changes to the the `items` or `growth_left` field of the table.
+    /// or any changes to the `items` or `growth_left` field of the table.
     ///
     /// # Safety
     ///
@@ -2449,7 +2679,7 @@ impl RawTableInner {
     /// bytes, returning the old control byte.
     ///
     /// This function does not make any changes to the `data` parts of the table,
-    /// or any changes to the the `items` or `growth_left` field of the table.
+    /// or any changes to the `items` or `growth_left` field of the table.
     ///
     /// # Safety
     ///
@@ -2484,7 +2714,7 @@ impl RawTableInner {
     /// the end of the array.
     ///
     /// This function does not make any changes to the `data` parts of the table,
-    /// or any changes to the the `items` or `growth_left` field of the table.
+    /// or any changes to the `items` or `growth_left` field of the table.
     ///
     /// # Safety
     ///
@@ -2756,7 +2986,7 @@ impl RawTableInner {
         // [Pad], T_n, ..., T1, T0, |CT0, CT1, ..., CT_n|, Group::WIDTH
         //                           \________  ________/
         //                                    \/
-        //       `n = buckets - 1`, i.e. `RawIndexTableInner::buckets() - 1`
+        //       `n = buckets - 1`, i.e. `RawTableInner::buckets() - 1`
         //
         // where: T0...T_n  - our stored data;
         //        CT0...CT_n - control bytes or metadata for `data`.
@@ -2998,7 +3228,7 @@ impl RawTableInner {
     ///
     /// # Note
     ///
-    /// This function must be called only after [`drop_elements`](RawTable::drop_elements),
+    /// This function must be called only after [`drop_elements`](RawTableInner::drop_elements),
     /// else it can lead to leaking of memory. Also calling this function automatically
     /// makes invalid (dangling) all instances of buckets ([`Bucket`]) and makes invalid
     /// (dangling) the `ctrl` field of the table.
@@ -3352,7 +3582,7 @@ impl<T: Clone, A: Allocator + Clone> RawTable<T, A> {
         // cloned so far.
         let mut guard = guard((0, &mut *self), |(index, self_)| {
             if T::NEEDS_DROP {
-                for i in 0..=*index {
+                for i in 0..*index {
                     if self_.is_bucket_full(i) {
                         self_.bucket(i).drop();
                     }
@@ -3366,7 +3596,7 @@ impl<T: Clone, A: Allocator + Clone> RawTable<T, A> {
             to.write(from.as_ref().clone());
 
             // Update the index in case we need to unwind.
-            guard.0 = index;
+            guard.0 = index + 1;
         }
 
         // Successfully cloned all items, no need to clean up.
@@ -3519,6 +3749,7 @@ impl<T> RawIterRange<T> {
     ///
     /// * The `len` must be a power of two.
     ///
+    /// [valid]: https://doc.rust-lang.org/std/ptr/index.html#safety
     /// [`undefined behavior`]: https://doc.rust-lang.org/reference/behavior-considered-undefined.html
     #[cfg_attr(feature = "inline-more", inline)]
     unsafe fn new(ctrl: *const u8, data: Bucket<T>, len: usize) -> Self {
@@ -3665,10 +3896,10 @@ impl<T> RawIterRange<T> {
             //    we will never end up in the given branch, since we should have already
             //    yielded all the elements of the table.
             //
-            // 2. For tables larger than the group width. The the number of buckets is a
-            //    power of two (2 ^ n), Group::WIDTH is also power of two (2 ^ k). Sinse
+            // 2. For tables larger than the group width. The number of buckets is a
+            //    power of two (2 ^ n), Group::WIDTH is also power of two (2 ^ k). Since
             //    `(2 ^ n) > (2 ^ k)`, than `(2 ^ n) % (2 ^ k) = 0`. As we start from the
-            //    the start of the array of control bytes, and never try to iterate after
+            //    start of the array of control bytes, and never try to iterate after
             //    getting all the elements, the last `self.current_group` will read bytes
             //    from the `self.buckets() - Group::WIDTH` index.  We know also that
             //    `self.current_group.next()` will always retun indices within the range
@@ -3988,8 +4219,8 @@ impl FullBucketsIndices {
             //    we will never end up in the given branch, since we should have already
             //    yielded all the elements of the table.
             //
-            // 2. For tables larger than the group width. The the number of buckets is a
-            //    power of two (2 ^ n), Group::WIDTH is also power of two (2 ^ k). Sinse
+            // 2. For tables larger than the group width. The number of buckets is a
+            //    power of two (2 ^ n), Group::WIDTH is also power of two (2 ^ k). Since
             //    `(2 ^ n) > (2 ^ k)`, than `(2 ^ n) % (2 ^ k) = 0`. As we start from the
             //    the start of the array of control bytes, and never try to iterate after
             //    getting all the elements, the last `self.ctrl` will be equal to
@@ -4306,6 +4537,28 @@ impl Iterator for RawIterHashInner {
                 self.bitmask = self.group.match_byte(self.h2_hash).into_iter();
             }
         }
+    }
+}
+
+pub(crate) struct RawExtractIf<'a, T, A: Allocator> {
+    pub iter: RawIter<T>,
+    pub table: &'a mut RawTable<T, A>,
+}
+
+impl<T, A: Allocator> RawExtractIf<'_, T, A> {
+    #[cfg_attr(feature = "inline-more", inline)]
+    pub(crate) fn next<F>(&mut self, mut f: F) -> Option<T>
+    where
+        F: FnMut(&mut T) -> bool,
+    {
+        unsafe {
+            for item in &mut self.iter {
+                if f(item.as_mut()) {
+                    return Some(self.table.remove(item).0);
+                }
+            }
+        }
+        None
     }
 }
 

@@ -1,10 +1,10 @@
-# Borsh in Rust &emsp; [![Latest Version]][crates.io] [![borsh: rustc 1.66+]][Rust 1.66] [![License Apache-2.0 badge]][License Apache-2.0] [![License MIT badge]][License MIT]
+# Borsh in Rust &emsp; [![Latest Version]][crates.io] [![borsh: rustc 1.67+]][Rust 1.67] [![License Apache-2.0 badge]][License Apache-2.0] [![License MIT badge]][License MIT]
 
 [Borsh]: https://borsh.io
 [Latest Version]: https://img.shields.io/crates/v/borsh.svg
 [crates.io]: https://crates.io/crates/borsh
-[borsh: rustc 1.66+]: https://img.shields.io/badge/rustc-1.66+-lightgray.svg
-[Rust 1.66]: https://blog.rust-lang.org/2022/12/15/Rust-1.66.0.html
+[borsh: rustc 1.67+]: https://img.shields.io/badge/rustc-1.67+-lightgray.svg
+[Rust 1.67]: https://blog.rust-lang.org/2023/01/26/Rust-1.67.0.html
 [License Apache-2.0 badge]: https://img.shields.io/badge/license-Apache2.0-blue.svg
 [License Apache-2.0]: https://opensource.org/licenses/Apache-2.0
 [License MIT badge]: https://img.shields.io/badge/license-MIT-blue.svg
@@ -99,6 +99,10 @@ enum A {
 }
 ```
 
+## Testing
+
+Integration tests should generally be preferred to unit ones. Root module of integration tests of `borsh` crate is [linked](./borsh/tests/tests.rs) here.
+ 
 ## Releasing
 
 The versions of all public crates in this repository are collectively managed by a single version in the [workspace manifest](https://github.com/near/borsh-rs/blob/master/Cargo.toml).

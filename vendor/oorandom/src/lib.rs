@@ -25,7 +25,7 @@ use core::ops::Range;
 /// A PRNG producing a 32-bit output.
 ///
 /// The current implementation is `PCG-XSH-RR`.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Rand32 {
     state: u64,
     inc: u64,
@@ -157,7 +157,7 @@ impl Rand32 {
 // BUGGO: The recommended algorithm is PCG-XSL-RR?
 // See https://github.com/imneme/pcg-c/blob/master/include/pcg_variants.h#L2405
 // Not sure if it matters?
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Rand64 {
     state: u128,
     inc: u128,

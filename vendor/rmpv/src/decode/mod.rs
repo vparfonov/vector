@@ -24,17 +24,14 @@ pub enum Error {
     DepthLimitExceeded,
 }
 
-fn decrement_depth(depth: usize) -> Result<usize, Error> {
-    if depth == 0 {
-        Err(Error::DepthLimitExceeded)
-    } else {
-        Ok(depth - 1)
-    }
+#[inline]
+fn decrement_depth(depth: u16) -> Result<u16, Error> {
+    depth.checked_sub(1).ok_or(Error::DepthLimitExceeded)
 }
 
 impl Error {
     #[cold]
-    pub fn kind(&self) -> ErrorKind {
+    #[must_use] pub fn kind(&self) -> ErrorKind {
         match *self {
             Error::InvalidMarkerRead(ref err) => err.kind(),
             Error::InvalidDataRead(ref err) => err.kind(),
@@ -59,10 +56,10 @@ impl Display for Error {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), fmt::Error> {
         match *self {
             Error::InvalidMarkerRead(ref err) => {
-                write!(fmt, "I/O error while reading marker byte: {}", err)
+                write!(fmt, "I/O error while reading marker byte: {err}")
             }
             Error::InvalidDataRead(ref err) => {
-                write!(fmt, "I/O error while reading non-marker bytes: {}", err)
+                write!(fmt, "I/O error while reading non-marker bytes: {err}")
             }
             Error::DepthLimitExceeded => {
                 write!(fmt, "depth limit exceeded")

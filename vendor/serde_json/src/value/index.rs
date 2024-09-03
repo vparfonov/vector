@@ -14,7 +14,7 @@ use core::ops;
 ///
 /// [`get`]: ../enum.Value.html#method.get
 /// [`get_mut`]: ../enum.Value.html#method.get_mut
-/// [square-bracket indexing operator]: ../enum.Value.html#impl-Index%3CI%3E
+/// [square-bracket indexing operator]: ../enum.Value.html#impl-Index%3CI%3E-for-Value
 ///
 /// This trait is sealed and cannot be implemented for types outside of
 /// `serde_json`.
@@ -116,7 +116,7 @@ impl Index for String {
     }
 }
 
-impl<'a, T> Index for &'a T
+impl<T> Index for &T
 where
     T: ?Sized + Index,
 {

@@ -20,7 +20,7 @@
 )))]
 // Not needed for 2018 edition and conflicts with `rust_2018_idioms`
 #![doc(test(no_crate_inject))]
-#![doc(html_root_url = "https://docs.rs/serde_with_macros/3.7.0/")]
+#![doc(html_root_url = "https://docs.rs/serde_with_macros/3.9.0/")]
 // Tarpaulin does not work well with proc macros and marks most of the lines as uncovered.
 #![cfg(not(tarpaulin_include))]
 
@@ -229,6 +229,7 @@ where
 /// ```rust
 /// # use serde::Serialize;
 /// #
+/// # #[allow(dead_code)]
 /// #[derive(Serialize)]
 /// struct Data {
 ///     #[serde(skip_serializing_if = "Option::is_none")]
@@ -248,6 +249,8 @@ where
 /// ```rust
 /// # use serde::Serialize;
 /// # use serde_with_macros::skip_serializing_none;
+/// #
+/// # #[allow(dead_code)]
 /// #[skip_serializing_none]
 /// #[derive(Serialize)]
 /// struct Data {
@@ -278,8 +281,10 @@ where
 /// ```rust
 /// # use serde::Serialize;
 /// # use serde_with_macros::skip_serializing_none;
+/// # #[allow(dead_code)]
 /// type MyOption<T> = Option<T>;
 ///
+/// # #[allow(dead_code)]
 /// #[skip_serializing_none]
 /// #[derive(Serialize)]
 /// struct Data {
@@ -533,8 +538,7 @@ fn field_has_attribute(field: &Field, namespace: &str, name: &str) -> bool {
 ///     If `#[serde(borrow)]` or `#[serde(borrow = "...")]` is already present, this step will be
 ///     skipped.
 ///
-/// 5. Restore the ability of accepting missing fields if both the field and the
-/// transformation are `Option`.
+/// 5. Restore the ability of accepting missing fields if both the field and the transformation are `Option`.
 ///
 ///     An `Option` is detected by an exact text match.
 ///     Renaming an import or type aliases can cause confusion here.
@@ -589,8 +593,8 @@ fn field_has_attribute(field: &Field, namespace: &str, name: &str) -> bool {
 /// It will also work if the relevant derive is behind a `#[cfg_attr]` attribute
 /// and propagate the `#[cfg_attr]` to the various `#[schemars]` field attributes.
 ///
-/// [`serde_as`]: https://docs.rs/serde_with/3.7.0/serde_with/guide/index.html
-/// [re-exporting `serde_as`]: https://docs.rs/serde_with/3.7.0/serde_with/guide/serde_as/index.html#re-exporting-serde_as
+/// [`serde_as`]: https://docs.rs/serde_with/3.9.0/serde_with/guide/index.html
+/// [re-exporting `serde_as`]: https://docs.rs/serde_with/3.9.0/serde_with/guide/serde_as/index.html#re-exporting-serde_as
 #[proc_macro_attribute]
 pub fn serde_as(args: TokenStream, input: TokenStream) -> TokenStream {
     #[derive(FromMeta)]
@@ -794,23 +798,6 @@ fn serde_as_add_attr_to_field(
             quote!(#serde_with_crate_path::As::<#replacement_type>::deserialize).to_string();
         let attr = parse_quote!(#[serde(deserialize_with = #attr_inner_tokens)]);
         field.attrs.push(attr);
-
-        if let Some(cfg) = schemars_config.cfg_expr() {
-            let with_cfg = utils::schemars_with_attr_if(
-                &field.attrs,
-                &["with", "deserialize_with", "schema_with"],
-            )?;
-            let attr_inner_tokens =
-                quote!(#serde_with_crate_path::Schema::<#type_original, #replacement_type>::deserialize)
-                    .to_string();
-            let attr = parse_quote! {
-                #[cfg_attr(
-                    all(#cfg, not(#with_cfg)),
-                    schemars(deserialize_with = #attr_inner_tokens))
-                ]
-            };
-            field.attrs.push(attr);
-        }
     }
     if let Some(type_) = serde_as_options.serialize_as {
         let replacement_type = replace_infer_type_with_type(type_.clone(), type_same);
@@ -818,23 +805,6 @@ fn serde_as_add_attr_to_field(
             quote!(#serde_with_crate_path::As::<#replacement_type>::serialize).to_string();
         let attr = parse_quote!(#[serde(serialize_with = #attr_inner_tokens)]);
         field.attrs.push(attr);
-
-        if let Some(cfg) = schemars_config.cfg_expr() {
-            let with_cfg = utils::schemars_with_attr_if(
-                &field.attrs,
-                &["with", "serialize_with", "schema_with"],
-            )?;
-            let attr_inner_tokens =
-                quote!(#serde_with_crate_path::Schema::<#type_original, #replacement_type>::serialize)
-                    .to_string();
-            let attr = parse_quote! {
-                #[cfg_attr(
-                    all(#cfg, not(#with_cfg)),
-                    schemars(serialize_with = #attr_inner_tokens))
-                ]
-            };
-            field.attrs.push(attr);
-        }
     }
 
     Ok(())
@@ -1069,7 +1039,7 @@ fn has_type_embedded(type_: &Type, embedded_type: &syn::Ident) -> bool {
 /// [`Display`]: std::fmt::Display
 /// [`FromStr`]: std::str::FromStr
 /// [cargo-toml-rename]: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#renaming-dependencies-in-cargotoml
-/// [serde-as-crate]: https://docs.rs/serde_with/3.7.0/serde_with/guide/serde_as/index.html#re-exporting-serde_as
+/// [serde-as-crate]: https://docs.rs/serde_with/3.9.0/serde_with/guide/serde_as/index.html#re-exporting-serde_as
 /// [serde-crate]: https://serde.rs/container-attrs.html#crate
 #[proc_macro_derive(DeserializeFromStr, attributes(serde_with))]
 pub fn derive_deserialize_fromstr(item: TokenStream) -> TokenStream {
@@ -1189,7 +1159,7 @@ fn deserialize_fromstr(mut input: DeriveInput, serde_with_crate_path: Path) -> T
 /// [`Display`]: std::fmt::Display
 /// [`FromStr`]: std::str::FromStr
 /// [cargo-toml-rename]: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#renaming-dependencies-in-cargotoml
-/// [serde-as-crate]: https://docs.rs/serde_with/3.7.0/serde_with/guide/serde_as/index.html#re-exporting-serde_as
+/// [serde-as-crate]: https://docs.rs/serde_with/3.9.0/serde_with/guide/serde_as/index.html#re-exporting-serde_as
 /// [serde-crate]: https://serde.rs/container-attrs.html#crate
 #[proc_macro_derive(SerializeDisplay, attributes(serde_with))]
 pub fn derive_serialize_display(item: TokenStream) -> TokenStream {
@@ -1352,7 +1322,7 @@ pub fn __private_consume_serde_as_attributes(_: TokenStream) -> TokenStream {
 /// {
 ///     "always_serialize_this_field": null
 /// }
-/// # ), serde_json::to_value(&data).unwrap());
+/// # ), serde_json::to_value(data).unwrap());
 /// ```
 ///
 /// # Alternative path to `serde_with` crate

@@ -39,7 +39,7 @@ impl Config {
             config: self.cloneable.clone(),
             runtime_components: self.runtime_components.clone(),
             runtime_plugins: self.runtime_plugins.clone(),
-            behavior_version: self.behavior_version.clone(),
+            behavior_version: self.behavior_version,
         }
     }
     /// Return a reference to the stalled stream protection configuration contained in this config, if any.
@@ -121,9 +121,12 @@ impl Config {
     pub fn region(&self) -> ::std::option::Option<&crate::config::Region> {
         self.config.load::<crate::config::Region>()
     }
-    /// Returns the credentials provider for this service
+    /// This function was intended to be removed, and has been broken since release-2023-11-15 as it always returns a `None`. Do not use.
+    #[deprecated(
+        note = "This function was intended to be removed, and has been broken since release-2023-11-15 as it always returns a `None`. Do not use."
+    )]
     pub fn credentials_provider(&self) -> Option<crate::config::SharedCredentialsProvider> {
-        self.config.load::<crate::config::SharedCredentialsProvider>().cloned()
+        ::std::option::Option::None
     }
 }
 /// Builder for creating a `Config`.
@@ -148,6 +151,31 @@ impl Builder {
     /// Constructs a config builder.
     pub fn new() -> Self {
         Self::default()
+    }
+    /// Constructs a config builder from the given `config_bag`, setting only fields stored in the config bag,
+    /// but not those in runtime components.
+    #[allow(unused)]
+    pub(crate) fn from_config_bag(config_bag: &::aws_smithy_types::config_bag::ConfigBag) -> Self {
+        let mut builder = Self::new();
+        builder.set_stalled_stream_protection(config_bag.load::<crate::config::StalledStreamProtectionConfig>().cloned());
+        builder.set_force_path_style(config_bag.load::<crate::config::ForcePathStyle>().map(|ty| ty.0));
+
+        builder.set_use_arn_region(config_bag.load::<crate::config::UseArnRegion>().map(|ty| ty.0));
+
+        builder.set_disable_multi_region_access_points(config_bag.load::<crate::config::DisableMultiRegionAccessPoints>().map(|ty| ty.0));
+
+        builder.set_accelerate(config_bag.load::<crate::config::Accelerate>().map(|ty| ty.0));
+
+        builder.set_disable_s3_express_session_auth(config_bag.load::<crate::config::DisableS3ExpressSessionAuth>().map(|ty| ty.0));
+        builder.set_retry_config(config_bag.load::<::aws_smithy_types::retry::RetryConfig>().cloned());
+        builder.set_timeout_config(config_bag.load::<::aws_smithy_types::timeout::TimeoutConfig>().cloned());
+        builder.set_retry_partition(config_bag.load::<::aws_smithy_runtime::client::retries::RetryPartition>().cloned());
+        builder.set_app_name(config_bag.load::<::aws_types::app_name::AppName>().cloned());
+        builder.set_endpoint_url(config_bag.load::<::aws_types::endpoint_config::EndpointUrl>().map(|ty| ty.0.clone()));
+        builder.set_use_dual_stack(config_bag.load::<::aws_types::endpoint_config::UseDualStack>().map(|ty| ty.0));
+        builder.set_use_fips(config_bag.load::<::aws_types::endpoint_config::UseFips>().map(|ty| ty.0));
+        builder.set_region(config_bag.load::<crate::config::Region>().cloned());
+        builder
     }
     /// Set the [`StalledStreamProtectionConfig`](crate::config::StalledStreamProtectionConfig)
     /// to configure protection for stalled streams.
@@ -438,7 +466,11 @@ impl Builder {
         self
     }
 
-    /// Set the timeout_config for the builder
+    /// Set the timeout_config for the builder.
+    ///
+    /// Setting this to `None` has no effect if another source of configuration has set timeouts. If you
+    /// are attempting to disable timeouts, use [`TimeoutConfig::disabled`](::aws_smithy_types::timeout::TimeoutConfig::disabled)
+    ///
     ///
     /// # Examples
     ///
@@ -459,7 +491,13 @@ impl Builder {
     /// let config = builder.build();
     /// ```
     pub fn set_timeout_config(&mut self, timeout_config: ::std::option::Option<::aws_smithy_types::timeout::TimeoutConfig>) -> &mut Self {
-        timeout_config.map(|t| self.config.store_put(t));
+        // passing None has no impact.
+        let Some(mut timeout_config) = timeout_config else { return self };
+
+        if let Some(base) = self.config.load::<::aws_smithy_types::timeout::TimeoutConfig>() {
+            timeout_config.take_defaults_from(base);
+        }
+        self.config.store_put(timeout_config);
         self
     }
     /// Set the partition for retry-related state. When clients share a retry partition, they will
@@ -988,10 +1026,28 @@ impl Builder {
             #[cfg(feature = "sigv4a")]
             {
                 self.runtime_components
-                    .push_identity_resolver(::aws_runtime::auth::sigv4a::SCHEME_ID, credentials_provider.clone());
+                    .set_identity_resolver(::aws_runtime::auth::sigv4a::SCHEME_ID, credentials_provider.clone());
             }
             self.runtime_components
-                .push_identity_resolver(::aws_runtime::auth::sigv4::SCHEME_ID, credentials_provider);
+                .set_identity_resolver(::aws_runtime::auth::sigv4::SCHEME_ID, credentials_provider);
+        }
+        self
+    }
+    /// Sets the credentials provider for S3 Express One Zone
+    pub fn express_credentials_provider(mut self, credentials_provider: impl crate::config::ProvideCredentials + 'static) -> Self {
+        self.set_express_credentials_provider(::std::option::Option::Some(crate::config::SharedCredentialsProvider::new(
+            credentials_provider,
+        )));
+        self
+    }
+    /// Sets the credentials provider for S3 Express One Zone
+    pub fn set_express_credentials_provider(
+        &mut self,
+        credentials_provider: ::std::option::Option<crate::config::SharedCredentialsProvider>,
+    ) -> &mut Self {
+        if let ::std::option::Option::Some(credentials_provider) = credentials_provider {
+            self.runtime_components
+                .set_identity_resolver(crate::s3_express::auth::SCHEME_ID, credentials_provider);
         }
         self
     }
@@ -1091,10 +1147,11 @@ impl Builder {
         self.set_time_source(::std::option::Option::Some(::aws_smithy_async::time::SharedTimeSource::new(
             ::aws_smithy_async::time::StaticTimeSource::new(::std::time::UNIX_EPOCH + ::std::time::Duration::from_secs(1234567890)),
         )));
-        self.config.store_put(::aws_http::user_agent::AwsUserAgent::for_tests());
+        self.config.store_put(::aws_runtime::user_agent::AwsUserAgent::for_tests());
         self.set_credentials_provider(Some(crate::config::SharedCredentialsProvider::new(
             ::aws_credential_types::Credentials::for_tests(),
         )));
+        self.behavior_version = ::std::option::Option::Some(crate::config::BehaviorVersion::latest());
         self
     }
     #[cfg(any(feature = "test-util", test))]
@@ -1158,6 +1215,13 @@ impl ServiceRuntimePlugin {
                 ::aws_runtime::auth::sigv4a::SigV4aAuthScheme::new(),
             ));
         }
+        runtime_components.push_auth_scheme(::aws_smithy_runtime_api::client::auth::SharedAuthScheme::new(
+            crate::s3_express::auth::S3ExpressAuthScheme::new(),
+        ));
+        runtime_components.set_identity_resolver(crate::s3_express::auth::SCHEME_ID, crate::s3_express::identity_provider::DefaultS3ExpressIdentityProvider::builder()
+                                    .behavior_version(_service_config.behavior_version.expect("Invalid client configuration: A behavior version must be set when creating an inner S3 client. A behavior version should be set in the outer S3 client, so it needs to be passed down to the inner client."))
+                                    .time_source(_service_config.time_source().unwrap_or_default())
+                                    .build());
         Self { config, runtime_components }
     }
 }
@@ -1242,11 +1306,30 @@ pub use ::aws_credential_types::Credentials;
 impl From<&::aws_types::sdk_config::SdkConfig> for Builder {
     fn from(input: &::aws_types::sdk_config::SdkConfig) -> Self {
         let mut builder = Builder::default();
+        builder.set_disable_s3_express_session_auth(input.service_config().and_then(|conf| {
+            let str_config = conf.load_config(service_config_key(
+                "AWS_S3_DISABLE_EXPRESS_SESSION_AUTH",
+                "s3_disable_express_session_auth",
+            ));
+            str_config.and_then(|it| it.parse::<bool>().ok())
+        }));
         builder.set_credentials_provider(input.credentials_provider());
         builder = builder.region(input.region().cloned());
         builder.set_use_fips(input.use_fips());
         builder.set_use_dual_stack(input.use_dual_stack());
-        builder.set_endpoint_url(input.endpoint_url().map(|s| s.to_string()));
+        if input.get_origin("endpoint_url").is_client_config() {
+            builder.set_endpoint_url(input.endpoint_url().map(|s| s.to_string()));
+        } else {
+            builder.set_endpoint_url(
+                input
+                    .service_config()
+                    .and_then(|conf| {
+                        conf.load_config(service_config_key("AWS_ENDPOINT_URL", "endpoint_url"))
+                            .map(|it| it.parse().unwrap())
+                    })
+                    .or_else(|| input.endpoint_url().map(|s| s.to_string())),
+            );
+        }
         // resiliency
         builder.set_retry_config(input.retry_config().cloned());
         builder.set_timeout_config(input.timeout_config().cloned());
@@ -1277,36 +1360,48 @@ impl From<&::aws_types::sdk_config::SdkConfig> for Config {
 
 pub use ::aws_types::app_name::AppName;
 
+#[allow(dead_code)]
+fn service_config_key<'a>(env: &'a str, profile: &'a str) -> aws_types::service_config::ServiceConfigKey<'a> {
+    ::aws_types::service_config::ServiceConfigKey::builder()
+        .service_id("s3")
+        .env(env)
+        .profile(profile)
+        .build()
+        .expect("all field sets explicitly, can't fail")
+}
+
 pub use ::aws_smithy_async::rt::sleep::Sleep;
 
 pub(crate) fn base_client_runtime_plugins(mut config: crate::Config) -> ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugins {
     let mut configured_plugins = ::std::vec::Vec::new();
     ::std::mem::swap(&mut config.runtime_plugins, &mut configured_plugins);
-    #[allow(unused_mut)]
-    let mut behavior_version = config.behavior_version.clone();
     #[cfg(feature = "behavior-version-latest")]
     {
-        if behavior_version.is_none() {
-            behavior_version = Some(::aws_smithy_runtime_api::client::behavior_version::BehaviorVersion::latest());
+        if config.behavior_version.is_none() {
+            config.behavior_version = Some(::aws_smithy_runtime_api::client::behavior_version::BehaviorVersion::latest());
         }
     }
 
     let mut plugins = ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugins::new()
-                    // defaults
-                    .with_client_plugins(::aws_smithy_runtime::client::defaults::default_plugins(
-                        ::aws_smithy_runtime::client::defaults::DefaultPluginParams::new()
-                            .with_retry_partition_name("s3")
-                            .with_behavior_version(behavior_version.expect("Invalid client configuration: A behavior major version must be set when sending a request or constructing a client. You must set it during client construction or by enabling the `behavior-version-latest` cargo feature."))
-                    ))
-                    // user config
-                    .with_client_plugin(
-                        ::aws_smithy_runtime_api::client::runtime_plugin::StaticRuntimePlugin::new()
-                            .with_config(config.config.clone())
-                            .with_runtime_components(config.runtime_components.clone())
-                    )
-                    // codegen config
-                    .with_client_plugin(crate::config::ServiceRuntimePlugin::new(config))
-                    .with_client_plugin(::aws_smithy_runtime::client::auth::no_auth::NoAuthRuntimePlugin::new());
+                        // defaults
+                        .with_client_plugins(::aws_smithy_runtime::client::defaults::default_plugins(
+                            ::aws_smithy_runtime::client::defaults::DefaultPluginParams::new()
+                                .with_retry_partition_name("s3")
+                                .with_behavior_version(config.behavior_version.expect("Invalid client configuration: A behavior major version must be set when sending a request or constructing a client. You must set it during client construction or by enabling the `behavior-version-latest` cargo feature."))
+                        ))
+                        // user config
+                        .with_client_plugin(
+                            ::aws_smithy_runtime_api::client::runtime_plugin::StaticRuntimePlugin::new()
+                                .with_config(config.config.clone())
+                                .with_runtime_components(config.runtime_components.clone())
+                        )
+                        // codegen config
+                        .with_client_plugin(crate::config::ServiceRuntimePlugin::new(config.clone()))
+                        .with_client_plugin(::aws_smithy_runtime::client::auth::no_auth::NoAuthRuntimePlugin::new());
+
+    plugins = plugins.with_client_plugin(crate::s3_express::runtime_plugin::S3ExpressRuntimePlugin::new(
+        config.config.load::<crate::config::DisableS3ExpressSessionAuth>().cloned(),
+    ));
 
     for plugin in configured_plugins {
         plugins = plugins.with_client_plugin(plugin);
@@ -1335,10 +1430,6 @@ pub use ::aws_smithy_runtime_api::client::interceptors::SharedInterceptor;
 pub use ::aws_types::region::Region;
 
 pub use ::aws_credential_types::provider::SharedCredentialsProvider;
-
-pub use ::aws_smithy_runtime_api::client::http::HttpClient;
-
-pub use ::aws_smithy_runtime_api::shared::IntoShared;
 
 #[derive(Debug, Clone)]
 pub(crate) struct ForcePathStyle(pub(crate) bool);
@@ -1370,6 +1461,10 @@ impl ::aws_smithy_types::config_bag::Storable for DisableS3ExpressSessionAuth {
     type Storer = ::aws_smithy_types::config_bag::StoreReplace<Self>;
 }
 
+pub use ::aws_smithy_runtime_api::client::http::HttpClient;
+
+pub use ::aws_smithy_runtime_api::shared::IntoShared;
+
 pub use ::aws_smithy_async::rt::sleep::AsyncSleep;
 
 pub use ::aws_smithy_runtime_api::client::identity::ResolveCachedIdentity;
@@ -1384,6 +1479,9 @@ pub use ::aws_smithy_types::config_bag::Layer;
 
 /// Types needed to configure endpoint resolution.
 pub mod endpoint;
+
+/// HTTP request and response types.
+pub mod http;
 
 /// Types needed to implement [`Intercept`](crate::config::Intercept).
 pub mod interceptors;

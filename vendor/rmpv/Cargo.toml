@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.70"
 name = "rmpv"
-version = "1.0.1"
+version = "1.3.0"
 authors = ["Evgeny Safronov <division494@gmail.com>"]
 description = "Value variant for RMP"
 documentation = "https://docs.rs/rmpv"
@@ -26,16 +26,18 @@ keywords = [
 categories = ["encoding"]
 license = "MIT"
 repository = "https://github.com/3Hren/msgpack-rust"
-resolver = "1"
+
+[package.metadata.release]
+tag-prefix = "{{crate_name}}/"
 
 [dependencies.num-traits]
 version = "0.2.14"
 
 [dependencies.rmp]
-version = "0.8.11"
+version = "0.8.14"
 
 [dependencies.serde]
-version = "1.0.130"
+version = "1.0.197"
 optional = true
 
 [dependencies.serde_bytes]

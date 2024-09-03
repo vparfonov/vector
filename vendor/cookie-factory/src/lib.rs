@@ -39,6 +39,8 @@ pub mod gen;
 
 mod internal;
 pub use internal::*;
+#[cfg(feature = "async")]
+pub mod async_bufwriter;
 pub mod bytes;
 pub mod combinator;
 pub mod multi;

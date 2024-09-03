@@ -586,14 +586,17 @@ use std::time::Duration;
 
 pub use oauth2::{
     AccessToken, AuthType, AuthUrl, AuthorizationCode, ClientCredentialsTokenRequest, ClientId,
-    ClientSecret, CodeTokenRequest, ConfigurationError, CsrfToken, EmptyExtraTokenFields,
-    ErrorResponse, ErrorResponseType, ExtraTokenFields, HttpRequest, HttpResponse,
+    ClientSecret, CodeTokenRequest, ConfigurationError, CsrfToken, DeviceAccessTokenRequest,
+    DeviceAuthorizationRequest, DeviceAuthorizationResponse, DeviceAuthorizationUrl, DeviceCode,
+    DeviceCodeErrorResponse, DeviceCodeErrorResponseType, EmptyExtraDeviceAuthorizationFields,
+    EmptyExtraTokenFields, EndUserVerificationUrl, ErrorResponse, ErrorResponseType,
+    ExtraDeviceAuthorizationFields, ExtraTokenFields, HttpRequest, HttpResponse,
     IntrospectionRequest, IntrospectionUrl, PasswordTokenRequest, PkceCodeChallenge,
     PkceCodeChallengeMethod, PkceCodeVerifier, RedirectUrl, RefreshToken, RefreshTokenRequest,
     RequestTokenError, ResourceOwnerPassword, ResourceOwnerUsername, RevocableToken,
     RevocationErrorResponseType, RevocationRequest, RevocationUrl, Scope, StandardErrorResponse,
     StandardTokenIntrospectionResponse, StandardTokenResponse, TokenIntrospectionResponse,
-    TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl,
+    TokenResponse as OAuth2TokenResponse, TokenType, TokenUrl, UserCode, VerificationUriComplete,
 };
 
 ///
@@ -602,8 +605,11 @@ pub use oauth2::{
 pub use oauth2::http;
 pub use oauth2::url;
 
-#[cfg(feature = "curl")]
+#[cfg(all(feature = "curl", not(target_arch = "wasm32")))]
 pub use oauth2::curl;
+
+#[cfg(all(feature = "curl", target_arch = "wasm32"))]
+compile_error!("wasm32 is not supported with the `curl` feature. Use the `reqwest` backend or a custom backend for wasm32 support");
 
 #[cfg(feature = "reqwest")]
 pub use oauth2::reqwest;
@@ -621,25 +627,28 @@ pub use id_token::IdTokenFields;
 pub use id_token::{IdToken, IdTokenClaims};
 pub use jwt::JsonWebTokenError;
 use jwt::{JsonWebToken, JsonWebTokenAccess, JsonWebTokenAlgorithm, JsonWebTokenHeader};
+pub use logout::{LogoutProviderMetadata, LogoutRequest, ProviderMetadataWithLogout};
 // Flatten the module hierarchy involving types. They're only separated to improve code
 // organization.
 pub use types::{
     AccessTokenHash, AddressCountry, AddressLocality, AddressPostalCode, AddressRegion,
     ApplicationType, Audience, AuthDisplay, AuthPrompt, AuthenticationContextClass,
     AuthenticationMethodReference, AuthorizationCodeHash, ClaimName, ClaimType, ClientAuthMethod,
-    ClientConfigUrl, ClientContactEmail, ClientName, ClientUrl, EndUserBirthday, EndUserEmail,
-    EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName, EndUserNickname,
-    EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone, EndUserUsername,
-    EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl, IssuerUrl, JsonWebKey,
-    JsonWebKeyId, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType, JsonWebKeyUse,
-    JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm, LanguageTag,
-    LocalizedClaim, LoginHint, LogoUrl, Nonce, OpPolicyUrl, OpTosUrl, PolicyUrl, PrivateSigningKey,
-    RegistrationAccessToken, RegistrationUrl, RequestUrl, ResponseMode, ResponseType,
-    ResponseTypes, SectorIdentifierUrl, ServiceDocUrl, SigningError, StreetAddress,
-    SubjectIdentifier, SubjectIdentifierType, ToSUrl,
+    ClientConfigUrl, ClientContactEmail, ClientName, ClientUrl, EndSessionUrl, EndUserBirthday,
+    EndUserEmail, EndUserFamilyName, EndUserGivenName, EndUserMiddleName, EndUserName,
+    EndUserNickname, EndUserPhoneNumber, EndUserPictureUrl, EndUserProfileUrl, EndUserTimezone,
+    EndUserUsername, EndUserWebsiteUrl, FormattedAddress, GrantType, InitiateLoginUrl, IssuerUrl,
+    JsonWebKey, JsonWebKeyAlgorithm, JsonWebKeyId, JsonWebKeySet, JsonWebKeySetUrl, JsonWebKeyType,
+    JsonWebKeyUse, JweContentEncryptionAlgorithm, JweKeyManagementAlgorithm, JwsSigningAlgorithm,
+    LanguageTag, LocalizedClaim, LoginHint, LogoUrl, LogoutHint, Nonce, OpPolicyUrl, OpTosUrl,
+    PolicyUrl, PostLogoutRedirectUrl, PrivateSigningKey, RegistrationAccessToken, RegistrationUrl,
+    RequestUrl, ResponseMode, ResponseType, ResponseTypes, SectorIdentifierUrl, ServiceDocUrl,
+    SigningError, StreetAddress, SubjectIdentifier, SubjectIdentifierType, ToSUrl,
 };
+
 pub use user_info::{
-    UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoUrl,
+    UserInfoClaims, UserInfoError, UserInfoJsonWebToken, UserInfoRequest, UserInfoResponseType,
+    UserInfoUrl,
 };
 use verification::{AudiencesClaim, IssuerClaim};
 pub use verification::{
@@ -664,6 +673,7 @@ mod claims;
 mod discovery;
 mod helpers;
 mod id_token;
+mod logout;
 pub(crate) mod types;
 mod user_info;
 mod verification;
@@ -681,7 +691,7 @@ const OPENID_SCOPE: &str = "openid";
 /// Authentication flow, which determines how the Authorization Server returns the OpenID Connect
 /// ID token and OAuth2 access token to the Relying Party.
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum AuthenticationFlow<RT: ResponseType> {
     ///
@@ -940,6 +950,19 @@ where
     }
 
     ///
+    /// Sets the device authorization URL for contacting the device authorization endpoint ([RFC 8628](https://tools.ietf.org/html/rfc8628)).
+    ///
+    pub fn set_device_authorization_uri(
+        mut self,
+        device_authorization_url: DeviceAuthorizationUrl,
+    ) -> Self {
+        self.oauth2_client = self
+            .oauth2_client
+            .set_device_authorization_url(device_authorization_url);
+        self
+    }
+
+    ///
     /// Enables the `openid` scope to be requested automatically.
     ///
     /// This scope is requested by default, so this function is only useful after previous calls to
@@ -1051,16 +1074,49 @@ where
     /// Acquires ownership of the `code` because authorization codes may only be used once to
     /// retrieve an access token from the authorization server.
     ///
-    /// See https://tools.ietf.org/html/rfc6749#section-4.1.3
+    /// See <https://tools.ietf.org/html/rfc6749#section-4.1.3>
     ///
     pub fn exchange_code(&self, code: AuthorizationCode) -> CodeTokenRequest<TE, TR, TT> {
         self.oauth2_client.exchange_code(code)
     }
 
     ///
+    /// Creates a request builder for device authorization.
+    ///
+    /// See <https://tools.ietf.org/html/rfc8628#section-3.4>
+    ///
+    pub fn exchange_device_code(
+        &self,
+    ) -> Result<DeviceAuthorizationRequest<TE>, ConfigurationError> {
+        let request = self.oauth2_client.exchange_device_code();
+        if self.use_openid_scope {
+            Ok(request?.add_scope(Scope::new(OPENID_SCOPE.to_string())))
+        } else {
+            request
+        }
+    }
+
+    ///
+    /// Creates a request builder for exchanging a device code for an access token.
+    ///
+    /// See <https://tools.ietf.org/html/rfc8628#section-3.4>
+    ///
+    pub fn exchange_device_access_token<'a, 'b, 'c, EF>(
+        &'a self,
+        auth_response: &'b DeviceAuthorizationResponse<EF>,
+    ) -> DeviceAccessTokenRequest<'b, 'c, TR, TT, EF>
+    where
+        'a: 'b,
+        EF: ExtraDeviceAuthorizationFields,
+    {
+        self.oauth2_client
+            .exchange_device_access_token(auth_response)
+    }
+
+    ///
     /// Creates a request builder for exchanging a refresh token for an access token.
     ///
-    /// See https://tools.ietf.org/html/rfc6749#section-6
+    /// See <https://tools.ietf.org/html/rfc6749#section-6>
     ///
     pub fn exchange_refresh_token<'a, 'b>(
         &'a self,
@@ -1075,7 +1131,7 @@ where
     ///
     /// Creates a request builder for exchanging credentials for an access token.
     ///
-    /// See https://tools.ietf.org/html/rfc6749#section-6
+    /// See <https://tools.ietf.org/html/rfc6749#section-6>
     ///
     pub fn exchange_password<'a, 'b>(
         &'a self,
@@ -1091,7 +1147,7 @@ where
     ///
     /// Creates a request builder for exchanging client credentials for an access token.
     ///
-    /// See https://tools.ietf.org/html/rfc6749#section-4.4
+    /// See <https://tools.ietf.org/html/rfc6749#section-4.4>
     ///
     pub fn exchange_client_credentials<'a, 'b>(
         &'a self,
@@ -1128,6 +1184,7 @@ where
                 .ok_or(ConfigurationError::MissingUrl("userinfo"))?,
             access_token,
             require_signed_response: false,
+            response_type: UserInfoResponseType::Json,
             signed_response_verifier: UserInfoVerifier::new(
                 self.client_id.clone(),
                 self.issuer.clone(),
@@ -1140,7 +1197,7 @@ where
     ///
     /// Creates a request builder for obtaining metadata about a previously received token.
     ///
-    /// See https://tools.ietf.org/html/rfc7662
+    /// See <https://tools.ietf.org/html/rfc7662>
     ///
     pub fn introspect<'a>(
         &'a self,
@@ -1158,7 +1215,7 @@ where
     /// Attempting to submit the generated request without calling [`set_revocation_uri()`](Self::set_revocation_uri())
     /// first will result in an error.
     ///
-    /// See https://tools.ietf.org/html/rfc7009
+    /// See <https://tools.ietf.org/html/rfc7009>
     ///
     pub fn revoke_token(
         &self,
@@ -1200,6 +1257,17 @@ where
     ///
     pub fn add_scope(mut self, scope: Scope) -> Self {
         self.inner = self.inner.add_scope(scope);
+        self
+    }
+
+    ///
+    /// Appends a collection of scopes to the authorization URL.
+    ///
+    pub fn add_scopes<I>(mut self, scopes: I) -> Self
+    where
+        I: IntoIterator<Item = Scope>,
+    {
+        self.inner = self.inner.add_scopes(scopes);
         self
     }
 
@@ -1599,7 +1667,7 @@ mod tests {
         .unwrap();
 
         let (authorize_url, _, _) = client
-            .authorize_url(flow, new_csrf, new_nonce)
+            .authorize_url(flow.clone(), new_csrf, new_nonce)
             .add_scope(Scope::new("email".to_string()))
             .set_display(CoreAuthDisplay::Touch)
             .set_id_token_hint(&id_token)
@@ -1619,6 +1687,38 @@ mod tests {
             format!(
                 "https://example/authorize?response_type=code&client_id=aaa&state=CSRF123&\
                  redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email&foo=bar&\
+                 nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
+                 id_token_hint={}&login_hint=foo%40bar.com&\
+                 max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",
+                serialized_jwt
+            ),
+            authorize_url.to_string()
+        );
+
+        let (authorize_url, _, _) = client
+            .authorize_url(flow, new_csrf, new_nonce)
+            .add_scopes(vec![
+                Scope::new("email".to_string()),
+                Scope::new("profile".to_string()),
+            ])
+            .set_display(CoreAuthDisplay::Touch)
+            .set_id_token_hint(&id_token)
+            .set_login_hint(LoginHint::new("foo@bar.com".to_string()))
+            .add_prompt(CoreAuthPrompt::Login)
+            .add_prompt(CoreAuthPrompt::Consent)
+            .set_max_age(Duration::from_secs(1800))
+            .add_ui_locale(LanguageTag::new("fr-CA".to_string()))
+            .add_ui_locale(LanguageTag::new("fr".to_string()))
+            .add_ui_locale(LanguageTag::new("en".to_string()))
+            .add_auth_context_value(AuthenticationContextClass::new(
+                "urn:mace:incommon:iap:silver".to_string(),
+            ))
+            .add_extra_param("foo", "bar")
+            .url();
+        assert_eq!(
+            format!(
+                "https://example/authorize?response_type=code&client_id=aaa&state=CSRF123&\
+                 redirect_uri=http%3A%2F%2Flocalhost%3A8888%2F&scope=openid+email+profile&foo=bar&\
                  nonce=NONCE456&acr_values=urn%3Amace%3Aincommon%3Aiap%3Asilver&display=touch&\
                  id_token_hint={}&login_hint=foo%40bar.com&\
                  max_age=1800&prompt=login+consent&ui_locales=fr-CA+fr+en",

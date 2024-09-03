@@ -1,13 +1,3 @@
-use super::{Command, Event, Shared, Watch};
-use crate::{
-    stats::{self, Unsent},
-    ToProto, WatchRequest,
-};
-use console_api as proto;
-use proto::resources::resource;
-use tokio::sync::{mpsc, Notify};
-
-use futures::FutureExt;
 use std::{
     sync::{
         atomic::{AtomicBool, Ordering::*},
@@ -15,14 +5,34 @@ use std::{
     },
     time::{Duration, Instant},
 };
+
+use console_api as proto;
+use prost::Message;
+use proto::resources::resource;
+use tokio::sync::{mpsc, Notify};
 use tracing_core::{span::Id, Metadata};
+
+use super::{Command, Event, Shared, Watch};
+use crate::{
+    stats::{self, Unsent},
+    ToProto, WatchRequest,
+};
 
 mod id_data;
 mod shrink;
 use self::id_data::{IdData, Include};
 use self::shrink::{ShrinkMap, ShrinkVec};
 
-pub(crate) struct Aggregator {
+/// Should match tonic's (private) codec::DEFAULT_MAX_RECV_MESSAGE_SIZE
+const MAX_MESSAGE_SIZE: usize = 4 * 1024 * 1024;
+
+/// Aggregates instrumentation traces and prepares state for the instrument
+/// server.
+///
+/// The `Aggregator` is responsible for receiving and organizing the
+/// instrumentated events and preparing the data to be served to a instrument
+/// client.
+pub struct Aggregator {
     /// Channel of incoming events emitted by `TaskLayer`s.
     events: mpsc::Receiver<Event>,
 
@@ -157,7 +167,12 @@ impl Aggregator {
         }
     }
 
-    pub(crate) async fn run(mut self) {
+    /// Runs the aggregator.
+    ///
+    /// This method will start the aggregator loop and should run as long as
+    /// the instrument server is running. If the instrument server stops,
+    /// this future can be aborted.
+    pub async fn run(mut self) {
         let mut publish = tokio::time::interval(self.publish_interval);
         loop {
             let should_send = tokio::select! {
@@ -210,9 +225,11 @@ impl Aggregator {
             // to be woken when the flush interval has elapsed, or when the
             // channel is almost full.
             let mut drained = false;
-            while let Some(event) = self.events.recv().now_or_never() {
+            let mut counts = EventCounts::new();
+            while let Some(event) = recv_now_or_never(&mut self.events) {
                 match event {
                     Some(event) => {
+                        counts.update(&event);
                         self.update_state(event);
                         drained = true;
                     }
@@ -224,6 +241,15 @@ impl Aggregator {
                     }
                 };
             }
+            tracing::debug!(
+                async_resource_ops = counts.async_resource_op,
+                metadatas = counts.metadata,
+                poll_ops = counts.poll_op,
+                resources = counts.resource,
+                spawns = counts.spawn,
+                total = counts.total(),
+                "event channel drain loop",
+            );
 
             // flush data to clients, if there are any currently subscribed
             // watchers and we should send a new update.
@@ -248,31 +274,65 @@ impl Aggregator {
             .drop_closed(&mut self.resource_stats, now, self.retention, has_watchers);
         self.async_ops
             .drop_closed(&mut self.async_op_stats, now, self.retention, has_watchers);
+        if !has_watchers {
+            self.poll_ops.clear();
+        }
     }
 
     /// Add the task subscription to the watchers after sending the first update
     fn add_instrument_subscription(&mut self, subscription: Watch<proto::instrument::Update>) {
         tracing::debug!("new instrument subscription");
-
-        let task_update = Some(self.task_update(Include::All));
-        let resource_update = Some(self.resource_update(Include::All));
-        let async_op_update = Some(self.async_op_update(Include::All));
         let now = Instant::now();
 
-        let update = &proto::instrument::Update {
-            task_update,
-            resource_update,
-            async_op_update,
-            now: Some(self.base_time.to_timestamp(now)),
-            new_metadata: Some(proto::RegisterMetadata {
-                metadata: (*self.all_metadata).clone(),
-            }),
+        let update = loop {
+            let update = proto::instrument::Update {
+                task_update: Some(self.task_update(Include::All)),
+                resource_update: Some(self.resource_update(Include::All)),
+                async_op_update: Some(self.async_op_update(Include::All)),
+                now: Some(self.base_time.to_timestamp(now)),
+                new_metadata: Some(proto::RegisterMetadata {
+                    metadata: (*self.all_metadata).clone(),
+                }),
+            };
+            let message_size = update.encoded_len();
+            if message_size < MAX_MESSAGE_SIZE {
+                // normal case
+                break Some(update);
+            }
+            // If the grpc message is bigger than tokio-console will accept, throw away the oldest
+            // inactive data and try again
+            self.retention /= 2;
+            self.cleanup_closed();
+            tracing::debug!(
+                retention = ?self.retention,
+                message_size,
+                max_message_size = MAX_MESSAGE_SIZE,
+                "Message too big, reduced retention",
+            );
+
+            if self.retention <= self.publish_interval {
+                self.retention = self.publish_interval;
+                break None;
+            }
         };
 
-        // Send the initial state --- if this fails, the subscription is already dead
-        if subscription.update(update) {
-            self.watchers.push(subscription)
+        match update {
+            // Send the initial state
+            Some(update) => {
+                if !subscription.update(&update) {
+                    // If sending the initial update fails, the subscription is already dead,
+                    // so don't add it to `watchers`.
+                    return;
+                }
+            }
+            // User will only get updates.
+            None => tracing::error!(
+                min_retention = ?self.publish_interval,
+                "Message too big. Start with smaller retention.",
+            ),
         }
+
+        self.watchers.push(subscription);
     }
 
     fn task_update(&mut self, include: Include) -> proto::tasks::TaskUpdate {
@@ -284,14 +344,10 @@ impl Aggregator {
     }
 
     fn resource_update(&mut self, include: Include) -> proto::resources::ResourceUpdate {
-        let new_poll_ops = match include {
-            Include::All => self.poll_ops.clone(),
-            Include::UpdatedOnly => std::mem::take(&mut self.poll_ops),
-        };
         proto::resources::ResourceUpdate {
             new_resources: self.resources.as_proto_list(include, &self.base_time),
             stats_update: self.resource_stats.as_proto(include, &self.base_time),
-            new_poll_ops,
+            new_poll_ops: std::mem::take(&mut self.poll_ops),
             dropped_events: self.shared.dropped_resources.swap(0, AcqRel) as u64,
         }
     }
@@ -332,7 +388,7 @@ impl Aggregator {
             {
                 self.details_watchers
                     .entry(id.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(subscription);
             }
         }
@@ -451,6 +507,10 @@ impl Aggregator {
                 task_id,
                 is_ready,
             } => {
+                // CLI doesn't show historical poll ops, so don't save them if no-one is watching
+                if self.watchers.is_empty() {
+                    return;
+                }
                 let poll_op = proto::resources::PollOp {
                     metadata: Some(metadata.into()),
                     resource_id: Some(resource_id.into()),
@@ -486,6 +546,53 @@ impl Aggregator {
                 self.async_op_stats.insert(id, stats);
             }
         }
+    }
+}
+
+fn recv_now_or_never<T>(receiver: &mut mpsc::Receiver<T>) -> Option<Option<T>> {
+    let waker = futures_task::noop_waker();
+    let mut cx = std::task::Context::from_waker(&waker);
+
+    match receiver.poll_recv(&mut cx) {
+        std::task::Poll::Ready(opt) => Some(opt),
+        std::task::Poll::Pending => None,
+    }
+}
+
+/// Count of events received in each aggregator drain cycle.
+struct EventCounts {
+    async_resource_op: usize,
+    metadata: usize,
+    poll_op: usize,
+    resource: usize,
+    spawn: usize,
+}
+
+impl EventCounts {
+    fn new() -> Self {
+        Self {
+            async_resource_op: 0,
+            metadata: 0,
+            poll_op: 0,
+            resource: 0,
+            spawn: 0,
+        }
+    }
+
+    /// Count the event based on its variant.
+    fn update(&mut self, event: &Event) {
+        match event {
+            Event::AsyncResourceOp { .. } => self.async_resource_op += 1,
+            Event::Metadata(_) => self.metadata += 1,
+            Event::PollOp { .. } => self.poll_op += 1,
+            Event::Resource { .. } => self.resource += 1,
+            Event::Spawn { .. } => self.spawn += 1,
+        }
+    }
+
+    /// Total number of events recorded.
+    fn total(&self) -> usize {
+        self.async_resource_op + self.metadata + self.poll_op + self.resource + self.spawn
     }
 }
 

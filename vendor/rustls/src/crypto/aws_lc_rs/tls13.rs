@@ -1,21 +1,21 @@
 use alloc::boxed::Box;
-use alloc::vec::Vec;
+
+use aws_lc_rs::hkdf::KeyType;
+use aws_lc_rs::{aead, hkdf, hmac};
 
 use crate::crypto;
 use crate::crypto::cipher::{
-    make_tls13_aad, AeadKey, Iv, MessageDecrypter, MessageEncrypter, Nonce, Tls13AeadAlgorithm,
-    UnsupportedOperationError,
+    make_tls13_aad, AeadKey, InboundOpaqueMessage, Iv, MessageDecrypter, MessageEncrypter, Nonce,
+    Tls13AeadAlgorithm, UnsupportedOperationError,
 };
 use crate::crypto::tls13::{Hkdf, HkdfExpander, OkmBlock, OutputLengthError};
 use crate::enums::{CipherSuite, ContentType, ProtocolVersion};
 use crate::error::Error;
-use crate::msgs::codec::Codec;
-use crate::msgs::message::{BorrowedPlainMessage, OpaqueMessage, PlainMessage};
+use crate::msgs::message::{
+    InboundPlainMessage, OutboundOpaqueMessage, OutboundPlainMessage, PrefixedPayload,
+};
 use crate::suites::{CipherSuiteCommon, ConnectionTrafficSecrets, SupportedCipherSuite};
 use crate::tls13::Tls13CipherSuite;
-
-use aws_lc_rs::hkdf::KeyType;
-use aws_lc_rs::{aead, hkdf, hmac};
 
 /// The TLS1.3 ciphersuite TLS_CHACHA20_POLY1305_SHA256
 pub static TLS13_CHACHA20_POLY1305_SHA256: SupportedCipherSuite =
@@ -25,15 +25,19 @@ pub(crate) static TLS13_CHACHA20_POLY1305_SHA256_INTERNAL: &Tls13CipherSuite = &
     common: CipherSuiteCommon {
         suite: CipherSuite::TLS13_CHACHA20_POLY1305_SHA256,
         hash_provider: &super::hash::SHA256,
+        // ref: <https://www.ietf.org/archive/id/draft-irtf-cfrg-aead-limits-08.html#section-5.2.1>
         confidentiality_limit: u64::MAX,
-        integrity_limit: 1 << 36,
     },
     hkdf_provider: &RingHkdf(hkdf::HKDF_SHA256, hmac::HMAC_SHA256),
     aead_alg: &Chacha20Poly1305Aead(AeadAlgorithm(&aead::CHACHA20_POLY1305)),
-    quic: Some(&super::quic::KeyBuilder(
-        &aead::CHACHA20_POLY1305,
-        &aead::quic::CHACHA20,
-    )),
+    quic: Some(&super::quic::KeyBuilder {
+        packet_alg: &aead::CHACHA20_POLY1305,
+        header_alg: &aead::quic::CHACHA20,
+        // ref: <https://datatracker.ietf.org/doc/html/rfc9001#section-6.6>
+        confidentiality_limit: u64::MAX,
+        // ref: <https://datatracker.ietf.org/doc/html/rfc9001#section-6.6>
+        integrity_limit: 1 << 36,
+    }),
 };
 
 /// The TLS1.3 ciphersuite TLS_AES_256_GCM_SHA384
@@ -42,15 +46,18 @@ pub static TLS13_AES_256_GCM_SHA384: SupportedCipherSuite =
         common: CipherSuiteCommon {
             suite: CipherSuite::TLS13_AES_256_GCM_SHA384,
             hash_provider: &super::hash::SHA384,
-            confidentiality_limit: 1 << 23,
-            integrity_limit: 1 << 52,
+            confidentiality_limit: 1 << 24,
         },
         hkdf_provider: &RingHkdf(hkdf::HKDF_SHA384, hmac::HMAC_SHA384),
         aead_alg: &Aes256GcmAead(AeadAlgorithm(&aead::AES_256_GCM)),
-        quic: Some(&super::quic::KeyBuilder(
-            &aead::AES_256_GCM,
-            &aead::quic::AES_256,
-        )),
+        quic: Some(&super::quic::KeyBuilder {
+            packet_alg: &aead::AES_256_GCM,
+            header_alg: &aead::quic::AES_256,
+            // ref: <https://datatracker.ietf.org/doc/html/rfc9001#section-b.1.1>
+            confidentiality_limit: 1 << 23,
+            // ref: <https://datatracker.ietf.org/doc/html/rfc9001#section-b.1.2>
+            integrity_limit: 1 << 52,
+        }),
     });
 
 /// The TLS1.3 ciphersuite TLS_AES_128_GCM_SHA256
@@ -61,15 +68,18 @@ pub(crate) static TLS13_AES_128_GCM_SHA256_INTERNAL: &Tls13CipherSuite = &Tls13C
     common: CipherSuiteCommon {
         suite: CipherSuite::TLS13_AES_128_GCM_SHA256,
         hash_provider: &super::hash::SHA256,
-        confidentiality_limit: 1 << 23,
-        integrity_limit: 1 << 52,
+        confidentiality_limit: 1 << 24,
     },
     hkdf_provider: &RingHkdf(hkdf::HKDF_SHA256, hmac::HMAC_SHA256),
     aead_alg: &Aes128GcmAead(AeadAlgorithm(&aead::AES_128_GCM)),
-    quic: Some(&super::quic::KeyBuilder(
-        &aead::AES_128_GCM,
-        &aead::quic::AES_128,
-    )),
+    quic: Some(&super::quic::KeyBuilder {
+        packet_alg: &aead::AES_128_GCM,
+        header_alg: &aead::quic::AES_128,
+        // ref: <https://datatracker.ietf.org/doc/html/rfc9001#section-b.1.1>
+        confidentiality_limit: 1 << 23,
+        // ref: <https://datatracker.ietf.org/doc/html/rfc9001#section-b.1.2>
+        integrity_limit: 1 << 52,
+    }),
 };
 
 struct Chacha20Poly1305Aead(AeadAlgorithm);
@@ -106,6 +116,10 @@ impl Tls13AeadAlgorithm for Chacha20Poly1305Aead {
     ) -> Result<ConnectionTrafficSecrets, UnsupportedOperationError> {
         Ok(ConnectionTrafficSecrets::Chacha20Poly1305 { key, iv })
     }
+
+    fn fips(&self) -> bool {
+        false // not FIPS approved
+    }
 }
 
 struct Aes256GcmAead(AeadAlgorithm);
@@ -130,6 +144,10 @@ impl Tls13AeadAlgorithm for Aes256GcmAead {
     ) -> Result<ConnectionTrafficSecrets, UnsupportedOperationError> {
         Ok(ConnectionTrafficSecrets::Aes256Gcm { key, iv })
     }
+
+    fn fips(&self) -> bool {
+        super::fips()
+    }
 }
 
 struct Aes128GcmAead(AeadAlgorithm);
@@ -153,6 +171,10 @@ impl Tls13AeadAlgorithm for Aes128GcmAead {
         iv: Iv,
     ) -> Result<ConnectionTrafficSecrets, UnsupportedOperationError> {
         Ok(ConnectionTrafficSecrets::Aes128Gcm { key, iv })
+    }
+
+    fn fips(&self) -> bool {
+        super::fips()
     }
 }
 
@@ -208,19 +230,24 @@ struct AeadMessageDecrypter {
 }
 
 impl MessageEncrypter for AeadMessageEncrypter {
-    fn encrypt(&mut self, msg: BorrowedPlainMessage, seq: u64) -> Result<OpaqueMessage, Error> {
+    fn encrypt(
+        &mut self,
+        msg: OutboundPlainMessage<'_>,
+        seq: u64,
+    ) -> Result<OutboundOpaqueMessage, Error> {
         let total_len = self.encrypted_payload_len(msg.payload.len());
-        let mut payload = Vec::with_capacity(total_len);
-        payload.extend_from_slice(msg.payload);
-        msg.typ.encode(&mut payload);
+        let mut payload = PrefixedPayload::with_capacity(total_len);
 
         let nonce = aead::Nonce::assume_unique_for_key(Nonce::new(&self.iv, seq).0);
         let aad = aead::Aad::from(make_tls13_aad(total_len));
+        payload.extend_from_chunks(&msg.payload);
+        payload.extend_from_slice(&msg.typ.to_array());
+
         self.enc_key
             .seal_in_place_append_tag(nonce, aad, &mut payload)
             .map_err(|_| Error::EncryptError)?;
 
-        Ok(OpaqueMessage::new(
+        Ok(OutboundOpaqueMessage::new(
             ContentType::ApplicationData,
             // Note: all TLS 1.3 application data records use TLSv1_2 (0x0303) as the legacy record
             // protocol version, see https://www.rfc-editor.org/rfc/rfc8446#section-5.1
@@ -235,8 +262,12 @@ impl MessageEncrypter for AeadMessageEncrypter {
 }
 
 impl MessageDecrypter for AeadMessageDecrypter {
-    fn decrypt(&mut self, mut msg: OpaqueMessage, seq: u64) -> Result<PlainMessage, Error> {
-        let payload = msg.payload_mut();
+    fn decrypt<'a>(
+        &mut self,
+        mut msg: InboundOpaqueMessage<'a>,
+        seq: u64,
+    ) -> Result<InboundPlainMessage<'a>, Error> {
+        let payload = &mut msg.payload;
         if payload.len() < self.dec_key.algorithm().tag_len() {
             return Err(Error::DecryptError);
         }
@@ -260,19 +291,24 @@ struct GcmMessageEncrypter {
 }
 
 impl MessageEncrypter for GcmMessageEncrypter {
-    fn encrypt(&mut self, msg: BorrowedPlainMessage, seq: u64) -> Result<OpaqueMessage, Error> {
-        let total_len = msg.payload.len() + 1 + self.enc_key.algorithm().tag_len();
-        let mut payload = Vec::with_capacity(total_len);
-        payload.extend_from_slice(msg.payload);
-        msg.typ.encode(&mut payload);
+    fn encrypt(
+        &mut self,
+        msg: OutboundPlainMessage<'_>,
+        seq: u64,
+    ) -> Result<OutboundOpaqueMessage, Error> {
+        let total_len = self.encrypted_payload_len(msg.payload.len());
+        let mut payload = PrefixedPayload::with_capacity(total_len);
 
         let nonce = aead::Nonce::assume_unique_for_key(Nonce::new(&self.iv, seq).0);
         let aad = aead::Aad::from(make_tls13_aad(total_len));
+        payload.extend_from_chunks(&msg.payload);
+        payload.extend_from_slice(&msg.typ.to_array());
+
         self.enc_key
             .seal_in_place_append_tag(nonce, aad, &mut payload)
             .map_err(|_| Error::EncryptError)?;
 
-        Ok(OpaqueMessage::new(
+        Ok(OutboundOpaqueMessage::new(
             ContentType::ApplicationData,
             ProtocolVersion::TLSv1_2,
             payload,
@@ -290,8 +326,12 @@ struct GcmMessageDecrypter {
 }
 
 impl MessageDecrypter for GcmMessageDecrypter {
-    fn decrypt(&mut self, mut msg: OpaqueMessage, seq: u64) -> Result<PlainMessage, Error> {
-        let payload = msg.payload_mut();
+    fn decrypt<'a>(
+        &mut self,
+        mut msg: InboundOpaqueMessage<'a>,
+        seq: u64,
+    ) -> Result<InboundPlainMessage<'a>, Error> {
+        let payload = &mut msg.payload;
         if payload.len() < self.dec_key.algorithm().tag_len() {
             return Err(Error::DecryptError);
         }
@@ -345,6 +385,10 @@ impl Hkdf for RingHkdf {
 
     fn hmac_sign(&self, key: &OkmBlock, message: &[u8]) -> crypto::hmac::Tag {
         crypto::hmac::Tag::new(hmac::sign(&hmac::Key::new(self.1, key.as_ref()), message).as_ref())
+    }
+
+    fn fips(&self) -> bool {
+        super::fips()
     }
 }
 

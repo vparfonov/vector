@@ -47,14 +47,14 @@ pub use header::parse_last_modified;
 pub use header::parse_location;
 
 mod uri;
+pub use uri::percent_decode_path;
 pub use uri::percent_encode_path;
 
 mod error;
 pub use error::new_request_build_error;
 pub use error::new_request_credential_error;
 pub use error::new_request_sign_error;
-pub use error::parse_error_response;
-pub use error::ErrorResponse;
+pub use error::with_error_response_context;
 
 mod bytes_range;
 pub use bytes_range::BytesRange;

@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.20.10 (July 9, 2024)
+
+-  Add `#[allow(clippy::manual_unwrap_or_default)]` to all generated impls to avoid causing clippy fails in crates using `darling` [#296](https://github.com/TedDriggs/darling/pull/296)
+-  Properly initialize `attrs` magic field in derived `FromAttributes` impls [#297](https://github.com/TedDriggs/darling/pull/297)
+
+## v0.20.9 (May 15, 2024)
+
+-  Allow word-form for newtype enum variants whose only field produces a value when `from_none` is called on their type [#249](https://github.com/TedDriggs/darling/issues/249)
+-  Add `FromMeta` impls for the `std::num::NonZero*` types [#288](https://github.com/TedDriggs/darling/pull/288)
+-  Fix panic in number `FromMeta` impls when the parsed value is too large for the receiver type [#289](https://github.com/TedDriggs/darling/issues/289)
+
 ## v0.20.8 (February 23, 2024)
 
 -  Add `#[darling(with = ...)]` support to `attrs` magic field to allow using custom receiver types for `attrs` [#273](https://github.com/TedDriggs/darling/issues/273)

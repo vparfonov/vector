@@ -1,23 +1,32 @@
-#[cfg(not(any(solarish, target_os = "haiku", target_os = "nto")))]
+#[cfg(not(any(solarish, target_os = "haiku", target_os = "nto", target_os = "vita")))]
 use super::types::FileType;
 use crate::backend::c;
 use crate::backend::conv::owned_fd;
 use crate::fd::{AsFd, BorrowedFd, OwnedFd};
 use crate::ffi::{CStr, CString};
-use crate::fs::{fcntl_getfl, fstat, openat, Mode, OFlags, Stat};
+use crate::fs::{fcntl_getfl, openat, Mode, OFlags};
+#[cfg(not(target_os = "vita"))]
+use crate::fs::{fstat, Stat};
 #[cfg(not(any(
     solarish,
     target_os = "haiku",
     target_os = "netbsd",
     target_os = "nto",
     target_os = "redox",
+    target_os = "vita",
     target_os = "wasi",
 )))]
 use crate::fs::{fstatfs, StatFs};
-#[cfg(not(any(solarish, target_os = "haiku", target_os = "redox", target_os = "wasi")))]
+#[cfg(not(any(
+    solarish,
+    target_os = "haiku",
+    target_os = "redox",
+    target_os = "vita",
+    target_os = "wasi"
+)))]
 use crate::fs::{fstatvfs, StatVfs};
 use crate::io;
-#[cfg(not(any(target_os = "fuchsia", target_os = "wasi")))]
+#[cfg(not(any(target_os = "fuchsia", target_os = "vita", target_os = "wasi")))]
 #[cfg(feature = "process")]
 use crate::process::fchdir;
 use alloc::borrow::ToOwned;
@@ -154,11 +163,12 @@ impl Dir {
                         solarish,
                         target_os = "aix",
                         target_os = "haiku",
-                        target_os = "nto"
+                        target_os = "nto",
+                        target_os = "vita"
                     )))]
                     d_type: dirent.d_type,
 
-                    #[cfg(not(any(freebsdlike, netbsdlike)))]
+                    #[cfg(not(any(freebsdlike, netbsdlike, target_os = "vita")))]
                     d_ino: dirent.d_ino,
 
                     #[cfg(any(freebsdlike, netbsdlike))]
@@ -173,6 +183,7 @@ impl Dir {
     }
 
     /// `fstat(self)`
+    #[cfg(not(target_os = "vita"))]
     #[inline]
     pub fn stat(&self) -> io::Result<Stat> {
         fstat(unsafe { BorrowedFd::borrow_raw(c::dirfd(self.libc_dir.as_ptr())) })
@@ -185,6 +196,7 @@ impl Dir {
         target_os = "netbsd",
         target_os = "nto",
         target_os = "redox",
+        target_os = "vita",
         target_os = "wasi",
     )))]
     #[inline]
@@ -193,7 +205,13 @@ impl Dir {
     }
 
     /// `fstatvfs(self)`
-    #[cfg(not(any(solarish, target_os = "haiku", target_os = "redox", target_os = "wasi")))]
+    #[cfg(not(any(
+        solarish,
+        target_os = "haiku",
+        target_os = "redox",
+        target_os = "vita",
+        target_os = "wasi"
+    )))]
     #[inline]
     pub fn statvfs(&self) -> io::Result<StatVfs> {
         fstatvfs(unsafe { BorrowedFd::borrow_raw(c::dirfd(self.libc_dir.as_ptr())) })
@@ -201,8 +219,8 @@ impl Dir {
 
     /// `fchdir(self)`
     #[cfg(feature = "process")]
-    #[cfg(not(any(target_os = "fuchsia", target_os = "wasi")))]
-    #[cfg_attr(doc_cfg, doc(cfg(feature = "process")))]
+    #[cfg(not(any(target_os = "fuchsia", target_os = "vita", target_os = "wasi")))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "process")))]
     #[inline]
     pub fn chdir(&self) -> io::Result<()> {
         fchdir(unsafe { BorrowedFd::borrow_raw(c::dirfd(self.libc_dir.as_ptr())) })
@@ -233,19 +251,26 @@ impl Iterator for Dir {
 
 impl fmt::Debug for Dir {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Dir")
-            .field("fd", unsafe { &c::dirfd(self.libc_dir.as_ptr()) })
-            .finish()
+        let mut s = f.debug_struct("Dir");
+        #[cfg(not(target_os = "vita"))]
+        s.field("fd", unsafe { &c::dirfd(self.libc_dir.as_ptr()) });
+        s.finish()
     }
 }
 
 /// `struct dirent`
 #[derive(Debug)]
 pub struct DirEntry {
-    #[cfg(not(any(solarish, target_os = "aix", target_os = "haiku", target_os = "nto")))]
+    #[cfg(not(any(
+        solarish,
+        target_os = "aix",
+        target_os = "haiku",
+        target_os = "nto",
+        target_os = "vita"
+    )))]
     d_type: u8,
 
-    #[cfg(not(any(freebsdlike, netbsdlike)))]
+    #[cfg(not(any(freebsdlike, netbsdlike, target_os = "vita")))]
     d_ino: c::ino_t,
 
     #[cfg(any(freebsdlike, netbsdlike))]
@@ -262,14 +287,20 @@ impl DirEntry {
     }
 
     /// Returns the type of this directory entry.
-    #[cfg(not(any(solarish, target_os = "aix", target_os = "haiku", target_os = "nto")))]
+    #[cfg(not(any(
+        solarish,
+        target_os = "aix",
+        target_os = "haiku",
+        target_os = "nto",
+        target_os = "vita"
+    )))]
     #[inline]
     pub fn file_type(&self) -> FileType {
         FileType::from_dirent_d_type(self.d_type)
     }
 
     /// Return the inode number of this directory entry.
-    #[cfg(not(any(freebsdlike, netbsdlike)))]
+    #[cfg(not(any(freebsdlike, netbsdlike, target_os = "vita")))]
     #[inline]
     pub fn ino(&self) -> u64 {
         self.d_ino as u64

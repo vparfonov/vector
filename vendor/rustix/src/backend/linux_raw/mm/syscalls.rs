@@ -16,7 +16,7 @@ use crate::backend::conv::loff_t_from_u64;
 use crate::backend::conv::{c_uint, no_fd, pass_usize, ret, ret_owned_fd, ret_void_star};
 use crate::fd::{BorrowedFd, OwnedFd};
 use crate::io;
-use linux_raw_sys::general::MAP_ANONYMOUS;
+use linux_raw_sys::general::{MAP_ANONYMOUS, MREMAP_FIXED};
 
 #[inline]
 pub(crate) fn madvise(addr: *mut c::c_void, len: usize, advice: Advice) -> io::Result<()> {
@@ -170,7 +170,7 @@ pub(crate) unsafe fn mremap_fixed(
         old_address,
         pass_usize(old_size),
         pass_usize(new_size),
-        flags,
+        c_uint(flags.bits() | MREMAP_FIXED),
         new_address
     ))
 }
@@ -213,10 +213,11 @@ pub(crate) unsafe fn userfaultfd(flags: UserfaultfdFlags) -> io::Result<OwnedFd>
 
 /// Locks all pages mapped into the address space of the calling process.
 ///
-/// This includes the pages of the code, data and stack segment, as well as shared libraries,
-/// user space kernel data, shared memory, and memory-mapped files. All mapped pages are
-/// guaranteed to be resident in RAM when the call returns successfully;
-/// the pages are guaranteed to stay in RAM until later unlocked.
+/// This includes the pages of the code, data, and stack segment, as well as
+/// shared libraries, user space kernel data, shared memory, and memory-mapped
+/// files. All mapped pages are guaranteed to be resident in RAM when the call
+/// returns successfully; the pages are guaranteed to stay in RAM until later
+/// unlocked.
 #[inline]
 pub(crate) fn mlockall(flags: MlockAllFlags) -> io::Result<()> {
     // When `mlockall` is used with `MCL_ONFAULT | MCL_FUTURE`, the ordering

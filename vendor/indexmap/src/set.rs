@@ -1,6 +1,7 @@
 //! A hash set implemented using [`IndexMap`]
 
 mod iter;
+mod mutable;
 mod slice;
 
 #[cfg(test)]
@@ -9,6 +10,7 @@ mod tests;
 pub use self::iter::{
     Difference, Drain, Intersection, IntoIter, Iter, Splice, SymmetricDifference, Union,
 };
+pub use self::mutable::MutableValues;
 pub use self::slice::Slice;
 
 #[cfg(feature = "rayon")]
@@ -508,9 +510,9 @@ where
     /// Return `true` if an equivalent to `value` exists in the set.
     ///
     /// Computes in **O(1)** time (average).
-    pub fn contains<Q: ?Sized>(&self, value: &Q) -> bool
+    pub fn contains<Q>(&self, value: &Q) -> bool
     where
-        Q: Hash + Equivalent<T>,
+        Q: ?Sized + Hash + Equivalent<T>,
     {
         self.map.contains_key(value)
     }
@@ -519,17 +521,17 @@ where
     /// else `None`.
     ///
     /// Computes in **O(1)** time (average).
-    pub fn get<Q: ?Sized>(&self, value: &Q) -> Option<&T>
+    pub fn get<Q>(&self, value: &Q) -> Option<&T>
     where
-        Q: Hash + Equivalent<T>,
+        Q: ?Sized + Hash + Equivalent<T>,
     {
         self.map.get_key_value(value).map(|(x, &())| x)
     }
 
     /// Return item index and value
-    pub fn get_full<Q: ?Sized>(&self, value: &Q) -> Option<(usize, &T)>
+    pub fn get_full<Q>(&self, value: &Q) -> Option<(usize, &T)>
     where
-        Q: Hash + Equivalent<T>,
+        Q: ?Sized + Hash + Equivalent<T>,
     {
         self.map.get_full(value).map(|(i, x, &())| (i, x))
     }
@@ -537,9 +539,9 @@ where
     /// Return item index, if it exists in the set
     ///
     /// Computes in **O(1)** time (average).
-    pub fn get_index_of<Q: ?Sized>(&self, value: &Q) -> Option<usize>
+    pub fn get_index_of<Q>(&self, value: &Q) -> Option<usize>
     where
-        Q: Hash + Equivalent<T>,
+        Q: ?Sized + Hash + Equivalent<T>,
     {
         self.map.get_index_of(value)
     }
@@ -552,9 +554,9 @@ where
     /// [`.shift_remove(value)`][Self::shift_remove] instead.
     #[deprecated(note = "`remove` disrupts the set order -- \
         use `swap_remove` or `shift_remove` for explicit behavior.")]
-    pub fn remove<Q: ?Sized>(&mut self, value: &Q) -> bool
+    pub fn remove<Q>(&mut self, value: &Q) -> bool
     where
-        Q: Hash + Equivalent<T>,
+        Q: ?Sized + Hash + Equivalent<T>,
     {
         self.swap_remove(value)
     }
@@ -568,9 +570,9 @@ where
     /// Return `false` if `value` was not in the set.
     ///
     /// Computes in **O(1)** time (average).
-    pub fn swap_remove<Q: ?Sized>(&mut self, value: &Q) -> bool
+    pub fn swap_remove<Q>(&mut self, value: &Q) -> bool
     where
-        Q: Hash + Equivalent<T>,
+        Q: ?Sized + Hash + Equivalent<T>,
     {
         self.map.swap_remove(value).is_some()
     }
@@ -584,9 +586,9 @@ where
     /// Return `false` if `value` was not in the set.
     ///
     /// Computes in **O(n)** time (average).
-    pub fn shift_remove<Q: ?Sized>(&mut self, value: &Q) -> bool
+    pub fn shift_remove<Q>(&mut self, value: &Q) -> bool
     where
-        Q: Hash + Equivalent<T>,
+        Q: ?Sized + Hash + Equivalent<T>,
     {
         self.map.shift_remove(value).is_some()
     }
@@ -600,9 +602,9 @@ where
     /// [`.shift_take(value)`][Self::shift_take] instead.
     #[deprecated(note = "`take` disrupts the set order -- \
         use `swap_take` or `shift_take` for explicit behavior.")]
-    pub fn take<Q: ?Sized>(&mut self, value: &Q) -> Option<T>
+    pub fn take<Q>(&mut self, value: &Q) -> Option<T>
     where
-        Q: Hash + Equivalent<T>,
+        Q: ?Sized + Hash + Equivalent<T>,
     {
         self.swap_take(value)
     }
@@ -617,9 +619,9 @@ where
     /// Return `None` if `value` was not in the set.
     ///
     /// Computes in **O(1)** time (average).
-    pub fn swap_take<Q: ?Sized>(&mut self, value: &Q) -> Option<T>
+    pub fn swap_take<Q>(&mut self, value: &Q) -> Option<T>
     where
-        Q: Hash + Equivalent<T>,
+        Q: ?Sized + Hash + Equivalent<T>,
     {
         self.map.swap_remove_entry(value).map(|(x, ())| x)
     }
@@ -634,9 +636,9 @@ where
     /// Return `None` if `value` was not in the set.
     ///
     /// Computes in **O(n)** time (average).
-    pub fn shift_take<Q: ?Sized>(&mut self, value: &Q) -> Option<T>
+    pub fn shift_take<Q>(&mut self, value: &Q) -> Option<T>
     where
-        Q: Hash + Equivalent<T>,
+        Q: ?Sized + Hash + Equivalent<T>,
     {
         self.map.shift_remove_entry(value).map(|(x, ())| x)
     }
@@ -648,9 +650,9 @@ where
     /// the position of what used to be the last element!**
     ///
     /// Return `None` if `value` was not in the set.
-    pub fn swap_remove_full<Q: ?Sized>(&mut self, value: &Q) -> Option<(usize, T)>
+    pub fn swap_remove_full<Q>(&mut self, value: &Q) -> Option<(usize, T)>
     where
-        Q: Hash + Equivalent<T>,
+        Q: ?Sized + Hash + Equivalent<T>,
     {
         self.map.swap_remove_full(value).map(|(i, x, ())| (i, x))
     }
@@ -662,9 +664,9 @@ where
     /// **This perturbs the index of all of those elements!**
     ///
     /// Return `None` if `value` was not in the set.
-    pub fn shift_remove_full<Q: ?Sized>(&mut self, value: &Q) -> Option<(usize, T)>
+    pub fn shift_remove_full<Q>(&mut self, value: &Q) -> Option<(usize, T)>
     where
-        Q: Hash + Equivalent<T>,
+        Q: ?Sized + Hash + Equivalent<T>,
     {
         self.map.shift_remove_full(value).map(|(i, x, ())| (i, x))
     }
@@ -778,6 +780,63 @@ impl<T, S> IndexSet<T, S> {
         self.with_entries(move |entries| {
             entries.sort_by_cached_key(move |a| sort_key(&a.key));
         });
+    }
+
+    /// Search over a sorted set for a value.
+    ///
+    /// Returns the position where that value is present, or the position where it can be inserted
+    /// to maintain the sort. See [`slice::binary_search`] for more details.
+    ///
+    /// Computes in **O(log(n))** time, which is notably less scalable than looking the value up
+    /// using [`get_index_of`][IndexSet::get_index_of], but this can also position missing values.
+    pub fn binary_search(&self, x: &T) -> Result<usize, usize>
+    where
+        T: Ord,
+    {
+        self.as_slice().binary_search(x)
+    }
+
+    /// Search over a sorted set with a comparator function.
+    ///
+    /// Returns the position where that value is present, or the position where it can be inserted
+    /// to maintain the sort. See [`slice::binary_search_by`] for more details.
+    ///
+    /// Computes in **O(log(n))** time.
+    #[inline]
+    pub fn binary_search_by<'a, F>(&'a self, f: F) -> Result<usize, usize>
+    where
+        F: FnMut(&'a T) -> Ordering,
+    {
+        self.as_slice().binary_search_by(f)
+    }
+
+    /// Search over a sorted set with an extraction function.
+    ///
+    /// Returns the position where that value is present, or the position where it can be inserted
+    /// to maintain the sort. See [`slice::binary_search_by_key`] for more details.
+    ///
+    /// Computes in **O(log(n))** time.
+    #[inline]
+    pub fn binary_search_by_key<'a, B, F>(&'a self, b: &B, f: F) -> Result<usize, usize>
+    where
+        F: FnMut(&'a T) -> B,
+        B: Ord,
+    {
+        self.as_slice().binary_search_by_key(b, f)
+    }
+
+    /// Returns the index of the partition point of a sorted set according to the given predicate
+    /// (the index of the first element of the second partition).
+    ///
+    /// See [`slice::partition_point`] for more details.
+    ///
+    /// Computes in **O(log(n))** time.
+    #[must_use]
+    pub fn partition_point<P>(&self, pred: P) -> usize
+    where
+        P: FnMut(&T) -> bool,
+    {
+        self.as_slice().partition_point(pred)
     }
 
     /// Reverses the order of the set’s values in place.

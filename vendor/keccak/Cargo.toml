@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "keccak"
-version = "0.1.4"
+version = "0.1.5"
 authors = ["RustCrypto Developers"]
 description = """
 Pure Rust implementation of the Keccak sponge function including the keccak-f

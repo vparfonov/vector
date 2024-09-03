@@ -14,22 +14,14 @@ use backend::fd::AsFd;
 
 /// `ioctl(fd, FIOCLEX, NULL)`—Set the close-on-exec flag.
 ///
-/// Also known as `fcntl(fd, F_SETFD, FD_CLOEXEC)`.
-///
-/// # References
-///  - [Winsock2]
-///  - [NetBSD]
-///  - [OpenBSD]
-///
-/// [Winsock2]: https://docs.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-ioctlsocket
-/// [NetBSD]: https://man.netbsd.org/ioctl.2#GENERIC%20IOCTLS
-/// [OpenBSD]: https://man.openbsd.org/ioctl.2#GENERIC_IOCTLS
+/// This is similar to `fcntl(fd, F_SETFD, FD_CLOEXEC)`, except that it avoids
+/// clearing any other flags that might be set.
 #[cfg(apple)]
 #[inline]
 #[doc(alias = "FIOCLEX")]
 #[doc(alias = "FD_CLOEXEC")]
 pub fn ioctl_fioclex<Fd: AsFd>(fd: Fd) -> io::Result<()> {
-    // SAFETY: FIOCLEX is a no-argument setter opcode.
+    // SAFETY: `FIOCLEX` is a no-argument setter opcode.
     unsafe {
         let ctl = ioctl::NoArg::<ioctl::BadOpcode<{ c::FIOCLEX }>>::new();
         ioctl::ioctl(fd, ctl)
@@ -49,7 +41,7 @@ pub fn ioctl_fioclex<Fd: AsFd>(fd: Fd) -> io::Result<()> {
 #[inline]
 #[doc(alias = "FIONBIO")]
 pub fn ioctl_fionbio<Fd: AsFd>(fd: Fd, value: bool) -> io::Result<()> {
-    // SAFETY: FIONBIO is a pointer setter opcode.
+    // SAFETY: `FIONBIO` is a pointer setter opcode.
     unsafe {
         let ctl = ioctl::Setter::<ioctl::BadOpcode<{ c::FIONBIO }>, c::c_int>::new(value.into());
         ioctl::ioctl(fd, ctl)
@@ -58,8 +50,8 @@ pub fn ioctl_fionbio<Fd: AsFd>(fd: Fd, value: bool) -> io::Result<()> {
 
 /// `ioctl(fd, FIONREAD)`—Returns the number of bytes ready to be read.
 ///
-/// The result of this function gets silently coerced into a C `int`
-/// by the OS, so it may contain a wrapped value.
+/// The result of this function gets silently coerced into a C `int` by the OS,
+/// so it may contain a wrapped value.
 ///
 /// # References
 ///  - [Linux]
@@ -73,11 +65,11 @@ pub fn ioctl_fionbio<Fd: AsFd>(fd: Fd, value: bool) -> io::Result<()> {
 /// [FreeBSD]: https://man.freebsd.org/cgi/man.cgi?query=ioctl&sektion=2#GENERIC%09IOCTLS
 /// [NetBSD]: https://man.netbsd.org/ioctl.2#GENERIC%20IOCTLS
 /// [OpenBSD]: https://man.openbsd.org/ioctl.2#GENERIC_IOCTLS
-#[cfg(not(target_os = "espidf"))]
+#[cfg(not(any(target_os = "espidf", target_os = "horizon", target_os = "vita")))]
 #[inline]
 #[doc(alias = "FIONREAD")]
 pub fn ioctl_fionread<Fd: AsFd>(fd: Fd) -> io::Result<u64> {
-    // SAFETY: FIONREAD is a getter opcode that gets a c_int.
+    // SAFETY: `FIONREAD` is a getter opcode that gets a `c_int`.
     unsafe {
         let ctl = ioctl::Getter::<ioctl::BadOpcode<{ c::FIONREAD }>, c::c_int>::new();
         ioctl::ioctl(fd, ctl).map(|n| n as u64)

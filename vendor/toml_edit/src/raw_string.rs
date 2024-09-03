@@ -31,7 +31,7 @@ impl RawString {
         }
     }
 
-    /// Access the underlying span
+    /// The location within the original document
     ///
     /// This generally requires an [`ImDocument`][crate::ImDocument].
     pub fn span(&self) -> Option<std::ops::Range<usize>> {
@@ -79,7 +79,7 @@ impl RawString {
             RawStringInner::Spanned(span) => {
                 *self = Self::from(input.get(span.clone()).unwrap_or_else(|| {
                     panic!("span {:?} should be in input:\n```\n{}\n```", span, input)
-                }))
+                }));
             }
         }
     }

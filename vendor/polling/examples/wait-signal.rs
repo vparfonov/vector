@@ -13,34 +13,30 @@
 ))]
 mod example {
     use polling::os::kqueue::{PollerKqueueExt, Signal};
-    use polling::{PollMode, Poller};
+    use polling::{Events, PollMode, Poller};
 
     pub(super) fn main2() {
         // Create a poller.
         let poller = Poller::new().unwrap();
 
         // Register SIGINT in the poller.
-        let sigint = Signal(libc::SIGINT);
+        let sigint = Signal(rustix::process::Signal::Int as _);
         poller.add_filter(sigint, 1, PollMode::Oneshot).unwrap();
 
-        let mut events = vec![];
+        let mut events = Events::new();
 
         println!("Press Ctrl+C to exit...");
 
-        loop {
-            // Wait for events.
-            poller.wait(&mut events, None).unwrap();
+        // Wait for events.
+        poller.wait(&mut events, None).unwrap();
 
-            // Process events.
-            for ev in events.drain(..) {
-                match ev.key {
-                    1 => {
-                        println!("SIGINT received");
-                        return;
-                    }
-                    _ => unreachable!(),
-                }
+        // Process events.
+        let ev = events.iter().next().unwrap();
+        match ev.key {
+            1 => {
+                println!("SIGINT received");
             }
+            _ => unreachable!(),
         }
     }
 }

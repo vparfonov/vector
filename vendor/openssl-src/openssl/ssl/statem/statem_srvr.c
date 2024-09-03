@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2023 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
  * Copyright (c) 2002, Oracle and/or its affiliates. All rights reserved
  * Copyright 2005 Nokia. All rights reserved.
  *
@@ -994,9 +994,6 @@ WORK_STATE ossl_statem_server_post_work(SSL_CONNECTION *s, WORK_STATE wst)
             /* SSLfatal() already called */
             return WORK_ERROR;
         }
-
-        if (SSL_CONNECTION_IS_DTLS(s))
-            dtls1_increment_epoch(s, SSL3_CC_WRITE);
         break;
 
     case TLS_ST_SW_SRVR_DONE:
@@ -1734,18 +1731,9 @@ static int tls_early_post_process_client_hello(SSL_CONNECTION *s)
         /* SSLv3/TLS */
         s->client_version = clienthello->legacy_version;
     }
-    /*
-     * Do SSL/TLS version negotiation if applicable. For DTLS we just check
-     * versions are potentially compatible. Version negotiation comes later.
-     */
-    if (!SSL_CONNECTION_IS_DTLS(s)) {
-        protverr = ssl_choose_server_version(s, clienthello, &dgrd);
-    } else if (ssl->method->version != DTLS_ANY_VERSION &&
-               DTLS_VERSION_LT((int)clienthello->legacy_version, s->version)) {
-        protverr = SSL_R_VERSION_TOO_LOW;
-    } else {
-        protverr = 0;
-    }
+
+    /* Choose the server SSL/TLS/DTLS version. */
+    protverr = ssl_choose_server_version(s, clienthello, &dgrd);
 
     if (protverr) {
         if (SSL_IS_FIRST_HANDSHAKE(s)) {
@@ -1782,14 +1770,6 @@ static int tls_early_post_process_client_hello(SSL_CONNECTION *s)
                 goto err;
             }
             s->d1->cookie_verified = 1;
-        }
-        if (ssl->method->version == DTLS_ANY_VERSION) {
-            protverr = ssl_choose_server_version(s, clienthello, &dgrd);
-            if (protverr != 0) {
-                s->version = s->client_version;
-                SSLfatal(s, SSL_AD_PROTOCOL_VERSION, protverr);
-                goto err;
-            }
         }
     }
 
@@ -1979,6 +1959,11 @@ static int tls_early_post_process_client_hello(SSL_CONNECTION *s)
         }
     }
 
+    if (!s->hit && !tls1_set_server_sigalgs(s)) {
+        /* SSLfatal() already called */
+        goto err;
+    }
+
     if (!s->hit
             && s->version >= TLS1_VERSION
             && !SSL_CONNECTION_IS_TLS13(s)
@@ -2130,10 +2115,6 @@ static int tls_early_post_process_client_hello(SSL_CONNECTION *s)
 #else
         s->session->compress_meth = (comp == NULL) ? 0 : comp->id;
 #endif
-        if (!tls1_set_server_sigalgs(s)) {
-            /* SSLfatal() already called */
-            goto err;
-        }
     }
 
     sk_SSL_CIPHER_free(ciphers);
@@ -2445,9 +2426,8 @@ CON_FUNC_RETURN tls_construct_server_hello(SSL_CONNECTION *s, WPACKET *pkt)
      * so the following won't overwrite an ID that we're supposed
      * to send back.
      */
-    if (s->session->not_resumable ||
-        (!(SSL_CONNECTION_GET_CTX(s)->session_cache_mode & SSL_SESS_CACHE_SERVER)
-         && !s->hit))
+    if (!(SSL_CONNECTION_GET_CTX(s)->session_cache_mode & SSL_SESS_CACHE_SERVER)
+            && !s->hit)
         s->session->session_id_length = 0;
 
     if (usetls13) {
@@ -3250,7 +3230,7 @@ static int tls_process_cke_gost(SSL_CONNECTION *s, PACKET *pkt)
     }
     if (EVP_PKEY_decrypt_init(pkey_ctx) <= 0) {
         SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
-        return 0;
+        goto err;
     }
     /*
      * If client certificate is present and is of the same type, maybe

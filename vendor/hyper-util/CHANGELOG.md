@@ -1,3 +1,29 @@
+# 0.1.7 (2024-08-06)
+
+- Add `Connected::poison()` to `legacy` client, a port from hyper v0.14.x.
+- Add `Error::connect_info()` to `legacy` client, a port from hyper v0.14.x.
+
+# 0.1.6 (2024-07-01)
+
+- Add support for AIX operating system to `legacy` client.
+- Fix `legacy` client to better use dying pooled connections.
+
+# 0.1.5 (2024-05-28)
+
+- Add `server::graceful::GracefulShutdown` helper to coordinate over many connections.
+- Add `server::conn::auto::Connection::into_owned()` to unlink lifetime from `Builder`.
+- Allow `service` module to be available with only `service` feature enabled.
+
+# 0.1.4 (2024-05-24)
+
+- Add `initial_max_send_streams()` to `legacy` client builder
+- Add `max_pending_accept_reset_streams()` to `legacy` client builder
+- Add `max_headers(usize)` to `auto` server builder
+- Add `http1_onl()` and `http2_only()` to `auto` server builder
+- Add connection capturing API to `legacy` client
+- Add `impl Connection for TokioIo`
+- Fix graceful shutdown hanging on reading the HTTP version
+
 # 0.1.3 (2024-01-31)
 
 ### Added

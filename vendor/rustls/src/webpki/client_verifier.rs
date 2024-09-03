@@ -2,24 +2,23 @@ use alloc::sync::Arc;
 use alloc::vec::Vec;
 
 use pki_types::{CertificateDer, CertificateRevocationListDer, UnixTime};
-use webpki::{CertRevocationList, RevocationCheckDepth, UnknownStatusPolicy};
+use webpki::{CertRevocationList, ExpirationPolicy, RevocationCheckDepth, UnknownStatusPolicy};
 
 use super::{pki_error, VerifierBuilderError};
+#[cfg(doc)]
+use crate::crypto;
 use crate::crypto::{CryptoProvider, WebPkiSupportedAlgorithms};
+#[cfg(doc)]
+use crate::server::ServerConfig;
 use crate::verify::{
     ClientCertVerified, ClientCertVerifier, DigitallySignedStruct, HandshakeSignatureValid,
     NoClientAuth,
 };
 use crate::webpki::parse_crls;
 use crate::webpki::verify::{verify_tls12_signature, verify_tls13_signature, ParsedCertificate};
-use crate::{DistinguishedName, Error, RootCertStore, SignatureScheme};
-
-#[cfg(doc)]
-use crate::crypto;
-#[cfg(doc)]
-use crate::server::ServerConfig;
 #[cfg(doc)]
 use crate::ConfigBuilder;
+use crate::{DistinguishedName, Error, RootCertStore, SignatureScheme};
 
 /// A builder for configuring a `webpki` client certificate verifier.
 ///
@@ -31,6 +30,7 @@ pub struct ClientCertVerifierBuilder {
     crls: Vec<CertificateRevocationListDer<'static>>,
     revocation_check_depth: RevocationCheckDepth,
     unknown_revocation_policy: UnknownStatusPolicy,
+    revocation_expiration_policy: ExpirationPolicy,
     anon_policy: AnonymousClientPolicy,
     supported_algs: WebPkiSupportedAlgorithms,
 }
@@ -47,6 +47,7 @@ impl ClientCertVerifierBuilder {
             anon_policy: AnonymousClientPolicy::Deny,
             revocation_check_depth: RevocationCheckDepth::Chain,
             unknown_revocation_policy: UnknownStatusPolicy::Deny,
+            revocation_expiration_policy: ExpirationPolicy::Ignore,
             supported_algs,
         }
     }
@@ -139,6 +140,19 @@ impl ClientCertVerifierBuilder {
         self
     }
 
+    /// Enforce the CRL nextUpdate field (i.e. expiration)
+    ///
+    /// If CRLs are provided with [`with_crls`][Self::with_crls] and the verification time is
+    /// beyond the time in the CRL nextUpdate field, it is expired and treated as an error condition.
+    /// Overrides the default behavior where expired CRLs are not treated as an error condition.
+    ///
+    /// If no CRLs are provided then this setting has no effect as revocation status checks
+    /// are not performed.
+    pub fn enforce_revocation_expiration(mut self) -> Self {
+        self.revocation_expiration_policy = ExpirationPolicy::Enforce;
+        self
+    }
+
     /// Build a client certificate verifier. The built verifier will be used for the server to offer
     /// client certificate authentication, to control how offered client certificates are validated,
     /// and to determine what to do with anonymous clients that do not respond to the client
@@ -152,7 +166,7 @@ impl ClientCertVerifierBuilder {
     /// [`with_client_cert_verifier`][ConfigBuilder<ClientConfig, WantsVerifier>::with_client_cert_verifier].
     ///
     /// # Errors
-    /// This function will return a `ClientCertVerifierBuilderError` if:
+    /// This function will return a [`VerifierBuilderError`] if:
     /// 1. No trust anchors have been provided.
     /// 2. DER encoded CRLs have been provided that can not be parsed successfully.
     pub fn build(self) -> Result<Arc<dyn ClientCertVerifier>, VerifierBuilderError> {
@@ -166,6 +180,7 @@ impl ClientCertVerifierBuilder {
             parse_crls(self.crls)?,
             self.revocation_check_depth,
             self.unknown_revocation_policy,
+            self.revocation_expiration_policy,
             self.anon_policy,
             self.supported_algs,
         )))
@@ -173,7 +188,8 @@ impl ClientCertVerifierBuilder {
 }
 
 /// A client certificate verifier that uses the `webpki` crate[^1] to perform client certificate
-/// validation. It must be created via the [WebPkiClientVerifier::builder()] function.
+/// validation. It must be created via the [`WebPkiClientVerifier::builder()`] or
+/// [`WebPkiClientVerifier::builder_with_provider()`] functions.
 ///
 /// Once built, the provided `Arc<dyn ClientCertVerifier>` can be used with a Rustls [`ServerConfig`]
 /// to configure client certificate validation using [`with_client_cert_verifier`][ConfigBuilder<ClientConfig, WantsVerifier>::with_client_cert_verifier].
@@ -182,7 +198,7 @@ impl ClientCertVerifierBuilder {
 ///
 /// To require all clients present a client certificate issued by a trusted CA:
 /// ```no_run
-/// # #[cfg(feature = "ring")] {
+/// # #[cfg(any(feature = "ring", feature = "aws_lc_rs"))] {
 /// # use rustls::RootCertStore;
 /// # use rustls::server::WebPkiClientVerifier;
 /// # let roots = RootCertStore::empty();
@@ -195,7 +211,7 @@ impl ClientCertVerifierBuilder {
 /// Or, to allow clients presenting a client certificate authenticated by a trusted CA, or
 /// anonymous clients that present no client certificate:
 /// ```no_run
-/// # #[cfg(feature = "ring")] {
+/// # #[cfg(any(feature = "ring", feature = "aws_lc_rs"))] {
 /// # use rustls::RootCertStore;
 /// # use rustls::server::WebPkiClientVerifier;
 /// # let roots = RootCertStore::empty();
@@ -217,7 +233,7 @@ impl ClientCertVerifierBuilder {
 /// You can also configure the client verifier to check for certificate revocation with
 /// client certificate revocation lists (CRLs):
 /// ```no_run
-/// # #[cfg(feature = "ring")] {
+/// # #[cfg(any(feature = "ring", feature = "aws_lc_rs"))] {
 /// # use rustls::RootCertStore;
 /// # use rustls::server::{WebPkiClientVerifier};
 /// # let roots = RootCertStore::empty();
@@ -237,25 +253,27 @@ pub struct WebPkiClientVerifier {
     crls: Vec<CertRevocationList<'static>>,
     revocation_check_depth: RevocationCheckDepth,
     unknown_revocation_policy: UnknownStatusPolicy,
+    revocation_expiration_policy: ExpirationPolicy,
     anonymous_policy: AnonymousClientPolicy,
     supported_algs: WebPkiSupportedAlgorithms,
 }
 
 impl WebPkiClientVerifier {
     /// Create a builder for the `webpki` client certificate verifier configuration using
-    /// the default [`CryptoProvider`].
+    /// the [process-default `CryptoProvider`][CryptoProvider#using-the-per-process-default-cryptoprovider].
     ///
     /// Client certificate authentication will be offered by the server, and client certificates
     /// will be verified using the trust anchors found in the provided `roots`. If you
-    /// wish to disable client authentication use [WebPkiClientVerifier::no_client_auth()] instead.
+    /// wish to disable client authentication use [`WebPkiClientVerifier::no_client_auth()`] instead.
     ///
-    /// The cryptography used comes from the default [`CryptoProvider`]: [`crypto::ring::default_provider`].
-    /// Use [`Self::builder_with_provider`] if you wish to customize this.
+    /// Use [`Self::builder_with_provider`] if you wish to specify an explicit provider.
     ///
     /// For more information, see the [`ClientCertVerifierBuilder`] documentation.
-    #[cfg(feature = "ring")]
     pub fn builder(roots: Arc<RootCertStore>) -> ClientCertVerifierBuilder {
-        Self::builder_with_provider(roots, crate::crypto::ring::default_provider().into())
+        Self::builder_with_provider(
+            roots,
+            Arc::clone(CryptoProvider::get_default_or_install_from_crate_features()),
+        )
     }
 
     /// Create a builder for the `webpki` client certificate verifier configuration using
@@ -304,6 +322,7 @@ impl WebPkiClientVerifier {
         crls: Vec<CertRevocationList<'static>>,
         revocation_check_depth: RevocationCheckDepth,
         unknown_revocation_policy: UnknownStatusPolicy,
+        revocation_expiration_policy: ExpirationPolicy,
         anonymous_policy: AnonymousClientPolicy,
         supported_algs: WebPkiSupportedAlgorithms,
     ) -> Self {
@@ -313,6 +332,7 @@ impl WebPkiClientVerifier {
             crls,
             revocation_check_depth,
             unknown_revocation_policy,
+            revocation_expiration_policy,
             anonymous_policy,
             supported_algs,
         }
@@ -355,6 +375,7 @@ impl ClientCertVerifier for WebPkiClientVerifier {
                     .unwrap()
                     .with_depth(self.revocation_check_depth)
                     .with_status_policy(self.unknown_revocation_policy)
+                    .with_expiration_policy(self.revocation_expiration_policy)
                     .build(),
             )
         };
@@ -405,15 +426,16 @@ pub(crate) enum AnonymousClientPolicy {
     Deny,
 }
 
-#[cfg(all(test, feature = "ring"))]
-mod tests {
+test_for_each_provider! {
     use super::WebPkiClientVerifier;
     use crate::server::VerifierBuilderError;
     use crate::RootCertStore;
 
     use pki_types::{CertificateDer, CertificateRevocationListDer};
 
+    use std::prelude::v1::*;
     use std::sync::Arc;
+    use std::{vec, format, println};
 
     fn load_crls(crls_der: &[&[u8]]) -> Vec<CertificateRevocationListDer<'static>> {
         crls_der
@@ -430,7 +452,7 @@ mod tests {
     fn test_crls() -> Vec<CertificateRevocationListDer<'static>> {
         load_crls(&[
             include_bytes!("../../../test-ca/ecdsa-p256/client.revoked.crl.pem").as_slice(),
-            include_bytes!("../../../test-ca/rsa/client.revoked.crl.pem").as_slice(),
+            include_bytes!("../../../test-ca/rsa-2048/client.revoked.crl.pem").as_slice(),
         ])
     }
 
@@ -447,7 +469,7 @@ mod tests {
     fn test_roots() -> Arc<RootCertStore> {
         load_roots(&[
             include_bytes!("../../../test-ca/ecdsa-p256/ca.der").as_slice(),
-            include_bytes!("../../../test-ca/rsa/ca.der").as_slice(),
+            include_bytes!("../../../test-ca/rsa-2048/ca.der").as_slice(),
         ])
     }
 
@@ -461,7 +483,10 @@ mod tests {
     fn test_client_verifier_required_auth() {
         // We should be able to build a verifier that requires client authentication, and does
         // no revocation checking.
-        let builder = WebPkiClientVerifier::builder(test_roots());
+        let builder = WebPkiClientVerifier::builder_with_provider(
+            test_roots(),
+            provider::default_provider().into(),
+        );
         // The builder should be Debug.
         println!("{:?}", builder);
         builder.build().unwrap();
@@ -471,7 +496,11 @@ mod tests {
     fn test_client_verifier_optional_auth() {
         // We should be able to build a verifier that allows client authentication, and anonymous
         // access, and does no revocation checking.
-        let builder = WebPkiClientVerifier::builder(test_roots()).allow_unauthenticated();
+        let builder = WebPkiClientVerifier::builder_with_provider(
+            test_roots(),
+            provider::default_provider().into(),
+        )
+        .allow_unauthenticated();
         // The builder should be Debug.
         println!("{:?}", builder);
         builder.build().unwrap();
@@ -482,7 +511,10 @@ mod tests {
         // We should be able to build a verifier that requires client authentication, and does
         // no revocation checking, that hasn't been configured to determine how to handle
         // unauthenticated clients yet.
-        let builder = WebPkiClientVerifier::builder(test_roots());
+        let builder = WebPkiClientVerifier::builder_with_provider(
+            test_roots(),
+            provider::default_provider().into(),
+        );
         // The builder should be Debug.
         println!("{:?}", builder);
         builder.build().unwrap();
@@ -492,7 +524,11 @@ mod tests {
     fn test_client_verifier_without_crls_opptional_auth() {
         // We should be able to build a verifier that allows client authentication,
         // and anonymous access, that does no revocation checking.
-        let builder = WebPkiClientVerifier::builder(test_roots()).allow_unauthenticated();
+        let builder = WebPkiClientVerifier::builder_with_provider(
+            test_roots(),
+            provider::default_provider().into(),
+        )
+        .allow_unauthenticated();
         // The builder should be Debug.
         println!("{:?}", builder);
         builder.build().unwrap();
@@ -501,9 +537,12 @@ mod tests {
     #[test]
     fn test_with_invalid_crls() {
         // Trying to build a client verifier with invalid CRLs should error at build time.
-        let result = WebPkiClientVerifier::builder(test_roots())
-            .with_crls(vec![CertificateRevocationListDer::from(vec![0xFF])])
-            .build();
+        let result = WebPkiClientVerifier::builder_with_provider(
+            test_roots(),
+            provider::default_provider().into(),
+        )
+        .with_crls(vec![CertificateRevocationListDer::from(vec![0xFF])])
+        .build();
         assert!(matches!(result, Err(VerifierBuilderError::InvalidCrl(_))));
     }
 
@@ -515,9 +554,12 @@ mod tests {
             load_crls(&[
                 include_bytes!("../../../test-ca/eddsa/client.revoked.crl.pem").as_slice(),
             ]);
-        let builder = WebPkiClientVerifier::builder(test_roots())
-            .with_crls(initial_crls.clone())
-            .with_crls(extra_crls.clone());
+        let builder = WebPkiClientVerifier::builder_with_provider(
+            test_roots(),
+            provider::default_provider().into(),
+        )
+        .with_crls(initial_crls.clone())
+        .with_crls(extra_crls.clone());
 
         // There should be the expected number of crls.
         assert_eq!(builder.crls.len(), initial_crls.len() + extra_crls.len());
@@ -530,7 +572,11 @@ mod tests {
     fn test_client_verifier_with_crls_required_auth_implicit() {
         // We should be able to build a verifier that requires client authentication, and that does
         // revocation checking with CRLs, and that does not allow any anonymous access.
-        let builder = WebPkiClientVerifier::builder(test_roots()).with_crls(test_crls());
+        let builder = WebPkiClientVerifier::builder_with_provider(
+            test_roots(),
+            provider::default_provider().into(),
+        )
+        .with_crls(test_crls());
         // The builder should be Debug.
         println!("{:?}", builder);
         builder.build().unwrap();
@@ -540,9 +586,12 @@ mod tests {
     fn test_client_verifier_with_crls_optional_auth() {
         // We should be able to build a verifier that supports client authentication, that does
         // revocation checking with CRLs, and that allows anonymous access.
-        let builder = WebPkiClientVerifier::builder(test_roots())
-            .with_crls(test_crls())
-            .allow_unauthenticated();
+        let builder = WebPkiClientVerifier::builder_with_provider(
+            test_roots(),
+            provider::default_provider().into(),
+        )
+        .with_crls(test_crls())
+        .allow_unauthenticated();
         // The builder should be Debug.
         println!("{:?}", builder);
         builder.build().unwrap();
@@ -551,9 +600,12 @@ mod tests {
     #[test]
     fn test_client_verifier_ee_only() {
         // We should be able to build a client verifier that only checks EE revocation status.
-        let builder = WebPkiClientVerifier::builder(test_roots())
-            .with_crls(test_crls())
-            .only_check_end_entity_revocation();
+        let builder = WebPkiClientVerifier::builder_with_provider(
+            test_roots(),
+            provider::default_provider().into(),
+        )
+        .with_crls(test_crls())
+        .only_check_end_entity_revocation();
         // The builder should be Debug.
         println!("{:?}", builder);
         builder.build().unwrap();
@@ -562,9 +614,26 @@ mod tests {
     #[test]
     fn test_client_verifier_allow_unknown() {
         // We should be able to build a client verifier that allows unknown revocation status
-        let builder = WebPkiClientVerifier::builder(test_roots())
-            .with_crls(test_crls())
-            .allow_unknown_revocation_status();
+        let builder = WebPkiClientVerifier::builder_with_provider(
+            test_roots(),
+            provider::default_provider().into(),
+        )
+        .with_crls(test_crls())
+        .allow_unknown_revocation_status();
+        // The builder should be Debug.
+        println!("{:?}", builder);
+        builder.build().unwrap();
+    }
+
+    #[test]
+    fn test_client_verifier_enforce_expiration() {
+        // We should be able to build a client verifier that allows unknown revocation status
+        let builder = WebPkiClientVerifier::builder_with_provider(
+            test_roots(),
+            provider::default_provider().into(),
+        )
+        .with_crls(test_crls())
+        .enforce_revocation_expiration();
         // The builder should be Debug.
         println!("{:?}", builder);
         builder.build().unwrap();
@@ -573,7 +642,11 @@ mod tests {
     #[test]
     fn test_builder_no_roots() {
         // Trying to create a client verifier builder with no trust anchors should fail at build time
-        let result = WebPkiClientVerifier::builder(RootCertStore::empty().into()).build();
+        let result = WebPkiClientVerifier::builder_with_provider(
+            RootCertStore::empty().into(),
+            provider::default_provider().into(),
+        )
+        .build();
         assert!(matches!(result, Err(VerifierBuilderError::NoRootAnchors)));
     }
 

@@ -1,9 +1,11 @@
 use alloc::collections::btree_map::Entry;
-use alloc::vec::Vec;
 use core::mem;
 use core::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Sub, SubAssign};
 
 use crate::RoaringTreemap;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 impl RoaringTreemap {
     /// Computes the len of the union with the specified other treemap without creating a new

@@ -1,68 +1,47 @@
-extern crate clap;
-extern crate libflate;
-
-#[cfg(not(feature = "no_std"))]
-use clap::App;
-#[cfg(not(feature = "no_std"))]
-use clap::Arg;
-#[cfg(not(feature = "no_std"))]
-use clap::SubCommand;
-#[cfg(not(feature = "no_std"))]
-use libflate::gzip;
-#[cfg(not(feature = "no_std"))]
-use libflate::zlib;
-#[cfg(not(feature = "no_std"))]
-use std::fs;
-#[cfg(not(feature = "no_std"))]
-use std::io;
-#[cfg(not(feature = "no_std"))]
-use std::io::Read;
-#[cfg(not(feature = "no_std"))]
-use std::io::Write;
-#[cfg(not(feature = "no_std"))]
-use std::process;
-
-#[cfg(feature = "no_std")]
+#[cfg(not(feature = "std"))]
 fn main() {}
 
-#[cfg(not(feature = "no_std"))]
+#[cfg(feature = "std")]
 fn main() {
-    let matches = App::new("deflate")
-        .arg(
-            Arg::with_name("INPUT")
-                .short("i")
-                .long("input")
-                .value_name("FILE")
-                .takes_value(true)
-                .default_value("-"),
-        )
-        .arg(
-            Arg::with_name("OUTPUT")
-                .short("o")
-                .long("output")
-                .value_name("FILE")
-                .takes_value(true)
-                .default_value("-"),
-        )
-        .arg(Arg::with_name("VERBOSE").short("v").long("verbose"))
-        .subcommand(SubCommand::with_name("copy"))
-        .subcommand(
-            SubCommand::with_name("byte-read").arg(
-                Arg::with_name("UNIT")
-                    .short("u")
-                    .long("unit")
-                    .takes_value(true)
-                    .default_value("1"),
-            ),
-        )
-        .subcommand(SubCommand::with_name("gzip-decode"))
-        .subcommand(SubCommand::with_name("gzip-decode-multi"))
-        .subcommand(SubCommand::with_name("gzip-encode"))
-        .subcommand(SubCommand::with_name("zlib-decode"))
-        .subcommand(SubCommand::with_name("zlib-encode"))
-        .get_matches();
+    use clap::Parser;
+    use libflate::gzip;
+    use libflate::zlib;
+    use std::fs;
+    use std::io;
+    use std::io::Read;
+    use std::io::Write;
 
-    let input_filename = matches.value_of("INPUT").unwrap();
+    #[derive(Parser)]
+    struct Args {
+        #[clap(short, long, default_value = "-")]
+        input: String,
+
+        #[clap(short, long, default_value = "-")]
+        output: String,
+
+        #[clap(short, long)]
+        verbose: bool,
+
+        #[clap(subcommand)]
+        command: Command,
+    }
+
+    #[derive(clap::Subcommand)]
+    enum Command {
+        Copy,
+        ByteRead {
+            #[clap(short, long, default_value = "1")]
+            unit: usize,
+        },
+        GzipDecode,
+        GzipDecodeMulti,
+        GzipEncode,
+        ZlibDecode,
+        ZlibEncode,
+    }
+
+    let args = Args::parse();
+    let input_filename = &args.input;
     let input: Box<dyn io::Read> = if input_filename == "-" {
         Box::new(io::stdin())
     } else {
@@ -72,7 +51,7 @@ fn main() {
     };
     let mut input = io::BufReader::new(input);
 
-    let output_filename = matches.value_of("OUTPUT").unwrap();
+    let output_filename = &args.output;
     let output: Box<dyn io::Write> = if output_filename == "-" {
         Box::new(io::stdout())
     } else if output_filename == "/dev/null" {
@@ -85,49 +64,50 @@ fn main() {
     };
     let mut output = io::BufWriter::new(output);
 
-    let verbose = matches.is_present("VERBOSE");
-    if let Some(_matches) = matches.subcommand_matches("copy") {
-        io::copy(&mut input, &mut output).expect("Coyping failed");
-    } else if let Some(matches) = matches.subcommand_matches("byte-read") {
-        let unit = matches
-            .value_of("UNIT")
-            .and_then(|x| x.parse::<usize>().ok())
-            .unwrap();
-        let mut buf = vec![0; unit];
-        let mut reader = input;
-        let mut count = 0;
-        while let Ok(size) = reader.read(&mut buf) {
-            if size == 0 {
-                break;
+    let verbose = args.verbose;
+    match args.command {
+        Command::Copy => {
+            io::copy(&mut input, &mut output).expect("Coyping failed");
+        }
+        Command::ByteRead { unit } => {
+            let mut buf = vec![0; unit];
+            let mut reader = input;
+            let mut count = 0;
+            while let Ok(size) = reader.read(&mut buf) {
+                if size == 0 {
+                    break;
+                }
+                count += size;
             }
-            count += size;
+            println!("COUNT: {}", count);
         }
-        println!("COUNT: {}", count);
-    } else if let Some(_matches) = matches.subcommand_matches("gzip-decode") {
-        let mut decoder = gzip::Decoder::new(input).expect("Read GZIP header failed");
-        if verbose {
-            let _ = writeln!(&mut io::stderr(), "HEADER: {:?}", decoder.header());
+        Command::GzipDecode => {
+            let mut decoder = gzip::Decoder::new(input).expect("Read GZIP header failed");
+            if verbose {
+                let _ = writeln!(&mut io::stderr(), "HEADER: {:?}", decoder.header());
+            }
+            io::copy(&mut decoder, &mut output).expect("Decoding GZIP stream failed");
         }
-        io::copy(&mut decoder, &mut output).expect("Decoding GZIP stream failed");
-    } else if let Some(_matches) = matches.subcommand_matches("gzip-decode-multi") {
-        let mut decoder = gzip::MultiDecoder::new(input).expect("Read GZIP header failed");
-        io::copy(&mut decoder, &mut output).expect("Decoding GZIP stream failed");
-    } else if let Some(_matches) = matches.subcommand_matches("gzip-encode") {
-        let mut encoder = gzip::Encoder::new(output).unwrap();
-        io::copy(&mut input, &mut encoder).expect("Encoding GZIP stream failed");
-        encoder.finish().into_result().unwrap();
-    } else if let Some(_matches) = matches.subcommand_matches("zlib-decode") {
-        let mut decoder = zlib::Decoder::new(input).expect("Read ZLIB header failed");
-        if verbose {
-            let _ = writeln!(&mut io::stderr(), "HEADER: {:?}", decoder.header());
+        Command::GzipDecodeMulti => {
+            let mut decoder = gzip::MultiDecoder::new(input).expect("Read GZIP header failed");
+            io::copy(&mut decoder, &mut output).expect("Decoding GZIP stream failed");
         }
-        io::copy(&mut decoder, &mut output).expect("Decoding ZLIB stream failed");
-    } else if let Some(_matches) = matches.subcommand_matches("zlib-encode") {
-        let mut encoder = zlib::Encoder::new(output).unwrap();
-        io::copy(&mut input, &mut encoder).expect("Encoding ZLIB stream failed");
-        encoder.finish().into_result().unwrap();
-    } else {
-        println!("{}", matches.usage());
-        process::exit(1);
+        Command::GzipEncode => {
+            let mut encoder = gzip::Encoder::new(output).unwrap();
+            io::copy(&mut input, &mut encoder).expect("Encoding GZIP stream failed");
+            encoder.finish().into_result().unwrap();
+        }
+        Command::ZlibDecode => {
+            let mut decoder = zlib::Decoder::new(input).expect("Read ZLIB header failed");
+            if verbose {
+                let _ = writeln!(&mut io::stderr(), "HEADER: {:?}", decoder.header());
+            }
+            io::copy(&mut decoder, &mut output).expect("Decoding ZLIB stream failed");
+        }
+        Command::ZlibEncode => {
+            let mut encoder = zlib::Encoder::new(output).unwrap();
+            io::copy(&mut input, &mut encoder).expect("Encoding ZLIB stream failed");
+            encoder.finish().into_result().unwrap();
+        }
     }
 }

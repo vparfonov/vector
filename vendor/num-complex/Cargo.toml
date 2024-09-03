@@ -10,12 +10,12 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
+edition = "2021"
+rust-version = "1.60"
 name = "num-complex"
-version = "0.4.4"
+version = "0.4.6"
 authors = ["The Rust Project Developers"]
 exclude = [
-    "/bors.toml",
     "/ci/*",
     "/.github/*",
 ]
@@ -56,7 +56,7 @@ version = "1"
 optional = true
 
 [dependencies.num-traits]
-version = "0.2.11"
+version = "0.2.18"
 features = ["i128"]
 default-features = false
 
@@ -76,6 +76,11 @@ optional = true
 default-features = false
 
 [features]
+bytecheck = ["dep:bytecheck"]
+bytemuck = ["dep:bytemuck"]
 default = ["std"]
 libm = ["num-traits/libm"]
+rand = ["dep:rand"]
+rkyv = ["dep:rkyv"]
+serde = ["dep:serde"]
 std = ["num-traits/std"]

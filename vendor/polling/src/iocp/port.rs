@@ -1,6 +1,7 @@
 //! A safe wrapper around the Windows I/O API.
 
-use std::convert::{TryFrom, TryInto};
+use super::dur2timeout;
+
 use std::fmt;
 use std::io;
 use std::marker::PhantomData;
@@ -8,6 +9,7 @@ use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::os::windows::io::{AsRawHandle, RawHandle};
 use std::pin::Pin;
+use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -132,7 +134,7 @@ impl<T> fmt::Debug for IoCompletionPort<T> {
 
         impl fmt::Debug for WriteAsHex {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{:010x}", self.0)
+                write!(f, "{:010x}", self.0 as usize)
             }
         }
 
@@ -148,13 +150,13 @@ impl<T: CompletionHandle> IoCompletionPort<T> {
         let handle = unsafe {
             CreateIoCompletionPort(
                 INVALID_HANDLE_VALUE,
-                0,
+                ptr::null_mut(),
                 0,
                 threads.try_into().expect("too many threads"),
             )
         };
 
-        if handle == 0 {
+        if handle.is_null() {
             Err(io::Error::last_os_error())
         } else {
             Ok(Self {
@@ -175,7 +177,7 @@ impl<T: CompletionHandle> IoCompletionPort<T> {
         let result =
             unsafe { CreateIoCompletionPort(handle as _, self.handle, handle as usize, 0) };
 
-        if result == 0 {
+        if result.is_null() {
             return Err(io::Error::last_os_error());
         }
 
@@ -293,36 +295,5 @@ impl<T: CompletionHandle> OverlappedEntry<T> {
 impl<T: CompletionHandle> Drop for OverlappedEntry<T> {
     fn drop(&mut self) {
         drop(unsafe { self.packet() });
-    }
-}
-
-// Implementation taken from https://github.com/rust-lang/rust/blob/db5476571d9b27c862b95c1e64764b0ac8980e23/src/libstd/sys/windows/mod.rs
-fn dur2timeout(dur: Duration) -> u32 {
-    // Note that a duration is a (u64, u32) (seconds, nanoseconds) pair, and the
-    // timeouts in windows APIs are typically u32 milliseconds. To translate, we
-    // have two pieces to take care of:
-    //
-    // * Nanosecond precision is rounded up
-    // * Greater than u32::MAX milliseconds (50 days) is rounded up to INFINITE
-    //   (never time out).
-    dur.as_secs()
-        .checked_mul(1000)
-        .and_then(|ms| ms.checked_add((dur.subsec_nanos() as u64) / 1_000_000))
-        .and_then(|ms| {
-            if dur.subsec_nanos() % 1_000_000 > 0 {
-                ms.checked_add(1)
-            } else {
-                Some(ms)
-            }
-        })
-        .and_then(|x| u32::try_from(x).ok())
-        .unwrap_or(INFINITE)
-}
-
-struct CallOnDrop<F: FnMut()>(F);
-
-impl<F: FnMut()> Drop for CallOnDrop<F> {
-    fn drop(&mut self) {
-        (self.0)();
     }
 }

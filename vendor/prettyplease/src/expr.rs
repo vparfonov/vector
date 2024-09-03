@@ -18,31 +18,33 @@ use syn::{
 
 impl Printer {
     pub fn expr(&mut self, expr: &Expr) {
+        let beginning_of_line = false;
         match expr {
+            #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
             Expr::Array(expr) => self.expr_array(expr),
             Expr::Assign(expr) => self.expr_assign(expr),
             Expr::Async(expr) => self.expr_async(expr),
-            Expr::Await(expr) => self.expr_await(expr, false),
+            Expr::Await(expr) => self.expr_await(expr, beginning_of_line),
             Expr::Binary(expr) => self.expr_binary(expr),
             Expr::Block(expr) => self.expr_block(expr),
             Expr::Break(expr) => self.expr_break(expr),
-            Expr::Call(expr) => self.expr_call(expr, false),
+            Expr::Call(expr) => self.expr_call(expr, beginning_of_line),
             Expr::Cast(expr) => self.expr_cast(expr),
             Expr::Closure(expr) => self.expr_closure(expr),
             Expr::Const(expr) => self.expr_const(expr),
             Expr::Continue(expr) => self.expr_continue(expr),
-            Expr::Field(expr) => self.expr_field(expr, false),
+            Expr::Field(expr) => self.expr_field(expr, beginning_of_line),
             Expr::ForLoop(expr) => self.expr_for_loop(expr),
             Expr::Group(expr) => self.expr_group(expr),
             Expr::If(expr) => self.expr_if(expr),
-            Expr::Index(expr) => self.expr_index(expr, false),
+            Expr::Index(expr) => self.expr_index(expr, beginning_of_line),
             Expr::Infer(expr) => self.expr_infer(expr),
             Expr::Let(expr) => self.expr_let(expr),
             Expr::Lit(expr) => self.expr_lit(expr),
             Expr::Loop(expr) => self.expr_loop(expr),
             Expr::Macro(expr) => self.expr_macro(expr),
             Expr::Match(expr) => self.expr_match(expr),
-            Expr::MethodCall(expr) => self.expr_method_call(expr, false),
+            Expr::MethodCall(expr) => self.expr_method_call(expr, beginning_of_line),
             Expr::Paren(expr) => self.expr_paren(expr),
             Expr::Path(expr) => self.expr_path(expr),
             Expr::Range(expr) => self.expr_range(expr),
@@ -50,7 +52,7 @@ impl Printer {
             Expr::Repeat(expr) => self.expr_repeat(expr),
             Expr::Return(expr) => self.expr_return(expr),
             Expr::Struct(expr) => self.expr_struct(expr),
-            Expr::Try(expr) => self.expr_try(expr, false),
+            Expr::Try(expr) => self.expr_try(expr, beginning_of_line),
             Expr::TryBlock(expr) => self.expr_try_block(expr),
             Expr::Tuple(expr) => self.expr_tuple(expr),
             Expr::Unary(expr) => self.expr_unary(expr),
@@ -58,7 +60,6 @@ impl Printer {
             Expr::Verbatim(expr) => self.expr_verbatim(expr),
             Expr::While(expr) => self.expr_while(expr),
             Expr::Yield(expr) => self.expr_yield(expr),
-            #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
             _ => unimplemented!("unknown Expr"),
         }
     }
@@ -80,7 +81,10 @@ impl Printer {
             Expr::Call(expr) => self.subexpr_call(expr),
             Expr::Field(expr) => self.subexpr_field(expr, beginning_of_line),
             Expr::Index(expr) => self.subexpr_index(expr, beginning_of_line),
-            Expr::MethodCall(expr) => self.subexpr_method_call(expr, beginning_of_line, false),
+            Expr::MethodCall(expr) => {
+                let unindent_call_args = false;
+                self.subexpr_method_call(expr, beginning_of_line, unindent_call_args);
+            }
             Expr::Try(expr) => self.subexpr_try(expr, beginning_of_line),
             _ => {
                 self.cbox(-INDENT);
@@ -127,6 +131,7 @@ impl Printer {
         self.ibox(0);
         self.expr(&expr.left);
         self.word(" = ");
+        self.neverbreak();
         self.expr(&expr.right);
         self.end();
     }
@@ -200,7 +205,8 @@ impl Printer {
     }
 
     fn subexpr_call(&mut self, expr: &ExprCall) {
-        self.subexpr(&expr.func, false);
+        let beginning_of_line = false;
+        self.subexpr(&expr.func, beginning_of_line);
         self.word("(");
         self.call_args(&expr.args);
         self.word(")");
@@ -675,8 +681,14 @@ impl Printer {
         enum ExprVerbatim {
             Empty,
             Ellipsis,
+            Become(Become),
             Builtin(Builtin),
             RawReference(RawReference),
+        }
+
+        struct Become {
+            attrs: Vec<Attribute>,
+            tail_call: Expr,
         }
 
         struct Builtin {
@@ -703,6 +715,11 @@ impl Printer {
                 let lookahead = ahead.lookahead1();
                 if input.is_empty() {
                     Ok(ExprVerbatim::Empty)
+                } else if lookahead.peek(Token![become]) {
+                    input.advance_to(&ahead);
+                    input.parse::<Token![become]>()?;
+                    let tail_call: Expr = input.parse()?;
+                    Ok(ExprVerbatim::Become(Become { attrs, tail_call }))
                 } else if lookahead.peek(kw::builtin) {
                     input.advance_to(&ahead);
                     input.parse::<kw::builtin>()?;
@@ -744,6 +761,12 @@ impl Printer {
             ExprVerbatim::Empty => {}
             ExprVerbatim::Ellipsis => {
                 self.word("...");
+            }
+            ExprVerbatim::Become(expr) => {
+                self.outer_attrs(&expr.attrs);
+                self.word("become");
+                self.nbsp();
+                self.expr(&expr.tail_call);
             }
             ExprVerbatim::Builtin(expr) => {
                 self.outer_attrs(&expr.attrs);
@@ -912,8 +935,8 @@ impl Printer {
         if attr::has_inner(attrs) || !block.stmts.is_empty() {
             self.space();
             self.inner_attrs(attrs);
-            match (block.stmts.get(0), block.stmts.get(1)) {
-                (Some(Stmt::Expr(expr, None)), None) if stmt::break_after(expr) => {
+            match block.stmts.as_slice() {
+                [Stmt::Expr(expr, None)] if stmt::break_after(expr) => {
                     self.ibox(0);
                     self.expr_beginning_of_line(expr, true);
                     self.end();
@@ -942,48 +965,52 @@ impl Printer {
     }
 
     fn binary_operator(&mut self, op: &BinOp) {
-        self.word(match op {
-            BinOp::Add(_) => "+",
-            BinOp::Sub(_) => "-",
-            BinOp::Mul(_) => "*",
-            BinOp::Div(_) => "/",
-            BinOp::Rem(_) => "%",
-            BinOp::And(_) => "&&",
-            BinOp::Or(_) => "||",
-            BinOp::BitXor(_) => "^",
-            BinOp::BitAnd(_) => "&",
-            BinOp::BitOr(_) => "|",
-            BinOp::Shl(_) => "<<",
-            BinOp::Shr(_) => ">>",
-            BinOp::Eq(_) => "==",
-            BinOp::Lt(_) => "<",
-            BinOp::Le(_) => "<=",
-            BinOp::Ne(_) => "!=",
-            BinOp::Ge(_) => ">=",
-            BinOp::Gt(_) => ">",
-            BinOp::AddAssign(_) => "+=",
-            BinOp::SubAssign(_) => "-=",
-            BinOp::MulAssign(_) => "*=",
-            BinOp::DivAssign(_) => "/=",
-            BinOp::RemAssign(_) => "%=",
-            BinOp::BitXorAssign(_) => "^=",
-            BinOp::BitAndAssign(_) => "&=",
-            BinOp::BitOrAssign(_) => "|=",
-            BinOp::ShlAssign(_) => "<<=",
-            BinOp::ShrAssign(_) => ">>=",
-            #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
-            _ => unimplemented!("unknown BinOp"),
-        });
+        self.word(
+            match op {
+                #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
+                BinOp::Add(_) => "+",
+                BinOp::Sub(_) => "-",
+                BinOp::Mul(_) => "*",
+                BinOp::Div(_) => "/",
+                BinOp::Rem(_) => "%",
+                BinOp::And(_) => "&&",
+                BinOp::Or(_) => "||",
+                BinOp::BitXor(_) => "^",
+                BinOp::BitAnd(_) => "&",
+                BinOp::BitOr(_) => "|",
+                BinOp::Shl(_) => "<<",
+                BinOp::Shr(_) => ">>",
+                BinOp::Eq(_) => "==",
+                BinOp::Lt(_) => "<",
+                BinOp::Le(_) => "<=",
+                BinOp::Ne(_) => "!=",
+                BinOp::Ge(_) => ">=",
+                BinOp::Gt(_) => ">",
+                BinOp::AddAssign(_) => "+=",
+                BinOp::SubAssign(_) => "-=",
+                BinOp::MulAssign(_) => "*=",
+                BinOp::DivAssign(_) => "/=",
+                BinOp::RemAssign(_) => "%=",
+                BinOp::BitXorAssign(_) => "^=",
+                BinOp::BitAndAssign(_) => "&=",
+                BinOp::BitOrAssign(_) => "|=",
+                BinOp::ShlAssign(_) => "<<=",
+                BinOp::ShrAssign(_) => ">>=",
+                _ => unimplemented!("unknown BinOp"),
+            },
+        );
     }
 
     fn unary_operator(&mut self, op: &UnOp) {
-        self.word(match op {
-            UnOp::Deref(_) => "*",
-            UnOp::Not(_) => "!",
-            UnOp::Neg(_) => "-",
-            #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
-            _ => unimplemented!("unknown UnOp"),
-        });
+        self.word(
+            match op {
+                #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
+                UnOp::Deref(_) => "*",
+                UnOp::Not(_) => "!",
+                UnOp::Neg(_) => "-",
+                _ => unimplemented!("unknown UnOp"),
+            },
+        );
     }
 
     fn zerobreak_unless_short_ident(&mut self, beginning_of_line: bool, expr: &Expr) {
@@ -997,6 +1024,7 @@ impl Printer {
 fn requires_terminator(expr: &Expr) -> bool {
     // see https://github.com/rust-lang/rust/blob/a266f1199/compiler/rustc_ast/src/util/classify.rs#L7-L26
     match expr {
+        #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
         Expr::If(_)
         | Expr::Match(_)
         | Expr::Block(_) | Expr::Unsafe(_) // both under ExprKind::Block in rustc
@@ -1037,7 +1065,6 @@ fn requires_terminator(expr: &Expr) -> bool {
         | Expr::Verbatim(_)
         | Expr::Yield(_) => true,
 
-        #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
         _ => true,
     }
 }
@@ -1048,6 +1075,7 @@ fn requires_terminator(expr: &Expr) -> bool {
 // { y: 1 }) == foo` does not.
 fn contains_exterior_struct_lit(expr: &Expr) -> bool {
     match expr {
+        #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
         Expr::Struct(_) => true,
 
         Expr::Assign(ExprAssign { left, right, .. })
@@ -1059,6 +1087,7 @@ fn contains_exterior_struct_lit(expr: &Expr) -> bool {
         Expr::Await(ExprAwait { base: e, .. })
         | Expr::Cast(ExprCast { expr: e, .. })
         | Expr::Field(ExprField { base: e, .. })
+        | Expr::Group(ExprGroup { expr: e, .. })
         | Expr::Index(ExprIndex { expr: e, .. })
         | Expr::MethodCall(ExprMethodCall { receiver: e, .. })
         | Expr::Reference(ExprReference { expr: e, .. })
@@ -1076,7 +1105,6 @@ fn contains_exterior_struct_lit(expr: &Expr) -> bool {
         | Expr::Const(_)
         | Expr::Continue(_)
         | Expr::ForLoop(_)
-        | Expr::Group(_)
         | Expr::If(_)
         | Expr::Infer(_)
         | Expr::Let(_)
@@ -1097,13 +1125,13 @@ fn contains_exterior_struct_lit(expr: &Expr) -> bool {
         | Expr::While(_)
         | Expr::Yield(_) => false,
 
-        #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
         _ => false,
     }
 }
 
 fn needs_newline_if_wrap(expr: &Expr) -> bool {
     match expr {
+        #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
         Expr::Array(_)
         | Expr::Async(_)
         | Expr::Block(_)
@@ -1150,7 +1178,6 @@ fn needs_newline_if_wrap(expr: &Expr) -> bool {
         | Expr::Unary(ExprUnary { expr: e, .. })
         | Expr::Yield(ExprYield { expr: Some(e), .. }) => needs_newline_if_wrap(e),
 
-        #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
         _ => false,
     }
 }
@@ -1169,6 +1196,7 @@ fn is_short_ident(expr: &Expr) -> bool {
 
 fn is_blocklike(expr: &Expr) -> bool {
     match expr {
+        #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
         Expr::Array(ExprArray { attrs, .. })
         | Expr::Async(ExprAsync { attrs, .. })
         | Expr::Block(ExprBlock { attrs, .. })
@@ -1210,7 +1238,6 @@ fn is_blocklike(expr: &Expr) -> bool {
         | Expr::While(_)
         | Expr::Yield(_) => false,
 
-        #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
         _ => false,
     }
 }
@@ -1221,6 +1248,7 @@ fn is_blocklike(expr: &Expr) -> bool {
 // bitwise OR operators while `{ {} |x| x }` has a block followed by a closure.
 fn parseable_as_stmt(expr: &Expr) -> bool {
     match expr {
+        #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
         Expr::Array(_)
         | Expr::Async(_)
         | Expr::Block(_)
@@ -1265,7 +1293,6 @@ fn parseable_as_stmt(expr: &Expr) -> bool {
         },
         Expr::Try(expr) => parseable_as_stmt(&expr.expr),
 
-        #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
         _ => false,
     }
 }

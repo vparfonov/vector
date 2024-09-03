@@ -1,7 +1,7 @@
 //! `getsockopt` and `setsockopt` functions.
 //!
-//! In the rustix API, there is a separate function for each option, so that
-//! it can be given an option-specific type signature.
+//! In the rustix API, there is a separate function for each option, so that it
+//! can be given an option-specific type signature.
 //!
 //! # References for all `get_*` functions:
 //!
@@ -155,6 +155,7 @@ use crate::net::xdp::{XdpMmapOffsets, XdpOptionsFlags, XdpStatistics, XdpUmemReg
     target_os = "haiku",
     target_os = "netbsd",
     target_os = "nto",
+    target_os = "vita",
 )))]
 use crate::net::AddressFamily;
 #[cfg(any(
@@ -441,8 +442,10 @@ pub fn get_socket_send_buffer_size<Fd: AsFd>(fd: Fd) -> io::Result<usize> {
     target_os = "emscripten",
     target_os = "espidf",
     target_os = "haiku",
+    target_os = "hurd",
     target_os = "netbsd",
     target_os = "nto",
+    target_os = "vita",
 )))]
 #[inline]
 #[doc(alias = "SO_DOMAIN")]
@@ -1067,8 +1070,8 @@ pub fn get_ipv6_freebind<Fd: AsFd>(fd: Fd) -> io::Result<bool> {
 
 /// `getsockopt(fd, IPPROTO_IP, SO_ORIGINAL_DST)`
 ///
-/// Even though this corresponnds to a `SO_*` constant, it is an
-/// `IPPROTO_IP` option.
+/// Even though this corresponds to a `SO_*` constant, it is an `IPPROTO_IP`
+/// option.
 ///
 /// See the [module-level documentation] for more.
 ///
@@ -1082,7 +1085,7 @@ pub fn get_ip_original_dst<Fd: AsFd>(fd: Fd) -> io::Result<SocketAddrV4> {
 
 /// `getsockopt(fd, IPPROTO_IPV6, IP6T_SO_ORIGINAL_DST)`
 ///
-/// Even though this corresponnds to a `IP6T_*` constant, it is an
+/// Even though this corresponds to a `IP6T_*` constant, it is an
 /// `IPPROTO_IPV6` option.
 ///
 /// See the [module-level documentation] for more.
@@ -1100,7 +1103,13 @@ pub fn get_ipv6_original_dst<Fd: AsFd>(fd: Fd) -> io::Result<SocketAddrV6> {
 /// See the [module-level documentation] for more.
 ///
 /// [module-level documentation]: self#references-for-get_ipv6_-and-set_ipv6_-functions
-#[cfg(not(any(solarish, windows, target_os = "espidf", target_os = "haiku")))]
+#[cfg(not(any(
+    solarish,
+    windows,
+    target_os = "espidf",
+    target_os = "haiku",
+    target_os = "vita"
+)))]
 #[inline]
 #[doc(alias = "IPV6_TCLASS")]
 pub fn set_ipv6_tclass<Fd: AsFd>(fd: Fd, value: u32) -> io::Result<()> {
@@ -1112,7 +1121,13 @@ pub fn set_ipv6_tclass<Fd: AsFd>(fd: Fd, value: u32) -> io::Result<()> {
 /// See the [module-level documentation] for more.
 ///
 /// [module-level documentation]: self#references-for-get_ipv6_-and-set_ipv6_-functions
-#[cfg(not(any(solarish, windows, target_os = "espidf", target_os = "haiku")))]
+#[cfg(not(any(
+    solarish,
+    windows,
+    target_os = "espidf",
+    target_os = "haiku",
+    target_os = "vita"
+)))]
 #[inline]
 #[doc(alias = "IPV6_TCLASS")]
 pub fn get_ipv6_tclass<Fd: AsFd>(fd: Fd) -> io::Result<u32> {
@@ -1348,7 +1363,8 @@ pub fn get_tcp_cork<Fd: AsFd>(fd: Fd) -> io::Result<bool> {
     backend::net::sockopt::get_tcp_cork(fd.as_fd())
 }
 
-/// Get credentials of Unix domain socket peer process
+/// `getsockopt(fd, SOL_SOCKET, SO_PEERCRED)`—Get credentials of Unix domain
+/// socket peer process.
 ///
 /// # References
 ///  - [Linux `unix`]

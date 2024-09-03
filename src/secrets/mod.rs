@@ -39,9 +39,9 @@ impl NamedComponent for SecretBackends {
     fn get_component_name(&self) -> &'static str {
         match self {
             Self::Exec(config) => config.get_component_name(),
-            Self::File(config) => config.get_component_name(),
             #[cfg(feature = "secrets-aws-secrets-manager")]
             Self::AwsSecretsManager(config) => config.get_component_name(),
+            Self::File(config) => config.get_component_name(),
             Self::Test(config) => config.get_component_name(),
         }
     }

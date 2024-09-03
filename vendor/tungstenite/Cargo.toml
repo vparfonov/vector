@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.51"
 name = "tungstenite"
-version = "0.20.1"
+version = "0.21.0"
 authors = [
     "Alexey Galakhov",
     "Daniel Abramov",
@@ -28,7 +28,7 @@ include = [
 ]
 description = "Lightweight stream-based WebSocket implementation"
 homepage = "https://github.com/snapview/tungstenite-rs"
-documentation = "https://docs.rs/tungstenite/0.20.0"
+documentation = "https://docs.rs/tungstenite/0.21.0"
 readme = "README.md"
 keywords = [
     "websocket",
@@ -88,7 +88,7 @@ version = "2"
 optional = true
 
 [dependencies.http]
-version = "0.2"
+version = "1.0"
 optional = true
 
 [dependencies.httparse]
@@ -107,11 +107,15 @@ package = "native-tls"
 version = "0.8.0"
 
 [dependencies.rustls]
-version = "0.21.0"
+version = "0.22.0"
 optional = true
 
 [dependencies.rustls-native-certs]
-version = "0.6.0"
+version = "0.7.0"
+optional = true
+
+[dependencies.rustls-pki-types]
+version = "1.0"
 optional = true
 
 [dependencies.sha1]
@@ -129,7 +133,7 @@ optional = true
 version = "0.7.5"
 
 [dependencies.webpki-roots]
-version = "0.24"
+version = "0.26"
 optional = true
 
 [dev-dependencies.criterion]
@@ -141,14 +145,17 @@ version = "0.10.0"
 [dev-dependencies.input_buffer]
 version = "0.5.0"
 
-[dev-dependencies.net2]
-version = "0.2.37"
-
 [dev-dependencies.rand]
 version = "0.8.4"
 
+[dev-dependencies.socket2]
+version = "0.5.5"
+
 [features]
-__rustls-tls = ["rustls"]
+__rustls-tls = [
+    "rustls",
+    "rustls-pki-types",
+]
 default = ["handshake"]
 handshake = [
     "data-encoding",

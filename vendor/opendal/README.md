@@ -44,10 +44,10 @@
 </details>
 
 <details>
-<summary>File Storage Services (like fs, azdfs, hdfs)</summary>
+<summary>File Storage Services (like fs, azdls, hdfs)</summary>
 
 - fs: POSIX alike file system
-- azdfs: [Azure Data Lake Storage Gen2](https://azure.microsoft.com/en-us/products/storage/data-lake-storage/) services (As known as [abfs](https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-abfs-driver))
+- azdls: [Azure Data Lake Storage Gen2](https://azure.microsoft.com/en-us/products/storage/data-lake-storage/) services (As known as [abfs](https://learn.microsoft.com/en-us/azure/storage/blobs/data-lake-storage-abfs-driver))
 - hdfs: [Hadoop Distributed File System](https://hadoop.apache.org/docs/r3.3.4/hadoop-project-dist/hadoop-hdfs/HdfsDesign.html)(HDFS)
 - ipfs: [InterPlanetary File System](https://ipfs.tech/) HTTP Gateway
 - ipmfs: [InterPlanetary File System](https://ipfs.tech/) MFS API *being worked on*
@@ -70,17 +70,20 @@
 - cacache: [cacache](https://crates.io/crates/cacache) backend
 - dashmap: [dashmap](https://github.com/xacrimon/dashmap) backend
 - memory: In memory backend
+- persy: [persy](https://crates.io/crates/persy) backend
 - redis: [Redis](https://redis.io/) services
 - rocksdb: [RocksDB](http://rocksdb.org/) services
 - sled: [sled](https://crates.io/crates/sled) backend
 - redb: [redb](https://crates.io/crates/redb) backend
+- tikv: [tikv](https://tikv.org/) backend
+- atomicserver: [Atomicserver](https://github.com/atomicdata-dev/atomic-server) services
 
 </details>
 
 <details>
 <summary>Cache Storage Service (like memcached, moka)</summary>
 
-- ghac: [Github Action Cache](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows) Service
+- ghac: [GitHub Action Cache](https://docs.github.com/en/actions/using-workflows/caching-dependencies-to-speed-up-workflows) Service
 - memcached: [Memcached](https://memcached.org/) service
 - mini_moka: [Mini Moka](https://github.com/moka-rs/mini-moka) backend
 - moka: [Moka](https://github.com/moka-rs/moka) backend
@@ -151,7 +154,7 @@ async fn main() -> Result<()> {
 
 ## Examples
 
-The examples are available at [here](./examples/rust).
+The examples are available at [here](../examples/rust).
 
 ## Contributing
 

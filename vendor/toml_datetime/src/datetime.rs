@@ -162,7 +162,7 @@ pub struct Time {
     pub minute: u8,
     /// Second: 0 to {58, 59, 60} (based on leap second rules)
     pub second: u8,
-    /// Nanosecond: 0 to 999_999_999
+    /// Nanosecond: 0 to `999_999_999`
     pub nanosecond: u32,
 }
 
@@ -179,9 +179,40 @@ pub enum Offset {
 
     /// Offset between local time and UTC
     Custom {
-        /// Minutes: -1_440..1_440
+        /// Minutes: -`1_440..1_440`
         minutes: i16,
     },
+}
+
+impl Datetime {
+    #[cfg(feature = "serde")]
+    fn type_name(&self) -> &'static str {
+        match (
+            self.date.is_some(),
+            self.time.is_some(),
+            self.offset.is_some(),
+        ) {
+            (true, true, true) => "offset datetime",
+            (true, true, false) => "local datetime",
+            (true, false, false) => Date::type_name(),
+            (false, true, false) => Time::type_name(),
+            _ => unreachable!("unsupported datetime combination"),
+        }
+    }
+}
+
+impl Date {
+    #[cfg(feature = "serde")]
+    fn type_name() -> &'static str {
+        "local date"
+    }
+}
+
+impl Time {
+    #[cfg(feature = "serde")]
+    fn type_name() -> &'static str {
+        "local time"
+    }
 }
 
 impl From<Date> for Datetime {
@@ -308,7 +339,15 @@ impl FromStr for Datetime {
             if date.month < 1 || date.month > 12 {
                 return Err(DatetimeParseError {});
             }
-            if date.day < 1 || date.day > 31 {
+            let is_leap_year =
+                (date.year % 4 == 0) && ((date.year % 100 != 0) || (date.year % 400 == 0));
+            let max_days_in_month = match date.month {
+                2 if is_leap_year => 29,
+                2 => 28,
+                4 | 6 | 9 | 11 => 30,
+                _ => 31,
+            };
+            if date.day < 1 || date.day > max_days_in_month {
                 return Err(DatetimeParseError {});
             }
 
@@ -349,6 +388,7 @@ impl FromStr for Datetime {
 
                 let mut end = whole.len();
                 for (i, byte) in whole.bytes().enumerate() {
+                    #[allow(clippy::single_match_else)]
                     match byte {
                         b'0'..=b'9' => {
                             if i < 9 {
@@ -381,7 +421,8 @@ impl FromStr for Datetime {
             if time.minute > 59 {
                 return Err(DatetimeParseError {});
             }
-            if time.second > 59 {
+            // 00-58, 00-59, 00-60 based on leap second rules
+            if time.second > 60 {
                 return Err(DatetimeParseError {});
             }
             if time.nanosecond > 999_999_999 {
@@ -451,7 +492,7 @@ impl FromStr for Datetime {
 
 fn digit(chars: &mut str::Chars<'_>) -> Result<u8, DatetimeParseError> {
     match chars.next() {
-        Some(c) if ('0'..='9').contains(&c) => Ok(c as u8 - b'0'),
+        Some(c) if c.is_ascii_digit() => Ok(c as u8 - b'0'),
         _ => Err(DatetimeParseError {}),
     }
 }
@@ -467,6 +508,26 @@ impl ser::Serialize for Datetime {
         let mut s = serializer.serialize_struct(NAME, 1)?;
         s.serialize_field(FIELD, &self.to_string())?;
         s.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl ser::Serialize for Date {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        Datetime::from(*self).serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl ser::Serialize for Time {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: ser::Serializer,
+    {
+        Datetime::from(*self).serialize(serializer)
     }
 }
 
@@ -500,6 +561,46 @@ impl<'de> de::Deserialize<'de> for Datetime {
 
         static FIELDS: [&str; 1] = [FIELD];
         deserializer.deserialize_struct(NAME, &FIELDS, DatetimeVisitor)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> de::Deserialize<'de> for Date {
+    fn deserialize<D>(deserializer: D) -> Result<Date, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        match Datetime::deserialize(deserializer)? {
+            Datetime {
+                date: Some(date),
+                time: None,
+                offset: None,
+            } => Ok(date),
+            datetime => Err(de::Error::invalid_type(
+                de::Unexpected::Other(datetime.type_name()),
+                &Self::type_name(),
+            )),
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de> de::Deserialize<'de> for Time {
+    fn deserialize<D>(deserializer: D) -> Result<Time, D::Error>
+    where
+        D: de::Deserializer<'de>,
+    {
+        match Datetime::deserialize(deserializer)? {
+            Datetime {
+                date: None,
+                time: Some(time),
+                offset: None,
+            } => Ok(time),
+            datetime => Err(de::Error::invalid_type(
+                de::Unexpected::Other(datetime.type_name()),
+                &Self::type_name(),
+            )),
+        }
     }
 }
 

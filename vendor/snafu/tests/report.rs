@@ -142,6 +142,22 @@ fn debug_and_display_are_the_same() {
     assert_eq!(display, debug);
 }
 
+/// `Report as Termination` prints-out the "Error:" prefix.  Ensure that `Report as Display` does
+/// not also add such a prefix, to avoid printing-out "Error: Error: ...".
+#[test]
+fn display_not_prefixed() {
+    #[derive(Debug, Snafu)]
+    #[snafu(display("This is my Display text!"))]
+    struct Error;
+
+    let r = Report::from_error(Error);
+    let msg = r.to_string();
+    let msg = msg.trim_start();
+
+    assert!(!msg.starts_with("Err"));
+    assert!(!msg.starts_with("err"));
+}
+
 #[test]
 fn procedural_macro_works_with_result_return_type() {
     #[derive(Debug, Snafu)]
@@ -153,6 +169,30 @@ fn procedural_macro_works_with_result_return_type() {
     }
 
     let _: Report<Error> = mainlike_result();
+}
+
+#[test]
+fn procedural_macro_works_with_tough_inference() {
+    #[derive(Debug, Snafu)]
+    struct InnerError;
+
+    #[derive(Debug, Snafu)]
+    struct OuterError {
+        source: InnerError,
+    }
+
+    fn inner() -> Result<(), InnerError> {
+        InnerSnafu.fail()
+    }
+
+    #[snafu::report]
+    fn mainlike_result() -> Result<(), OuterError> {
+        loop {
+            inner().context(OuterSnafu)?;
+        }
+    }
+
+    let _: Report<_> = mainlike_result();
 }
 
 #[test]
@@ -176,8 +216,13 @@ fn termination_returns_failure_code() {
 fn nasty_hack_exit_code_eq(left: ExitCode, right: ExitCode) -> bool {
     use std::mem;
 
-    let (left, right): (u8, u8) = unsafe {
-        assert_eq!(mem::size_of::<u8>(), mem::size_of::<ExitCode>());
+    #[cfg(target_os = "windows")]
+    type ExitCodeSize = u32;
+    #[cfg(not(target_os = "windows"))]
+    type ExitCodeSize = u8;
+
+    let (left, right): (ExitCodeSize, ExitCodeSize) = unsafe {
+        assert_eq!(mem::size_of::<ExitCodeSize>(), mem::size_of::<ExitCode>());
         (mem::transmute(left), mem::transmute(right))
     };
 

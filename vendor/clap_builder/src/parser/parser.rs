@@ -667,7 +667,7 @@ impl<'cmd> Parser<'cmd> {
 
         if self.cmd[current_positional.get_id()].is_allow_hyphen_values_set()
             || (self.cmd[current_positional.get_id()].is_allow_negative_numbers_set()
-                && next.is_number())
+                && next.is_negative_number())
         {
             // If allow hyphen, this isn't a new arg.
             debug!("Parser::is_new_arg: Allow hyphen");
@@ -677,7 +677,7 @@ impl<'cmd> Parser<'cmd> {
             debug!("Parser::is_new_arg: --<something> found");
             true
         } else if next.is_short() {
-            // If this is a short flag, this is a new arg. But a singe '-' by
+            // If this is a short flag, this is a new arg. But a single '-' by
             // itself is a value and typically means "stdin" on unix systems.
             debug!("Parser::is_new_arg: -<something> found");
             true
@@ -745,7 +745,7 @@ impl<'cmd> Parser<'cmd> {
         // maybe here lifetime should be 'a
         debug!("Parser::parse_long_arg");
 
-        #[allow(clippy::blocks_in_if_conditions)]
+        #[allow(clippy::blocks_in_conditions)]
         if matches!(parse_state, ParseState::Opt(opt) | ParseState::Pos(opt) if
             self.cmd[opt].is_allow_hyphen_values_set())
         {
@@ -863,9 +863,9 @@ impl<'cmd> Parser<'cmd> {
     ) -> ClapResult<ParseResult> {
         debug!("Parser::parse_short_arg: short_arg={short_arg:?}");
 
-        #[allow(clippy::blocks_in_if_conditions)]
+        #[allow(clippy::blocks_in_conditions)]
         if matches!(parse_state, ParseState::Opt(opt) | ParseState::Pos(opt)
-                if self.cmd[opt].is_allow_hyphen_values_set() || (self.cmd[opt].is_allow_negative_numbers_set() && short_arg.is_number()))
+                if self.cmd[opt].is_allow_hyphen_values_set() || (self.cmd[opt].is_allow_negative_numbers_set() && short_arg.is_negative_number()))
         {
             debug!("Parser::parse_short_args: prior arg accepts hyphenated values",);
             return Ok(ParseResult::MaybeHyphenValue);
@@ -875,7 +875,7 @@ impl<'cmd> Parser<'cmd> {
             .get(&pos_counter)
             .map(|arg| arg.is_allow_negative_numbers_set())
             .unwrap_or_default()
-            && short_arg.is_number()
+            && short_arg.is_negative_number()
         {
             debug!("Parser::parse_short_arg: negative number");
             return Ok(ParseResult::MaybeHyphenValue);
@@ -1165,7 +1165,7 @@ impl<'cmd> Parser<'cmd> {
                         split_raw_vals.extend(raw_val.split(val_delim).map(|x| x.to_owned()));
                     }
                 }
-                raw_vals = split_raw_vals
+                raw_vals = split_raw_vals;
             }
         }
 

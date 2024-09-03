@@ -65,6 +65,7 @@ impl PutObject {
             {
                 ::aws_runtime::auth::sigv4a::SCHEME_ID
             },
+            crate::s3_express::auth::SCHEME_ID,
             ::aws_smithy_runtime::client::auth::no_auth::NO_AUTH_SCHEME_ID,
         ]));
         if let ::std::option::Option::Some(config_override) = config_override {
@@ -96,7 +97,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for PutObje
         ));
 
         cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::SensitiveOutput);
-        cfg.store_put(::aws_smithy_http::operation::Metadata::new("PutObject", "s3"));
+        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new("PutObject", "s3"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = false;
         signing_options.content_sha256_header = true;
@@ -117,11 +118,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for PutObje
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("PutObject")
-            .with_interceptor(
-                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
-                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
-                ),
-            )
+            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
             .with_interceptor(PutObjectEndpointParamsInterceptor)
             .with_interceptor(crate::http_request_checksum::RequestChecksumInterceptor::new(
                 |input: &::aws_smithy_runtime_api::client::interceptors::context::Input| {
@@ -144,9 +141,15 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for PutObje
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::ModeledAsRetryableClassifier::<
                 crate::operation::put_object::PutObjectError,
             >::new())
-            .with_retry_classifier(::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<
-                crate::operation::put_object::PutObjectError,
-            >::new());
+            .with_retry_classifier(
+                ::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<crate::operation::put_object::PutObjectError>::builder()
+                    .transient_errors({
+                        let mut transient_errors: Vec<&'static str> = ::aws_runtime::retries::classifiers::TRANSIENT_ERRORS.into();
+                        transient_errors.push("InternalError");
+                        ::std::borrow::Cow::Owned(transient_errors)
+                    })
+                    .build(),
+            );
 
         ::std::borrow::Cow::Owned(rcb)
     }
@@ -298,13 +301,18 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for PutObjectEndp
         ::std::result::Result::Ok(())
     }
 }
+
+// The get_* functions below are generated from JMESPath expressions in the
+// operationContextParams trait. They target the operation's input shape.
+
 #[allow(unreachable_code, unused_variables)]
 #[cfg(test)]
-mod put_object_request_test {
+mod put_object_test {
+
     /// This test validates that if a content-type is specified, that only one content-type header is sent
     /// Test ID: DontSendDuplicateContentType
     #[::tokio::test]
-    #[allow(unused_mut)]
+    #[::tracing_test::traced_test]
     async fn dont_send_duplicate_content_type_request() {
         let (http_client, request_receiver) = ::aws_smithy_runtime::client::http::test_util::capture_request(None);
         let config_builder = crate::config::Config::builder().with_test_defaults().endpoint_url("https://example.com");
@@ -329,10 +337,11 @@ mod put_object_request_test {
         ::pretty_assertions::assert_eq!(http_request.method(), "PUT", "method was incorrect");
         ::pretty_assertions::assert_eq!(uri.path(), "/test-key", "path was incorrect");
     }
+
     /// This test validates that if a content-length is specified, that only one content-length header is sent
     /// Test ID: DontSendDuplicateContentLength
     #[::tokio::test]
-    #[allow(unused_mut)]
+    #[::tracing_test::traced_test]
     async fn dont_send_duplicate_content_length_request() {
         let (http_client, request_receiver) = ::aws_smithy_runtime::client::http::test_util::capture_request(None);
         let config_builder = crate::config::Config::builder().with_test_defaults().endpoint_url("https://example.com");

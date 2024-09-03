@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "raw-cpuid"
-version = "10.7.0"
+version = "11.1.0"
 authors = ["Gerd Zellweger <mail@gerdzellweger.com>"]
 description = "A library to parse the x86 CPUID instruction, written in rust with no external dependencies. The implementation closely resembles the Intel CPUID manual description. The library does only depend on libcore."
 homepage = "https://github.com/gz/rust-cpuid"
@@ -25,6 +25,10 @@ keywords = [
     "os",
     "libcore",
 ]
+categories = [
+    "no-std",
+    "no-std::no-alloc",
+]
 license = "MIT"
 repository = "https://github.com/gz/rust-cpuid"
 
@@ -33,11 +37,16 @@ name = "cpuid"
 path = "src/bin/cpuid.rs"
 required-features = ["cli"]
 
+[[example]]
+name = "serialize_deserialize"
+path = "examples/serialize_deserialize.rs"
+required-features = ["serde_json"]
+
 [dependencies.bitflags]
-version = "1.2"
+version = "2.0"
 
 [dependencies.clap]
-version = "3.1.6"
+version = "4.2"
 features = ["derive"]
 optional = true
 
@@ -55,8 +64,22 @@ version = "1.0"
 optional = true
 
 [dependencies.termimad]
-version = "0.20"
+version = "0.25"
 optional = true
+
+[dev-dependencies.core_affinity]
+version = "0.8.0"
+
+[dev-dependencies.libc]
+version = "0.2"
+default-features = false
+
+[dev-dependencies.phf]
+version = "0.11"
+features = ["macros"]
+
+[dev-dependencies.rustversion]
+version = "1.0"
 
 [features]
 cli = [
@@ -74,17 +97,3 @@ serialize = [
     "serde_derive",
 ]
 std = []
-
-[target."cfg(unix)".dev-dependencies.core_affinity]
-version = "0.5.10"
-
-[target."cfg(unix)".dev-dependencies.libc]
-version = "0.2"
-default-features = false
-
-[target."cfg(unix)".dev-dependencies.phf]
-version = "0.11"
-features = ["macros"]
-
-[target."cfg(unix)".dev-dependencies.rustversion]
-version = "1.0"

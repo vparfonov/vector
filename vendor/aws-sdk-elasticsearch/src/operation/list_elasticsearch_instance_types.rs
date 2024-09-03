@@ -97,7 +97,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for ListEla
             ::aws_smithy_runtime_api::client::auth::static_resolver::StaticAuthSchemeOptionResolverParams::new(),
         ));
 
-        cfg.store_put(::aws_smithy_http::operation::Metadata::new(
+        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new(
             "ListElasticsearchInstanceTypes",
             "elasticsearchservice",
         ));
@@ -121,11 +121,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for ListEla
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("ListElasticsearchInstanceTypes")
-            .with_interceptor(
-                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
-                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
-                ),
-            )
+            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
             .with_interceptor(ListElasticsearchInstanceTypesEndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::list_elasticsearch_instance_types::ListElasticsearchInstanceTypesError,
@@ -210,17 +206,17 @@ impl ::aws_smithy_runtime_api::client::ser_de::SerializeRequest for ListElastics
                 let mut query = ::aws_smithy_http::query::Writer::new(output);
                 if let ::std::option::Option::Some(inner_2) = &_input.domain_name {
                     {
-                        query.push_kv("domainName", &::aws_smithy_http::query::fmt_string(&inner_2));
+                        query.push_kv("domainName", &::aws_smithy_http::query::fmt_string(inner_2));
                     }
                 }
                 if let ::std::option::Option::Some(inner_3) = &_input.max_results {
-                    if *inner_3 != 0 {
+                    {
                         query.push_kv("maxResults", ::aws_smithy_types::primitive::Encoder::from(*inner_3).encode());
                     }
                 }
                 if let ::std::option::Option::Some(inner_4) = &_input.next_token {
                     {
-                        query.push_kv("nextToken", &::aws_smithy_http::query::fmt_string(&inner_4));
+                        query.push_kv("nextToken", &::aws_smithy_http::query::fmt_string(inner_4));
                     }
                 }
                 ::std::result::Result::Ok(())
@@ -280,6 +276,9 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for ListElasticse
         ::std::result::Result::Ok(())
     }
 }
+
+// The get_* functions below are generated from JMESPath expressions in the
+// operationContextParams trait. They target the operation's input shape.
 
 /// Error type for the `ListElasticsearchInstanceTypesError` operation.
 #[non_exhaustive]

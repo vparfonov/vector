@@ -18,15 +18,17 @@ bitflags! {
             solarish,
             target_os = "espidf",
             target_os = "haiku",
+            target_os = "hurd",
             target_os = "nto",
             target_os = "openbsd",
             target_os = "redox",
+            target_os = "vita",
         )))]
         const DIRECT = bitcast!(c::O_DIRECT);
         /// `O_NONBLOCK`
         const NONBLOCK = bitcast!(c::O_NONBLOCK);
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -35,6 +37,10 @@ bitflags! {
 bitflags! {
     /// `SPLICE_F_*` constants for use with [`splice`], [`vmsplice`], and
     /// [`tee`].
+    ///
+    /// [`splice`]: crate::pipe::splice
+    /// [`vmsplice`]: crate::pipe::splice
+    /// [`tee`]: crate::pipe::tee
     #[repr(transparent)]
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
     pub struct SpliceFlags: c::c_uint {
@@ -47,7 +53,7 @@ bitflags! {
         /// `SPLICE_F_GIFT`
         const GIFT = c::SPLICE_F_GIFT;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }

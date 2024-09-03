@@ -36,7 +36,10 @@ use crate::{layout::Alignment, text::Line};
 /// ```
 /// use ratatui::{
 ///     prelude::*,
-///     widgets::{block::*, *},
+///     widgets::{
+///         block::{Position, Title},
+///         Block,
+///     },
 /// };
 ///
 /// Title::from("Title")
@@ -87,7 +90,8 @@ pub enum Position {
 
 impl<'a> Title<'a> {
     /// Set the title content.
-    pub fn content<T>(mut self, content: T) -> Title<'a>
+    #[must_use = "method moves the value of self and returns the modified value"]
+    pub fn content<T>(mut self, content: T) -> Self
     where
         T: Into<Line<'a>>,
     {
@@ -97,14 +101,14 @@ impl<'a> Title<'a> {
 
     /// Set the title alignment.
     #[must_use = "method moves the value of self and returns the modified value"]
-    pub fn alignment(mut self, alignment: Alignment) -> Title<'a> {
+    pub const fn alignment(mut self, alignment: Alignment) -> Self {
         self.alignment = Some(alignment);
         self
     }
 
     /// Set the title position.
     #[must_use = "method moves the value of self and returns the modified value"]
-    pub fn position(mut self, position: Position) -> Title<'a> {
+    pub const fn position(mut self, position: Position) -> Self {
         self.position = Some(position);
         self
     }

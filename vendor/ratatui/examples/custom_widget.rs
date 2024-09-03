@@ -15,15 +15,23 @@
 
 use std::{error::Error, io, ops::ControlFlow, time::Duration};
 
-use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, MouseButton, MouseEvent,
-        MouseEventKind,
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    buffer::Buffer,
+    crossterm::{
+        event::{
+            self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, MouseButton, MouseEvent,
+            MouseEventKind,
+        },
+        execute,
+        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     },
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    layout::{Constraint, Layout, Rect},
+    style::{Color, Style},
+    terminal::{Frame, Terminal},
+    text::Line,
+    widgets::{Paragraph, Widget},
 };
-use ratatui::{prelude::*, widgets::*};
 
 /// A custom widget that renders a button with a label, theme and state.
 #[derive(Debug, Clone)]
@@ -71,7 +79,7 @@ const GREEN: Theme = Theme {
 
 /// A button with a label that can be themed.
 impl<'a> Button<'a> {
-    pub fn new<T: Into<Line<'a>>>(label: T) -> Button<'a> {
+    pub fn new<T: Into<Line<'a>>>(label: T) -> Self {
         Button {
             label: label.into(),
             theme: BLUE,
@@ -79,18 +87,19 @@ impl<'a> Button<'a> {
         }
     }
 
-    pub fn theme(mut self, theme: Theme) -> Button<'a> {
+    pub const fn theme(mut self, theme: Theme) -> Self {
         self.theme = theme;
         self
     }
 
-    pub fn state(mut self, state: State) -> Button<'a> {
+    pub const fn state(mut self, state: State) -> Self {
         self.state = state;
         self
     }
 }
 
 impl<'a> Widget for Button<'a> {
+    #[allow(clippy::cast_possible_truncation)]
     fn render(self, area: Rect, buf: &mut Buffer) {
         let (background, text, shadow, highlight) = self.colors();
         buf.set_style(area, Style::new().bg(background).fg(text));
@@ -124,7 +133,7 @@ impl<'a> Widget for Button<'a> {
 }
 
 impl Button<'_> {
-    fn colors(&self) -> (Color, Color, Color, Color) {
+    const fn colors(&self) -> (Color, Color, Color, Color) {
         let theme = self.theme;
         match self.state {
             State::Normal => (theme.background, theme.text, theme.shadow, theme.highlight),
@@ -163,7 +172,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
     let mut selected_button: usize = 0;
-    let button_states = &mut [State::Selected, State::Normal, State::Normal];
+    let mut button_states = [State::Selected, State::Normal, State::Normal];
     loop {
         terminal.draw(|frame| ui(frame, button_states))?;
         if !event::poll(Duration::from_millis(100))? {
@@ -174,18 +183,20 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
                 if key.kind != event::KeyEventKind::Press {
                     continue;
                 }
-                if handle_key_event(key, button_states, &mut selected_button).is_break() {
+                if handle_key_event(key, &mut button_states, &mut selected_button).is_break() {
                     break;
                 }
             }
-            Event::Mouse(mouse) => handle_mouse_event(mouse, button_states, &mut selected_button),
+            Event::Mouse(mouse) => {
+                handle_mouse_event(mouse, &mut button_states, &mut selected_button);
+            }
             _ => (),
         }
     }
     Ok(())
 }
 
-fn ui(frame: &mut Frame, states: &[State; 3]) {
+fn ui(frame: &mut Frame, states: [State; 3]) {
     let vertical = Layout::vertical([
         Constraint::Length(1),
         Constraint::Max(3),
@@ -202,7 +213,7 @@ fn ui(frame: &mut Frame, states: &[State; 3]) {
     frame.render_widget(Paragraph::new("←/→: select, Space: toggle, q: quit"), help);
 }
 
-fn render_buttons(frame: &mut Frame<'_>, area: Rect, states: &[State; 3]) {
+fn render_buttons(frame: &mut Frame<'_>, area: Rect, states: [State; 3]) {
     let horizontal = Layout::horizontal([
         Constraint::Length(15),
         Constraint::Length(15),

@@ -56,10 +56,20 @@ where
                                 crate::protocol_serde::shape_http_endpoint_destination_description::de_http_endpoint_destination_description(tokens)?,
                             );
                         }
+                        "SnowflakeDestinationDescription" => {
+                            builder = builder.set_snowflake_destination_description(
+                                crate::protocol_serde::shape_snowflake_destination_description::de_snowflake_destination_description(tokens)?,
+                            );
+                        }
                         "AmazonOpenSearchServerlessDestinationDescription" => {
                             builder = builder.set_amazon_open_search_serverless_destination_description(
                                     crate::protocol_serde::shape_amazon_open_search_serverless_destination_description::de_amazon_open_search_serverless_destination_description(tokens)?
                                 );
+                        }
+                        "IcebergDestinationDescription" => {
+                            builder = builder.set_iceberg_destination_description(
+                                crate::protocol_serde::shape_iceberg_destination_description::de_iceberg_destination_description(tokens)?,
+                            );
                         }
                         _ => ::aws_smithy_json::deserialize::token::skip_value(tokens)?,
                     },

@@ -14,6 +14,7 @@ use crate::{backend, io};
     target_os = "espidf",
     target_os = "haiku",
     target_os = "redox",
+    target_os = "vita",
     target_os = "wasi",
 )))]
 use backend::c;
@@ -41,6 +42,7 @@ pub use backend::pipe::types::{IoSliceRaw, SpliceFlags};
     target_os = "haiku",
     target_os = "hurd",
     target_os = "redox",
+    target_os = "vita",
     target_os = "wasi",
 )))]
 pub const PIPE_BUF: usize = c::PIPE_BUF;
@@ -154,9 +156,9 @@ pub fn splice<FdIn: AsFd, FdOut: AsFd>(
 /// the pipe is placed in `fd`.
 ///
 /// Additionally if `SpliceFlags::GIFT` is set, the caller must also ensure
-/// that the contents of `bufs` in never modified following the call,
-/// and that all of the pointers in `bufs` are page aligned,
-/// and the lengths are multiples of a page size in bytes.
+/// that the contents of `bufs` in never modified following the call, and that
+/// all of the pointers in `bufs` are page aligned, and the lengths are
+/// multiples of a page size in bytes.
 ///
 /// # References
 ///  - [Linux]

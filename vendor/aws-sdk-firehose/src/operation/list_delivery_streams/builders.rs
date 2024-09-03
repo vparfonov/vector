@@ -3,7 +3,7 @@ pub use crate::operation::list_delivery_streams::_list_delivery_streams_output::
 
 pub use crate::operation::list_delivery_streams::_list_delivery_streams_input::ListDeliveryStreamsInputBuilder;
 
-impl ListDeliveryStreamsInputBuilder {
+impl crate::operation::list_delivery_streams::builders::ListDeliveryStreamsInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -49,7 +49,7 @@ impl
     }
 }
 impl ListDeliveryStreamsFluentBuilder {
-    /// Creates a new `ListDeliveryStreams`.
+    /// Creates a new `ListDeliveryStreamsFluentBuilder`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -100,12 +100,12 @@ impl ListDeliveryStreamsFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
-        self.set_config_override(Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
+        self.set_config_override(::std::option::Option::Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }
@@ -125,8 +125,10 @@ impl ListDeliveryStreamsFluentBuilder {
     }
     /// <p>The delivery stream type. This can be one of the following values:</p>
     /// <ul>
-    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
-    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
+    /// <li>
+    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
+    /// <li>
+    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
     /// </ul>
     /// <p>This parameter is optional. If this parameter is omitted, delivery streams of all types are returned.</p>
     pub fn delivery_stream_type(mut self, input: crate::types::DeliveryStreamType) -> Self {
@@ -135,8 +137,10 @@ impl ListDeliveryStreamsFluentBuilder {
     }
     /// <p>The delivery stream type. This can be one of the following values:</p>
     /// <ul>
-    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
-    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
+    /// <li>
+    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
+    /// <li>
+    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
     /// </ul>
     /// <p>This parameter is optional. If this parameter is omitted, delivery streams of all types are returned.</p>
     pub fn set_delivery_stream_type(mut self, input: ::std::option::Option<crate::types::DeliveryStreamType>) -> Self {
@@ -145,8 +149,10 @@ impl ListDeliveryStreamsFluentBuilder {
     }
     /// <p>The delivery stream type. This can be one of the following values:</p>
     /// <ul>
-    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
-    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
+    /// <li>
+    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
+    /// <li>
+    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
     /// </ul>
     /// <p>This parameter is optional. If this parameter is omitted, delivery streams of all types are returned.</p>
     pub fn get_delivery_stream_type(&self) -> &::std::option::Option<crate::types::DeliveryStreamType> {

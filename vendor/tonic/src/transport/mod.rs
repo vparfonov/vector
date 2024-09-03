@@ -92,6 +92,7 @@ pub mod server;
 
 mod error;
 mod service;
+#[cfg(feature = "tls")]
 mod tls;
 
 #[doc(inline)]
@@ -103,9 +104,9 @@ pub use self::error::Error;
 pub use self::server::Server;
 #[doc(inline)]
 pub use self::service::grpc_timeout::TimeoutExpired;
+#[cfg(feature = "tls")]
+#[cfg_attr(docsrs, doc(cfg(feature = "tls")))]
 pub use self::tls::Certificate;
-#[doc(inline)]
-pub use crate::server::NamedService;
 pub use axum::{body::BoxBody as AxumBoxBody, Router as AxumRouter};
 pub use hyper::{Body, Uri};
 

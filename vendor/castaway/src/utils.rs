@@ -2,6 +2,7 @@
 
 use core::{
     any::{type_name, TypeId},
+    marker::PhantomData,
     mem, ptr,
 };
 
@@ -27,30 +28,31 @@ pub(crate) fn type_eq<T: 'static, U: 'static>() -> bool {
 /// `Struct<'b>`, even if either `'a` or `'b` outlives the other.
 #[inline(always)]
 pub(crate) fn type_eq_non_static<T: ?Sized, U: ?Sized>() -> bool {
-    // Inline has a weird, but desirable result on this function. It can't be
-    // fully inlined everywhere since it creates a function pointer of itself.
-    // But in practice when used here, the act of taking the address will be
-    // inlined, thus avoiding a function call when comparing two types.
-    #[inline]
-    fn type_id_of<T: ?Sized>() -> usize {
-        type_id_of::<T> as usize
+    non_static_type_id::<T>() == non_static_type_id::<U>()
+}
+
+/// Produces type IDs that are compatible with `TypeId::of::<T>`, but without
+/// `T: 'static` bound.
+fn non_static_type_id<T: ?Sized>() -> TypeId {
+    trait NonStaticAny {
+        fn get_type_id(&self) -> TypeId
+        where
+            Self: 'static;
     }
 
-    // What we're doing here is comparing two function pointers of the same
-    // generic function to see if they are identical. If they are not
-    // identical then `T` and `U` are not the same type.
-    //
-    // If they are equal, then they _might_ be the same type, unless an
-    // optimization step reduced two different functions to the same
-    // implementation due to having the same body. To avoid this we are using
-    // a function which references itself. This is something that LLVM cannot
-    // merge, since each monomorphized function has a reference to a different
-    // global alias.
-    type_id_of::<T>() == type_id_of::<U>()
-        // This is used as a sanity check more than anything. Our previous calls
-        // should not have any false positives, but if they did then the odds of
-        // them having the same type name as well is extremely unlikely.
-        && type_name::<T>() == type_name::<U>()
+    impl<T: ?Sized> NonStaticAny for PhantomData<T> {
+        fn get_type_id(&self) -> TypeId
+        where
+            Self: 'static,
+        {
+            TypeId::of::<T>()
+        }
+    }
+
+    let phantom_data = PhantomData::<T>;
+    NonStaticAny::get_type_id(unsafe {
+        mem::transmute::<&dyn NonStaticAny, &(dyn NonStaticAny + 'static)>(&phantom_data)
+    })
 }
 
 /// Reinterprets the bits of a value of one type as another type.
@@ -62,15 +64,29 @@ pub(crate) fn type_eq_non_static<T: ?Sized, U: ?Sized>() -> bool {
 /// size and layout and that it is safe to do this conversion. Which it probably
 /// isn't, unless `T` and `U` are identical.
 ///
+/// # Panics
+///
+/// This function panics if `T` and `U` have different sizes.
+///
 /// # Safety
 ///
 /// It is up to the caller to uphold the following invariants:
 ///
-/// - `T` must have the same size as `U`
 /// - `T` must have the same alignment as `U`
 /// - `T` must be safe to transmute into `U`
 #[inline(always)]
 pub(crate) unsafe fn transmute_unchecked<T, U>(value: T) -> U {
+    // Assert is necessary to avoid miscompilation caused by a bug in LLVM.
+    // Without it `castaway::cast!(123_u8, (u8, u8))` returns `Ok(...)` on
+    // release build profile. `assert` shouldn't be replaced by `assert_eq`
+    // because with `assert_eq` Rust 1.70 and 1.71 will still miscompile it.
+    //
+    // See https://github.com/rust-lang/rust/issues/127286 for details.
+    assert!(
+        mem::size_of::<T>() == mem::size_of::<U>(),
+        "cannot transmute_unchecked if Dst and Src have different size"
+    );
+
     let dest = ptr::read(&value as *const T as *const U);
     mem::forget(value);
     dest

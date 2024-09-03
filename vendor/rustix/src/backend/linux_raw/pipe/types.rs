@@ -16,7 +16,7 @@ bitflags! {
         /// `O_NONBLOCK`
         const NONBLOCK = linux_raw_sys::general::O_NONBLOCK;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -24,6 +24,10 @@ bitflags! {
 bitflags! {
     /// `SPLICE_F_*` constants for use with [`splice`], [`vmsplice`], and
     /// [`tee`].
+    ///
+    /// [`splice`]: crate::pipe::splice
+    /// [`vmsplice`]: crate::pipe::splice
+    /// [`tee`]: crate::pipe::tee
     #[repr(transparent)]
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
     pub struct SpliceFlags: c::c_uint {
@@ -36,7 +40,7 @@ bitflags! {
         /// `SPLICE_F_GIFT`
         const GIFT = linux_raw_sys::general::SPLICE_F_GIFT;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }

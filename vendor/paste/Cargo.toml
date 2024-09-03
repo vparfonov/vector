@@ -13,9 +13,15 @@
 edition = "2018"
 rust-version = "1.31"
 name = "paste"
-version = "1.0.14"
+version = "1.0.15"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
+build = "build.rs"
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Macros for all your token pasting needs"
+documentation = "https://docs.rs/paste"
 readme = "README.md"
 keywords = ["macros"]
 categories = [
@@ -31,7 +37,29 @@ rustdoc-args = ["--generate-link-to-definition"]
 targets = ["x86_64-unknown-linux-gnu"]
 
 [lib]
+name = "paste"
+path = "src/lib.rs"
 proc-macro = true
+
+[[test]]
+name = "test_item"
+path = "tests/test_item.rs"
+
+[[test]]
+name = "test_attr"
+path = "tests/test_attr.rs"
+
+[[test]]
+name = "compiletest"
+path = "tests/compiletest.rs"
+
+[[test]]
+name = "test_doc"
+path = "tests/test_doc.rs"
+
+[[test]]
+name = "test_expr"
+path = "tests/test_expr.rs"
 
 [dev-dependencies.paste-test-suite]
 version = "0"

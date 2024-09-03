@@ -13,12 +13,17 @@
 edition = "2021"
 rust-version = "1.65"
 name = "bstr"
-version = "1.9.1"
+version = "1.10.0"
 authors = ["Andrew Gallant <jamslam@gmail.com>"]
+build = false
 exclude = [
     "/.github",
     "/scripts",
 ]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A string type that is not required to be valid UTF-8."
 homepage = "https://github.com/BurntSushi/bstr"
 documentation = "https://docs.rs/bstr"
@@ -49,32 +54,54 @@ rustdoc-args = [
 debug = 2
 
 [lib]
+name = "bstr"
+path = "src/lib.rs"
 bench = false
 
 [[example]]
 name = "graphemes"
+path = "examples/graphemes.rs"
 required-features = [
     "std",
     "unicode",
 ]
+
+[[example]]
+name = "graphemes-std"
+path = "examples/graphemes-std.rs"
 
 [[example]]
 name = "lines"
+path = "examples/lines.rs"
 required-features = ["std"]
 
 [[example]]
+name = "lines-std"
+path = "examples/lines-std.rs"
+
+[[example]]
 name = "uppercase"
+path = "examples/uppercase.rs"
 required-features = [
     "std",
     "unicode",
 ]
 
 [[example]]
+name = "uppercase-std"
+path = "examples/uppercase-std.rs"
+
+[[example]]
 name = "words"
+path = "examples/words.rs"
 required-features = [
     "std",
     "unicode",
 ]
+
+[[example]]
+name = "words-std"
+path = "examples/words-std.rs"
 
 [dependencies.memchr]
 version = "2.7.1"

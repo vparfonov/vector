@@ -74,6 +74,12 @@ fn files() {
         .ok("start_with_name_with_include::path_4_files_element_2_txt")
         .ok("start_with_name_with_include::path_5_files_element_3_txt")
         .ok("start_with_name_with_include::path_6_files_sub_sub_dir_file_txt")
+        .ok("module::pathbuf_need_not_be_in_scope::path_1_files__ignore_me_txt")
+        .ok("module::pathbuf_need_not_be_in_scope::path_2_files_element_0_txt")
+        .ok("module::pathbuf_need_not_be_in_scope::path_3_files_element_1_txt")
+        .ok("module::pathbuf_need_not_be_in_scope::path_4_files_element_2_txt")
+        .ok("module::pathbuf_need_not_be_in_scope::path_5_files_element_3_txt")
+        .ok("module::pathbuf_need_not_be_in_scope::path_6_files_sub_sub_dir_file_txt")
         .assert(output);
 }
 
@@ -165,6 +171,18 @@ fn use_mutable_fixture_in_parametric_argumnts() {
     TestResults::new()
         .with_contains(true)
         .ok("use_mutate_fixture::case_1::b_1")
+        .assert(output);
+}
+
+#[test]
+fn should_not_remove_lifetimes() {
+    let (output, _) = run_test("lifetimes.rs");
+
+    TestResults::new()
+        .with_contains(true)
+        .ok("case")
+        .ok("values")
+        .ok("fixture")
         .assert(output);
 }
 
@@ -531,6 +549,19 @@ mod cases {
             .ok("my_async_test::case_3_pass_panic")
             .fail("my_async_test::case_4_fail_panic")
             .ok("my_async_test_revert::case_1_pass")
+            .assert(output);
+    }
+
+    #[rstest]
+    fn should_run_async_mut() {
+        let prj = prj(res("async_awt_mut.rs"));
+        prj.add_dependency("async-std", r#"{version="*", features=["attributes"]}"#);
+
+        let output = prj.run_tests().unwrap();
+
+        TestResults::new()
+            .ok("my_mut_test_global_awt::case_1_pass")
+            .ok("my_mut_test_local_awt::case_1_pass")
             .assert(output);
     }
 
@@ -948,8 +979,10 @@ fn rename() {
 
     TestResults::new()
         .ok("compact")
+        .ok("compact_mod")
         .ok("compact_injected")
         .ok("attribute")
+        .ok("attribute_mod")
         .ok("attribute_injected")
         .assert(output);
 }
@@ -1018,6 +1051,97 @@ fn timeout() {
         .ok("async_std_cases::compile_with_no_copy_fixture")
         .ok("async_std_cases::compile_with_async_fixture")
         .ok("async_std_cases::compile_with_async_awt_fixture")
+        .assert(output);
+}
+
+mod import_crate_with_other_name {
+    use super::*;
+
+    fn prj(res: &str, features: Option<&[&str]>) -> Project {
+        let prj = crate::base_prj();
+        let default_features = features.is_none();
+        let features = features
+            .map(|features| {
+                features
+                    .iter()
+                    .map(|f| format!(r#""{}""#, f))
+                    .collect::<Vec<_>>()
+                    .join(",")
+            })
+            .unwrap_or_else(|| "".to_string());
+        prj.add_dependency(
+            "other_name",
+            &format!(
+                r#"{{path="{}", package = "rstest", default-features = {}, features = [{}]}}"#,
+                prj.exec_dir_str().as_str(),
+                default_features,
+                features
+            ),
+        );
+        prj.set_code_file(resources(res))
+    }
+
+    #[test]
+    fn should_fails_to_compile_if_crate_name_feature_is_not_enabled() {
+        let prj = prj("timeout_other_name.rs", Some(&[]));
+        assert!(!prj.compile().unwrap().status.success());
+    }
+
+    #[test]
+    fn should_always_compile_project_that_use_default_name() {
+        let prj = crate::base_prj();
+        prj.add_dependency(
+            "rstest",
+            &format!(
+                r#"{{path="{}", default-features = false}}"#,
+                prj.exec_dir_str().as_str(),
+            ),
+        );
+        let prj = prj.set_code_file(resources("convert_string_literal.rs"));
+
+        assert!(prj.compile().unwrap().status.success());
+    }
+
+    #[rstest]
+    #[case::default_features(None)]
+    #[case::with_crate_name_feature(Some(["crate-name"].as_slice()))]
+    fn timeout_should_compile_and_run(#[case] features: Option<&[&str]>) {
+        let prj = prj("timeout_other_name.rs", features);
+        assert!(prj.compile().unwrap().status.success());
+    }
+
+    #[rstest]
+    #[case::default(None)]
+    #[case::with_crate_name_feature(Some(["crate-name"].as_slice()))]
+    fn convert_string_literal_should_compile_and_run(#[case] features: Option<&[&str]>) {
+        let prj = prj("convert_string_literal_other_name.rs", features);
+        assert!(prj.compile().unwrap().status.success());
+    }
+}
+
+#[test]
+fn local_lifetime() {
+    let (output, _) = run_test("local_lifetime.rs");
+
+    TestResults::new()
+        .ok("tests::it_works::case_1")
+        .assert(output);
+}
+
+#[test]
+fn by_ref() {
+    let prj = prj("by_ref.rs");
+    let files_path = prj.path().join("files");
+    std::fs::create_dir(&files_path).unwrap();
+    let name = "my_name.txt";
+    let mut out = File::create(files_path.join(name)).unwrap();
+    out.write_all(name.as_bytes()).unwrap();
+    let output = prj.run_tests().unwrap();
+
+    TestResults::new()
+        .ok("test::case_1::v_1_42")
+        .ok("test::case_1::v_2_142")
+        .ok("start_with_name::path_1_files_my_name_txt")
         .assert(output);
 }
 

@@ -1,4 +1,5 @@
 #![allow(deprecated)]
+#![allow(unknown_lints)]
 #![allow(clippy::module_inception)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
@@ -10,8 +11,12 @@
 #![allow(clippy::needless_return)]
 #![allow(clippy::derive_partial_eq_without_eq)]
 #![allow(clippy::result_large_err)]
+#![allow(clippy::unnecessary_map_on_constructor)]
 #![allow(rustdoc::bare_urls)]
+#![allow(rustdoc::redundant_explicit_links)]
+#![forbid(unsafe_code)]
 #![warn(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 //! ## Getting Started
 //!
 //! > Examples are available for many services and operations, check out the
@@ -23,8 +28,8 @@
 //!
 //! ```toml
 //! [dependencies]
-//! aws-config = { version = "1.0.1", features = ["behavior-version-latest"] }
-//! aws-sdk-s3 = "1.4.0"
+//! aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
+//! aws-sdk-s3 = "1.47.0"
 //! tokio = { version = "1", features = ["full"] }
 //! ```
 //!
@@ -109,9 +114,9 @@ pub use config::Config;
 /// # }
 /// ```
 ///
-/// Occasionally, SDKs may have additional service-specific that can be set on the [`Config`] that
+/// Occasionally, SDKs may have additional service-specific values that can be set on the [`Config`] that
 /// is absent from [`SdkConfig`], or slightly different settings for a specific client may be desired.
-/// The [`Config`] struct implements `From<&SdkConfig>`, so setting these specific settings can be
+/// The [`Builder`] struct implements `From<&SdkConfig>`, so setting these specific settings can be
 /// done as follows:
 ///
 /// ```rust,no_run
@@ -156,6 +161,20 @@ pub use config::Config;
 /// The underlying HTTP requests that get made by this can be modified with the `customize_operation`
 /// function on the fluent builder. See the [`customize`](crate::client::customize) module for more
 /// information.
+/// # Waiters
+///
+/// This client provides `wait_until` methods behind the [`Waiters`](crate::client::Waiters) trait.
+/// To use them, simply import the trait, and then call one of the `wait_until` methods. This will
+/// return a waiter fluent builder that takes various parameters, which are documented on the builder
+/// type. Once parameters have been provided, the `wait` method can be called to initiate waiting.
+///
+/// For example, if there was a `wait_until_thing` method, it could look like:
+/// ```rust,ignore
+/// let result = client.wait_until_thing()
+///     .thing_id("someId")
+///     .wait(Duration::from_secs(120))
+///     .await;
+/// ```
 pub mod client;
 
 /// Configuration for Amazon Simple Storage Service.
@@ -180,34 +199,40 @@ pub mod types;
 
 mod auth_plugin;
 
-///
+mod event_receiver;
+
 pub(crate) mod http_request_checksum;
 
-///
 pub(crate) mod http_response_checksum;
 
-///
 pub mod presigning;
 
-///
 pub(crate) mod presigning_interceptors;
 
 pub(crate) mod protocol_serde;
 
 mod rest_xml_unwrapped_errors;
 
-///
+mod s3_expires_interceptor;
+
+mod s3_express;
+
 mod s3_request_id;
 
 mod serialization_settings;
 
+mod endpoint_lib;
+
 mod lens;
+
+mod sdk_feature_tracker;
 
 mod serde_util;
 
-mod endpoint_lib;
-
-mod event_receiver;
+/// Supporting types for waiters.
+///
+/// Note: to use waiters, import the [`Waiters`](crate::client::Waiters) trait, which adds methods prefixed with `wait_until` to the client.
+pub mod waiters;
 
 mod event_stream_serde;
 

@@ -12,15 +12,16 @@
 [package]
 edition = "2021"
 name = "backon"
-version = "0.4.1"
+version = "0.4.4"
 authors = ["Xuanwo <github@xuanwo.io>"]
 description = "Retry with backoff without effort."
 documentation = "https://docs.rs/backon"
 readme = "README.md"
 license = "Apache-2.0"
+repository = "https://github.com/Xuanwo/backon"
 
 [dependencies.fastrand]
-version = "1.9.0"
+version = "2.0.0"
 
 [dependencies.futures-core]
 version = "0.3.26"
@@ -36,8 +37,13 @@ features = ["time"]
 version = "1"
 
 [dev-dependencies.reqwest]
-version = "0.11"
+version = "0.12"
 
 [dev-dependencies.tokio]
 version = "1"
-features = ["full"]
+features = [
+    "time",
+    "rt",
+    "macros",
+    "sync",
+]

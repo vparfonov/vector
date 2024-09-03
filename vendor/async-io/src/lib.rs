@@ -54,8 +54,13 @@
 //! ```
 
 #![warn(missing_docs, missing_debug_implementations, rust_2018_idioms)]
+#![doc(
+    html_favicon_url = "https://raw.githubusercontent.com/smol-rs/smol/master/assets/images/logo_fullsize_transparent.png"
+)]
+#![doc(
+    html_logo_url = "https://raw.githubusercontent.com/smol-rs/smol/master/assets/images/logo_fullsize_transparent.png"
+)]
 
-use std::convert::TryFrom;
 use std::future::Future;
 use std::io::{self, IoSlice, IoSliceMut, Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream, UdpSocket};
@@ -64,37 +69,32 @@ use std::sync::Arc;
 use std::task::{Context, Poll, Waker};
 use std::time::{Duration, Instant};
 
-#[cfg(all(not(async_io_no_io_safety), unix))]
-use std::os::unix::io::{AsFd, BorrowedFd, OwnedFd};
 #[cfg(unix)]
 use std::{
-    os::unix::io::{AsRawFd, RawFd},
+    os::unix::io::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd},
     os::unix::net::{SocketAddr as UnixSocketAddr, UnixDatagram, UnixListener, UnixStream},
     path::Path,
 };
 
 #[cfg(windows)]
-use std::os::windows::io::{AsRawSocket, RawSocket};
-#[cfg(all(not(async_io_no_io_safety), windows))]
-use std::os::windows::io::{AsSocket, BorrowedSocket, OwnedSocket};
+use std::os::windows::io::{AsRawSocket, AsSocket, BorrowedSocket, OwnedSocket, RawSocket};
 
-use futures_lite::io::{AsyncRead, AsyncWrite};
+use futures_io::{AsyncRead, AsyncWrite};
 use futures_lite::stream::{self, Stream};
 use futures_lite::{future, pin, ready};
-use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 
-use crate::reactor::{Reactor, Source};
+use rustix::io as rio;
+use rustix::net as rn;
+
+use crate::reactor::{Reactor, Registration, Source};
 
 mod driver;
 mod reactor;
 
+pub mod os;
+
 pub use driver::block_on;
 pub use reactor::{Readable, ReadableOwned, Writable, WritableOwned};
-
-/// Use `Duration::MAX` once `duration_constants` are stabilized.
-fn duration_max() -> Duration {
-    Duration::new(std::u64::MAX, 1_000_000_000 - 1)
-}
 
 /// A future or stream that emits timed events.
 ///
@@ -132,7 +132,7 @@ fn duration_max() -> Duration {
 /// # futures_lite::future::block_on(async {
 /// let addrs = async_net::resolve("google.com:80")
 ///     .or(async {
-///         Timer::after(Duration::from_secs(10)).await;
+///         Timer::after(Duration::from_secs(1)).await;
 ///         Err(std::io::ErrorKind::TimedOut.into())
 ///     })
 ///     .await?;
@@ -193,7 +193,7 @@ impl Timer {
         Timer {
             id_and_waker: None,
             when: None,
-            period: duration_max(),
+            period: Duration::MAX,
         }
     }
 
@@ -230,8 +230,7 @@ impl Timer {
     /// # });
     /// ```
     pub fn at(instant: Instant) -> Timer {
-        // Use Duration::MAX once duration_constants are stabilized.
-        Timer::interval_at(instant, duration_max())
+        Timer::interval_at(instant, Duration::MAX)
     }
 
     /// Creates a timer that emits events periodically.
@@ -282,10 +281,16 @@ impl Timer {
     /// [`never()`] will never fire, and timers created with [`after()`] or [`at()`] will fire
     /// if the duration is not too large.
     ///
+    /// [`never()`]: Timer::never()
+    /// [`after()`]: Timer::after()
+    /// [`at()`]: Timer::at()
+    ///
     /// # Examples
     ///
     /// ```
+    /// # futures_lite::future::block_on(async {
     /// use async_io::Timer;
+    /// use futures_lite::prelude::*;
     /// use std::time::Duration;
     ///
     /// // `never` will never fire.
@@ -294,6 +299,19 @@ impl Timer {
     /// // `after` will fire if the duration is not too large.
     /// assert!(Timer::after(Duration::from_secs(1)).will_fire());
     /// assert!(!Timer::after(Duration::MAX).will_fire());
+    ///
+    /// // However, once an `after` timer has fired, it will never fire again.
+    /// let mut t = Timer::after(Duration::from_secs(1));
+    /// assert!(t.will_fire());
+    /// (&mut t).await;
+    /// assert!(!t.will_fire());
+    ///
+    /// // Interval timers will fire periodically.
+    /// let mut t = Timer::interval(Duration::from_secs(1));
+    /// assert!(t.will_fire());
+    /// t.next().await;
+    /// assert!(t.will_fire());
+    /// # });
     /// ```
     #[inline]
     pub fn will_fire(&self) -> bool {
@@ -473,6 +491,8 @@ impl Stream for Timer {
                     // Register the timer in the reactor.
                     let id = Reactor::get().insert_timer(next, cx.waker());
                     this.id_and_waker = Some((id, cx.waker().clone()));
+                } else {
+                    this.when = None;
                 }
                 return Poll::Ready(Some(result_time));
             } else {
@@ -516,8 +536,15 @@ impl Stream for Timer {
 /// For higher-level primitives built on top of [`Async`], look into [`async-net`] or
 /// [`async-process`] (on Unix).
 ///
+/// The most notable caveat is that it is unsafe to access the inner I/O source mutably
+/// using this primitive. Traits likes [`AsyncRead`] and [`AsyncWrite`] are not implemented by
+/// default unless it is guaranteed that the resource won't be invalidated by reading or writing.
+/// See the [`IoSafe`] trait for more information.
+///
 /// [`async-net`]: https://github.com/smol-rs/async-net
 /// [`async-process`]: https://github.com/smol-rs/async-process
+/// [`AsyncRead`]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncRead.html
+/// [`AsyncWrite`]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncWrite.html
 ///
 /// ### Supported types
 ///
@@ -602,14 +629,14 @@ pub struct Async<T> {
 impl<T> Unpin for Async<T> {}
 
 #[cfg(unix)]
-impl<T: AsRawFd> Async<T> {
+impl<T: AsFd> Async<T> {
     /// Creates an async I/O handle.
     ///
     /// This method will put the handle in non-blocking mode and register it in
     /// [epoll]/[kqueue]/[event ports]/[IOCP].
     ///
-    /// On Unix systems, the handle must implement `AsRawFd`, while on Windows it must implement
-    /// `AsRawSocket`.
+    /// On Unix systems, the handle must implement `AsFd`, while on Windows it must implement
+    /// `AsSocket`.
     ///
     /// [epoll]: https://en.wikipedia.org/wiki/Epoll
     /// [kqueue]: https://en.wikipedia.org/wiki/Kqueue
@@ -628,34 +655,36 @@ impl<T: AsRawFd> Async<T> {
     /// # std::io::Result::Ok(()) });
     /// ```
     pub fn new(io: T) -> io::Result<Async<T>> {
-        let raw = io.as_raw_fd();
-
         // Put the file descriptor in non-blocking mode.
-        //
-        // Safety: We assume `as_raw_fd()` returns a valid fd. When we can
-        // depend on Rust >= 1.63, where `AsFd` is stabilized, and when
-        // `TimerFd` implements it, we can remove this unsafe and simplify this.
-        let fd = unsafe { rustix::fd::BorrowedFd::borrow_raw(raw) };
-        cfg_if::cfg_if! {
-            // ioctl(FIONBIO) sets the flag atomically, but we use this only on Linux
-            // for now, as with the standard library, because it seems to behave
-            // differently depending on the platform.
-            // https://github.com/rust-lang/rust/commit/efeb42be2837842d1beb47b51bb693c7474aba3d
-            // https://github.com/libuv/libuv/blob/e9d91fccfc3e5ff772d5da90e1c4a24061198ca0/src/unix/poll.c#L78-L80
-            // https://github.com/tokio-rs/mio/commit/0db49f6d5caf54b12176821363d154384357e70a
-            if #[cfg(target_os = "linux")] {
-                rustix::io::ioctl_fionbio(fd, true)?;
-            } else {
-                let previous = rustix::fs::fcntl_getfl(fd)?;
-                let new = previous | rustix::fs::OFlags::NONBLOCK;
-                if new != previous {
-                    rustix::fs::fcntl_setfl(fd, new)?;
-                }
-            }
-        }
+        set_nonblocking(io.as_fd())?;
+
+        Self::new_nonblocking(io)
+    }
+
+    /// Creates an async I/O handle without setting it to non-blocking mode.
+    ///
+    /// This method will register the handle in [epoll]/[kqueue]/[event ports]/[IOCP].
+    ///
+    /// On Unix systems, the handle must implement `AsFd`, while on Windows it must implement
+    /// `AsSocket`.
+    ///
+    /// [epoll]: https://en.wikipedia.org/wiki/Epoll
+    /// [kqueue]: https://en.wikipedia.org/wiki/Kqueue
+    /// [event ports]: https://illumos.org/man/port_create
+    /// [IOCP]: https://learn.microsoft.com/en-us/windows/win32/fileio/i-o-completion-ports
+    ///
+    /// # Caveats
+    ///
+    /// The caller should ensure that the handle is set to non-blocking mode or that it is okay if
+    /// it is not set. If not set to non-blocking mode, I/O operations may block the current thread
+    /// and cause a deadlock in an asynchronous context.
+    pub fn new_nonblocking(io: T) -> io::Result<Async<T>> {
+        // SAFETY: It is impossible to drop the I/O source while it is registered through
+        // this type.
+        let registration = unsafe { Registration::new(io.as_fd()) };
 
         Ok(Async {
-            source: Reactor::get().insert_io(raw)?,
+            source: Reactor::get().insert_io(registration)?,
             io: Some(io),
         })
     }
@@ -664,19 +693,19 @@ impl<T: AsRawFd> Async<T> {
 #[cfg(unix)]
 impl<T: AsRawFd> AsRawFd for Async<T> {
     fn as_raw_fd(&self) -> RawFd {
-        self.source.raw
+        self.get_ref().as_raw_fd()
     }
 }
 
-#[cfg(all(not(async_io_no_io_safety), unix))]
+#[cfg(unix)]
 impl<T: AsFd> AsFd for Async<T> {
     fn as_fd(&self) -> BorrowedFd<'_> {
         self.get_ref().as_fd()
     }
 }
 
-#[cfg(all(not(async_io_no_io_safety), unix))]
-impl<T: AsRawFd + From<OwnedFd>> TryFrom<OwnedFd> for Async<T> {
+#[cfg(unix)]
+impl<T: AsFd + From<OwnedFd>> TryFrom<OwnedFd> for Async<T> {
     type Error = io::Error;
 
     fn try_from(value: OwnedFd) -> Result<Self, Self::Error> {
@@ -684,7 +713,7 @@ impl<T: AsRawFd + From<OwnedFd>> TryFrom<OwnedFd> for Async<T> {
     }
 }
 
-#[cfg(all(not(async_io_no_io_safety), unix))]
+#[cfg(unix)]
 impl<T: Into<OwnedFd>> TryFrom<Async<T>> for OwnedFd {
     type Error = io::Error;
 
@@ -694,14 +723,14 @@ impl<T: Into<OwnedFd>> TryFrom<Async<T>> for OwnedFd {
 }
 
 #[cfg(windows)]
-impl<T: AsRawSocket> Async<T> {
+impl<T: AsSocket> Async<T> {
     /// Creates an async I/O handle.
     ///
     /// This method will put the handle in non-blocking mode and register it in
     /// [epoll]/[kqueue]/[event ports]/[IOCP].
     ///
-    /// On Unix systems, the handle must implement `AsRawFd`, while on Windows it must implement
-    /// `AsRawSocket`.
+    /// On Unix systems, the handle must implement `AsFd`, while on Windows it must implement
+    /// `AsSocket`.
     ///
     /// [epoll]: https://en.wikipedia.org/wiki/Epoll
     /// [kqueue]: https://en.wikipedia.org/wiki/Kqueue
@@ -720,18 +749,38 @@ impl<T: AsRawSocket> Async<T> {
     /// # std::io::Result::Ok(()) });
     /// ```
     pub fn new(io: T) -> io::Result<Async<T>> {
-        let sock = io.as_raw_socket();
-        let borrowed = unsafe { rustix::fd::BorrowedFd::borrow_raw(sock) };
-
         // Put the socket in non-blocking mode.
+        set_nonblocking(io.as_socket())?;
+
+        Self::new_nonblocking(io)
+    }
+
+    /// Creates an async I/O handle without setting it to non-blocking mode.
+    ///
+    /// This method will register the handle in [epoll]/[kqueue]/[event ports]/[IOCP].
+    ///
+    /// On Unix systems, the handle must implement `AsFd`, while on Windows it must implement
+    /// `AsSocket`.
+    ///
+    /// [epoll]: https://en.wikipedia.org/wiki/Epoll
+    /// [kqueue]: https://en.wikipedia.org/wiki/Kqueue
+    /// [event ports]: https://illumos.org/man/port_create
+    /// [IOCP]: https://learn.microsoft.com/en-us/windows/win32/fileio/i-o-completion-ports
+    ///
+    /// # Caveats
+    ///
+    /// The caller should ensure that the handle is set to non-blocking mode or that it is okay if
+    /// it is not set. If not set to non-blocking mode, I/O operations may block the current thread
+    /// and cause a deadlock in an asynchronous context.
+    pub fn new_nonblocking(io: T) -> io::Result<Async<T>> {
+        // Create the registration.
         //
-        // Safety: We assume `as_raw_socket()` returns a valid fd. When we can
-        // depend on Rust >= 1.63, where `AsFd` is stabilized, and when
-        // `TimerFd` implements it, we can remove this unsafe and simplify this.
-        rustix::io::ioctl_fionbio(borrowed, true)?;
+        // SAFETY: It is impossible to drop the I/O source while it is registered through
+        // this type.
+        let registration = unsafe { Registration::new(io.as_socket()) };
 
         Ok(Async {
-            source: Reactor::get().insert_io(sock)?,
+            source: Reactor::get().insert_io(registration)?,
             io: Some(io),
         })
     }
@@ -740,19 +789,19 @@ impl<T: AsRawSocket> Async<T> {
 #[cfg(windows)]
 impl<T: AsRawSocket> AsRawSocket for Async<T> {
     fn as_raw_socket(&self) -> RawSocket {
-        self.source.raw
+        self.get_ref().as_raw_socket()
     }
 }
 
-#[cfg(all(not(async_io_no_io_safety), windows))]
+#[cfg(windows)]
 impl<T: AsSocket> AsSocket for Async<T> {
     fn as_socket(&self) -> BorrowedSocket<'_> {
         self.get_ref().as_socket()
     }
 }
 
-#[cfg(all(not(async_io_no_io_safety), windows))]
-impl<T: AsRawSocket + From<OwnedSocket>> TryFrom<OwnedSocket> for Async<T> {
+#[cfg(windows)]
+impl<T: AsSocket + From<OwnedSocket>> TryFrom<OwnedSocket> for Async<T> {
     type Error = io::Error;
 
     fn try_from(value: OwnedSocket) -> Result<Self, Self::Error> {
@@ -760,7 +809,7 @@ impl<T: AsRawSocket + From<OwnedSocket>> TryFrom<OwnedSocket> for Async<T> {
     }
 }
 
-#[cfg(all(not(async_io_no_io_safety), windows))]
+#[cfg(windows)]
 impl<T: Into<OwnedSocket>> TryFrom<Async<T>> for OwnedSocket {
     type Error = io::Error;
 
@@ -789,6 +838,10 @@ impl<T> Async<T> {
 
     /// Gets a mutable reference to the inner I/O handle.
     ///
+    /// # Safety
+    ///
+    /// The underlying I/O source must not be dropped using this function.
+    ///
     /// # Examples
     ///
     /// ```
@@ -797,10 +850,10 @@ impl<T> Async<T> {
     ///
     /// # futures_lite::future::block_on(async {
     /// let mut listener = Async::<TcpListener>::bind(([127, 0, 0, 1], 0))?;
-    /// let inner = listener.get_mut();
+    /// let inner = unsafe { listener.get_mut() };
     /// # std::io::Result::Ok(()) });
     /// ```
-    pub fn get_mut(&mut self) -> &mut T {
+    pub unsafe fn get_mut(&mut self) -> &mut T {
         self.io.as_mut().unwrap()
     }
 
@@ -990,6 +1043,10 @@ impl<T> Async<T> {
     ///
     /// The closure receives a mutable reference to the I/O handle.
     ///
+    /// # Safety
+    ///
+    /// In the closure, the underlying I/O source must not be dropped.
+    ///
     /// # Examples
     ///
     /// ```no_run
@@ -1000,10 +1057,10 @@ impl<T> Async<T> {
     /// let mut listener = Async::<TcpListener>::bind(([127, 0, 0, 1], 0))?;
     ///
     /// // Accept a new client asynchronously.
-    /// let (stream, addr) = listener.read_with_mut(|l| l.accept()).await?;
+    /// let (stream, addr) = unsafe { listener.read_with_mut(|l| l.accept()).await? };
     /// # std::io::Result::Ok(()) });
     /// ```
-    pub async fn read_with_mut<R>(
+    pub async unsafe fn read_with_mut<R>(
         &mut self,
         op: impl FnMut(&mut T) -> io::Result<R>,
     ) -> io::Result<R> {
@@ -1058,7 +1115,10 @@ impl<T> Async<T> {
     /// [`io::ErrorKind::WouldBlock`]. In between iterations of the loop, it waits until the OS
     /// sends a notification that the I/O handle is writable.
     ///
-    /// The closure receives a mutable reference to the I/O handle.
+    /// # Safety
+    ///
+    /// The closure receives a mutable reference to the I/O handle. In the closure, the underlying
+    /// I/O source must not be dropped.
     ///
     /// # Examples
     ///
@@ -1071,10 +1131,10 @@ impl<T> Async<T> {
     /// socket.get_ref().connect("127.0.0.1:9000")?;
     ///
     /// let msg = b"hello";
-    /// let len = socket.write_with_mut(|s| s.send(msg)).await?;
+    /// let len = unsafe { socket.write_with_mut(|s| s.send(msg)).await? };
     /// # std::io::Result::Ok(()) });
     /// ```
-    pub async fn write_with_mut<R>(
+    pub async unsafe fn write_with_mut<R>(
         &mut self,
         op: impl FnMut(&mut T) -> io::Result<R>,
     ) -> io::Result<R> {
@@ -1095,12 +1155,6 @@ impl<T> AsRef<T> for Async<T> {
     }
 }
 
-impl<T> AsMut<T> for Async<T> {
-    fn as_mut(&mut self) -> &mut T {
-        self.get_mut()
-    }
-}
-
 impl<T> Drop for Async<T> {
     fn drop(&mut self) {
         if self.io.is_some() {
@@ -1113,14 +1167,105 @@ impl<T> Drop for Async<T> {
     }
 }
 
-impl<T: Read> AsyncRead for Async<T> {
+/// Types whose I/O trait implementations do not drop the underlying I/O source.
+///
+/// The resource contained inside of the [`Async`] cannot be invalidated. This invalidation can
+/// happen if the inner resource (the [`TcpStream`], [`UnixListener`] or other `T`) is moved out
+/// and dropped before the [`Async`]. Because of this, functions that grant mutable access to
+/// the inner type are unsafe, as there is no way to guarantee that the source won't be dropped
+/// and a dangling handle won't be left behind.
+///
+/// Unfortunately this extends to implementations of [`Read`] and [`Write`]. Since methods on those
+/// traits take `&mut`, there is no guarantee that the implementor of those traits won't move the
+/// source out while the method is being run.
+///
+/// This trait is an antidote to this predicament. By implementing this trait, the user pledges
+/// that using any I/O traits won't destroy the source. This way, [`Async`] can implement the
+/// `async` version of these I/O traits, like [`AsyncRead`] and [`AsyncWrite`].
+///
+/// # Safety
+///
+/// Any I/O trait implementations for this type must not drop the underlying I/O source. Traits
+/// affected by this trait include [`Read`], [`Write`], [`Seek`] and [`BufRead`].
+///
+/// This trait is implemented by default on top of `libstd` types. In addition, it is implemented
+/// for immutable reference types, as it is impossible to invalidate any outstanding references
+/// while holding an immutable reference, even with interior mutability. As Rust's current pinning
+/// system relies on similar guarantees, I believe that this approach is robust.
+///
+/// [`BufRead`]: https://doc.rust-lang.org/std/io/trait.BufRead.html
+/// [`Read`]: https://doc.rust-lang.org/std/io/trait.Read.html
+/// [`Seek`]: https://doc.rust-lang.org/std/io/trait.Seek.html
+/// [`Write`]: https://doc.rust-lang.org/std/io/trait.Write.html
+///
+/// [`AsyncRead`]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncRead.html
+/// [`AsyncWrite`]: https://docs.rs/futures-io/latest/futures_io/trait.AsyncWrite.html
+pub unsafe trait IoSafe {}
+
+/// Reference types can't be mutated.
+///
+/// The worst thing that can happen is that external state is used to change what kind of pointer
+/// `as_fd()` returns. For instance:
+///
+/// ```
+/// # #[cfg(unix)] {
+/// use std::cell::Cell;
+/// use std::net::TcpStream;
+/// use std::os::unix::io::{AsFd, BorrowedFd};
+///
+/// struct Bar {
+///     flag: Cell<bool>,
+///     a: TcpStream,
+///     b: TcpStream
+/// }
+///
+/// impl AsFd for Bar {
+///     fn as_fd(&self) -> BorrowedFd<'_> {
+///         if self.flag.replace(!self.flag.get()) {
+///             self.a.as_fd()
+///         } else {
+///             self.b.as_fd()
+///         }
+///     }
+/// }
+/// # }
+/// ```
+///
+/// We solve this problem by only calling `as_fd()` once to get the original source. Implementations
+/// like this are considered buggy (but not unsound) and are thus not really supported by `async-io`.
+unsafe impl<T: ?Sized> IoSafe for &T {}
+
+// Can be implemented on top of libstd types.
+unsafe impl IoSafe for std::fs::File {}
+unsafe impl IoSafe for std::io::Stderr {}
+unsafe impl IoSafe for std::io::Stdin {}
+unsafe impl IoSafe for std::io::Stdout {}
+unsafe impl IoSafe for std::io::StderrLock<'_> {}
+unsafe impl IoSafe for std::io::StdinLock<'_> {}
+unsafe impl IoSafe for std::io::StdoutLock<'_> {}
+unsafe impl IoSafe for std::net::TcpStream {}
+unsafe impl IoSafe for std::process::ChildStdin {}
+unsafe impl IoSafe for std::process::ChildStdout {}
+unsafe impl IoSafe for std::process::ChildStderr {}
+
+#[cfg(unix)]
+unsafe impl IoSafe for std::os::unix::net::UnixStream {}
+
+unsafe impl<T: IoSafe + Read> IoSafe for std::io::BufReader<T> {}
+unsafe impl<T: IoSafe + Write> IoSafe for std::io::BufWriter<T> {}
+unsafe impl<T: IoSafe + Write> IoSafe for std::io::LineWriter<T> {}
+unsafe impl<T: IoSafe + ?Sized> IoSafe for &mut T {}
+unsafe impl<T: IoSafe + ?Sized> IoSafe for Box<T> {}
+unsafe impl<T: Clone + IoSafe + ?Sized> IoSafe for std::borrow::Cow<'_, T> {}
+
+impl<T: IoSafe + Read> AsyncRead for Async<T> {
     fn poll_read(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &mut [u8],
     ) -> Poll<io::Result<usize>> {
         loop {
-            match (*self).get_mut().read(buf) {
+            match unsafe { (*self).get_mut() }.read(buf) {
                 Err(err) if err.kind() == io::ErrorKind::WouldBlock => {}
                 res => return Poll::Ready(res),
             }
@@ -1134,7 +1279,7 @@ impl<T: Read> AsyncRead for Async<T> {
         bufs: &mut [IoSliceMut<'_>],
     ) -> Poll<io::Result<usize>> {
         loop {
-            match (*self).get_mut().read_vectored(bufs) {
+            match unsafe { (*self).get_mut() }.read_vectored(bufs) {
                 Err(err) if err.kind() == io::ErrorKind::WouldBlock => {}
                 res => return Poll::Ready(res),
             }
@@ -1143,6 +1288,8 @@ impl<T: Read> AsyncRead for Async<T> {
     }
 }
 
+// Since this is through a reference, we can't mutate the inner I/O source.
+// Therefore this is safe!
 impl<T> AsyncRead for &Async<T>
 where
     for<'a> &'a T: Read,
@@ -1176,14 +1323,14 @@ where
     }
 }
 
-impl<T: Write> AsyncWrite for Async<T> {
+impl<T: IoSafe + Write> AsyncWrite for Async<T> {
     fn poll_write(
         mut self: Pin<&mut Self>,
         cx: &mut Context<'_>,
         buf: &[u8],
     ) -> Poll<io::Result<usize>> {
         loop {
-            match (*self).get_mut().write(buf) {
+            match unsafe { (*self).get_mut() }.write(buf) {
                 Err(err) if err.kind() == io::ErrorKind::WouldBlock => {}
                 res => return Poll::Ready(res),
             }
@@ -1197,7 +1344,7 @@ impl<T: Write> AsyncWrite for Async<T> {
         bufs: &[IoSlice<'_>],
     ) -> Poll<io::Result<usize>> {
         loop {
-            match (*self).get_mut().write_vectored(bufs) {
+            match unsafe { (*self).get_mut() }.write_vectored(bufs) {
                 Err(err) if err.kind() == io::ErrorKind::WouldBlock => {}
                 res => return Poll::Ready(res),
             }
@@ -1207,7 +1354,7 @@ impl<T: Write> AsyncWrite for Async<T> {
 
     fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<()>> {
         loop {
-            match (*self).get_mut().flush() {
+            match unsafe { (*self).get_mut() }.flush() {
                 Err(err) if err.kind() == io::ErrorKind::WouldBlock => {}
                 res => return Poll::Ready(res),
             }
@@ -1363,11 +1510,17 @@ impl Async<TcpStream> {
     /// # std::io::Result::Ok(()) });
     /// ```
     pub async fn connect<A: Into<SocketAddr>>(addr: A) -> io::Result<Async<TcpStream>> {
-        // Begin async connect.
+        // Figure out how to handle this address.
         let addr = addr.into();
-        let domain = Domain::for_address(addr);
-        let socket = connect(addr.into(), domain, Some(Protocol::TCP))?;
-        let stream = Async::new(TcpStream::from(socket))?;
+        let (domain, sock_addr) = match addr {
+            SocketAddr::V4(v4) => (rn::AddressFamily::INET, rn::SocketAddrAny::V4(v4)),
+            SocketAddr::V6(v6) => (rn::AddressFamily::INET6, rn::SocketAddrAny::V6(v6)),
+        };
+
+        // Begin async connect.
+        let socket = connect(sock_addr, domain, Some(rn::ipproto::TCP))?;
+        // Use new_nonblocking because connect already sets socket to non-blocking mode.
+        let stream = Async::new_nonblocking(TcpStream::from(socket))?;
 
         // The stream becomes writable when connected.
         stream.writable().await?;
@@ -1694,9 +1847,12 @@ impl Async<UnixStream> {
     /// # std::io::Result::Ok(()) });
     /// ```
     pub async fn connect<P: AsRef<Path>>(path: P) -> io::Result<Async<UnixStream>> {
+        let address = convert_path_to_socket_address(path.as_ref())?;
+
         // Begin async connect.
-        let socket = connect(SockAddr::unix(path)?, Domain::UNIX, None)?;
-        let stream = Async::new(UnixStream::from(socket))?;
+        let socket = connect(address.into(), rn::AddressFamily::UNIX, None)?;
+        // Use new_nonblocking because connect already sets socket to non-blocking mode.
+        let stream = Async::new_nonblocking(UnixStream::from(socket))?;
 
         // The stream becomes writable when connected.
         stream.writable().await?;
@@ -1905,8 +2061,16 @@ async fn optimistic(fut: impl Future<Output = io::Result<()>>) -> io::Result<()>
     .await
 }
 
-fn connect(addr: SockAddr, domain: Domain, protocol: Option<Protocol>) -> io::Result<Socket> {
-    let sock_type = Type::STREAM;
+fn connect(
+    addr: rn::SocketAddrAny,
+    domain: rn::AddressFamily,
+    protocol: Option<rn::Protocol>,
+) -> io::Result<rustix::fd::OwnedFd> {
+    #[cfg(windows)]
+    use rustix::fd::AsFd;
+
+    setup_networking();
+
     #[cfg(any(
         target_os = "android",
         target_os = "dragonfly",
@@ -1917,10 +2081,13 @@ fn connect(addr: SockAddr, domain: Domain, protocol: Option<Protocol>) -> io::Re
         target_os = "netbsd",
         target_os = "openbsd"
     ))]
-    // If we can, set nonblocking at socket creation for unix
-    let sock_type = sock_type.nonblocking();
-    // This automatically handles cloexec on unix, no_inherit on windows and nosigpipe on macos
-    let socket = Socket::new(domain, sock_type, protocol)?;
+    let socket = rn::socket_with(
+        domain,
+        rn::SocketType::STREAM,
+        rn::SocketFlags::CLOEXEC | rn::SocketFlags::NONBLOCK,
+        protocol,
+    )?;
+
     #[cfg(not(any(
         target_os = "android",
         target_os = "dragonfly",
@@ -1931,14 +2098,147 @@ fn connect(addr: SockAddr, domain: Domain, protocol: Option<Protocol>) -> io::Re
         target_os = "netbsd",
         target_os = "openbsd"
     )))]
-    // If the current platform doesn't support nonblocking at creation, enable it after creation
-    socket.set_nonblocking(true)?;
-    match socket.connect(&addr) {
+    let socket = {
+        #[cfg(not(any(
+            target_os = "aix",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "tvos",
+            target_os = "watchos",
+            target_os = "espidf",
+            windows,
+        )))]
+        let flags = rn::SocketFlags::CLOEXEC;
+        #[cfg(any(
+            target_os = "aix",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "tvos",
+            target_os = "watchos",
+            target_os = "espidf",
+            windows,
+        ))]
+        let flags = rn::SocketFlags::empty();
+
+        // Create the socket.
+        let socket = rn::socket_with(domain, rn::SocketType::STREAM, flags, protocol)?;
+
+        // Set cloexec if necessary.
+        #[cfg(any(
+            target_os = "aix",
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "tvos",
+            target_os = "watchos",
+        ))]
+        rio::fcntl_setfd(&socket, rio::fcntl_getfd(&socket)? | rio::FdFlags::CLOEXEC)?;
+
+        // Set non-blocking mode.
+        set_nonblocking(socket.as_fd())?;
+
+        socket
+    };
+
+    // Set nosigpipe if necessary.
+    #[cfg(any(
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "tvos",
+        target_os = "watchos",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "dragonfly",
+    ))]
+    rn::sockopt::set_socket_nosigpipe(&socket, true)?;
+
+    // Set the handle information to HANDLE_FLAG_INHERIT.
+    #[cfg(windows)]
+    unsafe {
+        if windows_sys::Win32::Foundation::SetHandleInformation(
+            socket.as_raw_socket() as _,
+            windows_sys::Win32::Foundation::HANDLE_FLAG_INHERIT,
+            windows_sys::Win32::Foundation::HANDLE_FLAG_INHERIT,
+        ) == 0
+        {
+            return Err(io::Error::last_os_error());
+        }
+    }
+
+    #[allow(unreachable_patterns)]
+    match rn::connect_any(&socket, &addr) {
         Ok(_) => {}
         #[cfg(unix)]
-        Err(err) if err.raw_os_error() == Some(rustix::io::Errno::INPROGRESS.raw_os_error()) => {}
-        Err(err) if err.kind() == io::ErrorKind::WouldBlock => {}
-        Err(err) => return Err(err),
+        Err(rio::Errno::INPROGRESS) => {}
+        Err(rio::Errno::AGAIN) | Err(rio::Errno::WOULDBLOCK) => {}
+        Err(err) => return Err(err.into()),
     }
     Ok(socket)
+}
+
+#[inline]
+fn setup_networking() {
+    #[cfg(windows)]
+    {
+        // On Windows, we need to call WSAStartup before calling any networking code.
+        // Make sure to call it at least once.
+        static INIT: std::sync::Once = std::sync::Once::new();
+
+        INIT.call_once(|| {
+            let _ = rustix::net::wsa_startup();
+        });
+    }
+}
+
+#[inline]
+fn set_nonblocking(
+    #[cfg(unix)] fd: BorrowedFd<'_>,
+    #[cfg(windows)] fd: BorrowedSocket<'_>,
+) -> io::Result<()> {
+    cfg_if::cfg_if! {
+        // ioctl(FIONBIO) sets the flag atomically, but we use this only on Linux
+        // for now, as with the standard library, because it seems to behave
+        // differently depending on the platform.
+        // https://github.com/rust-lang/rust/commit/efeb42be2837842d1beb47b51bb693c7474aba3d
+        // https://github.com/libuv/libuv/blob/e9d91fccfc3e5ff772d5da90e1c4a24061198ca0/src/unix/poll.c#L78-L80
+        // https://github.com/tokio-rs/mio/commit/0db49f6d5caf54b12176821363d154384357e70a
+        if #[cfg(any(windows, target_os = "linux"))] {
+            rustix::io::ioctl_fionbio(fd, true)?;
+        } else {
+            let previous = rustix::fs::fcntl_getfl(fd)?;
+            let new = previous | rustix::fs::OFlags::NONBLOCK;
+            if new != previous {
+                rustix::fs::fcntl_setfl(fd, new)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Converts a `Path` to its socket address representation.
+///
+/// This function is abstract socket-aware.
+#[cfg(unix)]
+#[inline]
+fn convert_path_to_socket_address(path: &Path) -> io::Result<rn::SocketAddrUnix> {
+    // SocketAddrUnix::new() will throw EINVAL when a path with a zero in it is passed in.
+    // However, some users expect to be able to pass in paths to abstract sockets, which
+    // triggers this error as it has a zero in it. Therefore, if a path starts with a zero,
+    // make it an abstract socket.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    let address = {
+        use std::os::unix::ffi::OsStrExt;
+
+        let path = path.as_os_str();
+        match path.as_bytes().first() {
+            Some(0) => rn::SocketAddrUnix::new_abstract_name(path.as_bytes().get(1..).unwrap())?,
+            _ => rn::SocketAddrUnix::new(path)?,
+        }
+    };
+
+    // Only Linux and Android support abstract sockets.
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    let address = rn::SocketAddrUnix::new(path)?;
+
+    Ok(address)
 }

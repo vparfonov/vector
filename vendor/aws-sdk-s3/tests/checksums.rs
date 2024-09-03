@@ -96,7 +96,11 @@ async fn test_checksum_on_streaming_response(
         .await
         .unwrap();
 
-    http_client.assert_requests_match(&["x-amz-checksum-mode", AUTHORIZATION.as_str()]);
+    http_client.assert_requests_match(&[
+        "x-amz-checksum-mode",
+        "x-amz-user-agent",
+        AUTHORIZATION.as_str(),
+    ]);
 
     res
 }
@@ -226,7 +230,7 @@ async fn test_checksum_on_streaming_request<'a>(
         "x-amz-trailer is incorrect"
     );
     assert_eq!(
-        HeaderValue::from_static(aws_http::content_encoding::header_value::AWS_CHUNKED),
+        HeaderValue::from_static(aws_runtime::content_encoding::header_value::AWS_CHUNKED),
         content_encoding,
         "content-encoding wasn't set to aws-chunked"
     );

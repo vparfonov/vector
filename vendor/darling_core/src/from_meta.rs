@@ -3,6 +3,7 @@ use std::cell::RefCell;
 use std::collections::hash_map::HashMap;
 use std::collections::HashSet;
 use std::hash::BuildHasher;
+use std::num;
 use std::rc::Rc;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -219,7 +220,7 @@ impl FromMeta for std::path::PathBuf {
 /// Generate an impl of `FromMeta` that will accept strings which parse to numbers or
 /// integer literals.
 macro_rules! from_meta_num {
-    ($ty:ident) => {
+    ($ty:path) => {
         impl FromMeta for $ty {
             fn from_string(s: &str) -> Result<Self> {
                 s.parse().map_err(|_| Error::unknown_value(s))
@@ -228,7 +229,7 @@ macro_rules! from_meta_num {
             fn from_value(value: &Lit) -> Result<Self> {
                 (match *value {
                     Lit::Str(ref s) => Self::from_string(&s.value()),
-                    Lit::Int(ref s) => Ok(s.base10_parse::<$ty>().unwrap()),
+                    Lit::Int(ref s) => s.base10_parse::<$ty>().map_err(Error::from),
                     _ => Err(Error::unexpected_lit_type(value)),
                 })
                 .map_err(|e| e.with_span(value))
@@ -249,6 +250,18 @@ from_meta_num!(i32);
 from_meta_num!(i64);
 from_meta_num!(i128);
 from_meta_num!(isize);
+from_meta_num!(num::NonZeroU8);
+from_meta_num!(num::NonZeroU16);
+from_meta_num!(num::NonZeroU32);
+from_meta_num!(num::NonZeroU64);
+from_meta_num!(num::NonZeroU128);
+from_meta_num!(num::NonZeroUsize);
+from_meta_num!(num::NonZeroI8);
+from_meta_num!(num::NonZeroI16);
+from_meta_num!(num::NonZeroI32);
+from_meta_num!(num::NonZeroI64);
+from_meta_num!(num::NonZeroI128);
+from_meta_num!(num::NonZeroIsize);
 
 /// Generate an impl of `FromMeta` that will accept strings which parse to floats or
 /// float literals.
@@ -262,7 +275,7 @@ macro_rules! from_meta_float {
             fn from_value(value: &Lit) -> Result<Self> {
                 (match *value {
                     Lit::Str(ref s) => Self::from_string(&s.value()),
-                    Lit::Float(ref s) => Ok(s.base10_parse::<$ty>().unwrap()),
+                    Lit::Float(ref s) => s.base10_parse::<$ty>().map_err(Error::from),
                     _ => Err(Error::unexpected_lit_type(value)),
                 })
                 .map_err(|e| e.with_span(value))
@@ -596,25 +609,49 @@ impl<T: FromMeta> FromMeta for Option<T> {
     }
 }
 
-impl<T: FromMeta> FromMeta for Box<T> {
-    fn from_none() -> Option<Self> {
-        T::from_none().map(Box::new)
-    }
-
-    fn from_meta(item: &Meta) -> Result<Self> {
-        FromMeta::from_meta(item).map(Box::new)
-    }
-}
-
 impl<T: FromMeta> FromMeta for Result<T> {
     fn from_none() -> Option<Self> {
         T::from_none().map(Ok)
+    }
+
+    // `#[darling(flatten)]` forwards directly to this method, so it's
+    // necessary to declare it to avoid getting an unsupported format
+    // error if it's invoked directly.
+    fn from_list(items: &[NestedMeta]) -> Result<Self> {
+        Ok(FromMeta::from_list(items))
     }
 
     fn from_meta(item: &Meta) -> Result<Self> {
         Ok(FromMeta::from_meta(item))
     }
 }
+
+/// Create an impl that forwards to an inner type `T` for parsing.
+macro_rules! smart_pointer_t {
+    ($ty:path, $map_fn:path) => {
+        impl<T: FromMeta> FromMeta for $ty {
+            fn from_none() -> Option<Self> {
+                T::from_none().map($map_fn)
+            }
+
+            // `#[darling(flatten)]` forwards directly to this method, so it's
+            // necessary to declare it to avoid getting an unsupported format
+            // error if it's invoked directly.
+            fn from_list(items: &[NestedMeta]) -> Result<Self> {
+                FromMeta::from_list(items).map($map_fn)
+            }
+
+            fn from_meta(item: &Meta) -> Result<Self> {
+                FromMeta::from_meta(item).map($map_fn)
+            }
+        }
+    };
+}
+
+smart_pointer_t!(Box<T>, Box::new);
+smart_pointer_t!(Rc<T>, Rc::new);
+smart_pointer_t!(Arc<T>, Arc::new);
+smart_pointer_t!(RefCell<T>, RefCell::new);
 
 /// Parses the meta-item, and in case of error preserves a copy of the input for
 /// later analysis.
@@ -623,36 +660,6 @@ impl<T: FromMeta> FromMeta for ::std::result::Result<T, Meta> {
         T::from_meta(item)
             .map(Ok)
             .or_else(|_| Ok(Err(item.clone())))
-    }
-}
-
-impl<T: FromMeta> FromMeta for Rc<T> {
-    fn from_none() -> Option<Self> {
-        T::from_none().map(Rc::new)
-    }
-
-    fn from_meta(item: &Meta) -> Result<Self> {
-        FromMeta::from_meta(item).map(Rc::new)
-    }
-}
-
-impl<T: FromMeta> FromMeta for Arc<T> {
-    fn from_none() -> Option<Self> {
-        T::from_none().map(Arc::new)
-    }
-
-    fn from_meta(item: &Meta) -> Result<Self> {
-        FromMeta::from_meta(item).map(Arc::new)
-    }
-}
-
-impl<T: FromMeta> FromMeta for RefCell<T> {
-    fn from_none() -> Option<Self> {
-        T::from_none().map(RefCell::new)
-    }
-
-    fn from_meta(item: &Meta) -> Result<Self> {
-        FromMeta::from_meta(item).map(RefCell::new)
     }
 }
 
@@ -787,6 +794,8 @@ hash_map!(syn::Path);
 /// it should not be considered by the parsing.
 #[cfg(test)]
 mod tests {
+    use std::num::{NonZeroU32, NonZeroU64};
+
     use proc_macro2::TokenStream;
     use quote::quote;
     use syn::parse_quote;
@@ -859,6 +868,20 @@ mod tests {
         assert_eq!(fm::<f64>(quote!(ignore = "1.4e10")), 1.4e10);
     }
 
+    #[should_panic(expected = "UnknownValue(\"0\")")]
+    #[test]
+    fn nonzero_number_fails() {
+        fm::<NonZeroU64>(quote!(ignore = "0"));
+    }
+
+    #[test]
+    fn nonzero_number_succeeds() {
+        assert_eq!(
+            fm::<NonZeroU32>(quote!(ignore = "2")),
+            NonZeroU32::new(2).unwrap()
+        );
+    }
+
     #[test]
     fn int_without_quotes() {
         assert_eq!(fm::<u8>(quote!(ignore = 2)), 2u8);
@@ -881,6 +904,11 @@ mod tests {
         assert_eq!(fm::<f32>(quote!(ignore = 2.)), 2.0f32);
         assert_eq!(fm::<f32>(quote!(ignore = 2.0)), 2.0f32);
         assert_eq!(fm::<f64>(quote!(ignore = 1.4e10)), 1.4e10f64);
+    }
+
+    #[test]
+    fn too_large_int_produces_error() {
+        assert!(fm::<Result<u8>>(quote!(ignore = 2000)).is_err());
     }
 
     #[test]

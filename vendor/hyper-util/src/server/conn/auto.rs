@@ -7,7 +7,7 @@ use std::marker::PhantomPinned;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::task::{Context, Poll};
-use std::{error::Error as StdError, io, marker::Unpin, time::Duration};
+use std::{error::Error as StdError, io, time::Duration};
 
 use bytes::Bytes;
 use http::{Request, Response};
@@ -58,6 +58,8 @@ pub struct Builder<E> {
     http1: http1::Builder,
     #[cfg(feature = "http2")]
     http2: http2::Builder<E>,
+    #[cfg(any(feature = "http1", feature = "http2"))]
+    version: Option<Version>,
     #[cfg(not(feature = "http2"))]
     _executor: E,
 }
@@ -84,6 +86,8 @@ impl<E> Builder<E> {
             http1: http1::Builder::new(),
             #[cfg(feature = "http2")]
             http2: http2::Builder::new(executor),
+            #[cfg(any(feature = "http1", feature = "http2"))]
+            version: None,
             #[cfg(not(feature = "http2"))]
             _executor: executor,
         }
@@ -101,6 +105,26 @@ impl<E> Builder<E> {
         Http2Builder { inner: self }
     }
 
+    /// Only accepts HTTP/2
+    ///
+    /// Does not do anything if used with [`serve_connection_with_upgrades`]
+    #[cfg(feature = "http2")]
+    pub fn http2_only(mut self) -> Self {
+        assert!(self.version.is_none());
+        self.version = Some(Version::H2);
+        self
+    }
+
+    /// Only accepts HTTP/1
+    ///
+    /// Does not do anything if used with [`serve_connection_with_upgrades`]
+    #[cfg(feature = "http1")]
+    pub fn http1_only(mut self) -> Self {
+        assert!(self.version.is_none());
+        self.version = Some(Version::H1);
+        self
+    }
+
     /// Bind a connection together with a [`Service`].
     pub fn serve_connection<I, S, B>(&self, io: I, service: S) -> Connection<'_, I, S, E>
     where
@@ -112,13 +136,28 @@ impl<E> Builder<E> {
         I: Read + Write + Unpin + 'static,
         E: HttpServerConnExec<S::Future, B>,
     {
-        Connection {
-            state: ConnState::ReadVersion {
+        let state = match self.version {
+            #[cfg(feature = "http1")]
+            Some(Version::H1) => {
+                let io = Rewind::new_buffered(io, Bytes::new());
+                let conn = self.http1.serve_connection(io, service);
+                ConnState::H1 { conn }
+            }
+            #[cfg(feature = "http2")]
+            Some(Version::H2) => {
+                let io = Rewind::new_buffered(io, Bytes::new());
+                let conn = self.http2.serve_connection(io, service);
+                ConnState::H2 { conn }
+            }
+            #[cfg(any(feature = "http1", feature = "http2"))]
+            _ => ConnState::ReadVersion {
                 read_version: read_version(io),
-                builder: self,
+                builder: Cow::Borrowed(self),
                 service: Some(service),
             },
-        }
+        };
+
+        Connection { state }
     }
 
     /// Bind a connection together with a [`Service`], with the ability to
@@ -141,14 +180,14 @@ impl<E> Builder<E> {
         UpgradeableConnection {
             state: UpgradeableConnState::ReadVersion {
                 read_version: read_version(io),
-                builder: self,
+                builder: Cow::Borrowed(self),
                 service: Some(service),
             },
         }
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 enum Version {
     H1,
     H2,
@@ -174,6 +213,7 @@ where
         buf: [MaybeUninit::uninit(); 24],
         filled: 0,
         version: Version::H2,
+        cancelled: false,
         _pin: PhantomPinned,
     }
 }
@@ -185,9 +225,16 @@ pin_project! {
         // the amount of `buf` thats been filled
         filled: usize,
         version: Version,
+        cancelled: bool,
         // Make this future `!Unpin` for compatibility with async trait methods.
         #[pin]
         _pin: PhantomPinned,
+    }
+}
+
+impl<I> ReadVersion<I> {
+    pub fn cancel(self: Pin<&mut Self>) {
+        *self.project().cancelled = true;
     }
 }
 
@@ -199,6 +246,9 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
+        if *this.cancelled {
+            return Poll::Ready(Err(io::Error::new(io::ErrorKind::Interrupted, "Cancelled")));
+        }
 
         let mut buf = ReadBuf::uninit(&mut *this.buf);
         // SAFETY: `this.filled` tracks how many bytes have been read (and thus initialized) and
@@ -215,7 +265,7 @@ where
 
             // We starts as H2 and switch to H1 when we don't get the preface.
             if buf.filled().len() == len
-                || &buf.filled()[len..] != &H2_PREFACE[len..buf.filled().len()]
+                || buf.filled()[len..] != H2_PREFACE[len..buf.filled().len()]
             {
                 *this.version = Version::H1;
                 break;
@@ -242,6 +292,22 @@ pin_project! {
     }
 }
 
+// A custom COW, since the libstd is has ToOwned bounds that are too eager.
+enum Cow<'a, T> {
+    Borrowed(&'a T),
+    Owned(T),
+}
+
+impl<'a, T> std::ops::Deref for Cow<'a, T> {
+    type Target = T;
+    fn deref(&self) -> &T {
+        match self {
+            Cow::Borrowed(t) => &*t,
+            Cow::Owned(ref t) => t,
+        }
+    }
+}
+
 #[cfg(feature = "http1")]
 type Http1Connection<I, S> = hyper::server::conn::http1::Connection<Rewind<I>, S>;
 
@@ -263,7 +329,7 @@ pin_project! {
         ReadVersion {
             #[pin]
             read_version: ReadVersion<I>,
-            builder: &'a Builder<E>,
+            builder: Cow<'a, Builder<E>>,
             service: Option<S>,
         },
         H1 {
@@ -296,13 +362,39 @@ where
     /// `Connection::poll` has resolved, this does nothing.
     pub fn graceful_shutdown(self: Pin<&mut Self>) {
         match self.project().state.project() {
-            ConnStateProj::ReadVersion { .. } => {}
+            ConnStateProj::ReadVersion { read_version, .. } => read_version.cancel(),
             #[cfg(feature = "http1")]
             ConnStateProj::H1 { conn } => conn.graceful_shutdown(),
             #[cfg(feature = "http2")]
             ConnStateProj::H2 { conn } => conn.graceful_shutdown(),
             #[cfg(any(not(feature = "http1"), not(feature = "http2")))]
             _ => unreachable!(),
+        }
+    }
+
+    /// Make this Connection static, instead of borrowing from Builder.
+    pub fn into_owned(self) -> Connection<'static, I, S, E>
+    where
+        Builder<E>: Clone,
+    {
+        Connection {
+            state: match self.state {
+                ConnState::ReadVersion {
+                    read_version,
+                    builder,
+                    service,
+                } => ConnState::ReadVersion {
+                    read_version,
+                    service,
+                    builder: Cow::Owned(builder.clone()),
+                },
+                #[cfg(feature = "http1")]
+                ConnState::H1 { conn } => ConnState::H1 { conn },
+                #[cfg(feature = "http2")]
+                ConnState::H2 { conn } => ConnState::H2 { conn },
+                #[cfg(any(not(feature = "http1"), not(feature = "http2")))]
+                _ => unreachable!(),
+            },
         }
     }
 }
@@ -387,7 +479,7 @@ pin_project! {
         ReadVersion {
             #[pin]
             read_version: ReadVersion<I>,
-            builder: &'a Builder<E>,
+            builder: Cow<'a, Builder<E>>,
             service: Option<S>,
         },
         H1 {
@@ -420,13 +512,39 @@ where
     /// called after `UpgradeableConnection::poll` has resolved, this does nothing.
     pub fn graceful_shutdown(self: Pin<&mut Self>) {
         match self.project().state.project() {
-            UpgradeableConnStateProj::ReadVersion { .. } => {}
+            UpgradeableConnStateProj::ReadVersion { read_version, .. } => read_version.cancel(),
             #[cfg(feature = "http1")]
             UpgradeableConnStateProj::H1 { conn } => conn.graceful_shutdown(),
             #[cfg(feature = "http2")]
             UpgradeableConnStateProj::H2 { conn } => conn.graceful_shutdown(),
             #[cfg(any(not(feature = "http1"), not(feature = "http2")))]
             _ => unreachable!(),
+        }
+    }
+
+    /// Make this Connection static, instead of borrowing from Builder.
+    pub fn into_owned(self) -> UpgradeableConnection<'static, I, S, E>
+    where
+        Builder<E>: Clone,
+    {
+        UpgradeableConnection {
+            state: match self.state {
+                UpgradeableConnState::ReadVersion {
+                    read_version,
+                    builder,
+                    service,
+                } => UpgradeableConnState::ReadVersion {
+                    read_version,
+                    service,
+                    builder: Cow::Owned(builder.clone()),
+                },
+                #[cfg(feature = "http1")]
+                UpgradeableConnState::H1 { conn } => UpgradeableConnState::H1 { conn },
+                #[cfg(feature = "http2")]
+                UpgradeableConnState::H2 { conn } => UpgradeableConnState::H2 { conn },
+                #[cfg(any(not(feature = "http1"), not(feature = "http2")))]
+                _ => unreachable!(),
+            },
         }
     }
 }
@@ -549,11 +667,36 @@ impl<E> Http1Builder<'_, E> {
         self
     }
 
+    /// Set the maximum number of headers.
+    ///
+    /// When a request is received, the parser will reserve a buffer to store headers for optimal
+    /// performance.
+    ///
+    /// If server receives more headers than the buffer size, it responds to the client with
+    /// "431 Request Header Fields Too Large".
+    ///
+    /// The headers is allocated on the stack by default, which has higher performance. After
+    /// setting this value, headers will be allocated in heap memory, that is, heap memory
+    /// allocation will occur for each request, and there will be a performance drop of about 5%.
+    ///
+    /// Note that this setting does not affect HTTP/2.
+    ///
+    /// Default is 100.
+    pub fn max_headers(&mut self, val: usize) -> &mut Self {
+        self.inner.http1.max_headers(val);
+        self
+    }
+
     /// Set a timeout for reading client request headers. If a client does not
     /// transmit the entire header within this time, the connection is closed.
     ///
-    /// Default is None.
-    pub fn header_read_timeout(&mut self, read_timeout: Duration) -> &mut Self {
+    /// Requires a [`Timer`] set by [`Http1Builder::timer`] to take effect. Panics if `header_read_timeout` is configured
+    /// without a [`Timer`].
+    ///
+    /// Pass `None` to disable.
+    ///
+    /// Default is currently 30 seconds, but do not depend on that.
+    pub fn header_read_timeout(&mut self, read_timeout: impl Into<Option<Duration>>) -> &mut Self {
         self.inner.http1.header_read_timeout(read_timeout);
         self
     }
@@ -634,6 +777,27 @@ impl<E> Http1Builder<'_, E> {
     {
         self.inner.serve_connection(io, service).await
     }
+
+    /// Bind a connection together with a [`Service`], with the ability to
+    /// handle HTTP upgrades. This requires that the IO object implements
+    /// `Send`.
+    #[cfg(feature = "http2")]
+    pub fn serve_connection_with_upgrades<I, S, B>(
+        &self,
+        io: I,
+        service: S,
+    ) -> UpgradeableConnection<'_, I, S, E>
+    where
+        S: Service<Request<Incoming>, Response = Response<B>>,
+        S::Future: 'static,
+        S::Error: Into<Box<dyn StdError + Send + Sync>>,
+        B: Body + 'static,
+        B::Error: Into<Box<dyn StdError + Send + Sync>>,
+        I: Read + Write + Unpin + Send + 'static,
+        E: HttpServerConnExec<S::Future, B>,
+    {
+        self.inner.serve_connection_with_upgrades(io, service)
+    }
 }
 
 /// Http2 part of builder.
@@ -648,6 +812,17 @@ impl<E> Http2Builder<'_, E> {
     /// Http1 configuration.
     pub fn http1(&mut self) -> Http1Builder<'_, E> {
         Http1Builder { inner: self.inner }
+    }
+
+    /// Configures the maximum number of pending reset streams allowed before a GOAWAY will be sent.
+    ///
+    /// This will default to the default value set by the [`h2` crate](https://crates.io/crates/h2).
+    /// As of v0.4.0, it is 20.
+    ///
+    /// See <https://github.com/hyperium/hyper/issues/2877> for more information.
+    pub fn max_pending_accept_reset_streams(&mut self, max: impl Into<Option<usize>>) -> &mut Self {
+        self.inner.http2.max_pending_accept_reset_streams(max);
+        self
     }
 
     /// Sets the [`SETTINGS_INITIAL_WINDOW_SIZE`][spec] option for HTTP2
@@ -782,6 +957,26 @@ impl<E> Http2Builder<'_, E> {
     {
         self.inner.serve_connection(io, service).await
     }
+
+    /// Bind a connection together with a [`Service`], with the ability to
+    /// handle HTTP upgrades. This requires that the IO object implements
+    /// `Send`.
+    pub fn serve_connection_with_upgrades<I, S, B>(
+        &self,
+        io: I,
+        service: S,
+    ) -> UpgradeableConnection<'_, I, S, E>
+    where
+        S: Service<Request<Incoming>, Response = Response<B>>,
+        S::Future: 'static,
+        S::Error: Into<Box<dyn StdError + Send + Sync>>,
+        B: Body + 'static,
+        B::Error: Into<Box<dyn StdError + Send + Sync>>,
+        I: Read + Write + Unpin + Send + 'static,
+        E: HttpServerConnExec<S::Future, B>,
+    {
+        self.inner.serve_connection_with_upgrades(io, service)
+    }
 }
 
 #[cfg(test)]
@@ -794,8 +989,11 @@ mod tests {
     use http_body::Body;
     use http_body_util::{BodyExt, Empty, Full};
     use hyper::{body, body::Bytes, client, service::service_fn};
-    use std::{convert::Infallible, error::Error as StdError, net::SocketAddr};
-    use tokio::net::{TcpListener, TcpStream};
+    use std::{convert::Infallible, error::Error as StdError, net::SocketAddr, time::Duration};
+    use tokio::{
+        net::{TcpListener, TcpStream},
+        pin,
+    };
 
     const BODY: &[u8] = b"Hello, world!";
 
@@ -820,7 +1018,7 @@ mod tests {
     #[cfg(not(miri))]
     #[tokio::test]
     async fn http1() {
-        let addr = start_server().await;
+        let addr = start_server(false, false).await;
         let mut sender = connect_h1(addr).await;
 
         let response = sender
@@ -836,7 +1034,7 @@ mod tests {
     #[cfg(not(miri))]
     #[tokio::test]
     async fn http2() {
-        let addr = start_server().await;
+        let addr = start_server(false, false).await;
         let mut sender = connect_h2(addr).await;
 
         let response = sender
@@ -847,6 +1045,96 @@ mod tests {
         let body = response.into_body().collect().await.unwrap().to_bytes();
 
         assert_eq!(body, BODY);
+    }
+
+    #[cfg(not(miri))]
+    #[tokio::test]
+    async fn http2_only() {
+        let addr = start_server(false, true).await;
+        let mut sender = connect_h2(addr).await;
+
+        let response = sender
+            .send_request(Request::new(Empty::<Bytes>::new()))
+            .await
+            .unwrap();
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+
+        assert_eq!(body, BODY);
+    }
+
+    #[cfg(not(miri))]
+    #[tokio::test]
+    async fn http2_only_fail_if_client_is_http1() {
+        let addr = start_server(false, true).await;
+        let mut sender = connect_h1(addr).await;
+
+        let _ = sender
+            .send_request(Request::new(Empty::<Bytes>::new()))
+            .await
+            .expect_err("should fail");
+    }
+
+    #[cfg(not(miri))]
+    #[tokio::test]
+    async fn http1_only() {
+        let addr = start_server(true, false).await;
+        let mut sender = connect_h1(addr).await;
+
+        let response = sender
+            .send_request(Request::new(Empty::<Bytes>::new()))
+            .await
+            .unwrap();
+
+        let body = response.into_body().collect().await.unwrap().to_bytes();
+
+        assert_eq!(body, BODY);
+    }
+
+    #[cfg(not(miri))]
+    #[tokio::test]
+    async fn http1_only_fail_if_client_is_http2() {
+        let addr = start_server(true, false).await;
+        let mut sender = connect_h2(addr).await;
+
+        let _ = sender
+            .send_request(Request::new(Empty::<Bytes>::new()))
+            .await
+            .expect_err("should fail");
+    }
+
+    #[cfg(not(miri))]
+    #[tokio::test]
+    async fn graceful_shutdown() {
+        let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], 0)))
+            .await
+            .unwrap();
+
+        let listener_addr = listener.local_addr().unwrap();
+
+        // Spawn the task in background so that we can connect there
+        let listen_task = tokio::spawn(async move { listener.accept().await.unwrap() });
+        // Only connect a stream, do not send headers or anything
+        let _stream = TcpStream::connect(listener_addr).await.unwrap();
+
+        let (stream, _) = listen_task.await.unwrap();
+        let stream = TokioIo::new(stream);
+        let builder = auto::Builder::new(TokioExecutor::new());
+        let connection = builder.serve_connection(stream, service_fn(hello));
+
+        pin!(connection);
+
+        connection.as_mut().graceful_shutdown();
+
+        let connection_error = tokio::time::timeout(Duration::from_millis(200), connection)
+            .await
+            .expect("Connection should have finished in a timely manner after graceful shutdown.")
+            .expect_err("Connection should have been interrupted.");
+
+        let connection_error = connection_error
+            .downcast_ref::<std::io::Error>()
+            .expect("The error should have been `std::io::Error`.");
+        assert_eq!(connection_error.kind(), std::io::ErrorKind::Interrupted);
     }
 
     async fn connect_h1<B>(addr: SocketAddr) -> client::conn::http1::SendRequest<B>
@@ -880,7 +1168,7 @@ mod tests {
         sender
     }
 
-    async fn start_server() -> SocketAddr {
+    async fn start_server(h1_only: bool, h2_only: bool) -> SocketAddr {
         let addr: SocketAddr = ([127, 0, 0, 1], 0).into();
         let listener = TcpListener::bind(addr).await.unwrap();
 
@@ -891,9 +1179,21 @@ mod tests {
                 let (stream, _) = listener.accept().await.unwrap();
                 let stream = TokioIo::new(stream);
                 tokio::task::spawn(async move {
-                    let _ = auto::Builder::new(TokioExecutor::new())
-                        .serve_connection(stream, service_fn(hello))
-                        .await;
+                    let mut builder = auto::Builder::new(TokioExecutor::new());
+                    if h1_only {
+                        builder = builder.http1_only();
+                        builder.serve_connection(stream, service_fn(hello)).await
+                    } else if h2_only {
+                        builder = builder.http2_only();
+                        builder.serve_connection(stream, service_fn(hello)).await
+                    } else {
+                        builder
+                            .http2()
+                            .max_header_list_size(4096)
+                            .serve_connection_with_upgrades(stream, service_fn(hello))
+                            .await
+                    }
+                    .unwrap();
                 });
             }
         });

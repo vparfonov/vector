@@ -25,9 +25,9 @@ where
 {
     /// Creates a new `BoxPredicate`, a wrapper around a dynamically-dispatched
     /// `Predicate` type with useful trait impls.
-    pub fn new<P: Predicate<Item>>(inner: P) -> BoxPredicate<Item>
+    pub fn new<P>(inner: P) -> BoxPredicate<Item>
     where
-        P: Send + Sync + 'static,
+        P: Predicate<Item> + Send + Sync + 'static,
     {
         BoxPredicate(Box::new(inner))
     }
@@ -84,7 +84,7 @@ where
 {
     /// Returns a `BoxPredicate` wrapper around this `Predicate` type.
     ///
-    /// Returns a `BoxPredicate` wrapper around this `Predicate type. The
+    /// Returns a `BoxPredicate` wrapper around this `Predicate` type. The
     /// `BoxPredicate` type has a number of useful properties:
     ///
     ///   - It stores the inner predicate as a trait object, so the type of

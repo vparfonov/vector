@@ -13,20 +13,25 @@
 edition = "2021"
 rust-version = "1.56.0"
 name = "pinky-swear"
-version = "6.1.0"
+version = "6.2.0"
 authors = ["Marc-Antoine Perennou <Marc-Antoine@Perennou.com>"]
 description = "Futures and async/await-ready Promises"
 documentation = "https://docs.rs/pinky-swear"
-keywords = ["futures", "promises", "async"]
+readme = "README.md"
+keywords = [
+    "futures",
+    "promises",
+    "async",
+]
 categories = ["asynchronous"]
 license = "BSD-2-Clause"
 repository = "https://github.com/amqp-rs/pinky-swear"
-resolver = "2"
+
 [dependencies.doc-comment]
 version = "^0.3"
 
 [dependencies.flume]
-version = "^0.10"
+version = "^0.11"
 default-features = false
 
 [dependencies.parking_lot]
@@ -35,5 +40,6 @@ version = "^0.12"
 [dependencies.tracing]
 version = "^0.1"
 default-features = false
+
 [badges.maintenance]
 status = "actively-developed"

@@ -1,3 +1,54 @@
+# Version 2.3.4
+
+- Update `windows-sys` to v0.59. (#195)
+- On NetBSD/DragonflyBSD, set `nosigpipe` on sockets. (#196)
+
+# Version 2.3.3
+
+- Fix nightly clippy warnings. (#191)
+
+# Version 2.3.2
+
+- Fix usage of the wrong socket flags on AIX. (#187)
+
+# Version 2.3.1
+
+- On Windows, call `WSAStartup` before any raw socket functions. (#183)
+
+# Version 2.3.0
+
+- Add `Waitable`, which allows waiting for waitable handles on
+  Windows. (#152)
+
+# Version 2.2.2
+
+- Fix an `EINVAL` error that would occur when abstract sockets are used. (#176)
+
+# Version 2.2.1
+
+- Remove dependency on `waker-fn`. (#165)
+- Update `windows-sys` to v0.52.0. (#173)
+
+# Version 2.2.0
+
+- Bump `async-lock` and `futures-lite` to their latest version. (#170)
+
+# Version 2.1.0
+
+- Implement `IoSafe` for `std::process::{ChildStdin, ChildStdout, ChildStderr}`. (#162)
+
+# Version 2.0.0
+
+- **Breaking:** `Async::new()` now takes types that implement `AsFd`/`AsSocket` instead of `AsRawFd`/`AsRawSocket`, in order to implement I/O safety. (#142)
+- **Breaking:** `Async::get_mut()`, `Async::read_with_mut()` and `Async::write_with_mut()` are now `unsafe`. The underlying source is technically "borrowed" by the polling instance, so moving it out would be unsound. (#142)
+- Expose miscellaneous `kqueue` filters in the `os::kqueue` module. (#112)
+- Expose a way to get the underlying `Poller`'s file descriptor on Unix. (#125)
+- Add a new `Async::new_nonblocking` method to allow users to avoid duplicating an already nonblocking socket. (#159)
+- Remove the unused `fastrand` and `memchr` dependencies. (#131)
+- Use `tracing` instead of `log`. (#140)
+- Support ESP-IDF. (#144)
+- Optimize the `block_on` function to reduce allocation, leading to a slight performance improvement. (#149)
+
 # Version 1.13.0
 
 - Use [`rustix`] instead of [`libc`]/[`windows-sys`] for system calls (#76)

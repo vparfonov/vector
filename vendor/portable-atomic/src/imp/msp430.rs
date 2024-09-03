@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 // Atomic load/store implementation on MSP430.
 //
 // Adapted from https://github.com/pftbest/msp430-atomic.
@@ -95,12 +97,6 @@ macro_rules! atomic {
                 // SAFETY: the mutable reference guarantees unique ownership.
                 // (UnsafeCell::get_mut requires Rust 1.50)
                 unsafe { &mut *self.v.get() }
-            }
-
-            #[cfg(test)]
-            #[inline]
-            pub(crate) fn into_inner(self) -> $value_type {
-                 self.v.into_inner()
             }
 
             #[inline]

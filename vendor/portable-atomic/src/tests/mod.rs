@@ -1,8 +1,9 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 #![allow(
     clippy::alloc_instead_of_core,
     clippy::std_instead_of_alloc,
     clippy::std_instead_of_core,
-    clippy::too_many_lines,
     clippy::undocumented_unsafe_blocks,
     clippy::wildcard_imports
 )]
@@ -82,7 +83,7 @@ fn test_is_lock_free() {
             feature = "fallback",
             target_arch = "arm",
             not(any(miri, portable_atomic_sanitize_thread)),
-            any(not(portable_atomic_no_asm), portable_atomic_unstable_asm),
+            not(portable_atomic_no_asm),
             any(target_os = "linux", target_os = "android"),
             not(any(target_feature = "v6", portable_atomic_target_feature = "v6")),
             not(portable_atomic_no_outline_atomics),
@@ -142,7 +143,6 @@ fn test_is_lock_free() {
         {
             let has_cmpxchg16b = cfg!(all(
                 feature = "fallback",
-                not(portable_atomic_no_cmpxchg16b_target_feature),
                 not(portable_atomic_no_outline_atomics),
                 not(any(target_env = "sgx", miri)),
                 not(portable_atomic_test_outline_atomics_detect_false),
@@ -316,10 +316,10 @@ LLVM version: 15.0.3",
 }
 
 #[cfg(feature = "serde")]
+#[allow(clippy::as_underscore)]
 #[test]
 fn test_serde() {
-    use serde_test::{assert_tokens, Token};
-    use test_helper::serde::DebugPartialEq;
+    use test_helper::serde::{assert_tokens, DebugPartialEq, Token};
 
     macro_rules! t {
         ($atomic_type:ty, $value_type:ident, $token_type:ident) => {
@@ -346,12 +346,13 @@ fn test_serde() {
     t!(AtomicU32, u32, U32);
     t!(AtomicI64, i64, I64);
     t!(AtomicU64, u64, U64);
-    // TODO: serde_test doesn't support Token::{I128,U128}
+    // TODO: serde_test doesn't support Token::{I128,U128}: https://github.com/serde-rs/test/pull/6
     // t!(AtomicI128, i128, I128);
     // t!(AtomicU128, u128, U128);
     #[cfg(feature = "float")]
     t!(AtomicF32, f32, F32);
     #[cfg(feature = "float")]
+    // TODO: fixed in LLVM 18?
     #[cfg(not(target_arch = "mips"))] // LLVM 17 (nightly-2023-08-09) bug: assertion failed at core/src/num/diy_float.rs:78:9
     t!(AtomicF64, f64, F64);
 }

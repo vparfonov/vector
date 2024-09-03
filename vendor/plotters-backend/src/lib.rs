@@ -3,7 +3,7 @@
   Plotters project, please check the [main crate](https://crates.io/crates/plotters).
 
   This is the crate that used as the connector between Plotters and different backend crates. Since Plotters 0.3, all the backends has been
-  hosted as seperate crates for the usability and maintainability reasons.
+  hosted as separate crates for the usability and maintainability reasons.
 
   At the same time, Plotters is now supporting third-party backends and all the backends are now supports "plug-and-play":
   To use a external backend, just depends on both the Plotters main crate and the third-party backend crate.
@@ -16,7 +16,7 @@
 
   If the backend only implements [DrawingBackend::draw_pixel](trait.DrawingBackend.html#tymethod.draw_pixel), the default CPU rasterizer will be
   used to give your backend ability of drawing different shapes. For those backend that supports advanced drawing instructions, such as, GPU
-  acelerated shape drawing, all the provided trait method can be overriden from the specific backend code.
+  accelerated shape drawing, all the provided trait method can be overridden from the specific backend code.
 
   If your backend have text rendering ability, you may want to override the [DrawingBackend::estimate_text_size](trait.DrawingBackend.html#tymethod.estimate_text_size)
   to avoid wrong spacing, since the Plotters default text handling code may behaves differently from the backend in terms of text rendering.
@@ -33,7 +33,7 @@
   ```text
                                         .ensure_prepared() &&
     +-------------+    +-------------+    .draw_pixels()             +--------------+   drop
-    |Start drwaing|--->|Ready to draw| ------------------------+---->|Finish 1 frame| --------->
+    |Start drawing|--->|Ready to draw| ------------------------+---->|Finish 1 frame| --------->
     +-------------+    +-------------+                         |     +--------------+
            ^                  ^                                |            |
            |                  +------------------------------- +            |
@@ -48,12 +48,12 @@
   - For dynamic drawing, frames are defined by invocation of `DrawingBackend::present`, everything prior the invocation should belongs to previous frame
 
   # Compatibility Note
-  Since Plotters v0.3, plotters use the "plug-and-play" schema to import backends, this requires both Plotters and the backend crates depdens on a
+  Since Plotters v0.3, plotters use the "plug-and-play" schema to import backends, this requires both Plotters and the backend crates depends on a
   same version of `plotters-backend` crate. This crate (`plotters-backend`) will enforce that any revision (means the last number in a version number)
   won't contains breaking change - both on the Plotters side and backend side.
 
   Plotters main crate is always importing the backend crate with version specification `plotters-backend = "^<major>.<minor>*"`.
-  It's highly recommended that all the external crates follows the same rule to import `plotters-backend` depdendency, to avoid protential breaking
+  It's highly recommended that all the external crates follows the same rule to import `plotters-backend` dependency, to avoid potential breaking
   caused by `plotters-backend` crates gets a revision update.
 
   We also impose a versioning rule with `plotters` and some backends:
@@ -233,8 +233,8 @@ pub trait DrawingBackend: Sized {
             .layout_box(text)
             .map_err(|e| DrawingErrorKind::FontError(Box::new(e)))?;
         let ((min_x, min_y), (max_x, max_y)) = layout;
-        let width = (max_x - min_x) as i32;
-        let height = (max_y - min_y) as i32;
+        let width = max_x - min_x;
+        let height = max_y - min_y;
         let dx = match style.anchor().h_pos {
             HPos::Left => 0,
             HPos::Right => -width,
@@ -247,7 +247,7 @@ pub trait DrawingBackend: Sized {
         };
         let trans = style.transform();
         let (w, h) = self.get_size();
-        match style.draw(text, (0, 0), |x, y, color| {
+        let drawing_result = style.draw(text, (0, 0), |x, y, color| {
             let (x, y) = trans.transform(x + dx - min_x, y + dy - min_y);
             let (x, y) = (pos.0 + x, pos.1 + y);
             if x >= 0 && x < w as i32 && y >= 0 && y < h as i32 {
@@ -255,7 +255,8 @@ pub trait DrawingBackend: Sized {
             } else {
                 Ok(())
             }
-        }) {
+        });
+        match drawing_result {
             Ok(drawing_result) => drawing_result,
             Err(font_error) => Err(DrawingErrorKind::FontError(Box::new(font_error))),
         }
@@ -308,9 +309,9 @@ pub trait DrawingBackend: Sized {
                     break;
                 }
                 // FIXME: This assume we have RGB image buffer
-                let r = src[(dx + dy * w) as usize * 3];
-                let g = src[(dx + dy * w) as usize * 3 + 1];
-                let b = src[(dx + dy * w) as usize * 3 + 2];
+                let r = src[(dx + dy * iw) as usize * 3];
+                let g = src[(dx + dy * iw) as usize * 3 + 1];
+                let b = src[(dx + dy * iw) as usize * 3 + 2];
                 let color = BackendColor {
                     alpha: 1.0,
                     rgb: (r, g, b),

@@ -462,9 +462,9 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
+            | Serializer::Syslog(_)
             | Serializer::Protobuf(_)
-            | Serializer::RawMessage(_)
-            | Serializer::Syslog(_) => false,
+            | Serializer::RawMessage(_) => false,
         }
     }
 
@@ -484,9 +484,9 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
+            | Serializer::Syslog(_)
             | Serializer::Protobuf(_)
-            | Serializer::RawMessage(_)
-            | Serializer::Syslog(_) => {
+            | Serializer::RawMessage(_) => {
                 panic!("Serializer does not support JSON")
             }
         }

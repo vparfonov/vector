@@ -1,5 +1,5 @@
 /*
- * Copyright 2015-2022 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2015-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -282,6 +282,7 @@ struct evp_md_st {
     OSSL_FUNC_digest_init_fn *dinit;
     OSSL_FUNC_digest_update_fn *dupdate;
     OSSL_FUNC_digest_final_fn *dfinal;
+    OSSL_FUNC_digest_squeeze_fn *dsqueeze;
     OSSL_FUNC_digest_digest_fn *digest;
     OSSL_FUNC_digest_freectx_fn *freectx;
     OSSL_FUNC_digest_dupctx_fn *dupctx;
@@ -950,9 +951,18 @@ int evp_kdf_get_number(const EVP_KDF *kdf);
 int evp_kem_get_number(const EVP_KEM *wrap);
 int evp_keyexch_get_number(const EVP_KEYEXCH *keyexch);
 int evp_keymgmt_get_number(const EVP_KEYMGMT *keymgmt);
+int evp_keymgmt_get_legacy_alg(const EVP_KEYMGMT *keymgmt);
 int evp_mac_get_number(const EVP_MAC *mac);
 int evp_md_get_number(const EVP_MD *md);
 int evp_rand_get_number(const EVP_RAND *rand);
+int evp_rand_can_seed(EVP_RAND_CTX *ctx);
+size_t evp_rand_get_seed(EVP_RAND_CTX *ctx,
+                         unsigned char **buffer,
+                         int entropy, size_t min_len, size_t max_len,
+                         int prediction_resistance,
+                         const unsigned char *adin, size_t adin_len);
+void evp_rand_clear_seed(EVP_RAND_CTX *ctx,
+                         unsigned char *buffer, size_t b_len);
 int evp_signature_get_number(const EVP_SIGNATURE *signature);
 
 int evp_pkey_decrypt_alloc(EVP_PKEY_CTX *ctx, unsigned char **outp,

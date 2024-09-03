@@ -8,6 +8,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - ReleaseDate
 
+## [0.22.3] - 2024-03-16
+
+### Added
+
+- Additional implementations of `IntoF64` for standard numerical types (`i8`, `u8`, `i16`, `u16`,
+  `i32`, `u32`, and `f32`).
+
+## [0.22.2] - 2024-03-16
+
+### Fixed
+
+- Bump `ahash` back to `0.8.8` to remove range constraint after an upstream fix was provided to
+  remove the unnecessary MSRV bump.
+
+## [0.22.1] - 2024-02-11
+
+### Fixed
+
+- Lock down the version of `ahash` to avoid unnecessary MSRV bumping.
+
+## [0.22.0] - 2023-12-24
+
+### Added
+
+- Support for using `Arc<T>` with `Cow<'a, T>`.
+  ([#402](https://github.com/metrics-rs/metrics/pull/402))
+
+  This will primarily allow using `Arc<str>` for metric names and labels, where previously only
+  `&'static str` or `String` were allowed. There's still work to be done to also support labels in
+  this regard.
+
+- Support for local recorders. ([#414](https://github.com/metrics-rs/metrics/pull/414))
+
+  This is a large feature, and is documented in [RELEASES.md](RELEASES.md).
+
+### Changed
+
+- Make `Unit` methods return `&'static str` (instead of `&str`) where possible. ([#392](https://github.com/metrics-rs/metrics/pull/393))
+- Bump MSRV to 1.65.0.
+- `SetRecorderError` now returns the recorder given to `set_global_recorder` if another global
+  recorder was already installed instead of leaking it. ([#414](https://github.com/metrics-rs/metrics/pull/414))
+
 ## [0.21.1] - 2023-07-02
 
 ### Added

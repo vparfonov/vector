@@ -1,6 +1,10 @@
-// Copyright 2019 The Fuchsia Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// Copyright 2019 The Fuchsia Authors
+//
+// Licensed under a BSD-style license <LICENSE-BSD>, Apache License, Version 2.0
+// <LICENSE-APACHE or https://www.apache.org/licenses/LICENSE-2.0>, or the MIT
+// license <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your option.
+// This file may not be copied, modified, or distributed except according to
+// those terms.
 
 #![allow(warnings)]
 
@@ -8,26 +12,29 @@ mod util;
 
 use std::{marker::PhantomData, option::IntoIter};
 
-use {static_assertions::assert_impl_all, zerocopy::FromBytes};
+use {
+    static_assertions::assert_impl_all,
+    zerocopy::{FromBytes, FromZeroes},
+};
 
 use crate::util::AU16;
 
 // A struct is `FromBytes` if:
 // - all fields are `FromBytes`
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 struct Zst;
 
 assert_impl_all!(Zst: FromBytes);
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 struct One {
     a: u8,
 }
 
 assert_impl_all!(One: FromBytes);
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 struct Two {
     a: u8,
     b: Zst,
@@ -35,14 +42,14 @@ struct Two {
 
 assert_impl_all!(Two: FromBytes);
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 struct Unsized {
     a: [u8],
 }
 
 assert_impl_all!(Unsized: FromBytes);
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 struct TypeParams<'a, T: ?Sized, I: Iterator> {
     a: I::Item,
     b: u8,

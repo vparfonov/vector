@@ -34,7 +34,7 @@
 //! }
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/serde_repr/0.1.16")]
+#![doc(html_root_url = "https://docs.rs/serde_repr/0.1.19")]
 #![allow(clippy::single_match_else)]
 
 extern crate proc_macro;
@@ -61,9 +61,10 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
     });
 
     TokenStream::from(quote! {
+        #[allow(deprecated)]
         impl serde::Serialize for #ident {
             #[allow(clippy::use_self)]
-            fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
+            fn serialize<S>(&self, serializer: S) -> ::core::result::Result<S::Ok, S::Error>
             where
                 S: serde::Serializer
             {
@@ -93,7 +94,7 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     let match_discriminants = input.variants.iter().map(|variant| {
         let variant = &variant.ident;
         quote! {
-            discriminant::#variant => core::result::Result::Ok(#ident::#variant),
+            discriminant::#variant => ::core::result::Result::Ok(#ident::#variant),
         }
     });
 
@@ -107,20 +108,21 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
         Some(variant) => {
             let variant = &variant.ident;
             quote! {
-                core::result::Result::Ok(#ident::#variant)
+                ::core::result::Result::Ok(#ident::#variant)
             }
         }
         None => quote! {
-            core::result::Result::Err(serde::de::Error::custom(
+            ::core::result::Result::Err(serde::de::Error::custom(
                 format_args!(#error_format, other #(, discriminant::#variants)*)
             ))
         },
     };
 
     TokenStream::from(quote! {
+        #[allow(deprecated)]
         impl<'de> serde::Deserialize<'de> for #ident {
             #[allow(clippy::use_self)]
-            fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
+            fn deserialize<D>(deserializer: D) -> ::core::result::Result<Self, D::Error>
             where
                 D: serde::Deserializer<'de>,
             {

@@ -153,10 +153,10 @@ fn ml_basic_string<'i>(input: &mut Input<'i>) -> PResult<Cow<'i, str>> {
         "ml-basic-string",
         delimited(
             ML_BASIC_STRING_DELIM,
-            preceded(opt(newline), cut_err(ml_basic_body)),
-            cut_err(ML_BASIC_STRING_DELIM),
-        )
-        .context(StrContext::Label("multiline basic string")),
+            preceded(opt(newline), cut_err(ml_basic_body))
+                .context(StrContext::Label("multiline basic string")),
+            cut_err(ML_BASIC_STRING_DELIM).context(StrContext::Label("multiline basic string")),
+        ),
     )
     .parse_next(input)
 }
@@ -212,7 +212,7 @@ fn mlb_content<'i>(input: &mut Input<'i>) -> PResult<Cow<'i, str>> {
 
 // mlb-quotes = 1*2quotation-mark
 fn mlb_quotes<'i>(
-    mut term: impl winnow::Parser<Input<'i>, (), ContextError>,
+    mut term: impl Parser<Input<'i>, (), ContextError>,
 ) -> impl Parser<Input<'i>, &'i str, ContextError> {
     move |input: &mut Input<'i>| {
         let start = input.checkpoint();
@@ -296,10 +296,10 @@ fn ml_literal_string<'i>(input: &mut Input<'i>) -> PResult<Cow<'i, str>> {
                 } else {
                     Cow::Borrowed(t)
                 }
-            })),
-            cut_err(ML_LITERAL_STRING_DELIM),
-        )
-        .context(StrContext::Label("multiline literal string")),
+            }))
+            .context(StrContext::Label("multiline literal string")),
+            cut_err(ML_LITERAL_STRING_DELIM).context(StrContext::Label("multiline literal string")),
+        ),
     )
     .parse_next(input)
 }
@@ -321,14 +321,14 @@ fn ml_literal_body<'i>(input: &mut Input<'i>) -> PResult<&'i str> {
         .map(|()| ()),
         opt(mll_quotes(ML_LITERAL_STRING_DELIM.void())),
     )
-        .recognize()
+        .take()
         .try_map(std::str::from_utf8)
         .parse_next(input)
 }
 
 // mll-content = mll-char / newline
 fn mll_content(input: &mut Input<'_>) -> PResult<u8> {
-    alt((one_of(MLL_CHAR), newline)).parse_next(input)
+    alt((one_of(MLL_CHAR), newline.value(b'\n'))).parse_next(input)
 }
 
 // mll-char = %x09 / %x20-26 / %x28-7E / non-ascii
@@ -341,7 +341,7 @@ const MLL_CHAR: (
 
 // mll-quotes = 1*2apostrophe
 fn mll_quotes<'i>(
-    mut term: impl winnow::Parser<Input<'i>, (), ContextError>,
+    mut term: impl Parser<Input<'i>, (), ContextError>,
 ) -> impl Parser<Input<'i>, &'i str, ContextError> {
     move |input: &mut Input<'i>| {
         let start = input.checkpoint();
@@ -441,10 +441,10 @@ The quick brown \
     #[test]
     fn literal_string() {
         let inputs = [
-            r#"'C:\Users\nodejs\templates'"#,
-            r#"'\\ServerX\admin$\system32\'"#,
+            r"'C:\Users\nodejs\templates'",
+            r"'\\ServerX\admin$\system32\'",
             r#"'Tom "Dubs" Preston-Werner'"#,
-            r#"'<\i\c*\s*>'"#,
+            r"'<\i\c*\s*>'",
         ];
 
         for input in &inputs {
@@ -457,7 +457,7 @@ The quick brown \
     #[test]
     fn ml_literal_string() {
         let inputs = [
-            r#"'''I [dw]on't need \d{2} apples'''"#,
+            r"'''I [dw]on't need \d{2} apples'''",
             r#"''''one_quote''''"#,
         ];
         for input in &inputs {

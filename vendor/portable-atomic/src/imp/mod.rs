@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 // -----------------------------------------------------------------------------
 // Lock-free implementations
 
@@ -45,13 +47,13 @@ mod aarch64;
 // x86_64 128-bit atomics
 #[cfg(all(
     target_arch = "x86_64",
+    not(all(any(miri, portable_atomic_sanitize_thread), portable_atomic_no_cmpxchg16b_intrinsic)),
     any(not(portable_atomic_no_asm), portable_atomic_unstable_asm),
     any(
         target_feature = "cmpxchg16b",
         portable_atomic_target_feature = "cmpxchg16b",
         all(
             feature = "fallback",
-            not(portable_atomic_no_cmpxchg16b_target_feature),
             not(portable_atomic_no_outline_atomics),
             not(any(target_env = "sgx", miri)),
         ),
@@ -106,14 +108,8 @@ mod powerpc64;
 // s390x 128-bit atomics
 #[cfg(all(target_arch = "s390x", portable_atomic_unstable_asm_experimental_arch))]
 // Use intrinsics.rs on Miri and Sanitizer that do not support inline assembly.
-#[cfg_attr(
-    all(any(miri, portable_atomic_sanitize_thread), portable_atomic_new_atomic_intrinsics),
-    path = "atomic128/intrinsics.rs"
-)]
-#[cfg_attr(
-    not(all(any(miri, portable_atomic_sanitize_thread), portable_atomic_new_atomic_intrinsics)),
-    path = "atomic128/s390x.rs"
-)]
+#[cfg_attr(any(miri, portable_atomic_sanitize_thread), path = "atomic128/intrinsics.rs")]
+#[cfg_attr(not(any(miri, portable_atomic_sanitize_thread)), path = "atomic128/s390x.rs")]
 mod s390x;
 
 // pre-v6 ARM Linux 64-bit atomics
@@ -122,7 +118,7 @@ mod s390x;
 #[cfg(all(
     target_arch = "arm",
     not(any(miri, portable_atomic_sanitize_thread)),
-    any(not(portable_atomic_no_asm), portable_atomic_unstable_asm),
+    not(portable_atomic_no_asm),
     any(target_os = "linux", target_os = "android"),
     not(any(target_feature = "v6", portable_atomic_target_feature = "v6")),
     not(portable_atomic_no_outline_atomics),
@@ -150,7 +146,7 @@ mod riscv;
 #[cfg(all(
     any(target_arch = "x86", target_arch = "x86_64"),
     not(any(miri, portable_atomic_sanitize_thread)),
-    any(not(portable_atomic_no_asm), portable_atomic_unstable_asm),
+    not(portable_atomic_no_asm),
 ))]
 mod x86;
 
@@ -190,7 +186,7 @@ mod fallback;
 
 // On AVR, we always use critical section based fallback implementation.
 // AVR can be safely assumed to be single-core, so this is sound.
-// https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/lib/Target/AVR/AVRExpandPseudoInsts.cpp#L1074
+// https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/lib/Target/AVR/AVRExpandPseudoInsts.cpp#L1074
 // MSP430 as well.
 #[cfg(any(
     all(test, target_os = "none"),
@@ -318,7 +314,7 @@ items! {
     #[cfg(not(all(
         target_arch = "arm",
         not(any(miri, portable_atomic_sanitize_thread)),
-        any(not(portable_atomic_no_asm), portable_atomic_unstable_asm),
+        not(portable_atomic_no_asm),
         any(target_os = "linux", target_os = "android"),
         not(any(target_feature = "v6", portable_atomic_target_feature = "v6")),
         not(portable_atomic_no_outline_atomics),
@@ -333,13 +329,16 @@ items! {
         ),
         all(
             target_arch = "x86_64",
+            not(all(
+                any(miri, portable_atomic_sanitize_thread),
+                portable_atomic_no_cmpxchg16b_intrinsic,
+            )),
             any(not(portable_atomic_no_asm), portable_atomic_unstable_asm),
             any(
                 target_feature = "cmpxchg16b",
                 portable_atomic_target_feature = "cmpxchg16b",
                 all(
                     feature = "fallback",
-                    not(portable_atomic_no_cmpxchg16b_target_feature),
                     not(portable_atomic_no_outline_atomics),
                     not(any(target_env = "sgx", miri)),
                 ),
@@ -385,7 +384,7 @@ items! {
 #[cfg(all(
     target_arch = "arm",
     not(any(miri, portable_atomic_sanitize_thread)),
-    any(not(portable_atomic_no_asm), portable_atomic_unstable_asm),
+    not(portable_atomic_no_asm),
     any(target_os = "linux", target_os = "android"),
     not(any(target_feature = "v6", portable_atomic_target_feature = "v6")),
     not(portable_atomic_no_outline_atomics),
@@ -404,13 +403,13 @@ pub(crate) use self::aarch64::{AtomicI128, AtomicU128};
 // x86_64 & (cmpxchg16b | outline-atomics)
 #[cfg(all(
     target_arch = "x86_64",
+    not(all(any(miri, portable_atomic_sanitize_thread), portable_atomic_no_cmpxchg16b_intrinsic)),
     any(not(portable_atomic_no_asm), portable_atomic_unstable_asm),
     any(
         target_feature = "cmpxchg16b",
         portable_atomic_target_feature = "cmpxchg16b",
         all(
             feature = "fallback",
-            not(portable_atomic_no_cmpxchg16b_target_feature),
             not(portable_atomic_no_outline_atomics),
             not(any(target_env = "sgx", miri)),
         ),

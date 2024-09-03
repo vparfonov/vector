@@ -67,6 +67,49 @@ fn test_generics() {
 }
 
 #[test]
+fn test_2d_const_generics() {
+    #[derive(PartialEq, TypedBuilder)]
+    struct Foo<const NUM_COLS: usize, const NUM_ROWS: usize> {
+        data: [[u32; NUM_ROWS]; NUM_COLS],
+    }
+    assert!(Foo::builder().data([[]]).build() == Foo { data: [[]] });
+}
+
+#[test]
+fn test_multiple_const_generics() {
+    #[derive(PartialEq, TypedBuilder)]
+    struct Foo<const A: usize, const B: usize, const C: usize> {
+        data: [u32; A],
+        data2: [u32; B],
+        data3: [u32; C],
+    }
+    assert!(
+        Foo::builder().data([1]).data2([2, 3]).data3([]).build()
+            == Foo {
+                data: [1],
+                data2: [2, 3],
+                data3: []
+            }
+    );
+}
+
+#[test]
+fn test_const_generics_with_other_generics() {
+    #[derive(PartialEq, TypedBuilder)]
+    struct Foo<const A: usize, B> {
+        data: [B; A],
+        data2: [B; 3],
+    }
+    assert!(
+        Foo::builder().data([3]).data2([0, 1, 2]).build()
+            == Foo {
+                data: [3],
+                data2: [0, 1, 2]
+            }
+    );
+}
+
+#[test]
 fn test_into() {
     #[derive(PartialEq, TypedBuilder)]
     struct Foo {
@@ -504,7 +547,7 @@ fn test_clone_builder_with_generics() {
     let semi_built2 = Foo::builder().x("four");
 
     assert!(semi_built2.clone().y(5).build() == Foo { x: "four", y: 5 });
-    assert!(semi_built2.clone().y(6).build() == Foo { x: "four", y: 6 });
+    assert!(semi_built2.y(6).build() == Foo { x: "four", y: 6 });
 
     // Just to make sure it can build with generic bounds
     #[allow(dead_code)]
@@ -533,6 +576,32 @@ fn test_builder_on_struct_with_keywords() {
 
     assert!(
         r#struct::builder().r#fn(1).r#union("two").build()
+            == r#struct {
+                r#fn: 1,
+                r#type: None,
+                r#enum: Some(()),
+                r#union: "two".to_owned(),
+            }
+    );
+}
+
+#[test]
+fn test_builder_on_struct_with_keywords_prefix_suffix() {
+    #[allow(non_camel_case_types)]
+    #[derive(PartialEq, TypedBuilder)]
+    #[builder(field_defaults(setter(prefix = "set_", suffix = "_value")))]
+    struct r#struct {
+        r#fn: u32,
+        #[builder(default, setter(strip_option))]
+        r#type: Option<u32>,
+        #[builder(default = Some(()), setter(skip))]
+        r#enum: Option<()>,
+        #[builder(setter(into))]
+        r#union: String,
+    }
+
+    assert!(
+        r#struct::builder().r#set_fn_value(1).r#set_union_value("two").build()
             == r#struct {
                 r#fn: 1,
                 r#type: None,
@@ -662,12 +731,72 @@ fn test_into_set_generic_impl_into() {
         value: i32,
     }
 
-    impl Into<Bar> for Foo {
-        fn into(self) -> Bar {
-            Bar { value: self.value }
+    impl From<Foo> for Bar {
+        fn from(val: Foo) -> Self {
+            Self { value: val.value }
         }
     }
 
     let bar: Bar = Foo::builder().value(42).build();
     assert_eq!(bar, Bar { value: 42 });
+}
+
+#[test]
+fn test_prefix() {
+    #[derive(Debug, PartialEq, TypedBuilder)]
+    #[builder(field_defaults(setter(prefix = "with_")))]
+    struct Foo {
+        x: i32,
+        y: i32,
+    }
+
+    let foo = Foo::builder().with_x(1).with_y(2).build();
+    assert_eq!(foo, Foo { x: 1, y: 2 })
+}
+
+#[test]
+fn test_suffix() {
+    #[derive(Debug, PartialEq, TypedBuilder)]
+    #[builder(field_defaults(setter(suffix = "_value")))]
+    struct Foo {
+        x: i32,
+        y: i32,
+    }
+
+    let foo = Foo::builder().x_value(1).y_value(2).build();
+    assert_eq!(foo, Foo { x: 1, y: 2 })
+}
+
+#[test]
+fn test_prefix_and_suffix() {
+    #[derive(Debug, PartialEq, TypedBuilder)]
+    #[builder(field_defaults(setter(prefix = "with_", suffix = "_value")))]
+    struct Foo {
+        x: i32,
+        y: i32,
+    }
+
+    let foo = Foo::builder().with_x_value(1).with_y_value(2).build();
+    assert_eq!(foo, Foo { x: 1, y: 2 })
+}
+
+#[test]
+fn test_issue_118() {
+    #[derive(TypedBuilder)]
+    #[builder(build_method(into=Bar))]
+    struct Foo<T> {
+        #[builder(default, setter(skip))]
+        #[allow(dead_code)]
+        foo: Option<T>,
+    }
+
+    struct Bar;
+
+    impl<T> From<Foo<T>> for Bar {
+        fn from(_value: Foo<T>) -> Self {
+            Self
+        }
+    }
+
+    let _ = Foo::<u32>::builder().build();
 }

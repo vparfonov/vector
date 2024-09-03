@@ -73,7 +73,7 @@ fn duplicate_annotation() {
 #[test]
 fn pub_inline_annotation() {
     check_err(
-        r#"public items cannot be marked #\[inline\]"#,
+        r"public items cannot be marked #\[inline\]",
         r#"grammar; #[inline] pub Term = ();"#,
         r#"           ~~~~~~            "#,
     );
@@ -91,7 +91,7 @@ fn multiple_match_token() {
 #[test]
 fn match_after_extern_token() {
     check_err(
-        r#"match and extern \(with custom tokens\) definitions are mutually exclusive"#,
+        r"match and extern \(with custom tokens\) definitions are mutually exclusive",
         r#"grammar; extern { enum Tok { } } match { _ }"#,
         r#"                                 ~~~~~      "#,
     );
@@ -100,34 +100,16 @@ fn match_after_extern_token() {
 #[test]
 fn extern_after_match_token() {
     check_err(
-        r#"extern \(with custom tokens\) and match definitions are mutually exclusive"#,
+        r"extern \(with custom tokens\) and match definitions are mutually exclusive",
         r#"grammar; match { _ } extern { enum Tok { } }"#,
         r#"                     ~~~~~~                 "#,
     );
 }
 
 #[test]
-fn match_catch_all_first_of_last() {
-    check_err(
-        r#"Catch all must be final item"#,
-        r#"grammar; match { _, "abc" }"#,
-        r#"                 ~         "#,
-    );
-}
-
-#[test]
-fn match_catch_all_last_of_first() {
-    check_err(
-        r#"Catch all must be final item"#,
-        r#"grammar; match { "abc", _ } else { "foo" }"#,
-        r#"                        ~                 "#,
-    );
-}
-
-#[test]
 fn expandable_expression_requires_named_variables() {
     check_err(
-        r#"Using `<>` between curly braces \(e.g., `\{<>\}`\) only works when your parsed values have been given names \(e.g., `<x:Foo>`, not just `<Foo>`\)"#,
+        r"Using `<>` between curly braces \(e.g., `\{<>\}`\) only works when your parsed values have been given names \(e.g., `<x:Foo>`, not just `<Foo>`\)",
         r#"grammar; Term = { <A> => Foo {<>} };"#,
         r#"                  ~~~~~~~~~~~~~~~~  "#,
     );
@@ -230,4 +212,13 @@ fn first_level_assoc() {
         r#"grammar; Term = { #[precedence(level="3")] #[assoc(side="left")] "a" => ()};"#,
         r#"                                             ~~~~~~~~~~~~~~~~~~             "#,
     );
+}
+
+#[test]
+fn missing_macro_arg() {
+    check_err(
+        r#"macros must have at least one argument"#,
+        r#"grammar; Macro<Smth>: String = { Smth => <>.to_string() } pub Root: String = { Macro<>}"#,
+        r#"                                                                               ~~~~~~~"#,
+    )
 }

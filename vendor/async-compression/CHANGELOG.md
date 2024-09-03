@@ -6,9 +6,39 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0), 
 
 ## Unreleased
 
-## 0.4.6
+## [0.4.12](https://github.com/Nullus157/async-compression/compare/v0.4.11...v0.4.12) - 2024-07-21
+
+### Feature
+- Enable customizing Zstd decoding parameters.
+
+## [0.4.11](https://github.com/Nullus157/async-compression/compare/v0.4.10...v0.4.11) - 2024-05-30
+
+### Other
+- Expose total_in/total_out from underlying flate2 encoder types.
+
+## [0.4.10](https://github.com/Nullus157/async-compression/compare/v0.4.9...v0.4.10) - 2024-05-09
+
+### Other
+- *(deps)* update brotli requirement from 5.0 to 6.0 ([#274](https://github.com/Nullus157/async-compression/pull/274))
+- Fix pipeline doc: Warn on unexpected cfgs instead of error ([#276](https://github.com/Nullus157/async-compression/pull/276))
+- Update name of release-pr.yml
+- Create release.yml
+- Create release-pr.yml
+
+## 0.4.9
+
+ - bump dep brotli from 4.0 to 5.0
+
+## 0.4.8
+
+ - bump dep brotli from 3.3 to 4.0
+
+## 0.4.7
 
 - Flush available data in decoder even when there's no incoming input.
+
+## 0.4.6
+
 - Return errors instead of panicking in all encode and decode operations.
 
 ## 0.4.5

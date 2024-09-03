@@ -3,6 +3,77 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## console-subscriber-v0.3.0 - (2024-06-10)
+
+### <a id = "0.3.0-breaking"></a>Breaking Changes
+- **Bump tonic to 0.11 ([#547](https://github.com/tokio-rs/console/pull/547))** ([ef6816c](https://github.com/tokio-rs/console/commit/ef6816caa0fe84171105b513425506f25d3082af))<br />This is a breaking change for users of `console-api` and
+`console-subscriber`, as it changes the public `tonic` dependency to a
+semver-incompatible version. This breaks compatibility with `tonic`
+0.10.x.
+
+### Added
+
+- Replace target column with kind column in tasks view ([#478](https://github.com/tokio-rs/console/pull/478)) ([903d9fa](https://github.com/tokio-rs/console/commit/903d9fa9f9d2dddec2235206b792c264ed9892fb))
+- Reduce retention period to fit in max message size ([#503](https://github.com/tokio-rs/console/pull/503)) ([bd3dd71](https://github.com/tokio-rs/console/commit/bd3dd71eb0645c028858967ed5b3f14ed34d0605))
+- Support grpc-web and add `grpc-web` feature ([#498](https://github.com/tokio-rs/console/pull/498)) ([4150253](https://github.com/tokio-rs/console/commit/41502531396106b551a9dde2d3a83ddb0beac774))
+
+### Documented
+
+- Add a grpc-web app example ([#526](https://github.com/tokio-rs/console/pull/526)) ([4af30f2](https://github.com/tokio-rs/console/commit/4af30f2c1df919a1e0d4f448534d15b4a1bb836b))
+- Fix typo in doc comment ([#543](https://github.com/tokio-rs/console/pull/543)) ([ff22678](https://github.com/tokio-rs/console/commit/ff2267880ba96f4fdf32090e05b66cf80189d7f8))
+
+### Fixed
+
+- Don't save poll_ops if no-one is receiving them ([#501](https://github.com/tokio-rs/console/pull/501)) ([1656c79](https://github.com/tokio-rs/console/commit/1656c791af35bb0500bb6dd3c60344a0ceb12520))
+- Ignore metadata that is not a span or event ([#554](https://github.com/tokio-rs/console/pull/554)) ([852a977](https://github.com/tokio-rs/console/commit/852a977bab71d0f6ae47c6c5c1c20b8679c9e576))
+
+### Updated
+
+- [**breaking**](#0.3.0-breaking) Bump tonic to 0.11 ([#547](https://github.com/tokio-rs/console/pull/547)) ([ef6816c](https://github.com/tokio-rs/console/commit/ef6816caa0fe84171105b513425506f25d3082af))
+
+
+## console-subscriber-v0.2.0 - (2023-09-29)
+
+[c8c4a85](https://github.com/tokio-rs/console/commit/c8c4a85df2da55c9745df6f38e19631e84ed0cf5)...[c8c4a85](https://github.com/tokio-rs/console/commit/c8c4a85df2da55c9745df6f38e19631e84ed0cf5)
+
+### <a id = "console-subscriber-v0.2.0-breaking"></a>Breaking Changes
+- **Update Tonic and Prost dependencies ([#364](https://github.com/tokio-rs/console/issues/364))** ([f9b8e03](https://github.com/tokio-rs/console/commit/f9b8e03bd7ee1d0edb441c94a93a350d5b06ed3b))<br />This commit updates the public dependencies `prost` and `tonic` to
+semver-incompatible versions (v0.11.0 and v0.8.0, respectively). This is
+a breaking change for users who are integrating the `console-api` protos
+with their own `tonic` servers or clients.
+- **Update `tonic` to v0.10 and increase MSRV to 1.64 ([#464](https://github.com/tokio-rs/console/issues/464))** ([96e62c8](https://github.com/tokio-rs/console/commit/96e62c83ef959569bb062dc8fee98fa2b2461e8d))<br />This is a breaking change for users of `console-api` and
+`console-subscriber`, as it changes the public `tonic` dependency to a
+semver-incompatible version. This breaks compatibility with `tonic`
+0.9.x and `prost` 0.11.x.
+
+### Added
+
+- [**breaking**](#console-subscriber-v0.2.0-breaking) Update Tonic and Prost dependencies ([#364](https://github.com/tokio-rs/console/issues/364)) ([f9b8e03](https://github.com/tokio-rs/console/commit/f9b8e03bd7ee1d0edb441c94a93a350d5b06ed3b))
+- Add support for Unix domain sockets ([#388](https://github.com/tokio-rs/console/issues/388)) ([a944dbc](https://github.com/tokio-rs/console/commit/a944dbcff2de49e45d5fa99edb227c85a5c3d40f), closes [#296](https://github.com/tokio-rs/console/issues/296))
+- Add scheduled time per task ([#406](https://github.com/tokio-rs/console/issues/406)) ([f280df9](https://github.com/tokio-rs/console/commit/f280df94100d24e868ce3f9fbfec160677d8a124))
+- Add task scheduled times histogram ([#409](https://github.com/tokio-rs/console/issues/409)) ([d92a399](https://github.com/tokio-rs/console/commit/d92a39994f6e759ddba4e53ab7263a0c4edb0b67))
+- Update `tonic` to 0.9 ([#420](https://github.com/tokio-rs/console/issues/420)) ([48af1ee](https://github.com/tokio-rs/console/commit/48af1eef6352bd35c607267d68b24cf16033beeb))
+- Update MSRV to Rust 1.60.0 ([b18ee47](https://github.com/tokio-rs/console/commit/b18ee473aa499aa581117baea7404623d98b081c))
+- Expose server parts ([#451](https://github.com/tokio-rs/console/issues/451)) ([e51ac5a](https://github.com/tokio-rs/console/commit/e51ac5a15338631136cc2d0e285ec3a9337c8ce4))
+- Add cfg `console_without_tokio_unstable` ([#446](https://github.com/tokio-rs/console/issues/446)) ([7ed6673](https://github.com/tokio-rs/console/commit/7ed6673241b0a566c00be59f7a0cbc911ea6a165))
+- Add warning for tasks that never yield ([#439](https://github.com/tokio-rs/console/issues/439)) ([d05fa9e](https://github.com/tokio-rs/console/commit/d05fa9ee6456dd9a9eec72c5299c32a4f0c845c0))
+- [**breaking**](#console-subscriber-v0.2.0-breaking) Update `tonic` to v0.10 and increase MSRV to 1.64 ([#464](https://github.com/tokio-rs/console/issues/464)) ([96e62c8](https://github.com/tokio-rs/console/commit/96e62c83ef959569bb062dc8fee98fa2b2461e8d))
+
+### Documented
+
+- Fix unclosed code block ([#463](https://github.com/tokio-rs/console/issues/463)) ([362bdbe](https://github.com/tokio-rs/console/commit/362bdbea1af1e36ec139ad460e97f0eeea79a9f2))
+- Update MSRV version docs to 1.64 ([#467](https://github.com/tokio-rs/console/issues/467)) ([94a5a51](https://github.com/tokio-rs/console/commit/94a5a5117b85e723c28fafa1eadabf31057570c3))
+
+### Fixed
+
+- Fix build on tokio 1.21.0 ([#374](https://github.com/tokio-rs/console/issues/374)) ([c34ac2d](https://github.com/tokio-rs/console/commit/c34ac2d6a569b0fd02b9b78ff4ecffd019d30a87))
+- Fix off-by-one indexing for `callsites` ([#391](https://github.com/tokio-rs/console/issues/391)) ([43891ab](https://github.com/tokio-rs/console/commit/43891aba0a42ec85cdcdfeac2a31ffe612eb1841))
+- Bump minimum Tokio version ([#397](https://github.com/tokio-rs/console/issues/397)) ([bbb8f25](https://github.com/tokio-rs/console/commit/bbb8f25a666a4e15de3c5054244e228a51b5c7c0), fixes [#386](https://github.com/tokio-rs/console/issues/386))
+- Fix self wakes count ([#430](https://github.com/tokio-rs/console/issues/430)) ([d308935](https://github.com/tokio-rs/console/commit/d3089350da7b483ef80284d42b4114bfc50c2b33))
+- Remove clock skew warning in `start_poll` ([#434](https://github.com/tokio-rs/console/issues/434)) ([4a88b28](https://github.com/tokio-rs/console/commit/4a88b28e608465eb3c23cbe7f0cb589ed6110962))
+- Do not report excessive polling ([#378](https://github.com/tokio-rs/console/issues/378)) ([#440](https://github.com/tokio-rs/console/issues/440)) ([8b483bf](https://github.com/tokio-rs/console/commit/8b483bf806bc5f5f7c94e97ea79299ae8ccb7955), closes [#378](https://github.com/tokio-rs/console/issues/378))
+- Correct retain logic ([#447](https://github.com/tokio-rs/console/issues/447)) ([36ffc51](https://github.com/tokio-rs/console/commit/36ffc513b26f27d5fb6344c24f12572ec76e41ac))
+
 ## console-subscriber-v0.1.10 - (2023-07-03)
 
 [05cdab0](https://github.com/tokio-rs/console/commit/05cdab07a3da603697520a56f0b99b2e2042d8bd)...[91929d0](https://github.com/tokio-rs/console/commit/91929d030768287b5f95595a757eea5eeb151022)

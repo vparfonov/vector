@@ -274,7 +274,7 @@ where
 /// This commits the parse result, preventing alternative branch paths like with
 /// [`winnow::combinator::alt`][crate::combinator::alt].
 ///
-/// See the [tutorial][crate::_tutorial::chapter_6] for more details.
+/// See the [tutorial][crate::_tutorial::chapter_7] for more details.
 ///
 /// # Example
 ///
@@ -391,7 +391,7 @@ where
 /// Call the iterator's [`ParserIterator::finish`] method to get the remaining input if successful,
 /// or the error value if we encountered an error.
 ///
-/// On [`ErrMode::Backtrack`], iteration will stop.  To instead chain an error up, see [`cut_err`].
+/// On [`ErrMode::Backtrack`], iteration will stop. To instead chain an error up, see [`cut_err`].
 ///
 /// # Example
 ///

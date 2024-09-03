@@ -11,9 +11,9 @@
 
 [package]
 edition = "2018"
-rust-version = "1.61.0"
+rust-version = "1.65.0"
 name = "metrics-util"
-version = "0.15.1"
+version = "0.16.3"
 authors = ["Toby Lawrence <toby@nuclearfurnace.com>"]
 description = "Helper types/functions used by the metrics ecosystem."
 homepage = "https://github.com/metrics-rs/metrics"
@@ -59,7 +59,7 @@ harness = false
 required-features = ["layer-router"]
 
 [dependencies.ahash]
-version = "0.8"
+version = "0.8.8"
 optional = true
 default-features = false
 
@@ -84,18 +84,19 @@ optional = true
 default-features = false
 
 [dependencies.hashbrown]
-version = "=0.13.1"
+version = "0.14"
 features = ["ahash"]
 optional = true
 default-features = false
 
 [dependencies.indexmap]
-version = "1"
+version = "2.1"
+features = ["std"]
 optional = true
 default-features = false
 
 [dependencies.metrics]
-version = "^0.21"
+version = "^0.22"
 
 [dependencies.num_cpus]
 version = "1"
@@ -103,12 +104,12 @@ optional = true
 default-features = false
 
 [dependencies.ordered-float]
-version = "3.4"
+version = "4.2"
 optional = true
 default-features = false
 
 [dependencies.quanta]
-version = "0.11"
+version = "0.12"
 optional = true
 default-features = false
 
@@ -152,7 +153,7 @@ version = "0.5"
 version = "0.2"
 
 [dev-dependencies.ordered-float]
-version = "3.4"
+version = "4.2"
 
 [dev-dependencies.predicates-core]
 version = "=1.0.5"

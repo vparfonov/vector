@@ -12,6 +12,8 @@ use crate::fd::{BorrowedFd, OwnedFd};
 use crate::ffi::CStr;
 #[cfg(all(apple, feature = "alloc"))]
 use crate::ffi::CString;
+#[cfg(not(any(target_os = "espidf", target_os = "vita")))]
+use crate::fs::Access;
 #[cfg(not(any(
     apple,
     netbsdlike,
@@ -20,6 +22,7 @@ use crate::ffi::CString;
     target_os = "espidf",
     target_os = "haiku",
     target_os = "redox",
+    target_os = "vita",
 )))]
 use crate::fs::Advice;
 #[cfg(not(any(target_os = "espidf", target_os = "redox")))]
@@ -27,14 +30,14 @@ use crate::fs::AtFlags;
 #[cfg(not(any(
     netbsdlike,
     solarish,
-    target_os = "aix",
     target_os = "dragonfly",
     target_os = "espidf",
     target_os = "nto",
     target_os = "redox",
+    target_os = "vita",
 )))]
 use crate::fs::FallocateFlags;
-#[cfg(not(any(target_os = "espidf", target_os = "wasi")))]
+#[cfg(not(any(target_os = "espidf", target_os = "vita", target_os = "wasi")))]
 use crate::fs::FlockOperation;
 #[cfg(any(linux_kernel, target_os = "freebsd"))]
 use crate::fs::MemfdFlags;
@@ -47,12 +50,19 @@ use crate::fs::SealFlags;
     target_os = "netbsd",
     target_os = "nto",
     target_os = "redox",
+    target_os = "vita",
     target_os = "wasi",
 )))]
 use crate::fs::StatFs;
-#[cfg(not(target_os = "espidf"))]
-use crate::fs::{Access, Timestamps};
-#[cfg(not(any(apple, target_os = "espidf", target_os = "redox", target_os = "wasi")))]
+#[cfg(not(any(target_os = "espidf", target_os = "vita")))]
+use crate::fs::Timestamps;
+#[cfg(not(any(
+    apple,
+    target_os = "espidf",
+    target_os = "redox",
+    target_os = "vita",
+    target_os = "wasi"
+)))]
 use crate::fs::{Dev, FileType};
 use crate::fs::{Mode, OFlags, SeekFrom, Stat};
 #[cfg(not(any(target_os = "haiku", target_os = "redox", target_os = "wasi")))]
@@ -70,7 +80,7 @@ use {
     crate::backend::conv::nonnegative_ret,
     crate::fs::{copyfile_state_t, CloneFlags, CopyfileFlags},
 };
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 use {crate::fs::XattrFlags, core::mem::size_of, core::ptr::null_mut};
 #[cfg(linux_kernel)]
 use {
@@ -129,7 +139,12 @@ fn open_via_syscall(path: &CStr, oflags: OFlags, mode: Mode) -> io::Result<Owned
 pub(crate) fn open(path: &CStr, oflags: OFlags, mode: Mode) -> io::Result<OwnedFd> {
     // Work around <https://sourceware.org/bugzilla/show_bug.cgi?id=17523>.
     // glibc versions before 2.25 don't handle `O_TMPFILE` correctly.
-    #[cfg(all(unix, target_env = "gnu", not(target_os = "hurd")))]
+    #[cfg(all(
+        unix,
+        target_env = "gnu",
+        not(target_os = "hurd"),
+        not(target_os = "freebsd")
+    ))]
     if oflags.contains(OFlags::TMPFILE) && crate::backend::if_glibc_is_less_than_2_25() {
         return open_via_syscall(path, oflags, mode);
     }
@@ -192,7 +207,12 @@ pub(crate) fn openat(
 ) -> io::Result<OwnedFd> {
     // Work around <https://sourceware.org/bugzilla/show_bug.cgi?id=17523>.
     // glibc versions before 2.25 don't handle `O_TMPFILE` correctly.
-    #[cfg(all(unix, target_env = "gnu", not(target_os = "hurd")))]
+    #[cfg(all(
+        unix,
+        target_env = "gnu",
+        not(target_os = "hurd"),
+        not(target_os = "freebsd")
+    ))]
     if oflags.contains(OFlags::TMPFILE) && crate::backend::if_glibc_is_less_than_2_25() {
         return openat_via_syscall(dirfd, path, oflags, mode);
     }
@@ -231,6 +251,7 @@ pub(crate) fn openat(
     target_os = "netbsd",
     target_os = "nto",
     target_os = "redox",
+    target_os = "vita",
     target_os = "wasi",
 )))]
 #[inline]
@@ -327,7 +348,7 @@ pub(crate) fn linkat(
     new_path: &CStr,
     flags: AtFlags,
 ) -> io::Result<()> {
-    // macOS <= 10.9 lacks `linkat`.
+    // macOS ≤ 10.9 lacks `linkat`.
     #[cfg(target_os = "macos")]
     unsafe {
         weak! {
@@ -384,7 +405,7 @@ pub(crate) fn unlink(path: &CStr) -> io::Result<()> {
 
 #[cfg(not(any(target_os = "espidf", target_os = "redox")))]
 pub(crate) fn unlinkat(dirfd: BorrowedFd<'_>, path: &CStr, flags: AtFlags) -> io::Result<()> {
-    // macOS <= 10.9 lacks `unlinkat`.
+    // macOS ≤ 10.9 lacks `unlinkat`.
     #[cfg(target_os = "macos")]
     unsafe {
         weak! {
@@ -437,7 +458,7 @@ pub(crate) fn renameat(
     new_dirfd: BorrowedFd<'_>,
     new_path: &CStr,
 ) -> io::Result<()> {
-    // macOS <= 10.9 lacks `renameat`.
+    // macOS ≤ 10.9 lacks `renameat`.
     #[cfg(target_os = "macos")]
     unsafe {
         weak! {
@@ -505,8 +526,6 @@ pub(crate) fn renameat2(
     }
 }
 
-/// At present, `libc` only has `renameat2` defined for glibc. On other
-/// ABIs, `RenameFlags` has no flags defined, and we use plain `renameat`.
 #[cfg(any(
     target_os = "android",
     all(target_os = "linux", not(target_env = "gnu")),
@@ -519,8 +538,32 @@ pub(crate) fn renameat2(
     new_path: &CStr,
     flags: RenameFlags,
 ) -> io::Result<()> {
-    assert!(flags.is_empty());
-    renameat(old_dirfd, old_path, new_dirfd, new_path)
+    // At present, `libc` only has `renameat2` defined for glibc. If we have
+    // no flags, we can use plain `renameat`, but otherwise we use `syscall!`.
+    // to call `renameat2` ourselves.
+    if flags.is_empty() {
+        renameat(old_dirfd, old_path, new_dirfd, new_path)
+    } else {
+        syscall! {
+            fn renameat2(
+                olddirfd: c::c_int,
+                oldpath: *const c::c_char,
+                newdirfd: c::c_int,
+                newpath: *const c::c_char,
+                flags: c::c_uint
+            ) via SYS_renameat2 -> c::c_int
+        }
+
+        unsafe {
+            ret(renameat2(
+                borrowed_fd(old_dirfd),
+                c_str(old_path),
+                borrowed_fd(new_dirfd),
+                c_str(new_path),
+                flags.bits(),
+            ))
+        }
+    }
 }
 
 pub(crate) fn symlink(old_path: &CStr, new_path: &CStr) -> io::Result<()> {
@@ -684,19 +727,24 @@ fn statat_old(dirfd: BorrowedFd<'_>, path: &CStr, flags: AtFlags) -> io::Result<
     }
 }
 
-#[cfg(not(any(target_os = "espidf", target_os = "emscripten")))]
+#[cfg(not(any(target_os = "espidf", target_os = "emscripten", target_os = "vita")))]
 pub(crate) fn access(path: &CStr, access: Access) -> io::Result<()> {
     unsafe { ret(c::access(c_str(path), access.bits())) }
 }
 
-#[cfg(not(any(target_os = "emscripten", target_os = "espidf", target_os = "redox")))]
+#[cfg(not(any(
+    target_os = "emscripten",
+    target_os = "espidf",
+    target_os = "redox",
+    target_os = "vita"
+)))]
 pub(crate) fn accessat(
     dirfd: BorrowedFd<'_>,
     path: &CStr,
     access: Access,
     flags: AtFlags,
 ) -> io::Result<()> {
-    // macOS <= 10.9 lacks `faccessat`.
+    // macOS ≤ 10.9 lacks `faccessat`.
     #[cfg(target_os = "macos")]
     unsafe {
         weak! {
@@ -755,7 +803,7 @@ pub(crate) fn accessat(
     Ok(())
 }
 
-#[cfg(not(any(target_os = "espidf", target_os = "redox")))]
+#[cfg(not(any(target_os = "espidf", target_os = "redox", target_os = "vita")))]
 pub(crate) fn utimensat(
     dirfd: BorrowedFd<'_>,
     path: &CStr,
@@ -1068,7 +1116,13 @@ pub(crate) fn chownat(
     }
 }
 
-#[cfg(not(any(apple, target_os = "espidf", target_os = "redox", target_os = "wasi")))]
+#[cfg(not(any(
+    apple,
+    target_os = "espidf",
+    target_os = "redox",
+    target_os = "vita",
+    target_os = "wasi"
+)))]
 pub(crate) fn mknodat(
     dirfd: BorrowedFd<'_>,
     path: &CStr,
@@ -1147,6 +1201,7 @@ pub(crate) fn copy_file_range(
     target_os = "espidf",
     target_os = "haiku",
     target_os = "redox",
+    target_os = "vita",
 )))]
 pub(crate) fn fadvise(fd: BorrowedFd<'_>, offset: u64, len: u64, advice: Advice) -> io::Result<()> {
     let offset = offset as i64;
@@ -1203,6 +1258,7 @@ pub(crate) fn fcntl_add_seals(fd: BorrowedFd<'_>, seals: SealFlags) -> io::Resul
     target_os = "espidf",
     target_os = "fuchsia",
     target_os = "redox",
+    target_os = "vita",
     target_os = "wasi"
 )))]
 #[inline]
@@ -1248,8 +1304,8 @@ pub(crate) fn seek(fd: BorrowedFd<'_>, pos: SeekFrom) -> io::Result<u64> {
         SeekFrom::Hole(offset) => (c::SEEK_HOLE, offset),
     };
 
-    // ESP-IDF doesn't support 64-bit offsets.
-    #[cfg(target_os = "espidf")]
+    // ESP-IDF and Vita don't support 64-bit offsets.
+    #[cfg(any(target_os = "espidf", target_os = "vita"))]
     let offset: i32 = offset.try_into().map_err(|_| io::Errno::OVERFLOW)?;
 
     let offset = unsafe { ret_off_t(c::lseek(borrowed_fd(fd), offset, whence))? };
@@ -1316,7 +1372,12 @@ pub(crate) fn fchown(fd: BorrowedFd<'_>, owner: Option<Uid>, group: Option<Gid>)
     }
 }
 
-#[cfg(not(any(target_os = "espidf", target_os = "solaris", target_os = "wasi")))]
+#[cfg(not(any(
+    target_os = "espidf",
+    target_os = "solaris",
+    target_os = "vita",
+    target_os = "wasi"
+)))]
 pub(crate) fn flock(fd: BorrowedFd<'_>, operation: FlockOperation) -> io::Result<()> {
     unsafe { ret(c::flock(borrowed_fd(fd), operation as c::c_int)) }
 }
@@ -1338,7 +1399,12 @@ pub(crate) fn syncfs(fd: BorrowedFd<'_>) -> io::Result<()> {
     unsafe { ret(syncfs(borrowed_fd(fd))) }
 }
 
-#[cfg(not(any(target_os = "espidf", target_os = "redox", target_os = "wasi")))]
+#[cfg(not(any(
+    target_os = "espidf",
+    target_os = "redox",
+    target_os = "vita",
+    target_os = "wasi"
+)))]
 pub(crate) fn sync() {
     unsafe { c::sync() }
 }
@@ -1406,6 +1472,7 @@ fn fstat_old(fd: BorrowedFd<'_>) -> io::Result<Stat> {
     target_os = "netbsd",
     target_os = "nto",
     target_os = "redox",
+    target_os = "vita",
     target_os = "wasi",
 )))]
 pub(crate) fn fstatfs(fd: BorrowedFd<'_>) -> io::Result<StatFs> {
@@ -1445,7 +1512,7 @@ fn libc_statvfs_to_statvfs(from: c::statvfs) -> StatVfs {
     }
 }
 
-#[cfg(not(target_os = "espidf"))]
+#[cfg(not(any(target_os = "espidf", target_os = "vita")))]
 pub(crate) fn futimens(fd: BorrowedFd<'_>, times: &Timestamps) -> io::Result<()> {
     // Old 32-bit version: libc has `futimens` but it is not y2038 safe by
     // default. But there may be a `__futimens64` we can use.
@@ -1548,11 +1615,11 @@ fn futimens_old(fd: BorrowedFd<'_>, times: &Timestamps) -> io::Result<()> {
     apple,
     netbsdlike,
     solarish,
-    target_os = "aix",
     target_os = "dragonfly",
     target_os = "espidf",
     target_os = "nto",
     target_os = "redox",
+    target_os = "vita",
 )))]
 pub(crate) fn fallocate(
     fd: BorrowedFd<'_>,
@@ -1630,6 +1697,7 @@ pub(crate) fn fsync(fd: BorrowedFd<'_>) -> io::Result<()> {
     target_os = "espidf",
     target_os = "haiku",
     target_os = "redox",
+    target_os = "vita",
 )))]
 pub(crate) fn fdatasync(fd: BorrowedFd<'_>) -> io::Result<()> {
     unsafe { ret(c::fdatasync(borrowed_fd(fd))) }
@@ -2171,7 +2239,7 @@ struct Attrlist {
     forkattr: Attrgroup,
 }
 
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 pub(crate) fn getxattr(path: &CStr, name: &CStr, value: &mut [u8]) -> io::Result<usize> {
     let value_ptr = value.as_mut_ptr();
 
@@ -2186,19 +2254,28 @@ pub(crate) fn getxattr(path: &CStr, name: &CStr, value: &mut [u8]) -> io::Result
     }
 
     #[cfg(apple)]
-    unsafe {
-        ret_usize(c::getxattr(
-            path.as_ptr(),
-            name.as_ptr(),
-            value_ptr.cast::<c::c_void>(),
-            value.len(),
-            0,
-            0,
-        ))
+    {
+        // Passing an empty to slice to `getxattr` leads to `ERANGE` on macOS.
+        // Pass null instead.
+        let ptr = if value.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            value_ptr.cast::<c::c_void>()
+        };
+        unsafe {
+            ret_usize(c::getxattr(
+                path.as_ptr(),
+                name.as_ptr(),
+                ptr,
+                value.len(),
+                0,
+                0,
+            ))
+        }
     }
 }
 
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 pub(crate) fn lgetxattr(path: &CStr, name: &CStr, value: &mut [u8]) -> io::Result<usize> {
     let value_ptr = value.as_mut_ptr();
 
@@ -2214,7 +2291,8 @@ pub(crate) fn lgetxattr(path: &CStr, name: &CStr, value: &mut [u8]) -> io::Resul
 
     #[cfg(apple)]
     {
-        // Passing an empty to slice to getxattr leads to ERANGE on macOS. Pass null instead.
+        // Passing an empty to slice to `getxattr` leads to `ERANGE` on macOS.
+        // Pass null instead.
         let ptr = if value.is_empty() {
             core::ptr::null_mut()
         } else {
@@ -2234,7 +2312,7 @@ pub(crate) fn lgetxattr(path: &CStr, name: &CStr, value: &mut [u8]) -> io::Resul
     }
 }
 
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 pub(crate) fn fgetxattr(fd: BorrowedFd<'_>, name: &CStr, value: &mut [u8]) -> io::Result<usize> {
     let value_ptr = value.as_mut_ptr();
 
@@ -2249,19 +2327,28 @@ pub(crate) fn fgetxattr(fd: BorrowedFd<'_>, name: &CStr, value: &mut [u8]) -> io
     }
 
     #[cfg(apple)]
-    unsafe {
-        ret_usize(c::fgetxattr(
-            borrowed_fd(fd),
-            name.as_ptr(),
-            value_ptr.cast::<c::c_void>(),
-            value.len(),
-            0,
-            0,
-        ))
+    {
+        // Passing an empty to slice to `getxattr` leads to `ERANGE` on macOS.
+        // Pass null instead.
+        let ptr = if value.is_empty() {
+            core::ptr::null_mut()
+        } else {
+            value_ptr.cast::<c::c_void>()
+        };
+        unsafe {
+            ret_usize(c::fgetxattr(
+                borrowed_fd(fd),
+                name.as_ptr(),
+                ptr,
+                value.len(),
+                0,
+                0,
+            ))
+        }
     }
 }
 
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 pub(crate) fn setxattr(
     path: &CStr,
     name: &CStr,
@@ -2292,7 +2379,7 @@ pub(crate) fn setxattr(
     }
 }
 
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 pub(crate) fn lsetxattr(
     path: &CStr,
     name: &CStr,
@@ -2323,7 +2410,7 @@ pub(crate) fn lsetxattr(
     }
 }
 
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 pub(crate) fn fsetxattr(
     fd: BorrowedFd<'_>,
     name: &CStr,
@@ -2354,7 +2441,7 @@ pub(crate) fn fsetxattr(
     }
 }
 
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 pub(crate) fn listxattr(path: &CStr, list: &mut [c::c_char]) -> io::Result<usize> {
     #[cfg(not(apple))]
     unsafe {
@@ -2372,7 +2459,7 @@ pub(crate) fn listxattr(path: &CStr, list: &mut [c::c_char]) -> io::Result<usize
     }
 }
 
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 pub(crate) fn llistxattr(path: &CStr, list: &mut [c::c_char]) -> io::Result<usize> {
     #[cfg(not(apple))]
     unsafe {
@@ -2390,7 +2477,7 @@ pub(crate) fn llistxattr(path: &CStr, list: &mut [c::c_char]) -> io::Result<usiz
     }
 }
 
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 pub(crate) fn flistxattr(fd: BorrowedFd<'_>, list: &mut [c::c_char]) -> io::Result<usize> {
     let fd = borrowed_fd(fd);
 
@@ -2405,7 +2492,7 @@ pub(crate) fn flistxattr(fd: BorrowedFd<'_>, list: &mut [c::c_char]) -> io::Resu
     }
 }
 
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 pub(crate) fn removexattr(path: &CStr, name: &CStr) -> io::Result<()> {
     #[cfg(not(apple))]
     unsafe {
@@ -2418,7 +2505,7 @@ pub(crate) fn removexattr(path: &CStr, name: &CStr) -> io::Result<()> {
     }
 }
 
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 pub(crate) fn lremovexattr(path: &CStr, name: &CStr) -> io::Result<()> {
     #[cfg(not(apple))]
     unsafe {
@@ -2435,7 +2522,7 @@ pub(crate) fn lremovexattr(path: &CStr, name: &CStr) -> io::Result<()> {
     }
 }
 
-#[cfg(any(apple, linux_kernel))]
+#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
 pub(crate) fn fremovexattr(fd: BorrowedFd<'_>, name: &CStr) -> io::Result<()> {
     let fd = borrowed_fd(fd);
 
@@ -2461,4 +2548,40 @@ fn test_sizes() {
     assert_eq_size!([c::timespec; 2], Timestamps);
     #[cfg(fix_y2038)]
     assert!(core::mem::size_of::<[c::timespec; 2]>() < core::mem::size_of::<Timestamps>());
+}
+
+#[inline]
+#[cfg(linux_kernel)]
+pub(crate) fn inotify_init1(flags: super::inotify::CreateFlags) -> io::Result<OwnedFd> {
+    // SAFETY: `inotify_init1` has no safety preconditions.
+    unsafe { ret_owned_fd(c::inotify_init1(bitflags_bits!(flags))) }
+}
+
+#[inline]
+#[cfg(linux_kernel)]
+pub(crate) fn inotify_add_watch(
+    inot: BorrowedFd<'_>,
+    path: &CStr,
+    flags: super::inotify::WatchFlags,
+) -> io::Result<i32> {
+    // SAFETY: The fd and path we are passing is guaranteed valid by the
+    // type system.
+    unsafe {
+        ret_c_int(c::inotify_add_watch(
+            borrowed_fd(inot),
+            c_str(path),
+            flags.bits(),
+        ))
+    }
+}
+
+#[inline]
+#[cfg(linux_kernel)]
+pub(crate) fn inotify_rm_watch(inot: BorrowedFd<'_>, wd: i32) -> io::Result<()> {
+    // Android's `inotify_rm_watch` takes `u32` despite that
+    // `inotify_add_watch` expects a `i32`.
+    #[cfg(target_os = "android")]
+    let wd = wd as u32;
+    // SAFETY: The fd is valid and closing an arbitrary wd is valid.
+    unsafe { ret(c::inotify_rm_watch(borrowed_fd(inot), wd)) }
 }

@@ -15,6 +15,7 @@
 ///     ProcessorParameterName::BufferIntervalInSeconds => { /* ... */ },
 ///     ProcessorParameterName::BufferSizeInMb => { /* ... */ },
 ///     ProcessorParameterName::CompressionFormat => { /* ... */ },
+///     ProcessorParameterName::DataMessageExtraction => { /* ... */ },
 ///     ProcessorParameterName::Delimiter => { /* ... */ },
 ///     ProcessorParameterName::JsonParsingEngine => { /* ... */ },
 ///     ProcessorParameterName::LambdaArn => { /* ... */ },
@@ -56,6 +57,8 @@ pub enum ProcessorParameterName {
     #[allow(missing_docs)] // documentation missing in model
     CompressionFormat,
     #[allow(missing_docs)] // documentation missing in model
+    DataMessageExtraction,
+    #[allow(missing_docs)] // documentation missing in model
     Delimiter,
     #[allow(missing_docs)] // documentation missing in model
     JsonParsingEngine,
@@ -79,6 +82,7 @@ impl ::std::convert::From<&str> for ProcessorParameterName {
             "BufferIntervalInSeconds" => ProcessorParameterName::BufferIntervalInSeconds,
             "BufferSizeInMBs" => ProcessorParameterName::BufferSizeInMb,
             "CompressionFormat" => ProcessorParameterName::CompressionFormat,
+            "DataMessageExtraction" => ProcessorParameterName::DataMessageExtraction,
             "Delimiter" => ProcessorParameterName::Delimiter,
             "JsonParsingEngine" => ProcessorParameterName::JsonParsingEngine,
             "LambdaArn" => ProcessorParameterName::LambdaArn,
@@ -104,6 +108,7 @@ impl ProcessorParameterName {
             ProcessorParameterName::BufferIntervalInSeconds => "BufferIntervalInSeconds",
             ProcessorParameterName::BufferSizeInMb => "BufferSizeInMBs",
             ProcessorParameterName::CompressionFormat => "CompressionFormat",
+            ProcessorParameterName::DataMessageExtraction => "DataMessageExtraction",
             ProcessorParameterName::Delimiter => "Delimiter",
             ProcessorParameterName::JsonParsingEngine => "JsonParsingEngine",
             ProcessorParameterName::LambdaArn => "LambdaArn",
@@ -120,6 +125,7 @@ impl ProcessorParameterName {
             "BufferIntervalInSeconds",
             "BufferSizeInMBs",
             "CompressionFormat",
+            "DataMessageExtraction",
             "Delimiter",
             "JsonParsingEngine",
             "LambdaArn",
@@ -144,6 +150,24 @@ impl ProcessorParameterName {
             #[allow(deprecated)]
             Self::Unknown(_) => ::std::result::Result::Err(crate::error::UnknownVariantError::new(value)),
             known => Ok(known),
+        }
+    }
+}
+impl ::std::fmt::Display for ProcessorParameterName {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        match self {
+            ProcessorParameterName::BufferIntervalInSeconds => write!(f, "BufferIntervalInSeconds"),
+            ProcessorParameterName::BufferSizeInMb => write!(f, "BufferSizeInMBs"),
+            ProcessorParameterName::CompressionFormat => write!(f, "CompressionFormat"),
+            ProcessorParameterName::DataMessageExtraction => write!(f, "DataMessageExtraction"),
+            ProcessorParameterName::Delimiter => write!(f, "Delimiter"),
+            ProcessorParameterName::JsonParsingEngine => write!(f, "JsonParsingEngine"),
+            ProcessorParameterName::LambdaArn => write!(f, "LambdaArn"),
+            ProcessorParameterName::MetadataExtractionQuery => write!(f, "MetadataExtractionQuery"),
+            ProcessorParameterName::LambdaNumberOfRetries => write!(f, "NumberOfRetries"),
+            ProcessorParameterName::RoleArn => write!(f, "RoleArn"),
+            ProcessorParameterName::SubRecordType => write!(f, "SubRecordType"),
+            ProcessorParameterName::Unknown(value) => write!(f, "{}", value),
         }
     }
 }

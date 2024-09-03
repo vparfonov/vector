@@ -1,6 +1,10 @@
-// Copyright 2019 The Fuchsia Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// Copyright 2019 The Fuchsia Authors
+//
+// Licensed under a BSD-style license <LICENSE-BSD>, Apache License, Version 2.0
+// <LICENSE-APACHE or https://www.apache.org/licenses/LICENSE-2.0>, or the MIT
+// license <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your option.
+// This file may not be copied, modified, or distributed except according to
+// those terms.
 
 use core::fmt::{self, Display, Formatter};
 
@@ -73,9 +77,7 @@ impl<R: KindRepr> Config<R> {
         }
 
         let initial_sp = metas[0].span();
-        let err_span = metas.iter().skip(1).fold(Some(initial_sp), |sp_option, meta| {
-            sp_option.and_then(|sp| sp.join(meta.span()))
-        });
+        let err_span = metas.iter().skip(1).try_fold(initial_sp, |sp, meta| sp.join(meta.span()));
 
         if self.allowed_combinations.contains(&reprs.as_slice()) {
             Ok(reprs)

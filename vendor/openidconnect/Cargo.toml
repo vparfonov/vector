@@ -10,9 +10,10 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
+edition = "2021"
+rust-version = "1.65"
 name = "openidconnect"
-version = "2.5.1"
+version = "3.5.0"
 authors = ["David A. Ramos <ramos@cs.stanford.edu>"]
 description = "OpenID Connect library"
 readme = "README.md"
@@ -30,8 +31,19 @@ version = "0.4"
 features = [
     "clock",
     "std",
+    "wasmbind",
 ]
 default-features = false
+
+[dependencies.dyn-clone]
+version = "1.0.10"
+
+[dependencies.ed25519-dalek]
+version = "2.0.0"
+features = ["pem"]
+
+[dependencies.hmac]
+version = "0.12.1"
 
 [dependencies.http]
 version = "0.2"
@@ -42,18 +54,21 @@ version = "0.10"
 [dependencies.log]
 version = "0.4"
 
-[dependencies.num-bigint]
-version = "0.4.3"
-
 [dependencies.oauth2]
-version = "4.2.2"
+version = "4.4.1"
 default-features = false
 
-[dependencies.rand]
-version = "0.8"
+[dependencies.p256]
+version = "0.13.2"
 
-[dependencies.ring]
-version = "0.16"
+[dependencies.p384]
+version = "0.13.0"
+
+[dependencies.rand]
+version = "0.8.5"
+
+[dependencies.rsa]
+version = "0.9.2"
 
 [dependencies.serde]
 version = "1.0"
@@ -74,7 +89,11 @@ version = "0.1"
 version = "1.0"
 
 [dependencies.serde_with]
-version = "1.13"
+version = "3"
+
+[dependencies.sha2]
+version = "0.10.6"
+features = ["oid"]
 
 [dependencies.subtle]
 version = "2.4"
@@ -83,7 +102,7 @@ version = "2.4"
 version = "1.0"
 
 [dependencies.url]
-version = "2.1"
+version = "2.4"
 features = ["serde"]
 
 [dev-dependencies.anyhow]
@@ -118,6 +137,7 @@ default = [
     "reqwest",
     "rustls-tls",
 ]
+jwk-alg = []
 native-tls = ["oauth2/native-tls"]
 nightly = []
 reqwest = ["oauth2/reqwest"]

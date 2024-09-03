@@ -12,7 +12,7 @@
 //!
 //! ## Compatibility
 //!
-//! The `num-complex` crate is tested for rustc 1.31 and greater.
+//! The `num-complex` crate is tested for rustc 1.60 and greater.
 
 #![doc(html_root_url = "https://docs.rs/num-complex/0.4")]
 #![no_std]
@@ -30,7 +30,7 @@ use core::str::FromStr;
 #[cfg(feature = "std")]
 use std::error::Error;
 
-use num_traits::{Inv, MulAdd, Num, One, Pow, Signed, Zero};
+use num_traits::{ConstOne, ConstZero, Inv, MulAdd, Num, One, Pow, Signed, Zero};
 
 use num_traits::float::FloatCore;
 #[cfg(any(feature = "std", feature = "libm"))]
@@ -92,11 +92,42 @@ pub struct Complex<T> {
     pub im: T,
 }
 
+/// Alias for a [`Complex<f32>`]
 pub type Complex32 = Complex<f32>;
+
+/// Create a new [`Complex<f32>`] with arguments that can convert [`Into<f32>`].
+///
+/// ```
+/// use num_complex::{c32, Complex32};
+/// assert_eq!(c32(1u8, 2), Complex32::new(1.0, 2.0));
+/// ```
+///
+/// Note: ambiguous integer literals in Rust will [default] to `i32`, which does **not** implement
+/// `Into<f32>`, so a call like `c32(1, 2)` will result in a type error. The example above uses a
+/// suffixed `1u8` to set its type, and then the `2` can be inferred as the same type.
+///
+/// [default]: https://doc.rust-lang.org/reference/expressions/literal-expr.html#integer-literal-expressions
+#[inline]
+pub fn c32<T: Into<f32>>(re: T, im: T) -> Complex32 {
+    Complex::new(re.into(), im.into())
+}
+
+/// Alias for a [`Complex<f64>`]
 pub type Complex64 = Complex<f64>;
 
+/// Create a new [`Complex<f64>`] with arguments that can convert [`Into<f64>`].
+///
+/// ```
+/// use num_complex::{c64, Complex64};
+/// assert_eq!(c64(1, 2), Complex64::new(1.0, 2.0));
+/// ```
+#[inline]
+pub fn c64<T: Into<f64>>(re: T, im: T) -> Complex64 {
+    Complex::new(re.into(), im.into())
+}
+
 impl<T> Complex<T> {
-    /// Create a new Complex
+    /// Create a new `Complex`
     #[inline]
     pub const fn new(re: T, im: T) -> Self {
         Complex { re, im }
@@ -104,7 +135,9 @@ impl<T> Complex<T> {
 }
 
 impl<T: Clone + Num> Complex<T> {
-    /// Returns imaginary unit
+    /// Returns the imaginary unit.
+    ///
+    /// See also [`Complex::I`].
     #[inline]
     pub fn i() -> Self {
         Self::new(T::zero(), T::one())
@@ -213,13 +246,11 @@ impl<T: Float> Complex<T> {
                 if !im.is_finite() {
                     return Self::new(T::zero(), T::zero());
                 }
-            } else {
-                if im == T::zero() || !im.is_finite() {
-                    if im.is_infinite() {
-                        im = T::nan();
-                    }
-                    return Self::new(re, im);
+            } else if im == T::zero() || !im.is_finite() {
+                if im.is_infinite() {
+                    im = T::nan();
                 }
+                return Self::new(re, im);
             }
         } else if re.is_nan() && im == T::zero() {
             return self;
@@ -975,7 +1006,7 @@ impl<T: Clone + Num + Neg<Output = T>> Inv for Complex<T> {
 
     #[inline]
     fn inv(self) -> Self::Output {
-        (&self).inv()
+        Complex::inv(&self)
     }
 }
 
@@ -984,7 +1015,7 @@ impl<'a, T: Clone + Num + Neg<Output = T>> Inv for &'a Complex<T> {
 
     #[inline]
     fn inv(self) -> Self::Output {
-        self.inv()
+        Complex::inv(self)
     }
 }
 
@@ -1148,6 +1179,15 @@ impl<T: Clone + Num> Rem<T> for Complex<T> {
 real_arithmetic!(usize, u8, u16, u32, u64, u128, isize, i8, i16, i32, i64, i128, f32, f64);
 
 // constants
+impl<T: ConstZero> Complex<T> {
+    /// A constant `Complex` 0.
+    pub const ZERO: Self = Self::new(T::ZERO, T::ZERO);
+}
+
+impl<T: Clone + Num + ConstZero> ConstZero for Complex<T> {
+    const ZERO: Self = Self::ZERO;
+}
+
 impl<T: Clone + Num> Zero for Complex<T> {
     #[inline]
     fn zero() -> Self {
@@ -1164,6 +1204,18 @@ impl<T: Clone + Num> Zero for Complex<T> {
         self.re.set_zero();
         self.im.set_zero();
     }
+}
+
+impl<T: ConstOne + ConstZero> Complex<T> {
+    /// A constant `Complex` 1.
+    pub const ONE: Self = Self::new(T::ONE, T::ZERO);
+
+    /// A constant `Complex` _i_, the imaginary unit.
+    pub const I: Self = Self::new(T::ZERO, T::ONE);
+}
+
+impl<T: Clone + Num + ConstOne + ConstZero> ConstOne for Complex<T> {
+    const ONE: Self = Self::ONE;
 }
 
 impl<T: Clone + Num> One for Complex<T> {
@@ -1338,7 +1390,6 @@ where
     }
 }
 
-#[allow(deprecated)] // `trim_left_matches` and `trim_right_matches` since 1.33
 fn from_str_generic<T, E, F>(s: &str, from: F) -> Result<Complex<T>, ParseComplexError<E>>
 where
     F: Fn(&str) -> Result<T, E>,
@@ -1360,8 +1411,8 @@ where
         // ignore '+'/'-' if part of an exponent
         if (c == b'+' || c == b'-') && !(p == b'e' || p == b'E') {
             // trim whitespace around the separator
-            a = &s[..=i].trim_right_matches(char::is_whitespace);
-            b = &s[i + 2..].trim_left_matches(char::is_whitespace);
+            a = s[..=i].trim_end_matches(char::is_whitespace);
+            b = s[i + 2..].trim_start_matches(char::is_whitespace);
             neg_b = c == b'-';
 
             if b.is_empty() || (neg_b && b.starts_with('-')) {
@@ -1508,7 +1559,7 @@ where
 #[cfg(feature = "serde")]
 impl<'de, T> serde::Deserialize<'de> for Complex<T>
 where
-    T: serde::Deserialize<'de> + Num + Clone,
+    T: serde::Deserialize<'de>,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where

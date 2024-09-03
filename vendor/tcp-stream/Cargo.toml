@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.63.0"
 name = "tcp-stream"
-version = "0.26.1"
+version = "0.28.0"
 authors = ["Marc-Antoine Perennou <Marc-Antoine@Perennou.com>"]
 description = "std::net::TcpStream on steroids"
 documentation = "https://docs.rs/tcp-stream"
@@ -40,41 +40,38 @@ name = "tcp_stream"
 [dependencies.cfg-if]
 version = "^1.0"
 
-[dependencies.native-tls-crate]
+[dependencies.native-tls]
 version = "^0.2"
 optional = true
-package = "native-tls"
 
 [dependencies.openssl]
 version = "^0.10"
 optional = true
 
-[dependencies.p12]
-version = "^0.6"
+[dependencies.p12-keystore]
+version = "^0.1"
 optional = true
 
 [dependencies.rustls-connector]
-version = "^0.18"
+version = "^0.20"
 optional = true
 default-features = false
 
 [dependencies.rustls-pemfile]
-version = "^1.0"
+version = "^2.0"
 optional = true
 
 [features]
-dangerous-configuration = ["rustls-connector/dangerous-configuration"]
 default = ["rustls"]
 native-tls = [
-    "native-tls-crate",
+    "dep:native-tls",
     "rustls-pemfile",
 ]
-quic = ["rustls-connector/quic"]
 rustls = ["rustls-native-certs"]
 rustls-common = [
     "rustls-connector",
     "rustls-pemfile",
-    "p12",
+    "p12-keystore",
 ]
 rustls-native-certs = [
     "rustls-common",

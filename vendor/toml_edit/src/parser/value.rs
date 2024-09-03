@@ -10,66 +10,64 @@ use crate::parser::numbers::{float, integer};
 use crate::parser::prelude::*;
 use crate::parser::strings::string;
 use crate::repr::{Formatted, Repr};
-use crate::value as v;
 use crate::RawString;
 use crate::Value;
 
 // val = string / boolean / array / inline-table / date-time / float / integer
-pub(crate) fn value<'i>(check: RecursionCheck) -> impl Parser<Input<'i>, v::Value, ContextError> {
-    move |input: &mut Input<'i>| {
-        dispatch!{peek(any);
+pub(crate) fn value(input: &mut Input<'_>) -> PResult<Value> {
+    dispatch! {peek(any);
             crate::parser::strings::QUOTATION_MARK |
             crate::parser::strings::APOSTROPHE => string.map(|s| {
-                v::Value::String(Formatted::new(
+                Value::String(Formatted::new(
                     s.into_owned()
                 ))
             }),
-            crate::parser::array::ARRAY_OPEN => array(check).map(v::Value::Array),
-            crate::parser::inline_table::INLINE_TABLE_OPEN => inline_table(check).map(v::Value::InlineTable),
+            crate::parser::array::ARRAY_OPEN => check_recursion(array).map(Value::Array),
+            crate::parser::inline_table::INLINE_TABLE_OPEN => check_recursion(inline_table).map(Value::InlineTable),
             // Date/number starts
             b'+' | b'-' | b'0'..=b'9' => {
                 // Uncommon enough not to be worth optimizing at this time
                 alt((
                     date_time
-                        .map(v::Value::from),
+                        .map(Value::from),
                     float
-                        .map(v::Value::from),
+                        .map(Value::from),
                     integer
-                        .map(v::Value::from),
+                        .map(Value::from),
                 ))
             },
             // Report as if they were numbers because its most likely a typo
             b'_' => {
                     integer
-                        .map(v::Value::from)
+                        .map(Value::from)
                 .context(StrContext::Expected(StrContextValue::Description("leading digit")))
             },
             // Report as if they were numbers because its most likely a typo
             b'.' =>  {
                     float
-                        .map(v::Value::from)
+                        .map(Value::from)
                 .context(StrContext::Expected(StrContextValue::Description("leading digit")))
             },
             b't' => {
-                crate::parser::numbers::true_.map(v::Value::from)
+                crate::parser::numbers::true_.map(Value::from)
                     .context(StrContext::Label("string"))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('"')))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('\'')))
             },
             b'f' => {
-                crate::parser::numbers::false_.map(v::Value::from)
+                crate::parser::numbers::false_.map(Value::from)
                     .context(StrContext::Label("string"))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('"')))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('\'')))
             },
             b'i' => {
-                crate::parser::numbers::inf.map(v::Value::from)
+                crate::parser::numbers::inf.map(Value::from)
                     .context(StrContext::Label("string"))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('"')))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('\'')))
             },
             b'n' => {
-                crate::parser::numbers::nan.map(v::Value::from)
+                crate::parser::numbers::nan.map(Value::from)
                     .context(StrContext::Label("string"))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('"')))
                     .context(StrContext::Expected(StrContextValue::CharLiteral('\'')))
@@ -81,13 +79,12 @@ pub(crate) fn value<'i>(check: RecursionCheck) -> impl Parser<Input<'i>, v::Valu
                     .context(StrContext::Expected(StrContextValue::CharLiteral('\'')))
             },
     }
-        .with_span()
-        .try_map(|(value, span)| apply_raw(value, span))
-        .parse_next(input)
-    }
+    .with_span()
+    .map(|(value, span)| apply_raw(value, span))
+    .parse_next(input)
 }
 
-fn apply_raw(mut val: Value, span: std::ops::Range<usize>) -> Result<Value, std::str::Utf8Error> {
+fn apply_raw(mut val: Value, span: std::ops::Range<usize>) -> Value {
     match val {
         Value::String(ref mut f) => {
             let raw = RawString::with_span(span);
@@ -117,7 +114,7 @@ fn apply_raw(mut val: Value, span: std::ops::Range<usize>) -> Result<Value, std:
         }
     };
     val.decorate("", "");
-    Ok(val)
+    val
 }
 
 #[cfg(test)]
@@ -133,7 +130,7 @@ mod test {
             "-239",
             "1e200",
             "9_224_617.445_991_228_313",
-            r#"'''I [dw]on't need \d{2} apples'''"#,
+            r"'''I [dw]on't need \d{2} apples'''",
             r#"'''
 The first newline is
 trimmed in raw strings.
@@ -147,7 +144,7 @@ trimmed in raw strings.
         ];
         for input in inputs {
             dbg!(input);
-            let mut parsed = value(Default::default()).parse(new_input(input));
+            let mut parsed = value.parse(new_input(input));
             if let Ok(parsed) = &mut parsed {
                 parsed.despan(input);
             }

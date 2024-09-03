@@ -12,12 +12,12 @@
 [package]
 edition = "2018"
 name = "sasl2-sys"
-version = "0.1.20+2.1.28"
+version = "0.1.22+2.1.28"
 authors = ["Materialize, Inc."]
 links = "sasl2"
 description = "Bindings for Cyrus SASL."
 documentation = "https://docs.rs/sasl2-sys"
-readme = "../README.md"
+readme = "README.md"
 categories = ["external-ffi-bindings"]
 license = "Apache-2.0"
 repository = "https://github.com/MaterializeInc/rust-sasl"

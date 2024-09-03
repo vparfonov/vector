@@ -3,12 +3,14 @@
 //! This module contains wide strings and related types.
 
 use crate::{U16CStr, U16CString, U16Str, U32CStr, U32CString, U32Str};
+#[allow(unused_imports)]
 use alloc::{
     borrow::{Cow, ToOwned},
     boxed::Box,
     string::String,
     vec::Vec,
 };
+#[allow(unused_imports)]
 use core::{
     borrow::{Borrow, BorrowMut},
     char, cmp,
@@ -1283,7 +1285,7 @@ impl U16String {
                 if !crate::is_utf16_low_surrogate(low) || self.inner.is_empty() {
                     Some(low as u32)
                 } else {
-                    let high = self.inner[self.len()];
+                    let high = self.inner[self.len() - 1];
                     if crate::is_utf16_high_surrogate(high) {
                         self.inner.pop();
                         let buf = [high, low];
@@ -1578,5 +1580,13 @@ mod test {
         let mut s = U16String::new();
         write!(s, "{}", 1234).unwrap();
         assert_eq!(s, U16String::from_str("1234"));
+    }
+
+    #[test]
+    fn truncated_with_surrogate() {
+        // Character U+24B62, encoded as D852 DF62 in UTF16
+        let buf = "𤭢";
+        let mut s = U16String::from_str(buf);
+        assert_eq!(s.pop_char(), Some('𤭢' as u32));
     }
 }

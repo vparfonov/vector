@@ -49,7 +49,11 @@ tracker](https://todo.sr.ht/~icefox/oorandom).
    thorough 3rd party investigation into them, though it apparently
    passes [Dr. Lemire's tests](https://github.com/lemire/testingRNG).
    So for now I personally consider WyRand to be in the "trust but
-   verify" level of quality.  It's probably fine.
+   verify" level of quality.  It's probably fine.  Check back in 2027.
+ * `fastrand` -- Looks fine, uses the same algorithm as `oorandom`.
+   Made by the same people as the `smol` async runtime, which may be
+   good or bad for you.  Does slightly more than `oorandom` does, which
+   may be good or bad for you.  Use it if you like it.
 
 # This is not...
 

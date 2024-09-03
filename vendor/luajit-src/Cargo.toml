@@ -12,12 +12,17 @@
 [package]
 edition = "2021"
 name = "luajit-src"
-version = "210.5.2+113a168"
+version = "210.5.10+f725e44"
 authors = ["Aleksandr Orlenko <zxteam@protonmail.com>"]
+build = false
 exclude = [
     "/luajit2/doc",
     "/luajit2/etc",
 ]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
 Sources of LuaJIT 2.1 and logic to build it.
 """
@@ -29,8 +34,12 @@ keywords = [
 license = "MIT"
 repository = "https://github.com/khvzak/luajit-src-rs"
 
+[lib]
+name = "luajit_src"
+path = "src/lib.rs"
+
 [dependencies.cc]
 version = "1.0"
 
 [dependencies.which]
-version = "5.0"
+version = "6.0"

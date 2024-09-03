@@ -1,17 +1,19 @@
 use proc_macro::{Span, TokenStream};
 use syn::{
-    Error, Result,
-    Ident, ItemEnum, Token,
     parse::{Parse, ParseStream},
     punctuated::Punctuated,
+    Error, Ident, ItemEnum, Result, Token,
 };
 
 pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
     let typ = parse_typ(attr)?;
 
-    let config = if let Some(idx) = item.attrs.iter().enumerate().find_map(
-        |(idx, attr)| attr.path().is_ident("bitmask_config").then_some(idx)
-    ) {
+    let config = if let Some(idx) = item
+        .attrs
+        .iter()
+        .enumerate()
+        .find_map(|(idx, attr)| attr.path().is_ident("bitmask_config").then_some(idx))
+    {
         item.attrs.remove(idx).parse_args::<Config>()?
     } else {
         Config::new()
@@ -28,13 +30,16 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
     }
 
     let mut all_flags = Vec::with_capacity(flags_amount);
+    let mut all_flags_names = Vec::with_capacity(flags_amount);
 
     let mut i: usize = 0;
-    let flags = item.variants.iter().map(|v| {
+    let mut flags = Vec::with_capacity(flags_amount);
+    for v in item.variants.iter() {
         let v_attrs = &v.attrs;
         let v_ident = &v.ident;
 
         all_flags.push(quote::quote!(Self::#v_ident));
+        all_flags_names.push(quote::quote!(stringify!(#v_ident)));
 
         let expr = if let Some((_, expr)) = v.discriminant.as_ref() {
             quote::quote!(#expr)
@@ -44,29 +49,59 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
             expr
         };
 
-        let i_flag = config.inverted_flags.then(|| {
-            let i_ident = Ident::new(&format!("Inverted{}", v_ident), v_ident.span());
+        let i_flag = config
+            .inverted_flags
+            .then(|| {
+                let i_ident = Ident::new(&format!("Inverted{}", v_ident), v_ident.span());
 
-            all_flags.push(quote::quote!(Self::#i_ident));
+                all_flags.push(quote::quote!(Self::#i_ident));
+                all_flags_names.push(quote::quote!(stringify!(#i_ident)));
 
-            quote::quote!(
-                #(#v_attrs)*
-                #vis const #i_ident: #ident = Self { bits: (#expr) ^ !0 };
-            )
-        }).into_iter();
+                quote::quote!(
+                    #(#v_attrs)*
+                    #vis const #i_ident: #ident = Self { bits: (#expr) ^ !0 };
+                )
+            })
+            .into_iter();
 
-        quote::quote!(
+        flags.push(quote::quote!(
             #(#v_attrs)*
             #vis const #v_ident: #ident = Self { bits: #expr };
 
             #(#i_flag)*
-        )
-    });
+        ))
+    }
+
+    let debug_impl = if config.vec_debug {
+        quote::quote! {
+            impl core::fmt::Debug for #ident {
+                fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+                    let mut matches = Vec::new();
+
+                    #(if self.contains(#all_flags) {
+                        matches.push(#all_flags_names);
+                    })*
+
+                    write!(f, "{}[{}]", stringify!(#ident), matches.join(", "))
+                }
+            }
+        }
+    } else {
+        quote::quote! {
+            impl core::fmt::Debug for #ident {
+                fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+                    f.debug_struct(stringify!(#ident))
+                        .field("bits", &self.bits)
+                        .finish()
+                }
+            }
+        }
+    };
 
     Ok(TokenStream::from(quote::quote! {
         #(#attrs)*
         #[repr(transparent)]
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
         #vis struct #ident {
             bits: #typ,
         }
@@ -84,19 +119,72 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
             /// Returns a bitmask that contains all values.
             ///
             /// This will include bits that do not have any flags.
-            /// Use `::full()` if you only want to use flags.
+            /// Use `::all_flags()` if you only want to use flags.
             #[inline]
-            #vis const fn all() -> Self {
+            #vis const fn all_bits() -> Self {
                 Self { bits: !0 }
+            }
+
+            /// Returns a bitmask that contains all flags.
+            #[inline]
+            #vis const fn all_flags() -> Self {
+                Self { bits: #(#all_flags.bits |)* 0 }
             }
 
             /// Returns `true` if the bitmask contains all values.
             ///
             /// This will check for `bits == !0`,
-            /// use `.is_full()` if you only want to check for all flags
+            /// use `.is_all_flags()` if you only want to check for all flags
             #[inline]
-            #vis const fn is_all(&self) -> bool {
+            #vis const fn is_all_bits(&self) -> bool {
                 self.bits == !0
+            }
+
+            /// Returns `true` if the bitmask contains all flags.
+            ///
+            /// This will fail if any unused bit is set,
+            /// consider using `.truncate()` first.
+            #[inline]
+            #vis const fn is_all_flags(&self) -> bool {
+                self.bits == Self::all_flags().bits
+            }
+
+            /// Returns a bitmask that contains all values.
+            ///
+            /// This will include bits that do not have any flags.
+            /// Use `::all_flags()` if you only want to use flags.
+            #[inline]
+            #[deprecated(note = "Please use the `::all_bits()` constructor")]
+            #vis const fn all() -> Self {
+                Self::all_bits()
+            }
+
+            /// Returns `true` if the bitmask contains all values.
+            ///
+            /// This will check for `bits == !0`,
+            /// use `.is_all_flags()` if you only want to check for all flags
+            #[inline]
+            #[deprecated(note = "Please use the `.is_all_bits()` method")]
+            #vis const fn is_all(&self) -> bool {
+                self.is_all_bits()
+            }
+
+
+            /// Returns a bitmask that contains all flags.
+            #[inline]
+            #[deprecated(note = "Please use the `::all_flags()` constructor")]
+            #vis const fn full() -> Self {
+                Self::all_flags()
+            }
+
+            /// Returns `true` if the bitmask contains all flags.
+            ///
+            /// This will fail if any unused bit is set,
+            /// consider using `.truncate()` first.
+            #[inline]
+            #[deprecated(note = "Please use the `.is_all_flags()` method")]
+            #vis const fn is_full(&self) -> bool {
+                self.is_all_flags()
             }
 
             /// Returns a bitmask that does not contain any values.
@@ -111,25 +199,10 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
                 self.bits == 0
             }
 
-            /// Returns a bitmask that contains all flags.
-            #[inline]
-            #vis const fn full() -> Self {
-                Self { bits: #(#all_flags.bits |)* 0 }
-            }
-
-            /// Returns `true` if the bitmask contains all flags.
-            ///
-            /// This will fail if any unused bit is set,
-            /// consider using `.truncate()` first.
-            #[inline]
-            #vis const fn is_full(&self) -> bool {
-                self.bits == Self::full().bits
-            }
-
             /// Returns a bitmask that only has bits corresponding to flags
             #[inline]
             #vis const fn truncate(&self) -> Self {
-                Self { bits: self.bits & Self::full().bits }
+                Self { bits: self.bits & Self::all_flags().bits }
             }
 
             /// Returns `true` if `self` intersects with any value in `other`,
@@ -178,7 +251,7 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
             type Output = Self;
             #[inline]
             fn not(self) -> Self::Output {
-                Self { bits: self.bits.not() }
+                Self { bits: core::ops::Not::not(self.bits) }
             }
         }
 
@@ -186,14 +259,14 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
             type Output = Self;
             #[inline]
             fn bitand(self, rhs: Self) -> Self::Output {
-                Self { bits: self.bits.bitand(rhs.bits) }
+                Self { bits: core::ops::BitAnd::bitand(self.bits, rhs.bits) }
             }
         }
 
         impl core::ops::BitAndAssign for #ident {
             #[inline]
-            fn bitand_assign(&mut self, rhs: Self){
-                self.bits.bitand_assign(rhs.bits)
+            fn bitand_assign(&mut self, rhs: Self) {
+                core::ops::BitAndAssign::bitand_assign(&mut self.bits, rhs.bits)
             }
         }
 
@@ -201,14 +274,14 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
             type Output = Self;
             #[inline]
             fn bitor(self, rhs: Self) -> Self::Output {
-                Self { bits: self.bits.bitor(rhs.bits) }
+                Self { bits: core::ops::BitOr::bitor(self.bits, rhs.bits) }
             }
         }
 
         impl core::ops::BitOrAssign for #ident {
             #[inline]
-            fn bitor_assign(&mut self, rhs: Self){
-                self.bits.bitor_assign(rhs.bits)
+            fn bitor_assign(&mut self, rhs: Self) {
+                core::ops::BitOrAssign::bitor_assign(&mut self.bits, rhs.bits)
             }
         }
 
@@ -216,14 +289,14 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
             type Output = Self;
             #[inline]
             fn bitxor(self, rhs: Self) -> Self::Output {
-                Self { bits: self.bits.bitxor(rhs.bits) }
+                Self { bits: core::ops::BitXor::bitxor(self.bits, rhs.bits) }
             }
         }
 
         impl core::ops::BitXorAssign for #ident {
             #[inline]
-            fn bitxor_assign(&mut self, rhs: Self){
-                self.bits.bitxor_assign(rhs.bits)
+            fn bitxor_assign(&mut self, rhs: Self) {
+                core::ops::BitXorAssign::bitxor_assign(&mut self.bits, rhs.bits)
             }
         }
 
@@ -248,31 +321,33 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
             }
         }
 
+        #debug_impl
+
         impl core::fmt::Binary for #ident {
             #[inline]
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                self.bits.fmt(f)
+                core::fmt::Binary::fmt(&self.bits, f)
             }
         }
 
         impl core::fmt::LowerHex for #ident {
             #[inline]
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                self.bits.fmt(f)
+                core::fmt::LowerHex::fmt(&self.bits, f)
             }
         }
 
         impl core::fmt::UpperHex for #ident {
             #[inline]
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                self.bits.fmt(f)
+                core::fmt::UpperHex::fmt(&self.bits, f)
             }
         }
 
         impl core::fmt::Octal for #ident {
             #[inline]
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                self.bits.fmt(f)
+                core::fmt::Octal::fmt(&self.bits, f)
             }
         }
     }))
@@ -287,19 +362,24 @@ fn parse_typ(attr: TokenStream) -> Result<Ident> {
             #[rustfmt::skip]
             "u8" | "u16" | "u32" | "u64" | "u128" | "usize" |
             "i8" | "i16" | "i32" | "i64" | "i128" | "isize" => Ok(ident),
-            _ => Err(Error::new_spanned(ident, "type can only be an (un)signed integer")),
+            _ => Err(Error::new_spanned(
+                ident,
+                "type can only be an (un)signed integer",
+            )),
         }
     }
 }
 
 struct Config {
     inverted_flags: bool,
+    vec_debug: bool,
 }
 
 impl Config {
     fn new() -> Self {
         Self {
             inverted_flags: false,
+            vec_debug: false,
         }
     }
 }
@@ -311,6 +391,7 @@ impl Parse for Config {
         for arg in args {
             match arg.to_string().as_str() {
                 "inverted_flags" => config.inverted_flags = true,
+                "vec_debug" => config.vec_debug = true,
                 _ => return Err(Error::new_spanned(arg, "unknown config option")),
             }
         }

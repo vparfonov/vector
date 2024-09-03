@@ -19,8 +19,6 @@ mod backend;
 pub use backend::AzblobBuilder as Azblob;
 pub use backend::AzblobConfig;
 
-mod appender;
-mod batch;
 mod core;
 mod error;
 mod lister;

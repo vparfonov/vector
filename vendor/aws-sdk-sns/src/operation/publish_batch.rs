@@ -90,7 +90,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for Publish
             ::aws_smithy_runtime_api::client::auth::static_resolver::StaticAuthSchemeOptionResolverParams::new(),
         ));
 
-        cfg.store_put(::aws_smithy_http::operation::Metadata::new("PublishBatch", "sns"));
+        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new("PublishBatch", "sns"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = true;
         signing_options.content_sha256_header = false;
@@ -111,11 +111,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for Publish
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("PublishBatch")
-            .with_interceptor(
-                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
-                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
-                ),
-            )
+            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
             .with_interceptor(PublishBatchEndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::publish_batch::PublishBatchError,
@@ -238,6 +234,9 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for PublishBatchE
     }
 }
 
+// The get_* functions below are generated from JMESPath expressions in the
+// operationContextParams trait. They target the operation's input shape.
+
 /// Error type for the `PublishBatchError` operation.
 #[non_exhaustive]
 #[derive(::std::fmt::Debug)]
@@ -254,7 +253,7 @@ pub enum PublishBatchError {
     EndpointDisabledException(crate::types::error::EndpointDisabledException),
     /// <p>Indicates an internal service error.</p>
     InternalErrorException(crate::types::error::InternalErrorException),
-    /// <p>The <code>Id</code> of a batch entry in a batch request doesn't abide by the specification. </p>
+    /// <p>The <code>Id</code> of a batch entry in a batch request doesn't abide by the specification.</p>
     InvalidBatchEntryIdException(crate::types::error::InvalidBatchEntryIdException),
     /// <p>Indicates that a request parameter does not comply with the associated constraints.</p>
     InvalidParameterException(crate::types::error::InvalidParameterException),
@@ -272,7 +271,7 @@ pub enum PublishBatchError {
     KmsNotFoundException(crate::types::error::KmsNotFoundException),
     /// <p>The Amazon Web Services access key ID needs a subscription for the service.</p>
     KmsOptInRequired(crate::types::error::KmsOptInRequired),
-    /// <p>The request was denied due to request throttling. For more information about throttling, see <a href="https://docs.aws.amazon.com/kms/latest/developerguide/limits.html#requests-per-second">Limits</a> in the <i>Key Management Service Developer Guide.</i> </p>
+    /// <p>The request was denied due to request throttling. For more information about throttling, see <a href="https://docs.aws.amazon.com/kms/latest/developerguide/limits.html#requests-per-second">Limits</a> in the <i>Key Management Service Developer Guide.</i></p>
     KmsThrottlingException(crate::types::error::KmsThrottlingException),
     /// <p>Indicates that the requested resource does not exist.</p>
     NotFoundException(crate::types::error::NotFoundException),

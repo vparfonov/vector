@@ -100,8 +100,9 @@
 //! [`OutputOkExt`]: output::OutputOkExt
 //! [`OutputAssertExt`]: assert::OutputAssertExt
 
-#![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
+#![warn(clippy::print_stderr)]
+#![warn(clippy::print_stdout)]
 
 /// Allows you to pull the name from your Cargo.toml at compile time.
 ///

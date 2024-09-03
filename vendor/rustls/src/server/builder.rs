@@ -1,18 +1,17 @@
-use crate::builder::{ConfigBuilder, WantsVerifier};
-use crate::crypto::CryptoProvider;
-use crate::error::Error;
-use crate::msgs::handshake::CertificateChain;
-use crate::server::handy;
-use crate::server::{ResolvesServerCert, ServerConfig};
-use crate::verify::{ClientCertVerifier, NoClientAuth};
-use crate::versions;
-use crate::NoKeyLog;
-
-use pki_types::{CertificateDer, PrivateKeyDer};
-
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
+
+use pki_types::{CertificateDer, PrivateKeyDer};
+
+use crate::builder::{ConfigBuilder, WantsVerifier};
+use crate::crypto::CryptoProvider;
+use crate::error::Error;
+use crate::server::{handy, ResolvesServerCert, ServerConfig};
+use crate::sign::CertifiedKey;
+use crate::time_provider::TimeProvider;
+use crate::verify::{ClientCertVerifier, NoClientAuth};
+use crate::{compress, versions, InconsistentKeys, NoKeyLog};
 
 impl ConfigBuilder<ServerConfig, WantsVerifier> {
     /// Choose how to verify client certificates.
@@ -25,6 +24,7 @@ impl ConfigBuilder<ServerConfig, WantsVerifier> {
                 provider: self.state.provider,
                 versions: self.state.versions,
                 verifier: client_cert_verifier,
+                time_provider: self.state.time_provider,
             },
             side: PhantomData,
         }
@@ -45,6 +45,7 @@ pub struct WantsServerCert {
     provider: Arc<CryptoProvider>,
     versions: versions::EnabledVersions,
     verifier: Arc<dyn ClientCertVerifier>,
+    time_provider: Arc<dyn TimeProvider>,
 }
 
 impl ConfigBuilder<ServerConfig, WantsServerCert> {
@@ -62,7 +63,9 @@ impl ConfigBuilder<ServerConfig, WantsServerCert> {
     /// `aws-lc-rs` and `ring` [`CryptoProvider`]s support all three encodings,
     /// but other `CryptoProviders` may not.
     ///
-    /// This function fails if `key_der` is invalid.
+    /// This function fails if `key_der` is invalid, or if the
+    /// `SubjectPublicKeyInfo` from the private key does not match the public
+    /// key for the end-entity certificate from the `cert_chain`.
     pub fn with_single_cert(
         self,
         cert_chain: Vec<CertificateDer<'static>>,
@@ -73,7 +76,15 @@ impl ConfigBuilder<ServerConfig, WantsServerCert> {
             .provider
             .key_provider
             .load_private_key(key_der)?;
-        let resolver = handy::AlwaysResolvesChain::new(private_key, CertificateChain(cert_chain));
+
+        let certified_key = CertifiedKey::new(cert_chain, private_key);
+        match certified_key.keys_match() {
+            // Don't treat unknown consistency as an error
+            Ok(()) | Err(Error::InconsistentKeys(InconsistentKeys::Unknown)) => (),
+            Err(err) => return Err(err),
+        }
+
+        let resolver = handy::AlwaysResolvesChain::new(certified_key);
         Ok(self.with_cert_resolver(Arc::new(resolver)))
     }
 
@@ -87,7 +98,9 @@ impl ConfigBuilder<ServerConfig, WantsServerCert> {
     /// but other `CryptoProviders` may not.
     /// `ocsp` is a DER-encoded OCSP response.  Ignored if zero length.
     ///
-    /// This function fails if `key_der` is invalid.
+    /// This function fails if `key_der` is invalid, or if the
+    /// `SubjectPublicKeyInfo` from the private key does not match the public
+    /// key for the end-entity certificate from the `cert_chain`.
     pub fn with_single_cert_with_ocsp(
         self,
         cert_chain: Vec<CertificateDer<'static>>,
@@ -99,11 +112,15 @@ impl ConfigBuilder<ServerConfig, WantsServerCert> {
             .provider
             .key_provider
             .load_private_key(key_der)?;
-        let resolver = handy::AlwaysResolvesChain::new_with_extras(
-            private_key,
-            CertificateChain(cert_chain),
-            ocsp,
-        );
+
+        let certified_key = CertifiedKey::new(cert_chain, private_key);
+        match certified_key.keys_match() {
+            // Don't treat unknown consistency as an error
+            Ok(()) | Err(Error::InconsistentKeys(InconsistentKeys::Unknown)) => (),
+            Err(err) => return Err(err),
+        }
+
+        let resolver = handy::AlwaysResolvesChain::new_with_extras(certified_key, ocsp);
         Ok(self.with_cert_resolver(Arc::new(resolver)))
     }
 
@@ -115,7 +132,10 @@ impl ConfigBuilder<ServerConfig, WantsServerCert> {
             cert_resolver,
             ignore_client_order: false,
             max_fragment_size: None,
+            #[cfg(feature = "std")]
             session_storage: handy::ServerSessionMemoryCache::new(256),
+            #[cfg(not(feature = "std"))]
+            session_storage: Arc::new(handy::NoServerSessionStorage {}),
             ticketer: Arc::new(handy::NeverProducesTickets {}),
             alpn_protocols: Vec::new(),
             versions: self.state.versions,
@@ -124,6 +144,12 @@ impl ConfigBuilder<ServerConfig, WantsServerCert> {
             max_early_data_size: 0,
             send_half_rtt_data: false,
             send_tls13_tickets: 4,
+            #[cfg(feature = "tls12")]
+            require_ems: cfg!(feature = "fips"),
+            time_provider: self.state.time_provider,
+            cert_compressors: compress::default_cert_compressors().to_vec(),
+            cert_compression_cache: Arc::new(compress::CompressionCache::default()),
+            cert_decompressors: compress::default_cert_decompressors().to_vec(),
         }
     }
 }

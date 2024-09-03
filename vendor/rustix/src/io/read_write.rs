@@ -16,6 +16,9 @@ pub use backend::io::types::ReadWriteFlags;
 
 /// `read(fd, buf)`—Reads from a stream.
 ///
+/// This takes a `&mut [u8]` which Rust requires to contain initialized memory.
+/// To use an uninitialized buffer, use [`read_uninit`].
+///
 /// # References
 ///  - [POSIX]
 ///  - [Linux]
@@ -52,8 +55,9 @@ pub fn read_uninit<Fd: AsFd>(
     buf: &mut [MaybeUninit<u8>],
 ) -> io::Result<(&mut [u8], &mut [MaybeUninit<u8>])> {
     // Get number of initialized bytes.
-    let length =
-        unsafe { backend::io::syscalls::read(fd.as_fd(), buf.as_mut_ptr() as *mut u8, buf.len()) };
+    let length = unsafe {
+        backend::io::syscalls::read(fd.as_fd(), buf.as_mut_ptr().cast::<u8>(), buf.len())
+    };
 
     // Split into the initialized and uninitialized portions.
     Ok(unsafe { split_init(buf, length?) })
@@ -87,6 +91,9 @@ pub fn write<Fd: AsFd>(fd: Fd, buf: &[u8]) -> io::Result<usize> {
 }
 
 /// `pread(fd, buf, offset)`—Reads from a file at a given position.
+///
+/// This takes a `&mut [u8]` which Rust requires to contain initialized memory.
+/// To use an uninitialized buffer, use [`pread_uninit`].
 ///
 /// # References
 ///  - [POSIX]
@@ -123,7 +130,7 @@ pub fn pread_uninit<Fd: AsFd>(
     offset: u64,
 ) -> io::Result<(&mut [u8], &mut [MaybeUninit<u8>])> {
     let length = unsafe {
-        backend::io::syscalls::pread(fd.as_fd(), buf.as_mut_ptr() as *mut u8, buf.len(), offset)
+        backend::io::syscalls::pread(fd.as_fd(), buf.as_mut_ptr().cast::<u8>(), buf.len(), offset)
     };
     Ok(unsafe { split_init(buf, length?) })
 }
@@ -177,7 +184,7 @@ pub fn pwrite<Fd: AsFd>(fd: Fd, buf: &[u8], offset: u64) -> io::Result<usize> {
 /// [OpenBSD]: https://man.openbsd.org/readv.2
 /// [DragonFly BSD]: https://man.dragonflybsd.org/?command=readv&section=2
 /// [illumos]: https://illumos.org/man/2/readv
-#[cfg(not(target_os = "espidf"))]
+#[cfg(not(any(target_os = "espidf", target_os = "horizon")))]
 #[inline]
 pub fn readv<Fd: AsFd>(fd: Fd, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize> {
     backend::io::syscalls::readv(fd.as_fd(), bufs)
@@ -203,7 +210,7 @@ pub fn readv<Fd: AsFd>(fd: Fd, bufs: &mut [IoSliceMut<'_>]) -> io::Result<usize>
 /// [OpenBSD]: https://man.openbsd.org/writev.2
 /// [DragonFly BSD]: https://man.dragonflybsd.org/?command=writev&section=2
 /// [illumos]: https://illumos.org/man/2/writev
-#[cfg(not(target_os = "espidf"))]
+#[cfg(not(any(target_os = "espidf", target_os = "horizon")))]
 #[inline]
 pub fn writev<Fd: AsFd>(fd: Fd, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
     backend::io::syscalls::writev(fd.as_fd(), bufs)
@@ -229,9 +236,11 @@ pub fn writev<Fd: AsFd>(fd: Fd, bufs: &[IoSlice<'_>]) -> io::Result<usize> {
 #[cfg(not(any(
     target_os = "espidf",
     target_os = "haiku",
+    target_os = "horizon",
     target_os = "nto",
     target_os = "redox",
-    target_os = "solaris"
+    target_os = "solaris",
+    target_os = "vita"
 )))]
 #[inline]
 pub fn preadv<Fd: AsFd>(fd: Fd, bufs: &mut [IoSliceMut<'_>], offset: u64) -> io::Result<usize> {
@@ -262,9 +271,11 @@ pub fn preadv<Fd: AsFd>(fd: Fd, bufs: &mut [IoSliceMut<'_>], offset: u64) -> io:
 #[cfg(not(any(
     target_os = "espidf",
     target_os = "haiku",
+    target_os = "horizon",
     target_os = "nto",
     target_os = "redox",
-    target_os = "solaris"
+    target_os = "solaris",
+    target_os = "vita"
 )))]
 #[inline]
 pub fn pwritev<Fd: AsFd>(fd: Fd, bufs: &[IoSlice<'_>], offset: u64) -> io::Result<usize> {

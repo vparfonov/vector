@@ -1,6 +1,6 @@
 use crate::{
-    decode_raw, encode, encode_prefix, encode_seed, err, from_seed, KeyPairType, PREFIX_BYTE_CURVE,
-    PREFIX_BYTE_PRIVATE,
+    decode_raw, decode_seed, encode, encode_prefix, encode_seed, err, KeyPairType,
+    PREFIX_BYTE_CURVE, PREFIX_BYTE_PRIVATE,
 };
 
 use super::Result;
@@ -86,7 +86,7 @@ impl XKey {
 
     /// Attempts to produce a full xkey pair from the given encoded seed string
     pub fn from_seed(source: &str) -> Result<Self> {
-        let (ty, seed) = from_seed(source)?;
+        let (ty, seed) = decode_seed(source)?;
 
         if ty != PREFIX_BYTE_CURVE {
             return Err(err!(
@@ -203,11 +203,18 @@ impl XKey {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
+impl Default for XKey {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::error::ErrorKind;
-    const MESSAGE: &'static [u8] = b"this is super secret";
+    const MESSAGE: &[u8] = b"this is super secret";
 
     #[test]
     fn seed_encode_decode_round_trip() {
@@ -236,7 +243,7 @@ mod tests {
 
     #[test]
     fn from_seed_rejects_bad_prefix() {
-        let seed = "FAAPN4W3EG6KCJGUQTKTJ5GSB5NHK5CHAJL4DBGFUM3HHROI4XUEP4OBK4";
+        let seed = "SZAIB67JMUPS5OKP6BZNCFTIMHOTS6JIX2C53TLSNEROIRFBJLSK3NUOVY";
         let pair = XKey::from_seed(seed);
         assert!(pair.is_err());
         if let Err(e) = pair {
@@ -250,7 +257,7 @@ mod tests {
         let pair = XKey::from_seed(seed);
         assert!(pair.is_err());
         if let Err(e) = pair {
-            assert_eq!(e.kind(), ErrorKind::InvalidSeedLength);
+            assert_eq!(e.kind(), ErrorKind::InvalidKeyLength);
         }
     }
 

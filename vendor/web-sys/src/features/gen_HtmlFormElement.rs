@@ -167,6 +167,23 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `HtmlFormElement`*"]
     pub fn report_validity(this: &HtmlFormElement) -> bool;
+    # [wasm_bindgen (catch , method , structural , js_class = "HTMLFormElement" , js_name = requestSubmit)]
+    #[doc = "The `requestSubmit()` method."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/requestSubmit)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `HtmlFormElement`*"]
+    pub fn request_submit(this: &HtmlFormElement) -> Result<(), JsValue>;
+    # [wasm_bindgen (catch , method , structural , js_class = "HTMLFormElement" , js_name = requestSubmit)]
+    #[doc = "The `requestSubmit()` method."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/HTMLFormElement/requestSubmit)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `HtmlFormElement`*"]
+    pub fn request_submit_with_submitter(
+        this: &HtmlFormElement,
+        submitter: Option<&HtmlElement>,
+    ) -> Result<(), JsValue>;
     # [wasm_bindgen (method , structural , js_class = "HTMLFormElement" , js_name = reset)]
     #[doc = "The `reset()` method."]
     #[doc = ""]
@@ -182,14 +199,14 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `HtmlFormElement`*"]
     pub fn submit(this: &HtmlFormElement) -> Result<(), JsValue>;
     #[wasm_bindgen(method, structural, js_class = "HTMLFormElement", indexing_getter)]
-    #[doc = "Indexing getter."]
+    #[doc = "Indexing getter. As in the literal Javascript `this[key]`."]
     #[doc = ""]
     #[doc = ""]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `HtmlFormElement`*"]
     pub fn get_with_index(this: &HtmlFormElement, index: u32) -> Option<Element>;
     #[wasm_bindgen(method, structural, js_class = "HTMLFormElement", indexing_getter)]
-    #[doc = "Indexing getter."]
+    #[doc = "Indexing getter. As in the literal Javascript `this[key]`."]
     #[doc = ""]
     #[doc = ""]
     #[doc = ""]

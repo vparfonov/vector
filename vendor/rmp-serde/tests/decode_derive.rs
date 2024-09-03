@@ -1,14 +1,9 @@
-#[macro_use]
-extern crate serde_derive;
-
-extern crate rmp_serde as rmps;
-
 use std::io::Cursor;
 
 use serde::Deserialize;
 
-use crate::rmps::decode::Error;
-use crate::rmps::Deserializer;
+use rmp_serde::decode::Error;
+use rmp_serde::Deserializer;
 
 #[test]
 fn pass_newtype() {
@@ -137,7 +132,7 @@ fn pass_tuple_enum_with_arg() {
     let actual: Enum = Deserialize::deserialize(&mut de).unwrap();
 
     assert_eq!(Enum::B(42), actual);
-    assert_eq!(3, de.get_ref().position())
+    assert_eq!(3, de.get_ref().position());
 }
 
 #[test]
@@ -156,7 +151,7 @@ fn pass_tuple_enum_with_args() {
     let actual: Enum = Deserialize::deserialize(&mut de).unwrap();
 
     assert_eq!(Enum::B(42, 58), actual);
-    assert_eq!(5, de.get_ref().position())
+    assert_eq!(5, de.get_ref().position());
 }
 
 #[test]
@@ -168,11 +163,11 @@ fn fail_enum_map_mismatch() {
         A(i32),
     }
 
-    let err: Result<Enum, _> = rmps::from_slice(&buf);
+    let err: Result<Enum, _> = rmp_serde::from_slice(&buf);
 
     match err.unwrap_err() {
         Error::LengthMismatch(2) => (),
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 }
 
@@ -193,7 +188,7 @@ fn fail_enum_overflow() {
 
     match actual.err().unwrap() {
         Error::Syntax(..) => (),
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 }
 
@@ -213,7 +208,7 @@ fn pass_struct_enum_with_arg() {
     let actual: Enum = Deserialize::deserialize(&mut de).unwrap();
 
     assert_eq!(Enum::B { id: 42 }, actual);
-    assert_eq!(4, de.get_ref().position())
+    assert_eq!(4, de.get_ref().position());
 }
 
 #[test]
@@ -234,7 +229,7 @@ fn pass_newtype_variant() {
     let actual: Enum = Deserialize::deserialize(&mut de).unwrap();
 
     assert_eq!(Enum::A(Newtype("le message".into())), actual);
-    assert_eq!(buf.len() as u64, de.get_ref().position())
+    assert_eq!(buf.len() as u64, de.get_ref().position());
 }
 
 #[cfg(disabled)] // This test doesn't actually compile anymore
@@ -300,7 +295,7 @@ fn pass_struct_variant() {
     let out_first = vec![0x81, 0x00, 0x91, 0x2a];
     let out_second = vec![0x81, 0x01, 0x91, 0x2a];
 
-    for (expected, out) in vec![(Custom::First{ data: 42 }, out_first), (Custom::Second { data: 42 }, out_second)] {
+    for (expected, out) in [(Custom::First{ data: 42 }, out_first), (Custom::Second { data: 42 }, out_second)] {
         let mut de = Deserializer::new(Cursor::new(&out[..]));
         let val: Custom = Deserialize::deserialize(&mut de).unwrap();
         assert_eq!(expected, val);
@@ -344,7 +339,7 @@ fn fail_internally_tagged_enum_tuple() {
     let mut de = Deserializer::new(cur);
     let actual: Result<Enum, Error> = Deserialize::deserialize(&mut de);
 
-    assert!(actual.is_ok())
+    assert!(actual.is_ok());
 }
 
 #[test]
@@ -363,7 +358,7 @@ fn pass_internally_tagged_enum_struct() {
     let actual: Result<Enum, Error> = Deserialize::deserialize(&mut de);
 
     assert!(actual.is_ok());
-    assert_eq!(Enum::Foo { value: 123 }, actual.unwrap())
+    assert_eq!(Enum::Foo { value: 123 }, actual.unwrap());
 }
 
 #[test]
@@ -381,7 +376,7 @@ fn pass_enum_with_one_arg() {
     let actual: Enum = Deserialize::deserialize(&mut de).unwrap();
 
     assert_eq!(Enum::V1(vec![1, 2]), actual);
-    assert_eq!(buf.len() as u64, de.get_ref().position())
+    assert_eq!(buf.len() as u64, de.get_ref().position());
 }
 
 #[test]
@@ -464,14 +459,8 @@ fn pass_struct_with_flattened_struct_field() {
 
     let expected = Struct {
         f1: 0,
-        f2: InnerStruct {
-            f4: 8,
-            f5: 13
-        },
-        f3: InnerStruct {
-            f4: 21,
-            f5: 34
-        }
+        f2: InnerStruct { f4: 8, f5: 13 },
+        f3: InnerStruct { f4: 21, f5: 34 },
     };
 
     // struct-as-tuple
@@ -519,7 +508,7 @@ fn pass_from_slice() {
         age: u8,
     }
 
-    assert_eq!(Person { name: "John", surname: "Smith", age: 42 }, rmps::from_slice(&buf[..]).unwrap());
+    assert_eq!(Person { name: "John", surname: "Smith", age: 42 }, rmp_serde::from_slice(&buf[..]).unwrap());
 }
 
 #[test]
@@ -533,5 +522,5 @@ fn pass_from_ref() {
         age: u8,
     }
 
-    assert_eq!(Dog { name: "Bobby", age: 8 }, rmps::from_read_ref(&buf).unwrap());
+    assert_eq!(Dog { name: "Bobby", age: 8 }, rmp_serde::from_read_ref(&buf).unwrap());
 }

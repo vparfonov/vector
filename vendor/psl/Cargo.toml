@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "psl"
-version = "2.1.22"
+version = "2.1.55"
 authors = ["rushmorem <rushmore@webenchanter.com>"]
 exclude = ["/tests"]
 description = "Extract root domain and suffix from a domain name"

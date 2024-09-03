@@ -9,28 +9,30 @@ use crate::fd::BorrowedFd;
 use crate::backend::process::wait::SiginfoExt;
 
 bitflags! {
-    /// Options for modifying the behavior of wait/waitpid
+    /// Options for modifying the behavior of [`wait`]/[`waitpid`].
     #[repr(transparent)]
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
     pub struct WaitOptions: u32 {
         /// Return immediately if no child has exited.
         const NOHANG = bitcast!(backend::process::wait::WNOHANG);
-        /// Return if a child has stopped (but not traced via [`ptrace`])
+        /// Return if a child has stopped (but not traced via [`ptrace`]).
         ///
         /// [`ptrace`]: https://man7.org/linux/man-pages/man2/ptrace.2.html
         const UNTRACED = bitcast!(backend::process::wait::WUNTRACED);
         /// Return if a stopped child has been resumed by delivery of
         /// [`Signal::Cont`].
+        ///
+        /// [`Signal::Cont`]: crate::process::Signal::Cont
         const CONTINUED = bitcast!(backend::process::wait::WCONTINUED);
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
 
 #[cfg(not(any(target_os = "openbsd", target_os = "redox", target_os = "wasi")))]
 bitflags! {
-    /// Options for modifying the behavior of waitid
+    /// Options for modifying the behavior of [`waitid`].
     #[repr(transparent)]
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
     pub struct WaitidOptions: u32 {
@@ -38,6 +40,8 @@ bitflags! {
         const NOHANG = bitcast!(backend::process::wait::WNOHANG);
         /// Return if a stopped child has been resumed by delivery of
         /// [`Signal::Cont`].
+        ///
+        /// [`Signal::Cont`]: crate::process::Signal::Cont
         const CONTINUED = bitcast!(backend::process::wait::WCONTINUED);
         /// Wait for processed that have exited.
         const EXITED = bitcast!(backend::process::wait::WEXITED);
@@ -46,7 +50,7 @@ bitflags! {
         /// Wait for processes that have been stopped.
         const STOPPED = bitcast!(backend::process::wait::WSTOPPED);
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -93,8 +97,8 @@ impl WaitStatus {
         backend::process::wait::WIFCONTINUED(self.0 as _)
     }
 
-    /// Returns the number of the signal that stopped the process,
-    /// if the process was stopped by a signal.
+    /// Returns the number of the signal that stopped the process, if the
+    /// process was stopped by a signal.
     #[inline]
     pub fn stopping_signal(self) -> Option<u32> {
         if self.stopped() {
@@ -104,8 +108,8 @@ impl WaitStatus {
         }
     }
 
-    /// Returns the exit status number returned by the process,
-    /// if it exited normally.
+    /// Returns the exit status number returned by the process, if it exited
+    /// normally.
     #[inline]
     pub fn exit_status(self) -> Option<u32> {
         if self.exited() {
@@ -115,8 +119,8 @@ impl WaitStatus {
         }
     }
 
-    /// Returns the number of the signal that terminated the process,
-    /// if the process was terminated by a signal.
+    /// Returns the number of the signal that terminated the process, if the
+    /// process was terminated by a signal.
     #[inline]
     pub fn terminating_signal(self) -> Option<u32> {
         if self.signaled() {
@@ -153,15 +157,15 @@ impl WaitidStatus {
         self.si_code() == backend::c::CLD_EXITED
     }
 
-    /// Returns whether the process was terminated by a signal
-    /// and did not create a core file.
+    /// Returns whether the process was terminated by a signal and did not
+    /// create a core file.
     #[inline]
     pub fn killed(&self) -> bool {
         self.si_code() == backend::c::CLD_KILLED
     }
 
-    /// Returns whether the process was terminated by a signal
-    /// and did create a core file.
+    /// Returns whether the process was terminated by a signal and did create a
+    /// core file.
     #[inline]
     pub fn dumped(&self) -> bool {
         self.si_code() == backend::c::CLD_DUMPED
@@ -173,8 +177,8 @@ impl WaitidStatus {
         self.si_code() == backend::c::CLD_CONTINUED
     }
 
-    /// Returns the number of the signal that stopped the process,
-    /// if the process was stopped by a signal.
+    /// Returns the number of the signal that stopped the process, if the
+    /// process was stopped by a signal.
     #[inline]
     #[cfg(not(any(target_os = "emscripten", target_os = "fuchsia", target_os = "netbsd")))]
     pub fn stopping_signal(&self) -> Option<u32> {
@@ -185,8 +189,8 @@ impl WaitidStatus {
         }
     }
 
-    /// Returns the number of the signal that trapped the process,
-    /// if the process was trapped by a signal.
+    /// Returns the number of the signal that trapped the process, if the
+    /// process was trapped by a signal.
     #[inline]
     #[cfg(not(any(target_os = "emscripten", target_os = "fuchsia", target_os = "netbsd")))]
     pub fn trapping_signal(&self) -> Option<u32> {
@@ -197,8 +201,8 @@ impl WaitidStatus {
         }
     }
 
-    /// Returns the exit status number returned by the process,
-    /// if it exited normally.
+    /// Returns the exit status number returned by the process, if it exited
+    /// normally.
     #[inline]
     #[cfg(not(any(target_os = "emscripten", target_os = "fuchsia", target_os = "netbsd")))]
     pub fn exit_status(&self) -> Option<u32> {
@@ -209,8 +213,8 @@ impl WaitidStatus {
         }
     }
 
-    /// Returns the number of the signal that terminated the process,
-    /// if the process was terminated by a signal.
+    /// Returns the number of the signal that terminated the process, if the
+    /// process was terminated by a signal.
     #[inline]
     #[cfg(not(any(target_os = "emscripten", target_os = "fuchsia", target_os = "netbsd")))]
     pub fn terminating_signal(&self) -> Option<u32> {

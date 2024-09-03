@@ -1,6 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 // The rustc-cfg emitted by the build script are *not* public API.
 
-#![warn(rust_2018_idioms, single_use_lifetimes)]
+#![allow(clippy::match_same_arms)] // https://github.com/rust-lang/rust-clippy/issues/12044
 
 #[path = "version.rs"]
 mod version;
@@ -19,28 +21,21 @@ fn main() {
     println!("cargo:rustc-cfg=portable_atomic_unsafe_assume_single_core");
     #[cfg(feature = "s-mode")]
     println!("cargo:rustc-cfg=portable_atomic_s_mode");
+    #[cfg(feature = "force-amo")]
+    println!("cargo:rustc-cfg=portable_atomic_force_amo");
     #[cfg(feature = "disable-fiq")]
     println!("cargo:rustc-cfg=portable_atomic_disable_fiq");
 
     let target = &*env::var("TARGET").expect("TARGET not set");
     let target_arch = &*env::var("CARGO_CFG_TARGET_ARCH").expect("CARGO_CFG_TARGET_ARCH not set");
     let target_os = &*env::var("CARGO_CFG_TARGET_OS").expect("CARGO_CFG_TARGET_OS not set");
-    // HACK: If --target is specified, rustflags is not applied to the build
-    // script itself, so the build script will not be rerun when these are changed.
-    //
-    // Ideally, the build script should be rebuilt when CARGO_ENCODED_RUSTFLAGS
-    // is changed, but since it is an environment variable set by cargo,
-    // as of 1.62.0-nightly, specifying it as rerun-if-env-changed does not work.
-    println!("cargo:rerun-if-env-changed=CARGO_ENCODED_RUSTFLAGS");
-    println!("cargo:rerun-if-env-changed=RUSTFLAGS");
-    println!("cargo:rerun-if-env-changed=CARGO_BUILD_RUSTFLAGS");
-    let mut target_upper = target.replace(|c: char| c == '-' || c == '.', "_");
-    target_upper.make_ascii_uppercase();
-    println!("cargo:rerun-if-env-changed=CARGO_TARGET_{}_RUSTFLAGS", target_upper);
 
     let version = match rustc_version() {
         Some(version) => version,
         None => {
+            if env::var_os("PORTABLE_ATOMIC_DENY_WARNINGS").unwrap_or_default() == "1" {
+                panic!("unable to determine rustc version")
+            }
             println!(
                 "cargo:warning={}: unable to determine rustc version; assuming latest stable rustc (1.{})",
                 env!("CARGO_PKG_NAME"),
@@ -49,6 +44,39 @@ fn main() {
             Version::LATEST
         }
     };
+
+    if version.minor >= 80 {
+        println!(
+            r#"cargo:rustc-check-cfg=cfg(target_feature,values("lse2","lse128","rcpc3","quadword-atomics","fast-serialization","load-store-on-cond","distinct-ops","miscellaneous-extensions-3"))"#
+        );
+
+        // Custom cfgs set by build script. Not public API.
+        // grep -E 'cargo:rustc-cfg=' build.rs | grep -v '=//' | sed -E 's/^.*cargo:rustc-cfg=//; s/(=\\)?".*$//' | LC_ALL=C sort -u | tr '\n' ','
+        println!(
+            "cargo:rustc-check-cfg=cfg(portable_atomic_disable_fiq,portable_atomic_force_amo,portable_atomic_ll_sc_rmw,portable_atomic_llvm_15,portable_atomic_llvm_16,portable_atomic_llvm_18,portable_atomic_new_atomic_intrinsics,portable_atomic_no_asm,portable_atomic_no_asm_maybe_uninit,portable_atomic_no_atomic_64,portable_atomic_no_atomic_cas,portable_atomic_no_atomic_load_store,portable_atomic_no_atomic_min_max,portable_atomic_no_cfg_target_has_atomic,portable_atomic_no_cmpxchg16b_intrinsic,portable_atomic_no_cmpxchg16b_target_feature,portable_atomic_no_const_raw_ptr_deref,portable_atomic_no_const_transmute,portable_atomic_no_core_unwind_safe,portable_atomic_no_stronger_failure_ordering,portable_atomic_no_track_caller,portable_atomic_no_unsafe_op_in_unsafe_fn,portable_atomic_s_mode,portable_atomic_sanitize_thread,portable_atomic_target_feature,portable_atomic_unsafe_assume_single_core,portable_atomic_unstable_asm,portable_atomic_unstable_asm_experimental_arch,portable_atomic_unstable_cfg_target_has_atomic,portable_atomic_unstable_isa_attribute)"
+        );
+        // TODO: handle multi-line target_feature_fallback
+        // grep -E 'target_feature_fallback\("' build.rs | sed -E 's/^.*target_feature_fallback\(//; s/",.*$/"/' | LC_ALL=C sort -u | tr '\n' ','
+        println!(
+            r#"cargo:rustc-check-cfg=cfg(portable_atomic_target_feature,values("cmpxchg16b","distinct-ops","fast-serialization","load-store-on-cond","lse","lse128","lse2","mclass","miscellaneous-extensions-3","quadword-atomics","rcpc3","v6"))"#
+        );
+    }
+
+    // https://github.com/rust-lang/rust/pull/123745 (includes https://github.com/rust-lang/cargo/pull/13560) merged in Rust 1.79 (nightly-2024-04-11).
+    if !version.probe(79, 2024, 4, 10) {
+        // HACK: If --target is specified, rustflags is not applied to the build
+        // script itself, so the build script will not be recompiled when rustflags
+        // is changed. That in itself is not a problem, but the old Cargo does
+        // not rerun the build script as well, which can be problematic.
+        // https://github.com/rust-lang/cargo/issues/13003
+        // This problem has been fixed in 1.79 so only older versions need a workaround.
+        println!("cargo:rerun-if-env-changed=CARGO_ENCODED_RUSTFLAGS");
+        println!("cargo:rerun-if-env-changed=RUSTFLAGS");
+        println!("cargo:rerun-if-env-changed=CARGO_BUILD_RUSTFLAGS");
+        let mut target_upper = target.replace(|c: char| c == '-' || c == '.', "_");
+        target_upper.make_ascii_uppercase();
+        println!("cargo:rerun-if-env-changed=CARGO_TARGET_{}_RUSTFLAGS", target_upper);
+    }
 
     // Note that this is `no_`*, not `has_*`. This allows treating as the latest
     // stable rustc is used when the build script doesn't run. This is useful
@@ -65,6 +93,10 @@ fn main() {
     if !version.probe(52, 2021, 3, 10) {
         println!("cargo:rustc-cfg=portable_atomic_no_unsafe_op_in_unsafe_fn");
     }
+    // const_transmute stabilized in Rust 1.56 (nightly-2021-07-29): https://github.com/rust-lang/rust/pull/85769
+    if !version.probe(56, 2021, 7, 28) {
+        println!("cargo:rustc-cfg=portable_atomic_no_const_transmute");
+    }
     // https://github.com/rust-lang/rust/pull/84662 merged in Rust 1.56 (nightly-2021-08-02).
     if !version.probe(56, 2021, 8, 1) {
         println!("cargo:rustc-cfg=portable_atomic_no_core_unwind_safe");
@@ -76,6 +108,10 @@ fn main() {
     // https://github.com/rust-lang/rust/pull/98383 merged in Rust 1.64 (nightly-2022-07-19).
     if !version.probe(64, 2022, 7, 18) {
         println!("cargo:rustc-cfg=portable_atomic_no_stronger_failure_ordering");
+    }
+    // https://github.com/rust-lang/rust/pull/114790 merged in nightly-2023-08-24
+    if !version.probe(74, 2023, 8, 23) {
+        println!("cargo:rustc-cfg=portable_atomic_no_asm_maybe_uninit");
     }
 
     // asm stabilized in Rust 1.59 (nightly-2021-12-16): https://github.com/rust-lang/rust/pull/91728
@@ -130,21 +166,6 @@ fn main() {
         println!("cargo:rustc-cfg=portable_atomic_llvm_16");
     }
     if version.nightly {
-        // https://github.com/rust-lang/rust/pull/97423 merged in Rust 1.64 (nightly-2022-06-30).
-        if version.probe(64, 2022, 6, 29) {
-            println!("cargo:rustc-cfg=portable_atomic_new_atomic_intrinsics");
-        }
-        // https://github.com/rust-lang/rust/pull/100911 (includes https://github.com/rust-lang/stdarch/pull/1315) merged in Rust 1.65 (nightly-2022-08-26).
-        if target_arch == "x86_64" && !version.probe(65, 2022, 8, 25) {
-            println!(
-                "cargo:rustc-cfg=portable_atomic_no_cmpxchg16b_intrinsic_stronger_failure_ordering"
-            );
-        }
-        // feature(isa_attribute) stabilized in Rust 1.67 (nightly-2022-11-06): https://github.com/rust-lang/rust/pull/102458
-        if target_arch == "arm" && !version.probe(67, 2022, 11, 5) {
-            println!("cargo:rustc-cfg=portable_atomic_unstable_isa_attribute");
-        }
-
         // `cfg(sanitize = "..")` is not stabilized.
         let sanitize = env::var("CARGO_CFG_SANITIZE").unwrap_or_default();
         if sanitize.contains("thread") {
@@ -155,9 +176,6 @@ fn main() {
             println!("cargo:rustc-cfg=portable_atomic_sanitize_thread");
         }
 
-        if version.llvm >= 15 {
-            println!("cargo:rustc-cfg=portable_atomic_llvm_15");
-        }
         // https://github.com/rust-lang/rust/pull/93868 merged in Rust 1.60 (nightly-2022-02-13).
         // https://github.com/rust-lang/rust/pull/111331 merged in Rust 1.71 (nightly-2023-05-09).
         if !no_asm
@@ -169,200 +187,210 @@ fn main() {
         }
     }
 
-    let is_apple =
-        target_os == "macos" || target_os == "ios" || target_os == "tvos" || target_os == "watchos";
+    let is_macos = target_os == "macos";
+    let is_apple = is_macos
+        || target_os == "ios"
+        || target_os == "tvos"
+        || target_os == "watchos"
+        || target_os == "visionos";
     match target_arch {
         "x86_64" => {
             // cmpxchg16b_target_feature stabilized in Rust 1.69 (nightly-2023-03-01): https://github.com/rust-lang/rust/pull/106774
             if !version.probe(69, 2023, 2, 28) {
-                if version.nightly && is_allowed_feature("cmpxchg16b_target_feature") {
-                    // This feature has not been changed since 1.33
-                    // (https://github.com/rust-lang/rust/commit/fbb56bcf44d28e65a9495decf091b6d0386e540c)
-                    // until it was stabilized in nightly-2023-03-01, so it can be safely enabled in
-                    // nightly, which is older than nightly-2023-03-01.
-                    println!("cargo:rustc-cfg=portable_atomic_unstable_cmpxchg16b_target_feature");
-                } else {
-                    println!("cargo:rustc-cfg=portable_atomic_no_cmpxchg16b_target_feature");
-                }
+                println!("cargo:rustc-cfg=portable_atomic_no_cmpxchg16b_target_feature");
+            }
+            // For Miri and ThreadSanitizer.
+            // https://github.com/rust-lang/rust/pull/109359 (includes https://github.com/rust-lang/stdarch/pull/1358) merged in Rust 1.70 (nightly-2023-03-24).
+            if version.nightly && !version.probe(70, 2023, 3, 23) {
+                println!("cargo:rustc-cfg=portable_atomic_no_cmpxchg16b_intrinsic");
             }
 
-            // x86_64 Apple targets always support CMPXCHG16B:
-            // https://github.com/rust-lang/rust/blob/1.70.0/compiler/rustc_target/src/spec/x86_64_apple_darwin.rs#L8
-            // https://github.com/rust-lang/rust/blob/1.70.0/compiler/rustc_target/src/spec/apple_base.rs#L69-L70
-            // Script to get targets that support cmpxchg16b by default:
-            // $ (for target in $(rustc --print target-list); do [[ "${target}" == "x86_64"* ]] && rustc --print cfg --target "${target}" | grep -q cmpxchg16b && echo "${target}"; done)
-            let has_cmpxchg16b = is_apple;
-            // LLVM recognizes this also as cx16 target feature: https://godbolt.org/z/r8zWGcMhd
-            // However, it is unlikely that rustc will support that name, so we ignore it.
             // cmpxchg16b_target_feature stabilized in Rust 1.69.
-            target_feature_if("cmpxchg16b", has_cmpxchg16b, &version, Some(69), true);
+            if needs_target_feature_fallback(&version, Some(69)) {
+                // x86_64 Apple targets always support CMPXCHG16B:
+                // https://github.com/rust-lang/rust/blob/1.68.0/compiler/rustc_target/src/spec/x86_64_apple_darwin.rs#L8
+                // https://github.com/rust-lang/rust/blob/1.68.0/compiler/rustc_target/src/spec/apple_base.rs#L69-L70
+                // (Since Rust 1.78, Windows (except Windows 7) targets also enable CMPXCHG16B, but
+                // this branch is only used on pre-1.69 that cmpxchg16b_target_feature is unstable.)
+                // Script to get targets that support cmpxchg16b by default:
+                // $ (for target in $(rustc --print target-list); do [[ "${target}" == "x86_64"* ]] && rustc --print cfg --target "${target}" | grep -q cmpxchg16b && echo "${target}"; done)
+                let has_cmpxchg16b = is_apple;
+                // LLVM recognizes this also as cx16 target feature: https://godbolt.org/z/KM3jz616j
+                // However, it is unlikely that rustc will support that name, so we ignore it.
+                target_feature_fallback("cmpxchg16b", has_cmpxchg16b);
+            }
         }
         "aarch64" => {
-            // aarch64_target_feature stabilized in Rust 1.61 (nightly-2022-03-16): https://github.com/rust-lang/rust/pull/90621
-            if !version.probe(61, 2022, 3, 15) {
-                if version.nightly && is_allowed_feature("aarch64_target_feature") {
-                    // The part of this feature we use has not been changed since 1.27
-                    // (https://github.com/rust-lang/rust/commit/1217d70465edb2079880347fea4baaac56895f51)
-                    // until it was stabilized in nightly-2022-03-16, so it can be safely enabled in
-                    // nightly, which is older than nightly-2022-03-16.
-                    println!("cargo:rustc-cfg=portable_atomic_unstable_aarch64_target_feature");
-                } else {
-                    // On aarch64, when aarch64_target_feature is not available, outline-atomics is also not available.
-                    println!("cargo:rustc-cfg=portable_atomic_no_outline_atomics");
-                }
+            // For Miri and ThreadSanitizer.
+            // https://github.com/rust-lang/rust/pull/97423 merged in Rust 1.64 (nightly-2022-06-30).
+            if version.nightly && version.probe(64, 2022, 6, 29) {
+                println!("cargo:rustc-cfg=portable_atomic_new_atomic_intrinsics");
             }
 
             // aarch64 macOS always supports FEAT_LSE and FEAT_LSE2 because it is armv8.5-a:
-            // https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/include/llvm/TargetParser/AArch64TargetParser.h#L494
-            let is_macos = target_os == "macos";
+            // https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/include/llvm/TargetParser/AArch64TargetParser.h#L728
             let mut has_lse = is_macos;
             // FEAT_LSE2 doesn't imply FEAT_LSE. FEAT_LSE128 implies FEAT_LSE but not FEAT_LSE2.
-            // As of rustc 1.70, target_feature "lse2"/"lse128"/"rcpc3" is not available on rustc side:
-            // https://github.com/rust-lang/rust/blob/1.70.0/compiler/rustc_codegen_ssa/src/target_features.rs#L58
-            target_feature_if("lse2", is_macos, &version, None, false);
+            // As of rustc 1.78, target_feature "lse2"/"lse128"/"rcpc3" is not available on rustc side:
+            // https://github.com/rust-lang/rust/blob/1.78.0/compiler/rustc_target/src/target_features.rs#L87
+            target_feature_fallback("lse2", is_macos);
             // LLVM supports FEAT_LRCPC3 and FEAT_LSE128 on LLVM 16+:
             // https://github.com/llvm/llvm-project/commit/a6aaa969f7caec58a994142f8d855861cf3a1463
             // https://github.com/llvm/llvm-project/commit/7fea6f2e0e606e5339c3359568f680eaf64aa306
-            has_lse |= target_feature_if("lse128", false, &version, None, false);
-            target_feature_if("rcpc3", false, &version, None, false);
+            if version.llvm >= 16 {
+                has_lse |= target_feature_fallback("lse128", false);
+                target_feature_fallback("rcpc3", false);
+            }
             // aarch64_target_feature stabilized in Rust 1.61.
-            target_feature_if("lse", has_lse, &version, Some(61), true);
+            if needs_target_feature_fallback(&version, Some(61)) {
+                target_feature_fallback("lse", has_lse);
+            }
 
-            // As of Apple M1/M1 Pro, on Apple hardware, CAS loop-based RMW is much slower than LL/SC
-            // loop-based RMW: https://github.com/taiki-e/portable-atomic/pull/89
-            if is_apple {
+            // As of Apple M1/M1 Pro, on Apple hardware, CAS-loop-based RMW is much slower than
+            // LL/SC-loop-based RMW: https://github.com/taiki-e/portable-atomic/pull/89
+            if is_apple || target_cpu().map_or(false, |cpu| cpu.starts_with("apple-")) {
                 println!("cargo:rustc-cfg=portable_atomic_ll_sc_rmw");
             }
         }
         "arm" => {
-            // #[cfg(target_feature = "v7")] and others don't work on stable.
-            // armv7-unknown-linux-gnueabihf
-            //    ^^
-            let mut subarch =
-                strip_prefix(target, "arm").or_else(|| strip_prefix(target, "thumb")).unwrap();
-            subarch = strip_prefix(subarch, "eb").unwrap_or(subarch); // ignore endianness
-            subarch = subarch.split('-').next().unwrap(); // ignore vender/os/env
-            subarch = subarch.split('.').next().unwrap(); // ignore .base/.main suffix
-            let mut known = true;
-            // See https://github.com/taiki-e/atomic-maybe-uninit/blob/HEAD/build.rs for details
-            let mut is_mclass = false;
-            match subarch {
-                "v7" | "v7a" | "v7neon" | "v7s" | "v7k" | "v8a" | "v9a" => {} // aclass
-                "v6m" | "v7em" | "v7m" | "v8m" => is_mclass = true,
-                "v7r" | "v8r" => {} // rclass
-                // arm-linux-androideabi is v5te
-                // https://github.com/rust-lang/rust/blob/1.70.0/compiler/rustc_target/src/spec/arm_linux_androideabi.rs#L11-L12
-                _ if target == "arm-linux-androideabi" => subarch = "v5te",
-                // armeb-unknown-linux-gnueabi is v8
-                // https://github.com/rust-lang/rust/blob/1.70.0/compiler/rustc_target/src/spec/armeb_unknown_linux_gnueabi.rs#L12
-                _ if target == "armeb-unknown-linux-gnueabi" => subarch = "v8",
-                // v6 targets other than v6m don't have *class target feature.
-                "" | "v6" | "v6k" => subarch = "v6",
-                // Other targets don't have *class target feature.
-                "v4t" | "v5te" => {}
-                _ => {
-                    known = false;
-                    println!(
-                        "cargo:warning={}: unrecognized arm subarch: {}",
-                        env!("CARGO_PKG_NAME"),
-                        target
-                    );
-                }
+            // For non-Linux/Android pre-v6 ARM (tier 3) with unsafe_assume_single_core enabled.
+            // feature(isa_attribute) stabilized in Rust 1.67 (nightly-2022-11-06): https://github.com/rust-lang/rust/pull/102458
+            if version.nightly && !version.probe(67, 2022, 11, 5) {
+                println!("cargo:rustc-cfg=portable_atomic_unstable_isa_attribute");
             }
-            target_feature_if("mclass", is_mclass, &version, None, true);
-            let v6 = known
-                && (subarch.starts_with("v6")
-                    || subarch.starts_with("v7")
-                    || subarch.starts_with("v8")
-                    || subarch.starts_with("v9"));
-            target_feature_if("v6", v6, &version, None, true);
+
+            if needs_target_feature_fallback(&version, None) {
+                // #[cfg(target_feature = "v7")] and others don't work on stable.
+                // armv7-unknown-linux-gnueabihf
+                //    ^^
+                let mut subarch =
+                    strip_prefix(target, "arm").or_else(|| strip_prefix(target, "thumb")).unwrap();
+                subarch = strip_prefix(subarch, "eb").unwrap_or(subarch); // ignore endianness
+                subarch = subarch.split('-').next().unwrap(); // ignore vender/os/env
+                subarch = subarch.split('.').next().unwrap(); // ignore .base/.main suffix
+                let mut known = true;
+                // See https://github.com/taiki-e/atomic-maybe-uninit/blob/HEAD/build.rs for details
+                let mut mclass = false;
+                match subarch {
+                    "v7" | "v7a" | "v7neon" | "v7s" | "v7k" | "v8" | "v8a" | "v9" | "v9a" => {} // aclass
+                    "v7r" | "v8r" | "v9r" => {} // rclass
+                    "v6m" | "v7em" | "v7m" | "v8m" => mclass = true,
+                    // arm-linux-androideabi is v5te
+                    // https://github.com/rust-lang/rust/blob/1.78.0/compiler/rustc_target/src/spec/targets/arm_linux_androideabi.rs#L18
+                    _ if target == "arm-linux-androideabi" => subarch = "v5te",
+                    // armeb-unknown-linux-gnueabi is v8 & aclass
+                    // https://github.com/rust-lang/rust/blob/1.78.0/compiler/rustc_target/src/spec/targets/armeb_unknown_linux_gnueabi.rs#L18
+                    _ if target == "armeb-unknown-linux-gnueabi" => subarch = "v8",
+                    // Legacy arm architectures (pre-v7 except v6m) don't have *class target feature.
+                    "" => subarch = "v6",
+                    "v4t" | "v5te" | "v6" | "v6k" => {}
+                    _ => {
+                        known = false;
+                        if env::var_os("PORTABLE_ATOMIC_DENY_WARNINGS").unwrap_or_default() == "1" {
+                            panic!("unrecognized arm subarch: {}", target)
+                        }
+                        println!(
+                            "cargo:warning={}: unrecognized arm subarch: {}",
+                            env!("CARGO_PKG_NAME"),
+                            target
+                        );
+                    }
+                }
+                let v6 = known
+                    && (subarch.starts_with("v6")
+                        || subarch.starts_with("v7")
+                        || subarch.starts_with("v8")
+                        || subarch.starts_with("v9"));
+                target_feature_fallback("v6", v6);
+                target_feature_fallback("mclass", mclass);
+            }
         }
         "powerpc64" => {
+            // For Miri and ThreadSanitizer.
+            if version.nightly && version.llvm >= 15 {
+                println!("cargo:rustc-cfg=portable_atomic_llvm_15");
+            }
+
             let target_endian =
                 env::var("CARGO_CFG_TARGET_ENDIAN").expect("CARGO_CFG_TARGET_ENDIAN not set");
-            // powerpc64le is pwr8+ by default
-            // https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/lib/Target/PowerPC/PPC.td#L663
+            // powerpc64le is pwr8+ by default https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/lib/Target/PowerPC/PPC.td#L674
             // See also https://github.com/rust-lang/rust/issues/59932
             let mut has_pwr8_features = target_endian == "little";
             // https://github.com/llvm/llvm-project/commit/549e118e93c666914a1045fde38a2cac33e1e445
-            if let Some(cpu) = target_cpu().as_ref() {
+            if let Some(cpu) = &target_cpu() {
                 if let Some(mut cpu_version) = strip_prefix(cpu, "pwr") {
                     cpu_version = strip_suffix(cpu_version, "x").unwrap_or(cpu_version); // for pwr5x and pwr6x
                     if let Ok(cpu_version) = cpu_version.parse::<u32>() {
                         has_pwr8_features = cpu_version >= 8;
                     }
                 } else {
-                    // https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/lib/Target/PowerPC/PPC.td#L663
-                    // https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/lib/Target/PowerPC/PPC.td#L445-L447
+                    // https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/lib/Target/PowerPC/PPC.td#L674
+                    // https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/lib/Target/PowerPC/PPC.td#L456
                     has_pwr8_features = cpu == "ppc64le" || cpu == "future";
                 }
             }
-            // Note: As of rustc 1.70, target_feature "quadword-atomics" is not available on rustc side:
-            // https://github.com/rust-lang/rust/blob/1.70.0/compiler/rustc_codegen_ssa/src/target_features.rs#L226
+            // As of rustc 1.78, target_feature "quadword-atomics" is not available on rustc side:
+            // https://github.com/rust-lang/rust/blob/1.78.0/compiler/rustc_target/src/target_features.rs#L255
             // lqarx and stqcx.
-            target_feature_if("quadword-atomics", has_pwr8_features, &version, None, false);
+            target_feature_fallback("quadword-atomics", has_pwr8_features);
         }
         "s390x" => {
-            // https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/lib/Target/SystemZ/SystemZFeatures.td
-            let mut has_arch9_features = false; // z196+
-            let mut has_arch13_features = false; // z15+
+            // For Miri and ThreadSanitizer.
+            if version.nightly && version.llvm >= 18 {
+                println!("cargo:rustc-cfg=portable_atomic_llvm_18");
+            }
+
+            // https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/lib/Target/SystemZ/SystemZFeatures.td
+            let mut arch9_features = false; // z196+
+            let mut arch13_features = false; // z15+
             if let Some(cpu) = target_cpu() {
-                // https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/lib/Target/SystemZ/SystemZProcessors.td
+                // https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/lib/Target/SystemZ/SystemZProcessors.td
                 match &*cpu {
                     "arch9" | "z196" | "arch10" | "zEC12" | "arch11" | "z13" | "arch12" | "z14" => {
-                        has_arch9_features = true;
+                        arch9_features = true;
                     }
                     "arch13" | "z15" | "arch14" | "z16" => {
-                        has_arch9_features = true;
-                        has_arch13_features = true;
+                        arch9_features = true;
+                        arch13_features = true;
                     }
                     _ => {}
                 }
             }
-            // Note: As of rustc 1.70, target_feature "fast-serialization"/"load-store-on-cond"/"distinct-ops"/"miscellaneous-extensions-3" is not available on rustc side:
-            // https://github.com/rust-lang/rust/blob/1.70.0/compiler/rustc_codegen_ssa/src/target_features.rs
+            // As of rustc 1.78, target_feature "fast-serialization"/"load-store-on-cond"/"distinct-ops"/"miscellaneous-extensions-3" is not available on rustc side:
+            // https://github.com/rust-lang/rust/blob/1.78.0/compiler/rustc_target/src/target_features.rs
             // bcr 14,0
-            target_feature_if("fast-serialization", has_arch9_features, &version, None, false);
+            target_feature_fallback("fast-serialization", arch9_features);
             // {l,st}oc{,g}{,r}
-            target_feature_if("load-store-on-cond", has_arch9_features, &version, None, false);
+            target_feature_fallback("load-store-on-cond", arch9_features);
             // {al,sl,n,o,x}{,g}rk
-            target_feature_if("distinct-ops", has_arch9_features, &version, None, false);
+            target_feature_fallback("distinct-ops", arch9_features);
             // nand (nnr{,g}k), select (sel{,g}r), etc.
-            target_feature_if(
-                "miscellaneous-extensions-3",
-                has_arch13_features,
-                &version,
-                None,
-                false,
-            );
+            target_feature_fallback("miscellaneous-extensions-3", arch13_features);
         }
         _ => {}
     }
 }
 
-fn target_feature_if(
-    name: &str,
-    mut has_target_feature: bool,
-    version: &Version,
-    stabilized: Option<u32>,
-    is_rustc_target_feature: bool,
-) -> bool {
-    // HACK: Currently, it seems that the only way to handle unstable target
-    // features on the stable is to parse the `-C target-feature` in RUSTFLAGS.
-    //
-    // - #[cfg(target_feature = "unstable_target_feature")] doesn't work on stable.
-    // - CARGO_CFG_TARGET_FEATURE excludes unstable target features on stable.
-    //
-    // As mentioned in the [RFC2045], unstable target features are also passed to LLVM
-    // (e.g., https://godbolt.org/z/TfaEx95jc), so this hack works properly on stable.
-    //
-    // [RFC2045]: https://rust-lang.github.io/rfcs/2045-target-feature.html#backend-compilation-options
-    if is_rustc_target_feature
-        && (version.nightly || stabilized.map_or(false, |stabilized| version.minor >= stabilized))
-    {
-        // In this case, cfg(target_feature = "...") would work, so skip emitting our own target_feature cfg.
-        return false;
-    } else if let Some(rustflags) = env::var_os("CARGO_ENCODED_RUSTFLAGS") {
+// HACK: Currently, it seems that the only way to handle unstable target
+// features on the stable is to parse the `-C target-feature` in RUSTFLAGS.
+//
+// - #[cfg(target_feature = "unstable_target_feature")] doesn't work on stable.
+// - CARGO_CFG_TARGET_FEATURE excludes unstable target features on stable.
+//
+// As mentioned in the [RFC2045], unstable target features are also passed to LLVM
+// (e.g., https://godbolt.org/z/4rr7rMcfG), so this hack works properly on stable.
+//
+// [RFC2045]: https://rust-lang.github.io/rfcs/2045-target-feature.html#backend-compilation-options
+fn needs_target_feature_fallback(version: &Version, stable: Option<u32>) -> bool {
+    match stable {
+        // In these cases, cfg(target_feature = "...") would work, so skip emitting our own fallback target_feature cfg.
+        _ if version.nightly => false,
+        Some(stabilized) if version.minor >= stabilized => false,
+        _ => true,
+    }
+}
+fn target_feature_fallback(name: &str, mut has_target_feature: bool) -> bool {
+    if let Some(rustflags) = env::var_os("CARGO_ENCODED_RUSTFLAGS") {
         for mut flag in rustflags.to_string_lossy().split('\x1f') {
             flag = strip_prefix(flag, "-C").unwrap_or(flag);
             if let Some(flag) = strip_prefix(flag, "target-feature=") {
@@ -398,6 +426,11 @@ fn target_cpu() -> Option<String> {
 }
 
 fn is_allowed_feature(name: &str) -> bool {
+    // https://github.com/dtolnay/thiserror/pull/248
+    if env::var_os("RUSTC_STAGE").is_some() {
+        return false;
+    }
+
     // allowed by default
     let mut allowed = true;
     if let Some(rustflags) = env::var_os("CARGO_ENCODED_RUSTFLAGS") {

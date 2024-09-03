@@ -117,7 +117,7 @@ pub(crate) fn tcgetpgrp(fd: BorrowedFd<'_>) -> io::Result<Pid> {
         let pid = ret_pid_t(c::tcgetpgrp(borrowed_fd(fd)))?;
 
         // This doesn't appear to be documented, but on Linux, it appears
-        // `tcsetpgrp` can succceed and set the pid to 0 if we pass it a
+        // `tcsetpgrp` can succeed and set the pid to 0 if we pass it a
         // pseudo-terminal device fd. For now, translate it into `OPNOTSUPP`.
         #[cfg(linux_kernel)]
         if pid == 0 {
@@ -153,9 +153,9 @@ pub(crate) fn tcsetattr(
         // linux-raw-sys' ioctl-generation script for sparc isn't working yet,
         // so as a temporary workaround, declare these manually.
         #[cfg(any(target_arch = "sparc", target_arch = "sparc64"))]
-        const TCSETS: u32 = 0x80245409;
+        const TCSETS: u32 = 0x8024_5409;
         #[cfg(any(target_arch = "sparc", target_arch = "sparc64"))]
-        const TCSETS2: u32 = 0x802c540d;
+        const TCSETS2: u32 = 0x802c_540d;
 
         // Translate from `optional_actions` into an ioctl request code. On
         // MIPS, `optional_actions` already has `TCGETS` added to it.

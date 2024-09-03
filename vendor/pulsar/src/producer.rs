@@ -201,7 +201,21 @@ impl<Exe: Executor> MultiTopicProducer<Exe> {
 
     /// sends one message on a topic
     #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
+    #[deprecated = "instead use send_non_blocking"]
     pub async fn send<T: SerializeMessage + Sized, S: Into<String>>(
+        &mut self,
+        topic: S,
+        message: T,
+    ) -> Result<SendFuture, Error> {
+        let fut = self.send_non_blocking(topic, message).await?;
+        let (tx, rx) = oneshot::channel();
+        let _ = tx.send(fut.await);
+        Ok(SendFuture(rx))
+    }
+
+    /// sends one message on a topic
+    #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
+    pub async fn send_non_blocking<T: SerializeMessage + Sized, S: Into<String>>(
         &mut self,
         topic: S,
         message: T,
@@ -222,12 +236,36 @@ impl<Exe: Executor> MultiTopicProducer<Exe> {
         }
 
         let producer = self.producers.get_mut(&topic).unwrap();
-        producer.send(message).await
+        producer.send_non_blocking(message).await
     }
 
     /// sends a list of messages on a topic
     #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
+    #[deprecated = "instead use send_all_non_blocking"]
     pub async fn send_all<'a, 'b, T, S, I>(
+        &mut self,
+        topic: S,
+        messages: I,
+    ) -> Result<Vec<SendFuture>, Error>
+    where
+        'b: 'a,
+        T: 'b + SerializeMessage + Sized,
+        I: IntoIterator<Item = T>,
+        S: Into<String>,
+    {
+        let topic: String = topic.into();
+        let mut futs = vec![];
+        for message in messages {
+            #[allow(deprecated)]
+            let fut = self.send(&topic, message).await?;
+            futs.push(fut);
+        }
+        Ok(futs)
+    }
+
+    /// sends a list of messages on a topic
+    #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
+    pub async fn send_all_non_blocking<'a, 'b, T, S, I>(
         &mut self,
         topic: S,
         messages: I,
@@ -241,7 +279,7 @@ impl<Exe: Executor> MultiTopicProducer<Exe> {
         let topic = topic.into();
         let mut sends = Vec::new();
         for msg in messages {
-            sends.push(self.send(&topic, msg).await);
+            sends.push(self.send_non_blocking(&topic, msg).await);
         }
         // TODO determine whether to keep this approach or go with the partial send, but more mem
         // friendly lazy approach. serialize all messages before sending to avoid a partial
@@ -328,6 +366,38 @@ impl<Exe: Executor> Producer<Exe> {
     ///
     /// ```rust,no_run
     /// # async fn run(mut producer: pulsar::Producer<pulsar::TokioExecutor>) -> Result<(), pulsar::Error> {
+    /// let f1 = producer.send_non_blocking("hello").await?;
+    /// let f2 = producer.send_non_blocking("world").await?;
+    /// let receipt1 = f1.await?;
+    /// let receipt2 = f2.await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
+    pub async fn send_non_blocking<T: SerializeMessage + Sized>(
+        &mut self,
+        message: T,
+    ) -> Result<SendFuture, Error> {
+        match &mut self.inner {
+            ProducerInner::Single(p) => p.send(message).await,
+            ProducerInner::Partitioned(p) => p.next().send(message).await,
+        }
+    }
+
+    /// Sends a message
+    ///
+    /// this function is similar to send_non_blocking then waits the returned `SendFuture`
+    /// for the receipt.
+    ///
+    /// It returns the returned receipt in another `SendFuture` to be backward compatible.
+    ///
+    /// It is deprecated, and users should instread use send_non_blocking. Users should await the
+    /// returned `SendFuture` if blocking is needed.
+    ///
+    /// Usage:
+    ///
+    /// ```rust,no_run
+    /// # async fn run(mut producer: pulsar::Producer<pulsar::TokioExecutor>) -> Result<(), pulsar::Error> {
     /// let f1 = producer.send("hello").await?;
     /// let f2 = producer.send("world").await?;
     /// let receipt1 = f1.await?;
@@ -336,14 +406,15 @@ impl<Exe: Executor> Producer<Exe> {
     /// # }
     /// ```
     #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
+    #[deprecated = "instead use send_non_blocking"]
     pub async fn send<T: SerializeMessage + Sized>(
         &mut self,
         message: T,
     ) -> Result<SendFuture, Error> {
-        match &mut self.inner {
-            ProducerInner::Single(p) => p.send(message).await,
-            ProducerInner::Partitioned(p) => p.next().send(message).await,
-        }
+        let fut = self.send_non_blocking(message).await?;
+        let (tx, rx) = oneshot::channel();
+        let _ = tx.send(fut.await);
+        Ok(SendFuture(rx))
     }
 
     /// sends a list of messages
@@ -538,7 +609,7 @@ impl<Exe: Executor> TopicProducer<Exe> {
                 };
 
                 trace!("sending a batched message of size {}", message_count);
-                let send_receipt = self.send_compress(message).await.map_err(Arc::new);
+                let send_receipt = self.send_compress(message).await?.await.map_err(Arc::new);
                 for resolver in receipts {
                     let _ = resolver.send(
                         send_receipt
@@ -557,8 +628,13 @@ impl<Exe: Executor> TopicProducer<Exe> {
         let (tx, rx) = oneshot::channel();
         match self.batch.as_ref() {
             None => {
-                let receipt = self.send_compress(message).await?;
-                let _ = tx.send(Ok(receipt));
+                let fut = self.send_compress(message).await?;
+                self.client
+                    .executor
+                    .spawn(Box::pin(async move {
+                        let _ = tx.send(fut.await);
+                    }))
+                    .map_err(|_| Error::Executor)?;
                 Ok(SendFuture(rx))
             }
             Some(batch) => {
@@ -586,16 +662,18 @@ impl<Exe: Executor> TopicProducer<Exe> {
                         ..Default::default()
                     };
 
-                    let send_receipt = self.send_compress(message).await.map_err(Arc::new);
-
                     trace!("sending a batched message of size {}", counter);
-                    for tx in receipts.drain(..) {
-                        let _ = tx.send(
-                            send_receipt
-                                .clone()
-                                .map_err(|e| ProducerError::Batch(e).into()),
-                        );
-                    }
+                    let receipt_fut = self.send_compress(message).await?;
+                    self.client
+                        .executor
+                        .spawn(Box::pin(async move {
+                            let res = receipt_fut.await.map_err(Arc::new);
+                            for tx in receipts.drain(..) {
+                                let _ = tx
+                                    .send(res.clone().map_err(|e| ProducerError::Batch(e).into()));
+                            }
+                        }))
+                        .map_err(|_| Error::Executor)?;
                 }
 
                 Ok(SendFuture(rx))
@@ -607,7 +685,7 @@ impl<Exe: Executor> TopicProducer<Exe> {
     async fn send_compress(
         &mut self,
         mut message: ProducerMessage,
-    ) -> Result<proto::CommandSendReceipt, Error> {
+    ) -> Result<impl Future<Output = Result<CommandSendReceipt, Error>>, Error> {
         let compressed_message = match self.compression.clone() {
             None | Some(Compression::None) => message,
             #[cfg(feature = "lz4")]
@@ -674,16 +752,25 @@ impl<Exe: Executor> TopicProducer<Exe> {
     async fn send_inner(
         &mut self,
         message: ProducerMessage,
-    ) -> Result<proto::CommandSendReceipt, Error> {
+    ) -> Result<impl Future<Output = Result<CommandSendReceipt, Error>>, Error> {
         loop {
             let msg = message.clone();
-            match self
-                .connection
-                .sender()
-                .send(self.id, self.name.clone(), self.message_id.get(), msg)
-                .await
-            {
-                Ok(receipt) => return Ok(receipt),
+            match self.connection.sender().send(
+                self.id,
+                self.name.clone(),
+                self.message_id.get(),
+                msg,
+            ) {
+                Ok(fut) => {
+                    let fut = async move {
+                        let res = fut.await;
+                        res.map_err(|e| {
+                            error!("wait send receipt got error: {:?}", e);
+                            Error::Producer(ProducerError::Connection(e))
+                        })
+                    };
+                    return Ok(fut);
+                }
                 Err(ConnectionError::Disconnected) => {}
                 Err(ConnectionError::Io(e)) => {
                     if e.kind() != std::io::ErrorKind::TimedOut {
@@ -1033,8 +1120,8 @@ impl<'a, T, Exe: Executor> MessageBuilder<'a, T, Exe> {
 
     /// sets the message's ordering key for key_shared subscription
     #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
-    pub fn with_ordering_key<S: Into<String>>(mut self, partition_key: S) -> Self {
-        self.partition_key = Some(partition_key.into());
+    pub fn with_ordering_key<S: Into<Vec<u8>>>(mut self, ordering_key: S) -> Self {
+        self.ordering_key = Some(ordering_key.into());
         self
     }
 
@@ -1094,7 +1181,17 @@ impl<'a, T, Exe: Executor> MessageBuilder<'a, T, Exe> {
 impl<'a, T: SerializeMessage + Sized, Exe: Executor> MessageBuilder<'a, T, Exe> {
     /// sends the message through the producer that created it
     #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
+    #[deprecated = "instead use send_non_blocking"]
     pub async fn send(self) -> Result<SendFuture, Error> {
+        let fut = self.send_non_blocking().await?;
+        let (tx, rx) = oneshot::channel();
+        let _ = tx.send(fut.await);
+        Ok(SendFuture(rx))
+    }
+
+    /// sends the message through the producer that created it
+    #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
+    pub async fn send_non_blocking(self) -> Result<SendFuture, Error> {
         let MessageBuilder {
             producer,
             properties,

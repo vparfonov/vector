@@ -1,10 +1,19 @@
 use core::cmp::Ordering;
 use core::fmt::{Debug, Display, Error, Formatter};
 
-use chrono::{Duration, FixedOffset, LocalResult, NaiveDate, NaiveDateTime, Offset, TimeZone};
+use chrono::{
+    Duration, FixedOffset, LocalResult, NaiveDate, NaiveDateTime, NaiveTime, Offset, TimeZone,
+};
 
 use crate::binary_search::binary_search;
 use crate::timezones::Tz;
+
+/// Returns [`Tz::UTC`].
+impl Default for Tz {
+    fn default() -> Self {
+        Tz::UTC
+    }
+}
 
 /// An Offset that applies for a period of time
 ///
@@ -22,7 +31,7 @@ pub struct FixedTimespan {
 
 impl Offset for FixedTimespan {
     fn fix(&self) -> FixedOffset {
-        FixedOffset::east(self.utc_offset + self.dst_offset)
+        FixedOffset::east_opt(self.utc_offset + self.dst_offset).unwrap()
     }
 }
 
@@ -275,9 +284,10 @@ impl TimeZone for Tz {
         offset.tz
     }
 
+    #[allow(deprecated)]
     fn offset_from_local_date(&self, local: &NaiveDate) -> LocalResult<Self::Offset> {
-        let earliest = self.offset_from_local_datetime(&local.and_hms(0, 0, 0));
-        let latest = self.offset_from_local_datetime(&local.and_hms(23, 59, 59));
+        let earliest = self.offset_from_local_datetime(&local.and_time(NaiveTime::MIN));
+        let latest = self.offset_from_local_datetime(&local.and_hms_opt(23, 59, 59).unwrap());
         // From the chrono docs:
         //
         // > This type should be considered ambiguous at best, due to the inherent lack of
@@ -318,7 +328,7 @@ impl TimeZone for Tz {
     // First search for a timespan that the local datetime falls into, then, if it exists,
     // check the two surrounding timespans (if they exist) to see if there is any ambiguity.
     fn offset_from_local_datetime(&self, local: &NaiveDateTime) -> LocalResult<Self::Offset> {
-        let timestamp = local.timestamp();
+        let timestamp = local.and_utc().timestamp();
         let timespans = self.timespans();
         let index = binary_search(0, timespans.len(), |i| timespans.local_span(i).cmp(timestamp));
         TzOffset::map_localresult(
@@ -342,15 +352,16 @@ impl TimeZone for Tz {
         )
     }
 
+    #[allow(deprecated)]
     fn offset_from_utc_date(&self, utc: &NaiveDate) -> Self::Offset {
         // See comment above for why it is OK to just take any arbitrary time in the day
-        self.offset_from_utc_datetime(&utc.and_hms(12, 0, 0))
+        self.offset_from_utc_datetime(&utc.and_time(NaiveTime::MIN))
     }
 
     // Binary search for the required timespan. Any i64 is guaranteed to fall within
     // exactly one timespan, no matter what (so the `unwrap` is safe).
-    fn offset_from_utc_datetime(&self, utc: &NaiveDateTime) -> Self::Offset {
-        let timestamp = utc.timestamp();
+    fn offset_from_utc_datetime(&self, dt: &NaiveDateTime) -> Self::Offset {
+        let timestamp = dt.and_utc().timestamp();
         let timespans = self.timespans();
         let index =
             binary_search(0, timespans.len(), |i| timespans.utc_span(i).cmp(timestamp)).unwrap();

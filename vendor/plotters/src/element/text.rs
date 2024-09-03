@@ -116,6 +116,10 @@ impl<'a, Coord, T: Borrow<str>> MultiLineText<'a, Coord, T> {
     }
 }
 
+// Rewrite of the layout function for multiline-text. It crashes when UTF-8 is used
+// instead of ASCII. Solution taken from:
+// https://stackoverflow.com/questions/68122526/splitting-a-utf-8-string-into-chunks
+// and modified for our purposes.
 fn layout_multiline_text<'a, F: FnMut(&'a str)>(
     text: &'a str,
     max_width: u32,
@@ -126,30 +130,59 @@ fn layout_multiline_text<'a, F: FnMut(&'a str)>(
         if max_width == 0 || line.is_empty() {
             func(line);
         } else {
-            let mut remaining = &line[0..];
+            let mut indices = line.char_indices().map(|(idx, _)| idx).peekable();
 
-            while !remaining.is_empty() {
-                let mut left = 0;
-                while left < remaining.len() {
-                    let width = font.box_size(&remaining[0..=left]).unwrap_or((0, 0)).0 as i32;
+            let it = std::iter::from_fn(|| {
+                let start_idx = match indices.next() {
+                    Some(idx) => idx,
+                    None => return None,
+                };
 
+                // iterate over indices
+                for idx in indices.by_ref() {
+                    let substring = &line[start_idx..idx];
+                    let width = font.box_size(substring).unwrap_or((0, 0)).0 as i32;
                     if width > max_width as i32 {
                         break;
                     }
-                    left += 1;
                 }
 
-                if left == 0 {
-                    left += 1;
-                }
+                let end_idx = match indices.peek() {
+                    Some(idx) => *idx,
+                    None => line.bytes().len(),
+                };
 
-                let cur_line = &remaining[..left];
-                remaining = &remaining[left..];
+                Some(&line[start_idx..end_idx])
+            });
 
-                func(cur_line);
+            for chunk in it {
+                func(chunk);
             }
         }
     }
+}
+
+// Only run the test on Linux because the default font is different
+// on other platforms, causing different multiline splits.
+#[cfg(all(feature = "ttf", target_os = "linux"))]
+#[test]
+fn test_multi_layout() {
+    use plotters_backend::{FontFamily, FontStyle};
+
+    let font = FontDesc::new(FontFamily::SansSerif, 20 as f64, FontStyle::Bold);
+
+    layout_multiline_text("öäabcde", 40, font, |txt| {
+        println!("Got: {}", txt);
+        assert!(txt == "öäabc" || txt == "de");
+    });
+
+    let font = FontDesc::new(FontFamily::SansSerif, 20 as f64, FontStyle::Bold);
+    layout_multiline_text("öä", 100, font, |txt| {
+        // This does not divide the line, but still crashed in the previous implementation
+        // of layout_multiline_text. So this test should be reliable
+        println!("Got: {}", txt);
+        assert_eq!(txt, "öä")
+    });
 }
 
 impl<'a, T: Borrow<str>> MultiLineText<'a, BackendCoord, T> {

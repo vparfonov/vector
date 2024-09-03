@@ -8,6 +8,7 @@
 //! passes them uninitialized memory buffers. This file also calls vDSO
 //! functions.
 #![allow(unsafe_code)]
+#![allow(clippy::missing_transmute_annotations)]
 
 #[cfg(target_arch = "x86")]
 use super::reg::{ArgReg, RetReg, SyscallNumber, A0, A1, A2, A3, A4, A5, R0};
@@ -408,7 +409,7 @@ unsafe extern "C" fn rustix_getcpu_via_syscall(
 #[cfg(target_arch = "x86")]
 extern "C" {
     /// A symbol pointing to an `int 0x80` instruction. This “function” is only
-    /// called from assembly, and only with the x86 syscall calling convention.
+    /// called from assembly, and only with the x86 syscall calling convention,
     /// so its signature here is not its true signature.
     ///
     /// This extern block and the `global_asm!` below can be replaced with

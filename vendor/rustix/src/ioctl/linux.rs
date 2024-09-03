@@ -50,7 +50,8 @@ const DIR_MASK: RawOpcode = (1 << DIR_BITS) - 1;
     target_arch = "aarch64",
     target_arch = "riscv32",
     target_arch = "riscv64",
-    target_arch = "loongarch64"
+    target_arch = "loongarch64",
+    target_arch = "csky"
 ))]
 mod consts {
     use super::RawOpcode;
@@ -83,8 +84,8 @@ mod consts {
 }
 
 #[cfg(not(any(
-    // These have no ioctl opcodes defined in linux_raw_sys
-    // so can't use that as a known-good value for this test.
+    // These have no ioctl opcodes defined in linux_raw_sys so we can't use
+    // that as a known-good value for this test.
     target_arch = "sparc",
     target_arch = "sparc64"
 )))]

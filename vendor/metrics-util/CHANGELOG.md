@@ -9,6 +9,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - ReleaseDate
 
+## [0.16.3] - 2024-03-16
+
+### Added
+
+- New set of methods on `Registry` for getting a metric handle if it exists. ([#457](https://github.com/metrics-rs/metrics/pull/457))
+- New set of methods on `Registry` for retaining metric handles that match a given predicate. ([#461](https://github.com/metrics-rs/metrics/pull/461))
+
+### Fixed
+
+- Bump `ahash` back to `0.8.8` to remove range constraint after an upstream fix was provided to
+  remove the unnecessary MSRV bump.
+
+## [0.16.2] - 2024-02-11
+
+### Fixed
+
+- Lock down the version of `ahash` to avoid unnecessary MSRV bumping.
+
+## [0.16.1] - 2024-02-11
+
+### Changed
+
+- Bumped the `indexmap` and `hashbrown` dependencies to their latest versions. ([#438](https://github.com/metrics-rs/metrics/pull/438), [#439](https://github.com/metrics-rs/metrics/pull/439))
+
+## [0.16.0] - 2023-12-24
+
+### Fixed
+
+- Fixed the `Debug` implementation for `bucket::Block<T>` which represented both an unsafe and
+  logically incorrect usage of `crossbeam-epoch.`
+
+### Changed
+
+- Bump MSRV to 1.65.0.
+- `RecoverableRecorder` no longer functions as a drop guard itself, and instead returns a new
+  type, `RecoveryHandle<R>`, which provides that functionality. ([#414](https://github.com/metrics-rs/metrics/pull/414))
+
+### Removed
+
+- Support for per-thread mode in `DebuggingRecorder`. Users should now use
+  `metrics::with_local_recorder` instead, which is inherently per-thread.
+
 ## [0.15.1] - 2023-07-02
 
 ### Added

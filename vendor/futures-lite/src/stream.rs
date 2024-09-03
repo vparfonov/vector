@@ -15,13 +15,13 @@
 //! # });
 //! ```
 
-#[cfg(feature = "alloc")]
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
 extern crate alloc;
 
 #[doc(no_inline)]
 pub use futures_core::stream::Stream;
 
-#[cfg(feature = "alloc")]
+#[cfg(all(not(feature = "std"), feature = "alloc"))]
 use alloc::boxed::Box;
 
 use core::fmt;
@@ -30,6 +30,9 @@ use core::marker::PhantomData;
 use core::mem;
 use core::pin::Pin;
 use core::task::{Context, Poll};
+
+#[cfg(feature = "race")]
+use fastrand::Rng;
 
 use pin_project_lite::pin_project;
 
@@ -1747,7 +1750,7 @@ pub trait StreamExt: Stream {
     /// let res = once(1).race(once(2)).next().await;
     /// # })
     /// ```
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", feature = "race"))]
     fn race<S>(self, other: S) -> Race<Self, S>
     where
         Self: Sized,
@@ -1756,7 +1759,59 @@ pub trait StreamExt: Stream {
         Race {
             stream1: self,
             stream2: other,
+            rng: Rng::new(),
         }
+    }
+
+    /// Yields all immediately available values from a stream.
+    ///
+    /// This is intended to be used as a way of polling a stream without waiting, similar to the
+    /// [`try_iter`] function on [`std::sync::mpsc::Receiver`]. For instance, running this stream
+    /// on an [`async_channel::Receiver`] will return all messages that are currently in the
+    /// channel, but will not wait for new messages.
+    ///
+    /// This returns a [`Stream`] instead of an [`Iterator`] because it still needs access to the
+    /// polling context in order to poll the underlying stream. Since this stream will never return
+    /// `Poll::Pending`, wrapping it in [`block_on`] will allow it to be effectively used as an
+    /// [`Iterator`].
+    ///
+    /// This stream is not necessarily fused. After it returns `None`, it can return `Some(x)` in
+    /// the future if it is polled again.
+    ///
+    /// [`try_iter`]: std::sync::mpsc::Receiver::try_iter
+    /// [`async_channel::Receiver`]: https://docs.rs/async-channel/latest/async_channel/struct.Receiver.html
+    /// [`Stream`]: crate::stream::Stream
+    /// [`Iterator`]: std::iter::Iterator
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use futures_lite::{future, pin};
+    /// use futures_lite::stream::{self, StreamExt};
+    ///
+    /// # #[cfg(feature = "std")] {
+    /// // A stream that yields two values, returns `Pending`, and then yields one more value.
+    /// let pend_once = stream::once_future(async {
+    ///     future::yield_now().await;
+    ///     3
+    /// });
+    /// let s = stream::iter(vec![1, 2]).chain(pend_once);
+    /// pin!(s);
+    ///
+    /// // This will return the first two values, and then `None` because the stream returns
+    /// // `Pending` after that.
+    /// let mut iter = stream::block_on(s.drain());
+    /// assert_eq!(iter.next(), Some(1));
+    /// assert_eq!(iter.next(), Some(2));
+    /// assert_eq!(iter.next(), None);
+    ///
+    /// // This will return the last value, because the stream returns `Ready` when polled.
+    /// assert_eq!(iter.next(), Some(3));
+    /// assert_eq!(iter.next(), None);
+    /// # }
+    /// ```
+    fn drain(&mut self) -> Drain<'_, Self> {
+        Drain { stream: self }
     }
 
     /// Boxes the stream and changes its type to `dyn Stream + Send + 'a`.
@@ -2303,6 +2358,14 @@ where
             }
         }
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (_, hi) = self.stream.size_hint();
+
+        // If the filter matches all of the elements, it will match the stream's upper bound.
+        // If the filter matches none of the elements, there will be zero returned values.
+        (0, hi)
+    }
 }
 
 /// Merges two streams, preferring items from `stream1` whenever both streams are ready.
@@ -2371,16 +2434,52 @@ where
 /// // One of the two stream is randomly chosen as the winner.
 /// let res = stream::race(once(1), once(2)).next().await;
 /// # })
-#[cfg(feature = "std")]
+/// ```
+#[cfg(all(feature = "std", feature = "race"))]
 pub fn race<T, S1, S2>(stream1: S1, stream2: S2) -> Race<S1, S2>
 where
     S1: Stream<Item = T>,
     S2: Stream<Item = T>,
 {
-    Race { stream1, stream2 }
+    Race {
+        stream1,
+        stream2,
+        rng: Rng::new(),
+    }
 }
 
-#[cfg(feature = "std")]
+/// Races two streams, but with a user-provided seed for randomness.
+///
+/// # Examples
+///
+/// ```
+/// use futures_lite::stream::{self, once, pending, StreamExt};
+///
+/// // A fixed seed is used for reproducibility.
+/// const SEED: u64 = 123;
+///
+/// # spin_on::spin_on(async {
+/// assert_eq!(stream::race_with_seed(once(1), pending(), SEED).next().await, Some(1));
+/// assert_eq!(stream::race_with_seed(pending(), once(2), SEED).next().await, Some(2));
+///
+/// // One of the two stream is randomly chosen as the winner.
+/// let res = stream::race_with_seed(once(1), once(2), SEED).next().await;
+/// # })
+/// ```
+#[cfg(feature = "race")]
+pub fn race_with_seed<T, S1, S2>(stream1: S1, stream2: S2, seed: u64) -> Race<S1, S2>
+where
+    S1: Stream<Item = T>,
+    S2: Stream<Item = T>,
+{
+    Race {
+        stream1,
+        stream2,
+        rng: Rng::with_seed(seed),
+    }
+}
+
+#[cfg(feature = "race")]
 pin_project! {
     /// Stream for the [`race()`] function and the [`StreamExt::race()`] method.
     #[derive(Clone, Debug)]
@@ -2390,10 +2489,11 @@ pin_project! {
         stream1: S1,
         #[pin]
         stream2: S2,
+        rng: Rng,
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg(feature = "race")]
 impl<T, S1, S2> Stream for Race<S1, S2>
 where
     S1: Stream<Item = T>,
@@ -2404,7 +2504,7 @@ where
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         let mut this = self.project();
 
-        if fastrand::bool() {
+        if this.rng.bool() {
             if let Poll::Ready(Some(t)) = this.stream1.as_mut().poll_next(cx) {
                 return Poll::Ready(Some(t));
             }
@@ -3124,5 +3224,89 @@ where
                 None => return Poll::Ready(this.res.take().unwrap()),
             }
         }
+    }
+}
+
+/// Stream for the [`StreamExt::drain()`] method.
+#[derive(Debug)]
+#[must_use = "streams do nothing unless polled"]
+pub struct Drain<'a, S: ?Sized> {
+    stream: &'a mut S,
+}
+
+impl<'a, S: Unpin + ?Sized> Unpin for Drain<'a, S> {}
+
+impl<'a, S: Unpin + ?Sized> Drain<'a, S> {
+    /// Get a reference to the underlying stream.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use futures_lite::{prelude::*, stream};
+    ///
+    /// # spin_on::spin_on(async {
+    /// let mut s = stream::iter(vec![1, 2, 3]);
+    /// let s2 = s.drain();
+    ///
+    /// let inner = s2.get_ref();
+    /// // s and inner are the same.
+    /// # });
+    /// ```
+    pub fn get_ref(&self) -> &S {
+        &self.stream
+    }
+
+    /// Get a mutable reference to the underlying stream.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use futures_lite::{prelude::*, stream};
+    ///
+    /// # spin_on::spin_on(async {
+    /// let mut s = stream::iter(vec![1, 2, 3]);
+    /// let mut s2 = s.drain();
+    ///
+    /// let inner = s2.get_mut();
+    /// assert_eq!(inner.collect::<Vec<_>>().await, vec![1, 2, 3]);
+    /// # });
+    /// ```
+    pub fn get_mut(&mut self) -> &mut S {
+        &mut self.stream
+    }
+
+    /// Consume this stream and get the underlying stream.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// use futures_lite::{prelude::*, stream};
+    ///
+    /// # spin_on::spin_on(async {
+    /// let mut s = stream::iter(vec![1, 2, 3]);
+    /// let mut s2 = s.drain();
+    ///
+    /// let inner = s2.into_inner();
+    /// assert_eq!(inner.collect::<Vec<_>>().await, vec![1, 2, 3]);
+    /// # });
+    /// ```
+    pub fn into_inner(self) -> &'a mut S {
+        self.stream
+    }
+}
+
+impl<'a, S: Stream + Unpin + ?Sized> Stream for Drain<'a, S> {
+    type Item = S::Item;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        match self.stream.poll_next(cx) {
+            Poll::Ready(x) => Poll::Ready(x),
+            Poll::Pending => Poll::Ready(None),
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let (_, hi) = self.stream.size_hint();
+        (0, hi)
     }
 }

@@ -1,9 +1,9 @@
 use futures::FutureExt;
-use http_types::StatusCode;
 use serde::Serialize;
 use serde_json::json;
 use std::net::TcpStream;
 use std::time::Duration;
+use surf::StatusCode;
 use wiremock::matchers::{body_json, body_partial_json, method, path, PathExactMatcher};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
@@ -13,7 +13,7 @@ async fn new_starts_the_server() {
     let mock_server = MockServer::start().await;
 
     // Assert
-    assert!(TcpStream::connect(&mock_server.address()).is_ok())
+    assert!(TcpStream::connect(mock_server.address()).is_ok())
 }
 
 #[async_std::test]

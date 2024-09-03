@@ -1,5 +1,5 @@
 /*!
-Represent an [XML 1.0](https://www.w3.org/TR/xml/) document as a read-only tree.
+Represent an [XML](https://www.w3.org/TR/xml/) document as a read-only tree.
 
 The root point of the documentations is [`Document::parse`].
 
@@ -489,7 +489,11 @@ struct AttributeData<'input> {
     name: ExpandedNameIndexed<'input>,
     value: StringStorage<'input>,
     #[cfg(feature = "positions")]
-    pos: usize,
+    range: Range<usize>,
+    #[cfg(feature = "positions")]
+    qname_len: u16,
+    #[cfg(feature = "positions")]
+    eq_len: u8, // includes any surrounding spaces
 }
 
 /// An attribute.
@@ -569,10 +573,60 @@ impl<'a, 'input> Attribute<'a, 'input> {
     /// ```
     ///
     /// [Document::text_pos_at]: struct.Document.html#method.text_pos_at
+    #[deprecated(note="replaced by `range`")]
     #[cfg(feature = "positions")]
     #[inline]
     pub fn position(&self) -> usize {
-        self.data.pos
+        self.data.range.start
+    }
+
+    /// Returns attribute's range in bytes in the original document.
+    ///
+    /// ```text
+    /// <e n:attr='value'/>
+    ///    ^^^^^^^^^^^^^^
+    /// ```
+    #[cfg(feature = "positions")]
+    #[inline]
+    pub fn range(&self) -> Range<usize> {
+        self.data.range.clone()
+    }
+
+    /// Returns attribute's qname's range in bytes in the original document.
+    ///
+    /// ```text
+    /// <e n:attr='value'/>
+    ///    ^^^^^^
+    /// ```
+    ///
+    /// To reduce memory usage the qname length is limited by u16::MAX.
+    /// If the attribute exceeds that limit then the end of the returned range will be incorrect.
+    #[cfg(feature = "positions")]
+    #[inline]
+    pub fn range_qname(&self) -> Range<usize> {
+        let end = self.data.range.start + usize::from(self.data.qname_len);
+        self.data.range.start..end
+    }
+
+    /// Returns attribute's value's range in bytes in the original document, excluding the surrounding quotes.
+    ///
+    /// If the attribute's value is an empty string then the `start` and `end` of this `Range` are equal, and indicate the closing quote.
+    ///
+    /// ```text
+    /// <e n:attr='value'/>
+    ///            ^^^^^
+    /// ```
+    ///
+    /// To reduce memory usage the qname length is limited by u16::MAX,
+    /// and the number of spaces around the equal sign is limited by u8::MAX.
+    /// If the attribute exceeds those limits then the start of the returned range will be incorrect.
+    #[cfg(feature = "positions")]
+    #[inline]
+    pub fn range_value(&self) -> Range<usize> {
+        // +1 on start and -1 on end are to exclude the quotes around the value (all valid quotes are 1 byte)
+        let start = self.data.range.start + usize::from(self.data.qname_len) + usize::from(self.data.eq_len) + 1;
+        let end = self.data.range.end - 1;
+        start..end
     }
 }
 

@@ -10,10 +10,10 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
-rust-version = "1.48"
+edition = "2021"
+rust-version = "1.60"
 name = "async-lock"
-version = "2.8.0"
+version = "3.4.0"
 authors = ["Stjepan Glavina <stjepang@gmail.com>"]
 exclude = ["/.*"]
 description = "Async synchronization primitives"
@@ -33,19 +33,46 @@ license = "Apache-2.0 OR MIT"
 repository = "https://github.com/smol-rs/async-lock"
 
 [dependencies.event-listener]
-version = "2.5.1"
+version = "5.0.0"
+default-features = false
 
-[dev-dependencies.async-channel]
-version = "1.5.0"
+[dependencies.event-listener-strategy]
+version = "0.5.0"
+default-features = false
+
+[dependencies.pin-project-lite]
+version = "0.2.11"
 
 [dev-dependencies.fastrand]
 version = "2.0.0"
 
+[dev-dependencies.flume]
+version = "0.11.0"
+
 [dev-dependencies.futures-lite]
-version = "1.12.0"
+version = "2.0.0"
 
 [dev-dependencies.waker-fn]
 version = "1.1.0"
 
-[target."cfg(any(target_arch = \"wasm32\", target_arch = \"wasm64\"))".dev-dependencies.wasm-bindgen-test]
+[features]
+default = ["std"]
+loom = [
+    "event-listener/loom",
+    "dep:loom",
+]
+std = [
+    "event-listener/std",
+    "event-listener-strategy/std",
+]
+
+[target."cfg(loom)".dependencies.loom]
+version = "0.7"
+optional = true
+
+[target."cfg(target_family = \"wasm\")".dev-dependencies.wasm-bindgen-test]
 version = "0.3"
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+priority = 0

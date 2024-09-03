@@ -20,7 +20,7 @@ bitflags! {
         /// `F_OK`
         const EXISTS = linux_raw_sys::general::F_OK;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -61,7 +61,7 @@ bitflags! {
         /// `AT_STATX_DONT_SYNC`
         const STATX_DONT_SYNC = linux_raw_sys::general::AT_STATX_DONT_SYNC;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -120,7 +120,7 @@ bitflags! {
         /// `S_ISVTX`
         const SVTX = linux_raw_sys::general::S_ISVTX;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -130,7 +130,7 @@ impl Mode {
     /// `Mode`.
     #[inline]
     pub const fn from_raw_mode(st_mode: RawMode) -> Self {
-        Self::from_bits_truncate(st_mode)
+        Self::from_bits_truncate(st_mode & !linux_raw_sys::general::S_IFMT)
     }
 
     /// Construct an `st_mode` value from a `Mode`.
@@ -250,7 +250,14 @@ bitflags! {
         /// `O_DIRECT`
         const DIRECT = linux_raw_sys::general::O_DIRECT;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// `O_LARGEFILE`
+        ///
+        /// Note that rustix and/or libc will automatically set this flag when appropriate on
+        /// `open(2)` and friends, thus typical users do not need to care about it.
+        /// It will may be reported in return of `fcntl_getfl`, though.
+        const LARGEFILE = linux_raw_sys::general::O_LARGEFILE;
+
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -280,7 +287,7 @@ bitflags! {
         /// `RESOLVE_CACHED` (since Linux 5.12)
         const CACHED = linux_raw_sys::general::RESOLVE_CACHED as u64;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -301,7 +308,7 @@ bitflags! {
         /// `RENAME_WHITEOUT`
         const WHITEOUT = linux_raw_sys::general::RENAME_WHITEOUT;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -428,9 +435,14 @@ bitflags! {
         /// `MFD_HUGETLB` (since Linux 4.14)
         const HUGETLB = linux_raw_sys::general::MFD_HUGETLB;
 
+        /// `MFD_NOEXEC_SEAL` (since Linux 6.3)
+        const NOEXEC_SEAL = linux_raw_sys::general::MFD_NOEXEC_SEAL;
+        /// `MFD_EXEC` (since Linux 6.3)
+        const EXEC = linux_raw_sys::general::MFD_EXEC;
+
         /// `MFD_HUGE_64KB`
         const HUGE_64KB = linux_raw_sys::general::MFD_HUGE_64KB;
-        /// `MFD_HUGE_512JB`
+        /// `MFD_HUGE_512KB`
         const HUGE_512KB = linux_raw_sys::general::MFD_HUGE_512KB;
         /// `MFD_HUGE_1MB`
         const HUGE_1MB = linux_raw_sys::general::MFD_HUGE_1MB;
@@ -453,7 +465,7 @@ bitflags! {
         /// `MFD_HUGE_16GB`
         const HUGE_16GB = linux_raw_sys::general::MFD_HUGE_16GB;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -478,7 +490,7 @@ bitflags! {
         /// `F_SEAL_FUTURE_WRITE` (since Linux 5.1)
         const FUTURE_WRITE = linux_raw_sys::general::F_SEAL_FUTURE_WRITE;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -538,7 +550,7 @@ bitflags! {
         /// `STATX_ALL`
         const ALL = linux_raw_sys::general::STATX_ALL;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -565,7 +577,7 @@ bitflags! {
         /// `FALLOC_FL_UNSHARE_RANGE`
         const UNSHARE_RANGE = linux_raw_sys::general::FALLOC_FL_UNSHARE_RANGE;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -602,7 +614,7 @@ bitflags! {
         /// `ST_SYNCHRONOUS`
         const SYNCHRONOUS = linux_raw_sys::general::MS_SYNCHRONOUS as u64;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -730,7 +742,7 @@ pub type RawMode = linux_raw_sys::general::__kernel_mode_t;
 pub type RawMode = c::c_uint;
 
 /// `dev_t`
-// Within the kernel the dev_t is 32-bit, but userspace uses a 64-bit field.
+// Within the kernel the `dev_t` is 32-bit, but userspace uses a 64-bit field.
 pub type Dev = u64;
 
 /// `__fsword_t`

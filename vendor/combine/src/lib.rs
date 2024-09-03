@@ -84,10 +84,10 @@
 //! If we need a parser that is mutually recursive or if we want to export a reusable parser the
 //! [`parser!`] macro can be used. In effect it makes it possible to return a parser without naming
 //! the type of the parser (which can be very large due to combine's trait based approach). While
-//! it is possible to do avoid naming the type without the macro those solutions require either allocation
-//! (`Box<dyn Parser< Input, Output = O, PartialState = P>>`) or nightly rust via `impl Trait`. The
-//! macro thus threads the needle and makes it possible to have non-allocating, anonymous parsers
-//! on stable rust.
+//! it is possible to do avoid naming the type without the macro those solutions require either
+//! allocation (`Box<dyn Parser< Input, Output = O, PartialState = P>>`) or via `impl Trait` in the
+//! return position. The macro thus threads the needle and makes it possible to have
+//! non-allocating, anonymous parsers on stable rust.
 //!
 //! ```
 //! #[macro_use]
@@ -108,8 +108,6 @@
 //! // `impl Parser` can be used to create reusable parsers with zero overhead
 //! fn expr_<Input>() -> impl Parser< Input, Output = Expr>
 //!     where Input: Stream<Token = char>,
-//!           // Necessary due to rust-lang/rust#24159
-//!           Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 //! {
 //!     let word = many1(letter());
 //!
@@ -241,8 +239,8 @@ pub use crate::parser::token::tokens_cmp;
 /// The expression which creates the parser should have no side effects as it may be called
 /// multiple times even during a single parse attempt.
 ///
-/// NOTE: If you are using rust nightly you can use `impl Trait` instead. See the [json parser][] for
-/// an example.
+/// NOTE: You can use `impl Trait` in the return position instead. See the [json parser][] for an
+/// example.
 ///
 /// [json parser]:https://github.com/Marwes/combine/blob/master/benches/json.rs
 ///
@@ -259,7 +257,6 @@ pub use crate::parser::token::tokens_cmp;
 ///     fn integer[Input]()(Input) -> i32
 ///     where [
 ///         Input: Stream<Token = char>,
-///         Input::Error: ParseError<char, Input::Range, Input::Position>,
 ///         <Input::Error as ParseError<Input::Token, Input::Range, Input::Position>>::StreamError:
 ///             From<::std::num::ParseIntError>,
 ///     ]
@@ -283,7 +280,6 @@ pub use crate::parser::token::tokens_cmp;
 ///     pub fn integer_or_string[Input]()(Input) -> IntOrString
 ///     where [
 ///         Input: Stream<Token = char>,
-///         Input::Error: ParseError<char, Input::Range, Input::Position>,
 ///         <Input::Error as ParseError<Input::Token, Input::Range, Input::Position>>::StreamError:
 ///             From<::std::num::ParseIntError>,
 ///     ]
@@ -709,7 +705,6 @@ mod std_tests {
     fn integer<Input>(input: &mut Input) -> StdParseResult<i64, Input>
     where
         Input: Stream<Token = char>,
-        Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
     {
         let (s, input) = many1::<String, _, _>(digit())
             .expected("integer")
@@ -834,7 +829,6 @@ mod std_tests {
     fn term<Input>(input: &mut Input) -> StdParseResult<Expr, Input>
     where
         Input: Stream<Token = char>,
-        Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
     {
         fn times(l: Expr, r: Expr) -> Expr {
             Expr::Times(Box::new(l), Box::new(r))

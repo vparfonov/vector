@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "aws-smithy-runtime-api"
-version = "1.2.0"
+version = "1.7.2"
 authors = [
     "AWS Rust SDK Team <aws-sdk-rust@amazon.com>",
     "Zelda Hessler <zhessler@amazon.com>",
@@ -38,18 +38,19 @@ targets = ["x86_64-unknown-linux-gnu"]
 stable = true
 
 [dependencies.aws-smithy-async]
-version = "1.1.8"
+version = "1.2.1"
 
 [dependencies.aws-smithy-types]
-version = "1.1.8"
+version = "1.2.0"
 
 [dependencies.bytes]
 version = "1"
 
-[dependencies.http]
+[dependencies.http-02x]
 version = "0.2.9"
+package = "http"
 
-[dependencies.http1]
+[dependencies.http-1x]
 version = "1"
 package = "http"
 

@@ -1,6 +1,6 @@
 # polling
 
-[![Build](https://github.com/smol-rs/polling/workflows/Build%20and%20test/badge.svg)](
+[![Build](https://github.com/smol-rs/polling/actions/workflows/ci.yml/badge.svg)](
 https://github.com/smol-rs/polling/actions)
 [![License](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](
 https://github.com/smol-rs/polling)
@@ -12,11 +12,11 @@ https://docs.rs/polling)
 Portable interface to epoll, kqueue, event ports, and IOCP.
 
 Supported platforms:
-- [epoll](https://en.wikipedia.org/wiki/Epoll): Linux, Android
+- [epoll](https://en.wikipedia.org/wiki/Epoll): Linux, Android, RedoxOS
 - [kqueue](https://en.wikipedia.org/wiki/Kqueue): macOS, iOS, tvOS, watchOS, FreeBSD, NetBSD, OpenBSD,
   DragonFly BSD
 - [event ports](https://illumos.org/man/port_create): illumos, Solaris
-- [poll](https://en.wikipedia.org/wiki/Poll_(Unix)): VxWorks, Fuchsia, other Unix systems
+- [poll](https://en.wikipedia.org/wiki/Poll_(Unix)): VxWorks, Fuchsia, HermitOS, other Unix systems
 - [IOCP](https://learn.microsoft.com/en-us/windows/win32/fileio/i-o-completion-ports): Windows, Wine (version 7.13+)
 
 Polling is done in oneshot mode, which means interest in I/O events needs to be reset after
@@ -61,8 +61,8 @@ loop {
 
 Licensed under either of
 
- * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+ * Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE) or https://www.apache.org/licenses/LICENSE-2.0)
+ * MIT license ([LICENSE-MIT](LICENSE-MIT) or https://opensource.org/license/mit/)
 
 at your option.
 

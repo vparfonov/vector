@@ -4,11 +4,11 @@ use crate::{Equivalent, TryReserveError};
 use alloc::borrow::ToOwned;
 use core::fmt;
 use core::hash::{BuildHasher, Hash};
-use core::iter::{Chain, FromIterator, FusedIterator};
+use core::iter::{Chain, FusedIterator};
 use core::ops::{BitAnd, BitOr, BitXor, Sub};
 
-use super::map::{self, DefaultHashBuilder, ExtractIfInner, HashMap, Keys};
-use crate::raw::{Allocator, Global};
+use super::map::{self, DefaultHashBuilder, HashMap, Keys};
+use crate::raw::{Allocator, Global, RawExtractIf};
 
 // Future Optimization (FIXME!)
 // =============================
@@ -102,7 +102,7 @@ use crate::raw::{Allocator, Global};
 /// use hashbrown::HashSet;
 ///
 /// let viking_names: HashSet<&'static str> =
-///     [ "Einar", "Olaf", "Harald" ].iter().cloned().collect();
+///     [ "Einar", "Olaf", "Harald" ].into_iter().collect();
 /// // use the values stored in the set
 /// ```
 ///
@@ -335,7 +335,7 @@ impl<T, S, A: Allocator> HashSet<T, S, A> {
     /// ```
     /// use hashbrown::HashSet;
     ///
-    /// let mut set: HashSet<_> = [1, 2, 3].iter().cloned().collect();
+    /// let mut set: HashSet<_> = [1, 2, 3].into_iter().collect();
     /// assert!(!set.is_empty());
     ///
     /// // print 1, 2, 3 in an arbitrary order
@@ -362,7 +362,7 @@ impl<T, S, A: Allocator> HashSet<T, S, A> {
     /// use hashbrown::HashSet;
     ///
     /// let xs = [1,2,3,4,5,6];
-    /// let mut set: HashSet<i32> = xs.iter().cloned().collect();
+    /// let mut set: HashSet<i32> = xs.into_iter().collect();
     /// set.retain(|&k| k % 2 == 0);
     /// assert_eq!(set.len(), 3);
     /// ```
@@ -382,6 +382,8 @@ impl<T, S, A: Allocator> HashSet<T, S, A> {
     /// If the returned `ExtractIf` is not exhausted, e.g. because it is dropped without iterating
     /// or the iteration short-circuits, then the remaining elements will be retained.
     /// Use [`retain()`] with a negated predicate if you do not need the returned iterator.
+    ///
+    /// [`retain()`]: HashSet::retain
     ///
     /// # Examples
     ///
@@ -406,7 +408,7 @@ impl<T, S, A: Allocator> HashSet<T, S, A> {
     {
         ExtractIf {
             f,
-            inner: ExtractIfInner {
+            inner: RawExtractIf {
                 iter: unsafe { self.map.table.iter() },
                 table: &mut self.map.table,
             },
@@ -722,8 +724,8 @@ where
     ///
     /// ```
     /// use hashbrown::HashSet;
-    /// let a: HashSet<_> = [1, 2, 3].iter().cloned().collect();
-    /// let b: HashSet<_> = [4, 2, 3, 4].iter().cloned().collect();
+    /// let a: HashSet<_> = [1, 2, 3].into_iter().collect();
+    /// let b: HashSet<_> = [4, 2, 3, 4].into_iter().collect();
     ///
     /// // Can be seen as `a - b`.
     /// for x in a.difference(&b) {
@@ -753,8 +755,8 @@ where
     ///
     /// ```
     /// use hashbrown::HashSet;
-    /// let a: HashSet<_> = [1, 2, 3].iter().cloned().collect();
-    /// let b: HashSet<_> = [4, 2, 3, 4].iter().cloned().collect();
+    /// let a: HashSet<_> = [1, 2, 3].into_iter().collect();
+    /// let b: HashSet<_> = [4, 2, 3, 4].into_iter().collect();
     ///
     /// // Print 1, 4 in arbitrary order.
     /// for x in a.symmetric_difference(&b) {
@@ -781,8 +783,8 @@ where
     ///
     /// ```
     /// use hashbrown::HashSet;
-    /// let a: HashSet<_> = [1, 2, 3].iter().cloned().collect();
-    /// let b: HashSet<_> = [4, 2, 3, 4].iter().cloned().collect();
+    /// let a: HashSet<_> = [1, 2, 3].into_iter().collect();
+    /// let b: HashSet<_> = [4, 2, 3, 4].into_iter().collect();
     ///
     /// // Print 2, 3 in arbitrary order.
     /// for x in a.intersection(&b) {
@@ -812,8 +814,8 @@ where
     ///
     /// ```
     /// use hashbrown::HashSet;
-    /// let a: HashSet<_> = [1, 2, 3].iter().cloned().collect();
-    /// let b: HashSet<_> = [4, 2, 3, 4].iter().cloned().collect();
+    /// let a: HashSet<_> = [1, 2, 3].into_iter().collect();
+    /// let b: HashSet<_> = [4, 2, 3, 4].into_iter().collect();
     ///
     /// // Print 1, 2, 3, 4 in arbitrary order.
     /// for x in a.union(&b) {
@@ -848,7 +850,7 @@ where
     /// ```
     /// use hashbrown::HashSet;
     ///
-    /// let set: HashSet<_> = [1, 2, 3].iter().cloned().collect();
+    /// let set: HashSet<_> = [1, 2, 3].into_iter().collect();
     /// assert_eq!(set.contains(&1), true);
     /// assert_eq!(set.contains(&4), false);
     /// ```
@@ -874,7 +876,7 @@ where
     /// ```
     /// use hashbrown::HashSet;
     ///
-    /// let set: HashSet<_> = [1, 2, 3].iter().cloned().collect();
+    /// let set: HashSet<_> = [1, 2, 3].into_iter().collect();
     /// assert_eq!(set.get(&2), Some(&2));
     /// assert_eq!(set.get(&4), None);
     /// ```
@@ -901,7 +903,7 @@ where
     /// ```
     /// use hashbrown::HashSet;
     ///
-    /// let mut set: HashSet<_> = [1, 2, 3].iter().cloned().collect();
+    /// let mut set: HashSet<_> = [1, 2, 3].into_iter().collect();
     /// assert_eq!(set.len(), 3);
     /// assert_eq!(set.get_or_insert(2), &2);
     /// assert_eq!(set.get_or_insert(100), &100);
@@ -1032,7 +1034,7 @@ where
     /// ```
     /// use hashbrown::HashSet;
     ///
-    /// let a: HashSet<_> = [1, 2, 3].iter().cloned().collect();
+    /// let a: HashSet<_> = [1, 2, 3].into_iter().collect();
     /// let mut b = HashSet::new();
     ///
     /// assert_eq!(a.is_disjoint(&b), true);
@@ -1053,7 +1055,7 @@ where
     /// ```
     /// use hashbrown::HashSet;
     ///
-    /// let sup: HashSet<_> = [1, 2, 3].iter().cloned().collect();
+    /// let sup: HashSet<_> = [1, 2, 3].into_iter().collect();
     /// let mut set = HashSet::new();
     ///
     /// assert_eq!(set.is_subset(&sup), true);
@@ -1074,7 +1076,7 @@ where
     /// ```
     /// use hashbrown::HashSet;
     ///
-    /// let sub: HashSet<_> = [1, 2].iter().cloned().collect();
+    /// let sub: HashSet<_> = [1, 2].into_iter().collect();
     /// let mut set = HashSet::new();
     ///
     /// assert_eq!(set.is_superset(&sub), false);
@@ -1203,7 +1205,7 @@ where
     /// ```
     /// use hashbrown::HashSet;
     ///
-    /// let mut set: HashSet<_> = [1, 2, 3].iter().cloned().collect();
+    /// let mut set: HashSet<_> = [1, 2, 3].into_iter().collect();
     /// assert_eq!(set.take(&2), Some(2));
     /// assert_eq!(set.take(&2), None);
     /// ```
@@ -1580,7 +1582,7 @@ where
     F: FnMut(&K) -> bool,
 {
     f: F,
-    inner: ExtractIfInner<'a, K, (), A>,
+    inner: RawExtractIf<'a, (K, ()), A>,
 }
 
 /// A lazy iterator producing elements in the intersection of `HashSet`s.
@@ -1803,9 +1805,9 @@ where
 
     #[cfg_attr(feature = "inline-more", inline)]
     fn next(&mut self) -> Option<Self::Item> {
-        let f = &mut self.f;
-        let (k, _) = self.inner.next(&mut |k, _| f(k))?;
-        Some(k)
+        self.inner
+            .next(|&mut (ref k, ())| (self.f)(k))
+            .map(|(k, ())| k)
     }
 
     #[inline]
@@ -2818,7 +2820,7 @@ mod test_set {
                 assert_eq!(last_i, 49);
             }
 
-            for _ in &s {
+            if !s.is_empty() {
                 panic!("s should be empty!");
             }
 
@@ -2832,6 +2834,7 @@ mod test_set {
         use core::hash;
 
         #[derive(Debug)]
+        #[allow(dead_code)]
         struct Foo(&'static str, i32);
 
         impl PartialEq for Foo {

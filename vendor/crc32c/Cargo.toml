@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "crc32c"
-version = "0.6.4"
+version = "0.6.8"
 authors = ["Zack Owens"]
 build = "build.rs"
 exclude = [
@@ -37,7 +37,7 @@ path = "benches/rand.rs"
 harness = false
 
 [dev-dependencies.criterion]
-version = "0.4"
+version = "0.5"
 
 [dev-dependencies.rand]
 version = "0.8"

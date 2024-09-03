@@ -9,6 +9,8 @@ pub(crate) use __private::Internal;
 /// The type of notification to use with an [`Event`].
 ///
 /// This is hidden and sealed to prevent changes to this trait from being breaking.
+///
+/// [`Event`]: crate::Event
 #[doc(hidden)]
 pub trait NotificationPrivate {
     /// The tag data associated with a notification.
@@ -44,7 +46,7 @@ pub trait NotificationPrivate {
 /// # Example
 ///
 /// ```
-/// use event_listener::{Event, prelude::*};
+/// use event_listener::{Event, IntoNotification, Notification};
 ///
 /// fn notify(ev: &Event, notify: impl Notification<Tag = ()>) {
 ///     ev.notify(notify);
@@ -52,6 +54,8 @@ pub trait NotificationPrivate {
 ///
 /// notify(&Event::new(), 1.additional());
 /// ```
+///
+/// [`Event`]: crate::Event
 pub trait Notification: NotificationPrivate {}
 impl<N: NotificationPrivate + ?Sized> Notification for N {}
 
@@ -338,7 +342,7 @@ impl<T, F: FnMut() -> T> TagProducer for F {
 /// into this:
 ///
 /// ```
-/// use event_listener::{Event, prelude::*};
+/// use event_listener::{Event, IntoNotification, Listener};
 ///
 /// let event = Event::new();
 ///
@@ -376,7 +380,7 @@ pub trait IntoNotification: __private::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use event_listener::prelude::*;
+    /// use event_listener::IntoNotification;
     ///
     /// let _ = 3.into_notification();
     /// ```
@@ -402,7 +406,7 @@ pub trait IntoNotification: __private::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use event_listener::{Event, prelude::*};
+    /// use event_listener::{Event, IntoNotification, Listener};
     ///
     /// let event = Event::new();
     ///
@@ -438,7 +442,7 @@ pub trait IntoNotification: __private::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use event_listener::{Event, prelude::*};
+    /// use event_listener::{Event, IntoNotification, Listener};
     /// use std::sync::atomic::{self, Ordering};
     ///
     /// let event = Event::new();
@@ -479,7 +483,7 @@ pub trait IntoNotification: __private::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use event_listener::{prelude::*, Event};
+    /// use event_listener::{IntoNotification, Listener, Event};
     ///
     /// let event = Event::<bool>::with_tag();
     ///
@@ -490,8 +494,8 @@ pub trait IntoNotification: __private::Sealed {
     /// event.notify(1.additional().tag(true));
     /// event.notify(1.additional().tag(false));
     ///
-    /// assert_eq!(listener1.as_mut().wait(), true);
-    /// assert_eq!(listener2.as_mut().wait(), false);
+    /// assert_eq!(listener1.wait(), true);
+    /// assert_eq!(listener2.wait(), false);
     /// ```
     #[cfg(feature = "std")]
     fn tag<T: Clone>(self, tag: T) -> Tag<Self::Notify, T>
@@ -513,7 +517,7 @@ pub trait IntoNotification: __private::Sealed {
     /// # Examples
     ///
     /// ```
-    /// use event_listener::{prelude::*, Event};
+    /// use event_listener::{IntoNotification, Listener, Event};
     ///
     /// let event = Event::<bool>::with_tag();
     ///
@@ -524,8 +528,8 @@ pub trait IntoNotification: __private::Sealed {
     /// event.notify(1.additional().tag_with(|| true));
     /// event.notify(1.additional().tag_with(|| false));
     ///
-    /// assert_eq!(listener1.as_mut().wait(), true);
-    /// assert_eq!(listener2.as_mut().wait(), false);
+    /// assert_eq!(listener1.wait(), true);
+    /// assert_eq!(listener2.wait(), false);
     /// ```
     #[cfg(feature = "std")]
     fn tag_with<T, F>(self, tag: F) -> TagWith<Self::Notify, F>
@@ -558,7 +562,6 @@ macro_rules! impl_for_numeric_types {
                     panic!("negative notification count");
                 }
 
-                use core::convert::TryInto;
                 Notify::new(self.try_into().expect("overflow"))
             }
         }

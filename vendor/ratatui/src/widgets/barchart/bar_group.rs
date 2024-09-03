@@ -1,11 +1,13 @@
 use super::Bar;
 use crate::prelude::*;
 
-/// represent a group of bars to be shown by the Barchart
+/// A group of bars to be shown by the Barchart.
 ///
 /// # Examples
+///
 /// ```
-/// # use ratatui::{prelude::*, widgets::*};
+/// use ratatui::{prelude::*, widgets::*};
+///
 /// BarGroup::default()
 ///     .label("Group 1".into())
 ///     .bars(&[Bar::default().value(200), Bar::default().value(150)]);
@@ -21,19 +23,19 @@ pub struct BarGroup<'a> {
 impl<'a> BarGroup<'a> {
     /// Set the group label
     #[must_use = "method moves the value of self and returns the modified value"]
-    pub fn label(mut self, label: Line<'a>) -> BarGroup<'a> {
+    pub fn label(mut self, label: Line<'a>) -> Self {
         self.label = Some(label);
         self
     }
 
     /// Set the bars of the group to be shown
     #[must_use = "method moves the value of self and returns the modified value"]
-    pub fn bars(mut self, bars: &[Bar<'a>]) -> BarGroup<'a> {
+    pub fn bars(mut self, bars: &[Bar<'a>]) -> Self {
         self.bars = bars.to_vec();
         self
     }
 
-    /// return the maximum bar value of this group
+    /// The maximum bar value of this group
     pub(super) fn max(&self) -> Option<u64> {
         self.bars.iter().max_by_key(|v| v.value).map(|v| v.value)
     }
@@ -63,8 +65,8 @@ impl<'a> BarGroup<'a> {
 }
 
 impl<'a> From<&[(&'a str, u64)]> for BarGroup<'a> {
-    fn from(value: &[(&'a str, u64)]) -> BarGroup<'a> {
-        BarGroup {
+    fn from(value: &[(&'a str, u64)]) -> Self {
+        Self {
             label: None,
             bars: value
                 .iter()
@@ -75,13 +77,14 @@ impl<'a> From<&[(&'a str, u64)]> for BarGroup<'a> {
 }
 
 impl<'a, const N: usize> From<&[(&'a str, u64); N]> for BarGroup<'a> {
-    fn from(value: &[(&'a str, u64); N]) -> BarGroup<'a> {
-        Self::from(value.as_ref())
+    fn from(value: &[(&'a str, u64); N]) -> Self {
+        let value: &[(&'a str, u64)] = value.as_ref();
+        Self::from(value)
     }
 }
 
 impl<'a> From<&Vec<(&'a str, u64)>> for BarGroup<'a> {
-    fn from(value: &Vec<(&'a str, u64)>) -> BarGroup<'a> {
+    fn from(value: &Vec<(&'a str, u64)>) -> Self {
         let array: &[(&str, u64)] = value;
         Self::from(array)
     }

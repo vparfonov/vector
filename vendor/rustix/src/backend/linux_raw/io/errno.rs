@@ -41,7 +41,6 @@ use linux_raw_sys::errno;
 /// [DragonFly BSD]: https://man.dragonflybsd.org/?command=errno&section=2
 /// [illumos]: https://illumos.org/man/3C/errno
 /// [glibc]: https://www.gnu.org/software/libc/manual/html_node/Error-Codes.html
-/// [`std::io::Error`]: Result
 #[repr(transparent)]
 #[doc(alias = "errno")]
 #[derive(Eq, PartialEq, Hash, Copy, Clone)]
@@ -60,7 +59,7 @@ impl Errno {
     #[inline]
     pub fn from_io_error(io_err: &std::io::Error) -> Option<Self> {
         io_err.raw_os_error().and_then(|raw| {
-            // `std::io::Error` could theoretically have arbitrary "OS error"
+            // `std::io::Error` could theoretically have arbitrary OS error
             // values, so check that they're in Linux's range.
             if (1..4096).contains(&raw) {
                 Some(Self::from_errno(raw as u32))
@@ -236,7 +235,7 @@ pub(in crate::backend) unsafe fn try_decode_void<Num: RetNumber>(
 /// # Safety
 ///
 /// This must only be used with syscalls which do not return on success.
-#[cfg(any(feature = "event", feature = "runtime"))]
+#[cfg(any(feature = "event", feature = "runtime", feature = "system"))]
 #[inline]
 pub(in crate::backend) unsafe fn try_decode_error<Num: RetNumber>(raw: RetReg<Num>) -> io::Errno {
     debug_assert!(raw.is_in_range(-4095..0));

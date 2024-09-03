@@ -7,7 +7,7 @@ pub struct DescribeDeliveryStreamInput {
     pub delivery_stream_name: ::std::option::Option<::std::string::String>,
     /// <p>The limit on the number of destinations to return. You can have one destination per delivery stream.</p>
     pub limit: ::std::option::Option<i32>,
-    /// <p>The ID of the destination to start returning the destination information. Kinesis Data Firehose supports one destination per delivery stream.</p>
+    /// <p>The ID of the destination to start returning the destination information. Firehose supports one destination per delivery stream.</p>
     pub exclusive_start_destination_id: ::std::option::Option<::std::string::String>,
 }
 impl DescribeDeliveryStreamInput {
@@ -19,7 +19,7 @@ impl DescribeDeliveryStreamInput {
     pub fn limit(&self) -> ::std::option::Option<i32> {
         self.limit
     }
-    /// <p>The ID of the destination to start returning the destination information. Kinesis Data Firehose supports one destination per delivery stream.</p>
+    /// <p>The ID of the destination to start returning the destination information. Firehose supports one destination per delivery stream.</p>
     pub fn exclusive_start_destination_id(&self) -> ::std::option::Option<&str> {
         self.exclusive_start_destination_id.as_deref()
     }
@@ -32,8 +32,8 @@ impl DescribeDeliveryStreamInput {
 }
 
 /// A builder for [`DescribeDeliveryStreamInput`](crate::operation::describe_delivery_stream::DescribeDeliveryStreamInput).
-#[non_exhaustive]
 #[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
+#[non_exhaustive]
 pub struct DescribeDeliveryStreamInputBuilder {
     pub(crate) delivery_stream_name: ::std::option::Option<::std::string::String>,
     pub(crate) limit: ::std::option::Option<i32>,
@@ -69,17 +69,17 @@ impl DescribeDeliveryStreamInputBuilder {
     pub fn get_limit(&self) -> &::std::option::Option<i32> {
         &self.limit
     }
-    /// <p>The ID of the destination to start returning the destination information. Kinesis Data Firehose supports one destination per delivery stream.</p>
+    /// <p>The ID of the destination to start returning the destination information. Firehose supports one destination per delivery stream.</p>
     pub fn exclusive_start_destination_id(mut self, input: impl ::std::convert::Into<::std::string::String>) -> Self {
         self.exclusive_start_destination_id = ::std::option::Option::Some(input.into());
         self
     }
-    /// <p>The ID of the destination to start returning the destination information. Kinesis Data Firehose supports one destination per delivery stream.</p>
+    /// <p>The ID of the destination to start returning the destination information. Firehose supports one destination per delivery stream.</p>
     pub fn set_exclusive_start_destination_id(mut self, input: ::std::option::Option<::std::string::String>) -> Self {
         self.exclusive_start_destination_id = input;
         self
     }
-    /// <p>The ID of the destination to start returning the destination information. Kinesis Data Firehose supports one destination per delivery stream.</p>
+    /// <p>The ID of the destination to start returning the destination information. Firehose supports one destination per delivery stream.</p>
     pub fn get_exclusive_start_destination_id(&self) -> &::std::option::Option<::std::string::String> {
         &self.exclusive_start_destination_id
     }

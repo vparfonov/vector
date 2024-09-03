@@ -20,15 +20,17 @@ use crate::{
     decimal::Decimal,
     duration::Duration,
     schema::{
-        DecimalSchema, EnumSchema, FixedSchema, Name, NamesRef, Namespace, Precision, RecordField,
+        DecimalSchema, EnumSchema, FixedSchema, Name, Namespace, Precision, RecordField,
         RecordSchema, ResolvedSchema, Scale, Schema, SchemaKind, UnionSchema,
     },
     AvroResult, Error,
 };
 use serde_json::{Number, Value as JsonValue};
 use std::{
+    borrow::Borrow,
     collections::{BTreeMap, HashMap},
     convert::TryFrom,
+    fmt::Debug,
     hash::BuildHasher,
     str::FromStr,
 };
@@ -106,6 +108,10 @@ pub enum Value {
     TimestampMillis(i64),
     /// Timestamp in microseconds.
     TimestampMicros(i64),
+    /// Local timestamp in milliseconds.
+    LocalTimestampMillis(i64),
+    /// Local timestamp in microseconds.
+    LocalTimestampMicros(i64),
     /// Avro Duration. An amount of time defined by months, days and milliseconds.
     Duration(Duration),
     /// Universally unique identifier.
@@ -325,6 +331,8 @@ impl TryFrom<Value> for JsonValue {
             Value::TimeMicros(t) => Ok(Self::Number(t.into())),
             Value::TimestampMillis(t) => Ok(Self::Number(t.into())),
             Value::TimestampMicros(t) => Ok(Self::Number(t.into())),
+            Value::LocalTimestampMillis(t) => Ok(Self::Number(t.into())),
+            Value::LocalTimestampMicros(t) => Ok(Self::Number(t.into())),
             Value::Duration(d) => Ok(Self::Array(
                 <[u8; 12]>::from(d).iter().map(|&v| v.into()).collect(),
             )),
@@ -376,7 +384,8 @@ impl Value {
         }
     }
 
-    pub(crate) fn validate_internal<S: std::borrow::Borrow<Schema>>(
+    /// Validates the value against the provided schema.
+    pub(crate) fn validate_internal<S: std::borrow::Borrow<Schema> + Debug>(
         &self,
         schema: &Schema,
         names: &HashMap<Name, S>,
@@ -406,8 +415,12 @@ impl Value {
             (&Value::Long(_), &Schema::TimeMicros) => None,
             (&Value::Long(_), &Schema::TimestampMillis) => None,
             (&Value::Long(_), &Schema::TimestampMicros) => None,
+            (&Value::Long(_), &Schema::LocalTimestampMillis) => None,
+            (&Value::Long(_), &Schema::LocalTimestampMicros) => None,
             (&Value::TimestampMicros(_), &Schema::TimestampMicros) => None,
             (&Value::TimestampMillis(_), &Schema::TimestampMillis) => None,
+            (&Value::LocalTimestampMicros(_), &Schema::LocalTimestampMicros) => None,
+            (&Value::LocalTimestampMillis(_), &Schema::LocalTimestampMillis) => None,
             (&Value::TimeMicros(_), &Schema::TimeMicros) => None,
             (&Value::TimeMillis(_), &Schema::TimeMillis) => None,
             (&Value::Date(_), &Schema::Date) => None,
@@ -459,7 +472,12 @@ impl Value {
                     None
                 }
             }
-            (&Value::Enum(i, ref s), Schema::Enum(EnumSchema { symbols, .. })) => symbols
+            (
+                &Value::Enum(i, ref s),
+                Schema::Enum(EnumSchema {
+                    symbols, default, ..
+                }),
+            ) => symbols
                 .get(i as usize)
                 .map(|ref symbol| {
                     if symbol != &s {
@@ -468,7 +486,10 @@ impl Value {
                         None
                     }
                 })
-                .unwrap_or_else(|| Some(format!("No symbol at position '{i}'"))),
+                .unwrap_or_else(|| match default {
+                    Some(_) => None,
+                    None => Some(format!("No symbol at position '{i}'")),
+                }),
             // (&Value::Union(None), &Schema::Union(_)) => None,
             (&Value::Union(i, ref value), Schema::Union(inner)) => inner
                 .variants()
@@ -476,7 +497,7 @@ impl Value {
                 .map(|schema| value.validate_internal(schema, names, enclosing_namespace))
                 .unwrap_or_else(|| Some(format!("No schema in the union at position '{i}'"))),
             (v, Schema::Union(inner)) => {
-                match inner.find_schema_with_known_schemata(v, Some(names)) {
+                match inner.find_schema_with_known_schemata(v, Some(names), enclosing_namespace) {
                     Some(_) => None,
                     None => Some("Could not find matching type in union".to_string()),
                 }
@@ -495,10 +516,19 @@ impl Value {
                     )
                 })
             }
-            (Value::Record(record_fields), Schema::Record(RecordSchema { fields, lookup, .. })) => {
+            (
+                Value::Record(record_fields),
+                Schema::Record(RecordSchema {
+                    fields,
+                    lookup,
+                    name,
+                    ..
+                }),
+            ) => {
                 let non_nullable_fields_count =
                     fields.iter().filter(|&rf| !rf.is_nullable()).count();
 
+                // If the record contains fewer fields as required fields by the schema, it is invalid.
                 if record_fields.len() < non_nullable_fields_count {
                     return Some(format!(
                         "The value's records length ({}) doesn't match the schema ({} non-nullable fields)",
@@ -516,6 +546,11 @@ impl Value {
                 record_fields
                     .iter()
                     .fold(None, |acc, (field_name, record_field)| {
+                        let record_namespace = if name.namespace.is_none() {
+                            enclosing_namespace
+                        } else {
+                            &name.namespace
+                        };
                         match lookup.get(field_name) {
                             Some(idx) => {
                                 let field = &fields[*idx];
@@ -524,7 +559,7 @@ impl Value {
                                     record_field.validate_internal(
                                         &field.schema,
                                         names,
-                                        enclosing_namespace,
+                                        record_namespace,
                                     ),
                                 )
                             }
@@ -581,10 +616,10 @@ impl Value {
         self.resolve_internal(schema, rs.get_names(), &enclosing_namespace, &None)
     }
 
-    fn resolve_internal(
+    pub(crate) fn resolve_internal<S: Borrow<Schema> + Debug>(
         mut self,
         schema: &Schema,
-        names: &NamesRef,
+        names: &HashMap<Name, S>,
         enclosing_namespace: &Namespace,
         field_default: &Option<JsonValue>,
     ) -> AvroResult<Self> {
@@ -606,7 +641,7 @@ impl Value {
 
                 if let Some(resolved) = names.get(&name) {
                     debug!("Resolved {:?}", name);
-                    self.resolve_internal(resolved, names, &name.namespace, field_default)
+                    self.resolve_internal(resolved.borrow(), names, &name.namespace, field_default)
                 } else {
                     error!("Failed to resolve schema {:?}", name);
                     Err(Error::SchemaResolutionError(name.clone()))
@@ -644,6 +679,8 @@ impl Value {
             Schema::TimeMicros => self.resolve_time_micros(),
             Schema::TimestampMillis => self.resolve_timestamp_millis(),
             Schema::TimestampMicros => self.resolve_timestamp_micros(),
+            Schema::LocalTimestampMillis => self.resolve_local_timestamp_millis(),
+            Schema::LocalTimestampMicros => self.resolve_local_timestamp_micros(),
             Schema::Duration => self.resolve_duration(),
             Schema::Uuid => self.resolve_uuid(),
         }
@@ -759,6 +796,26 @@ impl Value {
         }
     }
 
+    fn resolve_local_timestamp_millis(self) -> Result<Self, Error> {
+        match self {
+            Value::LocalTimestampMillis(ts) | Value::Long(ts) => {
+                Ok(Value::LocalTimestampMillis(ts))
+            }
+            Value::Int(ts) => Ok(Value::LocalTimestampMillis(i64::from(ts))),
+            other => Err(Error::GetLocalTimestampMillis(other.into())),
+        }
+    }
+
+    fn resolve_local_timestamp_micros(self) -> Result<Self, Error> {
+        match self {
+            Value::LocalTimestampMicros(ts) | Value::Long(ts) => {
+                Ok(Value::LocalTimestampMicros(ts))
+            }
+            Value::Int(ts) => Ok(Value::LocalTimestampMicros(i64::from(ts))),
+            other => Err(Error::GetLocalTimestampMicros(other.into())),
+        }
+    }
+
     fn resolve_null(self) -> Result<Self, Error> {
         match self {
             Value::Null => Ok(Value::Null),
@@ -847,7 +904,7 @@ impl Value {
         }
     }
 
-    fn resolve_enum(
+    pub(crate) fn resolve_enum(
         self,
         symbols: &[String],
         enum_default: &Option<String>,
@@ -883,10 +940,10 @@ impl Value {
         }
     }
 
-    fn resolve_union(
+    fn resolve_union<S: Borrow<Schema> + Debug>(
         self,
         schema: &UnionSchema,
-        names: &NamesRef,
+        names: &HashMap<Name, S>,
         enclosing_namespace: &Namespace,
         field_default: &Option<JsonValue>,
     ) -> Result<Self, Error> {
@@ -896,9 +953,8 @@ impl Value {
             // Reader is a union, but writer is not.
             v => v,
         };
-
         let (i, inner) = schema
-            .find_schema_with_known_schemata(&v, Some(names))
+            .find_schema_with_known_schemata(&v, Some(names), enclosing_namespace)
             .ok_or(Error::FindUnionVariant)?;
 
         Ok(Value::Union(
@@ -907,10 +963,10 @@ impl Value {
         ))
     }
 
-    fn resolve_array(
+    fn resolve_array<S: Borrow<Schema> + Debug>(
         self,
         schema: &Schema,
-        names: &NamesRef,
+        names: &HashMap<Name, S>,
         enclosing_namespace: &Namespace,
     ) -> Result<Self, Error> {
         match self {
@@ -927,10 +983,10 @@ impl Value {
         }
     }
 
-    fn resolve_map(
+    fn resolve_map<S: Borrow<Schema> + Debug>(
         self,
         schema: &Schema,
-        names: &NamesRef,
+        names: &HashMap<Name, S>,
         enclosing_namespace: &Namespace,
     ) -> Result<Self, Error> {
         match self {
@@ -951,10 +1007,10 @@ impl Value {
         }
     }
 
-    fn resolve_record(
+    fn resolve_record<S: Borrow<Schema> + Debug>(
         self,
         fields: &[RecordField],
-        names: &NamesRef,
+        names: &HashMap<Name, S>,
         enclosing_namespace: &Namespace,
     ) -> Result<Self, Error> {
         let mut items = match self {
@@ -1046,6 +1102,56 @@ mod tests {
     use num_bigint::BigInt;
     use pretty_assertions::assert_eq;
     use uuid::Uuid;
+
+    #[test]
+    fn avro_3809_validate_nested_records_with_implicit_namespace() -> TestResult {
+        let schema = Schema::parse_str(
+            r#"{
+            "name": "record_name",
+            "namespace": "space",
+            "type": "record",
+            "fields": [
+              {
+                "name": "outer_field_1",
+                "type": {
+                  "type": "record",
+                  "name": "middle_record_name",
+                  "namespace": "middle_namespace",
+                  "fields": [
+                    {
+                      "name": "middle_field_1",
+                      "type": {
+                        "type": "record",
+                        "name": "inner_record_name",
+                        "fields": [
+                          { "name": "inner_field_1", "type": "double" }
+                        ]
+                      }
+                    },
+                    { "name": "middle_field_2", "type": "inner_record_name" }
+                  ]
+                }
+              }
+            ]
+          }"#,
+        )?;
+        let value = Value::Record(vec![(
+            "outer_field_1".into(),
+            Value::Record(vec![
+                (
+                    "middle_field_1".into(),
+                    Value::Record(vec![("inner_field_1".into(), Value::Double(1.2f64))]),
+                ),
+                (
+                    "middle_field_2".into(),
+                    Value::Record(vec![("inner_field_1".into(), Value::Double(1.6f64))]),
+                ),
+            ]),
+        )]);
+
+        assert!(value.validate(&schema));
+        Ok(())
+    }
 
     #[test]
     fn validate() -> TestResult {
@@ -1608,6 +1714,26 @@ Field with name '"b"' is not a member of the map items"#,
     }
 
     #[test]
+    fn test_avro_3853_resolve_timestamp_millis() {
+        let value = Value::LocalTimestampMillis(10);
+        assert!(value.clone().resolve(&Schema::LocalTimestampMillis).is_ok());
+        assert!(value.resolve(&Schema::Float).is_err());
+
+        let value = Value::Float(10.0f32);
+        assert!(value.resolve(&Schema::LocalTimestampMillis).is_err());
+    }
+
+    #[test]
+    fn test_avro_3853_resolve_timestamp_micros() {
+        let value = Value::LocalTimestampMicros(10);
+        assert!(value.clone().resolve(&Schema::LocalTimestampMicros).is_ok());
+        assert!(value.resolve(&Schema::Int).is_err());
+
+        let value = Value::Double(10.0);
+        assert!(value.resolve(&Schema::LocalTimestampMicros).is_err());
+    }
+
+    #[test]
     fn resolve_duration() {
         let value = Value::Duration(Duration::new(
             Months::new(10),
@@ -1810,6 +1936,14 @@ Field with name '"b"' is not a member of the map items"#,
         );
         assert_eq!(
             JsonValue::try_from(Value::TimestampMicros(1))?,
+            JsonValue::Number(1.into())
+        );
+        assert_eq!(
+            JsonValue::try_from(Value::LocalTimestampMillis(1))?,
+            JsonValue::Number(1.into())
+        );
+        assert_eq!(
+            JsonValue::try_from(Value::LocalTimestampMicros(1))?,
             JsonValue::Number(1.into())
         );
         assert_eq!(

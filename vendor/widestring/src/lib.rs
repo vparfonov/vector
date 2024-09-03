@@ -220,16 +220,23 @@
     trivial_numeric_casts,
     future_incompatible
 )]
+#![allow(renamed_and_removed_lints, stable_features)] // Until min version gets bumped
 #![cfg_attr(not(feature = "std"), no_std)]
-#![doc(html_root_url = "https://docs.rs/widestring/1.0.2")]
+#![doc(html_root_url = "https://docs.rs/widestring/1.1.0")]
 #![doc(test(attr(deny(warnings), allow(unused))))]
 #![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(
+    feature = "debugger_visualizer",
+    feature(debugger_visualizer),
+    debugger_visualizer(natvis_file = "../debug_metadata/widestring.natvis")
+)]
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
 use crate::error::{DecodeUtf16Error, DecodeUtf32Error};
 #[cfg(feature = "alloc")]
+#[allow(unused_imports)]
 use alloc::vec::Vec;
 use core::fmt::Write;
 

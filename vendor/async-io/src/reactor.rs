@@ -5,10 +5,6 @@ use std::future::Future;
 use std::io;
 use std::marker::PhantomData;
 use std::mem;
-#[cfg(unix)]
-use std::os::unix::io::RawFd;
-#[cfg(windows)]
-use std::os::windows::io::RawSocket;
 use std::panic;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -19,8 +15,41 @@ use std::time::{Duration, Instant};
 use async_lock::OnceCell;
 use concurrent_queue::ConcurrentQueue;
 use futures_lite::ready;
-use polling::{Event, Poller};
+use polling::{Event, Events, Poller};
 use slab::Slab;
+
+// Choose the proper implementation of `Registration` based on the target platform.
+cfg_if::cfg_if! {
+    if #[cfg(windows)] {
+        mod windows;
+        pub use windows::Registration;
+    } else if #[cfg(any(
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "tvos",
+        target_os = "watchos",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "openbsd",
+        target_os = "dragonfly",
+    ))] {
+        mod kqueue;
+        pub use kqueue::Registration;
+    } else if #[cfg(unix)] {
+        mod unix;
+        pub use unix::Registration;
+    } else {
+        compile_error!("unsupported platform");
+    }
+}
+
+#[cfg(not(target_os = "espidf"))]
+const TIMER_QUEUE_SIZE: usize = 1000;
+
+/// ESP-IDF - being an embedded OS - does not need so many timers
+/// and this saves ~ 20K RAM which is a lot for an MCU with RAM < 400K
+#[cfg(target_os = "espidf")]
+const TIMER_QUEUE_SIZE: usize = 100;
 
 const READ: usize = 0;
 const WRITE: usize = 1;
@@ -32,7 +61,7 @@ pub(crate) struct Reactor {
     /// Portable bindings to epoll/kqueue/event ports/IOCP.
     ///
     /// This is where I/O is polled, producing I/O events.
-    poller: Poller,
+    pub(crate) poller: Poller,
 
     /// Ticker bumped before polling.
     ///
@@ -48,7 +77,7 @@ pub(crate) struct Reactor {
     /// Temporary storage for I/O events when polling the reactor.
     ///
     /// Holding a lock on this event list implies the exclusive right to poll I/O.
-    events: Mutex<Vec<Event>>,
+    events: Mutex<Events>,
 
     /// An ordered map of registered timers.
     ///
@@ -75,9 +104,9 @@ impl Reactor {
                 poller: Poller::new().expect("cannot initialize I/O event notification"),
                 ticker: AtomicUsize::new(0),
                 sources: Mutex::new(Slab::new()),
-                events: Mutex::new(Vec::new()),
+                events: Mutex::new(Events::new()),
                 timers: Mutex::new(BTreeMap::new()),
-                timer_ops: ConcurrentQueue::bounded(1000),
+                timer_ops: ConcurrentQueue::bounded(TIMER_QUEUE_SIZE),
             }
         })
     }
@@ -88,17 +117,13 @@ impl Reactor {
     }
 
     /// Registers an I/O source in the reactor.
-    pub(crate) fn insert_io(
-        &self,
-        #[cfg(unix)] raw: RawFd,
-        #[cfg(windows)] raw: RawSocket,
-    ) -> io::Result<Arc<Source>> {
+    pub(crate) fn insert_io(&self, raw: Registration) -> io::Result<Arc<Source>> {
         // Create an I/O source for this file descriptor.
         let source = {
             let mut sources = self.sources.lock().unwrap();
             let key = sources.vacant_entry().key();
             let source = Arc::new(Source {
-                raw,
+                registration: raw,
                 key,
                 state: Default::default(),
             });
@@ -107,7 +132,7 @@ impl Reactor {
         };
 
         // Register the file descriptor.
-        if let Err(err) = self.poller.add(raw, Event::none(source.key)) {
+        if let Err(err) = source.registration.add(&self.poller, source.key) {
             let mut sources = self.sources.lock().unwrap();
             sources.remove(source.key);
             return Err(err);
@@ -120,7 +145,7 @@ impl Reactor {
     pub(crate) fn remove_io(&self, source: &Source) -> io::Result<()> {
         let mut sources = self.sources.lock().unwrap();
         sources.remove(source.key);
-        self.poller.delete(source.raw)
+        source.registration.delete(&self.poller)
     }
 
     /// Registers a timer in the reactor.
@@ -182,6 +207,9 @@ impl Reactor {
     ///
     /// Returns the duration until the next timer before this method was called.
     fn process_timers(&self, wakers: &mut Vec<Waker>) -> Option<Duration> {
+        let span = tracing::trace_span!("process_timers");
+        let _enter = span.enter();
+
         let mut timers = self.timers.lock().unwrap();
         self.process_timer_ops(&mut timers);
 
@@ -210,7 +238,8 @@ impl Reactor {
         drop(timers);
 
         // Add wakers to the list.
-        log::trace!("process_timers: {} ready wakers", ready.len());
+        tracing::trace!("{} ready wakers", ready.len());
+
         for (_, waker) in ready {
             wakers.push(waker);
         }
@@ -222,29 +251,32 @@ impl Reactor {
     fn process_timer_ops(&self, timers: &mut MutexGuard<'_, BTreeMap<(Instant, usize), Waker>>) {
         // Process only as much as fits into the queue, or else this loop could in theory run
         // forever.
-        for _ in 0..self.timer_ops.capacity().unwrap() {
-            match self.timer_ops.pop() {
-                Ok(TimerOp::Insert(when, id, waker)) => {
+        self.timer_ops
+            .try_iter()
+            .take(self.timer_ops.capacity().unwrap())
+            .for_each(|op| match op {
+                TimerOp::Insert(when, id, waker) => {
                     timers.insert((when, id), waker);
                 }
-                Ok(TimerOp::Remove(when, id)) => {
+                TimerOp::Remove(when, id) => {
                     timers.remove(&(when, id));
                 }
-                Err(_) => break,
-            }
-        }
+            });
     }
 }
 
 /// A lock on the reactor.
 pub(crate) struct ReactorLock<'a> {
     reactor: &'a Reactor,
-    events: MutexGuard<'a, Vec<Event>>,
+    events: MutexGuard<'a, Events>,
 }
 
 impl ReactorLock<'_> {
     /// Processes new events, blocking until the first event or the timeout.
     pub(crate) fn react(&mut self, timeout: Option<Duration>) -> io::Result<()> {
+        let span = tracing::trace_span!("react");
+        let _enter = span.enter();
+
         let mut wakers = Vec::new();
 
         // Process ready timers.
@@ -295,18 +327,20 @@ impl ReactorLock<'_> {
                             }
                         }
 
-                        // Re-register if there are still writers or readers. The can happen if
+                        // Re-register if there are still writers or readers. This can happen if
                         // e.g. we were previously interested in both readability and writability,
                         // but only one of them was emitted.
                         if !state[READ].is_empty() || !state[WRITE].is_empty() {
-                            self.reactor.poller.modify(
-                                source.raw,
-                                Event {
-                                    key: source.key,
-                                    readable: !state[READ].is_empty(),
-                                    writable: !state[WRITE].is_empty(),
-                                },
-                            )?;
+                            // Create the event that we are interested in.
+                            let event = {
+                                let mut event = Event::none(source.key);
+                                event.readable = !state[READ].is_empty();
+                                event.writable = !state[WRITE].is_empty();
+                                event
+                            };
+
+                            // Register interest in this event.
+                            source.registration.modify(&self.reactor.poller, event)?;
                         }
                     }
                 }
@@ -322,7 +356,7 @@ impl ReactorLock<'_> {
         };
 
         // Wake up ready tasks.
-        log::trace!("react: {} ready wakers", wakers.len());
+        tracing::trace!("{} ready wakers", wakers.len());
         for waker in wakers {
             // Don't let a panicking waker blow everything up.
             panic::catch_unwind(|| waker.wake()).ok();
@@ -341,13 +375,8 @@ enum TimerOp {
 /// A registered source of I/O events.
 #[derive(Debug)]
 pub(crate) struct Source {
-    /// Raw file descriptor on Unix platforms.
-    #[cfg(unix)]
-    pub(crate) raw: RawFd,
-
-    /// Raw socket handle on Windows.
-    #[cfg(windows)]
-    pub(crate) raw: RawSocket,
+    /// This source's registration into the reactor.
+    registration: Registration,
 
     /// The key of this source obtained during registration.
     key: usize,
@@ -436,14 +465,16 @@ impl Source {
 
         // Update interest in this I/O handle.
         if was_empty {
-            Reactor::get().poller.modify(
-                self.raw,
-                Event {
-                    key: self.key,
-                    readable: !state[READ].is_empty(),
-                    writable: !state[WRITE].is_empty(),
-                },
-            )?;
+            // Create the event that we are interested in.
+            let event = {
+                let mut event = Event::none(self.key);
+                event.readable = !state[READ].is_empty();
+                event.writable = !state[WRITE].is_empty();
+                event
+            };
+
+            // Register interest in it.
+            self.registration.modify(&Reactor::get().poller, event)?;
         }
 
         Poll::Pending
@@ -490,7 +521,7 @@ impl<T> Future for Readable<'_, T> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         ready!(Pin::new(&mut self.0).poll(cx))?;
-        log::trace!("readable: fd={}", self.0.handle.source.raw);
+        tracing::trace!(fd = ?self.0.handle.source.registration, "readable");
         Poll::Ready(Ok(()))
     }
 }
@@ -510,7 +541,7 @@ impl<T> Future for ReadableOwned<T> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         ready!(Pin::new(&mut self.0).poll(cx))?;
-        log::trace!("readable_owned: fd={}", self.0.handle.source.raw);
+        tracing::trace!(fd = ?self.0.handle.source.registration, "readable_owned");
         Poll::Ready(Ok(()))
     }
 }
@@ -530,7 +561,7 @@ impl<T> Future for Writable<'_, T> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         ready!(Pin::new(&mut self.0).poll(cx))?;
-        log::trace!("writable: fd={}", self.0.handle.source.raw);
+        tracing::trace!(fd = ?self.0.handle.source.registration, "writable");
         Poll::Ready(Ok(()))
     }
 }
@@ -550,7 +581,7 @@ impl<T> Future for WritableOwned<T> {
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         ready!(Pin::new(&mut self.0).poll(cx))?;
-        log::trace!("writable_owned: fd={}", self.0.handle.source.raw);
+        tracing::trace!(fd = ?self.0.handle.source.registration, "writable_owned");
         Poll::Ready(Ok(()))
     }
 }
@@ -610,14 +641,20 @@ impl<H: Borrow<crate::Async<T>> + Clone, T> Future for Ready<H, T> {
 
         // Update interest in this I/O handle.
         if was_empty {
-            Reactor::get().poller.modify(
-                handle.borrow().source.raw,
-                Event {
-                    key: handle.borrow().source.key,
-                    readable: !state[READ].is_empty(),
-                    writable: !state[WRITE].is_empty(),
-                },
-            )?;
+            // Create the event that we are interested in.
+            let event = {
+                let mut event = Event::none(handle.borrow().source.key);
+                event.readable = !state[READ].is_empty();
+                event.writable = !state[WRITE].is_empty();
+                event
+            };
+
+            // Indicate that we are interested in this event.
+            handle
+                .borrow()
+                .source
+                .registration
+                .modify(&Reactor::get().poller, event)?;
         }
 
         Poll::Pending

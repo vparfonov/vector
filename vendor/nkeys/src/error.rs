@@ -28,8 +28,8 @@ pub struct Error {
 pub enum ErrorKind {
     /// Indicates an inappropriate byte prefix was used for an encoded key string
     InvalidPrefix,
-    /// Indicates a seed key string was used with the wrong length
-    InvalidSeedLength,
+    /// Indicates a key string was used with the wrong length
+    InvalidKeyLength,
     /// Indicates a signature verification mismatch. Use this to check for invalid signatures or messages
     VerifyError,
     /// Indicates an unexpected underlying error occurred while trying to perform routine signature tasks.
@@ -42,6 +42,8 @@ pub enum ErrorKind {
     IncorrectKeyType,
     /// Payload not valid (or failed to be decrypted)
     InvalidPayload,
+    /// Signature did not match the expected length (64 bytes)
+    InvalidSignatureLength,
 }
 
 /// A handy macro borrowed from the `signatory` crate that lets library-internal code generate
@@ -63,7 +65,8 @@ impl ErrorKind {
     pub fn as_str(self) -> &'static str {
         match self {
             ErrorKind::InvalidPrefix => "Invalid byte prefix",
-            ErrorKind::InvalidSeedLength => "Invalid seed length",
+            ErrorKind::InvalidKeyLength => "Invalid key length",
+            ErrorKind::InvalidSignatureLength => "Invalid signature length",
             ErrorKind::VerifyError => "Signature verification failure",
             ErrorKind::ChecksumFailure => "Checksum match failure",
             ErrorKind::CodecFailure => "Codec failure",
@@ -135,12 +138,12 @@ mod tests {
     #[test]
     fn test_error_to_string() {
         assert_eq!(
-            err!(InvalidSeedLength, "Testing").to_string(),
-            "Invalid seed length: Testing"
+            err!(InvalidKeyLength, "Testing").to_string(),
+            "Invalid key length: Testing"
         );
         assert_eq!(
-            err!(InvalidSeedLength, "Testing {}", 1).to_string(),
-            "Invalid seed length: Testing 1"
+            err!(InvalidKeyLength, "Testing {}", 1).to_string(),
+            "Invalid key length: Testing 1"
         );
     }
 }

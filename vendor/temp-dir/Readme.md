@@ -10,7 +10,7 @@ Provides a `TempDir` struct.
 # Features
 - Makes a directory in a system temporary directory
 - Recursively deletes the directory and its contents on drop
-- Deletes symbolic links and does not follow them.
+- Deletes symbolic links and does not follow them
 - Optional name prefix
 - Depends only on `std`
 - `forbid(unsafe_code)`
@@ -26,6 +26,10 @@ Provides a `TempDir` struct.
   [`remove_dir_all`](https://crates.io/crates/remove_dir_all) crate.
 
 # Alternatives
+- [`tempdir`](https://crates.io/crates/tempdir)
+  - Unmaintained
+  - Popular and mature
+  - Heavy dependencies (rand, winapi)
 - [`tempfile`](https://crates.io/crates/tempfile)
   - Popular and mature
   - Contains `unsafe`, dependencies full of `unsafe`
@@ -76,12 +80,13 @@ Symbols:
 
 Functions  Expressions  Impls  Traits  Methods  Dependency
 
-0/0        0/0          0/0    0/0     0/0      🔒  temp-dir 0.1.12
+0/0        0/0          0/0    0/0     0/0      🔒  temp-dir 0.1.13
 
 0/0        0/0          0/0    0/0     0/0    
 
 ```
 # Changelog
+- v0.1.13 - Update docs.
 - v0.1.12 - Work when the directory already exists.
 - v0.1.11
   - Return `std::io::Error` instead of `String`.

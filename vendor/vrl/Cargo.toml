@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.74"
+rust-version = "1.78"
 name = "vrl"
-version = "0.13.0"
+version = "0.17.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 description = "Vector Remap Language"
 homepage = "https://vrl.dev/"
@@ -68,6 +68,10 @@ optional = true
 version = "0.2"
 optional = true
 
+[dependencies.base62]
+version = "2.0.2"
+optional = true
+
 [dependencies.base64]
 version = "0.22"
 optional = true
@@ -108,7 +112,7 @@ optional = true
 default-features = false
 
 [dependencies.chrono-tz]
-version = "0.8"
+version = "0.9"
 optional = true
 default-features = false
 
@@ -182,7 +186,7 @@ version = "0.5"
 optional = true
 
 [dependencies.indexmap]
-version = "~2.2.5"
+version = "~2.2.6"
 features = ["std"]
 optional = true
 default-features = false
@@ -192,7 +196,7 @@ version = "2"
 optional = true
 
 [dependencies.itertools]
-version = "0.12"
+version = "0.13"
 optional = true
 default-features = false
 
@@ -262,7 +266,7 @@ optional = true
 default-features = false
 
 [dependencies.prettydiff]
-version = "0.6"
+version = "0.7"
 optional = true
 default-features = false
 
@@ -294,6 +298,14 @@ default-features = false
 version = "2"
 optional = true
 
+[dependencies.psl-types]
+version = "2"
+optional = true
+
+[dependencies.publicsuffix]
+version = "2"
+optional = true
+
 [dependencies.quickcheck]
 version = "1"
 optional = true
@@ -317,7 +329,7 @@ optional = true
 default-features = false
 
 [dependencies.roxmltree]
-version = "0.19"
+version = "0.20"
 optional = true
 
 [dependencies.rust_decimal]
@@ -387,7 +399,6 @@ optional = true
 
 [dependencies.tracing]
 version = "0.1"
-optional = true
 default-features = false
 
 [dependencies.uaparser]
@@ -404,7 +415,7 @@ version = "0.1"
 optional = true
 
 [dependencies.webbrowser]
-version = "0.8"
+version = "1.0"
 optional = true
 default-features = false
 
@@ -422,7 +433,7 @@ default-features = false
 version = "1"
 
 [dev-dependencies.chrono-tz]
-version = "0.8"
+version = "0.9"
 
 [dev-dependencies.criterion]
 version = "0.5"
@@ -504,7 +515,6 @@ compiler = [
     "dep:ordered-float",
     "dep:chrono-tz",
     "dep:snafu",
-    "dep:tracing",
     "dep:thiserror",
     "dep:dyn-clone",
     "dep:indoc",
@@ -528,6 +538,7 @@ datadog_filter = [
 ]
 datadog_grok = [
     "value",
+    "parsing",
     "dep:nom",
     "dep:peeking_take_while",
     "dep:serde_json",
@@ -536,7 +547,7 @@ datadog_grok = [
     "dep:thiserror",
     "dep:chrono",
     "dep:chrono-tz",
-    "dep:tracing",
+    "dep:percent-encoding",
 ]
 datadog_search = [
     "dep:pest",
@@ -559,6 +570,10 @@ diagnostic = [
     "dep:codespan-reporting",
     "dep:termcolor",
 ]
+float_roundtrip = [
+    "dep:serde_json",
+    "serde_json/float_roundtrip",
+]
 lua = ["dep:mlua"]
 parser = [
     "path",
@@ -567,6 +582,15 @@ parser = [
     "dep:thiserror",
     "dep:ordered-float",
     "dep:lalrpop-util",
+]
+parsing = [
+    "value",
+    "compiler",
+    "dep:url",
+    "dep:nom",
+    "dep:regex",
+    "dep:roxmltree",
+    "dep:rust_decimal",
 ]
 path = [
     "value",
@@ -583,8 +607,10 @@ stdlib = [
     "compiler",
     "core",
     "datadog",
+    "parsing",
     "dep:aes",
     "dep:base16",
+    "dep:base62",
     "dep:base64",
     "dep:cbc",
     "dep:cfb-mode",
@@ -597,6 +623,7 @@ stdlib = [
     "dep:ctr",
     "dep:data-encoding",
     "dep:digest",
+    "dep:domain",
     "dep:dns-lookup",
     "dep:flate2",
     "dep:grok",
@@ -614,6 +641,8 @@ stdlib = [
     "dep:prost",
     "dep:prost-reflect",
     "dep:psl",
+    "dep:psl-types",
+    "dep:publicsuffix",
     "dep:quoted_printable",
     "dep:rand",
     "dep:roxmltree",
@@ -625,6 +654,7 @@ stdlib = [
     "dep:snap",
     "dep:strip-ansi-escapes",
     "dep:syslog_loose",
+    "dep:tokio",
     "dep:uaparser",
     "dep:url",
     "dep:utf8-width",
@@ -653,18 +683,39 @@ value = [
 version = "2"
 optional = true
 
+[target."cfg(not(target_arch = \"wasm32\"))".dependencies.domain]
+version = "0.10.1"
+features = [
+    "resolv-sync",
+    "serde",
+]
+optional = true
+
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.grok]
 version = "2"
 optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.hostname]
-version = "0.3"
+version = "0.4"
 optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.onig]
 version = "6"
 optional = true
 default-features = false
+
+[target."cfg(not(target_arch = \"wasm32\"))".dependencies.tokio]
+version = "1.38"
+features = [
+    "io-util",
+    "macros",
+    "net",
+    "time",
+    "sync",
+    "rt",
+    "rt-multi-thread",
+]
+optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.uuid]
 version = "1"

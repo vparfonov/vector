@@ -1,7 +1,7 @@
 use std::io;
 use std::net::TcpListener;
 
-use polling::{Event, Poller};
+use polling::{Event, Events, Poller};
 
 fn main() -> io::Result<()> {
     let l1 = TcpListener::bind("127.0.0.1:8001")?;
@@ -10,15 +10,21 @@ fn main() -> io::Result<()> {
     l2.set_nonblocking(true)?;
 
     let poller = Poller::new()?;
-    poller.add(&l1, Event::readable(1))?;
-    poller.add(&l2, Event::readable(2))?;
+    unsafe {
+        poller.add(&l1, Event::readable(1))?;
+        poller.add(&l2, Event::readable(2))?;
+    }
 
-    let mut events = Vec::new();
+    println!("You can connect to the server using `nc`:");
+    println!(" $ nc 127.0.0.1 8001");
+    println!(" $ nc 127.0.0.1 8002");
+
+    let mut events = Events::new();
     loop {
         events.clear();
         poller.wait(&mut events, None)?;
 
-        for ev in &events {
+        for ev in events.iter() {
             match ev.key {
                 1 => {
                     println!("Accept on l1");

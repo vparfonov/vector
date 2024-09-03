@@ -122,11 +122,13 @@ pub enum ChunkMode {
 pub struct Compiler {
     optimization_level: u8,
     debug_level: u8,
+    type_info_level: u8,
     coverage_level: u8,
     vector_lib: Option<String>,
     vector_ctor: Option<String>,
     vector_type: Option<String>,
     mutable_globals: Vec<String>,
+    userdata_types: Vec<String>,
 }
 
 #[cfg(any(feature = "luau", doc))]
@@ -144,11 +146,13 @@ impl Compiler {
         Compiler {
             optimization_level: 1,
             debug_level: 1,
+            type_info_level: 0,
             coverage_level: 0,
             vector_lib: None,
             vector_ctor: None,
             vector_type: None,
             mutable_globals: Vec::new(),
+            userdata_types: Vec::new(),
         }
     }
 
@@ -173,6 +177,16 @@ impl Compiler {
     #[must_use]
     pub const fn set_debug_level(mut self, level: u8) -> Self {
         self.debug_level = level;
+        self
+    }
+
+    /// Sets Luau type information level used to guide native code generation decisions.
+    ///
+    /// Possible values:
+    /// * 0 - generate for native modules (default)
+    /// * 1 - generate for all modules
+    pub const fn set_type_info_level(mut self, level: u8) -> Self {
+        self.type_info_level = level;
         self
     }
 
@@ -218,6 +232,13 @@ impl Compiler {
         self
     }
 
+    /// Sets a list of userdata types that will be included in the type information.
+    #[must_use]
+    pub fn set_userdata_types(mut self, types: Vec<String>) -> Self {
+        self.userdata_types = types;
+        self
+    }
+
     /// Compiles the `source` into bytecode.
     pub fn compile(&self, source: impl AsRef<[u8]>) -> Vec<u8> {
         use std::os::raw::c_int;
@@ -233,32 +254,37 @@ impl Compiler {
         let vector_type = vector_type.and_then(|t| CString::new(t).ok());
         let vector_type = vector_type.as_ref();
 
-        let mutable_globals = self
-            .mutable_globals
-            .iter()
-            .map(|name| CString::new(name.clone()).ok())
-            .collect::<Option<Vec<_>>>()
-            .unwrap_or_default();
-        let mut mutable_globals = mutable_globals
-            .iter()
-            .map(|s| s.as_ptr())
-            .collect::<Vec<_>>();
-        let mut mutable_globals_ptr = ptr::null();
-        if !mutable_globals.is_empty() {
-            mutable_globals.push(ptr::null());
-            mutable_globals_ptr = mutable_globals.as_ptr();
+        macro_rules! vec2cstring_ptr {
+            ($name:ident, $name_ptr:ident) => {
+                let $name = self
+                    .$name
+                    .iter()
+                    .map(|name| CString::new(name.clone()).ok())
+                    .collect::<Option<Vec<_>>>()
+                    .unwrap_or_default();
+                let mut $name = $name.iter().map(|s| s.as_ptr()).collect::<Vec<_>>();
+                let mut $name_ptr = ptr::null();
+                if !$name.is_empty() {
+                    $name.push(ptr::null());
+                    $name_ptr = $name.as_ptr();
+                }
+            };
         }
 
+        vec2cstring_ptr!(mutable_globals, mutable_globals_ptr);
+        vec2cstring_ptr!(userdata_types, userdata_types_ptr);
+
         unsafe {
-            let options = ffi::lua_CompileOptions {
-                optimizationLevel: self.optimization_level as c_int,
-                debugLevel: self.debug_level as c_int,
-                coverageLevel: self.coverage_level as c_int,
-                vectorLib: vector_lib.map_or(ptr::null(), |s| s.as_ptr()),
-                vectorCtor: vector_ctor.map_or(ptr::null(), |s| s.as_ptr()),
-                vectorType: vector_type.map_or(ptr::null(), |s| s.as_ptr()),
-                mutableGlobals: mutable_globals_ptr,
-            };
+            let mut options = ffi::lua_CompileOptions::default();
+            options.optimizationLevel = self.optimization_level as c_int;
+            options.debugLevel = self.debug_level as c_int;
+            options.typeInfoLevel = self.type_info_level as c_int;
+            options.coverageLevel = self.coverage_level as c_int;
+            options.vectorLib = vector_lib.map_or(ptr::null(), |s| s.as_ptr());
+            options.vectorCtor = vector_ctor.map_or(ptr::null(), |s| s.as_ptr());
+            options.vectorType = vector_type.map_or(ptr::null(), |s| s.as_ptr());
+            options.mutableGlobals = mutable_globals_ptr;
+            options.userdataTypes = userdata_types_ptr;
             ffi::luau_compile(source.as_ref(), options)
         }
     }
@@ -315,7 +341,7 @@ impl<'lua, 'a> Chunk<'lua, 'a> {
     ///
     /// This is equivalent to calling the chunk function with no arguments and no return values.
     pub fn exec(self) -> Result<()> {
-        self.call(())?;
+        self.call::<_, ()>(())?;
         Ok(())
     }
 

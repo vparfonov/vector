@@ -10,10 +10,10 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
-rust-version = "1.56"
+edition = "2021"
+rust-version = "1.66"
 name = "relative-path"
-version = "1.9.0"
+version = "1.9.3"
 authors = ["John-John Tedro <udoprog@tedro.se>"]
 description = "Portable, relative paths for Rust."
 homepage = "https://github.com/udoprog/relative-path"
@@ -21,12 +21,18 @@ documentation = "https://docs.rs/relative-path"
 readme = "README.md"
 keywords = ["path"]
 categories = ["filesystem"]
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/udoprog/relative-path"
+
+[package.metadata.docs.rs]
+all-features = true
 
 [dependencies.serde]
 version = "1.0.160"
 optional = true
+
+[dev-dependencies.anyhow]
+version = "1.0.76"
 
 [dev-dependencies.serde]
 version = "1.0.160"

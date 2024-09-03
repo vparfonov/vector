@@ -1,11 +1,9 @@
 use crate::JsValue;
-use std::alloc::{self, Layout};
-use std::cell::Cell;
-use std::mem;
-use std::ptr;
-use std::slice;
-use std::vec::Vec;
-use std::cmp::max;
+
+use alloc::slice;
+use alloc::vec::Vec;
+use core::cell::Cell;
+use core::cmp::max;
 
 externs! {
     #[link(wasm_import_module = "__wbindgen_externref_xform__")]
@@ -46,23 +44,8 @@ impl Slab {
                     internal_error("someone else allocated table entries?")
                 }
 
-                // poor man's `try_reserve_exact` until that's stable
-                unsafe {
-                    let new_cap = self.data.capacity() + extra;
-                    let size = mem::size_of::<usize>() * new_cap;
-                    let align = mem::align_of::<usize>();
-                    let layout = match Layout::from_size_align(size, align) {
-                        Ok(l) => l,
-                        Err(_) => internal_error("size/align layout failure"),
-                    };
-                    let ptr = alloc::alloc(layout) as *mut usize;
-                    if ptr.is_null() {
-                        internal_error("allocation failure");
-                    }
-                    ptr::copy_nonoverlapping(self.data.as_ptr(), ptr, self.data.len());
-                    let new_vec = Vec::from_raw_parts(ptr, self.data.len(), new_cap);
-                    let mut old = mem::replace(&mut self.data, new_vec);
-                    old.set_len(0);
+                if self.data.try_reserve_exact(extra).is_err() {
+                    internal_error("allocation failure");
                 }
             }
 
@@ -116,10 +99,19 @@ impl Slab {
 }
 
 fn internal_error(msg: &str) -> ! {
-    if cfg!(debug_assertions) {
-        super::throw_str(msg)
-    } else {
-        std::process::abort()
+    cfg_if::cfg_if! {
+        if #[cfg(debug_assertions)] {
+            super::throw_str(msg)
+        } else if #[cfg(feature = "std")] {
+            std::process::abort();
+        } else if #[cfg(all(
+            target_arch = "wasm32",
+            target_os = "unknown"
+        ))] {
+            core::arch::wasm32::unreachable();
+        } else {
+            unreachable!()
+        }
     }
 }
 
@@ -178,7 +170,3 @@ pub unsafe extern "C" fn __externref_heap_live_count() -> u32 {
         })
         .unwrap_or_else(|_| internal_error("tls access failure"))
 }
-
-// see comment in module above this in `link_mem_intrinsics`
-#[inline(never)]
-pub fn link_intrinsics() {}

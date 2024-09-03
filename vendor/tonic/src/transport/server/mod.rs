@@ -12,7 +12,6 @@ mod unix;
 pub use super::service::Routes;
 pub use super::service::RoutesBuilder;
 
-pub use crate::server::NamedService;
 pub use conn::{Connected, TcpConnectInfo};
 #[cfg(feature = "tls")]
 pub use tls::ServerTlsConfig;
@@ -37,6 +36,7 @@ use crate::transport::Error;
 use self::recover_error::RecoverError;
 use super::service::{GrpcTimeout, ServerIo};
 use crate::body::BoxBody;
+use crate::server::NamedService;
 use bytes::Bytes;
 use http::{Request, Response};
 use http_body::Body as _;

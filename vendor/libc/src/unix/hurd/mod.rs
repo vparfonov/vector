@@ -350,7 +350,7 @@ s! {
     pub struct msghdr {
         pub msg_name: *mut ::c_void,
         pub msg_namelen: socklen_t,
-        pub msg_iov: *mut iovec,
+        pub msg_iov: *mut ::iovec,
         pub msg_iovlen: ::c_int,
         pub msg_control: *mut ::c_void,
         pub msg_controllen: socklen_t,
@@ -2759,6 +2759,10 @@ pub const MREMAP_MAYMOVE: ::c_int = 1;
 pub const MREMAP_FIXED: ::c_int = 2;
 pub const MCL_CURRENT: ::c_int = 0x0001;
 pub const MCL_FUTURE: ::c_int = 0x0002;
+
+// sys/xattr.h
+pub const XATTR_CREATE: ::c_int = 0x1;
+pub const XATTR_REPLACE: ::c_int = 0x2;
 
 // spawn.h
 pub const POSIX_SPAWN_USEVFORK: ::c_int = 64;

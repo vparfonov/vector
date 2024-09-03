@@ -31,11 +31,16 @@
 
 use std::{error::Error, io};
 
-use crossterm::{
-    event::{self, Event, KeyCode},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    crossterm::{
+        event::{self, Event, KeyCode},
+        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    },
+    terminal::{Frame, Terminal},
+    text::Line,
+    widgets::{Block, Paragraph},
 };
-use ratatui::{prelude::*, widgets::*};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -117,7 +122,7 @@ fn run_tui<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
 }
 
 /// Render the TUI.
-fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
+fn ui(f: &mut Frame, app: &App) {
     let text = vec![
         if app.hook_enabled {
             Line::from("HOOK IS CURRENTLY **ENABLED**")
@@ -139,11 +144,9 @@ fn ui<B: Backend>(f: &mut Frame<B>, app: &App) {
         Line::from("try first without the panic handler to see the difference"),
     ];
 
-    let b = Block::default()
-        .title("Panic Handler Demo")
-        .borders(Borders::ALL);
+    let paragraph = Paragraph::new(text)
+        .block(Block::bordered().title("Panic Handler Demo"))
+        .centered();
 
-    let p = Paragraph::new(text).block(b).centered();
-
-    f.render_widget(p, f.size());
+    f.render_widget(paragraph, f.size());
 }

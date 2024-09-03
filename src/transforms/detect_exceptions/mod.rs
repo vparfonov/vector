@@ -14,9 +14,11 @@ use crate::{
 use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
 use std::{collections::HashMap, pin::Pin, time::Duration};
-use vector_config::configurable_component;
-use vector_core::config::LogNamespace;
-use vector_core::config::clone_input_definitions;
+use vector_lib::{
+    configurable::configurable_component,
+    config::{LogNamespace, clone_input_definitions},
+    enrichment
+};
 
 /// ProgrammingLanguages
 #[configurable_component]

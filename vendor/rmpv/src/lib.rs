@@ -1,14 +1,5 @@
-//! Contains Value and ValueRef structs and its conversion traits.
-//!
-//! # Examples
-//!
-//! ```
-//! ```
+//! Contains Value and `ValueRef` structs and its conversion traits.
 #![forbid(unsafe_code)]
-
-#[cfg(feature = "with-serde")]
-#[macro_use]
-extern crate serde;
 
 use std::borrow::Cow;
 use std::convert::TryFrom;
@@ -59,6 +50,7 @@ pub struct Integer {
 impl Integer {
     /// Returns `true` if the integer can be represented as `i64`.
     #[inline]
+    #[must_use]
     pub fn is_i64(&self) -> bool {
         match self.n {
             IntPriv::PosInt(n) => n <= std::i64::MAX as u64,
@@ -68,6 +60,7 @@ impl Integer {
 
     /// Returns `true` if the integer can be represented as `u64`.
     #[inline]
+    #[must_use]
     pub fn is_u64(&self) -> bool {
         match self.n {
             IntPriv::PosInt(..) => true,
@@ -77,6 +70,7 @@ impl Integer {
 
     /// Returns the integer represented as `i64` if possible, or else `None`.
     #[inline]
+    #[must_use]
     pub fn as_i64(&self) -> Option<i64> {
         match self.n {
             IntPriv::PosInt(n) => NumCast::from(n),
@@ -86,6 +80,7 @@ impl Integer {
 
     /// Returns the integer represented as `u64` if possible, or else `None`.
     #[inline]
+    #[must_use]
     pub fn as_u64(&self) -> Option<u64> {
         match self.n {
             IntPriv::PosInt(n) => Some(n),
@@ -95,6 +90,7 @@ impl Integer {
 
     /// Returns the integer represented as `f64` if possible, or else `None`.
     #[inline]
+    #[must_use]
     pub fn as_f64(&self) -> Option<f64> {
         match self.n {
             IntPriv::PosInt(n) => NumCast::from(n),
@@ -228,18 +224,21 @@ pub struct Utf8String {
 impl Utf8String {
     /// Returns `true` if the string is valid UTF-8.
     #[inline]
+    #[must_use]
     pub fn is_str(&self) -> bool {
         self.s.is_ok()
     }
 
     /// Returns `true` if the string contains invalid UTF-8 sequence.
     #[inline]
+    #[must_use]
     pub fn is_err(&self) -> bool {
         self.s.is_err()
     }
 
     /// Returns the string reference if the string is valid UTF-8, or else `None`.
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self.s {
             Ok(ref s) => Some(s.as_str()),
@@ -250,6 +249,7 @@ impl Utf8String {
     /// Returns the underlying `Utf8Error` if the string contains invalud UTF-8 sequence, or
     /// else `None`.
     #[inline]
+    #[must_use]
     pub fn as_err(&self) -> Option<&Utf8Error> {
         match self.s {
             Ok(..) => None,
@@ -259,6 +259,7 @@ impl Utf8String {
 
     /// Returns a byte slice of this `Utf8String`'s contents.
     #[inline]
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         match self.s {
             Ok(ref s) => s.as_bytes(),
@@ -268,12 +269,14 @@ impl Utf8String {
 
     /// Consumes this object, yielding the string if the string is valid UTF-8, or else `None`.
     #[inline]
+    #[must_use]
     pub fn into_str(self) -> Option<String> {
         self.s.ok()
     }
 
     /// Converts a `Utf8String` into a byte vector.
     #[inline]
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         match self.s {
             Ok(s) => s.into_bytes(),
@@ -282,6 +285,7 @@ impl Utf8String {
     }
 
     #[inline]
+    #[must_use]
     pub fn as_ref(&self) -> Utf8StringRef<'_> {
         match self.s {
             Ok(ref s) => Utf8StringRef { s: Ok(s.as_str()) },
@@ -303,18 +307,14 @@ impl Display for Utf8String {
 impl<'a> From<String> for Utf8String {
     #[inline]
     fn from(val: String) -> Self {
-        Utf8String {
-            s: Ok(val),
-        }
+        Utf8String { s: Ok(val) }
     }
 }
 
 impl<'a> From<&'a str> for Utf8String {
     #[inline]
     fn from(val: &str) -> Self {
-        Utf8String {
-            s: Ok(val.into()),
-        }
+        Utf8String { s: Ok(val.into()) }
     }
 }
 
@@ -336,18 +336,21 @@ pub struct Utf8StringRef<'a> {
 impl<'a> Utf8StringRef<'a> {
     /// Returns `true` if the string is valid UTF-8.
     #[inline]
+    #[must_use]
     pub fn is_str(&self) -> bool {
         self.s.is_ok()
     }
 
     /// Returns `true` if the string contains invalid UTF-8 sequence.
     #[inline]
+    #[must_use]
     pub fn is_err(&self) -> bool {
         self.s.is_err()
     }
 
     /// Returns the string reference if the string is valid UTF-8, or else `None`.
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self.s {
             Ok(s) => Some(s),
@@ -358,6 +361,7 @@ impl<'a> Utf8StringRef<'a> {
     /// Returns the underlying `Utf8Error` if the string contains invalud UTF-8 sequence, or
     /// else `None`.
     #[inline]
+    #[must_use]
     pub fn as_err(&self) -> Option<&Utf8Error> {
         match self.s {
             Ok(..) => None,
@@ -367,6 +371,7 @@ impl<'a> Utf8StringRef<'a> {
 
     /// Returns a byte slice of this string contents no matter whether it's valid or not UTF-8.
     #[inline]
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         match self.s {
             Ok(s) => s.as_bytes(),
@@ -376,18 +381,21 @@ impl<'a> Utf8StringRef<'a> {
 
     /// Consumes this object, yielding the string if the string is valid UTF-8, or else `None`.
     #[inline]
+    #[must_use]
     pub fn into_string(self) -> Option<String> {
         self.s.ok().map(|s| s.into())
     }
 
     /// Consumes this object, yielding the string reference if the string is valid UTF-8, or else `None`.
     #[inline]
+    #[must_use]
     pub fn into_str(self) -> Option<&'a str> {
         self.s.ok()
     }
 
     /// Converts a `Utf8StringRef` into a byte vector.
     #[inline]
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         match self.s {
             Ok(s) => s.as_bytes().into(),
@@ -409,9 +417,7 @@ impl<'a> Display for Utf8StringRef<'a> {
 impl<'a> From<&'a str> for Utf8StringRef<'a> {
     #[inline]
     fn from(val: &'a str) -> Self {
-        Utf8StringRef {
-            s: Ok(val),
-        }
+        Utf8StringRef { s: Ok(val) }
     }
 }
 
@@ -419,7 +425,7 @@ impl<'a> From<Utf8StringRef<'a>> for Utf8String {
     fn from(val: Utf8StringRef<'a>) -> Self {
         match val.s {
             Ok(s) => Utf8String { s: Ok(s.into()) },
-            Err((buf, err)) => Utf8String { s: Err((buf.into(), err)) }
+            Err((buf, err)) => Utf8String { s: Err((buf.into(), err)) },
         }
     }
 }
@@ -468,7 +474,7 @@ pub enum Value {
 }
 
 impl Value {
-    /// Converts the current owned Value to a ValueRef.
+    /// Converts the current owned Value to a `ValueRef`.
     ///
     /// # Panics
     ///
@@ -496,6 +502,7 @@ impl Value {
     ///
     /// assert_eq!(expected, val.as_ref());
     /// ```
+    #[must_use]
     pub fn as_ref(&self) -> ValueRef<'_> {
         match *self {
             Value::Nil => ValueRef::Nil,
@@ -525,6 +532,7 @@ impl Value {
     /// assert!(Value::Nil.is_nil());
     /// ```
     #[inline]
+    #[must_use]
     pub fn is_nil(&self) -> bool {
         if let Value::Nil = *self {
             true
@@ -545,6 +553,7 @@ impl Value {
     /// assert!(!Value::Nil.is_bool());
     /// ```
     #[inline]
+    #[must_use]
     pub fn is_bool(&self) -> bool {
         self.as_bool().is_some()
     }
@@ -561,6 +570,7 @@ impl Value {
     /// assert!(!Value::from(42.0).is_i64());
     /// ```
     #[inline]
+    #[must_use]
     pub fn is_i64(&self) -> bool {
         if let Value::Integer(ref v) = *self {
             v.is_i64()
@@ -582,6 +592,7 @@ impl Value {
     /// assert!(!Value::F64(42.0).is_u64());
     /// ```
     #[inline]
+    #[must_use]
     pub fn is_u64(&self) -> bool {
         if let Value::Integer(ref v) = *self {
             v.is_u64()
@@ -603,6 +614,7 @@ impl Value {
     /// assert!(!Value::F64(42.0).is_f32());
     /// ```
     #[inline]
+    #[must_use]
     pub fn is_f32(&self) -> bool {
         if let Value::F32(..) = *self {
             true
@@ -624,6 +636,7 @@ impl Value {
     /// assert!(!Value::F32(42.0).is_f64());
     /// ```
     #[inline]
+    #[must_use]
     pub fn is_f64(&self) -> bool {
         if let Value::F64(..) = *self {
             true
@@ -645,6 +658,7 @@ impl Value {
     ///
     /// assert!(!Value::Nil.is_number());
     /// ```
+    #[must_use]
     pub fn is_number(&self) -> bool {
         match *self {
             Value::Integer(..) | Value::F32(..) | Value::F64(..) => true,
@@ -664,30 +678,35 @@ impl Value {
     /// assert!(!Value::Nil.is_str());
     /// ```
     #[inline]
+    #[must_use]
     pub fn is_str(&self) -> bool {
         self.as_str().is_some()
     }
 
     /// Returns true if the `Value` is a Binary. Returns false otherwise.
     #[inline]
+    #[must_use]
     pub fn is_bin(&self) -> bool {
         self.as_slice().is_some()
     }
 
     /// Returns true if the `Value` is an Array. Returns false otherwise.
     #[inline]
+    #[must_use]
     pub fn is_array(&self) -> bool {
         self.as_array().is_some()
     }
 
     /// Returns true if the `Value` is a Map. Returns false otherwise.
     #[inline]
+    #[must_use]
     pub fn is_map(&self) -> bool {
         self.as_map().is_some()
     }
 
     /// Returns true if the `Value` is an Ext. Returns false otherwise.
     #[inline]
+    #[must_use]
     pub fn is_ext(&self) -> bool {
         self.as_ext().is_some()
     }
@@ -705,6 +724,7 @@ impl Value {
     /// assert_eq!(None, Value::Nil.as_bool());
     /// ```
     #[inline]
+    #[must_use]
     pub fn as_bool(&self) -> Option<bool> {
         if let Value::Boolean(val) = *self {
             Some(val)
@@ -726,6 +746,7 @@ impl Value {
     /// assert_eq!(None, Value::F64(42.0).as_i64());
     /// ```
     #[inline]
+    #[must_use]
     pub fn as_i64(&self) -> Option<i64> {
         match *self {
             Value::Integer(ref n) => n.as_i64(),
@@ -747,6 +768,7 @@ impl Value {
     /// assert_eq!(None, Value::F64(42.0).as_u64());
     /// ```
     #[inline]
+    #[must_use]
     pub fn as_u64(&self) -> Option<u64> {
         match *self {
             Value::Integer(ref n) => n.as_u64(),
@@ -766,10 +788,11 @@ impl Value {
     /// assert_eq!(Some(42.0), Value::F32(42.0f32).as_f64());
     /// assert_eq!(Some(42.0), Value::F64(42.0f64).as_f64());
     ///
-    /// assert_eq!(Some(2147483647.0), Value::from(i32::max_value() as i64).as_f64());
+    /// assert_eq!(Some(2147483647.0), Value::from(i32::MAX as i64).as_f64());
     ///
     /// assert_eq!(None, Value::Nil.as_f64());
     /// ```
+    #[must_use]
     pub fn as_f64(&self) -> Option<f64> {
         match *self {
             Value::Integer(ref n) => n.as_f64(),
@@ -792,6 +815,7 @@ impl Value {
     /// assert_eq!(None, Value::Boolean(true).as_str());
     /// ```
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         if let Value::String(ref val) = *self {
             val.as_str()
@@ -812,6 +836,7 @@ impl Value {
     ///
     /// assert_eq!(None, Value::Boolean(true).as_slice());
     /// ```
+    #[must_use]
     pub fn as_slice(&self) -> Option<&[u8]> {
         if let Value::Binary(ref val) = *self {
             Some(val)
@@ -837,6 +862,7 @@ impl Value {
     /// assert_eq!(None, Value::Nil.as_array());
     /// ```
     #[inline]
+    #[must_use]
     pub fn as_array(&self) -> Option<&Vec<Value>> {
         if let Value::Array(ref array) = *self {
             Some(array)
@@ -864,6 +890,7 @@ impl Value {
     /// assert_eq!(None, Value::Nil.as_map());
     /// ```
     #[inline]
+    #[must_use]
     pub fn as_map(&self) -> Option<&Vec<(Value, Value)>> {
         if let Value::Map(ref map) = *self {
             Some(map)
@@ -885,6 +912,7 @@ impl Value {
     /// assert_eq!(None, Value::Boolean(true).as_ext());
     /// ```
     #[inline]
+    #[must_use]
     pub fn as_ext(&self) -> Option<(i8, &[u8])> {
         if let Value::Ext(ty, ref buf) = *self {
             Some((ty, buf))
@@ -1198,18 +1226,18 @@ impl Display for Value {
                 // TODO: This can be slower than naive implementation. Need benchmarks for more
                 // information.
                 let res = vec.iter()
-                    .map(|val| format!("{}", val))
+                    .map(|val| format!("{val}"))
                     .collect::<Vec<String>>()
                     .join(", ");
 
-                write!(f, "[{}]", res)
+                write!(f, "[{res}]")
             }
             Value::Map(ref vec) => {
                 write!(f, "{{")?;
 
                 match vec.iter().take(1).next() {
                     Some((k, v)) => {
-                        write!(f, "{}: {}", k, v)?;
+                        write!(f, "{k}: {v}")?;
                     }
                     None => {
                         write!(f, "")?;
@@ -1217,13 +1245,13 @@ impl Display for Value {
                 }
 
                 for (k, v) in vec.iter().skip(1) {
-                    write!(f, ", {}: {}", k, v)?;
+                    write!(f, ", {k}: {v}")?;
                 }
 
                 write!(f, "}}")
             }
             Value::Ext(ty, ref data) => {
-                write!(f, "[{}, {:?}]", ty, data)
+                write!(f, "[{ty}, {data:?}]")
             }
         }
     }
@@ -1287,6 +1315,7 @@ impl<'a> ValueRef<'a> {
     ///
     /// assert_eq!(expected, val.to_owned());
     /// ```
+    #[must_use]
     pub fn to_owned(&self) -> Value {
         match *self {
             ValueRef::Nil => Value::Nil,
@@ -1306,6 +1335,7 @@ impl<'a> ValueRef<'a> {
         }
     }
 
+    #[must_use]
     pub fn index(&self, index: usize) -> &ValueRef<'_> {
         self.as_array().and_then(|v| v.get(index)).unwrap_or(&NIL_REF)
     }
@@ -1320,6 +1350,7 @@ impl<'a> ValueRef<'a> {
     ///
     /// assert_eq!(Some(42), ValueRef::from(42).as_u64());
     /// ```
+    #[must_use]
     pub fn as_u64(&self) -> Option<u64> {
         match *self {
             ValueRef::Integer(ref n) => n.as_u64(),
@@ -1340,6 +1371,7 @@ impl<'a> ValueRef<'a> {
     /// assert_eq!(Some(&vec![ValueRef::Nil, ValueRef::Boolean(true)]), val.as_array());
     /// assert_eq!(None, ValueRef::Nil.as_array());
     /// ```
+    #[must_use]
     pub fn as_array(&self) -> Option<&Vec<ValueRef<'_>>> {
         if let ValueRef::Array(ref array) = *self {
             Some(array)
@@ -1349,6 +1381,7 @@ impl<'a> ValueRef<'a> {
     }
 
     #[inline]
+    #[must_use]
     pub fn into_array(self) -> Option<Vec<ValueRef<'a>>> {
         if let ValueRef::Array(array) = self {
             Some(array)
@@ -1481,19 +1514,17 @@ impl<'a> From<Vec<(ValueRef<'a>, ValueRef<'a>)>> for ValueRef<'a> {
 }
 
 impl<'a> TryFrom<ValueRef<'a>> for u64 {
-  type Error = ValueRef<'a>;
+    type Error = ValueRef<'a>;
 
-  fn try_from(val: ValueRef<'a>) -> Result<Self, Self::Error> {
-      match val {
-        ValueRef::Integer(n) => {
-          match n.as_u64() {
-            Some(i) => Ok(i),
-            None => Err(val)
-          }
+    fn try_from(val: ValueRef<'a>) -> Result<Self, Self::Error> {
+        match val {
+            ValueRef::Integer(n) => match n.as_u64() {
+                Some(i) => Ok(i),
+                None => Err(val),
+            },
+            v => Err(v),
         }
-        v => Err(v),
-      }
-  }
+    }
 }
 
 // The following impl was left out intentionally, see
@@ -1534,7 +1565,6 @@ impl_try_from_ref!(f32, F32);
 impl_try_from_ref!(Utf8StringRef<'a>, String);
 
 impl<'a> Display for ValueRef<'a> {
-
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> Result<(), fmt::Error> {
         match *self {
             ValueRef::Nil => write!(f, "nil"),
@@ -1546,18 +1576,18 @@ impl<'a> Display for ValueRef<'a> {
             ValueRef::Binary(ref val) => Debug::fmt(&val, f),
             ValueRef::Array(ref vec) => {
                 let res = vec.iter()
-                    .map(|val| format!("{}", val))
+                    .map(|val| format!("{val}"))
                     .collect::<Vec<String>>()
                     .join(", ");
 
-                write!(f, "[{}]", res)
+                write!(f, "[{res}]")
             }
             ValueRef::Map(ref vec) => {
                 write!(f, "{{")?;
 
                 match vec.iter().take(1).next() {
                     Some((k, v)) => {
-                        write!(f, "{}: {}", k, v)?;
+                        write!(f, "{k}: {v}")?;
                     }
                     None => {
                         write!(f, "")?;
@@ -1565,13 +1595,13 @@ impl<'a> Display for ValueRef<'a> {
                 }
 
                 for (k, v) in vec.iter().skip(1) {
-                    write!(f, ", {}: {}", k, v)?;
+                    write!(f, ", {k}: {v}")?;
                 }
 
                 write!(f, "}}")
             }
-            ValueRef::Ext(ty, ref data) => {
-                write!(f, "[{}, {:?}]", ty, data)
+            ValueRef::Ext(ty, data) => {
+                write!(f, "[{ty}, {data:?}]")
             }
         }
     }

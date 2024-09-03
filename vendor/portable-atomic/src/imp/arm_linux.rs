@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 // 64-bit atomic implementation using kuser_cmpxchg64 on pre-v6 ARM Linux/Android.
 //
 // Refs:
@@ -14,9 +16,7 @@
 #[path = "fallback/outline_atomics.rs"]
 mod fallback;
 
-#[cfg(not(portable_atomic_no_asm))]
-use core::arch::asm;
-use core::{cell::UnsafeCell, mem, sync::atomic::Ordering};
+use core::{arch::asm, cell::UnsafeCell, mem, sync::atomic::Ordering};
 
 use crate::utils::{Pair, U64};
 
@@ -89,6 +89,9 @@ where
         loop {
             // This is not single-copy atomic reads, but this is ok because subsequent
             // CAS will check for consistency.
+            //
+            // ARM's memory model allow mixed-sized atomic access.
+            // https://github.com/rust-lang/unsafe-code-guidelines/issues/345#issuecomment-1172891466
             //
             // Note that the C++20 memory model does not allow mixed-sized atomic access,
             // so we must use inline assembly to implement byte_wise_atomic_load.
@@ -288,33 +291,37 @@ macro_rules! atomic64 {
             }
 
             #[inline]
-            pub(crate) fn into_inner(self) -> $int_type {
-                self.v.into_inner()
-            }
-
-            #[inline]
             #[cfg_attr(all(debug_assertions, not(portable_atomic_no_track_caller)), track_caller)]
             pub(crate) fn load(&self, order: Ordering) -> $int_type {
                 crate::utils::assert_load_ordering(order);
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { atomic_load(self.v.get().cast::<u64>()) as $int_type }
+                unsafe {
+                    atomic_load(self.v.get().cast::<u64>()) as $int_type
+                }
             }
 
             #[inline]
             #[cfg_attr(all(debug_assertions, not(portable_atomic_no_track_caller)), track_caller)]
             pub(crate) fn store(&self, val: $int_type, order: Ordering) {
                 crate::utils::assert_store_ordering(order);
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { atomic_store(self.v.get().cast::<u64>(), val as u64) }
+                unsafe {
+                    atomic_store(self.v.get().cast::<u64>(), val as u64)
+                }
             }
 
             #[inline]
             pub(crate) fn swap(&self, val: $int_type, _order: Ordering) -> $int_type {
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { atomic_swap(self.v.get().cast::<u64>(), val as u64) as $int_type }
+                unsafe {
+                    atomic_swap(self.v.get().cast::<u64>(), val as u64) as $int_type
+                }
             }
 
             #[inline]
@@ -327,18 +334,19 @@ macro_rules! atomic64 {
                 failure: Ordering,
             ) -> Result<$int_type, $int_type> {
                 crate::utils::assert_compare_exchange_ordering(success, failure);
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
                 unsafe {
-                    let (res, ok) = atomic_compare_exchange(
+                    let (prev, ok) = atomic_compare_exchange(
                         self.v.get().cast::<u64>(),
                         current as u64,
                         new as u64,
                     );
                     if ok {
-                        Ok(res as $int_type)
+                        Ok(prev as $int_type)
                     } else {
-                        Err(res as $int_type)
+                        Err(prev as $int_type)
                     }
                 }
             }
@@ -357,65 +365,92 @@ macro_rules! atomic64 {
 
             #[inline]
             pub(crate) fn fetch_add(&self, val: $int_type, _order: Ordering) -> $int_type {
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { atomic_add(self.v.get().cast::<u64>(), val as u64) as $int_type }
+                unsafe {
+                    atomic_add(self.v.get().cast::<u64>(), val as u64) as $int_type
+                }
             }
 
             #[inline]
             pub(crate) fn fetch_sub(&self, val: $int_type, _order: Ordering) -> $int_type {
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { atomic_sub(self.v.get().cast::<u64>(), val as u64) as $int_type }
+                unsafe {
+                    atomic_sub(self.v.get().cast::<u64>(), val as u64) as $int_type
+                }
             }
 
             #[inline]
             pub(crate) fn fetch_and(&self, val: $int_type, _order: Ordering) -> $int_type {
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { atomic_and(self.v.get().cast::<u64>(), val as u64) as $int_type }
+                unsafe {
+                    atomic_and(self.v.get().cast::<u64>(), val as u64) as $int_type
+                }
             }
 
             #[inline]
             pub(crate) fn fetch_nand(&self, val: $int_type, _order: Ordering) -> $int_type {
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { atomic_nand(self.v.get().cast::<u64>(), val as u64) as $int_type }
+                unsafe {
+                    atomic_nand(self.v.get().cast::<u64>(), val as u64) as $int_type
+                }
             }
 
             #[inline]
             pub(crate) fn fetch_or(&self, val: $int_type, _order: Ordering) -> $int_type {
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { atomic_or(self.v.get().cast::<u64>(), val as u64) as $int_type }
+                unsafe {
+                    atomic_or(self.v.get().cast::<u64>(), val as u64) as $int_type
+                }
             }
 
             #[inline]
             pub(crate) fn fetch_xor(&self, val: $int_type, _order: Ordering) -> $int_type {
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { atomic_xor(self.v.get().cast::<u64>(), val as u64) as $int_type }
+                unsafe {
+                    atomic_xor(self.v.get().cast::<u64>(), val as u64) as $int_type
+                }
             }
 
             #[inline]
             pub(crate) fn fetch_max(&self, val: $int_type, _order: Ordering) -> $int_type {
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { $atomic_max(self.v.get().cast::<u64>(), val as u64) as $int_type }
+                unsafe {
+                    $atomic_max(self.v.get().cast::<u64>(), val as u64) as $int_type
+                }
             }
 
             #[inline]
             pub(crate) fn fetch_min(&self, val: $int_type, _order: Ordering) -> $int_type {
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { $atomic_min(self.v.get().cast::<u64>(), val as u64) as $int_type }
+                unsafe {
+                    $atomic_min(self.v.get().cast::<u64>(), val as u64) as $int_type
+                }
             }
 
             #[inline]
             pub(crate) fn fetch_not(&self, _order: Ordering) -> $int_type {
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { atomic_not(self.v.get().cast::<u64>()) as $int_type }
+                unsafe {
+                    atomic_not(self.v.get().cast::<u64>()) as $int_type
+                }
             }
             #[inline]
             pub(crate) fn not(&self, order: Ordering) {
@@ -424,9 +459,12 @@ macro_rules! atomic64 {
 
             #[inline]
             pub(crate) fn fetch_neg(&self, _order: Ordering) -> $int_type {
+                #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
                 // SAFETY: any data races are prevented by the kernel user helper or the lock
                 // and the raw pointer passed in is valid because we got it from a reference.
-                unsafe { atomic_neg(self.v.get().cast::<u64>()) as $int_type }
+                unsafe {
+                    atomic_neg(self.v.get().cast::<u64>()) as $int_type
+                }
             }
             #[inline]
             pub(crate) fn neg(&self, order: Ordering) {

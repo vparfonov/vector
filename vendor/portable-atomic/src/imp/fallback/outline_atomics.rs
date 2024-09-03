@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 // Helper for outline-atomics.
 //
 // On architectures where DW atomics are not supported on older CPUs, we use
@@ -113,7 +115,12 @@ macro_rules! atomic_rmw_3 {
         #[cold]
         pub(crate) unsafe fn $name(dst: *mut Udw, val: Udw, order: Ordering) -> Udw {
             debug_assert_outline_atomics!();
-            #[allow(clippy::cast_ptr_alignment)]
+            #[allow(
+                clippy::as_underscore,
+                clippy::cast_possible_wrap,
+                clippy::cast_ptr_alignment,
+                clippy::cast_sign_loss
+            )]
             // SAFETY: the caller must uphold the safety contract.
             unsafe {
                 (*(dst as *const $atomic_type)).$method_name(val as _, order) as Udw

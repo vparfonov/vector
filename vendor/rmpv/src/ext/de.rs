@@ -5,6 +5,7 @@ use std::slice::Iter;
 use std::vec::IntoIter;
 
 use serde::de::{self, DeserializeSeed, IntoDeserializer, SeqAccess, Unexpected, Visitor};
+use serde::forward_to_deserialize_any;
 use serde::{self, Deserialize, Deserializer};
 
 use crate::{IntPriv, Integer, Utf8String, Utf8StringRef, Value, ValueRef};
@@ -30,7 +31,7 @@ pub fn deserialize_from<'de, T, D>(val: D) -> Result<T, Error>
 impl de::Error for Error {
     #[cold]
     fn custom<T: Display>(msg: T) -> Self {
-        Error::Syntax(format!("{}", msg))
+        Error::Syntax(format!("{msg}"))
     }
 }
 
@@ -314,20 +315,16 @@ impl<'de> Deserializer<'de> for Value {
         match self {
             Value::Nil => visitor.visit_unit(),
             Value::Boolean(v) => visitor.visit_bool(v),
-            Value::Integer(Integer { n }) => {
-                match n {
-                    IntPriv::PosInt(v) => visitor.visit_u64(v),
-                    IntPriv::NegInt(v) => visitor.visit_i64(v)
-                }
-            }
+            Value::Integer(Integer { n }) => match n {
+                IntPriv::PosInt(v) => visitor.visit_u64(v),
+                IntPriv::NegInt(v) => visitor.visit_i64(v),
+            },
             Value::F32(v) => visitor.visit_f32(v),
             Value::F64(v) => visitor.visit_f64(v),
-            Value::String(v) => {
-                match v.s {
-                    Ok(v) => visitor.visit_string(v),
-                    Err(v) => visitor.visit_byte_buf(v.0),
-                }
-            }
+            Value::String(v) => match v.s {
+                Ok(v) => visitor.visit_string(v),
+                Err(v) => visitor.visit_byte_buf(v.0),
+            },
             Value::Binary(v) => visitor.visit_byte_buf(v),
             Value::Array(v) => {
                 let len = v.len();
@@ -380,9 +377,7 @@ impl<'de> Deserializer<'de> for Value {
                     let ext_de = ExtDeserializer::new_owned(tag, data);
                     return visitor.visit_newtype_struct(ext_de);
                 }
-                other => {
-                    return Err(de::Error::invalid_type(other.unexpected(), &"expected Ext"))
-                }
+                other => return Err(de::Error::invalid_type(other.unexpected(), &"expected Ext")),
             }
         }
 
@@ -413,20 +408,16 @@ impl<'de> Deserializer<'de> for ValueRef<'de> {
         match self {
             ValueRef::Nil => visitor.visit_unit(),
             ValueRef::Boolean(v) => visitor.visit_bool(v),
-            ValueRef::Integer(Integer { n }) => {
-                match n {
-                    IntPriv::PosInt(v) => visitor.visit_u64(v),
-                    IntPriv::NegInt(v) => visitor.visit_i64(v)
-                }
-            }
+            ValueRef::Integer(Integer { n }) => match n {
+                IntPriv::PosInt(v) => visitor.visit_u64(v),
+                IntPriv::NegInt(v) => visitor.visit_i64(v),
+            },
             ValueRef::F32(v) => visitor.visit_f32(v),
             ValueRef::F64(v) => visitor.visit_f64(v),
-            ValueRef::String(v) => {
-                match v.s {
-                    Ok(v) => visitor.visit_borrowed_str(v),
-                    Err(v) => visitor.visit_borrowed_bytes(v.0),
-                }
-            }
+            ValueRef::String(v) => match v.s {
+                Ok(v) => visitor.visit_borrowed_str(v),
+                Err(v) => visitor.visit_borrowed_bytes(v.0),
+            },
             ValueRef::Binary(v) => visitor.visit_borrowed_bytes(v),
             ValueRef::Array(v) => {
                 let len = v.len();
@@ -479,9 +470,7 @@ impl<'de> Deserializer<'de> for ValueRef<'de> {
                     let ext_de = ExtDeserializer::new_ref(tag, data);
                     return visitor.visit_newtype_struct(ext_de);
                 }
-                other => {
-                    return Err(de::Error::invalid_type(other.unexpected(), &"expected Ext"))
-                }
+                other => return Err(de::Error::invalid_type(other.unexpected(), &"expected Ext")),
             }
         }
 
@@ -512,20 +501,16 @@ impl<'de> Deserializer<'de> for &'de ValueRef<'de> {
         match *self {
             ValueRef::Nil => visitor.visit_unit(),
             ValueRef::Boolean(v) => visitor.visit_bool(v),
-            ValueRef::Integer(Integer { n }) => {
-                match n {
-                    IntPriv::PosInt(v) => visitor.visit_u64(v),
-                    IntPriv::NegInt(v) => visitor.visit_i64(v)
-                }
-            }
+            ValueRef::Integer(Integer { n }) => match n {
+                IntPriv::PosInt(v) => visitor.visit_u64(v),
+                IntPriv::NegInt(v) => visitor.visit_i64(v),
+            },
             ValueRef::F32(v) => visitor.visit_f32(v),
             ValueRef::F64(v) => visitor.visit_f64(v),
-            ValueRef::String(v) => {
-                match v.s {
-                    Ok(v) => visitor.visit_borrowed_str(v),
-                    Err(v) => visitor.visit_borrowed_bytes(v.0),
-                }
-            }
+            ValueRef::String(v) => match v.s {
+                Ok(v) => visitor.visit_borrowed_str(v),
+                Err(v) => visitor.visit_borrowed_bytes(v.0),
+            },
             ValueRef::Binary(v) => visitor.visit_borrowed_bytes(v),
             ValueRef::Array(ref v) => {
                 let len = v.len();
@@ -600,9 +585,7 @@ impl<'de> Deserializer<'de> for &'de ValueRef<'de> {
                     let ext_de = ExtDeserializer::new_ref(*tag, data);
                     return visitor.visit_newtype_struct(ext_de);
                 }
-                other => {
-                    return Err(de::Error::invalid_type(other.unexpected(), &"expected Ext"))
-                }
+                other => return Err(de::Error::invalid_type(other.unexpected(), &"expected Ext")),
             }
         }
 
@@ -686,7 +669,7 @@ impl<'a, 'de: 'a> Deserializer<'de> for ExtDeserializer<'de> {
     }
 }
 
-/// Deserializer for Ext SeqAccess elements
+/// Deserializer for Ext `SeqAccess` elements
 impl<'a, 'de: 'a> Deserializer<'de> for &'a mut ExtDeserializer<'de> {
     type Error = Error;
 
@@ -701,10 +684,11 @@ impl<'a, 'de: 'a> Deserializer<'de> for &'a mut ExtDeserializer<'de> {
             let data = self.data.take().unwrap();
             match data {
                 Cow::Owned(data) => visitor.visit_byte_buf(data),
-                Cow::Borrowed(data) => visitor.visit_borrowed_bytes(data)
+                Cow::Borrowed(data) => visitor.visit_borrowed_bytes(data),
             }
         } else {
-            unreachable!("ext seq only has two elements");
+            debug_assert!(false, "ext seq only has two elements");
+            Err(Error::Syntax(String::new()))
         }
     }
 
@@ -779,10 +763,7 @@ struct MapDeserializer<I, U> {
 
 impl<I, U> MapDeserializer<I, U> {
     fn new(iter: I) -> Self {
-        Self {
-            val: None,
-            iter,
-        }
+        Self { val: None, iter }
     }
 }
 
@@ -841,10 +822,7 @@ struct EnumDeserializer<U> {
 
 impl<U> EnumDeserializer<U> {
     pub fn new(id: u32, value: Option<U>) -> Self {
-        Self {
-            id,
-            value,
-        }
+        Self { id, value }
     }
 }
 
@@ -954,10 +932,7 @@ pub struct MapRefDeserializer<'de> {
 
 impl<'de> MapRefDeserializer<'de> {
     fn new(iter: Iter<'de, (ValueRef<'de>, ValueRef<'de>)>) -> Self {
-        Self {
-            val: None,
-            iter,
-        }
+        Self { val: None, iter }
     }
 }
 
@@ -1009,11 +984,8 @@ pub struct EnumRefDeserializer<'de> {
 }
 
 impl<'de> EnumRefDeserializer<'de> {
-    pub fn new(id: u32, value: Option<&'de ValueRef<'de>>) -> Self {
-        Self {
-            id,
-            value,
-        }
+    #[must_use] pub fn new(id: u32, value: Option<&'de ValueRef<'de>>) -> Self {
+        Self { id, value }
     }
 }
 
@@ -1200,7 +1172,7 @@ impl<'de> ValueBase<'de> for Value {
     fn into_iter(self) -> Result<Self::Iter, Self::Item> {
         match self {
             Value::Array(v) => Ok(v.into_iter()),
-            other => Err(other)
+            other => Err(other),
         }
     }
 
@@ -1208,7 +1180,7 @@ impl<'de> ValueBase<'de> for Value {
     fn into_map_iter(self) -> Result<Self::MapIter, Self::Item> {
         match self {
             Value::Map(v) => Ok(v.into_iter()),
-            other => Err(other)
+            other => Err(other),
         }
     }
 }
@@ -1232,7 +1204,7 @@ impl<'de> ValueBase<'de> for ValueRef<'de> {
     fn into_iter(self) -> Result<Self::Iter, Self::Item> {
         match self {
             ValueRef::Array(v) => Ok(v.into_iter()),
-            other => Err(other)
+            other => Err(other),
         }
     }
 
@@ -1240,7 +1212,7 @@ impl<'de> ValueBase<'de> for ValueRef<'de> {
     fn into_map_iter(self) -> Result<Self::MapIter, Self::Item> {
         match self {
             ValueRef::Map(v) => Ok(v.into_iter()),
-            other => Err(other)
+            other => Err(other),
         }
     }
 }

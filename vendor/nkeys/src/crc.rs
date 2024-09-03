@@ -1,5 +1,5 @@
-use byteorder::{LittleEndian, ReadBytesExt, WriteBytesExt};
-use std::io::Cursor;
+use super::error::{Error, ErrorKind};
+use super::Result;
 
 const CRC_TABLE: [u16; 256] = [
     0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7, 0x8108, 0x9129, 0xa14a, 0xb16b,
@@ -36,17 +36,45 @@ pub(crate) fn crc16(data: &[u8]) -> u16 {
 }
 
 pub(crate) fn valid_checksum(data: &[u8], expected: u16) -> bool {
-    crc16(data) != expected
+    crc16(data) == expected
 }
 
 pub(crate) fn push_crc(data: &mut Vec<u8>) {
     let crc = crc16(data);
-    data.write_u16::<LittleEndian>(crc).unwrap();
+    data.extend(u16::to_le_bytes(crc));
 }
 
-pub(crate) fn extract_crc(data: &mut Vec<u8>) -> u16 {
-    let crc_bytes = data[..data.len() - 2].to_vec();
-    let mut reader = Cursor::new(crc_bytes);
-    (*data).truncate(data.len() - 2);
-    reader.read_u16::<LittleEndian>().unwrap()
+pub(crate) fn extract_crc(data: &mut Vec<u8>) -> Result<u16> {
+    let data_len = data.len().checked_sub(2).ok_or_else(|| {
+        Error::new(
+            ErrorKind::ChecksumFailure,
+            Some("CRC data vector contains less than two characters"),
+        )
+    })?;
+
+    let crc = u16::from_le_bytes(data[data_len..].try_into().unwrap());
+    data.truncate(data_len);
+    Ok(crc)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{crc16, extract_crc, push_crc, valid_checksum};
+
+    #[test]
+    fn e2e() {
+        let mut raw_data = rand::random::<[u8; 32]>();
+        let data_crc = crc16(&raw_data);
+
+        let mut data = raw_data.to_vec();
+        push_crc(&mut data);
+
+        let crc = extract_crc(&mut data).unwrap();
+        assert_eq!(raw_data, data.as_slice());
+        assert_eq!(data_crc, crc);
+        assert!(valid_checksum(&raw_data, data_crc));
+
+        raw_data[17] = raw_data[17].wrapping_sub(1);
+        assert!(!valid_checksum(&raw_data, data_crc));
+    }
 }

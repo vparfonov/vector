@@ -1,6 +1,6 @@
 #![cfg_attr(
     async_trait_nightly_testing,
-    feature(impl_trait_in_assoc_type, min_specialization)
+    feature(impl_trait_in_assoc_type, min_specialization, never_type)
 )]
 #![deny(rust_2021_compatibility, unused_qualifications)]
 #![allow(
@@ -336,7 +336,7 @@ pub mod issue17 {
     }
 
     pub struct Struct {
-        string: String,
+        pub string: String,
     }
 
     #[async_trait]
@@ -1380,7 +1380,6 @@ pub mod issue161 {
 }
 
 // https://github.com/dtolnay/async-trait/issues/169
-#[deny(where_clauses_object_safety)]
 pub mod issue169 {
     use async_trait::async_trait;
 
@@ -1620,5 +1619,25 @@ pub mod issue238 {
     #[async_trait]
     impl Trait for &Struct {
         async fn f() {}
+    }
+}
+
+// https://github.com/dtolnay/async-trait/issues/266
+#[cfg(async_trait_nightly_testing)]
+pub mod issue266 {
+    use async_trait::async_trait;
+
+    #[async_trait]
+    pub trait Trait {
+        async fn f() -> !;
+    }
+
+    #[async_trait]
+    impl Trait for () {
+        async fn f() -> ! {
+            loop {
+                std::thread::sleep(std::time::Duration::from_millis(1));
+            }
+        }
     }
 }

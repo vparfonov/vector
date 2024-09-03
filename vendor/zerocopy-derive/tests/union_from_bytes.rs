@@ -1,31 +1,38 @@
-// Copyright 2019 The Fuchsia Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// Copyright 2019 The Fuchsia Authors
+//
+// Licensed under a BSD-style license <LICENSE-BSD>, Apache License, Version 2.0
+// <LICENSE-APACHE or https://www.apache.org/licenses/LICENSE-2.0>, or the MIT
+// license <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your option.
+// This file may not be copied, modified, or distributed except according to
+// those terms.
 
 #![allow(warnings)]
 
 use std::{marker::PhantomData, option::IntoIter};
 
-use {static_assertions::assert_impl_all, zerocopy::FromBytes};
+use {
+    static_assertions::assert_impl_all,
+    zerocopy::{FromBytes, FromZeroes},
+};
 
 // A union is `FromBytes` if:
 // - all fields are `FromBytes`
 
-#[derive(Clone, Copy, FromBytes)]
+#[derive(Clone, Copy, FromZeroes, FromBytes)]
 union Zst {
     a: (),
 }
 
 assert_impl_all!(Zst: FromBytes);
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 union One {
     a: u8,
 }
 
 assert_impl_all!(One: FromBytes);
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 union Two {
     a: u8,
     b: Zst,
@@ -33,7 +40,7 @@ union Two {
 
 assert_impl_all!(Two: FromBytes);
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 union TypeParams<'a, T: Copy, I: Iterator>
 where
     I::Item: Copy,

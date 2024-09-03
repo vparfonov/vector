@@ -35,19 +35,19 @@ use serde::ser::{Serialize, Serializer};
 /// # }
 /// ```
 #[derive(Copy, Clone, Eq, Ord)]
-#[cfg_attr(not(doc), repr(transparent))]
+#[repr(transparent)]
 pub struct ByteArray<const N: usize> {
     bytes: [u8; N],
 }
 
 impl<const N: usize> ByteArray<N> {
     /// Wrap an existing [array] into a `ByteArray`.
-    pub fn new(bytes: [u8; N]) -> Self {
+    pub const fn new(bytes: [u8; N]) -> Self {
         ByteArray { bytes }
     }
 
     /// Unwrap the byte array underlying this `ByteArray`.
-    pub fn into_array(self) -> [u8; N] {
+    pub const fn into_array(self) -> [u8; N] {
         self.bytes
     }
 
@@ -59,6 +59,12 @@ impl<const N: usize> ByteArray<N> {
 impl<const N: usize> Debug for ByteArray<N> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         Debug::fmt(&self.bytes, f)
+    }
+}
+
+impl<const N: usize> Default for ByteArray<N> {
+    fn default() -> Self {
+        ByteArray { bytes: [0; N] }
     }
 }
 
@@ -109,6 +115,12 @@ impl<const N: usize> Borrow<Bytes> for ByteArray<N> {
 impl<const N: usize> BorrowMut<Bytes> for ByteArray<N> {
     fn borrow_mut(&mut self) -> &mut Bytes {
         unsafe { &mut *(&mut self.bytes as &mut [u8] as *mut [u8] as *mut Bytes) }
+    }
+}
+
+impl<const N: usize> From<[u8; N]> for ByteArray<N> {
+    fn from(bytes: [u8; N]) -> Self {
+        ByteArray { bytes }
     }
 }
 

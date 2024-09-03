@@ -152,7 +152,7 @@ where
     }
 }
 
-/// The coordinate combinator that transform a continous coordinate to a discrete coordinate
+/// The coordinate combinator that transform a continuous coordinate to a discrete coordinate
 /// to a discrete coordinate by a giving step.
 ///
 /// For example, range `0f32..100f32` is a continuous coordinate, thus this prevent us having a
@@ -315,7 +315,7 @@ where
     }
 
     fn from_index(&self, idx: usize) -> Option<T::ValueType> {
-        self.grid_value.get(idx).map(Clone::clone)
+        self.grid_value.get(idx).cloned()
     }
 }
 

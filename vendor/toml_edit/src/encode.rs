@@ -1,12 +1,14 @@
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter, Result, Write};
 
-use toml_datetime::*;
+use toml_datetime::Datetime;
 
 use crate::inline_table::DEFAULT_INLINE_KEY_DECOR;
 use crate::key::Key;
 use crate::repr::{Formatted, Repr, ValueRepr};
-use crate::table::{DEFAULT_KEY_DECOR, DEFAULT_KEY_PATH_DECOR, DEFAULT_TABLE_DECOR};
+use crate::table::{
+    DEFAULT_KEY_DECOR, DEFAULT_KEY_PATH_DECOR, DEFAULT_ROOT_DECOR, DEFAULT_TABLE_DECOR,
+};
 use crate::value::{
     DEFAULT_LEADING_VALUE_DECOR, DEFAULT_TRAILING_VALUE_DECOR, DEFAULT_VALUE_DECOR,
 };
@@ -197,6 +199,9 @@ pub(crate) fn encode_value(
 
 impl Display for DocumentMut {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
+        let decor = self.decor();
+        decor.prefix_encode(f, None, DEFAULT_ROOT_DECOR.0)?;
+
         let mut path = Vec::new();
         let mut last_position = 0;
         let mut tables = Vec::new();
@@ -214,6 +219,7 @@ impl Display for DocumentMut {
         for (_, table, path, is_array) in tables {
             visit_table(f, None, table, &path, is_array, &mut first_table)?;
         }
+        decor.suffix_encode(f, None, DEFAULT_ROOT_DECOR.1)?;
         self.trailing().encode_with_default(f, None, "")
     }
 }
@@ -326,12 +332,7 @@ pub(crate) fn to_string_repr(
     style: Option<StringStyle>,
     literal: Option<bool>,
 ) -> Repr {
-    let (style, literal) = match (style, literal) {
-        (Some(style), Some(literal)) => (style, literal),
-        (_, Some(literal)) => (infer_style(value).0, literal),
-        (Some(style), _) => (style, infer_style(value).1),
-        (_, _) => infer_style(value),
-    };
+    let (style, literal) = infer_style(value, style, literal);
 
     let mut output = String::with_capacity(value.len() * 2);
     if literal {
@@ -347,7 +348,7 @@ pub(crate) fn to_string_repr(
                 '\u{a}' => match style {
                     StringStyle::NewlineTriple => output.push('\n'),
                     StringStyle::OnelineSingle => output.push_str("\\n"),
-                    _ => unreachable!(),
+                    StringStyle::OnelineTriple => unreachable!(),
                 },
                 '\u{c}' => output.push_str("\\f"),
                 '\u{d}' => output.push_str("\\r"),
@@ -409,17 +410,45 @@ impl StringStyle {
     }
 }
 
-fn infer_style(value: &str) -> (StringStyle, bool) {
-    // For doing pretty prints we store in a new String
-    // because there are too many cases where pretty cannot
-    // work. We need to determine:
+fn infer_style(
+    value: &str,
+    style: Option<StringStyle>,
+    literal: Option<bool>,
+) -> (StringStyle, bool) {
+    match (style, literal) {
+        (Some(style), Some(literal)) => (style, literal),
+        (None, Some(literal)) => (infer_all_style(value).0, literal),
+        (Some(style), None) => {
+            let literal = infer_literal(value);
+            (style, literal)
+        }
+        (None, None) => infer_all_style(value),
+    }
+}
+
+fn infer_literal(value: &str) -> bool {
+    #[cfg(feature = "parse")]
+    {
+        use winnow::stream::ContainsToken as _;
+        (value.contains('"') | value.contains('\\'))
+            && value
+                .chars()
+                .all(|c| crate::parser::strings::LITERAL_CHAR.contains_token(c))
+    }
+    #[cfg(not(feature = "parse"))]
+    {
+        false
+    }
+}
+
+fn infer_all_style(value: &str) -> (StringStyle, bool) {
+    // We need to determine:
     // - if we are a "multi-line" pretty (if there are \n)
     // - if ['''] appears if multi or ['] if single
     // - if there are any invalid control characters
     //
     // Doing it any other way would require multiple passes
     // to determine if a pretty string works or not.
-    let mut out = String::with_capacity(value.len() * 2);
     let mut ty = StringStyle::OnelineSingle;
     // found consecutive single quotes
     let mut max_found_singles = 0;
@@ -438,10 +467,13 @@ fn infer_style(value: &str) -> (StringStyle, bool) {
                 if found_singles > max_found_singles {
                     max_found_singles = found_singles;
                 }
-                found_singles = 0
+                found_singles = 0;
             }
             match ch {
                 '\t' => {}
+                '"' => {
+                    prefer_literal = true;
+                }
                 '\\' => {
                     prefer_literal = true;
                 }
@@ -451,7 +483,6 @@ fn infer_style(value: &str) -> (StringStyle, bool) {
                 c if c <= '\u{1f}' || c == '\u{7f}' => can_be_pretty = false,
                 _ => {}
             }
-            out.push(ch);
         } else {
             // the string cannot be represented as pretty,
             // still check if it should be multiline
@@ -520,5 +551,47 @@ impl ValueRepr for bool {
 impl ValueRepr for Datetime {
     fn to_repr(&self) -> Repr {
         Repr::new_unchecked(self.to_string())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        #[cfg(feature = "parse")]
+        fn parseable_string(string in "\\PC*") {
+            let string = Value::from(string);
+            let encoded = string.to_string();
+            let _: Value = encoded.parse().unwrap_or_else(|err| {
+                panic!("error: {err}
+
+string:
+```
+{string}
+```
+")
+            });
+        }
+    }
+
+    proptest! {
+        #[test]
+        #[cfg(feature = "parse")]
+        fn parseable_key(string in "\\PC*") {
+            let string = Key::new(string);
+            let encoded = string.to_string();
+            let _: Key = encoded.parse().unwrap_or_else(|err| {
+                panic!("error: {err}
+
+string:
+```
+{string}
+```
+")
+            });
+        }
     }
 }

@@ -80,6 +80,20 @@ mod single_test_should {
         assert_eq!(inner_fn_impl.display_code(), input_fn.block.display_code());
     }
 
+    #[test]
+    fn not_remove_lifetimes() {
+        let input_fn: ItemFn = r#"
+                pub fn test<'a, 'b, 'c: 'a + 'b>(a: A<'a>, b: A<'b>, c: A<'c>) -> A<'c>
+                {
+                }
+                "#
+        .ast();
+
+        let result: ItemFn = single(input_fn.clone(), Default::default()).ast();
+
+        assert_eq!(3, result.sig.generics.lifetimes().count());
+    }
+
     #[rstest]
     fn not_copy_any_attributes(
         #[values(
@@ -174,6 +188,29 @@ mod single_test_should {
         assert_not_in!(
             item_fn.block.display_code(),
             await_argument_code_string("c")
+        );
+    }
+
+    #[test]
+    fn use_ref_if_any() {
+        let input_fn: ItemFn = r#"fn test(a: i32, b:i32, c:i32) {} "#.ast();
+        let mut info: RsTestInfo = Default::default();
+        info.arguments.set_by_ref(ident("a"));
+        info.arguments.set_by_ref(ident("c"));
+
+        let item_fn: ItemFn = single(input_fn.clone(), info).ast();
+
+        assert_in!(
+            item_fn.block.stmts.last().display_code(),
+            ref_argument_code_string("a")
+        );
+        assert_not_in!(
+            item_fn.block.stmts.last().display_code(),
+            ref_argument_code_string("b")
+        );
+        assert_in!(
+            item_fn.block.stmts.last().display_code(),
+            ref_argument_code_string("c")
         );
     }
 
@@ -317,6 +354,7 @@ impl Parse for TestsGroup {
 }
 
 trait QueryAttrs {
+    #[allow(dead_code)]
     fn has_attr(&self, attr: &syn::Path) -> bool;
     fn has_attr_that_ends_with(&self, attr: &syn::PathSegment) -> bool;
 }
@@ -480,14 +518,12 @@ impl From<TokenStream> for TestsGroup {
 }
 
 mod cases_should {
-    use std::iter::FromIterator;
 
     use rstest_test::{assert_in, assert_not_in};
 
     use crate::parse::{
         arguments::{ArgumentsInfo, FutureArg},
-        rstest::{RsTestData, RsTestInfo, RsTestItem},
-        testcase::TestCase,
+        rstest::RsTestItem,
     };
 
     use super::{assert_eq, *};
@@ -1025,10 +1061,7 @@ mod cases_should {
 mod matrix_cases_should {
     use rstest_test::{assert_in, assert_not_in};
 
-    use crate::parse::{
-        arguments::{ArgumentsInfo, FutureArg},
-        vlist::ValueList,
-    };
+    use crate::parse::arguments::{ArgumentsInfo, FutureArg};
 
     /// Should test matrix tests render without take in account MatrixInfo to RsTestInfo
     /// transformation

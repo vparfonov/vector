@@ -11,6 +11,8 @@ use crate::de::Error;
 /// # Example
 ///
 /// ```
+/// # #[cfg(feature = "parse")] {
+/// # #[cfg(feature = "display")] {
 /// use serde::Deserialize;
 ///
 /// #[derive(Deserialize)]
@@ -29,6 +31,8 @@ use crate::de::Error;
 /// let config = Config::deserialize(deserializer).unwrap();
 /// assert_eq!(config.title, "TOML Example");
 /// assert_eq!(config.owner.name, "Lisa");
+/// # }
+/// # }
 /// ```
 pub struct ValueDeserializer {
     input: crate::Item,
@@ -162,7 +166,7 @@ impl<'de> serde::Deserializer<'de> for ValueDeserializer {
                     e.set_span(span);
                 }
                 e
-            })?
+            })?;
         }
 
         self.deserialize_any(visitor)
@@ -185,12 +189,12 @@ impl<'de> serde::Deserializer<'de> for ValueDeserializer {
             }
             crate::Item::Value(crate::Value::InlineTable(v)) => {
                 if v.is_empty() {
-                    Err(crate::de::Error::custom(
+                    Err(Error::custom(
                         "wanted exactly 1 element, found 0 elements",
                         v.span(),
                     ))
                 } else if v.len() != 1 {
-                    Err(crate::de::Error::custom(
+                    Err(Error::custom(
                         "wanted exactly 1 element, more than 1 element",
                         v.span(),
                     ))
@@ -202,7 +206,7 @@ impl<'de> serde::Deserializer<'de> for ValueDeserializer {
             crate::Item::Table(v) => v
                 .into_deserializer()
                 .deserialize_enum(name, variants, visitor),
-            e => Err(crate::de::Error::custom("wanted string or table", e.span())),
+            e => Err(Error::custom("wanted string or table", e.span())),
         }
         .map_err(|mut e: Self::Error| {
             if e.span().is_none() {
@@ -219,7 +223,7 @@ impl<'de> serde::Deserializer<'de> for ValueDeserializer {
     }
 }
 
-impl<'de> serde::de::IntoDeserializer<'de, crate::de::Error> for ValueDeserializer {
+impl<'de> serde::de::IntoDeserializer<'de, Error> for ValueDeserializer {
     type Deserializer = Self;
 
     fn into_deserializer(self) -> Self::Deserializer {
@@ -227,7 +231,7 @@ impl<'de> serde::de::IntoDeserializer<'de, crate::de::Error> for ValueDeserializ
     }
 }
 
-impl<'de> serde::de::IntoDeserializer<'de, crate::de::Error> for crate::Value {
+impl<'de> serde::de::IntoDeserializer<'de, Error> for crate::Value {
     type Deserializer = ValueDeserializer;
 
     fn into_deserializer(self) -> Self::Deserializer {

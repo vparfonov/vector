@@ -11,7 +11,7 @@
 
 [package]
 name = "syslog"
-version = "6.1.0"
+version = "6.1.1"
 authors = ["contact@geoffroycouprie.com"]
 description = "Send log messages to syslog"
 documentation = "https://docs.rs/syslog"

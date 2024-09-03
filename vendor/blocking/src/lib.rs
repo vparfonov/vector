@@ -86,7 +86,6 @@
 
 use std::any::Any;
 use std::collections::VecDeque;
-use std::env;
 use std::fmt;
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::num::NonZeroUsize;
@@ -98,26 +97,42 @@ use std::task::{Context, Poll};
 use std::thread;
 use std::time::Duration;
 
+#[cfg(not(target_family = "wasm"))]
+use std::env;
+
 use async_channel::{bounded, Receiver};
-use async_lock::OnceCell;
 use async_task::Runnable;
 use futures_io::{AsyncRead, AsyncSeek, AsyncWrite};
-use futures_lite::{future, prelude::*, ready};
+use futures_lite::{
+    future::{self, Future},
+    ready,
+    stream::Stream,
+};
 use piper::{pipe, Reader, Writer};
 
 #[doc(no_inline)]
 pub use async_task::Task;
 
 /// Default value for max threads that Executor can grow to
-const DEFAULT_MAX_THREADS: usize = 500;
+#[cfg(not(target_family = "wasm"))]
+const DEFAULT_MAX_THREADS: NonZeroUsize = {
+    if let Some(size) = NonZeroUsize::new(500) {
+        size
+    } else {
+        panic!("DEFAULT_MAX_THREADS is non-zero");
+    }
+};
 
 /// Minimum value for max threads config
+#[cfg(not(target_family = "wasm"))]
 const MIN_MAX_THREADS: usize = 1;
 
 /// Maximum value for max threads config
+#[cfg(not(target_family = "wasm"))]
 const MAX_MAX_THREADS: usize = 10000;
 
 /// Env variable that allows to override default value for max threads.
+#[cfg(not(target_family = "wasm"))]
 const MAX_THREADS_ENV: &str = "BLOCKING_MAX_THREADS";
 
 /// The blocking executor.
@@ -141,48 +156,76 @@ struct Inner {
     /// This is the number of idle threads + the number of active threads.
     thread_count: usize,
 
+    // TODO: The option is only used for const-initialization. This can be replaced with
+    // a normal VecDeque when the MSRV can be bumped passed
     /// The queue of blocking tasks.
-    queue: VecDeque<Runnable>,
+    queue: Option<VecDeque<Runnable>>,
 
     /// Maximum number of threads in the pool
-    thread_limit: NonZeroUsize,
+    thread_limit: Option<NonZeroUsize>,
+}
+
+impl Inner {
+    #[inline]
+    fn queue(&mut self) -> &mut VecDeque<Runnable> {
+        self.queue.get_or_insert_with(VecDeque::new)
+    }
 }
 
 impl Executor {
-    fn max_threads() -> usize {
+    #[cfg(not(target_family = "wasm"))]
+    fn max_threads() -> NonZeroUsize {
         match env::var(MAX_THREADS_ENV) {
             Ok(v) => v
                 .parse::<usize>()
-                .map(|v| v.max(MIN_MAX_THREADS).min(MAX_MAX_THREADS))
+                .ok()
+                .and_then(|v| NonZeroUsize::new(v.clamp(MIN_MAX_THREADS, MAX_MAX_THREADS)))
                 .unwrap_or(DEFAULT_MAX_THREADS),
             Err(_) => DEFAULT_MAX_THREADS,
         }
+    }
+
+    #[cfg(target_family = "wasm")]
+    fn max_threads() -> NonZeroUsize {
+        NonZeroUsize::new(1).unwrap()
+    }
+
+    /// Get a reference to the global executor.
+    #[inline]
+    fn get() -> &'static Self {
+        #[cfg(not(target_family = "wasm"))]
+        {
+            static EXECUTOR: Executor = Executor {
+                inner: Mutex::new(Inner {
+                    idle_count: 0,
+                    thread_count: 0,
+                    queue: None,
+                    thread_limit: None,
+                }),
+                cvar: Condvar::new(),
+            };
+
+            &EXECUTOR
+        }
+
+        #[cfg(target_family = "wasm")]
+        panic!("cannot spawn a blocking task on WASM")
     }
 
     /// Spawns a future onto this executor.
     ///
     /// Returns a [`Task`] handle for the spawned task.
     fn spawn<T: Send + 'static>(future: impl Future<Output = T> + Send + 'static) -> Task<T> {
-        static EXECUTOR: OnceCell<Executor> = OnceCell::new();
+        let (runnable, task) = async_task::Builder::new().propagate_panic(true).spawn(
+            move |()| future,
+            |r| {
+                // Initialize the executor if we haven't already.
+                let executor = Self::get();
 
-        let (runnable, task) = async_task::spawn(future, |r| {
-            // Initialize the executor if we haven't already.
-            let executor = EXECUTOR.get_or_init_blocking(|| {
-                let thread_limit = Self::max_threads();
-                Executor {
-                    inner: Mutex::new(Inner {
-                        idle_count: 0,
-                        thread_count: 0,
-                        queue: VecDeque::new(),
-                        thread_limit: NonZeroUsize::new(thread_limit).unwrap(),
-                    }),
-                    cvar: Condvar::new(),
-                }
-            });
-
-            // Schedule the task on our executor.
-            executor.schedule(r)
-        });
+                // Schedule the task on our executor.
+                executor.schedule(r)
+            },
+        );
         runnable.schedule();
         task
     }
@@ -191,8 +234,8 @@ impl Executor {
     ///
     /// This function runs blocking tasks until it becomes idle and times out.
     fn main_loop(&'static self) {
-        let span = tracing::trace_span!("blocking::main_loop");
-        let _enter = span.enter();
+        #[cfg(feature = "tracing")]
+        let _span = tracing::trace_span!("blocking::main_loop").entered();
 
         let mut inner = self.inner.lock().unwrap();
         loop {
@@ -200,7 +243,7 @@ impl Executor {
             inner.idle_count -= 1;
 
             // Run tasks in the queue.
-            while let Some(runnable) = inner.queue.pop_front() {
+            while let Some(runnable) = inner.queue().pop_front() {
                 // We have found a task - grow the pool if needed.
                 self.grow_pool(inner);
 
@@ -216,27 +259,30 @@ impl Executor {
 
             // Put the thread to sleep until another task is scheduled.
             let timeout = Duration::from_millis(500);
+            #[cfg(feature = "tracing")]
             tracing::trace!(?timeout, "going to sleep");
             let (lock, res) = self.cvar.wait_timeout(inner, timeout).unwrap();
             inner = lock;
 
             // If there are no tasks after a while, stop this thread.
-            if res.timed_out() && inner.queue.is_empty() {
+            if res.timed_out() && inner.queue().is_empty() {
                 inner.idle_count -= 1;
                 inner.thread_count -= 1;
                 break;
             }
 
+            #[cfg(feature = "tracing")]
             tracing::trace!("notified");
         }
 
+        #[cfg(feature = "tracing")]
         tracing::trace!("shutting down due to lack of tasks");
     }
 
     /// Schedules a runnable task for execution.
     fn schedule(&'static self, runnable: Runnable) {
         let mut inner = self.inner.lock().unwrap();
-        inner.queue.push_back(runnable);
+        inner.queue().push_back(runnable);
 
         // Notify a sleeping thread and spawn more threads if needed.
         self.cvar.notify_one();
@@ -245,19 +291,24 @@ impl Executor {
 
     /// Spawns more blocking threads if the pool is overloaded with work.
     fn grow_pool(&'static self, mut inner: MutexGuard<'static, Inner>) {
-        let span = tracing::trace_span!(
+        #[cfg(feature = "tracing")]
+        let _span = tracing::trace_span!(
             "grow_pool",
-            queue_len = inner.queue.len(),
+            queue_len = inner.queue().len(),
             idle_count = inner.idle_count,
             thread_count = inner.thread_count,
-        );
-        let _enter = span.enter();
+        )
+        .entered();
+
+        let thread_limit = inner
+            .thread_limit
+            .get_or_insert_with(Self::max_threads)
+            .get();
 
         // If runnable tasks greatly outnumber idle threads and there aren't too many threads
         // already, then be aggressive: wake all idle threads and spawn one more thread.
-        while inner.queue.len() > inner.idle_count * 5
-            && inner.thread_count < inner.thread_limit.get()
-        {
+        while inner.queue().len() > inner.idle_count * 5 && inner.thread_count < thread_limit {
+            #[cfg(feature = "tracing")]
             tracing::trace!("spawning a new thread to handle blocking tasks");
 
             // The new thread starts in idle state.
@@ -272,12 +323,13 @@ impl Executor {
             let id = ID.fetch_add(1, Ordering::Relaxed);
 
             // Spawn the new thread.
-            if let Err(e) = thread::Builder::new()
+            if let Err(_e) = thread::Builder::new()
                 .name(format!("blocking-{}", id))
                 .spawn(move || self.main_loop())
             {
                 // We were unable to spawn the thread, so we need to undo the state changes.
-                tracing::error!("failed to spawn a blocking thread: {}", e);
+                #[cfg(feature = "tracing")]
+                tracing::error!("failed to spawn a blocking thread: {}", _e);
                 inner.idle_count -= 1;
                 inner.thread_count -= 1;
 
@@ -288,12 +340,13 @@ impl Executor {
 
                     // If the limit is about to be set to zero, set it to one instead so that if,
                     // in the future, we are able to spawn more threads, we will be able to do so.
-                    NonZeroUsize::new(new_limit).unwrap_or_else(|| {
+                    Some(NonZeroUsize::new(new_limit).unwrap_or_else(|| {
+                        #[cfg(feature = "tracing")]
                         tracing::warn!(
                             "attempted to lower thread_limit to zero; setting to one instead"
                         );
                         NonZeroUsize::new(1).unwrap()
-                    })
+                    }))
                 };
             }
         }
@@ -668,7 +721,7 @@ enum State<T> {
 
     /// The inner value is an [`Iterator`] currently iterating in a task.
     ///
-    /// The `dyn Any` value here is a `mpsc::Receiver<<T as Iterator>::Item>`.
+    /// The `dyn Any` value here is a `Pin<Box<Receiver<<T as Iterator>::Item>>>`.
     Streaming(Option<Box<dyn Any + Send + Sync>>, Task<Box<T>>),
 
     /// The inner value is a [`Read`] currently reading in a task.
@@ -721,15 +774,15 @@ where
                     });
 
                     // Move into the busy state and poll again.
-                    self.state = State::Streaming(Some(Box::new(receiver)), task);
+                    self.state = State::Streaming(Some(Box::new(Box::pin(receiver))), task);
                 }
 
                 // If streaming, receive an item.
                 State::Streaming(Some(any), task) => {
-                    let receiver = any.downcast_mut::<Receiver<T::Item>>().unwrap();
+                    let receiver = any.downcast_mut::<Pin<Box<Receiver<T::Item>>>>().unwrap();
 
                     // Poll the channel.
-                    let opt = ready!(Pin::new(receiver).poll_next(cx));
+                    let opt = ready!(receiver.as_mut().poll_next(cx));
 
                     // If the channel is closed, retrieve the iterator back from the blocking task.
                     // This is not really a required step, but it's cleaner to drop the iterator on
@@ -943,29 +996,30 @@ impl<T: Seek + Send + 'static> AsyncSeek for Unblock<T> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(target_family = "wasm")))]
 mod tests {
     use super::*;
+
     #[test]
     fn test_max_threads() {
         // properly set env var
         env::set_var(MAX_THREADS_ENV, "100");
-        assert_eq!(100, Executor::max_threads());
+        assert_eq!(100, Executor::max_threads().get());
 
         // passed value below minimum, so we set it to minimum
         env::set_var(MAX_THREADS_ENV, "0");
-        assert_eq!(1, Executor::max_threads());
+        assert_eq!(1, Executor::max_threads().get());
 
         // passed value above maximum, so we set to allowed maximum
         env::set_var(MAX_THREADS_ENV, "50000");
-        assert_eq!(10000, Executor::max_threads());
+        assert_eq!(10000, Executor::max_threads().get());
 
         // no env var, use default
         env::set_var(MAX_THREADS_ENV, "");
-        assert_eq!(500, Executor::max_threads());
+        assert_eq!(500, Executor::max_threads().get());
 
         // not a number, use default
         env::set_var(MAX_THREADS_ENV, "NOTINT");
-        assert_eq!(500, Executor::max_threads());
+        assert_eq!(500, Executor::max_threads().get());
     }
 }

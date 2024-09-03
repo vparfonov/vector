@@ -321,13 +321,13 @@ impl DigitallySignedStruct {
     }
 }
 
-impl Codec for DigitallySignedStruct {
+impl Codec<'_> for DigitallySignedStruct {
     fn encode(&self, bytes: &mut Vec<u8>) {
         self.scheme.encode(bytes);
         self.sig.encode(bytes);
     }
 
-    fn read(r: &mut Reader) -> Result<Self, InvalidMessage> {
+    fn read(r: &mut Reader<'_>) -> Result<Self, InvalidMessage> {
         let scheme = SignatureScheme::read(r)?;
         let sig = PayloadU16::read(r)?;
 
@@ -337,6 +337,8 @@ impl Codec for DigitallySignedStruct {
 
 #[test]
 fn assertions_are_debug() {
+    use std::format;
+
     assert_eq!(
         format!("{:?}", ClientCertVerified::assertion()),
         "ClientCertVerified(())"

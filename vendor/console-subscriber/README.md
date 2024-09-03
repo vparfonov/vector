@@ -206,6 +206,13 @@ tracing_subscriber::registry()
 [`tokio-console`]: https://github.com/tokio-rs/console
 [Tokio]: https://tokio.rs
 
+### Using other runtimes
+
+If you are using a custom runtime that supports tokio-console, you may not need
+to enable the `tokio_unstable` cfg flag. In this case, you need to enable cfg
+`console_without_tokio_unstable` for console-subscriber to disable its check for
+`tokio_unstable`.
+
 ### Crate Feature Flags
 
 This crate provides the following feature flags and optional dependencies:
@@ -238,7 +245,7 @@ console project.
 ## Supported Rust Versions
 
 The Tokio console is built against the latest stable release. The minimum
-supported version is 1.58. The current Tokio console version is not guaranteed
+supported version is 1.74. The current Tokio console version is not guaranteed
 to build on Rust versions earlier than the minimum supported version.
 
 ## License

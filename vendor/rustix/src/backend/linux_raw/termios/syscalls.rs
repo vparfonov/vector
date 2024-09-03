@@ -88,7 +88,7 @@ pub(crate) fn tcgetpgrp(fd: BorrowedFd<'_>) -> io::Result<Pid> {
         let pid = result.assume_init();
 
         // This doesn't appear to be documented, but it appears `tcsetpgrp` can
-        // succceed and set the pid to 0 if we pass it a pseudo-terminal device
+        // succeed and set the pid to 0 if we pass it a pseudo-terminal device
         // fd. For now, fail with `OPNOTSUPP`.
         if pid == 0 {
             return Err(io::Errno::OPNOTSUPP);
@@ -294,7 +294,7 @@ pub(crate) fn ttyname(fd: BorrowedFd<'_>, buf: &mut [MaybeUninit<u8>]) -> io::Re
     // Check that `fd` is really a tty.
     tcgetwinsize(fd)?;
 
-    // Get a fd to '/proc/self/fd'.
+    // Get a fd to "/proc/self/fd".
     let proc_self_fd = procfs::proc_self_fd()?;
 
     // Gather the ttyname by reading the "fd" file inside `proc_self_fd`.

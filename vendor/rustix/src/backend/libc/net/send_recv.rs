@@ -2,7 +2,7 @@ use crate::backend::c;
 use bitflags::bitflags;
 
 bitflags! {
-    /// `MSG_*` flags for use with [`send`], [`send_to`], and related
+    /// `MSG_*` flags for use with [`send`], [`sendto`], and related
     /// functions.
     ///
     /// [`send`]: crate::net::send
@@ -19,6 +19,8 @@ bitflags! {
             target_os = "espidf",
             target_os = "nto",
             target_os = "haiku",
+            target_os = "hurd",
+            target_os = "vita",
         )))]
         const CONFIRM = bitcast!(c::MSG_CONFIRM);
         /// `MSG_DONTROUTE`
@@ -26,9 +28,15 @@ bitflags! {
         /// `MSG_DONTWAIT`
         #[cfg(not(windows))]
         const DONTWAIT = bitcast!(c::MSG_DONTWAIT);
+        /// Deprecated alias for [`EOR`].
+        ///
+        /// [`EOR`]: Self::EOR
+        #[cfg(not(windows))]
+        #[deprecated(note = "`rustix::net::SendFlags::EOT` is renamed to `rustix::net::SendFlags::EOR`.")]
+        const EOT = bitcast!(c::MSG_EOR);
         /// `MSG_EOR`
         #[cfg(not(windows))]
-        const EOT = bitcast!(c::MSG_EOR);
+        const EOR = bitcast!(c::MSG_EOR);
         /// `MSG_MORE`
         #[cfg(not(any(
             bsd,
@@ -36,16 +44,18 @@ bitflags! {
             windows,
             target_os = "aix",
             target_os = "haiku",
+            target_os = "hurd",
             target_os = "nto",
+            target_os = "vita",
         )))]
         const MORE = bitcast!(c::MSG_MORE);
-        #[cfg(not(any(apple, windows)))]
+        #[cfg(not(any(apple, windows, target_os = "vita")))]
         /// `MSG_NOSIGNAL`
         const NOSIGNAL = bitcast!(c::MSG_NOSIGNAL);
         /// `MSG_OOB`
         const OOB = bitcast!(c::MSG_OOB);
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -67,6 +77,7 @@ bitflags! {
             target_os = "espidf",
             target_os = "haiku",
             target_os = "nto",
+            target_os = "vita",
         )))]
         /// `MSG_CMSG_CLOEXEC`
         const CMSG_CLOEXEC = bitcast!(c::MSG_CMSG_CLOEXEC);
@@ -81,7 +92,9 @@ bitflags! {
             target_os = "aix",
             target_os = "espidf",
             target_os = "haiku",
+            target_os = "hurd",
             target_os = "nto",
+            target_os = "vita",
         )))]
         const ERRQUEUE = bitcast!(c::MSG_ERRQUEUE);
         /// `MSG_OOB`
@@ -93,7 +106,7 @@ bitflags! {
         /// `MSG_WAITALL`
         const WAITALL = bitcast!(c::MSG_WAITALL);
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }

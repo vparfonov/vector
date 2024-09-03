@@ -193,6 +193,19 @@ impl<W: Write> Encoder<'static, W> {
 }
 
 impl<'a, W: Write> Encoder<'a, W> {
+    /// Creates an encoder that uses the provided context to compress a stream.
+    pub fn with_context(
+        writer: W,
+        context: &'a mut zstd_safe::CCtx<'static>,
+    ) -> Self {
+        Self {
+            writer: zio::Writer::new(
+                writer,
+                raw::Encoder::with_context(context),
+            ),
+        }
+    }
+
     /// Creates a new encoder, using an existing prepared `EncoderDictionary`.
     ///
     /// (Provides better compression ratio for small files,
@@ -205,6 +218,20 @@ impl<'a, W: Write> Encoder<'a, W> {
         'b: 'a,
     {
         let encoder = raw::Encoder::with_prepared_dictionary(dictionary)?;
+        let writer = zio::Writer::new(writer, encoder);
+        Ok(Encoder { writer })
+    }
+
+    /// Creates a new encoder, using a ref prefix
+    pub fn with_ref_prefix<'b>(
+        writer: W,
+        level: i32,
+        ref_prefix: &'b [u8],
+    ) -> io::Result<Self>
+    where
+        'b: 'a,
+    {
+        let encoder = raw::Encoder::with_ref_prefix(level, ref_prefix)?;
         let writer = zio::Writer::new(writer, encoder);
         Ok(Encoder { writer })
     }
@@ -275,7 +302,7 @@ impl<'a, W: Write> Encoder<'a, W> {
         }
     }
 
-    /// Attemps to finish the stream.
+    /// Attempts to finish the stream.
     ///
     /// You *need* to finish the stream when you're done writing, either with
     /// this method or with [`finish(self)`](#method.finish).

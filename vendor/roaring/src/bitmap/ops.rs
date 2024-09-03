@@ -1,11 +1,12 @@
 use core::mem;
 use core::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Sub, SubAssign};
 
-use alloc::vec::Vec;
-
 use crate::bitmap::container::Container;
 use crate::bitmap::Pairs;
 use crate::RoaringBitmap;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 impl RoaringBitmap {
     /// Computes the len of the intersection with the specified other bitmap without creating a
@@ -222,7 +223,7 @@ impl BitAnd<&RoaringBitmap> for &RoaringBitmap {
         for pair in Pairs::new(&self.containers, &rhs.containers) {
             if let (Some(lhs), Some(rhs)) = pair {
                 let container = BitAnd::bitand(lhs, rhs);
-                if container.len() != 0 {
+                if !container.is_empty() {
                     containers.push(container);
                 }
             }
@@ -247,7 +248,7 @@ impl BitAndAssign<RoaringBitmap> for RoaringBitmap {
                     let rhs_cont = &mut rhs.containers[loc];
                     let rhs_cont = mem::replace(rhs_cont, Container::new(rhs_cont.key));
                     BitAndAssign::bitand_assign(cont, rhs_cont);
-                    cont.len() != 0
+                    !cont.is_empty()
                 }
                 Err(_) => false,
             }
@@ -263,7 +264,7 @@ impl BitAndAssign<&RoaringBitmap> for RoaringBitmap {
             match rhs.containers.binary_search_by_key(&key, |c| c.key) {
                 Ok(loc) => {
                     BitAndAssign::bitand_assign(cont, &rhs.containers[loc]);
-                    cont.len() != 0
+                    !cont.is_empty()
                 }
                 Err(_) => false,
             }
@@ -313,7 +314,7 @@ impl Sub<&RoaringBitmap> for &RoaringBitmap {
                 (None, Some(_)) => (),
                 (Some(lhs), Some(rhs)) => {
                     let container = Sub::sub(lhs, rhs);
-                    if container.len() != 0 {
+                    if !container.is_empty() {
                         containers.push(container);
                     }
                 }
@@ -339,7 +340,7 @@ impl SubAssign<&RoaringBitmap> for RoaringBitmap {
             match rhs.containers.binary_search_by_key(&cont.key, |c| c.key) {
                 Ok(loc) => {
                     SubAssign::sub_assign(cont, &rhs.containers[loc]);
-                    cont.len() != 0
+                    !cont.is_empty()
                 }
                 Err(_) => true,
             }
@@ -389,7 +390,7 @@ impl BitXor<&RoaringBitmap> for &RoaringBitmap {
                 (None, Some(rhs)) => containers.push(rhs.clone()),
                 (Some(lhs), Some(rhs)) => {
                     let container = BitXor::bitxor(lhs, rhs);
-                    if container.len() != 0 {
+                    if !container.is_empty() {
                         containers.push(container);
                     }
                 }
@@ -408,7 +409,7 @@ impl BitXorAssign<RoaringBitmap> for RoaringBitmap {
             match pair {
                 (Some(mut lhs), Some(rhs)) => {
                     BitXorAssign::bitxor_assign(&mut lhs, rhs);
-                    if lhs.len() != 0 {
+                    if !lhs.is_empty() {
                         self.containers.push(lhs);
                     }
                 }
@@ -427,7 +428,7 @@ impl BitXorAssign<&RoaringBitmap> for RoaringBitmap {
             match pair {
                 (Some(mut lhs), Some(rhs)) => {
                     BitXorAssign::bitxor_assign(&mut lhs, rhs);
-                    if lhs.len() != 0 {
+                    if !lhs.is_empty() {
                         self.containers.push(lhs);
                     }
                 }

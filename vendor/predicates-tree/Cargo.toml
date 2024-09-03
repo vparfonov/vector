@@ -11,10 +11,11 @@
 
 [package]
 edition = "2021"
-rust-version = "1.64.0"
+rust-version = "1.74"
 name = "predicates-tree"
-version = "1.0.9"
+version = "1.0.11"
 authors = ["Nick Stevens <nick@bitcurry.com>"]
+build = false
 include = [
     "build.rs",
     "src/**/*",
@@ -24,6 +25,10 @@ include = [
     "benches/**/*",
     "examples/**/*",
 ]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Render boolean-valued predicate functions results as a tree."
 homepage = "https://github.com/assert-rs/predicates-rs/tree/master/crates/tree"
 documentation = "https://docs.rs/predicates-tree"
@@ -42,40 +47,55 @@ categories = [
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/assert-rs/predicates-rs/tree/master/crates/tree"
 
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+]
+
 [[package.metadata.release.pre-release-replacements]]
 file = "CHANGELOG.md"
-search = "Unreleased"
+min = 1
 replace = "{{version}}"
-min = 1
+search = "Unreleased"
 
 [[package.metadata.release.pre-release-replacements]]
-file = "CHANGELOG.md"
-search = '\.\.\.HEAD'
-replace = "...{{tag_name}}"
 exactly = 1
+file = "CHANGELOG.md"
+replace = "...{{tag_name}}"
+search = '\.\.\.HEAD'
 
 [[package.metadata.release.pre-release-replacements]]
 file = "CHANGELOG.md"
-search = "ReleaseDate"
-replace = "{{date}}"
 min = 1
+replace = "{{date}}"
+search = "ReleaseDate"
 
 [[package.metadata.release.pre-release-replacements]]
+exactly = 1
 file = "CHANGELOG.md"
-search = "<!-- next-header -->"
 replace = """
 <!-- next-header -->
 ## [Unreleased] - ReleaseDate
 """
-exactly = 1
+search = "<!-- next-header -->"
 
 [[package.metadata.release.pre-release-replacements]]
+exactly = 1
 file = "CHANGELOG.md"
-search = "<!-- next-url -->"
 replace = """
 <!-- next-url -->
 [Unreleased]: https://github.com/assert-rs/predicates-rs/compare/{{tag_name}}...HEAD"""
-exactly = 1
+search = "<!-- next-url -->"
+
+[lib]
+name = "predicates_tree"
+path = "src/lib.rs"
+
+[[example]]
+name = "failures"
+path = "examples/failures.rs"
 
 [dependencies.predicates-core]
 version = "1.0"
@@ -84,5 +104,5 @@ version = "1.0"
 version = "0.4.1"
 
 [dev-dependencies.predicates]
-version = "3.0"
+version = "3.1"
 features = ["color"]

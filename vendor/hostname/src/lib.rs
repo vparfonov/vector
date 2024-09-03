@@ -8,14 +8,11 @@ Set and get the host name:
 ```rust,no_run
 # use std::io;
 # use std::ffi::OsStr;
-# fn try_main() -> io::Result<()> {
+# fn main() -> io::Result<()> {
 hostname::set("potato")?;
 let new_name = hostname::get()?;
 assert_eq!(new_name, OsStr::new("potato"));
 # Ok(())
-# }
-# fn main() {
-#    try_main().unwrap();
 # }
 ```
 "#
@@ -27,18 +24,15 @@ Get the host name:
 ```rust,no_run
 # use std::io;
 # use std::ffi::OsStr;
-# fn try_main() -> io::Result<()> {
+# fn main() -> io::Result<()> {
 let name = hostname::get()?;
 println!("{:?}", name);
 # Ok(())
 # }
-# fn main() {
-#    try_main().unwrap();
-# }
 ```
 "#
 )]
-#![doc(html_root_url = "https://docs.rs/hostname/0.3.1")]
+#![doc(html_root_url = "https://docs.rs/hostname/0.4.0")]
 #![deny(
     unused,
     unused_imports,
@@ -54,30 +48,23 @@ println!("{:?}", name);
     unused_import_braces,
     unused_results
 )]
-#![allow(unknown_lints, unused_extern_crates)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
-#[macro_use]
-extern crate match_cfg;
+use cfg_if::cfg_if;
 
 #[cfg(feature = "set")]
 use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::io;
 
-match_cfg! {
-    #[cfg(any(unix, target_os = "redox"))] => {
-        extern crate libc;
-
+cfg_if! {
+    if #[cfg(any(unix, target_os = "redox"))] {
         mod nix;
-        use ::nix as sys;
-    }
-    #[cfg(target_os = "windows")] => {
-        extern crate winapi;
-
+        use crate::nix as sys;
+    } else if #[cfg(target_os = "windows")] {
         mod windows;
-        use ::windows as sys;
-    }
-    _ => {
+        use crate::windows as sys;
+    } else {
         compile_error!("Unsupported target OS! Create an issue: https://github.com/svartalf/hostname/issues/new");
     }
 }
@@ -88,12 +75,9 @@ match_cfg! {
 ///
 /// ```rust
 /// # use std::io;
-/// # fn try_main() -> io::Result<()> {
+/// # fn main() -> io::Result<()> {
 /// let name = hostname::get()?;
 /// # Ok(())
-/// # }
-/// # fn main() {
-/// #    try_main().unwrap();
 /// # }
 /// ```
 ///
@@ -116,12 +100,9 @@ pub fn get() -> io::Result<OsString> {
 
 ```rust,no_run
 # use std::io;
-# fn try_main() -> io::Result<()> {
+# fn main() -> io::Result<()> {
 hostname::set("potato")?;
 # Ok(())
-# }
-# fn main() {
-#    try_main().unwrap();
 # }
 ```
 "#

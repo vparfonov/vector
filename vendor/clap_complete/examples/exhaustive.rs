@@ -1,9 +1,12 @@
 use clap::builder::PossibleValue;
-#[cfg(feature = "unstable-dynamic")]
+#[cfg(feature = "unstable-command")]
 use clap::{FromArgMatches, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 
 fn main() {
+    #[cfg(feature = "unstable-dynamic")]
+    clap_complete::CompleteEnv::with_factory(cli).complete();
+
     let matches = cli().get_matches();
     if let Some(generator) = matches.get_one::<Shell>("generate") {
         let mut cmd = cli();
@@ -12,10 +15,8 @@ fn main() {
         return;
     }
 
-    #[cfg(feature = "unstable-dynamic")]
-    if let Ok(completions) =
-        clap_complete::dynamic::shells::CompleteCommand::from_arg_matches(&matches)
-    {
+    #[cfg(feature = "unstable-command")]
+    if let Ok(completions) = clap_complete::CompleteCommand::from_arg_matches(&matches) {
         completions.complete(&mut cli());
         return;
     };
@@ -197,7 +198,7 @@ fn cli() -> clap::Command {
                     .value_hint(clap::ValueHint::EmailAddress),
             ]),
         ]);
-    #[cfg(feature = "unstable-dynamic")]
-    let cli = clap_complete::dynamic::shells::CompleteCommand::augment_subcommands(cli);
+    #[cfg(feature = "unstable-command")]
+    let cli = clap_complete::CompleteCommand::augment_subcommands(cli);
     cli
 }

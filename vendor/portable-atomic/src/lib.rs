@@ -1,20 +1,25 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 /*!
 <!-- tidy:crate-doc:start -->
 Portable atomic types including support for 128-bit atomics, atomic float, etc.
 
+<!-- TODO: move atomic_bool_fetch_not to "features that require newer compilers" group once 1.81 became stable: https://github.com/rust-lang/rust/pull/127204 -->
 - Provide all atomic integer types (`Atomic{I,U}{8,16,32,64}`) for all targets that can use atomic CAS. (i.e., all targets that can use `std`, and most no-std targets)
 - Provide `AtomicI128` and `AtomicU128`.
 - Provide `AtomicF32` and `AtomicF64`. ([optional, requires the `float` feature](#optional-features-float))
 - Provide atomic load/store for targets where atomic is not available at all in the standard library. (RISC-V without A-extension, MSP430, AVR)
 - Provide atomic CAS for targets where atomic CAS is not available in the standard library. (thumbv6m, pre-v6 ARM, RISC-V without A-extension, MSP430, AVR, Xtensa, etc.) (always enabled for MSP430 and AVR, [optional](#optional-features-critical-section) otherwise)
 - Provide stable equivalents of the standard library's atomic types' unstable APIs, such as [`AtomicPtr::fetch_*`](https://github.com/rust-lang/rust/issues/99108), [`AtomicBool::fetch_not`](https://github.com/rust-lang/rust/issues/98485).
-- Make features that require newer compilers, such as [`fetch_{max,min}`](https://doc.rust-lang.org/std/sync/atomic/struct.AtomicUsize.html#method.fetch_max), [`fetch_update`](https://doc.rust-lang.org/std/sync/atomic/struct.AtomicUsize.html#method.fetch_update), [`as_ptr`](https://doc.rust-lang.org/std/sync/atomic/struct.AtomicUsize.html#method.as_ptr), and [stronger CAS failure ordering](https://github.com/rust-lang/rust/pull/98383) available on Rust 1.34+.
+- Make features that require newer compilers, such as [`fetch_{max,min}`](https://doc.rust-lang.org/std/sync/atomic/struct.AtomicUsize.html#method.fetch_max), [`fetch_update`](https://doc.rust-lang.org/std/sync/atomic/struct.AtomicUsize.html#method.fetch_update), [`as_ptr`](https://doc.rust-lang.org/std/sync/atomic/struct.AtomicUsize.html#method.as_ptr), [`from_ptr`](https://doc.rust-lang.org/std/sync/atomic/struct.AtomicUsize.html#method.from_ptr) and [stronger CAS failure ordering](https://github.com/rust-lang/rust/pull/98383) available on Rust 1.34+.
 - Provide workaround for bugs in the standard library's atomic-related APIs, such as [rust-lang/rust#100650], `fence`/`compiler_fence` on MSP430 that cause LLVM error, etc.
 
 <!-- TODO:
 - mention Atomic{I,U}*::fetch_neg, Atomic{I*,U*,Ptr}::bit_*, etc.
-- mention portable-atomic-util crate
+- mention optimizations not available in the standard library's equivalents
 -->
+
+portable-atomic version of `std::sync::Arc` is provided by the [portable-atomic-util](https://github.com/taiki-e/portable-atomic/tree/HEAD/portable-atomic-util) crate.
 
 ## Usage
 
@@ -33,20 +38,18 @@ If you don't need them, disabling the default features may reduce code size and 
 portable-atomic = { version = "1", default-features = false }
 ```
 
-If your crate supports no-std environment and requires atomic CAS, enabling the `require-cas` feature will allow the `portable-atomic` to display helpful error messages to users on targets requiring additional action on the user side to provide atomic CAS.
+If your crate supports no-std environment and requires atomic CAS, enabling the `require-cas` feature will allow the `portable-atomic` to display a [helpful error message](https://github.com/taiki-e/portable-atomic/pull/100) to users on targets requiring additional action on the user side to provide atomic CAS.
 
 ```toml
 [dependencies]
 portable-atomic = { version = "1.3", default-features = false, features = ["require-cas"] }
 ```
 
-*Compiler support: requires rustc 1.34+*
-
 ## 128-bit atomics support
 
 Native 128-bit atomic operations are available on x86_64 (Rust 1.59+), aarch64 (Rust 1.59+), powerpc64 (nightly only), and s390x (nightly only), otherwise the fallback implementation is used.
 
-On x86_64, even if `cmpxchg16b` is not available at compile-time (note: `cmpxchg16b` target feature is enabled by default only on Apple targets), run-time detection checks whether `cmpxchg16b` is available. If `cmpxchg16b` is not available at either compile-time or run-time detection, the fallback implementation is used. See also [`portable_atomic_no_outline_atomics`](#optional-cfg-no-outline-atomics) cfg.
+On x86_64, even if `cmpxchg16b` is not available at compile-time (note: `cmpxchg16b` target feature is enabled by default only on Apple and Windows (except Windows 7) targets), run-time detection checks whether `cmpxchg16b` is available. If `cmpxchg16b` is not available at either compile-time or run-time detection, the fallback implementation is used. See also [`portable_atomic_no_outline_atomics`](#optional-cfg-no-outline-atomics) cfg.
 
 They are usually implemented using inline assembly, and when using Miri or ThreadSanitizer that do not support inline assembly, core intrinsics are used instead of inline assembly if possible.
 
@@ -159,10 +162,10 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
 - <a name="optional-cfg-no-outline-atomics"></a>**`--cfg portable_atomic_no_outline_atomics`**<br>
   Disable dynamic dispatching by run-time CPU feature detection.
 
-  If dynamic dispatching by run-time CPU feature detection is enabled, it allows maintaining support for older CPUs while using features that are not supported on older CPUs, such as CMPXCHG16B (x86_64) and FEAT_LSE (aarch64).
+  If dynamic dispatching by run-time CPU feature detection is enabled, it allows maintaining support for older CPUs while using features that are not supported on older CPUs, such as CMPXCHG16B (x86_64) and FEAT_LSE/FEAT_LSE2 (aarch64).
 
   Note:
-  - Dynamic detection is currently only enabled in Rust 1.61+ for aarch64, in Rust 1.59+ (AVX) or 1.69+ (CMPXCHG16B) for x86_64, nightly only for powerpc64 (disabled by default), otherwise it works the same as when this cfg is set.
+  - Dynamic detection is currently only enabled in Rust 1.59+ for aarch64 and x86_64, nightly only for powerpc64 (disabled by default), otherwise it works the same as when this cfg is set.
   - If the required target features are enabled at compile-time, the atomic operations are inlined.
   - This is compatible with no-std (as with all features except `std`).
   - On some targets, run-time detection is disabled by default mainly for compatibility with older versions of operating systems or incomplete build environments, and can be enabled by `--cfg portable_atomic_outline_atomics`. (When both cfg are enabled, `*_no_*` cfg is preferred.)
@@ -193,46 +196,25 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
         allow(dead_code, unused_variables)
     )
 ))]
-#![warn(
-    improper_ctypes,
-    missing_debug_implementations,
-    missing_docs,
-    rust_2018_idioms,
-    single_use_lifetimes,
-    unreachable_pub
-)]
 #![cfg_attr(not(portable_atomic_no_unsafe_op_in_unsafe_fn), warn(unsafe_op_in_unsafe_fn))] // unsafe_op_in_unsafe_fn requires Rust 1.52
 #![cfg_attr(portable_atomic_no_unsafe_op_in_unsafe_fn, allow(unused_unsafe))]
 #![warn(
-    clippy::pedantic,
-    // lints for public library
+    // Lints that may help when writing public library.
+    missing_debug_implementations,
+    // missing_docs,
     clippy::alloc_instead_of_core,
     clippy::exhaustive_enums,
     clippy::exhaustive_structs,
+    clippy::impl_trait_in_params,
+    clippy::missing_inline_in_public_items,
     clippy::std_instead_of_alloc,
     clippy::std_instead_of_core,
-    // lints that help writing unsafe code
-    clippy::as_ptr_cast_mut,
-    clippy::default_union_representation,
-    clippy::trailing_empty_array,
-    clippy::transmute_undefined_repr,
-    clippy::undocumented_unsafe_blocks,
-    // misc
-    clippy::inline_asm_x86_att_syntax,
-    clippy::missing_inline_in_public_items,
 )]
+#![cfg_attr(not(portable_atomic_no_asm), warn(missing_docs))] // module-level #![allow(missing_docs)] doesn't work for macros on old rustc
 #![allow(
     clippy::cast_lossless,
-    clippy::doc_markdown,
-    clippy::float_cmp,
     clippy::inline_always,
-    clippy::missing_errors_doc,
-    clippy::module_inception,
     clippy::naive_bytecount,
-    clippy::similar_names,
-    clippy::single_match,
-    clippy::too_many_lines,
-    clippy::type_complexity,
     clippy::unreadable_literal
 )]
 // asm_experimental_arch
@@ -256,30 +238,10 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
 // These features are already stabilized or have already been removed from compilers,
 // and can safely be enabled for old nightly as long as version detection works.
 // - cfg(target_has_atomic)
-// - #[target_feature(enable = "lse")] on AArch64
-// - #[target_feature(enable = "cmpxchg16b")] on x86_64
-// - asm! on ARM, AArch64, RISC-V, x86, x86_64
+// - asm! on ARM, AArch64, RISC-V, x86_64
 // - llvm_asm! on AVR (tier 3) and MSP430 (tier 3)
-// - #[instruction_set] on non-Linux pre-v6 ARM (tier 3)
+// - #[instruction_set] on non-Linux/Android pre-v6 ARM (tier 3)
 #![cfg_attr(portable_atomic_unstable_cfg_target_has_atomic, feature(cfg_target_has_atomic))]
-#![cfg_attr(
-    all(
-        target_arch = "aarch64",
-        portable_atomic_unstable_aarch64_target_feature,
-        not(portable_atomic_no_outline_atomics),
-    ),
-    feature(aarch64_target_feature)
-)]
-#![cfg_attr(
-    all(
-        target_arch = "x86_64",
-        portable_atomic_unstable_cmpxchg16b_target_feature,
-        not(portable_atomic_no_outline_atomics),
-        not(any(target_env = "sgx", miri)),
-        feature = "fallback",
-    ),
-    feature(cmpxchg16b_target_feature)
-)]
 #![cfg_attr(
     all(
         portable_atomic_unstable_asm,
@@ -288,7 +250,6 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
             target_arch = "arm",
             target_arch = "riscv32",
             target_arch = "riscv64",
-            target_arch = "x86",
             target_arch = "x86_64",
         ),
     ),
@@ -311,6 +272,15 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
 // Miri and/or ThreadSanitizer only
 // They do not support inline assembly, so we need to use unstable features instead.
 // Since they require nightly compilers anyway, we can use the unstable features.
+// This is not an ideal situation, but it is still better than always using lock-based
+// fallback and causing memory ordering problems to be missed by these checkers.
+#![cfg_attr(
+    all(
+        any(target_arch = "aarch64", target_arch = "powerpc64", target_arch = "s390x"),
+        any(miri, portable_atomic_sanitize_thread),
+    ),
+    allow(internal_features)
+)]
 #![cfg_attr(
     all(
         any(target_arch = "aarch64", target_arch = "powerpc64", target_arch = "s390x"),
@@ -318,13 +288,7 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
     ),
     feature(core_intrinsics)
 )]
-// This feature will be unnecessary once stdarch submodule in rust-lang/rust is
-// updated to include https://github.com/rust-lang/stdarch/pull/1358.
-#![cfg_attr(
-    all(target_arch = "x86_64", any(miri, portable_atomic_sanitize_thread)),
-    feature(stdsimd)
-)]
-// docs.rs only
+// docs.rs only (cfg is enabled by docs.rs, not build script)
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![cfg_attr(
     all(
@@ -341,10 +305,10 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
     allow(unused_imports, unused_macros)
 )]
 
-// There are currently no 8-bit, 128-bit, or higher builtin targets.
+// There are currently no 128-bit or higher builtin targets.
 // (Although some of our generic code is written with the future
 // addition of 128-bit targets in mind.)
-// Note that Rust (and C99) pointers must be at least 16-bits: https://github.com/rust-lang/rust/pull/49305
+// Note that Rust (and C99) pointers must be at least 16-bit (i.e., 8-bit targets are impossible): https://github.com/rust-lang/rust/pull/49305
 #[cfg(not(any(
     target_pointer_width = "16",
     target_pointer_width = "32",
@@ -411,6 +375,9 @@ compile_error!("cfg(portable_atomic_disable_fiq) does not compatible with this t
 #[cfg(portable_atomic_s_mode)]
 #[cfg(not(any(target_arch = "riscv32", target_arch = "riscv64")))]
 compile_error!("cfg(portable_atomic_s_mode) does not compatible with this target");
+#[cfg(portable_atomic_force_amo)]
+#[cfg(not(any(target_arch = "riscv32", target_arch = "riscv64")))]
+compile_error!("cfg(portable_atomic_force_amo) does not compatible with this target");
 
 #[cfg(portable_atomic_disable_fiq)]
 #[cfg(not(portable_atomic_unsafe_assume_single_core))]
@@ -421,6 +388,11 @@ compile_error!(
 #[cfg(not(portable_atomic_unsafe_assume_single_core))]
 compile_error!(
     "cfg(portable_atomic_s_mode) may only be used together with cfg(portable_atomic_unsafe_assume_single_core)"
+);
+#[cfg(portable_atomic_force_amo)]
+#[cfg(not(portable_atomic_unsafe_assume_single_core))]
+compile_error!(
+    "cfg(portable_atomic_force_amo) may only be used together with cfg(portable_atomic_unsafe_assume_single_core)"
 );
 
 #[cfg(all(portable_atomic_unsafe_assume_single_core, feature = "critical-section"))]
@@ -457,6 +429,17 @@ compile_error!(
 
 #[cfg(any(test, feature = "std"))]
 extern crate std;
+
+#[macro_use]
+mod cfgs;
+#[cfg(target_pointer_width = "128")]
+pub use {cfg_has_atomic_128 as cfg_has_atomic_ptr, cfg_no_atomic_128 as cfg_no_atomic_ptr};
+#[cfg(target_pointer_width = "16")]
+pub use {cfg_has_atomic_16 as cfg_has_atomic_ptr, cfg_no_atomic_16 as cfg_no_atomic_ptr};
+#[cfg(target_pointer_width = "32")]
+pub use {cfg_has_atomic_32 as cfg_has_atomic_ptr, cfg_no_atomic_32 as cfg_no_atomic_ptr};
+#[cfg(target_pointer_width = "64")]
+pub use {cfg_has_atomic_64 as cfg_has_atomic_ptr, cfg_no_atomic_64 as cfg_no_atomic_ptr};
 
 #[macro_use]
 mod utils;
@@ -530,7 +513,7 @@ cfg_has_atomic_8! {
 cfg_has_atomic_cas! {
 // See https://github.com/rust-lang/rust/pull/114034 for details.
 // https://github.com/rust-lang/rust/blob/9339f446a5302cd5041d3f3b5e59761f36699167/library/core/src/sync/atomic.rs#L134
-// https://godbolt.org/z/5W85abT58
+// https://godbolt.org/z/Enh87Ph9b
 #[cfg(portable_atomic_no_cfg_target_has_atomic)]
 const EMULATE_ATOMIC_BOOL: bool = cfg!(all(
     not(portable_atomic_no_atomic_cas),
@@ -604,6 +587,40 @@ impl AtomicBool {
         Self { v: core::cell::UnsafeCell::new(v as u8) }
     }
 
+    // TODO: update docs based on https://github.com/rust-lang/rust/pull/116762
+    /// Creates a new `AtomicBool` from a pointer.
+    ///
+    /// # Safety
+    ///
+    /// * `ptr` must be aligned to `align_of::<AtomicBool>()` (note that on some platforms this can
+    ///   be bigger than `align_of::<bool>()`).
+    /// * `ptr` must be [valid] for both reads and writes for the whole lifetime `'a`.
+    /// * If this atomic type is [lock-free](Self::is_lock_free), non-atomic accesses to the value
+    ///   behind `ptr` must have a happens-before relationship with atomic accesses via the returned
+    ///   value (or vice-versa).
+    ///   * In other words, time periods where the value is accessed atomically may not overlap
+    ///     with periods where the value is accessed non-atomically.
+    ///   * This requirement is trivially satisfied if `ptr` is never used non-atomically for the
+    ///     duration of lifetime `'a`. Most use cases should be able to follow this guideline.
+    ///   * This requirement is also trivially satisfied if all accesses (atomic or not) are done
+    ///     from the same thread.
+    /// * If this atomic type is *not* lock-free:
+    ///   * Any accesses to the value behind `ptr` must have a happens-before relationship
+    ///     with accesses via the returned value (or vice-versa).
+    ///   * Any concurrent accesses to the value behind `ptr` for the duration of lifetime `'a` must
+    ///     be compatible with operations performed by this atomic type.
+    /// * This method must not be used to create overlapping or mixed-size atomic accesses, as
+    ///   these are not supported by the memory model.
+    ///
+    /// [valid]: core::ptr#safety
+    #[inline]
+    #[must_use]
+    pub unsafe fn from_ptr<'a>(ptr: *mut bool) -> &'a Self {
+        #[allow(clippy::cast_ptr_alignment)]
+        // SAFETY: guaranteed by the caller
+        unsafe { &*(ptr as *mut Self) }
+    }
+
     /// Returns `true` if operations on values of this type are lock-free.
     ///
     /// If the compiler or the platform doesn't support the necessary
@@ -666,26 +683,33 @@ impl AtomicBool {
         unsafe { &mut *(self.v.get() as *mut bool) }
     }
 
-    // TODO: Add from_mut/get_mut_slice/from_mut_slice/from_ptr once it is stable on std atomic types.
+    // TODO: Add from_mut/get_mut_slice/from_mut_slice once it is stable on std atomic types.
     // https://github.com/rust-lang/rust/issues/76314
-    // https://github.com/rust-lang/rust/issues/108652
 
-    /// Consumes the atomic and returns the contained value.
-    ///
-    /// This is safe because passing `self` by value guarantees that no other threads are
-    /// concurrently accessing the atomic data.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use portable_atomic::AtomicBool;
-    ///
-    /// let some_bool = AtomicBool::new(true);
-    /// assert_eq!(some_bool.into_inner(), true);
-    /// ```
-    #[inline]
-    pub fn into_inner(self) -> bool {
-        self.v.into_inner() != 0
+    const_fn! {
+        const_if: #[cfg(not(portable_atomic_no_const_transmute))];
+        /// Consumes the atomic and returns the contained value.
+        ///
+        /// This is safe because passing `self` by value guarantees that no other threads are
+        /// concurrently accessing the atomic data.
+        ///
+        /// This is `const fn` on Rust 1.56+.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use portable_atomic::AtomicBool;
+        ///
+        /// let some_bool = AtomicBool::new(true);
+        /// assert_eq!(some_bool.into_inner(), true);
+        /// ```
+        #[inline]
+        pub const fn into_inner(self) -> bool {
+            // SAFETY: AtomicBool and u8 have the same size and in-memory representations,
+            // so they can be safely transmuted.
+            // (const UnsafeCell::into_inner is unstable)
+            unsafe { core::mem::transmute::<AtomicBool, u8>(self) != 0 }
+        }
     }
 
     /// Loads a value from the bool.
@@ -1287,7 +1311,7 @@ impl AtomicBool {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use portable_atomic::{AtomicBool, Ordering};
     ///
     /// let x = AtomicBool::new(false);
@@ -1390,7 +1414,7 @@ impl<T> From<*mut T> for AtomicPtr<T> {
 }
 
 impl<T> fmt::Debug for AtomicPtr<T> {
-    #[allow(clippy::missing_inline_in_public_items)] // fmt is not hot path
+    #[inline] // fmt is not hot path, but #[inline] on fmt seems to still be useful: https://github.com/rust-lang/rust/pull/117727
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // std atomic types use Relaxed in Debug::fmt: https://github.com/rust-lang/rust/blob/1.70.0/library/core/src/sync/atomic.rs#L2024
         fmt::Debug::fmt(&self.load(Ordering::Relaxed), f)
@@ -1398,7 +1422,7 @@ impl<T> fmt::Debug for AtomicPtr<T> {
 }
 
 impl<T> fmt::Pointer for AtomicPtr<T> {
-    #[allow(clippy::missing_inline_in_public_items)] // fmt is not hot path
+    #[inline] // fmt is not hot path, but #[inline] on fmt seems to still be useful: https://github.com/rust-lang/rust/pull/117727
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // std atomic types use Relaxed in Debug::fmt: https://github.com/rust-lang/rust/blob/1.70.0/library/core/src/sync/atomic.rs#L2024
         fmt::Pointer::fmt(&self.load(Ordering::Relaxed), f)
@@ -1427,6 +1451,40 @@ impl<T> AtomicPtr<T> {
     pub const fn new(p: *mut T) -> Self {
         static_assert_layout!(AtomicPtr<()>, *mut ());
         Self { inner: imp::AtomicPtr::new(p) }
+    }
+
+    // TODO: update docs based on https://github.com/rust-lang/rust/pull/116762
+    /// Creates a new `AtomicPtr` from a pointer.
+    ///
+    /// # Safety
+    ///
+    /// * `ptr` must be aligned to `align_of::<AtomicPtr<T>>()` (note that on some platforms this
+    ///   can be bigger than `align_of::<*mut T>()`).
+    /// * `ptr` must be [valid] for both reads and writes for the whole lifetime `'a`.
+    /// * If this atomic type is [lock-free](Self::is_lock_free), non-atomic accesses to the value
+    ///   behind `ptr` must have a happens-before relationship with atomic accesses via the returned
+    ///   value (or vice-versa).
+    ///   * In other words, time periods where the value is accessed atomically may not overlap
+    ///     with periods where the value is accessed non-atomically.
+    ///   * This requirement is trivially satisfied if `ptr` is never used non-atomically for the
+    ///     duration of lifetime `'a`. Most use cases should be able to follow this guideline.
+    ///   * This requirement is also trivially satisfied if all accesses (atomic or not) are done
+    ///     from the same thread.
+    /// * If this atomic type is *not* lock-free:
+    ///   * Any accesses to the value behind `ptr` must have a happens-before relationship
+    ///     with accesses via the returned value (or vice-versa).
+    ///   * Any concurrent accesses to the value behind `ptr` for the duration of lifetime `'a` must
+    ///     be compatible with operations performed by this atomic type.
+    /// * This method must not be used to create overlapping or mixed-size atomic accesses, as
+    ///   these are not supported by the memory model.
+    ///
+    /// [valid]: core::ptr#safety
+    #[inline]
+    #[must_use]
+    pub unsafe fn from_ptr<'a>(ptr: *mut *mut T) -> &'a Self {
+        #[allow(clippy::cast_ptr_alignment)]
+        // SAFETY: guaranteed by the caller
+        unsafe { &*(ptr as *mut Self) }
     }
 
     /// Returns `true` if operations on values of this type are lock-free.
@@ -1491,27 +1549,34 @@ impl<T> AtomicPtr<T> {
         self.inner.get_mut()
     }
 
-    // TODO: Add from_mut/get_mut_slice/from_mut_slice/from_ptr once it is stable on std atomic types.
+    // TODO: Add from_mut/get_mut_slice/from_mut_slice once it is stable on std atomic types.
     // https://github.com/rust-lang/rust/issues/76314
-    // https://github.com/rust-lang/rust/issues/108652
 
-    /// Consumes the atomic and returns the contained value.
-    ///
-    /// This is safe because passing `self` by value guarantees that no other threads are
-    /// concurrently accessing the atomic data.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use portable_atomic::AtomicPtr;
-    ///
-    /// let mut data = 5;
-    /// let atomic_ptr = AtomicPtr::new(&mut data);
-    /// assert_eq!(unsafe { *atomic_ptr.into_inner() }, 5);
-    /// ```
-    #[inline]
-    pub fn into_inner(self) -> *mut T {
-        self.inner.into_inner()
+    const_fn! {
+        const_if: #[cfg(not(portable_atomic_no_const_transmute))];
+        /// Consumes the atomic and returns the contained value.
+        ///
+        /// This is safe because passing `self` by value guarantees that no other threads are
+        /// concurrently accessing the atomic data.
+        ///
+        /// This is `const fn` on Rust 1.56+.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use portable_atomic::AtomicPtr;
+        ///
+        /// let mut data = 5;
+        /// let atomic_ptr = AtomicPtr::new(&mut data);
+        /// assert_eq!(unsafe { *atomic_ptr.into_inner() }, 5);
+        /// ```
+        #[inline]
+        pub const fn into_inner(self) -> *mut T {
+            // SAFETY: AtomicPtr<T> and *mut T have the same size and in-memory representations,
+            // so they can be safely transmuted.
+            // (const UnsafeCell::into_inner is unstable)
+            unsafe { core::mem::transmute(self) }
+        }
     }
 
     /// Loads a value from the pointer.
@@ -1729,7 +1794,7 @@ impl<T> AtomicPtr<T> {
     ///
     /// # Examples
     ///
-    /// ```rust
+    /// ```
     /// use portable_atomic::{AtomicPtr, Ordering};
     ///
     /// let ptr: *mut _ = &mut 5;
@@ -1854,7 +1919,7 @@ impl<T> AtomicPtr<T> {
     /// let array = [1i32, 2i32];
     /// let atom = AtomicPtr::new(array.as_ptr().wrapping_add(1) as *mut _);
     ///
-    /// assert!(core::ptr::eq(atom.fetch_ptr_sub(1, Ordering::Relaxed), &array[1],));
+    /// assert!(core::ptr::eq(atom.fetch_ptr_sub(1, Ordering::Relaxed), &array[1]));
     /// assert!(core::ptr::eq(atom.load(Ordering::Relaxed), &array[0]));
     /// ```
     #[inline]
@@ -2164,7 +2229,7 @@ impl<T> AtomicPtr<T> {
         #[cfg(miri)]
         {
             let mask = 1_usize.wrapping_shl(bit);
-            strict::addr(self.fetch_or(mask, order)) & mask != 0
+            self.fetch_or(mask, order) as usize & mask != 0
         }
         #[cfg(not(miri))]
         {
@@ -2209,7 +2274,7 @@ impl<T> AtomicPtr<T> {
         #[cfg(miri)]
         {
             let mask = 1_usize.wrapping_shl(bit);
-            strict::addr(self.fetch_and(!mask, order)) & mask != 0
+            self.fetch_and(!mask, order) as usize & mask != 0
         }
         #[cfg(not(miri))]
         {
@@ -2254,7 +2319,7 @@ impl<T> AtomicPtr<T> {
         #[cfg(miri)]
         {
             let mask = 1_usize.wrapping_shl(bit);
-            strict::addr(self.fetch_xor(mask, order)) & mask != 0
+            self.fetch_xor(mask, order) as usize & mask != 0
         }
         #[cfg(not(miri))]
         {
@@ -2302,6 +2367,7 @@ impl<T> AtomicPtr<T> {
 } // cfg_has_atomic_ptr!
 
 macro_rules! atomic_int {
+    // TODO: support AtomicF{16,128} once https://github.com/rust-lang/rust/issues/116909 stabilized.
     (AtomicU32, $int_type:ident, $align:literal) => {
         atomic_int!(int, AtomicU32, $int_type, $align);
         #[cfg(feature = "float")]
@@ -2383,6 +2449,43 @@ let atomic_forty_two = ", stringify!($atomic_type), "::new(42);
                 }
             }
 
+            // TODO: update docs based on https://github.com/rust-lang/rust/pull/116762
+            doc_comment! {
+                concat!("Creates a new reference to an atomic integer from a pointer.
+
+# Safety
+
+* `ptr` must be aligned to `align_of::<", stringify!($atomic_type), ">()` (note that on some platforms this
+  can be bigger than `align_of::<", stringify!($int_type), ">()`).
+* `ptr` must be [valid] for both reads and writes for the whole lifetime `'a`.
+* If this atomic type is [lock-free](Self::is_lock_free), non-atomic accesses to the value
+  behind `ptr` must have a happens-before relationship with atomic accesses via
+  the returned value (or vice-versa).
+  * In other words, time periods where the value is accessed atomically may not
+    overlap with periods where the value is accessed non-atomically.
+  * This requirement is trivially satisfied if `ptr` is never used non-atomically
+    for the duration of lifetime `'a`. Most use cases should be able to follow
+    this guideline.
+  * This requirement is also trivially satisfied if all accesses (atomic or not) are
+    done from the same thread.
+* If this atomic type is *not* lock-free:
+  * Any accesses to the value behind `ptr` must have a happens-before relationship
+    with accesses via the returned value (or vice-versa).
+  * Any concurrent accesses to the value behind `ptr` for the duration of lifetime `'a` must
+    be compatible with operations performed by this atomic type.
+* This method must not be used to create overlapping or mixed-size atomic
+  accesses, as these are not supported by the memory model.
+
+[valid]: core::ptr#safety"),
+                #[inline]
+                #[must_use]
+                pub unsafe fn from_ptr<'a>(ptr: *mut $int_type) -> &'a Self {
+                    #[allow(clippy::cast_ptr_alignment)]
+                    // SAFETY: guaranteed by the caller
+                    unsafe { &*(ptr as *mut Self) }
+                }
+            }
+
             doc_comment! {
                 concat!("Returns `true` if operations on values of this type are lock-free.
 
@@ -2449,15 +2552,42 @@ assert_eq!(some_var.load(Ordering::SeqCst), 5);
                 }
             }
 
-            // TODO: Add from_mut/get_mut_slice/from_mut_slice/from_ptr once it is stable on std atomic types.
+            // TODO: Add from_mut/get_mut_slice/from_mut_slice once it is stable on std atomic types.
             // https://github.com/rust-lang/rust/issues/76314
-            // https://github.com/rust-lang/rust/issues/108652
 
+            #[cfg(not(portable_atomic_no_const_transmute))]
             doc_comment! {
                 concat!("Consumes the atomic and returns the contained value.
 
 This is safe because passing `self` by value guarantees that no other threads are
 concurrently accessing the atomic data.
+
+This is `const fn` on Rust 1.56+.
+
+# Examples
+
+```
+use portable_atomic::", stringify!($atomic_type), ";
+
+let some_var = ", stringify!($atomic_type), "::new(5);
+assert_eq!(some_var.into_inner(), 5);
+```"),
+                #[inline]
+                pub const fn into_inner(self) -> $int_type {
+                    // SAFETY: $atomic_type and $int_type have the same size and in-memory representations,
+                    // so they can be safely transmuted.
+                    // (const UnsafeCell::into_inner is unstable)
+                    unsafe { core::mem::transmute(self) }
+                }
+            }
+            #[cfg(portable_atomic_no_const_transmute)]
+            doc_comment! {
+                concat!("Consumes the atomic and returns the contained value.
+
+This is safe because passing `self` by value guarantees that no other threads are
+concurrently accessing the atomic data.
+
+This is `const fn` on Rust 1.56+.
 
 # Examples
 
@@ -2469,7 +2599,10 @@ assert_eq!(some_var.into_inner(), 5);
 ```"),
                 #[inline]
                 pub fn into_inner(self) -> $int_type {
-                    self.inner.into_inner()
+                    // SAFETY: $atomic_type and $int_type have the same size and in-memory representations,
+                    // so they can be safely transmuted.
+                    // (const UnsafeCell::into_inner is unstable)
+                    unsafe { core::mem::transmute(self) }
                 }
             }
 
@@ -3046,7 +3179,7 @@ In particular, this method will not circumvent the [ABA Problem].
 
 # Examples
 
-```rust
+```
 use portable_atomic::{", stringify!($atomic_type), ", Ordering};
 
 let x = ", stringify!($atomic_type), "::new(7);
@@ -3447,6 +3580,43 @@ This type has the same in-memory representation as the underlying floating point
                 Self { inner: imp::float::$atomic_type::new(v) }
             }
 
+            // TODO: update docs based on https://github.com/rust-lang/rust/pull/116762
+            doc_comment! {
+                concat!("Creates a new reference to an atomic float from a pointer.
+
+# Safety
+
+* `ptr` must be aligned to `align_of::<", stringify!($atomic_type), ">()` (note that on some platforms this
+  can be bigger than `align_of::<", stringify!($float_type), ">()`).
+* `ptr` must be [valid] for both reads and writes for the whole lifetime `'a`.
+* If this atomic type is [lock-free](Self::is_lock_free), non-atomic accesses to the value
+  behind `ptr` must have a happens-before relationship with atomic accesses via
+  the returned value (or vice-versa).
+  * In other words, time periods where the value is accessed atomically may not
+    overlap with periods where the value is accessed non-atomically.
+  * This requirement is trivially satisfied if `ptr` is never used non-atomically
+    for the duration of lifetime `'a`. Most use cases should be able to follow
+    this guideline.
+  * This requirement is also trivially satisfied if all accesses (atomic or not) are
+    done from the same thread.
+* If this atomic type is *not* lock-free:
+  * Any accesses to the value behind `ptr` must have a happens-before relationship
+    with accesses via the returned value (or vice-versa).
+  * Any concurrent accesses to the value behind `ptr` for the duration of lifetime `'a` must
+    be compatible with operations performed by this atomic type.
+* This method must not be used to create overlapping or mixed-size atomic
+  accesses, as these are not supported by the memory model.
+
+[valid]: core::ptr#safety"),
+                #[inline]
+                #[must_use]
+                pub unsafe fn from_ptr<'a>(ptr: *mut $float_type) -> &'a Self {
+                    #[allow(clippy::cast_ptr_alignment)]
+                    // SAFETY: guaranteed by the caller
+                    unsafe { &*(ptr as *mut Self) }
+                }
+            }
+
             /// Returns `true` if operations on values of this type are lock-free.
             ///
             /// If the compiler or the platform doesn't support the necessary
@@ -3481,16 +3651,24 @@ This type has the same in-memory representation as the underlying floating point
                 self.inner.get_mut()
             }
 
-            // TODO: Add from_mut once it is stable on std atomic types.
+            // TODO: Add from_mut/get_mut_slice/from_mut_slice once it is stable on std atomic types.
             // https://github.com/rust-lang/rust/issues/76314
 
-            /// Consumes the atomic and returns the contained value.
-            ///
-            /// This is safe because passing `self` by value guarantees that no other threads are
-            /// concurrently accessing the atomic data.
-            #[inline]
-            pub fn into_inner(self) -> $float_type {
-                self.inner.into_inner()
+            const_fn! {
+                const_if: #[cfg(not(portable_atomic_no_const_transmute))];
+                /// Consumes the atomic and returns the contained value.
+                ///
+                /// This is safe because passing `self` by value guarantees that no other threads are
+                /// concurrently accessing the atomic data.
+                ///
+                /// This is `const fn` on Rust 1.56+.
+                #[inline]
+                pub const fn into_inner(self) -> $float_type {
+                    // SAFETY: $atomic_type and $float_type have the same size and in-memory representations,
+                    // so they can be safely transmuted.
+                    // (const UnsafeCell::into_inner is unstable)
+                    unsafe { core::mem::transmute(self) }
+                }
             }
 
             /// Loads a value from the atomic float.
@@ -3756,7 +3934,7 @@ This type has the same in-memory representation as the underlying floating point
 
             #[cfg(not(portable_atomic_no_const_raw_ptr_deref))]
             doc_comment! {
-                concat!("Raw transmutation to `", stringify!($atomic_int_type), "`.
+                concat!("Raw transmutation to `&", stringify!($atomic_int_type), "`.
 
 See [`", stringify!($float_type) ,"::from_bits`] for some discussion of the
 portability of this operation (there are almost no issues).
@@ -3769,7 +3947,7 @@ This is `const fn` on Rust 1.58+."),
             }
             #[cfg(portable_atomic_no_const_raw_ptr_deref)]
             doc_comment! {
-                concat!("Raw transmutation to `", stringify!($atomic_int_type), "`.
+                concat!("Raw transmutation to `&", stringify!($atomic_int_type), "`.
 
 See [`", stringify!($float_type) ,"::from_bits`] for some discussion of the
 portability of this operation (there are almost no issues).

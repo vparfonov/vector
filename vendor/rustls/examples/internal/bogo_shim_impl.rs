@@ -4,33 +4,37 @@
 // https://boringssl.googlesource.com/boringssl/+/master/ssl/test
 //
 
+use std::fmt::{Debug, Formatter};
+use std::io::{self, BufReader, Read, Write};
+use std::sync::Arc;
+use std::{env, fs, net, process, thread, time};
+
+use base64::prelude::{Engine, BASE64_STANDARD};
+use pki_types::{CertificateDer, PrivateKeyDer, ServerName, UnixTime};
 use rustls::client::danger::{HandshakeSignatureValid, ServerCertVerified, ServerCertVerifier};
 use rustls::client::{ClientConfig, ClientConnection, Resumption, WebPkiServerVerifier};
+#[cfg(all(feature = "ring", not(feature = "aws_lc_rs")))]
+use rustls::crypto::ring as provider;
 use rustls::crypto::{CryptoProvider, SupportedKxGroup};
 use rustls::internal::msgs::codec::Codec;
 use rustls::internal::msgs::persist::ServerSessionValue;
 use rustls::server::danger::{ClientCertVerified, ClientCertVerifier};
 use rustls::server::{ClientHello, ServerConfig, ServerConnection, WebPkiClientVerifier};
 use rustls::{
-    self, client, server, sign, version, AlertDescription, CertificateError, Connection,
-    DigitallySignedStruct, DistinguishedName, Error, InvalidMessage, NamedGroup, PeerIncompatible,
-    PeerMisbehaved, ProtocolVersion, RootCertStore, Side, SignatureAlgorithm, SignatureScheme,
-    SupportedProtocolVersion,
+    client, compress, server, sign, version, AlertDescription, CertificateCompressionAlgorithm,
+    CertificateError, Connection, DigitallySignedStruct, DistinguishedName, Error, HandshakeKind,
+    InvalidMessage, NamedGroup, PeerIncompatible, PeerMisbehaved, ProtocolVersion, RootCertStore,
+    Side, SignatureAlgorithm, SignatureScheme, SupportedProtocolVersion,
 };
-
-#[cfg(all(not(feature = "ring"), feature = "aws_lc_rs"))]
-use rustls::crypto::aws_lc_rs as provider;
-#[cfg(feature = "ring")]
-use rustls::crypto::ring as provider;
-
-use base64::prelude::{Engine, BASE64_STANDARD};
-use pki_types::{CertificateDer, PrivateKeyDer, ServerName, UnixTime};
-
-use std::fmt::{Debug, Formatter};
-use std::io::{self, BufReader, Read, Write};
-use std::sync::Arc;
-use std::time;
-use std::{env, fs, net, process, thread};
+#[cfg(feature = "aws_lc_rs")]
+use rustls::{
+    client::{EchConfig, EchGreaseConfig, EchMode, EchStatus},
+    crypto::aws_lc_rs as provider,
+    crypto::aws_lc_rs::hpke,
+    crypto::hpke::{Hpke, HpkePublicKey},
+    internal::msgs::codec::Reader,
+    internal::msgs::handshake::EchConfigPayload,
+};
 
 static BOGO_NACK: i32 = 89;
 
@@ -43,6 +47,7 @@ macro_rules! println_err(
 #[derive(Debug)]
 struct Options {
     port: u16,
+    shim_id: u64,
     side: Side,
     max_fragment: Option<usize>,
     resumes: usize,
@@ -85,12 +90,26 @@ struct Options {
     expect_version: u16,
     resumption_delay: u32,
     queue_early_data_after_received_messages: Vec<usize>,
+    require_ems: bool,
+    expect_handshake_kind: Option<Vec<HandshakeKind>>,
+    expect_handshake_kind_resumed: Option<Vec<HandshakeKind>>,
+    install_cert_compression_algs: CompressionAlgs,
+    provider: CryptoProvider,
+    ech_config_list: Option<pki_types::EchConfigListBytes<'static>>,
+    expect_ech_accept: bool,
+    expect_ech_retry_configs: Option<pki_types::EchConfigListBytes<'static>>,
+    on_resume_ech_config_list: Option<pki_types::EchConfigListBytes<'static>>,
+    on_resume_expect_ech_accept: bool,
+    on_initial_expect_ech_accept: bool,
+    enable_ech_grease: bool,
+    send_key_update: bool,
 }
 
 impl Options {
     fn new() -> Self {
         Options {
             port: 0,
+            shim_id: 0,
             side: Side::Client,
             max_fragment: None,
             resumes: 0,
@@ -133,12 +152,26 @@ impl Options {
             expect_version: 0,
             resumption_delay: 0,
             queue_early_data_after_received_messages: vec![],
+            require_ems: false,
+            expect_handshake_kind: None,
+            expect_handshake_kind_resumed: Some(vec![HandshakeKind::Resumed]),
+            install_cert_compression_algs: CompressionAlgs::None,
+            provider: default_provider(),
+            ech_config_list: None,
+            expect_ech_accept: false,
+            expect_ech_retry_configs: None,
+            on_resume_ech_config_list: None,
+            on_resume_expect_ech_accept: false,
+            on_initial_expect_ech_accept: false,
+            enable_ech_grease: false,
+            send_key_update: false,
         }
     }
 
     fn version_allowed(&self, vers: ProtocolVersion) -> bool {
-        (self.min_version.is_none() || vers.get_u16() >= self.min_version.unwrap().get_u16())
-            && (self.max_version.is_none() || vers.get_u16() <= self.max_version.unwrap().get_u16())
+        (self.min_version.is_none() || u16::from(vers) >= u16::from(self.min_version.unwrap()))
+            && (self.max_version.is_none()
+                || u16::from(vers) <= u16::from(self.max_version.unwrap()))
     }
 
     fn tls13_supported(&self) -> bool {
@@ -160,6 +193,16 @@ impl Options {
             versions.push(&version::TLS13);
         }
         versions
+    }
+}
+
+fn default_provider() -> CryptoProvider {
+    // ensure all suites and kx groups are included (even in fips builds)
+    // as non-fips test cases require them
+    CryptoProvider {
+        kx_groups: provider::ALL_KX_GROUPS.to_vec(),
+        cipher_suites: provider::ALL_CIPHER_SUITES.to_vec(),
+        ..provider::default_provider()
     }
 }
 
@@ -514,13 +557,13 @@ fn make_server_cfg(opts: &Options) -> Arc<ServerConfig> {
             .map(|curveid| lookup_kx_group(*curveid))
             .collect()
     } else {
-        provider::ALL_KX_GROUPS.to_vec()
+        opts.provider.kx_groups.clone()
     };
 
     let mut cfg = ServerConfig::builder_with_provider(
         CryptoProvider {
             kx_groups,
-            ..provider::default_provider()
+            ..opts.provider.clone()
         }
         .into(),
     )
@@ -533,6 +576,7 @@ fn make_server_cfg(opts: &Options) -> Arc<ServerConfig> {
     cfg.session_storage = ServerCacheWithResumptionDelay::new(opts.resumption_delay);
     cfg.max_fragment_size = opts.max_fragment;
     cfg.send_tls13_tickets = 1;
+    cfg.require_ems = opts.require_ems;
 
     if opts.use_signing_scheme > 0 {
         let scheme = lookup_scheme(opts.use_signing_scheme);
@@ -564,6 +608,20 @@ fn make_server_cfg(opts: &Options) -> Arc<ServerConfig> {
         // see kMaxEarlyDataAccepted in boringssl, which bogo validates
         cfg.max_early_data_size = 14336;
         cfg.send_half_rtt_data = true;
+    }
+
+    match opts.install_cert_compression_algs {
+        CompressionAlgs::All => {
+            cfg.cert_compressors = vec![&ExpandingAlgorithm, &ShrinkingAlgorithm, &RandomAlgorithm];
+            cfg.cert_decompressors =
+                vec![&ExpandingAlgorithm, &ShrinkingAlgorithm, &RandomAlgorithm];
+        }
+        CompressionAlgs::One(ShrinkingAlgorithm::ALGORITHM) => {
+            cfg.cert_compressors = vec![&ShrinkingAlgorithm];
+            cfg.cert_decompressors = vec![&ShrinkingAlgorithm];
+        }
+        CompressionAlgs::None => {}
+        _ => unimplemented!(),
     }
 
     Arc::new(cfg)
@@ -646,20 +704,46 @@ fn make_client_cfg(opts: &Options) -> Arc<ClientConfig> {
             .map(|curveid| lookup_kx_group(*curveid))
             .collect()
     } else {
-        provider::ALL_KX_GROUPS.to_vec()
+        opts.provider.kx_groups.clone()
     };
 
     let cfg = ClientConfig::builder_with_provider(
         CryptoProvider {
             kx_groups,
-            ..provider::default_provider()
+            ..opts.provider.clone()
         }
         .into(),
-    )
-    .with_protocol_versions(&opts.supported_versions())
-    .expect("inconsistent settings")
-    .dangerous()
-    .with_custom_certificate_verifier(Arc::new(DummyServerAuth::new()));
+    );
+
+    #[cfg(feature = "aws_lc_rs")]
+    let cfg = if let Some(ech_config_list) = &opts.ech_config_list {
+        let ech_mode: EchMode = EchConfig::new(ech_config_list.clone(), hpke::ALL_SUPPORTED_SUITES)
+            .unwrap_or_else(|_| quit(":INVALID_ECH_CONFIG_LIST:"))
+            .into();
+
+        cfg.with_ech(ech_mode)
+            .expect("invalid ECH config")
+    } else if opts.enable_ech_grease {
+        let ech_mode = EchMode::Grease(EchGreaseConfig::new(
+            GREASE_HPKE_SUITE,
+            HpkePublicKey(GREASE_25519_PUBKEY.to_vec()),
+        ));
+
+        cfg.with_ech(ech_mode)
+            .expect("invalid GREASE ECH config")
+    } else {
+        cfg.with_protocol_versions(&opts.supported_versions())
+            .expect("inconsistent settings")
+    };
+
+    #[cfg(not(feature = "aws_lc_rs"))]
+    let cfg = cfg
+        .with_protocol_versions(&opts.supported_versions())
+        .expect("inconsistent settings");
+
+    let cfg = cfg
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(DummyServerAuth::new()));
 
     let mut cfg = if !opts.cert_file.is_empty() && !opts.key_file.is_empty() {
         let cert = load_cert(&opts.cert_file);
@@ -681,6 +765,7 @@ fn make_client_cfg(opts: &Options) -> Arc<ClientConfig> {
     cfg.resumption = Resumption::store(ClientCacheWithoutKxHints::new(opts.resumption_delay));
     cfg.enable_sni = opts.use_sni;
     cfg.max_fragment_size = opts.max_fragment;
+    cfg.require_ems = opts.require_ems;
 
     if !opts.protocols.is_empty() {
         cfg.alpn_protocols = opts
@@ -692,6 +777,20 @@ fn make_client_cfg(opts: &Options) -> Arc<ClientConfig> {
 
     if opts.enable_early_data {
         cfg.enable_early_data = true;
+    }
+
+    match opts.install_cert_compression_algs {
+        CompressionAlgs::All => {
+            cfg.cert_decompressors =
+                vec![&ExpandingAlgorithm, &ShrinkingAlgorithm, &RandomAlgorithm];
+            cfg.cert_compressors = vec![&ExpandingAlgorithm, &ShrinkingAlgorithm, &RandomAlgorithm];
+        }
+        CompressionAlgs::One(ShrinkingAlgorithm::ALGORITHM) => {
+            cfg.cert_decompressors = vec![&ShrinkingAlgorithm];
+            cfg.cert_compressors = vec![&ShrinkingAlgorithm];
+        }
+        CompressionAlgs::None => {}
+        _ => unimplemented!(),
     }
 
     Arc::new(cfg)
@@ -707,7 +806,7 @@ fn quit_err(why: &str) -> ! {
     process::exit(1)
 }
 
-fn handle_err(err: Error) -> ! {
+fn handle_err(opts: &Options, err: Error) -> ! {
     println!("TLS error: {:?}", err);
     thread::sleep(time::Duration::from_millis(100));
 
@@ -745,18 +844,75 @@ fn handle_err(err: Error) -> ! {
         | Error::InvalidMessage(InvalidMessage::InvalidEmptyPayload)
         | Error::InvalidMessage(InvalidMessage::UnknownProtocolVersion)
         | Error::InvalidMessage(InvalidMessage::MessageTooLarge) => quit(":GARBAGE:"),
+        Error::InvalidMessage(InvalidMessage::MessageTooShort)
+            if opts.enable_ech_grease || opts.ech_config_list.is_some() =>
+        {
+            quit(":ERROR_PARSING_EXTENSION:")
+        }
         Error::InvalidMessage(InvalidMessage::UnexpectedMessage(_)) => quit(":GARBAGE:"),
+        Error::DecryptError if opts.ech_config_list.is_some() => {
+            quit(":INCONSISTENT_ECH_NEGOTIATION:")
+        }
         Error::DecryptError => quit(":DECRYPTION_FAILED_OR_BAD_RECORD_MAC:"),
         Error::NoApplicationProtocol => quit(":NO_APPLICATION_PROTOCOL:"),
         Error::PeerIncompatible(
             PeerIncompatible::ServerSentHelloRetryRequestWithUnknownExtension,
         ) => quit(":UNEXPECTED_EXTENSION:"),
+        Error::PeerIncompatible(PeerIncompatible::ServerRejectedEncryptedClientHello(
+            _retry_configs,
+        )) => {
+            #[cfg(feature = "aws_lc_rs")]
+            if let Some(expected_configs) = &opts.expect_ech_retry_configs {
+                let expected_configs =
+                    Vec::<EchConfigPayload>::read(&mut Reader::init(expected_configs)).unwrap();
+                assert_eq!(_retry_configs, Some(expected_configs));
+            }
+            quit(":ECH_REJECTED:")
+        }
         Error::PeerIncompatible(_) => quit(":INCOMPATIBLE:"),
         Error::PeerMisbehaved(PeerMisbehaved::MissingPskModesExtension) => {
             quit(":MISSING_EXTENSION:")
         }
         Error::PeerMisbehaved(PeerMisbehaved::TooMuchEarlyDataReceived) => {
             quit(":TOO_MUCH_READ_EARLY_DATA:")
+        }
+        Error::PeerMisbehaved(PeerMisbehaved::SignedHandshakeWithUnadvertisedSigScheme)
+        | Error::PeerMisbehaved(PeerMisbehaved::SignedKxWithWrongAlgorithm) => {
+            quit(":WRONG_SIGNATURE_TYPE:")
+        }
+        Error::PeerMisbehaved(PeerMisbehaved::SelectedUnofferedCertCompression) => {
+            quit(":UNKNOWN_CERT_COMPRESSION_ALG:")
+        }
+        Error::PeerMisbehaved(PeerMisbehaved::InvalidCertCompression) => {
+            quit(":CERT_DECOMPRESSION_FAILED:")
+        }
+        Error::PeerMisbehaved(PeerMisbehaved::OfferedDuplicateCertificateCompressions) => {
+            quit(":ERROR_PARSING_EXTENSION:")
+        }
+        Error::PeerMisbehaved(PeerMisbehaved::SelectedUnofferedCipherSuite) => {
+            quit(":WRONG_CIPHER_RETURNED:")
+        }
+        Error::PeerMisbehaved(PeerMisbehaved::TooManyWarningAlertsReceived) => {
+            quit(":TOO_MANY_WARNING_ALERTS:")
+        }
+        Error::PeerMisbehaved(PeerMisbehaved::TooManyKeyUpdateRequests) => {
+            quit(":TOO_MANY_KEY_UPDATES:")
+        }
+        Error::PeerMisbehaved(PeerMisbehaved::TooManyEmptyFragments) => {
+            quit(":TOO_MANY_EMPTY_FRAGMENTS:")
+        }
+        Error::PeerMisbehaved(PeerMisbehaved::IllegalHelloRetryRequestWithInvalidEch)
+        | Error::PeerMisbehaved(PeerMisbehaved::UnsolicitedEchExtension) => {
+            quit(":UNEXPECTED_EXTENSION:")
+        }
+        // The TLS-ECH-Client-UnsolicitedInnerServerNameAck test is expected to fail with
+        // :UNEXPECTED_EXTENSION: when we receive an unsolicited inner hello SNI extension.
+        // We treat this the same as any unexpected enc'd ext and return :PEER_MISBEHAVIOUR:.
+        // Convert to the expected if this error occurs when we're configured w/ ECH.
+        Error::PeerMisbehaved(PeerMisbehaved::UnsolicitedEncryptedExtension)
+            if opts.ech_config_list.is_some() =>
+        {
+            quit(":UNEXPECTED_EXTENSION:")
         }
         Error::PeerMisbehaved(_) => quit(":PEER_MISBEHAVIOUR:"),
         Error::NoCertificatesPresented => quit(":NO_CERTS:"),
@@ -800,14 +956,14 @@ fn server(conn: &mut Connection) -> &mut ServerConnection {
 
 const MAX_MESSAGE_SIZE: usize = 0xffff + 5;
 
-fn after_read(sess: &mut Connection, conn: &mut net::TcpStream) {
+fn after_read(opts: &Options, sess: &mut Connection, conn: &mut net::TcpStream) {
     if let Err(err) = sess.process_new_packets() {
         flush(sess, conn); /* send any alerts before exiting */
-        handle_err(err);
+        handle_err(opts, err);
     }
 }
 
-fn read_n_bytes(sess: &mut Connection, conn: &mut net::TcpStream, n: usize) {
+fn read_n_bytes(opts: &Options, sess: &mut Connection, conn: &mut net::TcpStream, n: usize) {
     let mut bytes = [0u8; MAX_MESSAGE_SIZE];
     match conn.read(&mut bytes[..n]) {
         Ok(count) => {
@@ -819,17 +975,17 @@ fn read_n_bytes(sess: &mut Connection, conn: &mut net::TcpStream, n: usize) {
         Err(err) => panic!("invalid read: {}", err),
     };
 
-    after_read(sess, conn);
+    after_read(opts, sess, conn);
 }
 
-fn read_all_bytes(sess: &mut Connection, conn: &mut net::TcpStream) {
+fn read_all_bytes(opts: &Options, sess: &mut Connection, conn: &mut net::TcpStream) {
     match sess.read_tls(conn) {
         Ok(_) => {}
         Err(ref err) if err.kind() == io::ErrorKind::ConnectionReset => {}
         Err(err) => panic!("invalid read: {}", err),
     };
 
-    after_read(sess, conn);
+    after_read(opts, sess, conn);
 }
 
 fn exec(opts: &Options, mut sess: Connection, count: usize) {
@@ -842,7 +998,11 @@ fn exec(opts: &Options, mut sess: Connection, count: usize) {
     let mut conn = net::TcpStream::connect(&addrs[..]).expect("cannot connect");
     let mut sent_shutdown = false;
     let mut sent_exporter = false;
+    let mut sent_key_update = false;
     let mut quench_writes = false;
+
+    conn.write_all(&opts.shim_id.to_le_bytes())
+        .unwrap();
 
     loop {
         if !sent_message && (opts.queue_data || (opts.queue_data_on_resume && count > 0)) {
@@ -852,7 +1012,7 @@ fn exec(opts: &Options, mut sess: Connection, count: usize) {
             {
                 flush(&mut sess, &mut conn);
                 for message_size_estimate in &opts.queue_early_data_after_received_messages {
-                    read_n_bytes(&mut sess, &mut conn, *message_size_estimate);
+                    read_n_bytes(opts, &mut sess, &mut conn, *message_size_estimate);
                 }
                 println!("now ready for early data");
             }
@@ -878,7 +1038,7 @@ fn exec(opts: &Options, mut sess: Connection, count: usize) {
         }
 
         if sess.wants_read() {
-            read_all_bytes(&mut sess, &mut conn);
+            read_all_bytes(opts, &mut sess, &mut conn);
         }
 
         if opts.side == Side::Server && opts.enable_early_data {
@@ -920,6 +1080,11 @@ fn exec(opts: &Options, mut sess: Connection, count: usize) {
             sent_exporter = true;
         }
 
+        if opts.send_key_update && !sent_key_update && !sess.is_handshaking() {
+            sess.refresh_traffic_keys().unwrap();
+            sent_key_update = true;
+        }
+
         if !sess.is_handshaking() && opts.only_write_one_byte_after_handshake && !sent_message {
             println!("writing message and then only one byte of its tls frame");
             flush(&mut sess, &mut conn);
@@ -953,6 +1118,30 @@ fn exec(opts: &Options, mut sess: Connection, count: usize) {
                     Some(ProtocolVersion::TLSv1_3) | Some(ProtocolVersion::Unknown(0x7f17)) => {}
                     _ => quit_err("wrong protocol version"),
                 }
+            }
+        }
+
+        if opts.expect_handshake_kind.is_some() && !sess.is_handshaking() {
+            let expected_options = opts
+                .expect_handshake_kind
+                .as_ref()
+                .unwrap();
+            let actual = sess.handshake_kind().unwrap();
+            assert!(
+                expected_options.contains(&actual),
+                "wanted to see {expected_options:?} but got {actual:?}"
+            );
+        }
+
+        #[cfg(feature = "aws_lc_rs")]
+        {
+            let ech_accept_required =
+                (count == 0 && opts.on_initial_expect_ech_accept) || opts.expect_ech_accept;
+            if ech_accept_required
+                && !sess.is_handshaking()
+                && client(&mut sess).ech_status() != EchStatus::Accepted
+            {
+                quit_err("ECH was not accepted, but we expect the opposite");
             }
         }
 
@@ -1020,6 +1209,9 @@ pub fn main() {
             "-port" => {
                 opts.port = args.remove(0).parse::<u16>().unwrap();
             }
+            "-shim-id" => {
+                opts.shim_id = args.remove(0).parse::<u64>().unwrap();
+            }
             "-server" => {
                 opts.side = Side::Server;
             }
@@ -1083,6 +1275,9 @@ pub fn main() {
                     }
                 }
             }
+            "-verify-prefs" => {
+                lookup_scheme(args.remove(0).parse::<u16>().unwrap());
+            }
             "-max-cert-list" |
             "-expect-curve-id" |
             "-expect-resume-curve-id" |
@@ -1114,16 +1309,28 @@ pub fn main() {
             "-expect-secure-renegotiation" |
             "-expect-no-session-id" |
             "-enable-ed25519" |
-            "-expect-hrr" |
-            "-expect-no-hrr" |
             "-on-resume-expect-no-offer-early-data" |
-            "-key-update" | //< we could implement an API for this
             "-expect-tls13-downgrade" |
             "-enable-signed-cert-timestamps" |
             "-expect-session-id" => {
                 println!("not checking {}; NYI", arg);
             }
 
+            "-key-update" => {
+                opts.send_key_update = true;
+            }
+            "-expect-hrr" => {
+                opts.expect_handshake_kind = Some(vec![HandshakeKind::FullWithHelloRetryRequest]);
+            }
+            "-expect-no-hrr" => {
+                opts.expect_handshake_kind = Some(vec![HandshakeKind::Full]);
+            }
+            "-expect-session-miss" => {
+                opts.expect_handshake_kind_resumed = Some(vec![
+                    HandshakeKind::Full,
+                    HandshakeKind::FullWithHelloRetryRequest
+                ]);
+            }
             "-export-keying-material" => {
                 opts.export_keying_material = args.remove(0).parse::<usize>().unwrap();
             }
@@ -1245,6 +1452,56 @@ pub fn main() {
                 opts.resumption_delay = args.remove(0).parse::<u32>().unwrap();
                 align_time();
             }
+            "-expect-extended-master-secret" => {
+                opts.require_ems = true;
+            }
+            "-install-cert-compression-algs" => {
+                opts.install_cert_compression_algs = CompressionAlgs::All;
+            }
+            "-install-one-cert-compression-alg" => {
+                opts.install_cert_compression_algs = CompressionAlgs::One(args.remove(0).parse::<u16>().unwrap());
+            }
+            #[cfg(feature = "fips")]
+            "-fips-202205" => {
+                opts.provider = rustls::crypto::default_fips_provider();
+            }
+            #[cfg(not(feature = "fips"))]
+            "-fips-202205" => {
+                println!("Not a FIPS build");
+                process::exit(BOGO_NACK);
+            }
+            "-ech-config-list" => {
+                opts.ech_config_list = Some(BASE64_STANDARD.decode(args.remove(0).as_bytes())
+                    .expect("invalid ECH config base64").into());
+            }
+            "-expect-ech-accept" => {
+                opts.expect_ech_accept = true;
+            }
+            "-expect-ech-retry-configs" => {
+                opts.expect_ech_retry_configs = Some(BASE64_STANDARD.decode(args.remove(0).as_bytes())
+                    .expect("invalid ECH config base64").into());
+            }
+            "-on-resume-ech-config-list" => {
+                opts.on_resume_ech_config_list = Some(BASE64_STANDARD.decode(args.remove(0).as_bytes())
+                    .expect("invalid on resume ECH config base64").into());
+            }
+            "-on-resume-expect-ech-accept" => {
+                opts.on_resume_expect_ech_accept = true;
+            }
+            "-expect-no-ech-retry-configs" => {
+                opts.expect_ech_retry_configs = None;
+            }
+            "-on-initial-expect-ech-accept" => {
+                opts.on_initial_expect_ech_accept = true;
+            }
+            "-on-retry-expect-ech-retry-configs" => {
+                // Note: we treat this the same as -expect-ech-retry-configs
+                opts.expect_ech_retry_configs = Some(BASE64_STANDARD.decode(args.remove(0).as_bytes())
+                    .expect("invalid retry ECH config base64").into());
+            }
+            "-enable-ech-grease" => {
+                opts.enable_ech_grease = true;
+            }
 
             // defaults:
             "-enable-all-curves" |
@@ -1253,12 +1510,12 @@ pub fn main() {
             "-no-tls1" |
             "-no-ssl3" |
             "-handoff" |
+            "-ipv6" |
             "-decline-alpn" |
             "-expect-no-session" |
-            "-expect-session-miss" |
-            "-expect-extended-master-secret" |
             "-expect-ticket-renewal" |
             "-enable-ocsp-stapling" |
+            "-forbid-renegotiation-after-handshake" |
             // internal openssl details:
             "-async" |
             "-implicit-handshake" |
@@ -1305,18 +1562,17 @@ pub fn main() {
             "-handshake-twice" |
             "-on-resume-verify-fail" |
             "-reverify-on-resume" |
-            "-verify-prefs" |
             "-no-op-extra-handshake" |
             "-expect-peer-cert-file" |
             "-no-rsa-pss-rsae-certs" |
             "-ignore-tls13-downgrade" |
             "-allow-hint-mismatch" |
-            "-fips-202205" |
             "-wpa-202304" |
             "-srtp-profiles" |
             "-permute-extensions" |
             "-signed-cert-timestamps" |
-            "-on-initial-expect-peer-cert-file" => {
+            "-on-initial-expect-peer-cert-file" |
+            "-use-custom-verify-callback" => {
                 println!("NYI option {:?}", arg);
                 process::exit(BOGO_NACK);
             }
@@ -1330,7 +1586,7 @@ pub fn main() {
 
     println!("opts {:?}", opts);
 
-    let (client_cfg, mut server_cfg) = match opts.side {
+    let (mut client_cfg, mut server_cfg) = match opts.side {
         Side::Client => (Some(make_client_cfg(&opts)), None),
         Side::Server => (None, Some(make_server_cfg(&opts))),
     };
@@ -1369,5 +1625,157 @@ pub fn main() {
             opts.tickets = false;
             server_cfg = Some(make_server_cfg(&opts));
         }
+        if opts.on_resume_ech_config_list.is_some() {
+            opts.ech_config_list
+                .clone_from(&opts.on_resume_ech_config_list);
+            opts.expect_ech_accept = opts.on_resume_expect_ech_accept;
+            client_cfg = Some(make_client_cfg(&opts));
+        }
+        opts.expect_handshake_kind
+            .clone_from(&opts.expect_handshake_kind_resumed);
     }
 }
+
+#[derive(Debug, PartialEq)]
+enum CompressionAlgs {
+    None,
+    All,
+    One(u16),
+}
+
+#[derive(Debug)]
+struct ShrinkingAlgorithm;
+
+impl ShrinkingAlgorithm {
+    const ALGORITHM: u16 = 0xff01;
+}
+
+impl compress::CertDecompressor for ShrinkingAlgorithm {
+    fn algorithm(&self) -> CertificateCompressionAlgorithm {
+        CertificateCompressionAlgorithm::Unknown(Self::ALGORITHM)
+    }
+
+    fn decompress(
+        &self,
+        input: &[u8],
+        output: &mut [u8],
+    ) -> Result<(), compress::DecompressionFailed> {
+        if output.len() != input.len() + 2 {
+            return Err(compress::DecompressionFailed);
+        }
+        output[..2].copy_from_slice(&[0, 0]);
+        output[2..].copy_from_slice(input);
+        Ok(())
+    }
+}
+
+impl compress::CertCompressor for ShrinkingAlgorithm {
+    fn algorithm(&self) -> CertificateCompressionAlgorithm {
+        CertificateCompressionAlgorithm::Unknown(Self::ALGORITHM)
+    }
+
+    fn compress(
+        &self,
+        mut input: Vec<u8>,
+        _: compress::CompressionLevel,
+    ) -> Result<Vec<u8>, compress::CompressionFailed> {
+        assert_eq!(input[..2], [0, 0]);
+        input.drain(0..2);
+        Ok(input)
+    }
+}
+
+#[derive(Debug)]
+struct ExpandingAlgorithm;
+
+impl compress::CertDecompressor for ExpandingAlgorithm {
+    fn algorithm(&self) -> CertificateCompressionAlgorithm {
+        CertificateCompressionAlgorithm::Unknown(0xff02)
+    }
+
+    fn decompress(
+        &self,
+        input: &[u8],
+        output: &mut [u8],
+    ) -> Result<(), compress::DecompressionFailed> {
+        if output.len() + 4 != input.len() {
+            return Err(compress::DecompressionFailed);
+        }
+        if input[..4] != [1, 2, 3, 4] {
+            return Err(compress::DecompressionFailed);
+        }
+        output.copy_from_slice(&input[4..]);
+        Ok(())
+    }
+}
+
+impl compress::CertCompressor for ExpandingAlgorithm {
+    fn algorithm(&self) -> CertificateCompressionAlgorithm {
+        CertificateCompressionAlgorithm::Unknown(0xff02)
+    }
+
+    fn compress(
+        &self,
+        mut input: Vec<u8>,
+        _: compress::CompressionLevel,
+    ) -> Result<Vec<u8>, compress::CompressionFailed> {
+        input.insert(0, 1);
+        input.insert(1, 2);
+        input.insert(2, 3);
+        input.insert(3, 4);
+        Ok(input)
+    }
+}
+
+#[derive(Debug)]
+struct RandomAlgorithm;
+
+impl compress::CertDecompressor for RandomAlgorithm {
+    fn algorithm(&self) -> CertificateCompressionAlgorithm {
+        CertificateCompressionAlgorithm::Unknown(0xff03)
+    }
+
+    fn decompress(
+        &self,
+        input: &[u8],
+        output: &mut [u8],
+    ) -> Result<(), compress::DecompressionFailed> {
+        if output.len() + 1 != input.len() {
+            return Err(compress::DecompressionFailed);
+        }
+        output.copy_from_slice(&input[1..]);
+        Ok(())
+    }
+}
+
+impl compress::CertCompressor for RandomAlgorithm {
+    fn algorithm(&self) -> CertificateCompressionAlgorithm {
+        CertificateCompressionAlgorithm::Unknown(0xff03)
+    }
+
+    fn compress(
+        &self,
+        mut input: Vec<u8>,
+        _: compress::CompressionLevel,
+    ) -> Result<Vec<u8>, compress::CompressionFailed> {
+        let random_byte = {
+            let mut bytes = [0];
+            provider::default_provider()
+                .secure_random
+                .fill(&mut bytes)
+                .unwrap();
+            bytes[0]
+        };
+        input.insert(0, random_byte);
+        Ok(input)
+    }
+}
+
+#[cfg(feature = "aws_lc_rs")]
+static GREASE_HPKE_SUITE: &dyn Hpke = hpke::DH_KEM_X25519_HKDF_SHA256_AES_128;
+
+#[cfg(feature = "aws_lc_rs")]
+const GREASE_25519_PUBKEY: &[u8] = &[
+    0x67, 0x35, 0xCA, 0x50, 0x21, 0xFC, 0x4F, 0xE6, 0x29, 0x3B, 0x31, 0x2C, 0xB5, 0xE0, 0x97, 0xD8,
+    0xD0, 0x58, 0x97, 0xCF, 0x5C, 0x15, 0x12, 0x79, 0x4B, 0xEF, 0x1D, 0x98, 0x52, 0x74, 0xDC, 0x5E,
+];

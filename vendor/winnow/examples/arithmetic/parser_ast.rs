@@ -13,7 +13,7 @@ use winnow::{
 };
 
 #[derive(Debug, Clone)]
-pub enum Expr {
+pub(crate) enum Expr {
     Value(i64),
     Add(Box<Expr>, Box<Expr>),
     Sub(Box<Expr>, Box<Expr>),
@@ -23,7 +23,7 @@ pub enum Expr {
 }
 
 impl Expr {
-    pub fn eval(&self) -> i64 {
+    pub(crate) fn eval(&self) -> i64 {
         match self {
             Self::Value(v) => *v,
             Self::Add(lhs, rhs) => lhs.eval() + rhs.eval(),
@@ -39,17 +39,17 @@ impl Display for Expr {
     fn fmt(&self, format: &mut Formatter<'_>) -> fmt::Result {
         use Expr::{Add, Div, Mul, Paren, Sub, Value};
         match *self {
-            Value(val) => write!(format, "{}", val),
-            Add(ref left, ref right) => write!(format, "{} + {}", left, right),
-            Sub(ref left, ref right) => write!(format, "{} - {}", left, right),
-            Mul(ref left, ref right) => write!(format, "{} * {}", left, right),
-            Div(ref left, ref right) => write!(format, "{} / {}", left, right),
-            Paren(ref expr) => write!(format, "({})", expr),
+            Value(val) => write!(format, "{val}"),
+            Add(ref left, ref right) => write!(format, "{left} + {right}"),
+            Sub(ref left, ref right) => write!(format, "{left} - {right}"),
+            Mul(ref left, ref right) => write!(format, "{left} * {right}"),
+            Div(ref left, ref right) => write!(format, "{left} / {right}"),
+            Paren(ref expr) => write!(format, "({expr})"),
         }
     }
 }
 
-pub fn expr(i: &mut &str) -> PResult<Expr> {
+pub(crate) fn expr(i: &mut &str) -> PResult<Expr> {
     let init = term.parse_next(i)?;
 
     repeat(0.., (one_of(['+', '-']), term))

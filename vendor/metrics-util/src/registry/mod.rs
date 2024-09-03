@@ -15,6 +15,7 @@ pub use storage::{AtomicStorage, Storage};
 mod recency;
 
 #[cfg(feature = "recency")]
+#[cfg_attr(docsrs, doc(cfg(feature = "recency")))]
 pub use recency::{
     Generation, Generational, GenerationalAtomicStorage, GenerationalStorage, Recency,
 };
@@ -32,17 +33,14 @@ type RegistryHashMap<K, V> = HashMap<K, V, BuildHasherDefault<RegistryHasher>>;
 /// ## Using `Registry` as the basis of an exporter
 ///
 /// As a reusable building blocking for building exporter implementations, users should look at
-/// [`Key`] and [`AtomicStorage`][crate::registry::AtomicStorage] to use for their key and storage,
-/// respectively.
+/// [`Key`] and [`AtomicStorage`] to use for their key and storage, respectively.
 ///
 /// These two implementations provide behavior that is suitable for most exporters, providing
 /// seamless integration with the existing key type used by the core
 /// [`Recorder`][metrics::Recorder] trait, as well as atomic storage for metrics.
 ///
-/// In some cases, users may prefer
-/// [`GenerationalAtomicStorage`][crate::registry::GenerationalAtomicStorage] when know if a metric
-/// has been touched, even if its value has not changed since the last time it was observed, is
-/// necessary.
+/// In some cases, users may prefer [`GenerationalAtomicStorage`] when know if a metric has been
+/// touched, even if its value has not changed since the last time it was observed, is necessary.
 ///
 /// ## Performance
 ///
@@ -392,6 +390,69 @@ where
         });
         histograms
     }
+
+    /// Gets a copy of an existing counter.
+    pub fn get_counter(&self, key: &K) -> Option<S::Counter> {
+        let (hash, shard) = self.get_hash_and_shard_for_counter(key);
+        let shard_read = shard.read().unwrap_or_else(PoisonError::into_inner);
+        shard_read.raw_entry().from_key_hashed_nocheck(hash, key).map(|(_, v)| v.clone())
+    }
+
+    /// Gets a copy of an existing gauge.
+    pub fn get_gauge(&self, key: &K) -> Option<S::Gauge> {
+        let (hash, shard) = self.get_hash_and_shard_for_gauge(key);
+        let shard_read = shard.read().unwrap_or_else(PoisonError::into_inner);
+        shard_read.raw_entry().from_key_hashed_nocheck(hash, key).map(|(_, v)| v.clone())
+    }
+
+    /// Gets a copy of an existing histogram.
+    pub fn get_histogram(&self, key: &K) -> Option<S::Histogram> {
+        let (hash, shard) = self.get_hash_and_shard_for_histogram(key);
+        let shard_read = shard.read().unwrap_or_else(PoisonError::into_inner);
+        shard_read.raw_entry().from_key_hashed_nocheck(hash, key).map(|(_, v)| v.clone())
+    }
+
+    /// Retains only counters specified by the predicate.
+    ///
+    /// Remove all counters for which f(&k, &c) returns false. This operation proceeds
+    /// through the "subshards" in the same way as `visit_counters`.
+    pub fn retain_counters<F>(&self, mut f: F)
+    where
+        F: FnMut(&K, &S::Counter) -> bool,
+    {
+        for subshard in self.counters.iter() {
+            let mut shard_write = subshard.write().unwrap_or_else(PoisonError::into_inner);
+            shard_write.retain(|k, c| f(k, c));
+        }
+    }
+
+    /// Retains only gauges specified by the predicate.
+    ///
+    /// Remove all gauges for which f(&k, &g) returns false. This operation proceeds
+    /// through the "subshards" in the same way as `visit_gauges`.
+    pub fn retain_gauges<F>(&self, mut f: F)
+    where
+        F: FnMut(&K, &S::Gauge) -> bool,
+    {
+        for subshard in self.gauges.iter() {
+            let mut shard_write = subshard.write().unwrap_or_else(PoisonError::into_inner);
+            shard_write.retain(|k, g| f(k, g));
+        }
+    }
+
+    /// Retains only histograms specified by the predicate.
+    ///
+    /// Remove all histograms for which f(&k, &h) returns false. This operation proceeds
+    /// through the "subshards" in the same way as `visit_histograms`.
+    pub fn retain_histograms<F>(&self, mut f: F)
+    where
+        F: FnMut(&K, &S::Histogram) -> bool,
+    {
+        for subshard in self.histograms.iter() {
+            let mut shard_write = subshard.write().unwrap_or_else(PoisonError::into_inner);
+            shard_write.retain(|k, h| f(k, h));
+        }
+    }
 }
 
 #[cfg(test)]
@@ -408,6 +469,8 @@ mod tests {
 
         let entries = registry.get_counter_handles();
         assert_eq!(entries.len(), 0);
+
+        assert!(registry.get_counter(&key).is_none());
 
         registry.get_or_create_counter(&key, |c: &Arc<AtomicU64>| c.increment(1));
 
@@ -432,6 +495,20 @@ mod tests {
         let (ukey, uvalue) = updated_entry;
         assert_eq!(ukey, key);
         assert_eq!(uvalue.load(Ordering::SeqCst), 2);
+
+        let value = registry.get_counter(&key).expect("failed to get entry");
+        assert!(Arc::ptr_eq(&value, &uvalue));
+
+        registry.get_or_create_counter(&Key::from_name("baz"), |_| ());
+        assert_eq!(registry.get_counter_handles().len(), 2);
+
+        let mut n = 0;
+        registry.retain_counters(|k, _| {
+            n += 1;
+            k.name().starts_with("foo")
+        });
+        assert_eq!(n, 2);
+        assert_eq!(registry.get_counter_handles().len(), 1);
 
         assert!(registry.delete_counter(&key));
 

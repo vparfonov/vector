@@ -15,40 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-<<<<<<<< HEAD:vendor/opendal/src/services/fs/appender.rs
-use async_trait::async_trait;
-use bytes::Bytes;
-use tokio::io::AsyncWriteExt;
-
-use super::error::parse_io_error;
-use crate::raw::*;
-use crate::*;
-
-pub struct FsAppender<F> {
-    f: F,
-}
-
-impl<F> FsAppender<F> {
-    pub fn new(f: F) -> Self {
-        Self { f }
-    }
-}
-
-#[async_trait]
-impl oio::Append for FsAppender<tokio::fs::File> {
-    async fn append(&mut self, bs: Bytes) -> Result<()> {
-        self.f.write_all(&bs).await.map_err(parse_io_error)?;
-
-        Ok(())
-    }
-
-    async fn close(&mut self) -> Result<()> {
-        self.f.sync_all().await.map_err(parse_io_error)?;
-
-        Ok(())
-    }
-}
-========
 //! Utilities for opendal testing.
 
 mod read;
@@ -62,4 +28,3 @@ pub use write::WriteChecker;
 mod utils;
 pub use utils::init_test_service;
 pub use utils::TEST_RUNTIME;
->>>>>>>> 75e70ace9f (LOG-5296: Update vector to v0.37.x):vendor/opendal/src/raw/tests/mod.rs

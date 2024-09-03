@@ -1,3 +1,11 @@
+use alloc::vec::Vec;
+use core::cmp;
+#[cfg(feature = "tls12")]
+use core::mem;
+
+use pki_types::{DnsName, UnixTime};
+use zeroize::Zeroizing;
+
 use crate::enums::{CipherSuite, ProtocolVersion};
 use crate::error::InvalidMessage;
 use crate::msgs::base::{PayloadU16, PayloadU8};
@@ -8,14 +16,6 @@ use crate::msgs::handshake::SessionId;
 #[cfg(feature = "tls12")]
 use crate::tls12::Tls12CipherSuite;
 use crate::tls13::Tls13CipherSuite;
-
-use pki_types::{DnsName, UnixTime};
-use zeroize::Zeroizing;
-
-use alloc::vec::Vec;
-use core::cmp;
-#[cfg(feature = "tls12")]
-use core::mem;
 
 pub(crate) struct Retrieved<T> {
     pub(crate) value: T,
@@ -82,7 +82,7 @@ impl Tls13ClientSessionValue {
         suite: &'static Tls13CipherSuite,
         ticket: Vec<u8>,
         secret: &[u8],
-        server_cert_chain: CertificateChain,
+        server_cert_chain: CertificateChain<'static>,
         time_now: UnixTime,
         lifetime_secs: u32,
         age_add: u32,
@@ -154,7 +154,7 @@ impl Tls12ClientSessionValue {
         session_id: SessionId,
         ticket: Vec<u8>,
         master_secret: &[u8],
-        server_cert_chain: CertificateChain,
+        server_cert_chain: CertificateChain<'static>,
         time_now: UnixTime,
         lifetime_secs: u32,
         extended_ms: bool,
@@ -207,7 +207,7 @@ pub struct ClientSessionCommon {
     secret: Zeroizing<PayloadU8>,
     epoch: u64,
     lifetime_secs: u32,
-    server_cert_chain: CertificateChain,
+    server_cert_chain: CertificateChain<'static>,
 }
 
 impl ClientSessionCommon {
@@ -216,7 +216,7 @@ impl ClientSessionCommon {
         secret: &[u8],
         time_now: UnixTime,
         lifetime_secs: u32,
-        server_cert_chain: CertificateChain,
+        server_cert_chain: CertificateChain<'static>,
     ) -> Self {
         Self {
             ticket: PayloadU16(ticket),
@@ -227,7 +227,7 @@ impl ClientSessionCommon {
         }
     }
 
-    pub(crate) fn server_cert_chain(&self) -> &CertificateChain {
+    pub(crate) fn server_cert_chain(&self) -> &CertificateChain<'static> {
         &self.server_cert_chain
     }
 
@@ -256,7 +256,7 @@ pub struct ServerSessionValue {
     pub(crate) cipher_suite: CipherSuite,
     pub(crate) master_secret: Zeroizing<PayloadU8>,
     pub(crate) extended_ms: bool,
-    pub(crate) client_cert_chain: Option<CertificateChain>,
+    pub(crate) client_cert_chain: Option<CertificateChain<'static>>,
     pub(crate) alpn: Option<PayloadU8>,
     pub(crate) application_data: PayloadU16,
     pub creation_time_sec: u64,
@@ -264,7 +264,7 @@ pub struct ServerSessionValue {
     freshness: Option<bool>,
 }
 
-impl Codec for ServerSessionValue {
+impl Codec<'_> for ServerSessionValue {
     fn encode(&self, bytes: &mut Vec<u8>) {
         if let Some(ref sni) = self.sni {
             1u8.encode(bytes);
@@ -295,7 +295,7 @@ impl Codec for ServerSessionValue {
             .encode(bytes);
     }
 
-    fn read(r: &mut Reader) -> Result<Self, InvalidMessage> {
+    fn read(r: &mut Reader<'_>) -> Result<Self, InvalidMessage> {
         let has_sni = u8::read(r)?;
         let sni = if has_sni == 1 {
             let dns_name = PayloadU8::read(r)?;
@@ -315,7 +315,7 @@ impl Codec for ServerSessionValue {
         let ems = u8::read(r)?;
         let has_ccert = u8::read(r)? == 1;
         let ccert = if has_ccert {
-            Some(CertificateChain::read(r)?)
+            Some(CertificateChain::read(r)?.into_owned())
         } else {
             None
         };
@@ -351,7 +351,7 @@ impl ServerSessionValue {
         v: ProtocolVersion,
         cs: CipherSuite,
         ms: &[u8],
-        client_cert_chain: Option<CertificateChain>,
+        client_cert_chain: Option<CertificateChain<'static>>,
         alpn: Option<Vec<u8>>,
         application_data: Vec<u8>,
         creation_time: UnixTime,
@@ -406,11 +406,11 @@ impl ServerSessionValue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::enums::*;
-    use crate::msgs::codec::{Codec, Reader};
 
+    #[cfg(feature = "std")] // for UnixTime::now
     #[test]
     fn serversessionvalue_is_debug() {
+        use std::{println, vec};
         let ssv = ServerSessionValue::new(
             None,
             ProtocolVersion::TLSv1_3,

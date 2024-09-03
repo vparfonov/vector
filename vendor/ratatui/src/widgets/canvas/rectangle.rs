@@ -66,7 +66,7 @@ impl Shape for Rectangle {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{assert_buffer_eq, prelude::*, widgets::canvas::Canvas};
+    use crate::{prelude::*, symbols::Marker, widgets::canvas::Canvas};
 
     #[test]
     fn draw_block_lines() {
@@ -85,7 +85,7 @@ mod tests {
                 });
             });
         canvas.render(buffer.area, &mut buffer);
-        let mut expected = Buffer::with_lines(vec![
+        let mut expected = Buffer::with_lines([
             "██████████",
             "█        █",
             "█        █",
@@ -98,8 +98,43 @@ mod tests {
             "██████████",
         ]);
         expected.set_style(buffer.area, Style::new().red());
-        expected.set_style(buffer.area.inner(&Margin::new(1, 1)), Style::reset());
-        assert_buffer_eq!(buffer, expected);
+        expected.set_style(buffer.area.inner(Margin::new(1, 1)), Style::reset());
+        assert_eq!(buffer, expected);
+    }
+
+    #[test]
+    fn draw_half_block_lines() {
+        let mut buffer = Buffer::empty(Rect::new(0, 0, 10, 10));
+        let canvas = Canvas::default()
+            .marker(Marker::HalfBlock)
+            .x_bounds([0.0, 10.0])
+            .y_bounds([0.0, 10.0])
+            .paint(|context| {
+                context.draw(&Rectangle {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 10.0,
+                    height: 10.0,
+                    color: Color::Red,
+                });
+            });
+        canvas.render(buffer.area, &mut buffer);
+        let mut expected = Buffer::with_lines([
+            "█▀▀▀▀▀▀▀▀█",
+            "█        █",
+            "█        █",
+            "█        █",
+            "█        █",
+            "█        █",
+            "█        █",
+            "█        █",
+            "█        █",
+            "█▄▄▄▄▄▄▄▄█",
+        ]);
+        expected.set_style(buffer.area, Style::new().red().on_red());
+        expected.set_style(buffer.area.inner(Margin::new(1, 0)), Style::reset().red());
+        expected.set_style(buffer.area.inner(Margin::new(1, 1)), Style::reset());
+        assert_eq!(buffer, expected);
     }
 
     #[test]
@@ -128,7 +163,7 @@ mod tests {
                 });
             });
         canvas.render(buffer.area, &mut buffer);
-        let mut expected = Buffer::with_lines(vec![
+        let mut expected = Buffer::with_lines([
             "⡏⠉⠉⠉⠉⠉⠉⠉⠉⢹",
             "⡇⢠⠤⠤⠤⠤⠤⠤⡄⢸",
             "⡇⢸      ⡇⢸",
@@ -141,8 +176,8 @@ mod tests {
             "⣇⣀⣀⣀⣀⣀⣀⣀⣀⣸",
         ]);
         expected.set_style(buffer.area, Style::new().red());
-        expected.set_style(buffer.area.inner(&Margin::new(1, 1)), Style::new().green());
-        expected.set_style(buffer.area.inner(&Margin::new(2, 2)), Style::reset());
-        assert_buffer_eq!(buffer, expected);
+        expected.set_style(buffer.area.inner(Margin::new(1, 1)), Style::new().green());
+        expected.set_style(buffer.area.inner(Margin::new(2, 2)), Style::reset());
+        assert_eq!(buffer, expected);
     }
 }

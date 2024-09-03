@@ -12,16 +12,19 @@ mod cmp;
 mod inherent;
 mod iter;
 mod ops;
+#[cfg(feature = "std")]
+mod ops_with_serialized;
 #[cfg(feature = "serde")]
 mod serde;
 #[cfg(feature = "std")]
-mod serialization;
-
-use alloc::vec::Vec;
+pub(crate) mod serialization;
 
 use self::cmp::Pairs;
 pub use self::iter::IntoIter;
 pub use self::iter::Iter;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 /// A compressed bitmap using the [Roaring bitmap compression scheme](https://roaringbitmap.org/).
 ///

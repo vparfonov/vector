@@ -128,103 +128,117 @@ fn it_can_serialize_deserialize() {
     }
 }
 
-#[test]
 #[cfg(feature = "borsh")]
-fn it_can_serialize_deserialize_borsh() {
-    let tests = [
-        "12.3456789",
-        "5233.9008808150288439427720175",
-        "-5233.9008808150288439427720175",
-    ];
-    for test in &tests {
-        let a = Decimal::from_str(test).unwrap();
-        let mut bytes: Vec<u8> = Vec::new();
-        borsh::BorshSerialize::serialize(&a, &mut bytes).unwrap();
-        let b: Decimal = borsh::BorshDeserialize::deserialize(&mut bytes.as_slice()).unwrap();
-        assert_eq!(test.to_string(), b.to_string());
-        let bytes = borsh::try_to_vec_with_schema(&a);
-        assert!(bytes.is_ok(), "try_to_vec_with_schema.is_ok()");
-        let bytes = bytes.unwrap();
-        let result = borsh::try_from_slice_with_schema(&bytes);
-        assert!(result.is_ok(), "try_from_slice_with_schema.is_ok()");
-        let b: Decimal = result.unwrap();
-        assert_eq!(test.to_string(), b.to_string());
+mod borsh_tests {
+    use rust_decimal::Decimal;
+    use std::str::FromStr;
+
+    #[test]
+    fn it_can_serialize_deserialize_borsh() {
+        let tests = [
+            "12.3456789",
+            "5233.9008808150288439427720175",
+            "-5233.9008808150288439427720175",
+        ];
+        for test in &tests {
+            let a = Decimal::from_str(test).unwrap();
+            let mut bytes: Vec<u8> = Vec::new();
+            borsh::BorshSerialize::serialize(&a, &mut bytes).unwrap();
+            let b: Decimal = borsh::BorshDeserialize::deserialize(&mut bytes.as_slice()).unwrap();
+            assert_eq!(test.to_string(), b.to_string());
+            let bytes = borsh::try_to_vec_with_schema(&a);
+            assert!(bytes.is_ok(), "try_to_vec_with_schema.is_ok()");
+            let bytes = bytes.unwrap();
+            let result = borsh::try_from_slice_with_schema(&bytes);
+            assert!(result.is_ok(), "try_from_slice_with_schema.is_ok()");
+            let b: Decimal = result.unwrap();
+            assert_eq!(test.to_string(), b.to_string());
+        }
     }
 }
 
-#[test]
 #[cfg(feature = "ndarray")]
-fn it_can_do_scalar_ops_in_ndarray() {
-    use ndarray::Array1;
-    use num_traits::FromPrimitive;
+mod ndarray_tests {
+    use rust_decimal::Decimal;
 
-    let array_a = Array1::from(vec![
-        Decimal::from_f32(1.0).unwrap(),
-        Decimal::from_f32(2.0).unwrap(),
-        Decimal::from_f32(3.0).unwrap(),
-    ]);
+    #[test]
+    fn it_can_do_scalar_ops_in_ndarray() {
+        use ndarray::Array1;
+        use num_traits::FromPrimitive;
 
-    // Add
-    let output = array_a.clone() + Decimal::from_f32(5.0).unwrap();
-    let expectation = Array1::from(vec![
-        Decimal::from_f32(6.0).unwrap(),
-        Decimal::from_f32(7.0).unwrap(),
-        Decimal::from_f32(8.0).unwrap(),
-    ]);
-    assert_eq!(output, expectation);
+        let array_a = Array1::from(vec![
+            Decimal::from_f32(1.0).unwrap(),
+            Decimal::from_f32(2.0).unwrap(),
+            Decimal::from_f32(3.0).unwrap(),
+        ]);
 
-    // Sub
-    let output = array_a.clone() - Decimal::from_f32(5.0).unwrap();
-    let expectation = Array1::from(vec![
-        Decimal::from_f32(-4.0).unwrap(),
-        Decimal::from_f32(-3.0).unwrap(),
-        Decimal::from_f32(-2.0).unwrap(),
-    ]);
-    assert_eq!(output, expectation);
+        // Add
+        let output = array_a.clone() + Decimal::from_f32(5.0).unwrap();
+        let expectation = Array1::from(vec![
+            Decimal::from_f32(6.0).unwrap(),
+            Decimal::from_f32(7.0).unwrap(),
+            Decimal::from_f32(8.0).unwrap(),
+        ]);
+        assert_eq!(output, expectation);
 
-    // Mul
-    let output = array_a.clone() * Decimal::from_f32(5.0).unwrap();
-    let expectation = Array1::from(vec![
-        Decimal::from_f32(5.0).unwrap(),
-        Decimal::from_f32(10.0).unwrap(),
-        Decimal::from_f32(15.0).unwrap(),
-    ]);
-    assert_eq!(output, expectation);
+        // Sub
+        let output = array_a.clone() - Decimal::from_f32(5.0).unwrap();
+        let expectation = Array1::from(vec![
+            Decimal::from_f32(-4.0).unwrap(),
+            Decimal::from_f32(-3.0).unwrap(),
+            Decimal::from_f32(-2.0).unwrap(),
+        ]);
+        assert_eq!(output, expectation);
 
-    // Div
-    let output = array_a / Decimal::from_f32(5.0).unwrap();
-    let expectation = Array1::from(vec![
-        Decimal::from_f32(0.2).unwrap(),
-        Decimal::from_f32(0.4).unwrap(),
-        Decimal::from_f32(0.6).unwrap(),
-    ]);
-    assert_eq!(output, expectation);
+        // Mul
+        let output = array_a.clone() * Decimal::from_f32(5.0).unwrap();
+        let expectation = Array1::from(vec![
+            Decimal::from_f32(5.0).unwrap(),
+            Decimal::from_f32(10.0).unwrap(),
+            Decimal::from_f32(15.0).unwrap(),
+        ]);
+        assert_eq!(output, expectation);
+
+        // Div
+        let output = array_a / Decimal::from_f32(5.0).unwrap();
+        let expectation = Array1::from(vec![
+            Decimal::from_f32(0.2).unwrap(),
+            Decimal::from_f32(0.4).unwrap(),
+            Decimal::from_f32(0.6).unwrap(),
+        ]);
+        assert_eq!(output, expectation);
+    }
 }
 
-#[test]
 #[cfg(feature = "rkyv")]
-fn it_can_serialize_deserialize_rkyv() {
-    use rkyv::Deserialize;
-    let tests = [
-        "12.3456789",
-        "5233.9008808150288439427720175",
-        "-5233.9008808150288439427720175",
-    ];
-    for test in &tests {
-        let a = Decimal::from_str(test).unwrap();
-        let bytes = rkyv::to_bytes::<_, 256>(&a).unwrap();
+mod rkyv_tests {
+    use rust_decimal::Decimal;
+    use std::str::FromStr;
 
-        #[cfg(feature = "rkyv-safe")]
-        {
-            let archived = rkyv::check_archived_root::<Decimal>(&bytes[..]).unwrap();
+    #[test]
+    fn it_can_serialize_deserialize_rkyv() {
+        use rkyv::Deserialize;
+        let tests = [
+            "12.3456789",
+            "5233.9008808150288439427720175",
+            "-5233.9008808150288439427720175",
+        ];
+        for test in &tests {
+            let a = Decimal::from_str(test).unwrap();
+            let bytes = rkyv::to_bytes::<_, 256>(&a).unwrap();
+
+            #[cfg(feature = "rkyv-safe")]
+            {
+                let archived = rkyv::check_archived_root::<Decimal>(&bytes[..]).unwrap();
+                assert_eq!(archived, &a);
+            }
+
+            let archived = unsafe { rkyv::archived_root::<Decimal>(&bytes[..]) };
             assert_eq!(archived, &a);
+
+            let deserialized: Decimal = archived.deserialize(&mut rkyv::Infallible).unwrap();
+            assert_eq!(deserialized, a);
         }
-
-        let archived = unsafe { rkyv::archived_root::<Decimal>(&bytes[..]) };
-        assert_eq!(archived, &a);
-
-        let deserialized: Decimal = archived.deserialize(&mut rkyv::Infallible).unwrap();
-        assert_eq!(deserialized, a);
     }
 }
 
@@ -2967,11 +2981,18 @@ fn it_converts_from_i128() {
         (92233720368547758089, Some("92233720368547758089")),
         (0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF, Some("79228162514264337593543950335")),
         (0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF, None),
+        (i128::MIN, None),
+        (i128::MAX, None),
     ];
     for (value, expected) in tests {
-        if let Some(expected_value) = expected {
-            let decimal = Decimal::from_str(expected_value).unwrap();
-            assert_eq!(num_traits::FromPrimitive::from_i128(*value), Some(decimal));
+        let from_i128 = num_traits::FromPrimitive::from_i128(*value);
+
+        match expected {
+            Some(expected_value) => {
+                let decimal = Decimal::from_str(expected_value).unwrap();
+                assert_eq!(from_i128, Some(decimal));
+            }
+            None => assert!(from_i128.is_none()),
         }
     }
 }
@@ -2983,11 +3004,17 @@ fn it_converts_from_u128() {
         (0xFFFF_FFFF_FFFF_FFFF, Some("18446744073709551615")),
         (0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF, Some("79228162514264337593543950335")),
         (0x7FFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF, None),
+        (u128::MAX, None),
     ];
     for (value, expected) in tests {
-        if let Some(expected_value) = expected {
-            let decimal = Decimal::from_str(expected_value).unwrap();
-            assert_eq!(num_traits::FromPrimitive::from_u128(*value), Some(decimal));
+        let from_u128 = num_traits::FromPrimitive::from_u128(*value);
+
+        match expected {
+            Some(expected_value) => {
+                let decimal = Decimal::from_str(expected_value).unwrap();
+                assert_eq!(from_u128, Some(decimal));
+            }
+            None => assert!(from_u128.is_none()),
         }
     }
 }
@@ -3413,8 +3440,8 @@ fn it_can_calculate_abs_sub() {
     let tests = &[
         ("123", "124", 0),
         ("123", "123", 0),
-        ("123", "122", 123),
-        ("-123", "-124", 123),
+        ("123", "122", 1),
+        ("-123", "-124", 1),
         ("-123", "-123", 0),
         ("-123", "-122", 0),
     ];
@@ -3473,9 +3500,9 @@ fn declarative_ref_dec_sum() {
     assert_eq!(sum, Decimal::from(45))
 }
 
-#[cfg(feature = "postgres")]
+#[cfg(feature = "db-postgres")]
 #[test]
-fn to_from_sql() {
+fn postgres_to_from_sql() {
     use bytes::BytesMut;
     use postgres::types::{FromSql, Kind, ToSql, Type};
 
@@ -3511,6 +3538,36 @@ fn to_from_sql() {
         let output = Decimal::from_sql(&t, &bytes).unwrap();
 
         assert_eq!(input, output);
+    }
+}
+
+#[cfg(feature = "db-postgres")]
+#[test]
+fn postgres_from_sql_special_numeric() {
+    use postgres::types::{FromSql, Kind, Type};
+
+    // The numbers below are the big-endian equivalent of the NUMERIC_* masks for NAN, PINF, NINF
+    let tests = &[
+        ("NaN", &[0, 0, 0, 0, 192, 0, 0, 0]),
+        ("Infinity", &[0, 0, 0, 0, 208, 0, 0, 0]),
+        ("-Infinity", &[0, 0, 0, 0, 240, 0, 0, 0]),
+    ];
+
+    let t = Type::new("".into(), 0, Kind::Simple, "".into());
+
+    for (name, bytes) in tests {
+        let res = Decimal::from_sql(&t, *bytes);
+        match &res {
+            Ok(_) => panic!("Expected error, got Ok"),
+            Err(e) => {
+                let error_message = e.to_string();
+                assert!(
+                    error_message.contains(name),
+                    "Error message does not contain the expected value: {}",
+                    name
+                );
+            }
+        }
     }
 }
 
@@ -3693,6 +3750,8 @@ mod maths {
             ("0.1", 0_u64, "1"),
             ("342.4", 1_u64, "342.4"),
             ("2.0", 16_u64, "65536"),
+            ("0.99999999999999", 1477289400_u64, "0.9999852272151186611602884841"),
+            ("0.99999999999999", 0x8000_8000_0000_0000, "0"),
         ];
         for &(x, y, expected) in test_cases {
             let x = Decimal::from_str(x).unwrap();
@@ -3829,6 +3888,7 @@ mod maths {
                 "0.1234567890123456789012345678",
                 either!("0.0003533642875741443321850682", "0.0003305188683169079961720764"),
             ),
+            ("0.99999999999999", "1477289400", "0.9999852272151186611602884841"),
         ];
         for &(x, y, expected) in test_cases {
             let x = Decimal::from_str(x).unwrap();
@@ -3965,43 +4025,28 @@ mod maths {
     }
 
     #[test]
+    #[cfg(not(feature = "legacy-ops"))]
     fn test_norm_cdf() {
         let test_cases = &[
             (
                 Decimal::from_str("-0.4").unwrap(),
-                either!(
-                    Decimal::from_str("0.3445781286821245037094401704").unwrap(),
-                    Decimal::from_str("0.3445781286821245037094401728").unwrap()
-                ),
+                Decimal::from_str("0.3445781286821245037094401704").unwrap(),
             ),
             (
                 Decimal::from_str("-0.1").unwrap(),
-                either!(
-                    Decimal::from_str("0.4601722899186706579921922696").unwrap(),
-                    Decimal::from_str("0.4601722899186706579921922711").unwrap()
-                ),
+                Decimal::from_str("0.4601722899186706579921922696").unwrap(),
             ),
             (
                 Decimal::from_str("0.1").unwrap(),
-                Decimal::from_str(either!(
-                    "0.5398277100813293420078077304",
-                    "0.5398277100813293420078077290"
-                ))
-                .unwrap(),
+                Decimal::from_str("0.5398277100813293420078077304").unwrap(),
             ),
             (
                 Decimal::from_str("0.4").unwrap(),
-                either!(
-                    Decimal::from_str("0.6554218713178754962905598296").unwrap(),
-                    Decimal::from_str("0.6554218713178754962905598272").unwrap()
-                ),
+                Decimal::from_str("0.6554218713178754962905598296").unwrap(),
             ),
             (
                 Decimal::from_str("2.0").unwrap(),
-                either!(
-                    Decimal::from_str("0.9772497381095865280953380673").unwrap(),
-                    Decimal::from_str("0.9772497381095865280953380672").unwrap()
-                ),
+                Decimal::from_str("0.9772497381095865280953380673").unwrap(),
             ),
         ];
         for case in test_cases {
@@ -4675,7 +4720,7 @@ mod generated {
 }
 
 #[cfg(feature = "proptest")]
-mod proptest {
+mod proptest_tests {
     use super::Decimal;
     use proptest::prelude::*;
 
@@ -4689,7 +4734,7 @@ mod proptest {
 
 #[cfg(feature = "rocket-traits")]
 #[allow(clippy::disallowed_names)]
-mod rocket {
+mod rocket_tests {
     use crate::Decimal;
     use rocket::form::{Form, FromForm};
     use std::str::FromStr;
@@ -4712,7 +4757,7 @@ mod rocket {
 }
 
 #[cfg(feature = "rust-fuzz")]
-mod rust_fuzz {
+mod rust_fuzz_tests {
     use arbitrary::{Arbitrary, Unstructured};
 
     use super::*;

@@ -259,26 +259,14 @@
 //! [gh-repo-examples]: https://github.com/rust-cli/env_logger/tree/main/examples
 //! [level-enum]: https://docs.rs/log/latest/log/enum.Level.html
 //! [log-crate-url]: https://docs.rs/log
-//! [`Builder`]: struct.Builder.html
-//! [`Builder::is_test`]: struct.Builder.html#method.is_test
-//! [`Env`]: struct.Env.html
-//! [`fmt`]: fmt/index.html
 
-#![doc(
-    html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
-    html_favicon_url = "https://www.rust-lang.org/static/images/favicon.ico"
-)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
-// When compiled for the rustc compiler itself we want to make sure that this is
-// an unstable crate
-#![cfg_attr(rustbuild, feature(staged_api, rustc_private))]
-#![cfg_attr(rustbuild, unstable(feature = "rustc_private", issue = "27812"))]
-#![deny(missing_debug_implementations, missing_docs)]
+#![warn(clippy::print_stderr)]
+#![warn(clippy::print_stdout)]
 
 mod logger;
 
-pub mod filter;
 pub mod fmt;
 
-pub use self::fmt::glob::*;
+pub use self::fmt::{Target, TimestampPrecision, WriteStyle};
 pub use self::logger::*;

@@ -90,7 +90,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for ListQue
             ::aws_smithy_runtime_api::client::auth::static_resolver::StaticAuthSchemeOptionResolverParams::new(),
         ));
 
-        cfg.store_put(::aws_smithy_http::operation::Metadata::new("ListQueues", "sqs"));
+        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new("ListQueues", "sqs"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = true;
         signing_options.content_sha256_header = false;
@@ -111,11 +111,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for ListQue
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("ListQueues")
-            .with_interceptor(
-                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
-                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
-                ),
-            )
+            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
             .with_interceptor(ListQueuesEndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::list_queues::ListQueuesError,
@@ -239,6 +235,9 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for ListQueuesEnd
     }
 }
 
+// The get_* functions below are generated from JMESPath expressions in the
+// operationContextParams trait. They target the operation's input shape.
+
 /// Error type for the `ListQueuesError` operation.
 #[non_exhaustive]
 #[derive(::std::fmt::Debug)]
@@ -249,9 +248,12 @@ pub enum ListQueuesError {
     InvalidSecurity(crate::types::error::InvalidSecurity),
     /// <p>The request was denied due to request throttling.</p>
     /// <ul>
-    /// <li> <p>The rate of requests per second exceeds the Amazon Web Services KMS request quota for an account and Region. </p> </li>
-    /// <li> <p>A burst or sustained high rate of requests to change the state of the same KMS key. This condition is often known as a "hot key."</p> </li>
-    /// <li> <p>Requests for operations on KMS keys in a Amazon Web Services CloudHSM key store might be throttled at a lower-than-expected rate when the Amazon Web Services CloudHSM cluster associated with the Amazon Web Services CloudHSM key store is processing numerous commands, including those unrelated to the Amazon Web Services CloudHSM key store.</p> </li>
+    /// <li>
+    /// <p>The rate of requests per second exceeds the Amazon Web Services KMS request quota for an account and Region.</p></li>
+    /// <li>
+    /// <p>A burst or sustained high rate of requests to change the state of the same KMS key. This condition is often known as a "hot key."</p></li>
+    /// <li>
+    /// <p>Requests for operations on KMS keys in a Amazon Web Services CloudHSM key store might be throttled at a lower-than-expected rate when the Amazon Web Services CloudHSM cluster associated with the Amazon Web Services CloudHSM key store is processing numerous commands, including those unrelated to the Amazon Web Services CloudHSM key store.</p></li>
     /// </ul>
     RequestThrottled(crate::types::error::RequestThrottled),
     /// <p>Error code 400. Unsupported operation.</p>

@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "goauth"
-version = "0.13.1"
+version = "0.14.0"
 authors = ["Drazen Urch <github@drazenur.ch>"]
 description = "Crate for authenticating Server to Server Apps for Google Cloud Engine."
 documentation = "https://durch.github.io/rust-goauth"
@@ -61,7 +61,7 @@ version = "1"
 version = "0.1"
 
 [dependencies.smpl_jwt]
-version = "0.7.1"
+version = "0.8.0"
 default-features = false
 
 [dependencies.time]

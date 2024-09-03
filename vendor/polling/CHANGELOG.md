@@ -1,3 +1,74 @@
+# Version 3.7.3
+
+- Update to `windows-sys` v0.59. (#214)
+
+# Version 3.7.2
+
+- Update `hermit-abi` to v0.4.0. (#209)
+
+# Version 3.7.1
+
+- Fix a typo in `Event::is_err()`. (#204)
+
+# Version 3.7.0
+
+- Add support for the PS Vita as a platform. (#160)
+
+# Version 3.6.0
+
+- Add an `is_err` method to `Event` to tell when an error has occurred. (#189)
+- Deprecate the `is_connect_failed` function. (#189)
+- Add support for HermitOS to `polling`. (#194)
+
+# Version 3.5.0
+
+- Use the `epoll` backend when RedoxOS is enabled. (#190)
+
+# Version 3.4.0
+
+- Add the ability to identify whether socket connection has failed. (#185)
+- On BSD, add the ability to wait on a process by its PID. Previously, it was
+  only possible to wait on a process by a `Child` object. (#180)
+- On ESP-IDF, annotate `eventfd` initialization failures with a message
+  indicating the source of those failures. (#186)
+
+# Version 3.3.2
+
+- When AFD fails to initialize, the resulting error now references
+  the underlying system error. (#174)
+
+# Version 3.3.1
+
+- Bump `windows-sys` to v0.52.0. (#169)
+
+# Version 3.3.0
+
+- Automatically restarts polling when `ErrorKind::Interrupted` is returned, rather than relying on the user to handle it. (#164)
+- Fix bad link in documentation for `Poller::wait()`. (#163)
+
+# Version 3.2.0
+
+- The `kqueue` backend previously allowed the following operations that other backends forbid. Now these operations result in an error: (#153)
+  - Inserting a source that was already inserted.
+  - Modifying/deleting a source that was not already inserted.
+- Add support for Haiku OS. (#154)
+
+# Version 3.1.0
+
+- Add an `Event::new()` constructor to simplify creating `Event`s. (#149)
+
+# Version 3.0.0
+
+- Replace `libc` in all backends with the `rustix` crate (#108).
+- Use `tracing` instead of `log` for logging (#119).
+- **Breaking:** Rework the API to use I/O safety. Note that this makes several previously safe functions unsafe. (#123)
+- Add support for the ESP-IDF platform. (#128)
+- **Breaking:** Make `Event` partially opaque, and create a new `Events` struct for holding events. (#133)
+- Add support for running `polling` in Linux containers without `eventfd` available. (#134)
+- Specify the behavior when registered in multiple `Poller`s. (#136)
+- **Breaking:** Use `c_int` from the standard library in `polling::os::kqueue` instead of defining our own. (#143)
+- **Breaking:** Remove the useless `std` feature. (#147)
+
 # Version 2.8.0
 
 - Add functionality for posting events to the IOCP. (#101)

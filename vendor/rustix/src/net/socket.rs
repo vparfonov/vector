@@ -275,7 +275,8 @@ pub fn bind_unix<Fd: AsFd>(sockfd: Fd, addr: &SocketAddrUnix) -> io::Result<()> 
     backend::net::syscalls::bind_unix(sockfd.as_fd(), addr)
 }
 
-/// `bind(sockfd, addr, sizeof(struct sockaddr_un))`—Binds a socket to a XDP address.
+/// `bind(sockfd, addr, sizeof(struct sockaddr_un))`—Binds a socket to a XDP
+/// address.
 ///
 /// # References
 ///  - [Linux]
@@ -472,8 +473,8 @@ pub fn connect_unix<Fd: AsFd>(sockfd: Fd, addr: &SocketAddrUnix) -> io::Result<(
     backend::net::syscalls::connect_unix(sockfd.as_fd(), addr)
 }
 
-/// `connect(sockfd, {.sa_family = AF_UNSPEC}, sizeof(struct sockaddr))`
-/// — Dissolve the socket's association.
+/// `connect(sockfd, {.sa_family = AF_UNSPEC}, sizeof(struct sockaddr))`—
+/// Dissolve the socket's association.
 ///
 /// On UDP sockets, BSD platforms report [`Errno::AFNOSUPPORT`] or
 /// [`Errno::INVAL`] even if the disconnect was successful.

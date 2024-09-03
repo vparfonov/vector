@@ -6,6 +6,8 @@ pub use oauth2::basic::{
     BasicRequestTokenError as CoreRequestTokenError,
     BasicRevocationErrorResponse as CoreRevocationErrorResponse, BasicTokenType as CoreTokenType,
 };
+
+use oauth2::devicecode::{DeviceAuthorizationResponse, EmptyExtraDeviceAuthorizationFields};
 pub use oauth2::StandardRevocableToken as CoreRevocableToken;
 use oauth2::{
     EmptyExtraTokenFields, ErrorResponseType, ResponseType as OAuth2ResponseType,
@@ -30,13 +32,20 @@ use crate::{
 use super::AuthenticationFlow;
 
 pub use self::jwk::{
-    CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse, CoreRsaPrivateSigningKey,
+    CoreEdDsaPrivateSigningKey, CoreHmacKey, CoreJsonWebKey, CoreJsonWebKeyType, CoreJsonWebKeyUse,
+    CoreRsaPrivateSigningKey,
 };
 
 mod crypto;
 
 // Private purely for organizational reasons; exported publicly above.
 mod jwk;
+
+///
+/// Standard implementation of DeviceAuthorizationResponse which throws away extra received response fields.
+///
+pub type CoreDeviceAuthorizationResponse =
+    DeviceAuthorizationResponse<EmptyExtraDeviceAuthorizationFields>;
 
 ///
 /// OpenID Connect Core token introspection response.
@@ -847,6 +856,11 @@ pub enum CoreJwsSigningAlgorithm {
     #[serde(rename = "PS512")]
     RsaSsaPssSha512,
     ///
+    /// EdDSA signature using Ed25519 curve
+    ///
+    #[serde(rename = "Ed25519")]
+    EdDsaEd25519,
+    ///
     /// No digital signature or MAC performed.
     ///
     /// # Security Warning
@@ -875,6 +889,7 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
             CoreJwsSigningAlgorithm::EcdsaP256Sha256
             | CoreJwsSigningAlgorithm::EcdsaP384Sha384
             | CoreJwsSigningAlgorithm::EcdsaP521Sha512 => Some(CoreJsonWebKeyType::EllipticCurve),
+            CoreJwsSigningAlgorithm::EdDsaEd25519 => Some(CoreJsonWebKeyType::OctetKeyPair),
             CoreJwsSigningAlgorithm::None => None,
         }
     }
@@ -886,20 +901,33 @@ impl JwsSigningAlgorithm<CoreJsonWebKeyType> for CoreJwsSigningAlgorithm {
     }
 
     fn hash_bytes(&self, bytes: &[u8]) -> Result<Vec<u8>, String> {
-        use ring::digest::{digest, SHA256, SHA384, SHA512};
+        use sha2::{Digest, Sha256, Sha384, Sha512};
         Ok(match *self {
             CoreJwsSigningAlgorithm::HmacSha256
             | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256
             | CoreJwsSigningAlgorithm::RsaSsaPssSha256
-            | CoreJwsSigningAlgorithm::EcdsaP256Sha256 => digest(&SHA256, bytes).as_ref().to_vec(),
+            | CoreJwsSigningAlgorithm::EcdsaP256Sha256 => {
+                let mut hasher = Sha256::new();
+                hasher.update(bytes);
+                hasher.finalize().to_vec()
+            }
             CoreJwsSigningAlgorithm::HmacSha384
             | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha384
             | CoreJwsSigningAlgorithm::RsaSsaPssSha384
-            | CoreJwsSigningAlgorithm::EcdsaP384Sha384 => digest(&SHA384, bytes).as_ref().to_vec(),
+            | CoreJwsSigningAlgorithm::EcdsaP384Sha384 => {
+                let mut hasher = Sha384::new();
+                hasher.update(bytes);
+                hasher.finalize().to_vec()
+            }
             CoreJwsSigningAlgorithm::HmacSha512
             | CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha512
             | CoreJwsSigningAlgorithm::RsaSsaPssSha512
-            | CoreJwsSigningAlgorithm::EcdsaP521Sha512 => digest(&SHA512, bytes).as_ref().to_vec(),
+            | CoreJwsSigningAlgorithm::EcdsaP521Sha512
+            | CoreJwsSigningAlgorithm::EdDsaEd25519 => {
+                let mut hasher = Sha512::new();
+                hasher.update(bytes);
+                hasher.finalize().to_vec()
+            }
             CoreJwsSigningAlgorithm::None => {
                 return Err(
                     "signature algorithm `none` has no corresponding hash algorithm".to_string(),
@@ -1187,7 +1215,7 @@ impl ResponseMode for CoreResponseMode {}
 /// OpenID Connect Core response type.
 ///
 /// Informs the Authorization Server of the desired authorization processing flow, including what
-/// parameters are returned from the endpoints used.  
+/// parameters are returned from the endpoints used.
 ///
 /// This type represents a single Response Type. Multiple Response Types are represented via the
 /// `ResponseTypes` type, which wraps a `Vec<ResponseType>`.

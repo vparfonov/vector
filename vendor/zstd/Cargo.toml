@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.64"
 name = "zstd"
-version = "0.13.0"
+version = "0.13.2"
 authors = ["Alexandre Bury <alexandre.bury@gmail.com>"]
 exclude = [
     "assets/*.zst",
@@ -47,7 +47,7 @@ name = "train"
 required-features = ["zdict_builder"]
 
 [dependencies.zstd-safe]
-version = "7.0.0"
+version = "7.1.0"
 features = ["std"]
 default-features = false
 

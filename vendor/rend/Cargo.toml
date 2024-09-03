@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "rend"
-version = "0.4.1"
+version = "0.4.2"
 authors = ["David Koloski <djkoloski@gmail.com>"]
 description = "Endian-aware primitives for Rust"
 documentation = "https://docs.rs/rend"

@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "bytecheck"
-version = "0.6.11"
+version = "0.6.12"
 authors = ["David Koloski <djkoloski@gmail.com>"]
 description = "Derive macro for bytecheck"
 documentation = "https://docs.rs/bytecheck"
@@ -26,10 +26,10 @@ keywords = [
 categories = ["encoding"]
 license = "MIT"
 repository = "https://github.com/djkoloski/bytecheck"
-resolver = "1"
 
 [dependencies.bytecheck_derive]
-version = "0.6.11"
+version = "0.6.12"
+default-features = false
 
 [dependencies.ptr_meta]
 version = "0.1"

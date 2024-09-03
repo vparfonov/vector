@@ -10,9 +10,9 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
+edition = "2021"
 name = "libflate"
-version = "1.4.0"
+version = "2.1.0"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
 description = "A Rust implementation of DEFLATE algorithm and related formats (ZLIB, GZIP)"
 homepage = "https://github.com/sile/libflate"
@@ -22,33 +22,42 @@ keywords = [
     "gzip",
     "zlib",
 ]
-categories = ["compression"]
+categories = [
+    "compression",
+    "no-std",
+]
 license = "MIT"
 repository = "https://github.com/sile/libflate"
 
 [dependencies.adler32]
 version = "1"
+default-features = false
 
 [dependencies.core2]
 version = "0.4"
 features = ["alloc"]
-optional = true
-default_features = false
+default-features = false
 
 [dependencies.crc32fast]
 version = "1.1.1"
+default-features = false
+
+[dependencies.dary_heap]
+version = "0.3.5"
 
 [dependencies.libflate_lz77]
-version = "1.1"
-default_features = false
+version = "2.1.0"
+default-features = false
 
 [dev-dependencies.clap]
-version = "2"
+version = "4"
+features = ["derive"]
 
 [features]
-no_std = [
-    "libflate_lz77/no_std",
-    "core2",
+default = ["std"]
+std = [
+    "libflate_lz77/std",
+    "core2/std",
 ]
 
 [badges.coveralls]

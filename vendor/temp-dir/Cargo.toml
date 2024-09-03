@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "temp-dir"
-version = "0.1.12"
+version = "0.1.13"
 authors = ["Michael Leonhard <michael@leonhardllc.com>"]
 description = "Simple temporary directory with cleanup"
 readme = "Readme.md"

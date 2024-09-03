@@ -1,16 +1,6 @@
-extern crate proc_macro; // Needed even though it's the 2018 edition. See https://github.com/idanarye/rust-typed-builder/issues/57.
+#![no_std]
 
-use proc_macro2::TokenStream;
-
-use syn::parse::Error;
-use syn::spanned::Spanned;
-use syn::{parse_macro_input, DeriveInput};
-
-use quote::quote;
-
-mod field_info;
-mod struct_info;
-mod util;
+use core::ops::FnOnce;
 
 /// `TypedBuilder` is not a real type - deriving it will generate a `::builder()` method on your
 /// struct that will return a compile-time checked builder. Set the fields using setters with the
@@ -62,7 +52,7 @@ mod util;
 /// // Foo::builder().x(1).y(2).y(3);
 /// ```
 ///
-/// # Customisation with attributes
+/// # Customization with attributes
 ///
 /// In addition to putting `#[derive(TypedBuilder)]` on a type, you can specify a `#[builder(…)]`
 /// attribute on the type, and on any fields in it.
@@ -73,6 +63,14 @@ mod util;
 ///   `#[doc(hidden)]`, so that the `builder()` method will show `FooBuilder` as its return type,
 ///   but it won't be a link. If you turn this on, the builder type and its `build` method will get
 ///   sane defaults. The field methods on the builder will be undocumented by default.
+///
+/// - `crate_module_path`: This is only needed when `typed_builder` is reexported from another
+///   crate - which usually happens when another macro uses it. In that case, it is the
+///   reponsibility of that macro to set the `crate_module_path` to the _unquoted_ module path from
+///   which the `typed_builder` crate can be accessed, so that the `TypedBuilder` macro will be
+///   able to access the typed declared in it.
+///
+///   Defaults to `#[builder(crate_module_path=::typed_builder)]`.
 ///
 /// - The following subsections:
 ///   - `builder_method(...)`: customize the builder method that creates the builder type
@@ -88,7 +86,7 @@ mod util;
 ///
 /// - The `build_method(...)` subsection also has:
 ///   - `into` or `into = ...`: change the output type of the builder. When a specific value/type
-///     is set via the assignement, this will be the output type of the builder. If no specific
+///     is set via the assignment, this will be the output type of the builder. If no specific
 ///     type is set, but `into` is specified, the return type will be generic and the user can
 ///     decide which type shall be constructed. In both cases an [`Into`] conversion is required to
 ///     be defined from the original type to the target type.
@@ -162,49 +160,31 @@ mod util;
 ///     `param1: Type1, param2: Type2 ...` instead of the field type itself. The parameters are
 ///     transformed into the field type using the expression `expr`. The transformation is performed
 ///     when the setter is called.
-#[proc_macro_derive(TypedBuilder, attributes(builder))]
-pub fn derive_typed_builder(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
-    match impl_my_derive(&input) {
-        Ok(output) => output.into(),
-        Err(error) => error.to_compile_error().into(),
+///
+///   - `prefix = "..."` prepends the setter method with the specified prefix. For example, setting
+///     `prefix = "with_"` results in setters like `with_x` or `with_y`. This option is combinable
+///     with `suffix = "..."`.
+///
+///   - `suffix = "..."` appends the setter method with the specified suffix. For example, setting
+///     `suffix = "_value"` results in setters like `x_value` or `y_value`. This option is combinable
+///     with `prefix = "..."`.
+pub use typed_builder_macro::TypedBuilder;
+
+#[doc(hidden)]
+pub trait Optional<T> {
+    fn into_value<F: FnOnce() -> T>(self, default: F) -> T;
+}
+
+impl<T> Optional<T> for () {
+    fn into_value<F: FnOnce() -> T>(self, default: F) -> T {
+        default()
     }
 }
 
-fn impl_my_derive(ast: &syn::DeriveInput) -> Result<TokenStream, Error> {
-    let data = match &ast.data {
-        syn::Data::Struct(data) => match &data.fields {
-            syn::Fields::Named(fields) => {
-                let struct_info = struct_info::StructInfo::new(ast, fields.named.iter())?;
-                let builder_creation = struct_info.builder_creation_impl()?;
-                let conversion_helper = struct_info.conversion_helper_impl();
-                let fields = struct_info
-                    .included_fields()
-                    .map(|f| struct_info.field_impl(f))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let fields = quote!(#(#fields)*).into_iter();
-                let required_fields = struct_info
-                    .included_fields()
-                    .filter(|f| f.builder_attr.default.is_none())
-                    .map(|f| struct_info.required_field_impl(f))
-                    .collect::<Vec<_>>();
-                let build_method = struct_info.build_method_impl();
-
-                quote! {
-                    #builder_creation
-                    #conversion_helper
-                    #( #fields )*
-                    #( #required_fields )*
-                    #build_method
-                }
-            }
-            syn::Fields::Unnamed(_) => return Err(Error::new(ast.span(), "TypedBuilder is not supported for tuple structs")),
-            syn::Fields::Unit => return Err(Error::new(ast.span(), "TypedBuilder is not supported for unit structs")),
-        },
-        syn::Data::Enum(_) => return Err(Error::new(ast.span(), "TypedBuilder is not supported for enums")),
-        syn::Data::Union(_) => return Err(Error::new(ast.span(), "TypedBuilder is not supported for unions")),
-    };
-    Ok(data)
+impl<T> Optional<T> for (T,) {
+    fn into_value<F: FnOnce() -> T>(self, _: F) -> T {
+        self.0
+    }
 }
 
 // It'd be nice for the compilation tests to live in tests/ with the rest, but short of pulling in
@@ -287,4 +267,20 @@ fn impl_my_derive(ast: &syn::DeriveInput) -> Result<TokenStream, Error> {
 ///
 /// let _ = Foo::builder().x(Uncloneable).clone();
 /// ```
+///
+/// Handling deprecated fields:
+///
+/// ```compile_fail
+/// use typed_builder::TypedBuilder;
+///
+/// #[derive(TypedBuilder)]
+/// struct Foo {
+///     #[deprecated = "Don't use this!"]
+///     #[allow(dead_code)]
+///     value: i32,
+/// }
+///
+/// #[deny(deprecated)]
+/// Foo::builder().value(42).build();
+///```
 fn _compile_fail_tests() {}

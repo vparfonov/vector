@@ -15,13 +15,23 @@
 
 use std::{error::Error, io};
 
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
 use itertools::Itertools;
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    crossterm::{
+        event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+        execute,
+        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    },
+    layout::{Constraint, Layout, Margin, Rect},
+    style::{self, Color, Modifier, Style, Stylize},
+    terminal::{Frame, Terminal},
+    text::{Line, Text},
+    widgets::{
+        Block, BorderType, Cell, HighlightSpacing, Paragraph, Row, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, Table, TableState,
+    },
+};
 use style::palette::tailwind;
 use unicode_width::UnicodeWidthStr;
 
@@ -48,7 +58,7 @@ struct TableColors {
 }
 
 impl TableColors {
-    fn new(color: &tailwind::Palette) -> Self {
+    const fn new(color: &tailwind::Palette) -> Self {
         Self {
             buffer_bg: tailwind::SLATE.c950,
             header_bg: color.c900,
@@ -69,7 +79,7 @@ struct Data {
 }
 
 impl Data {
-    fn ref_array(&self) -> [&String; 3] {
+    const fn ref_array(&self) -> [&String; 3] {
         [&self.name, &self.address, &self.email]
     }
 
@@ -96,9 +106,9 @@ struct App {
 }
 
 impl App {
-    fn new() -> App {
+    fn new() -> Self {
         let data_vec = generate_fake_names();
-        App {
+        Self {
             state: TableState::default().with_selected(0),
             longest_item_lens: constraint_len_calculator(&data_vec),
             scroll_state: ScrollbarState::new((data_vec.len() - 1) * ITEM_HEIGHT),
@@ -147,7 +157,7 @@ impl App {
     }
 
     pub fn set_colors(&mut self) {
-        self.colors = TableColors::new(&PALETTES[self.color_index])
+        self.colors = TableColors::new(&PALETTES[self.color_index]);
     }
 }
 
@@ -210,13 +220,12 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, mut app: App) -> io::Result<(
 
         if let Event::Key(key) = event::read()? {
             if key.kind == KeyEventKind::Press {
-                use KeyCode::*;
                 match key.code {
-                    Char('q') | Esc => return Ok(()),
-                    Char('j') | Down => app.next(),
-                    Char('k') | Up => app.previous(),
-                    Char('l') | Right => app.next_color(),
-                    Char('h') | Left => app.previous_color(),
+                    KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
+                    KeyCode::Char('j') | KeyCode::Down => app.next(),
+                    KeyCode::Char('k') | KeyCode::Up => app.previous(),
+                    KeyCode::Char('l') | KeyCode::Right => app.next_color(),
+                    KeyCode::Char('h') | KeyCode::Left => app.previous_color(),
                     _ => {}
                 }
             }
@@ -245,8 +254,7 @@ fn render_table(f: &mut Frame, app: &mut App, area: Rect) {
         .fg(app.colors.selected_style_fg);
 
     let header = ["Name", "Address", "Email"]
-        .iter()
-        .cloned()
+        .into_iter()
         .map(Cell::from)
         .collect::<Row>()
         .style(header_style)
@@ -257,9 +265,8 @@ fn render_table(f: &mut Frame, app: &mut App, area: Rect) {
             _ => app.colors.alt_row_color,
         };
         let item = data.ref_array();
-        item.iter()
-            .cloned()
-            .map(|content| Cell::from(Text::from(format!("\n{}\n", content))))
+        item.into_iter()
+            .map(|content| Cell::from(Text::from(format!("\n{content}\n"))))
             .collect::<Row>()
             .style(Style::new().fg(app.colors.row_fg).bg(color))
             .height(4)
@@ -308,6 +315,7 @@ fn constraint_len_calculator(items: &[Data]) -> (u16, u16, u16) {
         .max()
         .unwrap_or(0);
 
+    #[allow(clippy::cast_possible_truncation)]
     (name_len as u16, address_len as u16, email_len as u16)
 }
 
@@ -317,7 +325,7 @@ fn render_scrollbar(f: &mut Frame, app: &mut App, area: Rect) {
             .orientation(ScrollbarOrientation::VerticalRight)
             .begin_symbol(None)
             .end_symbol(None),
-        area.inner(&Margin {
+        area.inner(Margin {
             vertical: 1,
             horizontal: 1,
         }),
@@ -325,15 +333,14 @@ fn render_scrollbar(f: &mut Frame, app: &mut App, area: Rect) {
     );
 }
 
-fn render_footer(f: &mut Frame, app: &mut App, area: Rect) {
+fn render_footer(f: &mut Frame, app: &App, area: Rect) {
     let info_footer = Paragraph::new(Line::from(INFO_TEXT))
         .style(Style::new().fg(app.colors.row_fg).bg(app.colors.buffer_bg))
         .centered()
         .block(
-            Block::default()
-                .borders(Borders::ALL)
-                .border_style(Style::new().fg(app.colors.footer_border_color))
-                .border_type(BorderType::Double),
+            Block::bordered()
+                .border_type(BorderType::Double)
+                .border_style(Style::new().fg(app.colors.footer_border_color)),
         );
     f.render_widget(info_footer, area);
 }

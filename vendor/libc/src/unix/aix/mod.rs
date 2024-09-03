@@ -1,7 +1,6 @@
-pub type c_char = i8;
+pub type c_char = u8;
 pub type caddr_t = *mut ::c_char;
-// FIXME: clockid_t must be c_long, but time.rs accepts only i32
-pub type clockid_t = ::c_int;
+pub type clockid_t = ::c_longlong;
 pub type blkcnt_t = ::c_long;
 pub type clock_t = ::c_int;
 pub type daddr_t = ::c_long;
@@ -1211,6 +1210,7 @@ pub const TCP_KEEPCNT: ::c_int = 0x13;
 pub const TCP_NODELAYACK: ::c_int = 0x14;
 
 // pthread.h
+pub const PTHREAD_BARRIER_SERIAL_THREAD: ::c_int = -1;
 pub const PTHREAD_CREATE_JOINABLE: ::c_int = 0;
 pub const PTHREAD_CREATE_DETACHED: ::c_int = 1;
 pub const PTHREAD_PROCESS_SHARED: ::c_int = 0;
@@ -3275,7 +3275,13 @@ extern "C" {
     pub fn splice(socket1: ::c_int, socket2: ::c_int, flags: ::c_int) -> ::c_int;
     pub fn srand(seed: ::c_uint);
     pub fn srand48(seed: ::c_long);
-    pub fn stat64(path: *const c_char, buf: *mut stat64) -> ::c_int;
+    pub fn stat64(path: *const ::c_char, buf: *mut stat64) -> ::c_int;
+    pub fn stat64at(
+        dirfd: ::c_int,
+        path: *const ::c_char,
+        buf: *mut stat64,
+        flags: ::c_int,
+    ) -> ::c_int;
     pub fn statfs(path: *const ::c_char, buf: *mut statfs) -> ::c_int;
     pub fn statfs64(path: *const ::c_char, buf: *mut statfs64) -> ::c_int;
     pub fn statvfs64(path: *const ::c_char, buf: *mut statvfs64) -> ::c_int;

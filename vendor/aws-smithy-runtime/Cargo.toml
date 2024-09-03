@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "aws-smithy-runtime"
-version = "1.1.8"
+version = "1.7.1"
 authors = [
     "AWS Rust SDK Team <aws-sdk-rust@amazon.com>",
     "Zelda Hessler <zhessler@amazon.com>",
@@ -41,20 +41,20 @@ targets = ["x86_64-unknown-linux-gnu"]
 stable = true
 
 [dependencies.aws-smithy-async]
-version = "1.1.8"
+version = "1.2.1"
 
 [dependencies.aws-smithy-http]
-version = "0.60.7"
+version = "0.60.10"
 
 [dependencies.aws-smithy-protocol-test]
-version = "0.60.7"
+version = "0.62.0"
 optional = true
 
 [dependencies.aws-smithy-runtime-api]
-version = "1.2.0"
+version = "1.7.2"
 
 [dependencies.aws-smithy-types]
-version = "1.1.8"
+version = "1.2.4"
 features = ["http-body-0-4-x"]
 
 [dependencies.bytes]
@@ -68,12 +68,20 @@ version = "0.3"
 optional = true
 default-features = false
 
-[dependencies.http]
+[dependencies.http-02x]
 version = "0.2.8"
+package = "http"
 
-[dependencies.http-body-0-4]
+[dependencies.http-body-04x]
 version = "0.4.4"
 package = "http-body"
+
+[dependencies.http-body-1x]
+version = "1"
+package = "http-body"
+
+[dependencies.httparse]
+version = "1.8.0"
 
 [dependencies.hyper-0-14]
 version = "0.14.26"
@@ -87,6 +95,11 @@ features = [
     "rustls-native-certs",
     "http2",
 ]
+optional = true
+
+[dependencies.indexmap]
+version = "2"
+features = ["serde"]
 optional = true
 
 [dependencies.once_cell]
@@ -109,6 +122,7 @@ optional = true
 
 [dependencies.serde_json]
 version = "1"
+features = ["preserve_order"]
 optional = true
 
 [dependencies.tokio]
@@ -121,6 +135,7 @@ version = "0.1.37"
 [dependencies.tracing-subscriber]
 version = "0.3.16"
 features = [
+    "env-filter",
     "fmt",
     "json",
 ]
@@ -130,19 +145,22 @@ optional = true
 version = "0.5.1"
 
 [dev-dependencies.aws-smithy-async]
-version = "1.1.8"
+version = "1.2.1"
 features = [
     "rt-tokio",
     "test-util",
 ]
 
 [dev-dependencies.aws-smithy-runtime-api]
-version = "1.2.0"
+version = "1.7.2"
 features = ["test-util"]
 
 [dev-dependencies.aws-smithy-types]
-version = "1.1.8"
+version = "1.2.4"
 features = ["test-util"]
+
+[dev-dependencies.fastrand]
+version = "~2.0.0"
 
 [dev-dependencies.futures-util]
 version = "0.3.29"
@@ -183,7 +201,10 @@ features = ["env-filter"]
 version = "0.2.1"
 
 [features]
-client = ["aws-smithy-runtime-api/client"]
+client = [
+    "aws-smithy-runtime-api/client",
+    "aws-smithy-types/http-body-1-x",
+]
 connector-hyper-0-14-x = [
     "dep:hyper-0-14",
     "hyper-0-14?/client",
@@ -201,6 +222,7 @@ test-util = [
     "dep:tracing-subscriber",
     "dep:serde",
     "dep:serde_json",
+    "dep:indexmap",
 ]
 tls-rustls = [
     "dep:hyper-rustls",

@@ -14,8 +14,13 @@ following lines to your `Cargo.toml` file:
 
 ```toml
 [dev-dependencies]
-rstest = "0.18.2"
+rstest = "0.21.0"
 ```
+
+### Features
+
+- `async-timeout`: `timeout` for `async` tests (Default enabled)
+- `crate-name`: Import `rstest` package with different name (Default enabled)
 
 ### Fixture
 
@@ -116,6 +121,25 @@ fn it_works(#[case] a: u32, #[case] b: u32) {
 ```
 
 See [`rstest_reuse`][reuse-crate-link] for more details.
+
+#### Feature flagged cases
+
+In case you want certain test cases to only be present if a certain feature is
+enabled, use `#[cfg_attr(feature = …, case(…))]`:
+
+```rust
+use rstest::rstest;
+
+#[rstest]
+#[case(2, 2)]
+#[cfg_attr(feature = "frac", case(4/2, 2))]
+#[case(4/2, 2)]
+fn it_works(#[case] a: u32, #[case] b: u32) {
+    assert!(a == b);
+}
+```
+
+This also works with [`rstest_reuse`][reuse-crate-link].
 
 ### Magic Conversion
 
@@ -321,6 +345,36 @@ fn single(once_fixture: &i32) {
 }
 ```
 
+## Local lifetime and `#[by_ref]` attribute
+
+In some cases you may want to use a local lifetime for some arguments of your test.
+In these cases you can use the `#[by_ref]` attribute then use the reference instead
+the value.
+
+```rust
+enum E<'a> {
+    A(bool),
+    B(&'a Cell<E<'a>>),
+}
+
+fn make_e_from_bool<'a>(_bump: &'a (), b: bool) -> E<'a> {
+    E::A(b)
+}
+
+#[fixture]
+fn bump() -> () {}
+ 
+#[rstest]
+#[case(true, E::A(true))]
+fn it_works<'a>(#[by_ref] bump: &'a (), #[case] b: bool, #[case] expected: E<'a>) {
+    let actual = make_e_from_bool(&bump, b);
+    assert_eq!(actual, expected);
+}
+```
+
+You can use `#[by_ref]` attribute for all arguments of your test and not just for fixture
+but also for cases, values and files.
+
 ## Complete Example
 
 All these features can be used together with a mixture of fixture variables,
@@ -461,20 +515,24 @@ is raised, but it's also possible to exclude a variable using the
 `#[notrace]` argument attribute.
 
 You can learn more on [Docs][docs-link] and find more examples in
-[`tests/resources`](tests/resources) directory.
+[`tests/resources`](/rstest/tests/resources) directory.
+
+## Rust version compatibility
+
+The minimum supported Rust version is 1.67.1.
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md)
+See [CHANGELOG.md](/CHANGELOG.md)
 
 ## License
 
 Licensed under either of
 
-* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
+* Apache License, Version 2.0, ([LICENSE-APACHE](/LICENSE-APACHE) or
 [license-apache-link])
 
-* MIT license [LICENSE-MIT](LICENSE-MIT) or [license-MIT-link]
+* MIT license [LICENSE-MIT](/LICENSE-MIT) or [license-MIT-link]
 at your option.
 
 [//]: # (links)

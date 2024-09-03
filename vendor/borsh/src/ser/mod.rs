@@ -11,9 +11,6 @@ use crate::__private::maybestd::{
 use crate::error::check_zst;
 use crate::io::{Error, ErrorKind, Result, Write};
 
-#[cfg(feature = "rc")]
-use crate::__private::maybestd::{rc::Rc, sync::Arc};
-
 pub(crate) mod helpers;
 
 const FLOAT_NAN_ERR: &str = "For portability reasons we do not allow to serialize NaNs.";
@@ -296,7 +293,7 @@ where
     }
 }
 
-#[cfg(any(test, feature = "bytes"))]
+#[cfg(feature = "bytes")]
 impl BorshSerialize for bytes::Bytes {
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
@@ -304,7 +301,7 @@ impl BorshSerialize for bytes::Bytes {
     }
 }
 
-#[cfg(any(test, feature = "bytes"))]
+#[cfg(feature = "bytes")]
 impl BorshSerialize for bytes::BytesMut {
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
@@ -312,7 +309,7 @@ impl BorshSerialize for bytes::BytesMut {
     }
 }
 
-#[cfg(any(test, feature = "bson"))]
+#[cfg(feature = "bson")]
 impl BorshSerialize for bson::oid::ObjectId {
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
@@ -356,11 +353,11 @@ where
 }
 
 /// Module is available if borsh is built with `features = ["std"]` or `features = ["hashbrown"]`.
+///
+/// Module defines [BorshSerialize] implementation for
+/// [HashMap](std::collections::HashMap)/[HashSet](std::collections::HashSet).
 #[cfg(hash_collections)]
 pub mod hashes {
-    //!
-    //! Module defines [BorshSerialize] implementation for
-    //! [HashMap](std::collections::HashMap)/[HashSet](std::collections::HashSet).
     use crate::__private::maybestd::vec::Vec;
     use crate::error::check_zst;
     use crate::{
@@ -387,9 +384,8 @@ pub mod hashes {
             u32::try_from(vec.len())
                 .map_err(|_| ErrorKind::InvalidData)?
                 .serialize(writer)?;
-            for (key, value) in vec {
-                key.serialize(writer)?;
-                value.serialize(writer)?;
+            for kv in vec {
+                kv.serialize(writer)?;
             }
             Ok(())
         }
@@ -600,22 +596,64 @@ impl_range!(RangeFrom, this, &this.start);
 impl_range!(RangeTo, this, &this.end);
 impl_range!(RangeToInclusive, this, &this.end);
 
+/// Module is available if borsh is built with `features = ["rc"]`.
 #[cfg(feature = "rc")]
-impl<T: BorshSerialize + ?Sized> BorshSerialize for Rc<T> {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        (**self).serialize(writer)
-    }
-}
+pub mod rc {
+    //!
+    //! Module defines [BorshSerialize] implementation for
+    //! [alloc::rc::Rc](std::rc::Rc) and [alloc::sync::Arc](std::sync::Arc).
+    use crate::__private::maybestd::{rc::Rc, sync::Arc};
+    use crate::io::{Result, Write};
+    use crate::BorshSerialize;
 
-#[cfg(feature = "rc")]
-impl<T: BorshSerialize + ?Sized> BorshSerialize for Arc<T> {
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        (**self).serialize(writer)
+    /// This impl requires the [`"rc"`] Cargo feature of borsh.
+    ///
+    /// Serializing a data structure containing `Rc` will serialize a copy of
+    /// the contents of the `Rc` each time the `Rc` is referenced within the
+    /// data structure. Serialization will not attempt to deduplicate these
+    /// repeated data.
+    impl<T: BorshSerialize + ?Sized> BorshSerialize for Rc<T> {
+        fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+            (**self).serialize(writer)
+        }
+    }
+
+    /// This impl requires the [`"rc"`] Cargo feature of borsh.
+    ///
+    /// Serializing a data structure containing `Arc` will serialize a copy of
+    /// the contents of the `Arc` each time the `Arc` is referenced within the
+    /// data structure. Serialization will not attempt to deduplicate these
+    /// repeated data.
+    impl<T: BorshSerialize + ?Sized> BorshSerialize for Arc<T> {
+        fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+            (**self).serialize(writer)
+        }
     }
 }
 
 impl<T: ?Sized> BorshSerialize for PhantomData<T> {
     fn serialize<W: Write>(&self, _: &mut W) -> Result<()> {
         Ok(())
+    }
+}
+
+impl<T> BorshSerialize for core::cell::Cell<T>
+where
+    T: BorshSerialize + Copy,
+{
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+        <T as BorshSerialize>::serialize(&self.get(), writer)
+    }
+}
+
+impl<T> BorshSerialize for core::cell::RefCell<T>
+where
+    T: BorshSerialize + Sized,
+{
+    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+        match self.try_borrow() {
+            Ok(ref value) => value.serialize(writer),
+            Err(_) => Err(Error::new(ErrorKind::Other, "already mutably borrowed")),
+        }
     }
 }

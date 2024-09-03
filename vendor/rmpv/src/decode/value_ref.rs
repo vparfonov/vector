@@ -2,13 +2,13 @@ use std;
 use std::io::{self, Cursor, ErrorKind, Read};
 use std::str;
 
-use rmp::decode::{RmpRead, read_marker};
+use rmp::decode::{read_marker, RmpRead};
 use rmp::Marker;
 
 use super::Error;
 use crate::{Utf8StringRef, ValueRef};
 
-fn read_str_data<'a, R>(rd: &mut R, len: usize, depth: usize) -> Result<Utf8StringRef<'a>, Error>
+fn read_str_data<'a, R>(rd: &mut R, len: usize, depth: u16) -> Result<Utf8StringRef<'a>, Error>
     where R: BorrowRead<'a>
 {
     let depth = super::decrement_depth(depth)?;
@@ -24,7 +24,7 @@ fn read_str_data<'a, R>(rd: &mut R, len: usize, depth: usize) -> Result<Utf8Stri
     }
 }
 
-fn read_bin_data<'a, R>(rd: &mut R, len: usize, depth: usize) -> Result<&'a [u8], Error>
+fn read_bin_data<'a, R>(rd: &mut R, len: usize, depth: u16) -> Result<&'a [u8], Error>
     where R: BorrowRead<'a>
 {
     let _depth = super::decrement_depth(depth)?;
@@ -41,7 +41,7 @@ fn read_bin_data<'a, R>(rd: &mut R, len: usize, depth: usize) -> Result<&'a [u8]
     Ok(buf)
 }
 
-fn read_ext_body<'a, R>(rd: &mut R, len: usize, depth: usize) -> Result<(i8, &'a [u8]), Error>
+fn read_ext_body<'a, R>(rd: &mut R, len: usize, depth: u16) -> Result<(i8, &'a [u8]), Error>
     where R: BorrowRead<'a>
 {
     let depth = super::decrement_depth(depth)?;
@@ -51,7 +51,7 @@ fn read_ext_body<'a, R>(rd: &mut R, len: usize, depth: usize) -> Result<(i8, &'a
     Ok((ty, buf))
 }
 
-fn read_array_data<'a, R>(rd: &mut R, mut len: usize, depth: usize) -> Result<Vec<ValueRef<'a>>, Error>
+fn read_array_data<'a, R>(rd: &mut R, mut len: usize, depth: u16) -> Result<Vec<ValueRef<'a>>, Error>
     where R: BorrowRead<'a>
 {
     let depth = super::decrement_depth(depth)?;
@@ -67,7 +67,7 @@ fn read_array_data<'a, R>(rd: &mut R, mut len: usize, depth: usize) -> Result<Ve
     Ok(vec)
 }
 
-fn read_map_data<'a, R>(rd: &mut R, mut len: usize, depth: usize) -> Result<Vec<(ValueRef<'a>, ValueRef<'a>)>, Error>
+fn read_map_data<'a, R>(rd: &mut R, mut len: usize, depth: u16) -> Result<Vec<(ValueRef<'a>, ValueRef<'a>)>, Error>
     where R: BorrowRead<'a>
 {
     let depth = super::decrement_depth(depth)?;
@@ -83,9 +83,9 @@ fn read_map_data<'a, R>(rd: &mut R, mut len: usize, depth: usize) -> Result<Vec<
     Ok(vec)
 }
 
-/// A BorrowRead is a type of Reader which has an internal buffer.
+/// A `BorrowRead` is a type of Reader which has an internal buffer.
 ///
-/// This magic trait acts like a standard BufRead but unlike the standard this has an explicit
+/// This magic trait acts like a standard `BufRead` but unlike the standard this has an explicit
 /// internal buffer lifetime, which allows to borrow from underlying buffer while consuming bytes.
 pub trait BorrowRead<'a>: Read {
     /// Returns the buffer contents.
@@ -114,7 +114,7 @@ impl<'a> BorrowRead<'a> for &'a [u8] {
     }
 }
 
-/// Useful when you want to know how much bytes has been consumed during ValueRef decoding.
+/// Useful when you want to know how much bytes has been consumed during `ValueRef` decoding.
 impl<'a> BorrowRead<'a> for Cursor<&'a [u8]> {
     fn fill_buf(&self) -> &'a [u8] {
         let len = std::cmp::min(self.position(), self.get_ref().len() as u64);
@@ -127,7 +127,7 @@ impl<'a> BorrowRead<'a> for Cursor<&'a [u8]> {
     }
 }
 
-fn read_value_ref_inner<'a, R>(rd: &mut R, depth: usize) -> Result<ValueRef<'a>, Error>
+fn read_value_ref_inner<'a, R>(rd: &mut R, depth: u16) -> Result<ValueRef<'a>, Error>
     where R: BorrowRead<'a>
 {
     let depth = super::decrement_depth(depth)?;
@@ -269,7 +269,7 @@ fn read_value_ref_inner<'a, R>(rd: &mut R, depth: usize) -> Result<ValueRef<'a>,
 /// zero-copy reading without a data loss fear in case of an error.
 ///
 /// Currently only two types fit in this requirement: `&[u8]` and `Cursor<&[u8]>`. Using Cursor is
-/// helpful, when you need to know how exactly many bytes the decoded ValueRef consumes. A `Vec<u8>`
+/// helpful, when you need to know how exactly many bytes the decoded `ValueRef` consumes. A `Vec<u8>`
 /// type doesn't fit in the `BorrowRead` requirement, because its mut reference can mutate the
 /// underlying buffer - use `Vec::as_slice()` if you need to decode a value from the vector.
 ///
@@ -296,7 +296,7 @@ fn read_value_ref_inner<'a, R>(rd: &mut R, depth: usize) -> Result<ValueRef<'a>,
 pub fn read_value_ref<'a, R>(rd: &mut R) -> Result<ValueRef<'a>, Error>
     where R: BorrowRead<'a>
 {
-    read_value_ref_inner(rd, super::MAX_DEPTH)
+    read_value_ref_inner(rd, super::MAX_DEPTH as _)
 }
 
 /// Attempts to read the data from the given reader until either a complete MessagePack value
@@ -316,5 +316,5 @@ pub fn read_value_ref<'a, R>(rd: &mut R) -> Result<ValueRef<'a>, Error>
 pub fn read_value_ref_with_max_depth<'a, R>(rd: &mut R, max_depth: usize) -> Result<ValueRef<'a>, Error>
     where R: BorrowRead<'a>
 {
-    read_value_ref_inner(rd, max_depth)
+    read_value_ref_inner(rd, max_depth.min(u16::MAX as _) as u16)
 }

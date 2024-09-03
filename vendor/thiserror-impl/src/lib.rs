@@ -6,6 +6,7 @@
     clippy::manual_let_else,
     clippy::manual_map,
     clippy::map_unwrap_or,
+    clippy::module_name_repetitions,
     clippy::needless_pass_by_value,
     clippy::range_plus_one,
     clippy::single_match_else,
@@ -22,6 +23,7 @@ mod expand;
 mod fmt;
 mod generics;
 mod prop;
+mod span;
 mod valid;
 
 use proc_macro::TokenStream;

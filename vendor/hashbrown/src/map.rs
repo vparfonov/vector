@@ -1,9 +1,11 @@
-use crate::raw::{Allocator, Bucket, Global, RawDrain, RawIntoIter, RawIter, RawTable};
+use crate::raw::{
+    Allocator, Bucket, Global, RawDrain, RawExtractIf, RawIntoIter, RawIter, RawTable,
+};
 use crate::{Equivalent, TryReserveError};
 use core::borrow::Borrow;
 use core::fmt::{self, Debug};
 use core::hash::{BuildHasher, Hash};
-use core::iter::{FromIterator, FusedIterator};
+use core::iter::FusedIterator;
 use core::marker::PhantomData;
 use core::mem;
 use core::ops::Index;
@@ -182,7 +184,7 @@ pub enum DefaultHashBuilder {}
 /// use hashbrown::HashMap;
 ///
 /// let timber_resources: HashMap<&str, i32> = [("Norway", 100), ("Denmark", 50), ("Iceland", 10)]
-///     .iter().cloned().collect();
+///     .into_iter().collect();
 /// // use the values stored in map
 /// ```
 pub struct HashMap<K, V, S = DefaultHashBuilder, A: Allocator = Global> {
@@ -944,6 +946,8 @@ impl<K, V, S, A: Allocator> HashMap<K, V, S, A> {
     ///
     /// Keeps the allocated memory for reuse.
     ///
+    /// [`retain()`]: HashMap::retain
+    ///
     /// # Examples
     ///
     /// ```
@@ -977,7 +981,7 @@ impl<K, V, S, A: Allocator> HashMap<K, V, S, A> {
     {
         ExtractIf {
             f,
-            inner: ExtractIfInner {
+            inner: RawExtractIf {
                 iter: unsafe { self.table.iter() },
                 table: &mut self.table,
             },
@@ -2738,7 +2742,7 @@ where
     F: FnMut(&K, &mut V) -> bool,
 {
     f: F,
-    inner: ExtractIfInner<'a, K, V, A>,
+    inner: RawExtractIf<'a, (K, V), A>,
 }
 
 impl<K, V, F, A> Iterator for ExtractIf<'_, K, V, F, A>
@@ -2750,7 +2754,7 @@ where
 
     #[cfg_attr(feature = "inline-more", inline)]
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next(&mut self.f)
+        self.inner.next(|&mut (ref k, ref mut v)| (self.f)(k, v))
     }
 
     #[inline]
@@ -2760,30 +2764,6 @@ where
 }
 
 impl<K, V, F> FusedIterator for ExtractIf<'_, K, V, F> where F: FnMut(&K, &mut V) -> bool {}
-
-/// Portions of `ExtractIf` shared with `set::ExtractIf`
-pub(super) struct ExtractIfInner<'a, K, V, A: Allocator> {
-    pub iter: RawIter<(K, V)>,
-    pub table: &'a mut RawTable<(K, V), A>,
-}
-
-impl<K, V, A: Allocator> ExtractIfInner<'_, K, V, A> {
-    #[cfg_attr(feature = "inline-more", inline)]
-    pub(super) fn next<F>(&mut self, f: &mut F) -> Option<(K, V)>
-    where
-        F: FnMut(&K, &mut V) -> bool,
-    {
-        unsafe {
-            for item in &mut self.iter {
-                let &mut (ref key, ref mut value) = item.as_mut();
-                if f(key, value) {
-                    return Some(self.table.remove(item).0);
-                }
-            }
-        }
-        None
-    }
-}
 
 /// A mutable iterator over the values of a `HashMap` in arbitrary order.
 /// The iterator element type is `&'a mut V`.
@@ -6825,7 +6805,7 @@ mod test_map {
         assert_eq!(m2.len(), 2);
     }
 
-    thread_local! { static DROP_VECTOR: RefCell<Vec<i32>> = RefCell::new(Vec::new()) }
+    thread_local! { static DROP_VECTOR: RefCell<Vec<i32>> = const { RefCell::new(Vec::new()) } }
 
     #[derive(Hash, PartialEq, Eq)]
     struct Droppable {
@@ -8544,7 +8524,7 @@ mod test_map {
     #[test]
     #[should_panic = "panic in clone"]
     fn test_clone_from_memory_leaks() {
-        use ::alloc::vec::Vec;
+        use alloc::vec::Vec;
 
         struct CheckedClone {
             panic_in_clone: bool,

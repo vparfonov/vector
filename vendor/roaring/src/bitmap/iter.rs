@@ -1,9 +1,12 @@
-use alloc::vec::{self, Vec};
-use core::iter::{self, FromIterator};
+use alloc::vec;
+use core::iter;
 use core::slice;
 
 use super::container::Container;
 use crate::{NonSortedIntegers, RoaringBitmap};
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 /// An iterator for `RoaringBitmap`.
 pub struct Iter<'a> {
@@ -46,12 +49,29 @@ impl Iterator for Iter<'_> {
             (usize::MAX, None)
         }
     }
+
+    #[inline]
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        self.inner.fold(init, f)
+    }
 }
 
 impl DoubleEndedIterator for Iter<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.size_hint = self.size_hint.saturating_sub(1);
         self.inner.next_back()
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, fold: Fold) -> Acc
+    where
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        self.inner.rfold(init, fold)
     }
 }
 
@@ -77,12 +97,29 @@ impl Iterator for IntoIter {
             (usize::MAX, None)
         }
     }
+
+    #[inline]
+    fn fold<B, F>(self, init: B, f: F) -> B
+    where
+        Self: Sized,
+        F: FnMut(B, Self::Item) -> B,
+    {
+        self.inner.fold(init, f)
+    }
 }
 
 impl DoubleEndedIterator for IntoIter {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.size_hint = self.size_hint.saturating_sub(1);
         self.inner.next_back()
+    }
+
+    #[inline]
+    fn rfold<Acc, Fold>(self, init: Acc, fold: Fold) -> Acc
+    where
+        Fold: FnMut(Acc, Self::Item) -> Acc,
+    {
+        self.inner.rfold(init, fold)
     }
 }
 

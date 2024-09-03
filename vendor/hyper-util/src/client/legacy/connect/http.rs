@@ -108,18 +108,29 @@ impl TcpKeepaliveConfig {
         }
     }
 
-    #[cfg(not(any(target_os = "openbsd", target_os = "redox", target_os = "solaris")))]
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "openbsd",
+        target_os = "redox",
+        target_os = "solaris"
+    )))]
     fn ka_with_interval(ka: TcpKeepalive, interval: Duration, dirty: &mut bool) -> TcpKeepalive {
         *dirty = true;
         ka.with_interval(interval)
     }
 
-    #[cfg(any(target_os = "openbsd", target_os = "redox", target_os = "solaris"))]
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "openbsd",
+        target_os = "redox",
+        target_os = "solaris"
+    ))]
     fn ka_with_interval(ka: TcpKeepalive, _: Duration, _: &mut bool) -> TcpKeepalive {
         ka // no-op as keepalive interval is not supported on this platform
     }
 
     #[cfg(not(any(
+        target_os = "aix",
         target_os = "openbsd",
         target_os = "redox",
         target_os = "solaris",
@@ -131,6 +142,7 @@ impl TcpKeepaliveConfig {
     }
 
     #[cfg(any(
+        target_os = "aix",
         target_os = "openbsd",
         target_os = "redox",
         target_os = "solaris",
@@ -438,12 +450,10 @@ where
     }
 }
 
-impl Connection for TokioIo<TcpStream> {
+impl Connection for TcpStream {
     fn connected(&self) -> Connected {
         let connected = Connected::new();
-        if let (Ok(remote_addr), Ok(local_addr)) =
-            (self.inner().peer_addr(), self.inner().local_addr())
-        {
+        if let (Ok(remote_addr), Ok(local_addr)) = (self.peer_addr(), self.local_addr()) {
             connected.extra(HttpInfo {
                 remote_addr,
                 local_addr,
@@ -451,6 +461,17 @@ impl Connection for TokioIo<TcpStream> {
         } else {
             connected
         }
+    }
+}
+
+// Implement `Connection` for generic `TokioIo<T>` so that external crates can
+// implement their own `HttpConnector` with `TokioIo<CustomTcpStream>`.
+impl<T> Connection for TokioIo<T>
+where
+    T: Connection,
+{
+    fn connected(&self) -> Connected {
+        self.inner().connected()
     }
 }
 
@@ -679,7 +700,6 @@ fn connect(
     // keepalive timeout, it would be nice to use that instead of socket2,
     // and avoid the unsafe `into_raw_fd`/`from_raw_fd` dance...
     use socket2::{Domain, Protocol, Socket, Type};
-    use std::convert::TryInto;
 
     let domain = Domain::for_address(*addr);
     let socket = Socket::new(domain, Type::STREAM, Some(Protocol::TCP))
@@ -739,13 +759,13 @@ fn connect(
     }
 
     if let Some(size) = config.send_buffer_size {
-        if let Err(e) = socket.set_send_buffer_size(size.try_into().unwrap_or(std::u32::MAX)) {
+        if let Err(e) = socket.set_send_buffer_size(size.try_into().unwrap_or(u32::MAX)) {
             warn!("tcp set_buffer_size error: {}", e);
         }
     }
 
     if let Some(size) = config.recv_buffer_size {
-        if let Err(e) = socket.set_recv_buffer_size(size.try_into().unwrap_or(std::u32::MAX)) {
+        if let Err(e) = socket.set_recv_buffer_size(size.try_into().unwrap_or(u32::MAX)) {
             warn!("tcp set_recv_buffer_size error: {}", e);
         }
     }

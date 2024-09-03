@@ -6,7 +6,7 @@ use crate::*;
 #[doc(inline)]
 pub use crate::dispatch;
 
-/// Helper trait for the [alt()] combinator.
+/// Helper trait for the [`alt()`] combinator.
 ///
 /// This trait is implemented for tuples of up to 21 elements
 pub trait Alt<I, O, E> {
@@ -17,7 +17,7 @@ pub trait Alt<I, O, E> {
 /// Pick the first successful parser
 ///
 /// To stop on an error, rather than trying further cases, see
-/// [`cut_err`][crate::combinator::cut_err] ([example][crate::_tutorial::chapter_6]).
+/// [`cut_err`][crate::combinator::cut_err] ([example][crate::_tutorial::chapter_7]).
 ///
 /// For tight control over the error when no match is found, add a final case using [`fail`][crate::combinator::fail].
 /// Alternatively, with a [custom error type][crate::_topic::error], it is possible to track all
@@ -37,7 +37,7 @@ pub trait Alt<I, O, E> {
 ///   alt((alpha1, digit1)).parse_peek(input)
 /// };
 ///
-/// // the first parser, alpha1, recognizes the input
+/// // the first parser, alpha1, takes the input
 /// assert_eq!(parser("abc"), Ok(("", "abc")));
 ///
 /// // the first parser returns an error, so alt tries the second one
@@ -58,7 +58,7 @@ where
     trace("alt", move |i: &mut Input| alternatives.choice(i))
 }
 
-/// Helper trait for the [permutation()] combinator.
+/// Helper trait for the [`permutation()`] combinator.
 ///
 /// This trait is implemented for tuples of up to 21 elements
 pub trait Permutation<I, O, E> {
@@ -73,7 +73,7 @@ pub trait Permutation<I, O, E> {
 /// tuple of the parser results.
 ///
 /// To stop on an error, rather than trying further permutations, see
-/// [`cut_err`][crate::combinator::cut_err] ([example][crate::_tutorial::chapter_6]).
+/// [`cut_err`][crate::combinator::cut_err] ([example][crate::_tutorial::chapter_7]).
 ///
 /// # Example
 ///
@@ -87,7 +87,7 @@ pub trait Permutation<I, O, E> {
 ///   permutation((alpha1, digit1)).parse_peek(input)
 /// }
 ///
-/// // permutation recognizes alphabetic characters then digit
+/// // permutation takes alphabetic characters then digit
 /// assert_eq!(parser("abc123"), Ok(("", ("abc", "123"))));
 ///
 /// // but also in inverse order
@@ -130,6 +130,31 @@ impl<const N: usize, I: Stream, O, E: ParserError<I>, P: Parser<I, O, E>> Alt<I,
 
         let start = input.checkpoint();
         for branch in self {
+            input.reset(&start);
+            match branch.parse_next(input) {
+                Err(ErrMode::Backtrack(e)) => {
+                    error = match error {
+                        Some(error) => Some(error.or(e)),
+                        None => Some(e),
+                    };
+                }
+                res => return res,
+            }
+        }
+
+        match error {
+            Some(e) => Err(ErrMode::Backtrack(e.append(input, &start, ErrorKind::Alt))),
+            None => Err(ErrMode::assert(input, "`alt` needs at least one parser")),
+        }
+    }
+}
+
+impl<I: Stream, O, E: ParserError<I>, P: Parser<I, O, E>> Alt<I, O, E> for &mut [P] {
+    fn choice(&mut self, input: &mut I) -> PResult<O, E> {
+        let mut error: Option<E> = None;
+
+        let start = input.checkpoint();
+        for branch in self.iter_mut() {
             input.reset(&start);
             match branch.parse_next(input) {
                 Err(ErrMode::Backtrack(e)) => {

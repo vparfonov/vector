@@ -1,14 +1,15 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::future::Future;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
+use std::task::Waker;
 use std::task::{Context, Poll};
 use std::thread;
 use std::time::{Duration, Instant};
 
 use async_lock::OnceCell;
 use futures_lite::pin;
-use waker_fn::waker_fn;
+use parking::Parker;
 
 use crate::reactor::Reactor;
 
@@ -43,6 +44,9 @@ pub(crate) fn init() {
 
 /// The main loop for the "async-io" thread.
 fn main_loop(parker: parking::Parker) {
+    let span = tracing::trace_span!("async_io::main_loop");
+    let _enter = span.enter();
+
     // The last observed reactor tick.
     let mut last_tick = 0;
     // Number of sleeps since this thread has called `react()`.
@@ -61,7 +65,7 @@ fn main_loop(parker: parking::Parker) {
             };
 
             if let Some(mut reactor_lock) = reactor_lock {
-                log::trace!("main_loop: waiting on I/O");
+                tracing::trace!("waiting on I/O");
                 reactor_lock.react(None).ok();
                 last_tick = Reactor::get().ticker();
                 sleeps = 0;
@@ -76,9 +80,9 @@ fn main_loop(parker: parking::Parker) {
                 .get(sleeps as usize)
                 .unwrap_or(&10_000);
 
-            log::trace!("main_loop: sleeping for {} us", delay_us);
+            tracing::trace!("sleeping for {} us", delay_us);
             if parker.park_timeout(Duration::from_micros(*delay_us)) {
-                log::trace!("main_loop: notified");
+                tracing::trace!("notified");
 
                 // If notified before timeout, reset the last tick and the sleep counter.
                 last_tick = Reactor::get().ticker();
@@ -105,7 +109,8 @@ fn main_loop(parker: parking::Parker) {
 /// });
 /// ```
 pub fn block_on<T>(future: impl Future<Output = T>) -> T {
-    log::trace!("block_on()");
+    let span = tracing::trace_span!("async_io::block_on");
+    let _enter = span.enter();
 
     // Increment `BLOCK_ON_COUNT` so that the "async-io" thread becomes less aggressive.
     BLOCK_ON_COUNT.fetch_add(1, Ordering::SeqCst);
@@ -116,112 +121,164 @@ pub fn block_on<T>(future: impl Future<Output = T>) -> T {
         unparker().unpark();
     });
 
-    // Parker and unparker for notifying the current thread.
-    let (p, u) = parking::pair();
-    // This boolean is set to `true` when the current thread is blocked on I/O.
-    let io_blocked = Arc::new(AtomicBool::new(false));
+    // Creates a parker and an associated waker that unparks it.
+    fn parker_and_waker() -> (Parker, Waker, Arc<AtomicBool>) {
+        // Parker and unparker for notifying the current thread.
+        let (p, u) = parking::pair();
 
-    thread_local! {
-        // Indicates that the current thread is polling I/O, but not necessarily blocked on it.
-        static IO_POLLING: Cell<bool> = Cell::new(false);
+        // This boolean is set to `true` when the current thread is blocked on I/O.
+        let io_blocked = Arc::new(AtomicBool::new(false));
+
+        // Prepare the waker.
+        let waker = BlockOnWaker::create(io_blocked.clone(), u);
+
+        (p, waker, io_blocked)
     }
 
-    // Prepare the waker.
-    let waker = waker_fn({
-        let io_blocked = io_blocked.clone();
-        move || {
-            if u.unpark() {
+    thread_local! {
+        // Cached parker and waker for efficiency.
+        static CACHE: RefCell<(Parker, Waker, Arc<AtomicBool>)> = RefCell::new(parker_and_waker());
+
+        // Indicates that the current thread is polling I/O, but not necessarily blocked on it.
+        static IO_POLLING: Cell<bool> = const { Cell::new(false) };
+    }
+
+    struct BlockOnWaker {
+        io_blocked: Arc<AtomicBool>,
+        unparker: parking::Unparker,
+    }
+
+    impl BlockOnWaker {
+        fn create(io_blocked: Arc<AtomicBool>, unparker: parking::Unparker) -> Waker {
+            Waker::from(Arc::new(BlockOnWaker {
+                io_blocked,
+                unparker,
+            }))
+        }
+    }
+
+    impl std::task::Wake for BlockOnWaker {
+        fn wake_by_ref(self: &Arc<Self>) {
+            if self.unparker.unpark() {
                 // Check if waking from another thread and if currently blocked on I/O.
-                if !IO_POLLING.with(Cell::get) && io_blocked.load(Ordering::SeqCst) {
+                if !IO_POLLING.with(Cell::get) && self.io_blocked.load(Ordering::SeqCst) {
                     Reactor::get().notify();
                 }
             }
         }
-    });
-    let cx = &mut Context::from_waker(&waker);
-    pin!(future);
 
-    loop {
-        // Poll the future.
-        if let Poll::Ready(t) = future.as_mut().poll(cx) {
-            log::trace!("block_on: completed");
-            return t;
-        }
-
-        // Check if a notification was received.
-        if p.park_timeout(Duration::from_secs(0)) {
-            log::trace!("block_on: notified");
-
-            // Try grabbing a lock on the reactor to process I/O events.
-            if let Some(mut reactor_lock) = Reactor::get().try_lock() {
-                // First let wakers know this parker is processing I/O events.
-                IO_POLLING.with(|io| io.set(true));
-                let _guard = CallOnDrop(|| {
-                    IO_POLLING.with(|io| io.set(false));
-                });
-
-                // Process available I/O events.
-                reactor_lock.react(Some(Duration::from_secs(0))).ok();
-            }
-            continue;
-        }
-
-        // Try grabbing a lock on the reactor to wait on I/O.
-        if let Some(mut reactor_lock) = Reactor::get().try_lock() {
-            // Record the instant at which the lock was grabbed.
-            let start = Instant::now();
-
-            loop {
-                // First let wakers know this parker is blocked on I/O.
-                IO_POLLING.with(|io| io.set(true));
-                io_blocked.store(true, Ordering::SeqCst);
-                let _guard = CallOnDrop(|| {
-                    IO_POLLING.with(|io| io.set(false));
-                    io_blocked.store(false, Ordering::SeqCst);
-                });
-
-                // Check if a notification has been received before `io_blocked` was updated
-                // because in that case the reactor won't receive a wakeup.
-                if p.park_timeout(Duration::from_secs(0)) {
-                    log::trace!("block_on: notified");
-                    break;
-                }
-
-                // Wait for I/O events.
-                log::trace!("block_on: waiting on I/O");
-                reactor_lock.react(None).ok();
-
-                // Check if a notification has been received.
-                if p.park_timeout(Duration::from_secs(0)) {
-                    log::trace!("block_on: notified");
-                    break;
-                }
-
-                // Check if this thread been handling I/O events for a long time.
-                if start.elapsed() > Duration::from_micros(500) {
-                    log::trace!("block_on: stops hogging the reactor");
-
-                    // This thread is clearly processing I/O events for some other threads
-                    // because it didn't get a notification yet. It's best to stop hogging the
-                    // reactor and give other threads a chance to process I/O events for
-                    // themselves.
-                    drop(reactor_lock);
-
-                    // Unpark the "async-io" thread in case no other thread is ready to start
-                    // processing I/O events. This way we prevent a potential latency spike.
-                    unparker().unpark();
-
-                    // Wait for a notification.
-                    p.park();
-                    break;
-                }
-            }
-        } else {
-            // Wait for an actual notification.
-            log::trace!("block_on: sleep until notification");
-            p.park();
+        fn wake(self: Arc<Self>) {
+            self.wake_by_ref()
         }
     }
+
+    CACHE.with(|cache| {
+        // Try grabbing the cached parker and waker.
+        let tmp_cached;
+        let tmp_fresh;
+        let (p, waker, io_blocked) = match cache.try_borrow_mut() {
+            Ok(cache) => {
+                // Use the cached parker and waker.
+                tmp_cached = cache;
+                &*tmp_cached
+            }
+            Err(_) => {
+                // Looks like this is a recursive `block_on()` call.
+                // Create a fresh parker and waker.
+                tmp_fresh = parker_and_waker();
+                &tmp_fresh
+            }
+        };
+
+        pin!(future);
+
+        let cx = &mut Context::from_waker(waker);
+
+        loop {
+            // Poll the future.
+            if let Poll::Ready(t) = future.as_mut().poll(cx) {
+                // Ensure the cached parker is reset to the unnotified state for future block_on calls,
+                // in case this future called wake and then immediately returned Poll::Ready.
+                p.park_timeout(Duration::from_secs(0));
+                tracing::trace!("completed");
+                return t;
+            }
+
+            // Check if a notification was received.
+            if p.park_timeout(Duration::from_secs(0)) {
+                tracing::trace!("notified");
+
+                // Try grabbing a lock on the reactor to process I/O events.
+                if let Some(mut reactor_lock) = Reactor::get().try_lock() {
+                    // First let wakers know this parker is processing I/O events.
+                    IO_POLLING.with(|io| io.set(true));
+                    let _guard = CallOnDrop(|| {
+                        IO_POLLING.with(|io| io.set(false));
+                    });
+
+                    // Process available I/O events.
+                    reactor_lock.react(Some(Duration::from_secs(0))).ok();
+                }
+                continue;
+            }
+
+            // Try grabbing a lock on the reactor to wait on I/O.
+            if let Some(mut reactor_lock) = Reactor::get().try_lock() {
+                // Record the instant at which the lock was grabbed.
+                let start = Instant::now();
+
+                loop {
+                    // First let wakers know this parker is blocked on I/O.
+                    IO_POLLING.with(|io| io.set(true));
+                    io_blocked.store(true, Ordering::SeqCst);
+                    let _guard = CallOnDrop(|| {
+                        IO_POLLING.with(|io| io.set(false));
+                        io_blocked.store(false, Ordering::SeqCst);
+                    });
+
+                    // Check if a notification has been received before `io_blocked` was updated
+                    // because in that case the reactor won't receive a wakeup.
+                    if p.park_timeout(Duration::from_secs(0)) {
+                        tracing::trace!("notified");
+                        break;
+                    }
+
+                    // Wait for I/O events.
+                    tracing::trace!("waiting on I/O");
+                    reactor_lock.react(None).ok();
+
+                    // Check if a notification has been received.
+                    if p.park_timeout(Duration::from_secs(0)) {
+                        tracing::trace!("notified");
+                        break;
+                    }
+
+                    // Check if this thread been handling I/O events for a long time.
+                    if start.elapsed() > Duration::from_micros(500) {
+                        tracing::trace!("stops hogging the reactor");
+
+                        // This thread is clearly processing I/O events for some other threads
+                        // because it didn't get a notification yet. It's best to stop hogging the
+                        // reactor and give other threads a chance to process I/O events for
+                        // themselves.
+                        drop(reactor_lock);
+
+                        // Unpark the "async-io" thread in case no other thread is ready to start
+                        // processing I/O events. This way we prevent a potential latency spike.
+                        unparker().unpark();
+
+                        // Wait for a notification.
+                        p.park();
+                        break;
+                    }
+                }
+            } else {
+                // Wait for an actual notification.
+                tracing::trace!("sleep until notification");
+                p.park();
+            }
+        }
+    })
 }
 
 /// Runs a closure when dropped.

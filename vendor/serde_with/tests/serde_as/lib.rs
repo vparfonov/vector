@@ -23,6 +23,7 @@ use alloc::{
 use core::{
     cell::{Cell, RefCell},
     ops::Bound,
+    pin::Pin,
 };
 use expect_test::expect;
 use serde::{Deserialize, Serialize};
@@ -44,11 +45,30 @@ fn test_basic_wrappers() {
 
     is_equal(SBox(Box::new(123)), expect![[r#""123""#]]);
 
+    // Deserialization in generally is not possible, only for unpin types
+    #[serde_as]
+    #[derive(Debug, Serialize, PartialEq)]
+    struct SPin<'a>(#[serde_as(as = "Pin<&DisplayFromStr>")] Pin<&'a u32>);
+    let tmp = 123;
+    check_serialization(SPin(Pin::new(&tmp)), expect![[r#""123""#]]);
+
+    #[serde_as]
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct SPinBox(#[serde_as(as = "Pin<Box<DisplayFromStr>>")] Pin<Box<u32>>);
+
+    is_equal(SPinBox(Box::pin(123)), expect![[r#""123""#]]);
+
     #[serde_as]
     #[derive(Debug, Serialize, Deserialize, PartialEq)]
     struct SRc(#[serde_as(as = "Rc<DisplayFromStr>")] Rc<u32>);
 
     is_equal(SRc(Rc::new(123)), expect![[r#""123""#]]);
+
+    #[serde_as]
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct SPinRc(#[serde_as(as = "Pin<Rc<DisplayFromStr>>")] Pin<Rc<u32>>);
+
+    is_equal(SPinRc(Rc::pin(123)), expect![[r#""123""#]]);
 
     #[serde_as]
     #[derive(Debug, Serialize, Deserialize)]
@@ -65,6 +85,12 @@ fn test_basic_wrappers() {
     struct SArc(#[serde_as(as = "Arc<DisplayFromStr>")] Arc<u32>);
 
     is_equal(SArc(Arc::new(123)), expect![[r#""123""#]]);
+
+    #[serde_as]
+    #[derive(Debug, Serialize, Deserialize, PartialEq)]
+    struct SPinArc(#[serde_as(as = "Pin<Arc<DisplayFromStr>>")] Pin<Arc<u32>>);
+
+    is_equal(SPinArc(Arc::pin(123)), expect![[r#""123""#]]);
 
     #[serde_as]
     #[derive(Debug, Serialize, Deserialize)]
@@ -546,6 +572,10 @@ fn test_vec_skip_error() {
         },
         r#"{"tag":"type","values":[0, "str", 1, [10, 11], -2, {}, 300]}"#,
     );
+    check_error_deserialization::<S>(
+        r#"{"tag":"type", "values":[0, "str", 1, , 300]}"#,
+        expect!["expected value at line 1 column 39"],
+    );
     is_equal(
         S {
             tag: "round-trip".into(),
@@ -558,6 +588,188 @@ fn test_vec_skip_error() {
             0,
             255
           ]
+        }"#]],
+    );
+}
+
+#[test]
+fn test_map_skip_error_btreemap() {
+    use serde_with::MapSkipError;
+
+    #[serde_as]
+    #[derive(Debug, PartialEq, Deserialize, Serialize)]
+    struct S {
+        tag: String,
+        #[serde_as(as = "MapSkipError<DisplayFromStr, _>")]
+        values: BTreeMap<u8, u8>,
+    }
+
+    check_deserialization(
+        S {
+            tag: "type".into(),
+            values: [(0, 1), (10, 20)].into_iter().collect(),
+        },
+        r#"
+        {
+          "tag":"type",
+          "values": {
+            "0": 1,
+            "str": 2,
+            "3": "str",
+            "4": [10, 11],
+            "5": {},
+            "10": 20
+          }
+        }"#,
+    );
+    check_error_deserialization::<S>(
+        r#"{"tag":"type", "values":{"0": 1,}}"#,
+        expect!["trailing comma at line 1 column 33"],
+    );
+    is_equal(
+        S {
+            tag: "round-trip".into(),
+            values: [(0, 0), (255, 255)].into_iter().collect(),
+        },
+        expect![[r#"
+        {
+          "tag": "round-trip",
+          "values": {
+            "0": 0,
+            "255": 255
+          }
+        }"#]],
+    );
+}
+
+#[test]
+fn test_map_skip_error_btreemap_flatten() {
+    use serde_with::MapSkipError;
+
+    #[serde_as]
+    #[derive(Debug, PartialEq, Deserialize, Serialize)]
+    struct S {
+        tag: String,
+        #[serde_as(as = "MapSkipError<DisplayFromStr, _>")]
+        #[serde(flatten)]
+        values: BTreeMap<u8, u8>,
+    }
+
+    check_deserialization(
+        S {
+            tag: "type".into(),
+            values: [(0, 1), (10, 20)].into_iter().collect(),
+        },
+        r#"
+        {
+          "tag":"type",
+          "0": 1,
+          "str": 2,
+          "3": "str",
+          "4": [10, 11],
+          "5": {},
+          "10": 20
+        }"#,
+    );
+    is_equal(
+        S {
+            tag: "round-trip".into(),
+            values: [(0, 0), (255, 255)].into_iter().collect(),
+        },
+        expect![[r#"
+        {
+          "tag": "round-trip",
+          "0": 0,
+          "255": 255
+        }"#]],
+    );
+}
+
+#[test]
+fn test_map_skip_error_hashmap() {
+    use serde_with::MapSkipError;
+
+    #[serde_as]
+    #[derive(Debug, PartialEq, Deserialize, Serialize)]
+    struct S {
+        tag: String,
+        #[serde_as(as = "MapSkipError<DisplayFromStr, _>")]
+        values: HashMap<u8, u8>,
+    }
+
+    check_deserialization(
+        S {
+            tag: "type".into(),
+            values: [(0, 1)].into_iter().collect(),
+        },
+        r#"
+        {
+          "tag":"type",
+          "values": {
+            "0": 1,
+            "str": 2,
+            "3": "str",
+            "4": [10, 11],
+            "5": {}
+          }
+        }"#,
+    );
+    check_error_deserialization::<S>(
+        r#"{"tag":"type", "values":{"0": 1,}}"#,
+        expect!["trailing comma at line 1 column 33"],
+    );
+    is_equal(
+        S {
+            tag: "round-trip".into(),
+            values: [(255, 0)].into_iter().collect(),
+        },
+        expect![[r#"
+        {
+          "tag": "round-trip",
+          "values": {
+            "255": 0
+          }
+        }"#]],
+    );
+}
+
+#[test]
+fn test_map_skip_error_hashmap_flatten() {
+    use serde_with::MapSkipError;
+
+    #[serde_as]
+    #[derive(Debug, PartialEq, Deserialize, Serialize)]
+    struct S {
+        tag: String,
+        #[serde_as(as = "MapSkipError<DisplayFromStr, _>")]
+        #[serde(flatten)]
+        values: HashMap<u8, u8>,
+    }
+
+    check_deserialization(
+        S {
+            tag: "type".into(),
+            values: [(0, 1)].into_iter().collect(),
+        },
+        r#"
+        {
+          "tag":"type",
+          "0": 1,
+          "str": 2,
+          "3": "str",
+          "4": [10, 11],
+          "5": {}
+        }"#,
+    );
+    is_equal(
+        S {
+            tag: "round-trip".into(),
+            values: [(255, 0)].into_iter().collect(),
+        },
+        expect![[r#"
+        {
+          "tag": "round-trip",
+          "255": 0
         }"#]],
     );
 }
@@ -580,7 +792,7 @@ fn test_serialize_reference() {
     #[derive(Debug, Serialize)]
     struct S1a<'a>(#[serde_as(as = "&Vec<DisplayFromStr>")] &'a Vec<u32>);
     check_serialization(
-        S1(&vec![1, 2]),
+        S1a(&vec![1, 2]),
         expect![[r#"
         [
           "1",
@@ -592,7 +804,7 @@ fn test_serialize_reference() {
     #[derive(Debug, Serialize)]
     struct S1Mut<'a>(#[serde_as(as = "Vec<DisplayFromStr>")] &'a mut Vec<u32>);
     check_serialization(
-        S1(&vec![1, 2]),
+        S1Mut(&mut vec![1, 2]),
         expect![[r#"
         [
           "1",
@@ -604,7 +816,7 @@ fn test_serialize_reference() {
     #[derive(Debug, Serialize)]
     struct S1aMut<'a>(#[serde_as(as = "&mut Vec<DisplayFromStr>")] &'a mut Vec<u32>);
     check_serialization(
-        S1(&vec![1, 2]),
+        S1aMut(&mut vec![1, 2]),
         expect![[r#"
         [
           "1",

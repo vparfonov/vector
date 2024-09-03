@@ -1,14 +1,14 @@
 //! Provides the [Engine] abstraction and out of the box implementations.
-#[cfg(any(feature = "alloc", feature = "std", test))]
+#[cfg(any(feature = "alloc", test))]
 use crate::chunked_encoder;
 use crate::{
     encode::{encode_with_padding, EncodeSliceError},
     encoded_len, DecodeError, DecodeSliceError,
 };
-#[cfg(any(feature = "alloc", feature = "std", test))]
+#[cfg(any(feature = "alloc", test))]
 use alloc::vec::Vec;
 
-#[cfg(any(feature = "alloc", feature = "std", test))]
+#[cfg(any(feature = "alloc", test))]
 use alloc::{string::String, vec};
 
 pub mod general_purpose;
@@ -109,7 +109,8 @@ pub trait Engine: Send + Sync {
     ///     engine::GeneralPurpose::new(&alphabet::URL_SAFE, general_purpose::NO_PAD);
     ///
     /// let b64_url = CUSTOM_ENGINE.encode(b"hello internet~");
-    #[cfg(any(feature = "alloc", feature = "std", test))]
+    /// ```
+    #[cfg(any(feature = "alloc", test))]
     #[inline]
     fn encode<T: AsRef<[u8]>>(&self, input: T) -> String {
         fn inner<E>(engine: &E, input_bytes: &[u8]) -> String
@@ -149,7 +150,7 @@ pub trait Engine: Send + Sync {
     ///     println!("{}", buf);
     /// }
     /// ```
-    #[cfg(any(feature = "alloc", feature = "std", test))]
+    #[cfg(any(feature = "alloc", test))]
     #[inline]
     fn encode_string<T: AsRef<[u8]>>(&self, input: T, output_buf: &mut String) {
         fn inner<E>(engine: &E, input_bytes: &[u8], output_buf: &mut String)
@@ -174,7 +175,8 @@ pub trait Engine: Send + Sync {
     ///
     /// # Example
     ///
-    /// ```rust
+    #[cfg_attr(feature = "alloc", doc = "```")]
+    #[cfg_attr(not(feature = "alloc"), doc = "```ignore")]
     /// use base64::{Engine as _, engine::general_purpose};
     /// let s = b"hello internet!";
     /// let mut buf = Vec::new();
@@ -237,7 +239,7 @@ pub trait Engine: Send + Sync {
     ///     .decode("aGVsbG8gaW50ZXJuZXR-Cg").unwrap();
     /// println!("{:?}", bytes_url);
     /// ```
-    #[cfg(any(feature = "alloc", feature = "std", test))]
+    #[cfg(any(feature = "alloc", test))]
     #[inline]
     fn decode<T: AsRef<[u8]>>(&self, input: T) -> Result<Vec<u8>, DecodeError> {
         fn inner<E>(engine: &E, input_bytes: &[u8]) -> Result<Vec<u8>, DecodeError>
@@ -295,7 +297,7 @@ pub trait Engine: Send + Sync {
     ///     println!("{:?}", buffer);
     /// }
     /// ```
-    #[cfg(any(feature = "alloc", feature = "std", test))]
+    #[cfg(any(feature = "alloc", test))]
     #[inline]
     fn decode_vec<T: AsRef<[u8]>>(
         &self,

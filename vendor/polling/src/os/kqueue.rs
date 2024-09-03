@@ -1,12 +1,14 @@
 //! Functionality that is only available for `kqueue`-based platforms.
 
-use crate::sys::{mode_to_flags, FilterFlags};
+use crate::sys::{mode_to_flags, SourceId};
 use crate::{PollMode, Poller};
 
-use std::convert::TryInto;
+use std::io;
+use std::marker::PhantomData;
 use std::process::Child;
 use std::time::Duration;
-use std::{io, mem};
+
+use rustix::event::kqueue;
 
 use super::__private::PollerSealed;
 use __private::FilterSealed;
@@ -30,16 +32,16 @@ pub trait PollerKqueueExt<F: Filter>: PollerSealed {
     /// # Examples
     ///
     /// ```no_run
-    /// use polling::{Poller, PollMode};
+    /// use polling::{Events, Poller, PollMode};
     /// use polling::os::kqueue::{Filter, PollerKqueueExt, Signal};
     ///
     /// let poller = Poller::new().unwrap();
     ///
     /// // Register the SIGINT signal.
-    /// poller.add_filter(Signal(libc::SIGINT), 0, PollMode::Oneshot).unwrap();
+    /// poller.add_filter(Signal(rustix::process::Signal::Int as _), 0, PollMode::Oneshot).unwrap();
     ///
     /// // Wait for the signal.
-    /// let mut events = vec![];
+    /// let mut events = Events::new();
     /// poller.wait(&mut events, None).unwrap();
     /// # let _ = events;
     /// ```
@@ -53,19 +55,19 @@ pub trait PollerKqueueExt<F: Filter>: PollerSealed {
     /// # Examples
     ///
     /// ```no_run
-    /// use polling::{Poller, PollMode};
+    /// use polling::{Events, Poller, PollMode};
     /// use polling::os::kqueue::{Filter, PollerKqueueExt, Signal};
     ///
     /// let poller = Poller::new().unwrap();
     ///
     /// // Register the SIGINT signal.
-    /// poller.add_filter(Signal(libc::SIGINT), 0, PollMode::Oneshot).unwrap();
+    /// poller.add_filter(Signal(rustix::process::Signal::Int as _), 0, PollMode::Oneshot).unwrap();
     ///
     /// // Re-register with a different key.
-    /// poller.modify_filter(Signal(libc::SIGINT), 1, PollMode::Oneshot).unwrap();
+    /// poller.modify_filter(Signal(rustix::process::Signal::Int as _), 1, PollMode::Oneshot).unwrap();
     ///
     /// // Wait for the signal.
-    /// let mut events = vec![];
+    /// let mut events = Events::new();
     /// poller.wait(&mut events, None).unwrap();
     /// # let _ = events;
     /// ```
@@ -85,10 +87,10 @@ pub trait PollerKqueueExt<F: Filter>: PollerSealed {
     /// let poller = Poller::new().unwrap();
     ///
     /// // Register the SIGINT signal.
-    /// poller.add_filter(Signal(libc::SIGINT), 0, PollMode::Oneshot).unwrap();
+    /// poller.add_filter(Signal(rustix::process::Signal::Int as _), 0, PollMode::Oneshot).unwrap();
     ///
     /// // Remove the filter.
-    /// poller.delete_filter(Signal(libc::SIGINT)).unwrap();
+    /// poller.delete_filter(Signal(rustix::process::Signal::Int as _)).unwrap();
     /// ```
     fn delete_filter(&self, filter: F) -> io::Result<()>;
 }
@@ -97,12 +99,15 @@ impl<F: Filter> PollerKqueueExt<F> for Poller {
     #[inline(always)]
     fn add_filter(&self, filter: F, key: usize, mode: PollMode) -> io::Result<()> {
         // No difference between adding and modifying in kqueue.
+        self.poller.add_source(filter.source_id())?;
         self.modify_filter(filter, key, mode)
     }
 
     fn modify_filter(&self, filter: F, key: usize, mode: PollMode) -> io::Result<()> {
+        self.poller.has_source(filter.source_id())?;
+
         // Convert the filter into a kevent.
-        let event = filter.filter(libc::EV_ADD | mode_to_flags(mode), key);
+        let event = filter.filter(kqueue::EventFlags::ADD | mode_to_flags(mode), key);
 
         // Modify the filter.
         self.poller.submit_changes([event])
@@ -110,10 +115,12 @@ impl<F: Filter> PollerKqueueExt<F> for Poller {
 
     fn delete_filter(&self, filter: F) -> io::Result<()> {
         // Convert the filter into a kevent.
-        let event = filter.filter(libc::EV_DELETE, 0);
+        let event = filter.filter(kqueue::EventFlags::DELETE, 0);
 
         // Delete the filter.
-        self.poller.submit_changes([event])
+        self.poller.submit_changes([event])?;
+
+        self.poller.remove_source(filter.source_id())
     }
 }
 
@@ -122,8 +129,13 @@ pub trait Filter: FilterSealed {}
 
 unsafe impl<T: FilterSealed + ?Sized> FilterSealed for &T {
     #[inline(always)]
-    fn filter(&self, flags: FilterFlags, key: usize) -> libc::kevent {
+    fn filter(&self, flags: kqueue::EventFlags, key: usize) -> kqueue::Event {
         (**self).filter(flags, key)
+    }
+
+    #[inline(always)]
+    fn source_id(&self) -> SourceId {
+        (**self).source_id()
     }
 }
 
@@ -134,22 +146,24 @@ impl<T: Filter + ?Sized> Filter for &T {}
 /// No matter what `PollMode` is specified, this filter will always be
 /// oneshot-only.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Signal(pub c_int);
-
-/// Alias for `libc::c_int`.
-#[allow(non_camel_case_types)]
-pub type c_int = i32;
+pub struct Signal(pub std::os::raw::c_int);
 
 unsafe impl FilterSealed for Signal {
     #[inline(always)]
-    fn filter(&self, flags: FilterFlags, key: usize) -> libc::kevent {
-        libc::kevent {
-            ident: self.0 as _,
-            filter: libc::EVFILT_SIGNAL,
-            flags: flags | libc::EV_RECEIPT,
-            udata: key as _,
-            ..unsafe { mem::zeroed() }
-        }
+    fn filter(&self, flags: kqueue::EventFlags, key: usize) -> kqueue::Event {
+        kqueue::Event::new(
+            kqueue::EventFilter::Signal {
+                signal: rustix::process::Signal::from_raw(self.0).expect("invalid signal number"),
+                times: 0,
+            },
+            flags | kqueue::EventFlags::RECEIPT,
+            key as _,
+        )
+    }
+
+    #[inline(always)]
+    fn source_id(&self) -> SourceId {
+        SourceId::Signal(self.0)
     }
 }
 
@@ -158,11 +172,14 @@ impl Filter for Signal {}
 /// Monitor a child process.
 #[derive(Debug)]
 pub struct Process<'a> {
-    /// The child process to monitor.
-    child: &'a Child,
+    /// The process ID to monitor.
+    pid: rustix::process::Pid,
 
     /// The operation to monitor.
     ops: ProcessOps,
+
+    /// Lifetime of the underlying process.
+    _lt: PhantomData<&'a Child>,
 }
 
 /// The operations that a monitored process can perform.
@@ -181,28 +198,57 @@ pub enum ProcessOps {
 
 impl<'a> Process<'a> {
     /// Monitor a child process.
-    pub fn new(child: &'a Child, ops: ProcessOps) -> Self {
-        Self { child, ops }
+    ///
+    /// # Safety
+    ///
+    /// Once registered into the `Poller`, the `Child` object must outlive this filter's
+    /// registration into the poller.
+    pub unsafe fn new(child: &'a Child, ops: ProcessOps) -> Self {
+        Self {
+            pid: rustix::process::Pid::from_child(child),
+            ops,
+            _lt: PhantomData,
+        }
+    }
+
+    /// Create a `Process` from a PID.
+    ///
+    /// # Safety
+    ///
+    /// The PID must be tied to an actual child process.
+    pub unsafe fn from_pid(pid: std::num::NonZeroI32, ops: ProcessOps) -> Self {
+        Self {
+            pid: unsafe { rustix::process::Pid::from_raw_unchecked(pid.get()) },
+            ops,
+            _lt: PhantomData,
+        }
     }
 }
 
 unsafe impl FilterSealed for Process<'_> {
     #[inline(always)]
-    fn filter(&self, flags: FilterFlags, key: usize) -> libc::kevent {
-        let fflags = match self.ops {
-            ProcessOps::Exit => libc::NOTE_EXIT,
-            ProcessOps::Fork => libc::NOTE_FORK,
-            ProcessOps::Exec => libc::NOTE_EXEC,
+    fn filter(&self, flags: kqueue::EventFlags, key: usize) -> kqueue::Event {
+        let events = match self.ops {
+            ProcessOps::Exit => kqueue::ProcessEvents::EXIT,
+            ProcessOps::Fork => kqueue::ProcessEvents::FORK,
+            ProcessOps::Exec => kqueue::ProcessEvents::EXEC,
         };
 
-        libc::kevent {
-            ident: self.child.id() as _,
-            filter: libc::EVFILT_PROC,
-            flags: flags | libc::EV_RECEIPT,
-            fflags,
-            udata: key as _,
-            ..unsafe { mem::zeroed() }
-        }
+        kqueue::Event::new(
+            kqueue::EventFilter::Proc {
+                // SAFETY: We know that the PID is nonzero.
+                pid: self.pid,
+                flags: events,
+            },
+            flags | kqueue::EventFlags::RECEIPT,
+            key as _,
+        )
+    }
+
+    #[inline(always)]
+    fn source_id(&self) -> SourceId {
+        // SAFETY: We know that the PID is nonzero
+        SourceId::Pid(self.pid)
     }
 }
 
@@ -221,82 +267,37 @@ pub struct Timer {
 }
 
 unsafe impl FilterSealed for Timer {
-    fn filter(&self, flags: FilterFlags, key: usize) -> libc::kevent {
-        // Figure out the granularity of the timer.
-        let (fflags, data) = {
-            #[cfg(not(any(target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd")))]
-            {
-                let subsec_nanos = self.timeout.subsec_nanos();
+    fn filter(&self, flags: kqueue::EventFlags, key: usize) -> kqueue::Event {
+        kqueue::Event::new(
+            kqueue::EventFilter::Timer {
+                ident: self.id as _,
+                timer: Some(self.timeout),
+            },
+            flags | kqueue::EventFlags::RECEIPT,
+            key as _,
+        )
+    }
 
-                match (subsec_nanos % 1_000, subsec_nanos % 1_000_000, subsec_nanos) {
-                    (_, _, 0) => (
-                        libc::NOTE_SECONDS,
-                        self.timeout.as_secs().try_into().expect("too many seconds"),
-                    ),
-                    (_, 0, _) => (
-                        // Note: 0 by default means milliseconds.
-                        0,
-                        self.timeout
-                            .as_millis()
-                            .try_into()
-                            .expect("too many milliseconds"),
-                    ),
-                    (0, _, _) => (
-                        libc::NOTE_USECONDS,
-                        self.timeout
-                            .as_micros()
-                            .try_into()
-                            .expect("too many microseconds"),
-                    ),
-                    (_, _, _) => (
-                        libc::NOTE_NSECONDS,
-                        self.timeout
-                            .as_nanos()
-                            .try_into()
-                            .expect("too many nanoseconds"),
-                    ),
-                }
-            }
-
-            #[cfg(any(target_os = "dragonfly", target_os = "netbsd", target_os = "openbsd"))]
-            {
-                // OpenBSD/Dragonfly/NetBSD only supports milliseconds.
-                // NetBSD 10 supports NOTE_SECONDS et al, once Rust drops support for
-                // NetBSD 9 we can use the same code as above.
-                // See also: https://github.com/rust-lang/libc/pull/3080
-                (
-                    0,
-                    self.timeout
-                        .as_millis()
-                        .try_into()
-                        .expect("too many milliseconds"),
-                )
-            }
-        };
-
-        #[allow(clippy::needless_update)]
-        libc::kevent {
-            ident: self.id as _,
-            filter: libc::EVFILT_TIMER,
-            flags: flags | libc::EV_RECEIPT,
-            fflags,
-            data,
-            udata: key as _,
-            ..unsafe { mem::zeroed() }
-        }
+    #[inline(always)]
+    fn source_id(&self) -> SourceId {
+        SourceId::Timer(self.id)
     }
 }
 
 impl Filter for Timer {}
 
 mod __private {
-    use crate::sys::FilterFlags;
+    use crate::sys::SourceId;
+    use rustix::event::kqueue;
 
     #[doc(hidden)]
     pub unsafe trait FilterSealed {
         /// Get the filter for the given event.
         ///
         /// This filter's flags must have `EV_RECEIPT`.
-        fn filter(&self, flags: FilterFlags, key: usize) -> libc::kevent;
+        fn filter(&self, flags: kqueue::EventFlags, key: usize) -> kqueue::Event;
+
+        /// Get the source ID for this source.
+        fn source_id(&self) -> SourceId;
     }
 }

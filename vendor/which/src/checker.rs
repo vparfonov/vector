@@ -11,10 +11,13 @@ impl ExecutableChecker {
 }
 
 impl Checker for ExecutableChecker {
-    #[cfg(any(unix, target_os = "wasi"))]
+    #[cfg(any(unix, target_os = "wasi", target_os = "redox"))]
     fn is_valid(&self, path: &Path) -> bool {
         use rustix::fs as rfs;
-        rfs::access(path, rfs::Access::EXEC_OK).is_ok()
+        let ret = rfs::access(path, rfs::Access::EXEC_OK).is_ok();
+        #[cfg(feature = "tracing")]
+        tracing::trace!("{} EXEC_OK = {ret}", path.display());
+        ret
     }
 
     #[cfg(windows)]
@@ -34,37 +37,46 @@ impl ExistedChecker {
 impl Checker for ExistedChecker {
     #[cfg(target_os = "windows")]
     fn is_valid(&self, path: &Path) -> bool {
-        fs::symlink_metadata(path)
+        let ret = fs::symlink_metadata(path)
             .map(|metadata| {
                 let file_type = metadata.file_type();
+                #[cfg(feature = "tracing")]
+                tracing::trace!(
+                    "{} is_file() = {}, is_symlink() = {}",
+                    path.display(),
+                    file_type.is_file(),
+                    file_type.is_symlink()
+                );
                 file_type.is_file() || file_type.is_symlink()
             })
             .unwrap_or(false)
-            && (path.extension().is_some() || matches_arch(path))
+            && (path.extension().is_some() || matches_arch(path));
+        #[cfg(feature = "tracing")]
+        tracing::trace!(
+            "{} has_extension = {}, ExistedChecker::is_valid() = {ret}",
+            path.display(),
+            path.extension().is_some()
+        );
+        ret
     }
 
     #[cfg(not(target_os = "windows"))]
     fn is_valid(&self, path: &Path) -> bool {
-        fs::metadata(path)
+        let ret = fs::metadata(path)
             .map(|metadata| metadata.is_file())
-            .unwrap_or(false)
+            .unwrap_or(false);
+        #[cfg(feature = "tracing")]
+        tracing::trace!("{} is_file() = {ret}", path.display());
+        ret
     }
 }
 
 #[cfg(target_os = "windows")]
 fn matches_arch(path: &Path) -> bool {
-    use std::os::windows::prelude::OsStrExt;
-
-    let os_str = path
-        .as_os_str()
-        .encode_wide()
-        .chain(std::iter::once(0))
-        .collect::<Vec<u16>>();
-    let mut out = 0;
-    let is_executable = unsafe {
-        windows_sys::Win32::Storage::FileSystem::GetBinaryTypeW(os_str.as_ptr(), &mut out)
-    };
-    is_executable != 0
+    let ret = winsafe::GetBinaryType(&path.display().to_string()).is_ok();
+    #[cfg(feature = "tracing")]
+    tracing::trace!("{} matches_arch() = {ret}", path.display());
+    ret
 }
 
 pub struct CompositeChecker {

@@ -36,11 +36,11 @@ if webbrowser::open("http://github.com").is_ok() {
 |----------|-----------|----------|-------------|
 | macos    | ✅        | default + [others](https://docs.rs/webbrowser/latest/webbrowser/enum.Browser.html) | ✅ |
 | windows  | ✅        | default only | ✅ |
-| linux/wsl/*bsd  | ✅     | default only (respects $BROWSER env var, so can be used with other browsers) | ✅ |
+| linux/wsl | ✅       | default only (respects $BROWSER env var, so can be used with other browsers) | ✅ |
 | android  | ✅        | default only | ✅ |
-| ios      | ✅        | default only | ✅ |
+| ios/tvOS/visionOS    | ✅        | default only | ✅ |
 | wasm     | ✅        | default only | ✅ |
-| haiku    | ✅ (experimental) | default only | ❌ |
+| unix (*bsd, aix etc.) | ✅        | default only (respects $BROWSER env var, so can be used with other browsers) | Manual |
 
 ## Consistent Behaviour
 `webbrowser` defines consistent behaviour on all platforms as follows:

@@ -12,12 +12,12 @@ mod tests;
 ///
 /// This allows to read a stream of compressed data
 /// (good for files or heavy network stream).
-pub struct Decoder<'a, R: BufRead> {
+pub struct Decoder<'a, R> {
     reader: zio::Reader<R, raw::Decoder<'a>>,
 }
 
 /// An encoder that compress input data from another `Read`.
-pub struct Encoder<'a, R: BufRead> {
+pub struct Encoder<'a, R> {
     reader: zio::Reader<R, raw::Encoder<'a>>,
 }
 
@@ -46,6 +46,19 @@ impl<R: BufRead> Decoder<'static, R> {
     }
 }
 impl<'a, R: BufRead> Decoder<'a, R> {
+    /// Creates a new decoder which employs the provided context for deserialization.
+    pub fn with_context(
+        reader: R,
+        context: &'a mut zstd_safe::DCtx<'static>,
+    ) -> Self {
+        Self {
+            reader: zio::Reader::new(
+                reader,
+                raw::Decoder::with_context(context),
+            ),
+        }
+    }
+
     /// Sets this `Decoder` to stop after the first frame.
     ///
     /// By default, it keeps concatenating frames until EOF is reached.
@@ -66,6 +79,22 @@ impl<'a, R: BufRead> Decoder<'a, R> {
         'b: 'a,
     {
         let decoder = raw::Decoder::with_prepared_dictionary(dictionary)?;
+        let reader = zio::Reader::new(reader, decoder);
+
+        Ok(Decoder { reader })
+    }
+
+    /// Creates a new decoder, using a ref prefix.
+    ///
+    /// The prefix must be the same as the one used during compression.
+    pub fn with_ref_prefix<'b>(
+        reader: R,
+        ref_prefix: &'b [u8]
+    ) -> io::Result<Self>
+    where
+        'b: 'a,
+    {
+        let decoder = raw::Decoder::with_ref_prefix(ref_prefix)?;
         let reader = zio::Reader::new(reader, decoder);
 
         Ok(Decoder { reader })

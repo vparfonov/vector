@@ -31,7 +31,7 @@ pub trait AdditionalProviderMetadata: Clone + Debug + DeserializeOwned + Seriali
 ///
 /// Empty (default) extra [`ProviderMetadata`] fields.
 ///
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct EmptyAdditionalProviderMetadata {}
 impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
 
@@ -41,7 +41,7 @@ impl AdditionalProviderMetadata for EmptyAdditionalProviderMetadata {}
 ///
 #[serde_as]
 #[skip_serializing_none]
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 #[allow(clippy::type_complexity)]
 pub struct ProviderMetadata<A, AD, CA, CN, CT, G, JE, JK, JS, JT, JU, K, RM, RT, S>
 where
@@ -302,9 +302,11 @@ where
             .join(CONFIG_URL_SUFFIX)
             .map_err(DiscoveryError::UrlParse)?;
 
-        http_client(Self::discovery_request(discovery_url))
+        http_client(Self::discovery_request(discovery_url.clone()))
             .map_err(DiscoveryError::Request)
-            .and_then(|http_response| Self::discovery_response(issuer_url, http_response))
+            .and_then(|http_response| {
+                Self::discovery_response(issuer_url, &discovery_url, http_response)
+            })
             .and_then(|provider_metadata| {
                 JsonWebKeySet::fetch(provider_metadata.jwks_uri(), http_client).map(|jwks| Self {
                     jwks,
@@ -323,17 +325,19 @@ where
     ) -> Result<Self, DiscoveryError<RE>>
     where
         F: Future<Output = Result<HttpResponse, RE>>,
-        HC: Fn(HttpRequest) -> F + 'static,
+        HC: Fn(HttpRequest) -> F,
         RE: std::error::Error + 'static,
     {
         let discovery_url = issuer_url
             .join(CONFIG_URL_SUFFIX)
             .map_err(DiscoveryError::UrlParse)?;
 
-        let provider_metadata = http_client(Self::discovery_request(discovery_url))
+        let provider_metadata = http_client(Self::discovery_request(discovery_url.clone()))
             .await
             .map_err(DiscoveryError::Request)
-            .and_then(|http_response| Self::discovery_response(&issuer_url, http_response))?;
+            .and_then(|http_response| {
+                Self::discovery_response(&issuer_url, &discovery_url, http_response)
+            })?;
 
         JsonWebKeySet::fetch_async(provider_metadata.jwks_uri(), http_client)
             .await
@@ -356,6 +360,7 @@ where
 
     fn discovery_response<RE>(
         issuer_url: &IssuerUrl,
+        discovery_url: &url::Url,
         discovery_response: HttpResponse,
     ) -> Result<Self, DiscoveryError<RE>>
     where
@@ -365,7 +370,10 @@ where
             return Err(DiscoveryError::Response(
                 discovery_response.status_code,
                 discovery_response.body,
-                format!("HTTP status code {}", discovery_response.status_code),
+                format!(
+                    "HTTP status code {} at {}",
+                    discovery_response.status_code, discovery_url
+                ),
             ));
         }
 
@@ -668,7 +676,6 @@ mod tests {
             "\"end_session_endpoint\":\"https://rp.certification.openid.net:8080/openidconnect-rs/rp-response_type-code/end_session\",\
             \"version\":\"3.0\""
         );
-        dbg!(&json_response);
 
         let all_signing_algs = vec![
             CoreJwsSigningAlgorithm::RsaSsaPkcs1V15Sha256,

@@ -37,7 +37,7 @@ system consists of two primary components:
 * _instrumentation_, embedded in the application, which collects data from the
   async runtime and exposes it over the console's wire format
 * _consumers_, such as the [`tokio-console`] command-line application, which
-  connect to the instrumented application, recieve telemetry data, and display
+  connect to the instrumented application, receive telemetry data, and display
   it to the user
 
 The wire format [protobuf] bindings in this crate are used by both the
@@ -96,7 +96,7 @@ console project.
 ## Supported Rust Versions
 
 The Tokio console is built against the latest stable release. The minimum
-supported version is 1.58. The current Tokio console version is not guaranteed
+supported version is 1.64. The current Tokio console version is not guaranteed
 to build on Rust versions earlier than the minimum supported version.
 
 ## License

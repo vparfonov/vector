@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "clipboard-win"
-version = "5.0.0"
+version = "5.4.0"
 authors = ["Douman <douman@gmx.se>"]
 include = [
     "**/*.rs",
@@ -33,9 +33,19 @@ repository = "https://github.com/DoumanAsh/clipboard-win"
 
 [package.metadata.docs.rs]
 default-target = "x86_64-pc-windows-msvc"
+features = ["monitor"]
+
+[[test]]
+name = "monitor"
+required-features = ["monitor"]
 
 [features]
+monitor = ["windows-win"]
 std = ["error-code/std"]
 
 [target."cfg(windows)".dependencies.error-code]
 version = "3"
+
+[target."cfg(windows)".dependencies.windows-win]
+version = "3"
+optional = true

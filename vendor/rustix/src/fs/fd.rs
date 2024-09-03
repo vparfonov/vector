@@ -7,23 +7,26 @@ use crate::fs::{Gid, Uid};
 use crate::fs::{OFlags, SeekFrom, Timespec};
 use crate::{backend, io};
 use backend::fd::{AsFd, BorrowedFd};
-
-#[cfg(not(any(target_os = "espidf", target_os = "wasi")))]
-pub use backend::fs::types::FlockOperation;
-
 #[cfg(not(any(
     netbsdlike,
     solarish,
-    target_os = "aix",
     target_os = "dragonfly",
     target_os = "espidf",
     target_os = "nto",
     target_os = "redox",
+    target_os = "vita",
 )))]
-pub use backend::fs::types::FallocateFlags;
-
-pub use backend::fs::types::Stat;
-
+use backend::fs::types::FallocateFlags;
+#[cfg(not(any(
+    target_os = "espidf",
+    target_os = "solaris",
+    target_os = "vita",
+    target_os = "wasi"
+)))]
+use backend::fs::types::FlockOperation;
+#[cfg(linux_kernel)]
+use backend::fs::types::FsWord;
+use backend::fs::types::Stat;
 #[cfg(not(any(
     solarish,
     target_os = "espidf",
@@ -31,15 +34,13 @@ pub use backend::fs::types::Stat;
     target_os = "netbsd",
     target_os = "nto",
     target_os = "redox",
+    target_os = "vita",
     target_os = "wasi",
 )))]
-pub use backend::fs::types::StatFs;
-
+use backend::fs::types::StatFs;
 #[cfg(not(any(target_os = "haiku", target_os = "redox", target_os = "wasi")))]
-pub use backend::fs::types::{StatVfs, StatVfsMountFlags};
-
-#[cfg(linux_kernel)]
-pub use backend::fs::types::FsWord;
+use backend::fs::types::StatVfs;
+use core::fmt;
 
 /// Timestamps used by [`utimensat`] and [`futimens`].
 ///
@@ -48,13 +49,24 @@ pub use backend::fs::types::FsWord;
 // This is `repr(C)` and specifically laid out to match the representation used
 // by `utimensat` and `futimens`, which expect 2-element arrays of timestamps.
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Timestamps {
     /// The timestamp of the last access to a filesystem object.
     pub last_access: Timespec,
 
     /// The timestamp of the last modification of a filesystem object.
     pub last_modification: Timespec,
+}
+
+impl fmt::Debug for Timestamps {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Timestamps")
+            .field("last_access.tv_sec", &self.last_access.tv_sec)
+            .field("last_access.tv_nsec", &self.last_access.tv_nsec)
+            .field("last_modification.tv_sec", &self.last_modification.tv_sec)
+            .field("last_modification.tv_nsec", &self.last_modification.tv_nsec)
+            .finish()
+    }
 }
 
 /// The filesystem magic number for procfs.
@@ -170,6 +182,7 @@ pub fn fstat<Fd: AsFd>(fd: Fd) -> io::Result<Stat> {
     target_os = "netbsd",
     target_os = "nto",
     target_os = "redox",
+    target_os = "vita",
     target_os = "wasi",
 )))]
 #[inline]
@@ -205,7 +218,7 @@ pub fn fstatvfs<Fd: AsFd>(fd: Fd) -> io::Result<StatVfs> {
 ///
 /// [POSIX]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/futimens.html
 /// [Linux]: https://man7.org/linux/man-pages/man2/utimensat.2.html
-#[cfg(not(target_os = "espidf"))]
+#[cfg(not(any(target_os = "espidf", target_os = "vita")))]
 #[inline]
 pub fn futimens<Fd: AsFd>(fd: Fd, times: &Timestamps) -> io::Result<()> {
     backend::fs::syscalls::futimens(fd.as_fd(), times)
@@ -229,11 +242,11 @@ pub fn futimens<Fd: AsFd>(fd: Fd, times: &Timestamps) -> io::Result<()> {
 #[cfg(not(any(
     netbsdlike,
     solarish,
-    target_os = "aix",
     target_os = "dragonfly",
     target_os = "espidf",
     target_os = "nto",
     target_os = "redox",
+    target_os = "vita",
 )))] // not implemented in libc for netbsd yet
 #[inline]
 #[doc(alias = "posix_fallocate")]
@@ -304,6 +317,7 @@ pub fn fsync<Fd: AsFd>(fd: Fd) -> io::Result<()> {
     target_os = "espidf",
     target_os = "haiku",
     target_os = "redox",
+    target_os = "vita",
 )))]
 #[inline]
 pub fn fdatasync<Fd: AsFd>(fd: Fd) -> io::Result<()> {
@@ -329,7 +343,12 @@ pub fn ftruncate<Fd: AsFd>(fd: Fd, length: u64) -> io::Result<()> {
 ///  - [Linux]
 ///
 /// [Linux]: https://man7.org/linux/man-pages/man2/flock.2.html
-#[cfg(not(any(target_os = "espidf", target_os = "solaris", target_os = "wasi")))]
+#[cfg(not(any(
+    target_os = "espidf",
+    target_os = "solaris",
+    target_os = "vita",
+    target_os = "wasi"
+)))]
 #[inline]
 pub fn flock<Fd: AsFd>(fd: Fd, operation: FlockOperation) -> io::Result<()> {
     backend::fs::syscalls::flock(fd.as_fd(), operation)

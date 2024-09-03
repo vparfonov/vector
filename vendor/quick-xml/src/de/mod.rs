@@ -15,10 +15,14 @@
 //! Table of Contents
 //! =================
 //! - [Mapping XML to Rust types](#mapping-xml-to-rust-types)
+//!   - [Basics](#basics)
 //!   - [Optional attributes and elements](#optional-attributes-and-elements)
 //!   - [Choices (`xs:choice` XML Schema type)](#choices-xschoice-xml-schema-type)
 //!   - [Sequences (`xs:all` and `xs:sequence` XML Schema types)](#sequences-xsall-and-xssequence-xml-schema-types)
 //! - [Composition Rules](#composition-rules)
+//! - [Enum Representations](#enum-representations)
+//!   - [Normal enum variant](#normal-enum-variant)
+//!   - [`$text` enum variant](#text-enum-variant)
 //! - [Difference between `$text` and `$value` special names](#difference-between-text-and-value-special-names)
 //!   - [`$text`](#text)
 //!   - [`$value`](#value)
@@ -27,7 +31,7 @@
 //!     - [Enums and sequences of enums](#enums-and-sequences-of-enums)
 //! - [Frequently Used Patterns](#frequently-used-patterns)
 //!   - [`<element>` lists](#element-lists)
-//!   - [Enum::Unit Variants As a Text](#enumunit-variants-as-a-text)
+//!   - [Overlapped (Out-of-Order) Elements](#overlapped-out-of-order-elements)
 //!   - [Internally Tagged Enums](#internally-tagged-enums)
 //!
 //!
@@ -57,6 +61,11 @@
 //!
 //! <table>
 //! <thead>
+//! <tr><th colspan="2">
+//!
+//! ## Basics
+//!
+//! </th></tr>
 //! <tr><th>To parse all these XML's...</th><th>...use these Rust type(s)</th></tr>
 //! </thead>
 //! <tbody style="vertical-align:top;">
@@ -990,6 +999,9 @@
 //!
 //! NOTE: consequent text and CDATA nodes are merged into the one text node,
 //! so you cannot have two adjacent string types in your sequence.
+//!
+//! NOTE: In the case that the list might contain tags that are overlapped with
+//! tags that do not correspond to the list you should add the feature [`overlapped-lists`].
 //! </div>
 //! </td>
 //! </tr>
@@ -1341,6 +1353,58 @@
 //!
 //!
 //!
+//! Enum Representations
+//! ====================
+//!
+//! `quick-xml` represents enums differently in normal fields, `$text` fields and
+//! `$value` fields. A normal representation is compatible with serde's adjacent
+//! and internal tags feature -- tag for adjacently and internally tagged enums
+//! are serialized using [`Serializer::serialize_unit_variant`] and deserialized
+//! using [`Deserializer::deserialize_enum`].
+//!
+//! Use those simple rules to remember, how enum would be represented in XML:
+//! - In `$value` field the representation is always the same as top-level representation;
+//! - In `$text` field the representation is always the same as in normal field,
+//!   but surrounding tags with field name are removed;
+//! - In normal field the representation is always contains a tag with a field name.
+//!
+//! Normal enum variant
+//! -------------------
+//!
+//! To model an `xs:choice` XML construct use `$value` field.
+//! To model a top-level `xs:choice` just use the enum type.
+//!
+//! |Kind   |Top-level and in `$value` field          |In normal field      |In `$text` field     |
+//! |-------|-----------------------------------------|---------------------|---------------------|
+//! |Unit   |`<Unit/>`                                |`<field>Unit</field>`|`Unit`               |
+//! |Newtype|`<Newtype>42</Newtype>`                  |Err(Unsupported)     |Err(Unsupported)     |
+//! |Tuple  |`<Tuple>42</Tuple><Tuple>answer</Tuple>` |Err(Unsupported)     |Err(Unsupported)     |
+//! |Struct |`<Struct><q>42</q><a>answer</a></Struct>`|Err(Unsupported)     |Err(Unsupported)     |
+//!
+//! `$text` enum variant
+//! --------------------
+//!
+//! |Kind   |Top-level and in `$value` field          |In normal field      |In `$text` field     |
+//! |-------|-----------------------------------------|---------------------|---------------------|
+//! |Unit   |_(empty)_                                |`<field/>`           |_(empty)_            |
+//! |Newtype|`42`                                     |Err(Unsupported) [^1]|Err(Unsupported) [^2]|
+//! |Tuple  |`42 answer`                              |Err(Unsupported) [^3]|Err(Unsupported) [^4]|
+//! |Struct |Err(Unsupported)                         |Err(Unsupported)     |Err(Unsupported)     |
+//!
+//! [^1]: If this serialize as `<field>42</field>` then it will be ambiguity during deserialization,
+//!       because it clash with `Unit` representation in normal field.
+//!
+//! [^2]: If this serialize as `42` then it will be ambiguity during deserialization,
+//!       because it clash with `Unit` representation in `$text` field.
+//!
+//! [^3]: If this serialize as `<field>42 answer</field>` then it will be ambiguity during deserialization,
+//!       because it clash with `Unit` representation in normal field.
+//!
+//! [^4]: If this serialize as `42 answer` then it will be ambiguity during deserialization,
+//!       because it clash with `Unit` representation in `$text` field.
+//!
+//!
+//!
 //! Difference between `$text` and `$value` special names
 //! =====================================================
 //!
@@ -1421,33 +1485,54 @@
 //! get their names from the field name. It cannot be deserialized, because `Enum`
 //! expects elements `<A/>`, `<B/>` or `<C/>`, but `AnyName` looked only for `<field/>`:
 //!
-//! ```no_run
+//! ```
 //! # use serde::{Deserialize, Serialize};
+//! # use pretty_assertions::assert_eq;
+//! # #[derive(PartialEq, Debug)]
 //! #[derive(Deserialize, Serialize)]
 //! enum Enum { A, B, C }
 //!
+//! # #[derive(PartialEq, Debug)]
 //! #[derive(Deserialize, Serialize)]
 //! struct AnyName {
-//!     // <field/>
+//!     // <field>A</field>, <field>B</field>, or <field>C</field>
 //!     field: Enum,
 //! }
+//! # assert_eq!(
+//! #     quick_xml::se::to_string(&AnyName { field: Enum::A }).unwrap(),
+//! #     "<AnyName><field>A</field></AnyName>",
+//! # );
+//! # assert_eq!(
+//! #     AnyName { field: Enum::B },
+//! #     quick_xml::de::from_str("<root><field>B</field></root>").unwrap(),
+//! # );
 //! ```
 //!
 //! If you rename field to `$value`, then `field` would be serialized as `<A/>`,
 //! `<B/>` or `<C/>`, depending on the its content. It is also possible to
 //! deserialize it from the same elements:
 //!
-//! ```no_run
+//! ```
 //! # use serde::{Deserialize, Serialize};
-//! # #[derive(Deserialize, Serialize)]
+//! # use pretty_assertions::assert_eq;
+//! # #[derive(Deserialize, Serialize, PartialEq, Debug)]
 //! # enum Enum { A, B, C }
 //! #
+//! # #[derive(PartialEq, Debug)]
 //! #[derive(Deserialize, Serialize)]
 //! struct AnyName {
 //!     // <A/>, <B/> or <C/>
 //!     #[serde(rename = "$value")]
 //!     field: Enum,
 //! }
+//! # assert_eq!(
+//! #     quick_xml::se::to_string(&AnyName { field: Enum::A }).unwrap(),
+//! #     "<AnyName><A/></AnyName>",
+//! # );
+//! # assert_eq!(
+//! #     AnyName { field: Enum::B },
+//! #     quick_xml::de::from_str("<root><B/></root>").unwrap(),
+//! # );
 //! ```
 //!
 //! ### Primitives and sequences of primitives
@@ -1457,6 +1542,7 @@
 //!
 //! ```
 //! # use serde::{Deserialize, Serialize};
+//! # use pretty_assertions::assert_eq;
 //! # use quick_xml::de::from_str;
 //! # use quick_xml::se::to_string;
 //! #[derive(Deserialize, Serialize, PartialEq, Debug)]
@@ -1483,6 +1569,7 @@
 //!
 //! ```
 //! # use serde::{Deserialize, Serialize};
+//! # use pretty_assertions::assert_eq;
 //! # use quick_xml::de::from_str;
 //! # use quick_xml::se::to_string;
 //! #[derive(Deserialize, Serialize, PartialEq, Debug)]
@@ -1506,6 +1593,7 @@
 //!
 //! ```
 //! # use serde::{Deserialize, Serialize};
+//! # use pretty_assertions::assert_eq;
 //! # use quick_xml::de::from_str;
 //! # use quick_xml::se::to_string;
 //! #[derive(Deserialize, Serialize, PartialEq, Debug)]
@@ -1539,6 +1627,7 @@
 //!
 //! ```
 //! # use serde::{Deserialize, Serialize};
+//! # use pretty_assertions::assert_eq;
 //! # use quick_xml::de::from_str;
 //! # use quick_xml::se::to_string;
 //! #[derive(Deserialize, Serialize, PartialEq, Debug)]
@@ -1673,74 +1762,30 @@
 //!
 //! Instead of writing such functions manually, you also could try <https://lib.rs/crates/serde-query>.
 //!
-//! Enum::Unit Variants As a Text
-//! -----------------------------
-//! One frequent task and a typical mistake is to creation of mapping a text
-//! content of some tag to a Rust `enum`. For example, for the XML:
-//!
+//! Overlapped (Out-of-Order) Elements
+//! ----------------------------------
+//! In the case that the list might contain tags that are overlapped with
+//! tags that do not correspond to the list (this is a usual case in XML
+//! documents) like this:
 //! ```xml
-//! <some-container>
-//!   <field>EnumValue</field>
-//! </some-container>
+//! <any-name>
+//!   <item/>
+//!   <another-item/>
+//!   <item/>
+//!   <item/>
+//! </any-name>
 //! ```
-//! one could create an _incorrect_ mapping
-//!
-//! ```
-//! # use serde::{Deserialize, Serialize};
-//! #
-//! #[derive(Serialize, Deserialize)]
-//! enum SomeEnum {
-//!     EnumValue,
-//! # /*
-//!     ...
-//! # */
-//! }
-//!
-//! #[derive(Serialize, Deserialize)]
-//! #[serde(rename = "some-container")]
-//! struct SomeContainer {
-//!     field: SomeEnum,
+//! you should enable the [`overlapped-lists`] feature to make it possible
+//! to deserialize this to:
+//! ```no_run
+//! # use serde::Deserialize;
+//! #[derive(Deserialize)]
+//! #[serde(rename_all = "kebab-case")]
+//! struct AnyName {
+//!     item: Vec<()>,
+//!     another_item: (),
 //! }
 //! ```
-//!
-//! Actually, those types will be serialized into:
-//! ```xml
-//! <some-container>
-//!   <EnumValue/>
-//! </some-container>
-//! ```
-//! and will not be able to be deserialized.
-//!
-//! You can easily see what's wrong if you think about attributes, which could
-//! be defined in the `<field>` tag:
-//! ```xml
-//! <some-container>
-//!   <field some="attribute">EnumValue</field>
-//! </some-container>
-//! ```
-//!
-//! After that you can find the correct solution, using the principles explained
-//! above. You should wrap `SomeEnum` into wrapper struct under the [`$text`](#text)
-//! name:
-//! ```
-//! # use serde::{Serialize, Deserialize};
-//! # type SomeEnum = ();
-//! #[derive(Serialize, Deserialize)]
-//! struct Field {
-//!     // Use a special name `$text` to map field to the text content
-//!     #[serde(rename = "$text")]
-//!     content: SomeEnum,
-//! }
-//!
-//! #[derive(Serialize, Deserialize)]
-//! #[serde(rename = "some-container")]
-//! struct SomeContainer {
-//!     field: Field,
-//! }
-//! ```
-//!
-//! If you still want to keep your struct untouched, you can instead use the
-//! helper module [`text_content`].
 //!
 //!
 //! Internally Tagged Enums
@@ -1755,10 +1800,12 @@
 //! macro documentation for details.
 //!
 //!
+//! [`overlapped-lists`]: ../index.html#overlapped-lists
 //! [specification]: https://www.w3.org/TR/xmlschema11-1/#Simple_Type_Definition
 //! [`deserialize_with`]: https://serde.rs/field-attrs.html#deserialize_with
 //! [#497]: https://github.com/tafia/quick-xml/issues/497
-//! [`text_content`]: crate::serde_helpers::text_content
+//! [`Serializer::serialize_unit_variant`]: serde::Serializer::serialize_unit_variant
+//! [`Deserializer::deserialize_enum`]: serde::Deserializer::deserialize_enum
 //! [Tagged enums]: https://serde.rs/enum-representations.html#internally-tagged
 //! [serde#1183]: https://github.com/serde-rs/serde/issues/1183
 //! [serde#1495]: https://github.com/serde-rs/serde/issues/1495
@@ -1868,18 +1915,6 @@ macro_rules! deserialize_primitives {
             self.deserialize_unit(visitor)
         }
 
-        /// Representation of the newtypes the same as one-element [tuple](#method.deserialize_tuple).
-        fn deserialize_newtype_struct<V>(
-            self,
-            _name: &'static str,
-            visitor: V,
-        ) -> Result<V::Value, DeError>
-        where
-            V: Visitor<'de>,
-        {
-            self.deserialize_tuple(1, visitor)
-        }
-
         /// Representation of tuples the same as [sequences](#method.deserialize_seq).
         fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, DeError>
         where
@@ -1901,6 +1936,16 @@ macro_rules! deserialize_primitives {
             self.deserialize_tuple(len, visitor)
         }
 
+        /// Forwards deserialization to the [`deserialize_struct`](#method.deserialize_struct)
+        /// with empty name and fields.
+        #[inline]
+        fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, DeError>
+        where
+            V: Visitor<'de>,
+        {
+            self.deserialize_struct("", &[], visitor)
+        }
+
         /// Identifiers represented as [strings](#method.deserialize_str).
         fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, DeError>
         where
@@ -1908,15 +1953,14 @@ macro_rules! deserialize_primitives {
         {
             self.deserialize_str(visitor)
         }
-    };
-}
 
-macro_rules! deserialize_option {
-    ($de:expr, $deserializer:ident, $visitor:ident) => {
-        match $de.peek()? {
-            DeEvent::Text(t) if t.is_empty() => $visitor.visit_none(),
-            DeEvent::Eof => $visitor.visit_none(),
-            _ => $visitor.visit_some($deserializer),
+        /// Forwards deserialization to the [`deserialize_unit`](#method.deserialize_unit).
+        #[inline]
+        fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, DeError>
+        where
+            V: Visitor<'de>,
+        {
+            self.deserialize_unit(visitor)
         }
     };
 }
@@ -1925,12 +1969,14 @@ mod key;
 mod map;
 mod resolver;
 mod simple_type;
+mod text;
 mod var;
 
 pub use crate::errors::serialize::DeError;
 pub use resolver::{EntityResolver, NoEntityResolver};
 
 use crate::{
+    de::map::ElementMapAccess,
     encoding::Decoder,
     errors::Error,
     events::{BytesCData, BytesEnd, BytesStart, BytesText, Event},
@@ -2081,6 +2127,11 @@ impl<'i, R: XmlRead<'i>, E: EntityResolver> XmlReader<'i, R, E> {
         }
     }
 
+    /// Returns `true` if all events was consumed
+    fn is_empty(&self) -> bool {
+        matches!(self.lookahead, Ok(PayloadEvent::Eof))
+    }
+
     /// Read next event and put it in lookahead, return the current lookahead
     #[inline(always)]
     fn next_impl(&mut self) -> Result<PayloadEvent<'i>, DeError> {
@@ -2177,8 +2228,8 @@ impl<'i, R: XmlRead<'i>, E: EntityResolver> XmlReader<'i, R, E> {
                 let result1 = self.reader.read_to_end(name);
                 let result2 = self.reader.read_to_end(name);
 
-                // In case of error `next` returns `Eof`
-                self.lookahead = self.reader.next();
+                // In case of error `next_impl` returns `Eof`
+                let _ = self.next_impl();
                 result1?;
                 result2?;
             }
@@ -2186,13 +2237,13 @@ impl<'i, R: XmlRead<'i>, E: EntityResolver> XmlReader<'i, R, E> {
             // Because this is end event, we already consume the whole tree, so
             // nothing to do, just update lookahead
             Ok(PayloadEvent::End(ref e)) if e.name() == name => {
-                self.lookahead = self.reader.next();
+                let _ = self.next_impl();
             }
             Ok(_) => {
                 let result = self.reader.read_to_end(name);
 
-                // In case of error `next` returns `Eof`
-                self.lookahead = self.reader.next();
+                // In case of error `next_impl` returns `Eof`
+                let _ = self.next_impl();
                 result?;
             }
             // Read next lookahead event, unpack error from the current lookahead
@@ -2338,6 +2389,19 @@ where
             #[cfg(not(feature = "overlapped-lists"))]
             peek: None,
         }
+    }
+
+    /// Returns `true` if all events was consumed.
+    pub fn is_empty(&self) -> bool {
+        #[cfg(feature = "overlapped-lists")]
+        if self.read.is_empty() {
+            return self.reader.is_empty();
+        }
+        #[cfg(not(feature = "overlapped-lists"))]
+        if self.peek.is_none() {
+            return self.reader.is_empty();
+        }
+        false
     }
 
     /// Set the maximum number of events that could be skipped during deserialization
@@ -2538,11 +2602,15 @@ where
     /// events, merge them into one string. If there are no such events, returns
     /// an empty string.
     ///
-    /// If `allow_start` is `false`, then only text events is consumed, for other
+    /// If `allow_start` is `false`, then only text events are consumed, for other
     /// events an error is returned (see table below).
     ///
-    /// If `allow_start` is `true`, then first [`DeEvent::Text`] event is returned
-    /// and all other content is skipped until corresponding end tag will be consumed.
+    /// If `allow_start` is `true`, then two or three events are expected:
+    /// - [`DeEvent::Start`];
+    /// - _(optional)_ [`DeEvent::Text`] which content is returned;
+    /// - [`DeEvent::End`]. If text event was missed, an empty string is returned.
+    ///
+    /// Corresponding events are consumed.
     ///
     /// # Handling events
     ///
@@ -2560,9 +2628,8 @@ where
     /// |Event             |XML                        |Handling
     /// |------------------|---------------------------|----------------------------------------------------------------------------------
     /// |[`DeEvent::Start`]|`<any-tag>...</any-tag>`   |Emits [`UnexpectedStart("any-tag")`](DeError::UnexpectedStart)
-    /// |[`DeEvent::End`]  |`</tag>`                   |Returns an empty slice, if close tag matched the open one
-    /// |[`DeEvent::End`]  |`</any-tag>`               |Emits [`UnexpectedEnd("any-tag")`](DeError::UnexpectedEnd)
-    /// |[`DeEvent::Text`] |`text content` or `<![CDATA[cdata content]]>` (probably mixed)|Returns event content unchanged, consumes events up to `</tag>`
+    /// |[`DeEvent::End`]  |`</tag>`                   |Returns an empty slice. The reader guarantee that tag will match the open one
+    /// |[`DeEvent::Text`] |`text content` or `<![CDATA[cdata content]]>` (probably mixed)|Returns event content unchanged, expects the `</tag>` after that
     /// |[`DeEvent::Eof`]  |                           |Emits [`UnexpectedEof`](DeError::UnexpectedEof)
     ///
     /// [`Text`]: Event::Text
@@ -2571,20 +2638,29 @@ where
         match self.next()? {
             DeEvent::Text(e) => Ok(e.text),
             // allow one nested level
-            DeEvent::Start(e) if allow_start => match self.next()? {
-                DeEvent::Text(t) => {
-                    self.read_to_end(e.name())?;
-                    Ok(t.text)
-                }
-                DeEvent::Start(s) => Err(DeError::UnexpectedStart(s.name().as_ref().to_owned())),
-                // We can get End event in case of `<tag></tag>` or `<tag/>` input
-                // Return empty text in that case
-                DeEvent::End(end) if end.name() == e.name() => Ok("".into()),
-                DeEvent::End(end) => Err(DeError::UnexpectedEnd(end.name().as_ref().to_owned())),
-                DeEvent::Eof => Err(DeError::UnexpectedEof),
-            },
+            DeEvent::Start(_) if allow_start => self.read_text(),
             DeEvent::Start(e) => Err(DeError::UnexpectedStart(e.name().as_ref().to_owned())),
             DeEvent::End(e) => Err(DeError::UnexpectedEnd(e.name().as_ref().to_owned())),
+            DeEvent::Eof => Err(DeError::UnexpectedEof),
+        }
+    }
+    /// Consumes one [`DeEvent::Text`] event and ensures that it is followed by the
+    /// [`DeEvent::End`] event.
+    fn read_text(&mut self) -> Result<Cow<'de, str>, DeError> {
+        match self.next()? {
+            DeEvent::Text(e) => match self.next()? {
+                // The matching tag name is guaranteed by the reader
+                DeEvent::End(_) => Ok(e.text),
+                // SAFETY: Cannot be two consequent Text events, they would be merged into one
+                DeEvent::Text(_) => unreachable!(),
+                DeEvent::Start(e) => Err(DeError::UnexpectedStart(e.name().as_ref().to_owned())),
+                DeEvent::Eof => Err(DeError::UnexpectedEof),
+            },
+            // We can get End event in case of `<tag></tag>` or `<tag/>` input
+            // Return empty text in that case
+            // The matching tag name is guaranteed by the reader
+            DeEvent::End(_) => Ok("".into()),
+            DeEvent::Start(s) => Err(DeError::UnexpectedStart(s.name().as_ref().to_owned())),
             DeEvent::Eof => Err(DeError::UnexpectedEof),
         }
     }
@@ -2739,13 +2815,7 @@ where
         V: Visitor<'de>,
     {
         match self.next()? {
-            DeEvent::Start(e) => {
-                let name = e.name().as_ref().to_vec();
-                let map = map::MapAccess::new(self, e, fields)?;
-                let value = visitor.visit_map(map)?;
-                self.read_to_end(QName(&name))?;
-                Ok(value)
-            }
+            DeEvent::Start(e) => visitor.visit_map(ElementMapAccess::new(self, e, fields)?),
             DeEvent::End(e) => Err(DeError::UnexpectedEnd(e.name().as_ref().to_owned())),
             DeEvent::Text(_) => Err(DeError::ExpectedStart),
             DeEvent::Eof => Err(DeError::UnexpectedEof),
@@ -2784,6 +2854,19 @@ where
         }
     }
 
+    /// Forwards deserialization of the inner type. Always calls [`Visitor::visit_newtype_struct`]
+    /// with the same deserializer.
+    fn deserialize_newtype_struct<V>(
+        self,
+        _name: &'static str,
+        visitor: V,
+    ) -> Result<V::Value, DeError>
+    where
+        V: Visitor<'de>,
+    {
+        visitor.visit_newtype_struct(self)
+    }
+
     fn deserialize_enum<V>(
         self,
         _name: &'static str,
@@ -2803,42 +2886,15 @@ where
         visitor.visit_seq(self)
     }
 
-    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, DeError>
-    where
-        V: Visitor<'de>,
-    {
-        self.deserialize_struct("", &[], visitor)
-    }
-
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, DeError>
     where
         V: Visitor<'de>,
     {
-        deserialize_option!(self, self, visitor)
-    }
-
-    /// Always call `visitor.visit_unit()` because returned value ignored in any case.
-    ///
-    /// This method consumes any single [event][DeEvent] except the [`Start`]
-    /// event, in which case all events up to and including corresponding [`End`]
-    /// event will be consumed.
-    ///
-    /// This method returns error if current event is [`End`] or [`Eof`].
-    ///
-    /// [`Start`]: DeEvent::Start
-    /// [`End`]: DeEvent::End
-    /// [`Eof`]: DeEvent::Eof
-    fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, DeError>
-    where
-        V: Visitor<'de>,
-    {
-        match self.next()? {
-            DeEvent::Start(e) => self.read_to_end(e.name())?,
-            DeEvent::End(e) => return Err(DeError::UnexpectedEnd(e.name().as_ref().to_owned())),
-            DeEvent::Eof => return Err(DeError::UnexpectedEof),
-            _ => (),
+        match self.peek()? {
+            DeEvent::Text(t) if t.is_empty() => visitor.visit_none(),
+            DeEvent::Eof => visitor.visit_none(),
+            _ => visitor.visit_some(self),
         }
-        visitor.visit_unit()
     }
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, DeError>
@@ -2846,10 +2902,8 @@ where
         V: Visitor<'de>,
     {
         match self.peek()? {
-            DeEvent::Start(_) => self.deserialize_map(visitor),
-            // Redirect to deserialize_unit in order to consume an event and return an appropriate error
-            DeEvent::End(_) | DeEvent::Eof => self.deserialize_unit(visitor),
-            _ => self.deserialize_string(visitor),
+            DeEvent::Text(_) => self.deserialize_str(visitor),
+            _ => self.deserialize_map(visitor),
         }
     }
 }
@@ -2871,7 +2925,11 @@ where
         T: DeserializeSeed<'de>,
     {
         match self.peek()? {
-            DeEvent::Eof => Ok(None),
+            DeEvent::Eof => {
+                // We need to consume event in order to self.is_empty() worked
+                self.next()?;
+                Ok(None)
+            }
 
             // Start(tag), End(tag), Text
             _ => seed.deserialize(&mut **self).map(Some),
@@ -3019,6 +3077,11 @@ mod tests {
     use super::*;
     use pretty_assertions::assert_eq;
 
+    fn make_de<'de>(source: &'de str) -> Deserializer<'de, SliceReader<'de>> {
+        dbg!(source);
+        Deserializer::from_str(source)
+    }
+
     #[cfg(feature = "overlapped-lists")]
     mod skip {
         use super::*;
@@ -3029,7 +3092,7 @@ mod tests {
         /// Checks that `peek()` and `read()` behaves correctly after `skip()`
         #[test]
         fn read_and_peek() {
-            let mut de = Deserializer::from_str(
+            let mut de = make_de(
                 r#"
                 <root>
                     <inner>
@@ -3160,7 +3223,7 @@ mod tests {
         /// Checks that `read_to_end()` behaves correctly after `skip()`
         #[test]
         fn read_to_end() {
-            let mut de = Deserializer::from_str(
+            let mut de = make_de(
                 r#"
                 <root>
                     <skip>
@@ -3253,7 +3316,7 @@ mod tests {
         /// Test for https://github.com/tafia/quick-xml/issues/435
         #[test]
         fn partial_replay() {
-            let mut de = Deserializer::from_str(
+            let mut de = make_de(
                 r#"
                 <root>
                     <skipped-1/>
@@ -3459,7 +3522,7 @@ mod tests {
                 item: Vec<()>,
             }
 
-            let mut de = Deserializer::from_str(
+            let mut de = make_de(
                 r#"
                 <any-name>
                     <item/>
@@ -3485,7 +3548,7 @@ mod tests {
         fn invalid_xml() {
             use crate::de::DeEvent::*;
 
-            let mut de = Deserializer::from_str("<root>");
+            let mut de = make_de("<root>");
 
             // Cache all events
             let checkpoint = de.skip_checkpoint();
@@ -3502,7 +3565,7 @@ mod tests {
 
         #[test]
         fn complex() {
-            let mut de = Deserializer::from_str(
+            let mut de = make_de(
                 r#"
                 <root>
                     <tag a="1"><tag>text</tag>content</tag>
@@ -3536,7 +3599,7 @@ mod tests {
 
         #[test]
         fn invalid_xml1() {
-            let mut de = Deserializer::from_str("<tag><tag></tag>");
+            let mut de = make_de("<tag><tag></tag>");
 
             assert_eq!(de.next().unwrap(), Start(BytesStart::new("tag")));
             assert_eq!(de.peek().unwrap(), &Start(BytesStart::new("tag")));
@@ -3550,7 +3613,7 @@ mod tests {
 
         #[test]
         fn invalid_xml2() {
-            let mut de = Deserializer::from_str("<tag><![CDATA[]]><tag></tag>");
+            let mut de = make_de("<tag><![CDATA[]]><tag></tag>");
 
             assert_eq!(de.next().unwrap(), Start(BytesStart::new("tag")));
             assert_eq!(de.peek().unwrap(), &Text("".into()));
@@ -3680,43 +3743,43 @@ mod tests {
 
         #[test]
         fn text() {
-            let mut de = Deserializer::from_str("text");
+            let mut de = make_de("text");
             assert_eq!(de.next().unwrap(), DeEvent::Text("text".into()));
         }
 
         #[test]
         fn cdata() {
-            let mut de = Deserializer::from_str("<![CDATA[cdata]]>");
+            let mut de = make_de("<![CDATA[cdata]]>");
             assert_eq!(de.next().unwrap(), DeEvent::Text("cdata".into()));
         }
 
         #[test]
         fn text_and_cdata() {
-            let mut de = Deserializer::from_str("text and <![CDATA[cdata]]>");
+            let mut de = make_de("text and <![CDATA[cdata]]>");
             assert_eq!(de.next().unwrap(), DeEvent::Text("text and cdata".into()));
         }
 
         #[test]
         fn text_and_empty_cdata() {
-            let mut de = Deserializer::from_str("text and <![CDATA[]]>");
+            let mut de = make_de("text and <![CDATA[]]>");
             assert_eq!(de.next().unwrap(), DeEvent::Text("text and ".into()));
         }
 
         #[test]
         fn cdata_and_text() {
-            let mut de = Deserializer::from_str("<![CDATA[cdata]]> and text");
+            let mut de = make_de("<![CDATA[cdata]]> and text");
             assert_eq!(de.next().unwrap(), DeEvent::Text("cdata and text".into()));
         }
 
         #[test]
         fn empty_cdata_and_text() {
-            let mut de = Deserializer::from_str("<![CDATA[]]> and text");
+            let mut de = make_de("<![CDATA[]]> and text");
             assert_eq!(de.next().unwrap(), DeEvent::Text(" and text".into()));
         }
 
         #[test]
         fn cdata_and_cdata() {
-            let mut de = Deserializer::from_str(
+            let mut de = make_de(
                 "\
                     <![CDATA[cdata]]]]>\
                     <![CDATA[>cdata]]>\
@@ -3731,7 +3794,7 @@ mod tests {
 
             #[test]
             fn text() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         text \
                         <!--comment 1--><!--comment 2--> \
@@ -3743,7 +3806,7 @@ mod tests {
 
             #[test]
             fn cdata() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         <![CDATA[cdata]]]]>\
                         <!--comment 1--><!--comment 2-->\
@@ -3755,7 +3818,7 @@ mod tests {
 
             #[test]
             fn text_and_cdata() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         text \
                         <!--comment 1--><!--comment 2-->\
@@ -3767,7 +3830,7 @@ mod tests {
 
             #[test]
             fn text_and_empty_cdata() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         text \
                         <!--comment 1--><!--comment 2-->\
@@ -3779,7 +3842,7 @@ mod tests {
 
             #[test]
             fn cdata_and_text() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         <![CDATA[cdata ]]>\
                         <!--comment 1--><!--comment 2--> \
@@ -3791,7 +3854,7 @@ mod tests {
 
             #[test]
             fn empty_cdata_and_text() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         <![CDATA[]]>\
                         <!--comment 1--><!--comment 2--> \
@@ -3803,7 +3866,7 @@ mod tests {
 
             #[test]
             fn cdata_and_cdata() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         <![CDATA[cdata]]]>\
                         <!--comment 1--><!--comment 2-->\
@@ -3820,7 +3883,7 @@ mod tests {
 
             #[test]
             fn text() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         text \
                         <?pi 1?><?pi 2?> \
@@ -3832,7 +3895,7 @@ mod tests {
 
             #[test]
             fn cdata() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         <![CDATA[cdata]]]]>\
                         <?pi 1?><?pi 2?>\
@@ -3844,7 +3907,7 @@ mod tests {
 
             #[test]
             fn text_and_cdata() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         text \
                         <?pi 1?><?pi 2?>\
@@ -3856,7 +3919,7 @@ mod tests {
 
             #[test]
             fn text_and_empty_cdata() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         text \
                         <?pi 1?><?pi 2?>\
@@ -3868,7 +3931,7 @@ mod tests {
 
             #[test]
             fn cdata_and_text() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         <![CDATA[cdata ]]>\
                         <?pi 1?><?pi 2?> \
@@ -3880,7 +3943,7 @@ mod tests {
 
             #[test]
             fn empty_cdata_and_text() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         <![CDATA[]]>\
                         <?pi 1?><?pi 2?> \
@@ -3892,7 +3955,7 @@ mod tests {
 
             #[test]
             fn cdata_and_cdata() {
-                let mut de = Deserializer::from_str(
+                let mut de = make_de(
                     "\
                         <![CDATA[cdata]]]>\
                         <?pi 1?><?pi 2?>\
@@ -3922,7 +3985,7 @@ mod tests {
 
                 #[test]
                 fn start() {
-                    let mut de = Deserializer::from_str("<tag1><tag2><tag3>");
+                    let mut de = make_de("<tag1><tag2><tag3>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag1")));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag2")));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag3")));
@@ -3932,7 +3995,7 @@ mod tests {
                 /// Not matching end tag will result to error
                 #[test]
                 fn end() {
-                    let mut de = Deserializer::from_str("<tag1><tag2></tag2>");
+                    let mut de = make_de("<tag1><tag2></tag2>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag1")));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag2")));
                     assert_eq!(de.next().unwrap(), DeEvent::End(BytesEnd::new("tag2")));
@@ -3941,7 +4004,7 @@ mod tests {
 
                 #[test]
                 fn text() {
-                    let mut de = Deserializer::from_str("<tag1><tag2> text ");
+                    let mut de = make_de("<tag1><tag2> text ");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag1")));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag2")));
                     // Text is trimmed from both sides
@@ -3951,7 +4014,7 @@ mod tests {
 
                 #[test]
                 fn cdata() {
-                    let mut de = Deserializer::from_str("<tag1><tag2><![CDATA[ cdata ]]>");
+                    let mut de = make_de("<tag1><tag2><![CDATA[ cdata ]]>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag1")));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag2")));
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata ".into()));
@@ -3960,7 +4023,7 @@ mod tests {
 
                 #[test]
                 fn eof() {
-                    let mut de = Deserializer::from_str("<tag1><tag2>");
+                    let mut de = make_de("<tag1><tag2>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag1")));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag2")));
                     assert_eq!(de.next().unwrap(), DeEvent::Eof);
@@ -3975,7 +4038,7 @@ mod tests {
 
                 #[test]
                 fn start() {
-                    let mut de = Deserializer::from_str("<tag></tag><tag2>");
+                    let mut de = make_de("<tag></tag><tag2>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::End(BytesEnd::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag2")));
@@ -3984,7 +4047,7 @@ mod tests {
 
                 #[test]
                 fn end() {
-                    let mut de = Deserializer::from_str("<tag></tag></tag2>");
+                    let mut de = make_de("<tag></tag></tag2>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::End(BytesEnd::new("tag")));
                     match de.next() {
@@ -3999,7 +4062,7 @@ mod tests {
 
                 #[test]
                 fn text() {
-                    let mut de = Deserializer::from_str("<tag></tag> text ");
+                    let mut de = make_de("<tag></tag> text ");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::End(BytesEnd::new("tag")));
                     // Text is trimmed from both sides
@@ -4009,7 +4072,7 @@ mod tests {
 
                 #[test]
                 fn cdata() {
-                    let mut de = Deserializer::from_str("<tag></tag><![CDATA[ cdata ]]>");
+                    let mut de = make_de("<tag></tag><![CDATA[ cdata ]]>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::End(BytesEnd::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata ".into()));
@@ -4018,7 +4081,7 @@ mod tests {
 
                 #[test]
                 fn eof() {
-                    let mut de = Deserializer::from_str("<tag></tag>");
+                    let mut de = make_de("<tag></tag>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::End(BytesEnd::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::Eof);
@@ -4033,7 +4096,7 @@ mod tests {
 
                 #[test]
                 fn start() {
-                    let mut de = Deserializer::from_str("<tag> text <tag2>");
+                    let mut de = make_de("<tag> text <tag2>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     // Text is trimmed from both sides
                     assert_eq!(de.next().unwrap(), DeEvent::Text("text".into()));
@@ -4043,7 +4106,7 @@ mod tests {
 
                 #[test]
                 fn end() {
-                    let mut de = Deserializer::from_str("<tag> text </tag>");
+                    let mut de = make_de("<tag> text </tag>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     // Text is trimmed from both sides
                     assert_eq!(de.next().unwrap(), DeEvent::Text("text".into()));
@@ -4055,7 +4118,7 @@ mod tests {
 
                 #[test]
                 fn cdata() {
-                    let mut de = Deserializer::from_str("<tag> text <![CDATA[ cdata ]]>");
+                    let mut de = make_de("<tag> text <![CDATA[ cdata ]]>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     // Text is trimmed from the start
                     assert_eq!(de.next().unwrap(), DeEvent::Text("text  cdata ".into()));
@@ -4064,7 +4127,7 @@ mod tests {
 
                 #[test]
                 fn eof() {
-                    let mut de = Deserializer::from_str("<tag> text ");
+                    let mut de = make_de("<tag> text ");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     // Text is trimmed from both sides
                     assert_eq!(de.next().unwrap(), DeEvent::Text("text".into()));
@@ -4080,7 +4143,7 @@ mod tests {
 
                 #[test]
                 fn start() {
-                    let mut de = Deserializer::from_str("<tag><![CDATA[ cdata ]]><tag2>");
+                    let mut de = make_de("<tag><![CDATA[ cdata ]]><tag2>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag2")));
@@ -4089,7 +4152,7 @@ mod tests {
 
                 #[test]
                 fn end() {
-                    let mut de = Deserializer::from_str("<tag><![CDATA[ cdata ]]></tag>");
+                    let mut de = make_de("<tag><![CDATA[ cdata ]]></tag>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::End(BytesEnd::new("tag")));
@@ -4098,7 +4161,7 @@ mod tests {
 
                 #[test]
                 fn text() {
-                    let mut de = Deserializer::from_str("<tag><![CDATA[ cdata ]]> text ");
+                    let mut de = make_de("<tag><![CDATA[ cdata ]]> text ");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     // Text is trimmed from the end
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata  text".into()));
@@ -4107,8 +4170,7 @@ mod tests {
 
                 #[test]
                 fn cdata() {
-                    let mut de =
-                        Deserializer::from_str("<tag><![CDATA[ cdata ]]><![CDATA[ cdata2 ]]>");
+                    let mut de = make_de("<tag><![CDATA[ cdata ]]><![CDATA[ cdata2 ]]>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata  cdata2 ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Eof);
@@ -4116,7 +4178,7 @@ mod tests {
 
                 #[test]
                 fn eof() {
-                    let mut de = Deserializer::from_str("<tag><![CDATA[ cdata ]]>");
+                    let mut de = make_de("<tag><![CDATA[ cdata ]]>");
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Eof);
@@ -4128,7 +4190,7 @@ mod tests {
         /// Start from End event will always generate an error
         #[test]
         fn end() {
-            let mut de = Deserializer::from_str("</tag>");
+            let mut de = make_de("</tag>");
             match de.next() {
                 Err(DeError::InvalidXml(Error::EndEventMismatch { expected, found })) => {
                     assert_eq!(expected, "");
@@ -4149,7 +4211,7 @@ mod tests {
 
                 #[test]
                 fn start() {
-                    let mut de = Deserializer::from_str(" text <tag1><tag2>");
+                    let mut de = make_de(" text <tag1><tag2>");
                     // Text is trimmed from both sides
                     assert_eq!(de.next().unwrap(), DeEvent::Text("text".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag1")));
@@ -4160,7 +4222,7 @@ mod tests {
                 /// Not matching end tag will result in error
                 #[test]
                 fn end() {
-                    let mut de = Deserializer::from_str(" text <tag></tag>");
+                    let mut de = make_de(" text <tag></tag>");
                     // Text is trimmed from both sides
                     assert_eq!(de.next().unwrap(), DeEvent::Text("text".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
@@ -4170,7 +4232,7 @@ mod tests {
 
                 #[test]
                 fn text() {
-                    let mut de = Deserializer::from_str(" text <tag> text2 ");
+                    let mut de = make_de(" text <tag> text2 ");
                     // Text is trimmed from both sides
                     assert_eq!(de.next().unwrap(), DeEvent::Text("text".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
@@ -4181,7 +4243,7 @@ mod tests {
 
                 #[test]
                 fn cdata() {
-                    let mut de = Deserializer::from_str(" text <tag><![CDATA[ cdata ]]>");
+                    let mut de = make_de(" text <tag><![CDATA[ cdata ]]>");
                     // Text is trimmed from both sides
                     assert_eq!(de.next().unwrap(), DeEvent::Text("text".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
@@ -4192,7 +4254,7 @@ mod tests {
                 #[test]
                 fn eof() {
                     // Text is trimmed from both sides
-                    let mut de = Deserializer::from_str(" text <tag>");
+                    let mut de = make_de(" text <tag>");
                     assert_eq!(de.next().unwrap(), DeEvent::Text("text".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::Eof);
@@ -4203,7 +4265,7 @@ mod tests {
             /// End event without corresponding start event will always generate an error
             #[test]
             fn end() {
-                let mut de = Deserializer::from_str(" text </tag>");
+                let mut de = make_de(" text </tag>");
                 // Text is trimmed from both sides
                 assert_eq!(de.next().unwrap(), DeEvent::Text("text".into()));
                 match de.next() {
@@ -4224,7 +4286,7 @@ mod tests {
 
                 #[test]
                 fn start() {
-                    let mut de = Deserializer::from_str(" text <![CDATA[ cdata ]]><tag>");
+                    let mut de = make_de(" text <![CDATA[ cdata ]]><tag>");
                     // Text is trimmed from the start
                     assert_eq!(de.next().unwrap(), DeEvent::Text("text  cdata ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
@@ -4233,7 +4295,7 @@ mod tests {
 
                 #[test]
                 fn end() {
-                    let mut de = Deserializer::from_str(" text <![CDATA[ cdata ]]></tag>");
+                    let mut de = make_de(" text <![CDATA[ cdata ]]></tag>");
                     // Text is trimmed from the start
                     assert_eq!(de.next().unwrap(), DeEvent::Text("text  cdata ".into()));
                     match de.next() {
@@ -4248,7 +4310,7 @@ mod tests {
 
                 #[test]
                 fn text() {
-                    let mut de = Deserializer::from_str(" text <![CDATA[ cdata ]]> text2 ");
+                    let mut de = make_de(" text <![CDATA[ cdata ]]> text2 ");
                     // Text is trimmed from the start and from the end
                     assert_eq!(
                         de.next().unwrap(),
@@ -4259,8 +4321,7 @@ mod tests {
 
                 #[test]
                 fn cdata() {
-                    let mut de =
-                        Deserializer::from_str(" text <![CDATA[ cdata ]]><![CDATA[ cdata2 ]]>");
+                    let mut de = make_de(" text <![CDATA[ cdata ]]><![CDATA[ cdata2 ]]>");
                     // Text is trimmed from the start
                     assert_eq!(
                         de.next().unwrap(),
@@ -4271,7 +4332,7 @@ mod tests {
 
                 #[test]
                 fn eof() {
-                    let mut de = Deserializer::from_str(" text <![CDATA[ cdata ]]>");
+                    let mut de = make_de(" text <![CDATA[ cdata ]]>");
                     // Text is trimmed from the start
                     assert_eq!(de.next().unwrap(), DeEvent::Text("text  cdata ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Eof);
@@ -4290,7 +4351,7 @@ mod tests {
 
                 #[test]
                 fn start() {
-                    let mut de = Deserializer::from_str("<![CDATA[ cdata ]]><tag1><tag2>");
+                    let mut de = make_de("<![CDATA[ cdata ]]><tag1><tag2>");
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag1")));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag2")));
@@ -4300,7 +4361,7 @@ mod tests {
                 /// Not matching end tag will result in error
                 #[test]
                 fn end() {
-                    let mut de = Deserializer::from_str("<![CDATA[ cdata ]]><tag></tag>");
+                    let mut de = make_de("<![CDATA[ cdata ]]><tag></tag>");
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::End(BytesEnd::new("tag")));
@@ -4309,7 +4370,7 @@ mod tests {
 
                 #[test]
                 fn text() {
-                    let mut de = Deserializer::from_str("<![CDATA[ cdata ]]><tag> text ");
+                    let mut de = make_de("<![CDATA[ cdata ]]><tag> text ");
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     // Text is trimmed from both sides
@@ -4319,8 +4380,7 @@ mod tests {
 
                 #[test]
                 fn cdata() {
-                    let mut de =
-                        Deserializer::from_str("<![CDATA[ cdata ]]><tag><![CDATA[ cdata2 ]]>");
+                    let mut de = make_de("<![CDATA[ cdata ]]><tag><![CDATA[ cdata2 ]]>");
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata2 ".into()));
@@ -4329,7 +4389,7 @@ mod tests {
 
                 #[test]
                 fn eof() {
-                    let mut de = Deserializer::from_str("<![CDATA[ cdata ]]><tag>");
+                    let mut de = make_de("<![CDATA[ cdata ]]><tag>");
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::Eof);
@@ -4340,7 +4400,7 @@ mod tests {
             /// End event without corresponding start event will always generate an error
             #[test]
             fn end() {
-                let mut de = Deserializer::from_str("<![CDATA[ cdata ]]></tag>");
+                let mut de = make_de("<![CDATA[ cdata ]]></tag>");
                 assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata ".into()));
                 match de.next() {
                     Err(DeError::InvalidXml(Error::EndEventMismatch { expected, found })) => {
@@ -4358,7 +4418,7 @@ mod tests {
 
                 #[test]
                 fn start() {
-                    let mut de = Deserializer::from_str("<![CDATA[ cdata ]]> text <tag>");
+                    let mut de = make_de("<![CDATA[ cdata ]]> text <tag>");
                     // Text is trimmed from the end
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata  text".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
@@ -4367,7 +4427,7 @@ mod tests {
 
                 #[test]
                 fn end() {
-                    let mut de = Deserializer::from_str("<![CDATA[ cdata ]]> text </tag>");
+                    let mut de = make_de("<![CDATA[ cdata ]]> text </tag>");
                     // Text is trimmed from the end
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata  text".into()));
                     match de.next() {
@@ -4384,8 +4444,7 @@ mod tests {
 
                 #[test]
                 fn cdata() {
-                    let mut de =
-                        Deserializer::from_str("<![CDATA[ cdata ]]> text <![CDATA[ cdata2 ]]>");
+                    let mut de = make_de("<![CDATA[ cdata ]]> text <![CDATA[ cdata2 ]]>");
                     assert_eq!(
                         de.next().unwrap(),
                         DeEvent::Text(" cdata  text  cdata2 ".into())
@@ -4395,7 +4454,7 @@ mod tests {
 
                 #[test]
                 fn eof() {
-                    let mut de = Deserializer::from_str("<![CDATA[ cdata ]]> text ");
+                    let mut de = make_de("<![CDATA[ cdata ]]> text ");
                     // Text is trimmed from the end
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata  text".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Eof);
@@ -4409,8 +4468,7 @@ mod tests {
 
                 #[test]
                 fn start() {
-                    let mut de =
-                        Deserializer::from_str("<![CDATA[ cdata ]]><![CDATA[ cdata2 ]]><tag>");
+                    let mut de = make_de("<![CDATA[ cdata ]]><![CDATA[ cdata2 ]]><tag>");
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata  cdata2 ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Start(BytesStart::new("tag")));
                     assert_eq!(de.next().unwrap(), DeEvent::Eof);
@@ -4418,8 +4476,7 @@ mod tests {
 
                 #[test]
                 fn end() {
-                    let mut de =
-                        Deserializer::from_str("<![CDATA[ cdata ]]><![CDATA[ cdata2 ]]></tag>");
+                    let mut de = make_de("<![CDATA[ cdata ]]><![CDATA[ cdata2 ]]></tag>");
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata  cdata2 ".into()));
                     match de.next() {
                         Err(DeError::InvalidXml(Error::EndEventMismatch { expected, found })) => {
@@ -4433,8 +4490,7 @@ mod tests {
 
                 #[test]
                 fn text() {
-                    let mut de =
-                        Deserializer::from_str("<![CDATA[ cdata ]]><![CDATA[ cdata2 ]]> text ");
+                    let mut de = make_de("<![CDATA[ cdata ]]><![CDATA[ cdata2 ]]> text ");
                     // Text is trimmed from the end
                     assert_eq!(
                         de.next().unwrap(),
@@ -4445,9 +4501,8 @@ mod tests {
 
                 #[test]
                 fn cdata() {
-                    let mut de = Deserializer::from_str(
-                        "<![CDATA[ cdata ]]><![CDATA[ cdata2 ]]><![CDATA[ cdata3 ]]>",
-                    );
+                    let mut de =
+                        make_de("<![CDATA[ cdata ]]><![CDATA[ cdata2 ]]><![CDATA[ cdata3 ]]>");
                     assert_eq!(
                         de.next().unwrap(),
                         DeEvent::Text(" cdata  cdata2  cdata3 ".into())
@@ -4457,7 +4512,7 @@ mod tests {
 
                 #[test]
                 fn eof() {
-                    let mut de = Deserializer::from_str("<![CDATA[ cdata ]]><![CDATA[ cdata2 ]]>");
+                    let mut de = make_de("<![CDATA[ cdata ]]><![CDATA[ cdata2 ]]>");
                     assert_eq!(de.next().unwrap(), DeEvent::Text(" cdata  cdata2 ".into()));
                     assert_eq!(de.next().unwrap(), DeEvent::Eof);
                     assert_eq!(de.next().unwrap(), DeEvent::Eof);

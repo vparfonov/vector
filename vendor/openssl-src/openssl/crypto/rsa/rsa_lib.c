@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2022 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -744,9 +744,13 @@ int RSA_pkey_ctx_ctrl(EVP_PKEY_CTX *ctx, int optype, int cmd, int p1, void *p2)
 
 DEFINE_STACK_OF(BIGNUM)
 
-int ossl_rsa_set0_all_params(RSA *r, const STACK_OF(BIGNUM) *primes,
-                             const STACK_OF(BIGNUM) *exps,
-                             const STACK_OF(BIGNUM) *coeffs)
+/*
+ * Note: This function deletes values from the parameter
+ * stack values as they are consumed and set in the RSA key.
+ */
+int ossl_rsa_set0_all_params(RSA *r, STACK_OF(BIGNUM) *primes,
+                             STACK_OF(BIGNUM) *exps,
+                             STACK_OF(BIGNUM) *coeffs)
 {
 #ifndef FIPS_MODULE
     STACK_OF(RSA_PRIME_INFO) *prime_infos, *old_infos = NULL;
@@ -757,17 +761,39 @@ int ossl_rsa_set0_all_params(RSA *r, const STACK_OF(BIGNUM) *primes,
         return 0;
 
     pnum = sk_BIGNUM_num(primes);
-    if (pnum < 2
-        || pnum != sk_BIGNUM_num(exps)
-        || pnum != sk_BIGNUM_num(coeffs) + 1)
+
+    /* we need at least 2 primes */
+    if (pnum < 2)
         return 0;
 
     if (!RSA_set0_factors(r, sk_BIGNUM_value(primes, 0),
-                          sk_BIGNUM_value(primes, 1))
-        || !RSA_set0_crt_params(r, sk_BIGNUM_value(exps, 0),
-                                sk_BIGNUM_value(exps, 1),
-                                sk_BIGNUM_value(coeffs, 0)))
+                          sk_BIGNUM_value(primes, 1)))
         return 0;
+
+    /*
+     * if we managed to set everything above, remove those elements from the
+     * stack
+     * Note, we do this after the above all to ensure that we have taken
+     * ownership of all the elements in the RSA key to avoid memory leaks
+     * we also use delete 0 here as we are grabbing items from the end of the
+     * stack rather than the start, otherwise we could use pop
+     */
+    sk_BIGNUM_delete(primes, 0);
+    sk_BIGNUM_delete(primes, 0);
+
+    if (pnum == sk_BIGNUM_num(exps)
+        && pnum == sk_BIGNUM_num(coeffs) + 1) {
+
+        if (!RSA_set0_crt_params(r, sk_BIGNUM_value(exps, 0),
+                                 sk_BIGNUM_value(exps, 1),
+                                 sk_BIGNUM_value(coeffs, 0)))
+        return 0;
+
+        /* as above, once we consume the above params, delete them from the list */
+        sk_BIGNUM_delete(exps, 0);
+        sk_BIGNUM_delete(exps, 0);
+        sk_BIGNUM_delete(coeffs, 0);
+    }
 
 #ifndef FIPS_MODULE
     old_infos = r->prime_infos;
@@ -782,9 +808,9 @@ int ossl_rsa_set0_all_params(RSA *r, const STACK_OF(BIGNUM) *primes,
             return 0;
 
         for (i = 2; i < pnum; i++) {
-            BIGNUM *prime = sk_BIGNUM_value(primes, i);
-            BIGNUM *exp = sk_BIGNUM_value(exps, i);
-            BIGNUM *coeff = sk_BIGNUM_value(coeffs, i - 1);
+            BIGNUM *prime = sk_BIGNUM_pop(primes);
+            BIGNUM *exp = sk_BIGNUM_pop(exps);
+            BIGNUM *coeff = sk_BIGNUM_pop(coeffs);
             RSA_PRIME_INFO *pinfo = NULL;
 
             if (!ossl_assert(prime != NULL && exp != NULL && coeff != NULL))
@@ -1094,6 +1120,12 @@ int EVP_PKEY_CTX_get_rsa_mgf1_md(EVP_PKEY_CTX *ctx, const EVP_MD **md)
 int EVP_PKEY_CTX_set0_rsa_oaep_label(EVP_PKEY_CTX *ctx, void *label, int llen)
 {
     OSSL_PARAM rsa_params[2], *p = rsa_params;
+    const char *empty = "";
+    /*
+     * Needed as we swap label with empty if it is NULL, and label is
+     * freed at the end of this function.
+     */
+    void *plabel = label;
     int ret;
 
     if (ctx == NULL || !EVP_PKEY_CTX_IS_ASYM_CIPHER_OP(ctx)) {
@@ -1106,9 +1138,13 @@ int EVP_PKEY_CTX_set0_rsa_oaep_label(EVP_PKEY_CTX *ctx, void *label, int llen)
     if (!EVP_PKEY_CTX_is_a(ctx, "RSA"))
         return -1;
 
+    /* Accept NULL for backward compatibility */
+    if (label == NULL && llen == 0)
+        plabel = (void *)empty;
+
     /* Cast away the const. This is read only so should be safe */
     *p++ = OSSL_PARAM_construct_octet_string(OSSL_ASYM_CIPHER_PARAM_OAEP_LABEL,
-                                             (void *)label, (size_t)llen);
+                                             (void *)plabel, (size_t)llen);
     *p++ = OSSL_PARAM_construct_end();
 
     ret = evp_pkey_ctx_set_params_strict(ctx, rsa_params);

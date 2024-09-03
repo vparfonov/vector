@@ -175,21 +175,25 @@ pub use composable::{ComposedElement, EmptyElement};
 #[cfg(feature = "candlestick")]
 mod candlestick;
 #[cfg(feature = "candlestick")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "candlestick")))]
 pub use candlestick::CandleStick;
 
 #[cfg(feature = "errorbar")]
 mod errorbar;
 #[cfg(feature = "errorbar")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "errorbar")))]
 pub use errorbar::{ErrorBar, ErrorBarOrientH, ErrorBarOrientV};
 
 #[cfg(feature = "boxplot")]
 mod boxplot;
 #[cfg(feature = "boxplot")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "boxplot")))]
 pub use boxplot::Boxplot;
 
 #[cfg(feature = "bitmap_backend")]
 mod image;
 #[cfg(feature = "bitmap_backend")]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "bitmap_backend")))]
 pub use self::image::BitMapElement;
 
 mod dynelem;
@@ -214,7 +218,7 @@ use crate::drawing::Rect;
 ///
 /// However,
 /// [Generic Associated Types](https://github.com/rust-lang/rfcs/blob/master/text/1598-generic_associated_types.md)
-/// is far away from stablize.
+/// is far away from stabilize.
 /// So currently we have the following workaround:
 ///
 /// Instead of implement the PointCollection trait on the element type itself, it implements on the

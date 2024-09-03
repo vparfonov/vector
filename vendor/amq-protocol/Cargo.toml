@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.63.0"
 name = "amq-protocol"
-version = "7.1.2"
+version = "7.2.1"
 authors = ["Marc-Antoine Perennou <%arc-Antoine@Perennou.com>"]
 build = "build.rs"
 description = "AMQP specifications"
@@ -30,24 +30,24 @@ categories = [
 ]
 license = "BSD-2-Clause"
 repository = "https://github.com/amqp-rs/amq-protocol"
-resolver = "1"
 
 [lib]
 name = "amq_protocol"
 
 [dependencies.amq-protocol-tcp]
-version = "=7.1.2"
+version = "=7.2.1"
 default-features = false
 
 [dependencies.amq-protocol-types]
-version = "=7.1.2"
+version = "=7.2.1"
 
 [dependencies.amq-protocol-uri]
-version = "=7.1.2"
+version = "=7.2.1"
 
 [dependencies.cookie-factory]
 version = "^0.3"
 features = ["std"]
+default-features = false
 
 [dependencies.nom]
 version = "^7.0"
@@ -58,7 +58,7 @@ version = "^1.0"
 features = ["derive"]
 
 [build-dependencies.amq-protocol-codegen]
-version = "=7.1.2"
+version = "=7.2.1"
 optional = true
 
 [features]

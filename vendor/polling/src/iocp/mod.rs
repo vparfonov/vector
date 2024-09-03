@@ -30,7 +30,14 @@ mod port;
 
 use afd::{base_socket, Afd, AfdPollInfo, AfdPollMask, HasAfdInfo, IoStatusBlock};
 use port::{IoCompletionPort, OverlappedEntry};
-use windows_sys::Win32::Foundation::{ERROR_INVALID_HANDLE, ERROR_IO_PENDING, STATUS_CANCELLED};
+
+use windows_sys::Win32::Foundation::{
+    BOOLEAN, ERROR_INVALID_HANDLE, ERROR_IO_PENDING, STATUS_CANCELLED,
+};
+use windows_sys::Win32::System::Threading::{
+    RegisterWaitForSingleObject, UnregisterWait, INFINITE, WT_EXECUTELONGFUNCTION,
+    WT_EXECUTEONLYONCE,
+};
 
 use crate::{Event, PollMode};
 
@@ -39,17 +46,18 @@ use pin_project_lite::pin_project;
 
 use std::cell::UnsafeCell;
 use std::collections::hash_map::{Entry, HashMap};
+use std::ffi::c_void;
 use std::fmt;
 use std::io;
 use std::marker::PhantomPinned;
-use std::os::windows::io::{AsRawHandle, RawHandle, RawSocket};
+use std::mem::{forget, MaybeUninit};
+use std::os::windows::io::{
+    AsHandle, AsRawHandle, AsRawSocket, BorrowedHandle, BorrowedSocket, RawHandle, RawSocket,
+};
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock, Weak};
 use std::time::{Duration, Instant};
-
-#[cfg(not(polling_no_io_safety))]
-use std::os::windows::io::{AsHandle, BorrowedHandle};
 
 /// Macro to lock and ignore lock poisoning.
 macro_rules! lock {
@@ -62,27 +70,46 @@ macro_rules! lock {
 #[derive(Debug)]
 pub(super) struct Poller {
     /// The I/O completion port.
-    port: IoCompletionPort<Packet>,
+    port: Arc<IoCompletionPort<Packet>>,
 
     /// List of currently active AFD instances.
     ///
-    /// Weak references are kept here so that the AFD handle is automatically dropped
-    /// when the last associated socket is dropped.
+    /// AFD acts as the actual source of the socket events. It's essentially running `WSAPoll` on
+    /// the sockets and then posting the events to the IOCP.
+    ///
+    /// AFD instances can be keyed to an unlimited number of sockets. However, each AFD instance
+    /// polls their sockets linearly. Therefore, it is best to limit the number of sockets each AFD
+    /// instance is responsible for. The limit of 32 is chosen because that's what `wepoll` uses.
+    ///
+    /// Weak references are kept here so that the AFD handle is automatically dropped when the last
+    /// associated socket is dropped.
     afd: Mutex<Vec<Weak<Afd<Packet>>>>,
 
     /// The state of the sources registered with this poller.
+    ///
+    /// Each source is keyed by its raw socket ID.
     sources: RwLock<HashMap<RawSocket, Packet>>,
 
+    /// The state of the waitable handles registered with this poller.
+    waitables: RwLock<HashMap<RawHandle, Packet>>,
+
     /// Sockets with pending updates.
+    ///
+    /// This list contains packets with sockets that need to have their AFD state adjusted by
+    /// calling the `update()` function on them. It's best to queue up packets as they need to
+    /// be updated and then run all of the updates before we start waiting on the IOCP, rather than
+    /// updating them as we come. If we're waiting on the IOCP updates should be run immediately.
     pending_updates: ConcurrentQueue<Packet>,
 
     /// Are we currently polling?
+    ///
+    /// This indicates whether or not we are blocking on the IOCP, and is used to determine
+    /// whether pending updates should be run immediately or queued.
     polling: AtomicBool,
 
-    /// A list of completion packets.
-    packets: Mutex<Vec<OverlappedEntry<Packet>>>,
-
     /// The packet used to notify the poller.
+    ///
+    /// This is a special-case packet that is used to wake up the poller when it is waiting.
     notifier: Packet,
 }
 
@@ -94,29 +121,30 @@ impl Poller {
     pub(super) fn new() -> io::Result<Self> {
         // Make sure AFD is able to be used.
         if let Err(e) = afd::NtdllImports::force_load() {
-            return Err(crate::unsupported_error(format!(
-                "Failed to initialize unstable Windows functions: {}\nThis usually only happens for old Windows or Wine.",
-                e
-            )));
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                AfdError::new("failed to initialize unstable Windows functions", e),
+            ));
         }
 
         // Create and destroy a single AFD to test if we support it.
-        Afd::<Packet>::new().map_err(|e| crate::unsupported_error(format!(
-            "Failed to initialize \\Device\\Afd: {}\nThis usually only happens for old Windows or Wine.",
-            e,
-        )))?;
+        Afd::<Packet>::new().map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Unsupported,
+                AfdError::new("failed to initialize \\Device\\Afd", e),
+            )
+        })?;
 
         let port = IoCompletionPort::new(0)?;
-
-        log::trace!("new: handle={:?}", &port);
+        tracing::trace!(handle = ?port, "new");
 
         Ok(Poller {
-            port,
+            port: Arc::new(port),
             afd: Mutex::new(vec![]),
             sources: RwLock::new(HashMap::new()),
+            waitables: RwLock::new(HashMap::new()),
             pending_updates: ConcurrentQueue::bounded(1024),
             polling: AtomicBool::new(false),
-            packets: Mutex::new(Vec::with_capacity(1024)),
             notifier: Arc::pin(
                 PacketInner::Wakeup {
                     _pinned: PhantomPinned,
@@ -137,13 +165,23 @@ impl Poller {
     }
 
     /// Add a new source to the poller.
-    pub(super) fn add(&self, socket: RawSocket, interest: Event, mode: PollMode) -> io::Result<()> {
-        log::trace!(
-            "add: handle={:?}, sock={}, ev={:?}",
-            self.port,
-            socket,
-            interest
+    ///
+    /// # Safety
+    ///
+    /// The socket must be a valid socket and must last until it is deleted.
+    pub(super) unsafe fn add(
+        &self,
+        socket: RawSocket,
+        interest: Event,
+        mode: PollMode,
+    ) -> io::Result<()> {
+        let span = tracing::trace_span!(
+            "add",
+            handle = ?self.port,
+            sock = ?socket,
+            ev = ?interest,
         );
+        let _enter = span.enter();
 
         // We don't support edge-triggered events.
         if matches!(mode, PollMode::Edge | PollMode::EdgeOneshot) {
@@ -155,6 +193,7 @@ impl Poller {
 
         // Create a new packet.
         let socket_state = {
+            // Create a new socket state and assign an AFD handle to it.
             let state = SocketState {
                 socket,
                 base_socket: base_socket(socket)?,
@@ -166,6 +205,7 @@ impl Poller {
                 status: SocketStatus::Idle,
             };
 
+            // We wrap this socket state in a Packet so the IOCP can use it.
             Arc::pin(IoStatusBlock::from(PacketInner::Socket {
                 packet: UnsafeCell::new(AfdPollInfo::default()),
                 socket: Mutex::new(state),
@@ -194,16 +234,17 @@ impl Poller {
     /// Update a source in the poller.
     pub(super) fn modify(
         &self,
-        socket: RawSocket,
+        socket: BorrowedSocket<'_>,
         interest: Event,
         mode: PollMode,
     ) -> io::Result<()> {
-        log::trace!(
-            "modify: handle={:?}, sock={}, ev={:?}",
-            self.port,
-            socket,
-            interest
+        let span = tracing::trace_span!(
+            "modify",
+            handle = ?self.port,
+            sock = ?socket,
+            ev = ?interest,
         );
+        let _enter = span.enter();
 
         // We don't support edge-triggered events.
         if matches!(mode, PollMode::Edge | PollMode::EdgeOneshot) {
@@ -218,7 +259,131 @@ impl Poller {
             let sources = lock!(self.sources.read());
 
             sources
-                .get(&socket)
+                .get(&socket.as_raw_socket())
+                .cloned()
+                .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?
+        };
+
+        // Set the new event.
+        if source.as_ref().set_events(interest, mode) {
+            // The packet needs to be updated.
+            self.update_packet(source)?;
+        }
+
+        Ok(())
+    }
+
+    /// Delete a source from the poller.
+    pub(super) fn delete(&self, socket: BorrowedSocket<'_>) -> io::Result<()> {
+        let span = tracing::trace_span!(
+            "remove",
+            handle = ?self.port,
+            sock = ?socket,
+        );
+        let _enter = span.enter();
+
+        // Remove the source from our associative map.
+        let source = {
+            let mut sources = lock!(self.sources.write());
+
+            match sources.remove(&socket.as_raw_socket()) {
+                Some(s) => s,
+                None => {
+                    // If the source has already been removed, then we can just return.
+                    return Ok(());
+                }
+            }
+        };
+
+        // Indicate to the source that it is being deleted.
+        // This cancels any ongoing AFD_IOCTL_POLL operations.
+        source.begin_delete()
+    }
+
+    /// Add a new waitable to the poller.
+    pub(super) fn add_waitable(
+        &self,
+        handle: RawHandle,
+        interest: Event,
+        mode: PollMode,
+    ) -> io::Result<()> {
+        tracing::trace!(
+            "add_waitable: handle={:?}, waitable={:p}, ev={:?}",
+            self.port,
+            handle,
+            interest
+        );
+
+        // We don't support edge-triggered events.
+        if matches!(mode, PollMode::Edge | PollMode::EdgeOneshot) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "edge-triggered events are not supported",
+            ));
+        }
+
+        // Create a new packet.
+        let handle_state = {
+            let state = WaitableState {
+                handle,
+                port: Arc::downgrade(&self.port),
+                interest,
+                mode,
+                status: WaitableStatus::Idle,
+            };
+
+            Arc::pin(IoStatusBlock::from(PacketInner::Waitable {
+                handle: Mutex::new(state),
+            }))
+        };
+
+        // Keep track of the source in the poller.
+        {
+            let mut sources = lock!(self.waitables.write());
+
+            match sources.entry(handle) {
+                Entry::Vacant(v) => {
+                    v.insert(Pin::<Arc<_>>::clone(&handle_state));
+                }
+
+                Entry::Occupied(_) => {
+                    return Err(io::Error::from(io::ErrorKind::AlreadyExists));
+                }
+            }
+        }
+
+        // Update the packet.
+        self.update_packet(handle_state)
+    }
+
+    /// Update a waitable in the poller.
+    pub(crate) fn modify_waitable(
+        &self,
+        waitable: RawHandle,
+        interest: Event,
+        mode: PollMode,
+    ) -> io::Result<()> {
+        tracing::trace!(
+            "modify_waitable: handle={:?}, waitable={:p}, ev={:?}",
+            self.port,
+            waitable,
+            interest
+        );
+
+        // We don't support edge-triggered events.
+        if matches!(mode, PollMode::Edge | PollMode::EdgeOneshot) {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "edge-triggered events are not supported",
+            ));
+        }
+
+        // Get a reference to the source.
+        let source = {
+            let sources = lock!(self.waitables.read());
+
+            sources
+                .get(&waitable)
                 .cloned()
                 .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?
         };
@@ -231,15 +396,15 @@ impl Poller {
         Ok(())
     }
 
-    /// Delete a source from the poller.
-    pub(super) fn delete(&self, socket: RawSocket) -> io::Result<()> {
-        log::trace!("remove: handle={:?}, sock={}", self.port, socket);
+    /// Delete a waitable from the poller.
+    pub(super) fn remove_waitable(&self, waitable: RawHandle) -> io::Result<()> {
+        tracing::trace!("remove: handle={:?}, waitable={:p}", self.port, waitable);
 
         // Get a reference to the source.
         let source = {
-            let mut sources = lock!(self.sources.write());
+            let mut sources = lock!(self.waitables.write());
 
-            match sources.remove(&socket) {
+            match sources.remove(&waitable) {
                 Some(s) => s,
                 None => {
                     // If the source has already been removed, then we can just return.
@@ -255,10 +420,15 @@ impl Poller {
 
     /// Wait for events.
     pub(super) fn wait(&self, events: &mut Events, timeout: Option<Duration>) -> io::Result<()> {
-        log::trace!("wait: handle={:?}, timeout={:?}", self.port, timeout);
+        let span = tracing::trace_span!(
+            "wait",
+            handle = ?self.port,
+            ?timeout,
+        );
+        let _enter = span.enter();
 
+        // Make sure we have a consistent timeout.
         let deadline = timeout.and_then(|timeout| Instant::now().checked_add(timeout));
-        let mut packets = lock!(self.packets.lock());
         let mut notified = false;
         events.packets.clear();
 
@@ -269,6 +439,7 @@ impl Poller {
             let was_polling = self.polling.swap(true, Ordering::SeqCst);
             debug_assert!(!was_polling);
 
+            // Even if we panic, we want to make sure we indicate that polling has stopped.
             let guard = CallOnDrop(|| {
                 let was_polling = self.polling.swap(false, Ordering::SeqCst);
                 debug_assert!(was_polling);
@@ -281,14 +452,17 @@ impl Poller {
             let timeout = deadline.map(|t| t.saturating_duration_since(Instant::now()));
 
             // Wait for I/O events.
-            let len = self.port.wait(&mut packets, timeout)?;
-            log::trace!("new events: handle={:?}, len={}", self.port, len);
+            let len = self.port.wait(&mut events.completions, timeout)?;
+            tracing::trace!(
+                handle = ?self.port,
+                res = ?len,
+                "new events");
 
             // We are no longer polling.
             drop(guard);
 
             // Process all of the events.
-            for entry in packets.drain(..) {
+            for entry in events.completions.drain(..) {
                 let packet = entry.into_packet();
 
                 // Feed the event into the packet.
@@ -311,7 +485,7 @@ impl Poller {
                 break;
             }
 
-            log::trace!("wait: no events found, re-entering polling loop");
+            tracing::trace!("wait: no events found, re-entering polling loop");
         }
 
         Ok(())
@@ -345,18 +519,22 @@ impl Poller {
 
             // If we failed to queue the update, we need to drain the queue first.
             self.drain_update_queue(true)?;
+
+            // Loop back and try again.
         }
     }
 
     /// Drain the update queue.
     fn drain_update_queue(&self, limit: bool) -> io::Result<()> {
+        // Determine how many packets to process.
         let max = if limit {
+            // Only drain the queue's capacity, since this could in theory run forever.
             self.pending_updates.capacity().unwrap()
         } else {
+            // Less of a concern if we're draining the queue prior to a poll operation.
             std::usize::MAX
         };
 
-        // Only drain the queue's capacity, since this could in theory run forever.
         self.pending_updates
             .try_iter()
             .take(max)
@@ -364,11 +542,14 @@ impl Poller {
     }
 
     /// Get a handle to the AFD reference.
+    ///
+    /// This finds an AFD handle with less than 32 associated sockets, or creates a new one if
+    /// one does not exist.
     fn afd_handle(&self) -> io::Result<Arc<Afd<Packet>>> {
         const AFD_MAX_SIZE: usize = 32;
 
         // Crawl the list and see if there are any existing AFD instances that we can use.
-        // Remove any unused AFD pointers.
+        // While we're here, remove any unused AFD pointers.
         let mut afd_handles = lock!(self.afd.lock());
         let mut i = 0;
         while i < afd_handles.len() {
@@ -406,7 +587,7 @@ impl Poller {
         // Register the AFD instance with the I/O completion port.
         self.port.register(&*afd, true)?;
 
-        // Insert a weak pointer to the AFD instance into the list.
+        // Insert a weak pointer to the AFD instance into the list for other sockets.
         afd_handles.push(Arc::downgrade(&afd));
 
         Ok(afd)
@@ -419,7 +600,6 @@ impl AsRawHandle for Poller {
     }
 }
 
-#[cfg(not(polling_no_io_safety))]
 impl AsHandle for Poller {
     fn as_handle(&self) -> BorrowedHandle<'_> {
         unsafe { BorrowedHandle::borrow_raw(self.as_raw_handle()) }
@@ -430,21 +610,88 @@ impl AsHandle for Poller {
 pub(super) struct Events {
     /// List of IOCP packets.
     packets: Vec<Event>,
+
+    /// Buffer for completion packets.
+    completions: Vec<OverlappedEntry<Packet>>,
 }
 
 unsafe impl Send for Events {}
 
 impl Events {
     /// Creates an empty list of events.
-    pub(super) fn new() -> Events {
+    pub fn with_capacity(cap: usize) -> Events {
         Events {
-            packets: Vec::with_capacity(1024),
+            packets: Vec::with_capacity(cap),
+            completions: Vec::with_capacity(cap),
         }
     }
 
     /// Iterate over I/O events.
-    pub(super) fn iter(&self) -> impl Iterator<Item = Event> + '_ {
+    pub fn iter(&self) -> impl Iterator<Item = Event> + '_ {
         self.packets.iter().copied()
+    }
+
+    /// Clear the list of events.
+    pub fn clear(&mut self) {
+        self.packets.clear();
+    }
+
+    /// The capacity of the list of events.
+    pub fn capacity(&self) -> usize {
+        self.packets.capacity()
+    }
+}
+
+/// Extra information about an event.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub struct EventExtra {
+    /// Flags associated with this event.
+    flags: AfdPollMask,
+}
+
+impl EventExtra {
+    /// Create a new, empty version of this struct.
+    #[inline]
+    pub const fn empty() -> EventExtra {
+        EventExtra {
+            flags: AfdPollMask::empty(),
+        }
+    }
+
+    /// Is this a HUP event?
+    #[inline]
+    pub fn is_hup(&self) -> bool {
+        self.flags.intersects(AfdPollMask::ABORT)
+    }
+
+    /// Is this a PRI event?
+    #[inline]
+    pub fn is_pri(&self) -> bool {
+        self.flags.intersects(AfdPollMask::RECEIVE_EXPEDITED)
+    }
+
+    /// Set up a listener for HUP events.
+    #[inline]
+    pub fn set_hup(&mut self, active: bool) {
+        self.flags.set(AfdPollMask::ABORT, active);
+    }
+
+    /// Set up a listener for PRI events.
+    #[inline]
+    pub fn set_pri(&mut self, active: bool) {
+        self.flags.set(AfdPollMask::RECEIVE_EXPEDITED, active);
+    }
+
+    /// Check if TCP connect failed. Deprecated.
+    #[inline]
+    pub fn is_connect_failed(&self) -> Option<bool> {
+        Some(self.flags.intersects(AfdPollMask::CONNECT_FAIL))
+    }
+
+    /// Check if TCP connect failed.
+    #[inline]
+    pub fn is_err(&self) -> Option<bool> {
+        Some(self.flags.intersects(AfdPollMask::CONNECT_FAIL))
     }
 }
 
@@ -470,6 +717,8 @@ impl CompletionPacket {
 }
 
 /// The type of our completion packet.
+///
+/// It needs to be pinned, since it contains data that is expected by IOCP not to be moved.
 type Packet = Pin<Arc<PacketUnwrapped>>;
 type PacketUnwrapped = IoStatusBlock<PacketInner>;
 
@@ -488,6 +737,11 @@ pin_project! {
             socket: Mutex<SocketState>
         },
 
+        /// A packet for a waitable handle.
+        Waitable {
+            handle: Mutex<WaitableState>
+        },
+
         /// A custom event sent by the user.
         Custom {
             event: Event,
@@ -497,6 +751,9 @@ pin_project! {
         Wakeup { #[pin] _pinned: PhantomPinned },
     }
 }
+
+unsafe impl Send for PacketInner {}
+unsafe impl Sync for PacketInner {}
 
 impl fmt::Debug for PacketInner {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -508,6 +765,9 @@ impl fmt::Debug for PacketInner {
                 .field("packet", &"..")
                 .field("socket", socket)
                 .finish(),
+            Self::Waitable { handle } => {
+                f.debug_struct("Waitable").field("handle", handle).finish()
+            }
         }
     }
 }
@@ -526,28 +786,95 @@ impl PacketUnwrapped {
     ///
     /// Returns `true` if we need to be updated.
     fn set_events(self: Pin<&Self>, interest: Event, mode: PollMode) -> bool {
-        let mut socket = match self.socket_state() {
-            Some(s) => s,
-            None => return false,
-        };
+        match self.data().project_ref() {
+            PacketInnerProj::Socket { socket, .. } => {
+                let mut socket = lock!(socket.lock());
+                socket.interest = interest;
+                socket.mode = mode;
+                socket.interest_error = true;
 
-        socket.interest = interest;
-        socket.mode = mode;
-        socket.interest_error = true;
+                // If there was a change, indicate that we need an update.
+                match socket.status {
+                    SocketStatus::Polling { flags } => {
+                        let our_flags = event_to_afd_mask(socket.interest, socket.interest_error);
+                        our_flags != flags
+                    }
+                    _ => true,
+                }
+            }
+            PacketInnerProj::Waitable { handle } => {
+                let mut handle = lock!(handle.lock());
 
-        match socket.status {
-            SocketStatus::Polling { readable, writable } => {
-                (interest.readable && !readable) || (interest.writable && !writable)
+                // Set the new interest.
+                handle.interest = interest;
+                handle.mode = mode;
+
+                // Update if there is no ongoing wait.
+                handle.status.is_idle()
             }
             _ => true,
         }
     }
 
     /// Update the socket and install the new status in AFD.
+    ///
+    /// This function does one of the following:
+    ///
+    /// - Nothing, if the packet is waiting on being dropped anyways.
+    /// - Cancels the ongoing poll, if we want to poll for different events than we are currently
+    ///   polling for.
+    /// - Starts a new AFD_POLL operation, if we are not currently polling.
     fn update(self: Pin<Arc<Self>>) -> io::Result<()> {
-        let mut socket = match self.as_ref().socket_state() {
-            Some(s) => s,
-            None => return Err(io::Error::new(io::ErrorKind::Other, "invalid socket state")),
+        let mut socket = match self.as_ref().data().project_ref() {
+            PacketInnerProj::Socket { socket, .. } => lock!(socket.lock()),
+            PacketInnerProj::Waitable { handle } => {
+                let mut handle = lock!(handle.lock());
+
+                // If there is no interests, or if we have been cancelled, we don't need to update.
+                if !handle.interest.readable && !handle.interest.writable {
+                    return Ok(());
+                }
+
+                // If we are idle, we need to update.
+                if !handle.status.is_idle() {
+                    return Ok(());
+                }
+
+                // Start a new wait.
+                let packet = self.clone();
+                let wait_handle = WaitHandle::new(
+                    handle.handle,
+                    move || {
+                        let mut handle = match packet.as_ref().data().project_ref() {
+                            PacketInnerProj::Waitable { handle } => lock!(handle.lock()),
+                            _ => unreachable!(),
+                        };
+
+                        // Try to get the IOCP.
+                        let iocp = match handle.port.upgrade() {
+                            Some(iocp) => iocp,
+                            None => return,
+                        };
+
+                        // Set us back into the idle state.
+                        handle.status = WaitableStatus::Idle;
+
+                        // Push this packet.
+                        drop(handle);
+                        if let Err(e) = iocp.post(0, 0, packet) {
+                            tracing::error!("failed to post completion packet: {}", e);
+                        }
+                    },
+                    None,
+                    false,
+                )?;
+
+                // Set the new status.
+                handle.status = WaitableStatus::Waiting(wait_handle);
+
+                return Ok(());
+            }
+            _ => return Err(io::Error::new(io::ErrorKind::Other, "invalid socket state")),
         };
 
         // If we are waiting on a delete, just return, dropping the packet.
@@ -557,12 +884,11 @@ impl PacketUnwrapped {
 
         // Check the current status.
         match socket.status {
-            SocketStatus::Polling { readable, writable } => {
+            SocketStatus::Polling { flags } => {
                 // If we need to poll for events aside from what we are currently polling, we need
                 // to update the packet. Cancel the ongoing poll.
-                if (socket.interest.readable && !readable)
-                    || (socket.interest.writable && !writable)
-                {
+                let our_flags = event_to_afd_mask(socket.interest, socket.interest_error);
+                if our_flags != flags {
                     return self.cancel(socket);
                 }
 
@@ -578,15 +904,8 @@ impl PacketUnwrapped {
 
             SocketStatus::Idle => {
                 // Start a new poll.
-                let result = socket.afd.poll(
-                    self.clone(),
-                    socket.base_socket,
-                    event_to_afd_mask(
-                        socket.interest.readable,
-                        socket.interest.writable,
-                        socket.interest_error,
-                    ),
-                );
+                let mask = event_to_afd_mask(socket.interest, socket.interest_error);
+                let result = socket.afd.poll(self.clone(), socket.base_socket, mask);
 
                 match result {
                     Ok(()) => {}
@@ -607,10 +926,7 @@ impl PacketUnwrapped {
                 }
 
                 // We are now polling for the current events.
-                socket.status = SocketStatus::Polling {
-                    readable: socket.interest.readable,
-                    writable: socket.interest.writable,
-                };
+                socket.status = SocketStatus::Polling { flags: mask };
 
                 Ok(())
             }
@@ -618,6 +934,9 @@ impl PacketUnwrapped {
     }
 
     /// This socket state was notified; see if we need to update it.
+    ///
+    /// This indicates that this packet was indicated as "ready" by the IOCP and needs to be
+    /// processed.
     fn feed_event(self: Pin<Arc<Self>>, poller: &Poller) -> io::Result<FeedEventResult> {
         let inner = self.as_ref().data().project_ref();
 
@@ -630,6 +949,21 @@ impl PacketUnwrapped {
             PacketInnerProj::Wakeup { .. } => {
                 // The poller was notified.
                 return Ok(FeedEventResult::Notified);
+            }
+            PacketInnerProj::Waitable { handle } => {
+                let mut handle = lock!(handle.lock());
+                let event = handle.interest;
+
+                // Clear the events if we are in one-shot mode.
+                if matches!(handle.mode, PollMode::Oneshot) {
+                    handle.interest = Event::none(handle.interest.key);
+                }
+
+                // Submit for an update.
+                drop(handle);
+                poller.update_packet(self)?;
+
+                return Ok(FeedEventResult::Event(event));
             }
         };
 
@@ -664,11 +998,12 @@ impl PacketUnwrapped {
                     // Check in on the AFD data.
                     let afd_data = &*afd_info.get();
 
+                    // There was at least one event.
                     if afd_data.handle_count() >= 1 {
                         let events = afd_data.events();
 
                         // If we closed the socket, remove it from being polled.
-                        if events.contains(AfdPollMask::LOCAL_CLOSE) {
+                        if events.intersects(AfdPollMask::LOCAL_CLOSE) {
                             let source = lock!(poller.sources.write())
                                 .remove(&socket_state.socket)
                                 .unwrap();
@@ -679,6 +1014,7 @@ impl PacketUnwrapped {
                         let (readable, writable) = afd_mask_to_event(events);
                         event.readable = readable;
                         event.writable = writable;
+                        event.extra.flags = events;
                     }
                 }
             }
@@ -690,7 +1026,13 @@ impl PacketUnwrapped {
 
         // If this event doesn't have anything that interests us, don't return or
         // update the oneshot state.
-        let return_value = if event.readable || event.writable {
+        let return_value = if event.readable
+            || event.writable
+            || event
+                .extra
+                .flags
+                .intersects(socket_state.interest.extra.flags)
+        {
             // If we are in oneshot mode, remove the interest.
             if matches!(socket_state.mode, PollMode::Oneshot) {
                 socket_state.interest = Event::none(socket_state.interest.key);
@@ -713,10 +1055,19 @@ impl PacketUnwrapped {
     /// Begin deleting this socket.
     fn begin_delete(self: Pin<Arc<Self>>) -> io::Result<()> {
         // If we aren't already being deleted, start deleting.
-        let mut socket = self
-            .as_ref()
-            .socket_state()
-            .expect("can't delete packet that doesn't belong to a socket");
+        let mut socket = match self.as_ref().data().project_ref() {
+            PacketInnerProj::Socket { socket, .. } => lock!(socket.lock()),
+            PacketInnerProj::Waitable { handle } => {
+                let mut handle = lock!(handle.lock());
+
+                // Set the status to be cancelled. This drops the wait handle and prevents
+                // any further updates.
+                handle.status = WaitableStatus::Cancelled;
+
+                return Ok(());
+            }
+            _ => panic!("can't delete packet that doesn't belong to a socket"),
+        };
         if !socket.waiting_on_delete {
             socket.waiting_on_delete = true;
 
@@ -742,17 +1093,6 @@ impl PacketUnwrapped {
         socket.status = SocketStatus::Cancelled;
 
         Ok(())
-    }
-
-    fn socket_state(self: Pin<&Self>) -> Option<MutexGuard<'_, SocketState>> {
-        let inner = self.data().project_ref();
-
-        let state = match inner {
-            PacketInnerProj::Socket { socket, .. } => socket,
-            _ => return None,
-        };
-
-        Some(lock!(state.lock()))
     }
 }
 
@@ -792,16 +1132,50 @@ enum SocketStatus {
 
     /// We are currently polling these events.
     Polling {
-        /// We are currently polling for readable events.
-        readable: bool,
-
-        /// We are currently polling for writable events.
-        writable: bool,
+        /// The flags we are currently polling for.
+        flags: AfdPollMask,
     },
 
     /// The last poll operation was cancelled, and we're waiting for it to
     /// complete.
     Cancelled,
+}
+
+/// Per-waitable handle state.
+#[derive(Debug)]
+struct WaitableState {
+    /// The handle that this state is for.
+    handle: RawHandle,
+
+    /// The IO completion port that this handle is registered with.
+    port: Weak<IoCompletionPort<Packet>>,
+
+    /// The event that this handle will report.
+    interest: Event,
+
+    /// The current poll mode.
+    mode: PollMode,
+
+    /// The status of this waitable.
+    status: WaitableStatus,
+}
+
+#[derive(Debug)]
+enum WaitableStatus {
+    /// We are not polling.
+    Idle,
+
+    /// We are waiting on this handle to become signaled.
+    Waiting(#[allow(dead_code)] WaitHandle),
+
+    /// This handle has been cancelled.
+    Cancelled,
+}
+
+impl WaitableStatus {
+    fn is_idle(&self) -> bool {
+        matches!(self, WaitableStatus::Idle)
+    }
 }
 
 /// The result of calling `feed_event`.
@@ -817,7 +1191,86 @@ enum FeedEventResult {
     Notified,
 }
 
-fn event_to_afd_mask(readable: bool, writable: bool, error: bool) -> afd::AfdPollMask {
+/// A handle for an ongoing wait operation.
+#[derive(Debug)]
+struct WaitHandle(RawHandle);
+
+impl Drop for WaitHandle {
+    fn drop(&mut self) {
+        unsafe {
+            UnregisterWait(self.0 as _);
+        }
+    }
+}
+
+impl WaitHandle {
+    /// Wait for a waitable handle to become signaled.
+    fn new<F>(
+        handle: RawHandle,
+        callback: F,
+        timeout: Option<Duration>,
+        long_wait: bool,
+    ) -> io::Result<Self>
+    where
+        F: FnOnce() + Send + Sync + 'static,
+    {
+        // Make sure a panic in the callback doesn't propagate to the OS.
+        struct AbortOnDrop;
+
+        impl Drop for AbortOnDrop {
+            fn drop(&mut self) {
+                std::process::abort();
+            }
+        }
+
+        unsafe extern "system" fn wait_callback<F: FnOnce() + Send + Sync + 'static>(
+            context: *mut c_void,
+            _timer_fired: BOOLEAN,
+        ) {
+            let _guard = AbortOnDrop;
+            let callback = Box::from_raw(context as *mut F);
+            callback();
+
+            // We executed without panicking, so don't abort.
+            forget(_guard);
+        }
+
+        let mut wait_handle = MaybeUninit::<RawHandle>::uninit();
+
+        let mut flags = WT_EXECUTEONLYONCE;
+        if long_wait {
+            flags |= WT_EXECUTELONGFUNCTION;
+        }
+
+        let res = unsafe {
+            RegisterWaitForSingleObject(
+                wait_handle.as_mut_ptr().cast::<_>(),
+                handle as _,
+                Some(wait_callback::<F>),
+                Box::into_raw(Box::new(callback)) as _,
+                timeout.map_or(INFINITE, dur2timeout),
+                flags,
+            )
+        };
+
+        if res == 0 {
+            return Err(io::Error::last_os_error());
+        }
+
+        let wait_handle = unsafe { wait_handle.assume_init() };
+        Ok(Self(wait_handle))
+    }
+}
+
+/// Translate an event to the mask expected by AFD.
+#[inline]
+fn event_to_afd_mask(event: Event, error: bool) -> afd::AfdPollMask {
+    event_properties_to_afd_mask(event.readable, event.writable, error) | event.extra.flags
+}
+
+/// Translate an event to the mask expected by AFD.
+#[inline]
+fn event_properties_to_afd_mask(readable: bool, writable: bool, error: bool) -> afd::AfdPollMask {
     use afd::AfdPollMask as AfdPoll;
 
     let mut mask = AfdPoll::empty();
@@ -838,6 +1291,8 @@ fn event_to_afd_mask(readable: bool, writable: bool, error: bool) -> afd::AfdPol
     mask
 }
 
+/// Convert the mask reported by AFD to an event.
+#[inline]
 fn afd_mask_to_event(mask: afd::AfdPollMask) -> (bool, bool) {
     use afd::AfdPollMask as AfdPoll;
 
@@ -860,6 +1315,77 @@ fn afd_mask_to_event(mask: afd::AfdPollMask) -> (bool, bool) {
     }
 
     (readable, writable)
+}
+
+// Implementation taken from https://github.com/rust-lang/rust/blob/db5476571d9b27c862b95c1e64764b0ac8980e23/src/libstd/sys/windows/mod.rs
+fn dur2timeout(dur: Duration) -> u32 {
+    // Note that a duration is a (u64, u32) (seconds, nanoseconds) pair, and the
+    // timeouts in windows APIs are typically u32 milliseconds. To translate, we
+    // have two pieces to take care of:
+    //
+    // * Nanosecond precision is rounded up
+    // * Greater than u32::MAX milliseconds (50 days) is rounded up to INFINITE
+    //   (never time out).
+    dur.as_secs()
+        .checked_mul(1000)
+        .and_then(|ms| ms.checked_add((dur.subsec_nanos() as u64) / 1_000_000))
+        .and_then(|ms| {
+            if dur.subsec_nanos() % 1_000_000 > 0 {
+                ms.checked_add(1)
+            } else {
+                Some(ms)
+            }
+        })
+        .and_then(|x| u32::try_from(x).ok())
+        .unwrap_or(INFINITE)
+}
+
+/// An error type that wraps around failing to open AFD.
+struct AfdError {
+    /// String description of what happened.
+    description: &'static str,
+
+    /// The underlying system error.
+    system: io::Error,
+}
+
+impl AfdError {
+    #[inline]
+    fn new(description: &'static str, system: io::Error) -> Self {
+        Self {
+            description,
+            system,
+        }
+    }
+}
+
+impl fmt::Debug for AfdError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AfdError")
+            .field("description", &self.description)
+            .field("system", &self.system)
+            .field("note", &"probably caused by old Windows or Wine")
+            .finish()
+    }
+}
+
+impl fmt::Display for AfdError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: {}\nThis error is usually caused by running on old Windows or Wine",
+            self.description, &self.system
+        )
+    }
+}
+
+impl std::error::Error for AfdError {
+    #[inline]
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.system)
+    }
 }
 
 struct CallOnDrop<F: FnMut()>(F);

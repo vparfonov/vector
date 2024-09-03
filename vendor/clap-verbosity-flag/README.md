@@ -7,7 +7,7 @@
 [Crates.io]: https://crates.io/crates/clap-verbosity-flag
 [Documentation]: https://docs.rs/clap-verbosity-flag/
 
-Easily add a `--verbose` flag to CLIs using clap
+Easily add a `--verbose` flag to CLIs using Clap
 
 ## Examples
 
@@ -17,7 +17,7 @@ use clap::Parser;
 // ...
 #[derive(Debug, Parser)]
 struct Cli {
-    #[clap(flatten)]
+    #[command(flatten)]
     verbose: clap_verbosity_flag::Verbosity,
 }
 ```
@@ -33,8 +33,8 @@ By default, it'll only report errors.
 
 Licensed under either of
 
- * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or <http://www.apache.org/licenses/LICENSE-2.0>)
+* MIT license ([LICENSE-MIT](LICENSE-MIT) or <http://opensource.org/licenses/MIT>)
 
 at your option.
 

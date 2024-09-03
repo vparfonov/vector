@@ -1,3 +1,9 @@
+1.10.0:
+ * No change to lz4-sys crate
+
+1.9.5:
+ * expand Lz4FrameInfo struct
+
 1.7.5:
 
  * Change version number

@@ -1,11 +1,16 @@
+//! The cpuid binary accompanying the library.
+//!
+//! The cpuid binary only compiles/runs on x86 platforms.
 use std::str::FromStr;
 
-use clap::Parser;
-use raw_cpuid::CpuId;
+use clap::{Parser, ValueEnum};
+use raw_cpuid::{CpuId, CpuIdReaderNative};
 
+#[derive(ValueEnum, Clone)]
 enum OutputFormat {
+    #[value(alias("raw"))]
     Raw,
-    Json,
+    #[value(alias("cli"))]
     Cli,
 }
 
@@ -15,7 +20,6 @@ impl FromStr for OutputFormat {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "raw" => Ok(OutputFormat::Raw),
-            "json" => Ok(OutputFormat::Json),
             "cli" => Ok(OutputFormat::Cli),
             _ => Err("no match"),
         }
@@ -28,18 +32,14 @@ impl FromStr for OutputFormat {
 #[clap(disable_colored_help(true))]
 struct Opts {
     /// Configures the output format.
-    #[clap(short, long, default_value = "cli", possible_values = &["raw", "json", "cli", ])]
+    #[clap(short, long, default_value = "cli")]
     format: OutputFormat,
 }
 
 fn main() {
     let opts: Opts = Opts::parse();
     match opts.format {
-        OutputFormat::Raw => raw_cpuid::display::raw(),
-        OutputFormat::Json => {
-            let cpuid = CpuId::new();
-            raw_cpuid::display::json(cpuid);
-        }
+        OutputFormat::Raw => raw_cpuid::display::raw(CpuIdReaderNative),
         OutputFormat::Cli => {
             let cpuid = CpuId::new();
             raw_cpuid::display::markdown(cpuid);

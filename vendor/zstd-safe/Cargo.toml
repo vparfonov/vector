@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.64"
 name = "zstd-safe"
-version = "7.0.0"
+version = "7.2.1"
 authors = ["Alexandre Bury <alexandre.bury@gmail.com>"]
 build = "build.rs"
 exclude = ["update_consts.sh"]
@@ -41,7 +41,7 @@ features = [
 ]
 
 [dependencies.zstd-sys]
-version = "2.0.7"
+version = "2.0.10"
 default-features = false
 
 [features]

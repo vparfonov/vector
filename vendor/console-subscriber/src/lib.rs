@@ -1,6 +1,6 @@
 #![doc = include_str!("../README.md")]
 use console_api as proto;
-use proto::resources::resource;
+use proto::{instrument::instrument_server::InstrumentServer, resources::resource};
 use serde::Serialize;
 use std::{
     cell::RefCell,
@@ -15,7 +15,10 @@ use std::{
 use thread_local::ThreadLocal;
 #[cfg(unix)]
 use tokio::net::UnixListener;
-use tokio::sync::{mpsc, oneshot};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task::JoinHandle,
+};
 #[cfg(unix)]
 use tokio_stream::wrappers::UnixListenerStream;
 use tracing_core::{
@@ -39,7 +42,7 @@ mod stats;
 pub(crate) mod sync;
 mod visitors;
 
-use aggregator::Aggregator;
+pub use aggregator::Aggregator;
 pub use builder::{Builder, ServerAddr};
 use callsites::Callsites;
 use record::Recorder;
@@ -235,10 +238,6 @@ enum WakeOp {
     Drop,
 }
 
-/// Marker type used to indicate that a span is actually tracked by the console.
-#[derive(Debug)]
-struct Tracked {}
-
 impl ConsoleLayer {
     /// Returns a `ConsoleLayer` built with the default settings.
     ///
@@ -264,7 +263,7 @@ impl ConsoleLayer {
         // depending on the build-time configuration...
         #![allow(clippy::assertions_on_constants)]
         assert!(
-            cfg!(tokio_unstable),
+            cfg!(any(tokio_unstable, console_without_tokio_unstable)),
             "task tracing requires Tokio to be built with RUSTFLAGS=\"--cfg tokio_unstable\"!"
         );
 
@@ -530,6 +529,10 @@ where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
     fn register_callsite(&self, meta: &'static Metadata<'static>) -> subscriber::Interest {
+        if !meta.is_span() && !meta.is_event() {
+            return subscriber::Interest::never();
+        }
+
         let dropped = match (meta.name(), meta.target()) {
             ("runtime.spawn", _) | ("task", "tokio::task") => {
                 self.spawn_callsites.insert(meta);
@@ -933,18 +936,16 @@ impl Server {
     ///
     /// [`tonic`]: https://docs.rs/tonic/
     pub async fn serve_with(
-        mut self,
+        self,
         mut builder: tonic::transport::Server,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
-        let aggregate = self
-            .aggregator
-            .take()
-            .expect("cannot start server multiple times");
-        let aggregate = spawn_named(aggregate.run(), "console::aggregate");
         let addr = self.addr.clone();
-        let router = builder.add_service(
-            proto::instrument::instrument_server::InstrumentServer::new(self),
-        );
+        let ServerParts {
+            instrument_server,
+            aggregator,
+        } = self.into_parts();
+        let aggregate = spawn_named(aggregator.run(), "console::aggregate");
+        let router = builder.add_service(instrument_server);
         let res = match addr {
             ServerAddr::Tcp(addr) => {
                 let serve = router.serve(addr);
@@ -959,6 +960,262 @@ impl Server {
         };
         aggregate.abort();
         res?.map_err(Into::into)
+    }
+
+    /// Starts the gRPC service with the default gRPC settings and gRPC-Web
+    /// support.
+    ///
+    /// # Examples
+    ///
+    /// To serve the instrument server with gRPC-Web support with the default
+    /// settings:
+    ///
+    /// ```rust
+    /// # async fn docs() -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+    /// # let (_, server) = console_subscriber::ConsoleLayer::new();
+    /// server.serve_with_grpc_web(tonic::transport::Server::default()).await
+    /// # }
+    /// ```
+    ///
+    /// To serve the instrument server with gRPC-Web support and a custom CORS configuration, use the
+    /// following code:
+    ///
+    /// ```rust
+    /// # use std::{thread, time::Duration};
+    /// #
+    /// use console_subscriber::{ConsoleLayer, ServerParts};
+    /// use tonic_web::GrpcWebLayer;
+    /// use tower_http::cors::{CorsLayer, AllowOrigin};
+    /// use http::header::HeaderName;
+    /// # use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+    /// # const DEFAULT_MAX_AGE: Duration = Duration::from_secs(24 * 60 * 60);
+    /// # const DEFAULT_EXPOSED_HEADERS: [&str; 3] =
+    /// #    ["grpc-status", "grpc-message", "grpc-status-details-bin"];
+    /// # const DEFAULT_ALLOW_HEADERS: [&str; 5] = [
+    /// #    "x-grpc-web",
+    /// #    "content-type",
+    /// #    "x-user-agent",
+    /// #    "grpc-timeout",
+    /// #    "user-agent",
+    /// # ];
+    ///
+    /// let (console_layer, server) = ConsoleLayer::builder().with_default_env().build();
+    /// # thread::Builder::new()
+    /// #    .name("subscriber".into())
+    /// #    .spawn(move || {
+    /// // Customize the CORS configuration.
+    /// let cors = CorsLayer::new()
+    ///     .allow_origin(AllowOrigin::mirror_request())
+    ///     .allow_credentials(true)
+    ///     .max_age(DEFAULT_MAX_AGE)
+    ///     .expose_headers(
+    ///         DEFAULT_EXPOSED_HEADERS
+    ///             .iter()
+    ///             .cloned()
+    ///             .map(HeaderName::from_static)
+    ///             .collect::<Vec<HeaderName>>(),
+    ///     )
+    ///     .allow_headers(
+    ///         DEFAULT_ALLOW_HEADERS
+    ///             .iter()
+    ///             .cloned()
+    ///             .map(HeaderName::from_static)
+    ///             .collect::<Vec<HeaderName>>(),
+    ///     );
+    /// #       let runtime = tokio::runtime::Builder::new_current_thread()
+    /// #           .enable_all()
+    /// #           .build()
+    /// #           .expect("console subscriber runtime initialization failed");
+    /// #       runtime.block_on(async move {
+    ///
+    /// let ServerParts {
+    ///     instrument_server,
+    ///     aggregator,
+    ///     ..
+    /// } = server.into_parts();
+    /// tokio::spawn(aggregator.run());
+    ///
+    /// // Serve the instrument server with gRPC-Web support and the CORS configuration.
+    /// let router = tonic::transport::Server::builder()
+    ///     .accept_http1(true)
+    ///     .layer(cors)
+    ///     .layer(GrpcWebLayer::new())
+    ///     .add_service(instrument_server);
+    /// let serve = router.serve(std::net::SocketAddr::new(
+    ///     std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
+    ///     // 6669 is a restricted port on Chrome, so we cannot use it. We use a different port instead.
+    ///     9999,
+    /// ));
+    ///
+    /// // Finally, spawn the server.
+    /// serve.await.expect("console subscriber server failed");
+    /// #       });
+    /// #   })
+    /// #   .expect("console subscriber could not spawn thread");
+    /// # tracing_subscriber::registry().with(console_layer).init();
+    /// ```
+    ///
+    /// For a comprehensive understanding and complete code example,
+    /// please refer to the `grpc-web` example in the examples directory.
+    ///
+    /// [`Router::serve`]: fn@tonic::transport::server::Router::serve
+    #[cfg(feature = "grpc-web")]
+    pub async fn serve_with_grpc_web(
+        self,
+        builder: tonic::transport::Server,
+    ) -> Result<(), Box<dyn std::error::Error + Send + Sync + 'static>> {
+        let addr = self.addr.clone();
+        let ServerParts {
+            instrument_server,
+            aggregator,
+        } = self.into_parts();
+        let router = builder
+            .accept_http1(true)
+            .add_service(tonic_web::enable(instrument_server));
+        let aggregate = spawn_named(aggregator.run(), "console::aggregate");
+        let res = match addr {
+            ServerAddr::Tcp(addr) => {
+                let serve = router.serve(addr);
+                spawn_named(serve, "console::serve").await
+            }
+            #[cfg(unix)]
+            ServerAddr::Unix(path) => {
+                let incoming = UnixListener::bind(path)?;
+                let serve = router.serve_with_incoming(UnixListenerStream::new(incoming));
+                spawn_named(serve, "console::serve").await
+            }
+        };
+        aggregate.abort();
+        res?.map_err(Into::into)
+    }
+
+    /// Returns the parts needed to spawn a gRPC server and the aggregator that
+    /// supplies it.
+    ///
+    /// Note that a server spawned in this way will disregard any value set by
+    /// [`Builder::server_addr`], as the user becomes responsible for defining
+    /// the address when calling [`Router::serve`].
+    ///
+    /// Additionally, the user of this API must ensure that the [`Aggregator`]
+    /// is running for as long as the gRPC server is. If the server stops
+    /// running, the aggregator task can be aborted.
+    ///
+    /// # Examples
+    ///
+    /// The parts can be used to serve the instrument server together with
+    /// other endpoints from the same gRPC server.
+    ///
+    /// ```
+    /// use console_subscriber::{ConsoleLayer, ServerParts};
+    ///
+    /// # let runtime = tokio::runtime::Builder::new_current_thread()
+    /// #     .enable_all()
+    /// #     .build()
+    /// #     .unwrap();
+    /// # runtime.block_on(async {
+    /// let (console_layer, server) = ConsoleLayer::builder().build();
+    /// let ServerParts {
+    ///     instrument_server,
+    ///     aggregator,
+    ///     ..
+    /// } = server.into_parts();
+    ///
+    /// let aggregator_handle = tokio::spawn(aggregator.run());
+    /// let router = tonic::transport::Server::builder()
+    ///     //.add_service(some_other_service)
+    ///     .add_service(instrument_server);
+    /// let serve = router.serve(std::net::SocketAddr::new(
+    ///     std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
+    ///     6669,
+    /// ));
+    ///
+    /// // Finally, spawn the server.
+    /// tokio::spawn(serve);
+    /// # // Avoid a warning that `console_layer` and `aggregator_handle` are unused.
+    /// # drop(console_layer);
+    /// # let mut aggregator_handle = aggregator_handle;
+    /// # aggregator_handle.abort();
+    /// # });
+    /// ```
+    ///
+    /// [`Router::serve`]: fn@tonic::transport::server::Router::serve
+    pub fn into_parts(mut self) -> ServerParts {
+        let aggregator = self
+            .aggregator
+            .take()
+            .expect("cannot start server multiple times");
+
+        let instrument_server = proto::instrument::instrument_server::InstrumentServer::new(self);
+
+        ServerParts {
+            instrument_server,
+            aggregator,
+        }
+    }
+}
+
+/// Server Parts
+///
+/// This struct contains the parts returned by [`Server::into_parts`]. It may contain
+/// further parts in the future, an as such is marked as `non_exhaustive`.
+///
+/// The `InstrumentServer<Server>` can be used to construct a router which
+/// can be added to a [`tonic`] gRPC server.
+///
+/// The `aggregator` is a future which should be running as long as the server is.
+/// Generally, this future should be spawned onto an appropriate runtime and then
+/// aborted if the server gets shut down.
+///
+/// See the [`Server::into_parts`] documentation for usage.
+#[non_exhaustive]
+pub struct ServerParts {
+    /// The instrument server.
+    ///
+    /// See the documentation for [`InstrumentServer`] for details.
+    pub instrument_server: InstrumentServer<Server>,
+
+    /// The aggregator.
+    ///
+    /// Responsible for collecting and preparing traces for the instrument server
+    /// to send its clients.
+    ///
+    /// The aggregator should be [`run`] when the instrument server is started.
+    /// If the server stops running for any reason, the aggregator task can be
+    /// aborted.
+    ///
+    /// [`run`]: fn@crate::Aggregator::run
+    pub aggregator: Aggregator,
+}
+
+/// Aggregator handle.
+///
+/// This object is returned from [`Server::into_parts`]. It can be
+/// used to abort the aggregator task.
+///
+/// The aggregator collects the traces that implement the async runtime
+/// being observed and prepares them to be served by the gRPC server.
+///
+/// Normally, if the server, started with [`Server::serve`] or
+/// [`Server::serve_with`] stops for any reason, the aggregator is aborted,
+/// hoewver, if the server was started with the [`InstrumentServer`] returned
+/// from [`Server::into_parts`], then it is the responsibility of the user
+/// of the API to stop the aggregator task by calling [`abort`] on this
+/// object.
+///
+/// [`abort`]: fn@crate::AggregatorHandle::abort
+pub struct AggregatorHandle {
+    join_handle: JoinHandle<()>,
+}
+
+impl AggregatorHandle {
+    /// Aborts the task running this aggregator.
+    ///
+    /// To avoid having a disconnected aggregator running forever, this
+    /// method should be called when the [`tonic::transport::Server`] started
+    /// with the [`InstrumentServer`] also returned from [`Server::into_parts`]
+    /// stops running.
+    pub fn abort(&mut self) {
+        self.join_handle.abort();
     }
 }
 

@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "rmp-serde"
-version = "1.1.2"
+version = "1.3.0"
 authors = ["Evgeny Safronov <division494@gmail.com>"]
 description = "Serde bindings for RMP"
 documentation = "https://docs.rs/rmp-serde"
@@ -26,7 +26,6 @@ keywords = [
 categories = ["encoding"]
 license = "MIT"
 repository = "https://github.com/3Hren/msgpack-rust"
-resolver = "1"
 
 [package.metadata.release]
 tag-prefix = "{{crate_name}}/"
@@ -35,16 +34,17 @@ tag-prefix = "{{crate_name}}/"
 version = "1.4.3"
 
 [dependencies.rmp]
-version = "0.8.11"
+version = "0.8.14"
 
 [dependencies.serde]
-version = "1.0.136"
+version = "1.0.197"
+
+[dev-dependencies.serde]
+version = "1.0.197"
+features = ["derive"]
 
 [dev-dependencies.serde_bytes]
 version = "0.11.5"
-
-[dev-dependencies.serde_derive]
-version = "1.0.136"
 
 [badges.maintenance]
 status = "looking-for-maintainer"

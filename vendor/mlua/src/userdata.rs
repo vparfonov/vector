@@ -54,8 +54,8 @@ pub enum MetaMethod {
     /// The unary minus (`-`) operator.
     Unm,
     /// The floor division (//) operator.
-    /// Requires `feature = "lua54/lua53"`
-    #[cfg(any(feature = "lua54", feature = "lua53"))]
+    /// Requires `feature = "lua54/lua53/luau"`
+    #[cfg(any(feature = "lua54", feature = "lua53", feature = "luau"))]
     IDiv,
     /// The bitwise AND (&) operator.
     /// Requires `feature = "lua54/lua53"`
@@ -180,7 +180,7 @@ impl MetaMethod {
             MetaMethod::Pow => "__pow",
             MetaMethod::Unm => "__unm",
 
-            #[cfg(any(feature = "lua54", feature = "lua53"))]
+            #[cfg(any(feature = "lua54", feature = "lua53", feature = "luau"))]
             MetaMethod::IDiv => "__idiv",
             #[cfg(any(feature = "lua54", feature = "lua53"))]
             MetaMethod::BAnd => "__band",
@@ -815,11 +815,7 @@ impl OwnedAnyUserData {
 impl<'lua> AnyUserData<'lua> {
     /// Checks whether the type of this userdata is `T`.
     pub fn is<T: 'static>(&self) -> bool {
-        match self.inspect(|_: &UserDataCell<T>| Ok(())) {
-            Ok(()) => true,
-            Err(Error::UserDataTypeMismatch) => false,
-            Err(_) => unreachable!(),
-        }
+        self.inspect(|_: &UserDataCell<T>| Ok(())).is_ok()
     }
 
     /// Borrow this userdata immutably if it is of type `T`.
@@ -1344,6 +1340,19 @@ impl<'lua> Serialize for AnyUserData<'lua> {
         S: Serializer,
     {
         let lua = self.0.lua;
+
+        // Special case for Luau buffer type
+        #[cfg(feature = "luau")]
+        if self.1 == SubtypeId::Buffer {
+            let buf = unsafe {
+                let mut size = 0usize;
+                let buf = ffi::lua_tobuffer(lua.ref_thread(), self.0.index, &mut size);
+                mlua_assert!(!buf.is_null(), "invalid Luau buffer");
+                std::slice::from_raw_parts(buf as *const u8, size)
+            };
+            return serializer.serialize_bytes(buf);
+        }
+
         let data = unsafe {
             let _ = lua
                 .get_userdata_ref_type_id(&self.0)
@@ -1362,7 +1371,7 @@ impl<'lua> Serialize for AnyUserData<'lua> {
 /// A wrapper type for an immutably borrowed value from a `AnyUserData`.
 ///
 /// It implements [`FromLua`] and can be used to receive a typed userdata from Lua.
-pub struct UserDataRef<'lua, T: 'static>(AnyUserData<'lua>, Ref<'lua, T>);
+pub struct UserDataRef<'lua, T: 'static>(#[allow(unused)] AnyUserData<'lua>, Ref<'lua, T>);
 
 impl<'lua, T: 'static> Deref for UserDataRef<'lua, T> {
     type Target = T;
@@ -1384,7 +1393,7 @@ impl<'lua, T: 'static> UserDataRef<'lua, T> {
 /// A wrapper type for a mutably borrowed value from a `AnyUserData`.
 ///
 /// It implements [`FromLua`] and can be used to receive a typed userdata from Lua.
-pub struct UserDataRefMut<'lua, T: 'static>(AnyUserData<'lua>, RefMut<'lua, T>);
+pub struct UserDataRefMut<'lua, T: 'static>(#[allow(unused)] AnyUserData<'lua>, RefMut<'lua, T>);
 
 impl<'lua, T: 'static> Deref for UserDataRefMut<'lua, T> {
     type Target = T;

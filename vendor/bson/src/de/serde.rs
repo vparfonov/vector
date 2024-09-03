@@ -26,6 +26,7 @@ use crate::{
     document::{Document, IntoIter},
     oid::ObjectId,
     raw::{RawBsonRef, RAW_ARRAY_NEWTYPE, RAW_BSON_NEWTYPE, RAW_DOCUMENT_NEWTYPE},
+    serde_helpers::HUMAN_READABLE_NEWTYPE,
     spec::BinarySubtype,
     uuid::UUID_NEWTYPE_NAME,
     Binary,
@@ -380,6 +381,14 @@ impl<'de> Visitor<'de> for BsonVisitor {
                     ));
                 }
 
+                "$uuid" => {
+                    let v: String = visitor.next_value()?;
+                    let uuid = extjson::models::Uuid { value: v }
+                        .parse()
+                        .map_err(Error::custom)?;
+                    return Ok(Bson::Binary(uuid));
+                }
+
                 "$code" => {
                     let code = visitor.next_value::<String>()?;
                     if let Some(key) = visitor.next_key::<String>()? {
@@ -578,6 +587,7 @@ pub struct Deserializer {
 pub struct DeserializerOptions {
     /// Whether the [`Deserializer`] should present itself as human readable or not.
     /// The default is true.
+    #[deprecated = "use bson::serde_helpers::HumanReadable"]
     pub human_readable: Option<bool>,
 }
 
@@ -597,6 +607,8 @@ pub struct DeserializerOptionsBuilder {
 
 impl DeserializerOptionsBuilder {
     /// Set the value for [`DeserializerOptions::human_readable`].
+    #[deprecated = "use bson::serde_helpers::HumanReadable"]
+    #[allow(deprecated)]
     pub fn human_readable(mut self, val: impl Into<Option<bool>>) -> Self {
         self.options.human_readable = val.into();
         self
@@ -637,13 +649,12 @@ impl Deserializer {
 
         let is_rawbson = matches!(hint, DeserializerHint::RawBson);
 
-        if let DeserializerHint::BinarySubtype(expected_st) = hint {
-            match value {
-                Bson::Binary(ref b) if b.subtype == expected_st => {}
-                ref b => {
+        if let DeserializerHint::BinarySubtype(expected_subtype) = hint {
+            if let Bson::Binary(ref binary) = value {
+                if binary.subtype != expected_subtype {
                     return Err(Error::custom(format!(
-                        "expected Binary with subtype {:?}, instead got {:?}",
-                        expected_st, b
+                        "expected Binary with subtype {:?}, instead got subtype {:?}",
+                        expected_subtype, binary.subtype
                     )));
                 }
             }
@@ -717,6 +728,7 @@ macro_rules! forward_to_deserialize {
 impl<'de> de::Deserializer<'de> for Deserializer {
     type Error = crate::de::Error;
 
+    #[allow(deprecated)]
     fn is_human_readable(&self) -> bool {
         self.options.human_readable.unwrap_or(true)
     }
@@ -816,7 +828,7 @@ impl<'de> de::Deserializer<'de> for Deserializer {
 
     #[inline]
     fn deserialize_newtype_struct<V>(
-        self,
+        mut self,
         name: &'static str,
         visitor: V,
     ) -> crate::de::Result<V::Value>
@@ -848,6 +860,11 @@ impl<'de> de::Deserializer<'de> for Deserializer {
                 }
 
                 self.deserialize_next(visitor, DeserializerHint::RawBson)
+            }
+            #[allow(deprecated)]
+            HUMAN_READABLE_NEWTYPE => {
+                self.options.human_readable = Some(true);
+                visitor.visit_newtype_struct(self)
             }
             _ => visitor.visit_newtype_struct(self),
         }

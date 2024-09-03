@@ -370,6 +370,8 @@ fn test_userdata_take() -> Result<()> {
             r => panic!("improper return for destructed userdata: {:?}", r),
         }
 
+        assert!(!userdata.is::<MyUserdata>());
+
         drop(userdata);
         lua.globals().raw_remove("userdata")?;
         lua.gc_collect()?;
@@ -400,7 +402,7 @@ fn test_userdata_take() -> Result<()> {
 
 #[test]
 fn test_userdata_destroy() -> Result<()> {
-    struct MyUserdata(Arc<()>);
+    struct MyUserdata(#[allow(unused)] Arc<()>);
 
     impl UserData for MyUserdata {}
 

@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 // AtomicF{32,64} implementation based on AtomicU{32,64}.
 //
 // This module provides atomic float implementations using atomic integer.
@@ -8,6 +10,8 @@
 // GPU targets have atomic instructions for float, so GPU targets will use
 // architecture-specific implementations instead of this implementation in the
 // future: https://github.com/taiki-e/portable-atomic/issues/34
+//
+// TODO: fetch_{minimum,maximum}* https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2024/p3008r2.html
 
 #![cfg_attr(
     all(target_pointer_width = "16", not(feature = "fallback")),
@@ -18,10 +22,7 @@ use core::{cell::UnsafeCell, sync::atomic::Ordering};
 
 macro_rules! atomic_float {
     (
-        $atomic_type:ident,
-        $float_type:ident,
-        $atomic_int_type:ident,
-        $int_type:ident,
+        $atomic_type:ident, $float_type:ident, $atomic_int_type:ident, $int_type:ident,
         $align:literal
     ) => {
         #[repr(C, align($align))]
@@ -53,11 +54,6 @@ macro_rules! atomic_float {
                 // SAFETY: the mutable reference guarantees unique ownership.
                 // (UnsafeCell::get_mut requires Rust 1.50)
                 unsafe { &mut *self.v.get() }
-            }
-
-            #[inline]
-            pub(crate) fn into_inner(self) -> $float_type {
-                self.v.into_inner()
             }
 
             #[inline]

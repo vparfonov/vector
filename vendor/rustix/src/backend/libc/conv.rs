@@ -13,10 +13,10 @@ use crate::io;
 #[cfg(not(windows))]
 #[inline]
 pub(super) fn c_str(c: &CStr) -> *const c::c_char {
-    c.as_ptr()
+    c.as_ptr().cast()
 }
 
-#[cfg(not(any(windows, target_os = "espidf", target_os = "wasi")))]
+#[cfg(not(any(windows, target_os = "espidf", target_os = "vita", target_os = "wasi")))]
 #[inline]
 pub(super) fn no_fd() -> LibcFd {
     -1
@@ -196,7 +196,13 @@ pub(super) fn msg_iov_len(len: usize) -> c::size_t {
 
 /// Convert the value to the `msg_iovlen` field of a `msghdr` struct.
 #[cfg(all(
-    not(any(windows, target_os = "espidf", target_os = "redox", target_os = "wasi")),
+    not(any(
+        windows,
+        target_os = "espidf",
+        target_os = "redox",
+        target_os = "vita",
+        target_os = "wasi"
+    )),
     not(any(
         target_os = "android",
         all(
@@ -220,6 +226,7 @@ pub(crate) fn msg_iov_len(len: usize) -> c::c_int {
     target_os = "emscripten",
     target_os = "fuchsia",
     target_os = "haiku",
+    target_os = "hurd",
     target_os = "nto",
 ))]
 #[inline]
@@ -238,8 +245,10 @@ pub(crate) fn msg_control_len(len: usize) -> c::socklen_t {
     target_os = "espidf",
     target_os = "fuchsia",
     target_os = "haiku",
+    target_os = "hurd",
     target_os = "nto",
     target_os = "redox",
+    target_os = "vita",
     target_os = "wasi",
 )))]
 #[inline]

@@ -1266,6 +1266,13 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `CanvasRenderingContext2d`*"]
     pub fn stroke_rect(this: &CanvasRenderingContext2d, x: f64, y: f64, w: f64, h: f64);
+    # [wasm_bindgen (method , structural , js_class = "CanvasRenderingContext2D" , js_name = reset)]
+    #[doc = "The `reset()` method."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/reset)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `CanvasRenderingContext2d`*"]
+    pub fn reset(this: &CanvasRenderingContext2d);
     # [wasm_bindgen (method , structural , js_class = "CanvasRenderingContext2D" , js_name = restore)]
     #[doc = "The `restore()` method."]
     #[doc = ""]
@@ -1384,6 +1391,26 @@ extern "C" {
         d: f64,
         e: f64,
         f: f64,
+    ) -> Result<(), JsValue>;
+    # [wasm_bindgen (catch , method , structural , js_class = "CanvasRenderingContext2D" , js_name = setTransform)]
+    #[doc = "The `setTransform()` method."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/setTransform)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `CanvasRenderingContext2d`*"]
+    pub fn set_transform_with_default_dom_matrix_2d_init(
+        this: &CanvasRenderingContext2d,
+    ) -> Result<(), JsValue>;
+    #[cfg(feature = "DomMatrix2dInit")]
+    # [wasm_bindgen (catch , method , structural , js_class = "CanvasRenderingContext2D" , js_name = setTransform)]
+    #[doc = "The `setTransform()` method."]
+    #[doc = ""]
+    #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/CanvasRenderingContext2D/setTransform)"]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `CanvasRenderingContext2d`, `DomMatrix2dInit`*"]
+    pub fn set_transform_with_dom_matrix_2d_init(
+        this: &CanvasRenderingContext2d,
+        transform: &DomMatrix2dInit,
     ) -> Result<(), JsValue>;
     # [wasm_bindgen (catch , method , structural , js_class = "CanvasRenderingContext2D" , js_name = transform)]
     #[doc = "The `transform()` method."]

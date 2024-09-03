@@ -10,7 +10,7 @@
 //! # Features
 //! - Makes a directory in a system temporary directory
 //! - Recursively deletes the directory and its contents on drop
-//! - Deletes symbolic links and does not follow them.
+//! - Deletes symbolic links and does not follow them
 //! - Optional name prefix
 //! - Depends only on `std`
 //! - `forbid(unsafe_code)`
@@ -26,6 +26,10 @@
 //!   [`remove_dir_all`](https://crates.io/crates/remove_dir_all) crate.
 //!
 //! # Alternatives
+//! - [`tempdir`](https://crates.io/crates/tempdir)
+//!   - Unmaintained
+//!   - Popular and mature
+//!   - Heavy dependencies (rand, winapi)
 //! - [`tempfile`](https://crates.io/crates/tempfile)
 //!   - Popular and mature
 //!   - Contains `unsafe`, dependencies full of `unsafe`
@@ -64,6 +68,7 @@
 //!
 //! # Cargo Geiger Safety Report
 //! # Changelog
+//! - v0.1.13 - Update docs.
 //! - v0.1.12 - Work when the directory already exists.
 //! - v0.1.11
 //!   - Return `std::io::Error` instead of `String`.
@@ -98,8 +103,10 @@ use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 
-static COUNTER: AtomicU32 = AtomicU32::new(0);
-static INTERNAL_RETRY: AtomicBool = AtomicBool::new(true);
+#[doc(hidden)]
+pub static INTERNAL_COUNTER: AtomicU32 = AtomicU32::new(0);
+#[doc(hidden)]
+pub static INTERNAL_RETRY: AtomicBool = AtomicBool::new(true);
 
 /// The path of an existing writable directory in a system temporary directory.
 ///
@@ -187,7 +194,7 @@ impl TempDir {
                 "{}{:x}-{:x}",
                 prefix.as_ref(),
                 std::process::id(),
-                COUNTER.fetch_add(1, Ordering::AcqRel),
+                INTERNAL_COUNTER.fetch_add(1, Ordering::AcqRel),
             ));
             match std::fs::create_dir(&path_buf) {
                 Err(e)
@@ -261,6 +268,3 @@ impl Drop for TempDir {
         }
     }
 }
-
-#[cfg(test)]
-mod test;

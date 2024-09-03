@@ -86,10 +86,20 @@ pub(crate) const XCASE: tcflag_t = linux_raw_sys::general::XCASE as _;
 #[cfg(target_os = "aix")]
 pub(crate) const MSG_DONTWAIT: c_int = libc::MSG_NONBLOCK;
 
-// TODO: Remove once https://github.com/rust-lang/libc/pull/3377 is merged and released.
-#[cfg(target_os = "netbsd")]
-#[cfg(feature = "net")]
-pub(crate) const SO_NOSIGPIPE: c_int = 0x0800;
+// `O_LARGEFILE` can be automatically set by the kernel on Linux:
+// <https://github.com/torvalds/linux/blob/v6.7/fs/open.c#L1458-L1459>
+// so libc implementations may leave it undefined or defined to zero.
+#[cfg(linux_kernel)]
+pub(crate) const O_LARGEFILE: c_int = linux_raw_sys::general::O_LARGEFILE as _;
+
+// Gated under `_LARGEFILE_SOURCE` but automatically set by the kernel.
+// <https://github.com/illumos/illumos-gate/blob/fb2cb638e5604b214d8ea8d4f01ad2e77b437c17/usr/src/ucbhead/sys/fcntl.h#L64>
+#[cfg(target_os = "illumos")]
+pub(crate) const O_LARGEFILE: c_int = 0x2000;
+
+// TODO: This is new in Linux 6.11; remove when linux-raw-sys is updated.
+#[cfg(linux_kernel)]
+pub(crate) const MAP_DROPPABLE: u32 = 0x8;
 
 // On PowerPC, the regular `termios` has the `termios2` fields and there is no
 // `termios2`. linux-raw-sys has aliases `termios2` to `termios` to cover this
@@ -224,25 +234,6 @@ pub(super) unsafe fn prlimit(
     prlimit64(pid, resource, new_limit, old_limit)
 }
 
-// 64-bit offsets on 32-bit platforms are passed in endianness-specific
-// lo/hi pairs. See src/backend/linux_raw/conv.rs for details.
-#[cfg(all(linux_kernel, target_endian = "little", target_pointer_width = "32"))]
-fn lo(x: i64) -> usize {
-    (x >> 32) as usize
-}
-#[cfg(all(linux_kernel, target_endian = "little", target_pointer_width = "32"))]
-fn hi(x: i64) -> usize {
-    x as usize
-}
-#[cfg(all(linux_kernel, target_endian = "big", target_pointer_width = "32"))]
-fn lo(x: i64) -> usize {
-    x as usize
-}
-#[cfg(all(linux_kernel, target_endian = "big", target_pointer_width = "32"))]
-fn hi(x: i64) -> usize {
-    (x >> 32) as usize
-}
-
 #[cfg(target_os = "android")]
 mod readwrite_pv64 {
     use super::*;
@@ -263,31 +254,18 @@ mod readwrite_pv64 {
         if let Some(fun) = preadv64.get() {
             fun(fd, iov, iovcnt, offset)
         } else {
-            #[cfg(target_pointer_width = "32")]
-            {
-                syscall! {
-                    fn preadv(
-                        fd: libc::c_int,
-                        iov: *const libc::iovec,
-                        iovcnt: libc::c_int,
-                        offset_hi: usize,
-                        offset_lo: usize
-                    ) via SYS_preadv -> libc::ssize_t
-                }
-                preadv(fd, iov, iovcnt, hi(offset), lo(offset))
+            // Unlike the plain "p" functions, the "pv" functions pass their
+            // offset in an endian-independent way, and always in two registers.
+            syscall! {
+                fn preadv(
+                    fd: libc::c_int,
+                    iov: *const libc::iovec,
+                    iovcnt: libc::c_int,
+                    offset_lo: usize,
+                    offset_hi: usize
+                ) via SYS_preadv -> libc::ssize_t
             }
-            #[cfg(target_pointer_width = "64")]
-            {
-                syscall! {
-                    fn preadv(
-                        fd: libc::c_int,
-                        iov: *const libc::iovec,
-                        iovcnt: libc::c_int,
-                        offset: libc::off_t
-                    ) via SYS_preadv -> libc::ssize_t
-                }
-                preadv(fd, iov, iovcnt, offset)
-            }
+            preadv(fd, iov, iovcnt, offset as usize, (offset >> 32) as usize)
         }
     }
     pub(in super::super) unsafe fn pwritev64(
@@ -303,31 +281,18 @@ mod readwrite_pv64 {
         if let Some(fun) = pwritev64.get() {
             fun(fd, iov, iovcnt, offset)
         } else {
-            #[cfg(target_pointer_width = "32")]
-            {
-                syscall! {
-                    fn pwritev(
-                        fd: libc::c_int,
-                        iov: *const libc::iovec,
-                        iovcnt: libc::c_int,
-                        offset_hi: usize,
-                        offset_lo: usize
-                    ) via SYS_pwritev -> libc::ssize_t
-                }
-                pwritev(fd, iov, iovcnt, hi(offset), lo(offset))
+            // Unlike the plain "p" functions, the "pv" functions pass their
+            // offset in an endian-independent way, and always in two registers.
+            syscall! {
+                fn pwritev(
+                    fd: libc::c_int,
+                    iov: *const libc::iovec,
+                    iovcnt: libc::c_int,
+                    offset_lo: usize,
+                    offset_hi: usize
+                ) via SYS_pwritev -> libc::ssize_t
             }
-            #[cfg(target_pointer_width = "64")]
-            {
-                syscall! {
-                    fn pwritev(
-                        fd: libc::c_int,
-                        iov: *const libc::iovec,
-                        iovcnt: libc::c_int,
-                        offset: libc::off_t
-                    ) via SYS_pwritev -> libc::ssize_t
-                }
-                pwritev(fd, iov, iovcnt, offset)
-            }
+            pwritev(fd, iov, iovcnt, offset as usize, (offset >> 32) as usize)
         }
     }
 }
@@ -378,33 +343,26 @@ mod readwrite_pv64v2 {
         if let Some(fun) = preadv64v2.get() {
             fun(fd, iov, iovcnt, offset, flags)
         } else {
-            #[cfg(target_pointer_width = "32")]
-            {
-                syscall! {
-                    fn preadv2(
-                        fd: libc::c_int,
-                        iov: *const libc::iovec,
-                        iovcnt: libc::c_int,
-                        offset_hi: usize,
-                        offset_lo: usize,
-                        flags: libc::c_int
-                    ) via SYS_preadv2 -> libc::ssize_t
-                }
-                preadv2(fd, iov, iovcnt, hi(offset), lo(offset), flags)
+            // Unlike the plain "p" functions, the "pv" functions pass their
+            // offset in an endian-independent way, and always in two registers.
+            syscall! {
+                fn preadv2(
+                    fd: libc::c_int,
+                    iov: *const libc::iovec,
+                    iovcnt: libc::c_int,
+                    offset_lo: usize,
+                    offset_hi: usize,
+                    flags: libc::c_int
+                ) via SYS_preadv2 -> libc::ssize_t
             }
-            #[cfg(target_pointer_width = "64")]
-            {
-                syscall! {
-                    fn preadv2(
-                        fd: libc::c_int,
-                        iov: *const libc::iovec,
-                        iovcnt: libc::c_int,
-                        offset: libc::off_t,
-                        flags: libc::c_int
-                    ) via SYS_preadv2 -> libc::ssize_t
-                }
-                preadv2(fd, iov, iovcnt, offset, flags)
-            }
+            preadv2(
+                fd,
+                iov,
+                iovcnt,
+                offset as usize,
+                (offset >> 32) as usize,
+                flags,
+            )
         }
     }
     pub(in super::super) unsafe fn pwritev64v2(
@@ -421,33 +379,26 @@ mod readwrite_pv64v2 {
         if let Some(fun) = pwritev64v2.get() {
             fun(fd, iov, iovcnt, offset, flags)
         } else {
-            #[cfg(target_pointer_width = "32")]
-            {
-                syscall! {
-                    fn pwritev2(
-                        fd: libc::c_int,
-                        iov: *const libc::iovec,
-                        iovec: libc::c_int,
-                        offset_hi: usize,
-                        offset_lo: usize,
-                        flags: libc::c_int
-                    ) via SYS_pwritev2 -> libc::ssize_t
-                }
-                pwritev2(fd, iov, iovcnt, hi(offset), lo(offset), flags)
+            // Unlike the plain "p" functions, the "pv" functions pass their
+            // offset in an endian-independent way, and always in two registers.
+            syscall! {
+                fn pwritev2(
+                    fd: libc::c_int,
+                    iov: *const libc::iovec,
+                    iovec: libc::c_int,
+                    offset_lo: usize,
+                    offset_hi: usize,
+                    flags: libc::c_int
+                ) via SYS_pwritev2 -> libc::ssize_t
             }
-            #[cfg(target_pointer_width = "64")]
-            {
-                syscall! {
-                    fn pwritev2(
-                        fd: libc::c_int,
-                        iov:*const libc::iovec,
-                        iovcnt: libc::c_int,
-                        offset: libc::off_t,
-                        flags: libc::c_int
-                    ) via SYS_pwritev2 -> libc::ssize_t
-                }
-                pwritev2(fd, iov, iovcnt, offset, flags)
-            }
+            pwritev2(
+                fd,
+                iov,
+                iovcnt,
+                offset as usize,
+                (offset >> 32) as usize,
+                flags,
+            )
         }
     }
 }
@@ -470,33 +421,26 @@ mod readwrite_pv64v2 {
         offset: libc::off64_t,
         flags: libc::c_int,
     ) -> libc::ssize_t {
-        #[cfg(target_pointer_width = "32")]
-        {
-            syscall! {
-                fn preadv2(
-                    fd: libc::c_int,
-                    iov: *const libc::iovec,
-                    iovcnt: libc::c_int,
-                    offset_hi: usize,
-                    offset_lo: usize,
-                    flags: libc::c_int
-                ) via SYS_preadv2 -> libc::ssize_t
-            }
-            preadv2(fd, iov, iovcnt, hi(offset), lo(offset), flags)
+        // Unlike the plain "p" functions, the "pv" functions pass their offset
+        // in an endian-independent way, and always in two registers.
+        syscall! {
+            fn preadv2(
+                fd: libc::c_int,
+                iov: *const libc::iovec,
+                iovcnt: libc::c_int,
+                offset_lo: usize,
+                offset_hi: usize,
+                flags: libc::c_int
+            ) via SYS_preadv2 -> libc::ssize_t
         }
-        #[cfg(target_pointer_width = "64")]
-        {
-            syscall! {
-                fn preadv2(
-                    fd: libc::c_int,
-                    iov: *const libc::iovec,
-                    iovcnt: libc::c_int,
-                    offset: libc::off_t,
-                    flags: libc::c_int
-                ) via SYS_preadv2 -> libc::ssize_t
-            }
-            preadv2(fd, iov, iovcnt, offset, flags)
-        }
+        preadv2(
+            fd,
+            iov,
+            iovcnt,
+            offset as usize,
+            (offset >> 32) as usize,
+            flags,
+        )
     }
     pub(in super::super) unsafe fn pwritev64v2(
         fd: libc::c_int,
@@ -505,33 +449,26 @@ mod readwrite_pv64v2 {
         offset: libc::off64_t,
         flags: libc::c_int,
     ) -> libc::ssize_t {
-        #[cfg(target_pointer_width = "32")]
-        {
-            syscall! {
-                fn pwritev2(
-                    fd: libc::c_int,
-                    iov: *const libc::iovec,
-                    iovcnt: libc::c_int,
-                    offset_hi: usize,
-                    offset_lo: usize,
-                    flags: libc::c_int
-                ) via SYS_pwritev2 -> libc::ssize_t
-            }
-            pwritev2(fd, iov, iovcnt, hi(offset), lo(offset), flags)
+        // Unlike the plain "p" functions, the "pv" functions pass their offset
+        // in an endian-independent way, and always in two registers.
+        syscall! {
+            fn pwritev2(
+                fd: libc::c_int,
+                iov: *const libc::iovec,
+                iovcnt: libc::c_int,
+                offset_lo: usize,
+                offset_hi: usize,
+                flags: libc::c_int
+            ) via SYS_pwritev2 -> libc::ssize_t
         }
-        #[cfg(target_pointer_width = "64")]
-        {
-            syscall! {
-                fn pwritev2(
-                    fd: libc::c_int,
-                    iov:*const libc::iovec,
-                    iovcnt: libc::c_int,
-                    offset: libc::off_t,
-                    flags: libc::c_int
-                ) via SYS_pwritev2 -> libc::ssize_t
-            }
-            pwritev2(fd, iov, iovcnt, offset, flags)
-        }
+        pwritev2(
+            fd,
+            iov,
+            iovcnt,
+            offset as usize,
+            (offset >> 32) as usize,
+            flags,
+        )
     }
 }
 #[cfg(any(

@@ -288,6 +288,8 @@ extern "C-unwind" {
     pub fn lua_setuserdatatag(L: *mut lua_State, idx: c_int, tag: c_int);
     pub fn lua_setuserdatadtor(L: *mut lua_State, tag: c_int, dtor: Option<lua_Destructor>);
     pub fn lua_getuserdatadtor(L: *mut lua_State, tag: c_int) -> Option<lua_Destructor>;
+    pub fn lua_setuserdatametatable(L: *mut lua_State, tag: c_int, idx: c_int);
+    pub fn lua_getuserdatametatable(L: *mut lua_State, tag: c_int);
     pub fn lua_setlightuserdataname(L: *mut lua_State, tag: c_int, name: *const c_char);
     pub fn lua_getlightuserdataname(L: *mut lua_State, tag: c_int) -> *const c_char;
     pub fn lua_clonefunction(L: *mut lua_State, idx: c_int);
@@ -525,6 +527,7 @@ pub struct lua_Debug {
 //
 
 #[repr(C)]
+#[non_exhaustive]
 pub struct lua_Callbacks {
     /// arbitrary userdata pointer that is never overwritten by Luau
     pub userdata: *mut c_void,
@@ -551,4 +554,9 @@ pub struct lua_Callbacks {
 
 extern "C" {
     pub fn lua_callbacks(L: *mut lua_State) -> *mut lua_Callbacks;
+}
+
+// Functions from customization lib
+extern "C" {
+    pub fn luau_setfflag(name: *const c_char, value: c_int) -> c_int;
 }

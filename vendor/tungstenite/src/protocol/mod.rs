@@ -13,13 +13,10 @@ use self::{
     },
     message::{IncompleteMessage, IncompleteMessageType},
 };
-use crate::{
-    error::{Error, ProtocolError, Result},
-    util::NonBlockingResult,
-};
+use crate::error::{Error, ProtocolError, Result};
 use log::*;
 use std::{
-    io::{ErrorKind as IoErrorKind, Read, Write},
+    io::{self, Read, Write},
     mem::replace,
 };
 
@@ -58,11 +55,11 @@ pub struct WebSocketConfig {
     /// Note: Should always be at least [`write_buffer_size + 1 message`](Self::write_buffer_size)
     /// and probably a little more depending on error handling strategy.
     pub max_write_buffer_size: usize,
-    /// The maximum size of a message. `None` means no size limit. The default value is 64 MiB
+    /// The maximum size of an incoming message. `None` means no size limit. The default value is 64 MiB
     /// which should be reasonably big for all normal use-cases but small enough to prevent
     /// memory eating by a malicious user.
     pub max_message_size: Option<usize>,
-    /// The maximum size of a single message frame. `None` means no size limit. The limit is for
+    /// The maximum size of a single incoming message frame. `None` means no size limit. The limit is for
     /// frame payload NOT including the frame header. The default value is 16 MiB which should
     /// be reasonably big for all normal use-cases but small enough to prevent memory eating
     /// by a malicious user.
@@ -313,6 +310,9 @@ pub struct WebSocketContext {
     incomplete: Option<IncompleteMessage>,
     /// Send in addition to regular messages E.g. "pong" or "close".
     additional_send: Option<Frame>,
+    /// True indicates there is an additional message (like a pong)
+    /// that failed to flush previously and we should try again.
+    unflushed_additional: bool,
     /// The configuration for the websocket session.
     config: WebSocketConfig,
 }
@@ -344,6 +344,7 @@ impl WebSocketContext {
             state: WebSocketState::Active,
             incomplete: None,
             additional_send: None,
+            unflushed_additional: false,
             config,
         }
     }
@@ -391,10 +392,16 @@ impl WebSocketContext {
         self.state.check_not_terminated()?;
 
         loop {
-            if self.additional_send.is_some() {
+            if self.additional_send.is_some() || self.unflushed_additional {
                 // Since we may get ping or close, we need to reply to the messages even during read.
-                // Thus we flush but ignore its blocking.
-                self.flush(stream).no_block()?;
+                match self.flush(stream) {
+                    Ok(_) => {}
+                    Err(Error::Io(err)) if err.kind() == io::ErrorKind::WouldBlock => {
+                        // If blocked continue reading, but try again later
+                        self.unflushed_additional = true;
+                    }
+                    Err(err) => return Err(err),
+                }
             } else if self.role == Role::Server && !self.state.can_read() {
                 self.state = WebSocketState::Terminated;
                 return Err(Error::ConnectionClosed);
@@ -462,7 +469,9 @@ impl WebSocketContext {
     {
         self._write(stream, None)?;
         self.frame.write_out_buffer(stream)?;
-        Ok(stream.flush()?)
+        stream.flush()?;
+        self.unflushed_additional = false;
+        Ok(())
     }
 
     /// Writes any data in the out_buffer, `additional_send` and given `data`.
@@ -495,7 +504,7 @@ impl WebSocketContext {
                 Ok(_) => true,
             }
         } else {
-            false
+            self.unflushed_additional
         };
 
         // If we're closing and there is nothing to send anymore, we should close the connection.
@@ -774,7 +783,7 @@ impl<T> CheckConnectionReset for Result<T> {
     fn check_connection_reset(self, state: WebSocketState) -> Self {
         match self {
             Err(Error::Io(io_error)) => Err({
-                if !state.can_read() && io_error.kind() == IoErrorKind::ConnectionReset {
+                if !state.can_read() && io_error.kind() == io::ErrorKind::ConnectionReset {
                     Error::ConnectionClosed
                 } else {
                     Error::Io(io_error)

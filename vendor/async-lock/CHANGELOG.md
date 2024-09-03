@@ -1,3 +1,34 @@
+# Version 3.4.0
+
+- Port to `event-listener` v5.0.0. (#74)
+
+# Version 3.3.0
+
+- Add a `forget()` method for semaphore guards. (#73)
+- Increase MSRV to v1.60. (#75)
+
+# Version 3.2.0
+
+- Add missing methods for blocking on locking with types wrapped in `Arc` (#71).
+
+# Version 3.1.2
+
+- Bump `event-listener` to version v4.0.0. (#69)
+
+# Version 3.1.1
+
+- Add a note to the documentation comparing this crate against `libstd`'s locks. (#58)
+
+# Version 3.1.0
+
+- Add a `Default` implementation for `OnceCell` (#63).
+
+# Version 3.0.0
+
+- **Breaking:** Add an enabled-by-default `std` feature that allows using this crate without the standard library. (#43)
+- Support blocking and non-blocking operations on the same locks. (#56)
+- Switch to a more efficient event notification mechanism. (#43)
+
 # Version 2.8.0
 
 - Fix a bug where the `SemaphoreGuard::acquire_arc` future would busy wait under certain conditions (#42).

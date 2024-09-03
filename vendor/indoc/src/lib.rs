@@ -121,7 +121,7 @@
 //!    the first line.
 //! 4. Remove the computed number of spaces from the beginning of each line.
 
-#![doc(html_root_url = "https://docs.rs/indoc/2.0.4")]
+#![doc(html_root_url = "https://docs.rs/indoc/2.0.5")]
 #![allow(
     clippy::derive_partial_eq_without_eq,
     clippy::from_iter_instead_of_collect,
@@ -153,7 +153,9 @@ enum Macro {
     Concat,
 }
 
-/// Unindent and produce `&'static str`.
+/// Unindent and produce `&'static str` or `&'static [u8]`.
+///
+/// Supports normal strings, raw strings, bytestrings, and raw bytestrings.
 ///
 /// # Example
 ///

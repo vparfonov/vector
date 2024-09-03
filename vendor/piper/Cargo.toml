@@ -13,18 +13,32 @@
 edition = "2018"
 rust-version = "1.36"
 name = "piper"
-version = "0.2.1"
+version = "0.2.4"
 authors = [
     "Stjepan Glavina <stjepang@gmail.com>",
     "John Nunley <dev@notgull.net>",
 ]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Async pipes, channels, mutexes, and more."
 readme = "README.md"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/notgull/piper"
+repository = "https://github.com/smol-rs/piper"
+
+[lib]
+name = "piper"
+path = "src/lib.rs"
+
+[[test]]
+name = "pipe"
+path = "tests/pipe.rs"
 
 [[bench]]
 name = "pipe_comparison"
+path = "benches/pipe_comparison.rs"
 harness = false
 
 [dependencies.atomic-waker]
@@ -39,7 +53,7 @@ version = "0.3.28"
 optional = true
 
 [dependencies.portable-atomic-util]
-version = "0.1.2"
+version = "0.2.0"
 features = ["alloc"]
 optional = true
 
@@ -50,13 +64,13 @@ default-features = false
 package = "portable-atomic"
 
 [dev-dependencies.async-channel]
-version = "1.8.0"
+version = "2.0.0"
 
 [dev-dependencies.async-executor]
 version = "1.5.1"
 
 [dev-dependencies.async-io]
-version = "1.13.0"
+version = "2.0.0"
 
 [dev-dependencies.criterion]
 version = "0.4.0"
@@ -67,7 +81,7 @@ default-features = false
 version = "3.2.0"
 
 [dev-dependencies.futures-lite]
-version = "1.12.0"
+version = "2.0.0"
 
 [features]
 default = ["std"]

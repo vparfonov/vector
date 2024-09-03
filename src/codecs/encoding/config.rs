@@ -124,8 +124,8 @@ impl EncodingConfigWithFraming {
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
                 | Serializer::Text(_)
-                | Serializer::Syslog(_)
-            ) => NewlineDelimitedEncoder::new().into(),
+                | Serializer::Syslog(_),
+            ) => NewlineDelimitedEncoder::default().into(),
         };
 
         Ok((framer, serializer))

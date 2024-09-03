@@ -6,6 +6,51 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## 0.16.2 - 2023-09-22
+### Fixed
+- Use generics with the constructor in `build` method (see issue #118)
+
+## 0.16.1 - 2023-09-18
+### Fixed
+- Add `#[allow(clippy::exhaustive_enums)]` to generated empty enums used for
+  error "reporting" (see issue #112)
+- Add `#[automatically_derived]` to generated `impl`s (see issue #114)
+- Add `#[allow(clippy::used_underscore_binding)]` to build method and setter
+  methods (see issue #113)
+
+## 0.16.0 - 2023-08-26
+### Added
+- `#[builder(crate_module_path = ...)]` for overcoming cases where the derive
+  macro is used in another crate's macro (see issue #109)
+
+## 0.15.2 - 2023-08-03
+### Fixed
+- Fix const generics generating "empty" entries in some lists, resulting in
+  consecutive commas (see issue #106)
+
+## 0.15.1 - 2023-07-10
+### Fixed
+- no-std build.
+
+## 0.15.0 - 2023-07-06
+### Changed
+- [**BREAKING**] Split the derive macro out to [a separate procmacro
+  crate](https://crates.io/crates/typed-builder-macro). This is considered a
+  breaking change because reexporting and/or renmaing the crate can now prevent
+  the generated code from finding the types it needs (see issue #101)
+
+### Fixed
+- Marking a field as `#[deprecated]` now behaves properly - `TypedBuilder`
+  generated code itself does trigger the deprecation warning, and instead the
+  setter for that field now does.
+- The "fake" `build` method when required fields are not provided now returns
+  the never type ("`!`"). Refer to PR #97 for more thorough explanation.
+
+### Added
+- Support for setter method prefixes and suffixes `#[builder(field_defaults(setter(prefix = "...", suffix = "...")))]`.
+  This either prepends or appends the provided string to the setter method. This allows method names like: `set_x()`,
+  `with_y()`, or `set_z_value()`.
+
 ## 0.14.0 - 2023-03-08
 ### Added
 - `build_method(into)` and `build_method(into = ...)`.
@@ -16,6 +61,7 @@ y
 - [**BREAKING**] Builder state parameter moved to the end of the generated builder type's parameters list.
 - Generated builder type's builder state parameter now defaults to tuple of
   empty tuples. This means the empty builder, where no parameter is yet set.
+
 ### Fixed
 - `#[builder(build_method(...))]` now affects the fake `build` method that's
   generated to add information to the compiler error.
@@ -25,6 +71,7 @@ y
 - [**BREAKING**] `builder_method_doc = "..."`, `builder_type_doc = "..."` and
   `build_method_doc = "..."` are replaced with `builder_method(doc = "...")`,
   `builder_type(doc = "...")` and `build_method(doc = "...")`.
+
 ### Added
 - `build_method(...)` now has a `doc` field.
 - `builder_method(...)` and `builder_type(...)`, which are structured similarly to `build_method(...)`.

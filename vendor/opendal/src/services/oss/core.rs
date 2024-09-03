@@ -66,7 +66,6 @@ pub struct OssCore {
     pub client: HttpClient,
     pub loader: AliyunLoader,
     pub signer: AliyunOssSigner,
-    pub write_min_size: usize,
     pub batch_max_operations: usize,
 }
 
@@ -163,9 +162,7 @@ impl OssCore {
         &self,
         path: &str,
         size: Option<u64>,
-        content_type: Option<&str>,
-        content_disposition: Option<&str>,
-        cache_control: Option<&str>,
+        args: &OpWrite,
         body: AsyncBody,
         is_presign: bool,
     ) -> Result<Request<AsyncBody>> {
@@ -177,15 +174,15 @@ impl OssCore {
 
         req = req.header(CONTENT_LENGTH, size.unwrap_or_default());
 
-        if let Some(mime) = content_type {
+        if let Some(mime) = args.content_type() {
             req = req.header(CONTENT_TYPE, mime);
         }
 
-        if let Some(pos) = content_disposition {
+        if let Some(pos) = args.content_disposition() {
             req = req.header(CONTENT_DISPOSITION, pos);
         }
 
-        if let Some(cache_control) = cache_control {
+        if let Some(cache_control) = args.cache_control() {
             req = req.header(CACHE_CONTROL, cache_control)
         }
 
@@ -200,8 +197,8 @@ impl OssCore {
         &self,
         path: &str,
         position: u64,
-        size: usize,
-        args: &OpAppend,
+        size: u64,
+        args: &OpWrite,
         body: AsyncBody,
     ) -> Result<Request<AsyncBody>> {
         let p = build_abs_path(&self.root, path);
@@ -405,20 +402,10 @@ impl OssCore {
         &self,
         path: &str,
         size: Option<u64>,
-        content_type: Option<&str>,
-        content_disposition: Option<&str>,
-        cache_control: Option<&str>,
+        args: &OpWrite,
         body: AsyncBody,
     ) -> Result<Response<IncomingAsyncBody>> {
-        let mut req = self.oss_put_object_request(
-            path,
-            size,
-            content_type,
-            content_disposition,
-            cache_control,
-            body,
-            false,
-        )?;
+        let mut req = self.oss_put_object_request(path, size, args, body, false)?;
 
         self.sign(&mut req).await?;
         self.send(req).await
@@ -518,25 +505,11 @@ impl OssCore {
     pub async fn oss_initiate_upload(
         &self,
         path: &str,
-        args: &OpWrite,
-    ) -> Result<Response<IncomingAsyncBody>> {
-        let cache_control = args.cache_control();
-        let req = self
-            .oss_initiate_upload_request(path, None, None, cache_control, AsyncBody::Empty, false)
-            .await?;
-        self.send(req).await
-    }
-
-    /// Creates a request that initiates multipart upload
-    async fn oss_initiate_upload_request(
-        &self,
-        path: &str,
         content_type: Option<&str>,
         content_disposition: Option<&str>,
         cache_control: Option<&str>,
-        body: AsyncBody,
         is_presign: bool,
-    ) -> Result<Request<AsyncBody>> {
+    ) -> Result<Response<IncomingAsyncBody>> {
         let path = build_abs_path(&self.root, path);
         let endpoint = self.get_endpoint(is_presign);
         let url = format!("{}/{}?uploads", endpoint, percent_encode_path(&path));
@@ -551,9 +524,11 @@ impl OssCore {
             req = req.header(CACHE_CONTROL, cache_control);
         }
         req = self.insert_sse_headers(req);
-        let mut req = req.body(body).map_err(new_request_build_error)?;
+        let mut req = req
+            .body(AsyncBody::Empty)
+            .map_err(new_request_build_error)?;
         self.sign(&mut req).await?;
-        Ok(req)
+        self.send(req).await
     }
 
     /// Creates a request to upload a part
@@ -563,9 +538,9 @@ impl OssCore {
         upload_id: &str,
         part_number: usize,
         is_presign: bool,
-        size: Option<u64>,
+        size: u64,
         body: AsyncBody,
-    ) -> Result<Request<AsyncBody>> {
+    ) -> Result<Response<IncomingAsyncBody>> {
         let p = build_abs_path(&self.root, path);
         let endpoint = self.get_endpoint(is_presign);
 
@@ -578,13 +553,10 @@ impl OssCore {
         );
 
         let mut req = Request::put(&url);
-
-        if let Some(size) = size {
-            req = req.header(CONTENT_LENGTH, size);
-        }
+        req = req.header(CONTENT_LENGTH, size);
         let mut req = req.body(body).map_err(new_request_build_error)?;
         self.sign(&mut req).await?;
-        Ok(req)
+        self.send(req).await
     }
 
     pub async fn oss_complete_multipart_upload_request(
@@ -592,7 +564,7 @@ impl OssCore {
         path: &str,
         upload_id: &str,
         is_presign: bool,
-        parts: &[MultipartUploadPart],
+        parts: Vec<MultipartUploadPart>,
     ) -> Result<Response<IncomingAsyncBody>> {
         let p = build_abs_path(&self.root, path);
         let endpoint = self.get_endpoint(is_presign);
@@ -618,6 +590,29 @@ impl OssCore {
             .body(AsyncBody::Bytes(Bytes::from(content)))
             .map_err(new_request_build_error)?;
 
+        self.sign(&mut req).await?;
+        self.send(req).await
+    }
+
+    /// Abort an on-going multipart upload.
+    /// reference docs https://www.alibabacloud.com/help/zh/oss/developer-reference/abortmultipartupload
+    pub async fn oss_abort_multipart_upload(
+        &self,
+        path: &str,
+        upload_id: &str,
+    ) -> Result<Response<IncomingAsyncBody>> {
+        let p = build_abs_path(&self.root, path);
+
+        let url = format!(
+            "{}/{}?uploadId={}",
+            self.endpoint,
+            percent_encode_path(&p),
+            percent_encode_path(upload_id)
+        );
+
+        let mut req = Request::delete(&url)
+            .body(AsyncBody::Empty)
+            .map_err(new_request_build_error)?;
         self.sign(&mut req).await?;
         self.send(req).await
     }
@@ -831,9 +826,10 @@ mod tests {
         };
 
         // quick_xml::se::to_string()
-        let mut serializer = quick_xml::se::Serializer::new(String::new());
+        let mut serialized = String::new();
+        let mut serializer = quick_xml::se::Serializer::new(&mut serialized);
         serializer.indent(' ', 4);
-        let serialized = req.serialize(serializer).unwrap();
+        req.serialize(serializer).unwrap();
         pretty_assertions::assert_eq!(
             serialized,
             r#"<CompleteMultipartUpload>

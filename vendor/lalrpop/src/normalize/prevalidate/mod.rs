@@ -77,18 +77,6 @@ impl<'grammar> Validator<'grammar> {
                                 "extern (with custom tokens) and match definitions are mutually exclusive");
                         }
                     }
-
-                    // Ensure that the catch all is final item of final block
-                    for (contents_idx, match_contents) in data.contents.iter().enumerate() {
-                        for (item_idx, item) in match_contents.items.iter().enumerate() {
-                            if item.is_catch_all()
-                                && (contents_idx != &data.contents.len() - 1
-                                    || item_idx != &match_contents.items.len() - 1)
-                            {
-                                return_err!(item.span(), "Catch all must be final item");
-                            }
-                        }
-                    }
                 }
 
                 GrammarItem::ExternToken(ref data) => {
@@ -378,7 +366,9 @@ impl<'grammar> Validator<'grammar> {
                 }
             }
             SymbolKind::Macro(ref msym) => {
-                debug_assert!(!msym.args.is_empty());
+                if msym.args.is_empty() {
+                    return_err!(symbol.span, "macros must have at least one argument")
+                }
                 for arg in &msym.args {
                     self.validate_symbol(arg)?;
                 }

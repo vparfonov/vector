@@ -11,9 +11,9 @@
 
 [package]
 edition = "2018"
-rust-version = "1.61.0"
+rust-version = "1.65.0"
 name = "metrics"
-version = "0.21.1"
+version = "0.22.3"
 authors = ["Toby Lawrence <toby@nuclearfurnace.com>"]
 description = "A lightweight metrics facade."
 homepage = "https://github.com/metrics-rs/metrics"
@@ -35,11 +35,8 @@ name = "macros"
 harness = false
 
 [dependencies.ahash]
-version = "0.8"
+version = "0.8.8"
 default-features = false
-
-[dependencies.metrics-macros]
-version = "^0.7"
 
 [dev-dependencies.criterion]
 version = "=0.3.3"

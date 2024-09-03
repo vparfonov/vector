@@ -10,9 +10,9 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
+edition = "2021"
 name = "mock_instant"
-version = "0.3.2"
+version = "0.5.1"
 authors = ["museun <museun@outlook.com>"]
 description = "a simple way to mock an std::time::Instant"
 documentation = "https://docs.rs/mock_instant"
@@ -25,11 +25,3 @@ keywords = [
 ]
 license = "0BSD"
 repository = "https://github.com/museun/mock_instant"
-
-[dependencies.once_cell]
-version = "1.17"
-optional = true
-
-[features]
-default = []
-sync = ["once_cell"]

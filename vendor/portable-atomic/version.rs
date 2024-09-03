@@ -1,9 +1,23 @@
-use std::{env, process::Command, str};
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
+use std::{env, iter, process::Command, str};
 
 pub(crate) fn rustc_version() -> Option<Version> {
     let rustc = env::var_os("RUSTC")?;
+    let rustc_wrapper = if env::var_os("CARGO_ENCODED_RUSTFLAGS").is_some() {
+        env::var_os("RUSTC_WRAPPER").filter(|v| !v.is_empty())
+    } else {
+        // Cargo sets environment variables for wrappers correctly only since https://github.com/rust-lang/cargo/pull/9601.
+        None
+    };
+    // Do not apply RUSTC_WORKSPACE_WRAPPER: https://github.com/cuviper/autocfg/issues/58#issuecomment-2067625980
+    let mut rustc = rustc_wrapper.into_iter().chain(iter::once(rustc));
+    let mut cmd = Command::new(rustc.next().unwrap());
+    cmd.args(rustc);
     // Use verbose version output because the packagers add extra strings to the normal version output.
-    let output = Command::new(rustc).args(&["--version", "--verbose"]).output().ok()?;
+    // Do not use long flags (--version --verbose) because clippy-deriver doesn't handle them properly.
+    // -vV is also matched with that cargo internally uses: https://github.com/rust-lang/cargo/blob/14b46ecc62aa671d7477beba237ad9c6a209cf5d/src/cargo/util/rustc.rs#L65
+    let output = cmd.arg("-vV").output().ok()?;
     let verbose_version = str::from_utf8(&output.stdout).ok()?;
     Version::parse(verbose_version)
 }
@@ -21,8 +35,8 @@ impl Version {
     // the rustc version, we assume this is the current version.
     // It is no problem if this is older than the actual latest stable.
     // LLVM version is assumed to be the minimum external LLVM version:
-    // https://github.com/rust-lang/rust/blob/1.71.0/src/bootstrap/llvm.rs#L529
-    pub(crate) const LATEST: Self = Self::stable(71, 14);
+    // https://github.com/rust-lang/rust/blob/1.79.0/src/bootstrap/src/core/build_steps/llvm.rs#L589
+    pub(crate) const LATEST: Self = Self::stable(79, 17);
 
     pub(crate) const fn stable(rustc_minor: u32, llvm_major: u32) -> Self {
         Self { minor: rustc_minor, nightly: false, commit_date: Date::UNKNOWN, llvm: llvm_major }
@@ -30,7 +44,8 @@ impl Version {
 
     pub(crate) fn probe(&self, minor: u32, year: u16, month: u8, day: u8) -> bool {
         if self.nightly {
-            self.minor > minor || self.commit_date >= Date::new(year, month, day)
+            self.minor > minor
+                || self.minor == minor && self.commit_date >= Date::new(year, month, day)
         } else {
             self.minor >= minor
         }
@@ -50,8 +65,8 @@ impl Version {
         let version = release.next().unwrap();
         let channel = release.next().unwrap_or_default();
         let mut digits = version.splitn(3, '.');
-        let major = digits.next()?.parse::<u32>().ok()?;
-        if major != 1 {
+        let major = digits.next()?;
+        if major != "1" {
             return None;
         }
         let minor = digits.next()?.parse::<u32>().ok()?;

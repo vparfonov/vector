@@ -12,13 +12,12 @@
 [package]
 edition = "2021"
 name = "bytecheck_derive"
-version = "0.6.11"
+version = "0.6.12"
 authors = ["David Koloski <djkoloski@gmail.com>"]
 description = "Derive macro for bytecheck"
 documentation = "https://docs.rs/bytecheck_derive"
 license = "MIT"
 repository = "https://github.com/djkoloski/bytecheck"
-resolver = "1"
 
 [lib]
 proc-macro = true

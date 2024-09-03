@@ -4,7 +4,7 @@
 [![Documentation](https://docs.rs/roxmltree/badge.svg)](https://docs.rs/roxmltree)
 [![Rust 1.60+](https://img.shields.io/badge/rust-1.60+-orange.svg)](https://www.rust-lang.org)
 
-Represents an [XML 1.0](https://www.w3.org/TR/xml/) document as a read-only tree.
+Represents an [XML](https://www.w3.org/TR/xml/) document as a read-only tree.
 
 ```rust
 // Find element by id.
@@ -45,7 +45,7 @@ For more details see [docs/parsing.md](https://github.com/RazrFalcon/roxmltree/b
 | No **unsafe**                   | ✓                |                     | ✓                |                  |
 | Language                        | Rust             | C                   | Rust             | Rust             |
 | Dependencies                    | **0**            | -                   | 2                | 2                |
-| Tested version                  | 0.19.0           | Apple-provided      | 0.10.3           | 0.3.2            |
+| Tested version                  | 0.20.0           | Apple-provided      | 0.10.3           | 0.3.2            |
 | License                         | MIT / Apache-2.0 | MIT                 | MIT              | MIT              |
 
 Legend:

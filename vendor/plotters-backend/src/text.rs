@@ -60,9 +60,10 @@ impl<'a> From<&'a str> for FontFamily<'a> {
 /// ```
 pub mod text_anchor {
     /// The horizontal position of the anchor point relative to the text.
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, Default)]
     pub enum HPos {
         /// Anchor point is on the left side of the text
+        #[default]
         Left,
         /// Anchor point is on the right side of the text
         Right,
@@ -71,9 +72,10 @@ pub mod text_anchor {
     }
 
     /// The vertical position of the anchor point relative to the text.
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, Default)]
     pub enum VPos {
         /// Anchor point is on the top of the text
+        #[default]
         Top,
         /// Anchor point is in the vertical center of the text
         Center,
@@ -82,7 +84,7 @@ pub mod text_anchor {
     }
 
     /// The text anchor position.
-    #[derive(Clone, Copy)]
+    #[derive(Clone, Copy, Default)]
     pub struct Pos {
         /// The horizontal position of the anchor point
         pub h_pos: HPos,
@@ -104,22 +106,6 @@ pub mod text_anchor {
         /// ```
         pub fn new(h_pos: HPos, v_pos: VPos) -> Self {
             Pos { h_pos, v_pos }
-        }
-
-        /// Create a default text anchor position (top left).
-        ///
-        /// - **returns** The default text anchor position
-        ///
-        /// ```rust
-        /// use plotters_backend::text_anchor::{Pos, HPos, VPos};
-        ///
-        /// let pos = Pos::default();
-        /// ```
-        pub fn default() -> Self {
-            Pos {
-                h_pos: HPos::Left,
-                v_pos: VPos::Top,
-            }
         }
     }
 }
@@ -201,8 +187,8 @@ impl<'a> From<&'a str> for FontStyle {
 /// text drawing, those font information provides instructions about how the text should be
 /// rendered: color, size, slant, anchor, font, etc.
 ///
-/// This trait decouples the detailed implementaiton about the font and the backend code which
-/// wants to perfome some operation on the font.
+/// This trait decouples the detailed implementation about the font and the backend code which
+/// wants to perform some operation on the font.
 ///
 pub trait BackendTextStyle {
     /// The error type of this text style implementation

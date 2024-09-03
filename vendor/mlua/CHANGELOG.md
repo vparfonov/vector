@@ -1,3 +1,26 @@
+## v0.9.9
+
+- Minimal Luau updated to 0.629
+- Fixed bug when attempting to reset or resume already running coroutines (#416).
+- Added `RegistryKey::id()` method to get the underlying Lua registry key id.
+
+## v0.9.8
+
+- Fixed serializing same table multiple times (#408)
+- Use `mlua-sys` v0.6 (to support Luau 0.624+)
+- Fixed cross compilation of windows dlls from unix (#394)
+
+## v0.9.7
+
+- Implemented `IntoLua` for `RegistryKey`
+- Mark `__idiv` metamethod as available for luau
+- Added `Function::deep_clone()` method (Luau)
+- Added `SerializeOptions::detect_serde_json_arbitrary_precision` option
+- Added `Lua::create_buffer()` method (Luau)
+- Support serializing buffer type as a byte slice (Luau)
+- Perf: Implemented `push_into_stack`/`from_stack` for `Option<T>`
+- Added `Lua::create_ser_any_userdata()` method
+
 ## v0.9.6
 
 - Added `to_pointer` function to `Function`/`Table`/`Thread`

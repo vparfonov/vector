@@ -148,6 +148,7 @@ use once_cell::sync::OnceCell;
 
 mod clocks;
 use self::clocks::{Counter, Monotonic};
+mod detection;
 mod mock;
 pub use self::mock::{IntoNanoseconds, Mock};
 mod instant;
@@ -201,7 +202,7 @@ impl Calibration {
             ref_time: 0,
             src_time: 0,
             scale_factor: 1,
-            scale_shift: 1,
+            scale_shift: 0,
         }
     }
 
@@ -314,8 +315,8 @@ impl Clock {
     /// Support for TSC, etc, are checked at the time of creation, not compile-time.
     pub fn new() -> Clock {
         let reference = Monotonic::default();
-        let inner = if has_tsc_support() {
-            let source = Counter::default();
+        let inner = if detection::has_counter_support() {
+            let source = Counter;
             let calibration = GLOBAL_CALIBRATION.get_or_init(|| {
                 let mut calibration = Calibration::new();
                 calibration.calibrate(reference, &source);
@@ -437,14 +438,12 @@ impl Clock {
     /// read directly without the need to scale to reference time.
     ///
     /// The upkeep thread must be started in order to update the time.  You can read the
-    /// documentation for [`Upkeep`][upkeep] for more information on starting the upkeep thread, as
+    /// documentation for [`Upkeep`] for more information on starting the upkeep thread, as
     /// well as the details of the "current time" mechanism.
     ///
     /// If the upkeep thread has not been started, the return value will be `0`.
     ///
     /// Returns an [`Instant`].
-    ///
-    /// [upkeep]: crate::Upkeep
     pub fn recent(&self) -> Instant {
         match &self.inner {
             ClockType::Mock(mock) => Instant(mock.value()),
@@ -538,26 +537,6 @@ fn mul_div_po2_u64(value: u64, numer: u64, denom: u32) -> u64 {
     v *= u128::from(numer);
     v >>= denom;
     v as u64
-}
-
-#[allow(dead_code)]
-#[cfg(all(target_arch = "x86_64", target_feature = "sse2"))]
-fn has_tsc_support() -> bool {
-    let cpuid = raw_cpuid::CpuId::new();
-    let has_invariant_tsc = cpuid
-        .get_advanced_power_mgmt_info()
-        .map_or(false, |apm| apm.has_invariant_tsc());
-    let has_rdtscp = cpuid
-        .get_extended_processor_and_feature_identifiers()
-        .map_or(false, |epf| epf.has_rdtscp());
-
-    has_invariant_tsc && has_rdtscp
-}
-
-#[allow(dead_code)]
-#[cfg(not(all(target_arch = "x86_64", target_feature = "sse2")))]
-fn has_tsc_support() -> bool {
-    false
 }
 
 #[cfg(test)]

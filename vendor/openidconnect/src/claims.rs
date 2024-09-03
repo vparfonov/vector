@@ -26,7 +26,7 @@ pub trait AdditionalClaims: Debug + DeserializeOwned + Serialize + 'static {}
 ///
 /// No additional claims.
 ///
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 // In order to support serde flatten, this must be an empty struct rather than an empty
 // tuple struct.
 pub struct EmptyAdditionalClaims {}
@@ -35,7 +35,7 @@ impl AdditionalClaims for EmptyAdditionalClaims {}
 ///
 /// Address claims.
 ///
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct AddressClaim {
     ///
     /// Full mailing address, formatted for display or use on a mailing label.
@@ -86,7 +86,7 @@ pub trait GenderClaim: Clone + Debug + DeserializeOwned + Serialize + 'static {}
 ///
 /// Standard Claims defined by OpenID Connect Core.
 ///
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct StandardClaims<GC>
 where
     GC: GenderClaim,
@@ -105,6 +105,7 @@ where
     pub(crate) email_verified: Option<bool>,
     pub(crate) gender: Option<GC>,
     pub(crate) birthday: Option<EndUserBirthday>,
+    pub(crate) birthdate: Option<EndUserBirthday>,
     pub(crate) zoneinfo: Option<EndUserTimezone>,
     pub(crate) locale: Option<LanguageTag>,
     pub(crate) phone_number: Option<EndUserPhoneNumber>,
@@ -137,6 +138,7 @@ where
             email_verified: None,
             gender: None,
             birthday: None,
+            birthdate: None,
             zoneinfo: None,
             locale: None,
             phone_number: None,
@@ -178,6 +180,7 @@ where
             set_email_verified -> email_verified[Option<bool>],
             set_gender -> gender[Option<GC>],
             set_birthday -> birthday[Option<EndUserBirthday>],
+            set_birthdate -> birthdate[Option<EndUserBirthday>],
             set_zoneinfo -> zoneinfo[Option<EndUserTimezone>],
             set_locale -> locale[Option<LanguageTag>],
             set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
@@ -210,6 +213,7 @@ where
                 | ("email_verified", None)
                 | ("gender", None)
                 | ("birthday", None)
+                | ("birthdate", None)
                 | ("zoneinfo", None)
                 | ("locale", None)
                 | ("phone_number", None)
@@ -261,6 +265,7 @@ where
                         [Option(Boolean(email_verified))]
                         [Option(gender)]
                         [Option(birthday)]
+                        [Option(birthdate)]
                         [Option(zoneinfo)]
                         [Option(locale)]
                         [Option(phone_number)]
@@ -299,6 +304,7 @@ where
                 [Option(email_verified)]
                 [Option(gender)]
                 [Option(birthday)]
+                [Option(birthdate)]
                 [Option(zoneinfo)]
                 [Option(locale)]
                 [Option(phone_number)]

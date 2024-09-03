@@ -35,18 +35,20 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
                 let pod_namespace = pod_info.namespace;
                 let container_name: String = pod_info.container_name;
 
-                counter!("component_received_events_total", 1, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone(), "container_name" => container_name.clone());
-                counter!("component_received_event_bytes_total", self.byte_size.get() as u64, "pod_name" => pod_name.clone(), "pod_namespace" => pod_namespace.clone(), "container_name" => container_name.clone());
-                counter!("events_in_total", 1, "pod_name" => pod_name, "pod_namespace" => pod_namespace, "container_name" => container_name.clone());
-            }
-            None => {
-                counter!("component_received_events_total", 1);
+                counter!("component_received_events_total",
+                    "pod_name" => pod_name.clone(),
+                    "pod_namespace" => pod_namespace.clone(),
+                    "container_name" => container_name.clone(),
+                )
+                    .increment(1);
                 counter!(
                     "component_received_event_bytes_total",
-                    "pod_name" => pod_name,
-                    "pod_namespace" => pod_namespace,
+                    "pod_name" => pod_name.clone(),
+                    "pod_namespace" => pod_namespace.clone(),
+                    "container_name" => container_name.clone(),
                 )
-                .increment(self.byte_size.get() as u64);
+                    .increment(self.byte_size.get() as u64);
+                counter!("events_in_total", "pod_name" => pod_name, "pod_namespace" => pod_namespace, "container_name" => container_name.clone()).increment(1);
             }
             None => {
                 counter!("component_received_events_total").increment(1);

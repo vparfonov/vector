@@ -31,7 +31,7 @@ bitflags! {
         /// Network name space.
         const NETWORK = CLONE_NEWNET;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -86,7 +86,7 @@ bitflags! {
         /// `CLONE_SYSVSEM`.
         const SYSVSEM = CLONE_SYSVSEM;
 
-        /// <https://docs.rs/bitflags/latest/bitflags/#externally-defined-flags>
+        /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
     }
 }
@@ -101,6 +101,7 @@ bitflags! {
 ///  - [Linux]
 ///
 /// [Linux]: https://man7.org/linux/man-pages/man2/setns.2.html
+#[doc(alias = "setns")]
 pub fn move_into_link_name_space(
     fd: BorrowedFd<'_>,
     allowed_type: Option<LinkNameSpaceType>,
@@ -118,6 +119,7 @@ pub fn move_into_link_name_space(
 ///  - [Linux]
 ///
 /// [Linux]: https://man7.org/linux/man-pages/man2/setns.2.html
+#[doc(alias = "setns")]
 pub fn move_into_thread_name_spaces(
     fd: BorrowedFd<'_>,
     allowed_types: ThreadNameSpaceType,

@@ -7,7 +7,7 @@ use crate::timezones::Tz;
 
 impl Serialize for Tz {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_str(&self.name())
+        serializer.serialize_str(self.name())
     }
 }
 
@@ -23,11 +23,19 @@ impl<'de> Deserialize<'de> for Tz {
             }
 
             fn visit_str<E: de::Error>(self, value: &str) -> Result<Tz, E> {
-                value.parse::<Tz>().map_err(|e| E::custom(e))
+                value.parse::<Tz>().map_err(|_| E::custom(SerdeError(value)))
             }
         }
 
         deserializer.deserialize_str(Visitor)
+    }
+}
+
+struct SerdeError<'a>(&'a str);
+
+impl fmt::Display for SerdeError<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "failed to parse timezone: '{}'", self.0)
     }
 }
 
@@ -47,8 +55,7 @@ mod tests {
     fn serde_de_error() {
         assert_de_tokens_error::<Tz>(
             &[Token::Str("Europe/L")],
-            "'Europe/L' is not a valid timezone",
+            "failed to parse timezone: 'Europe/L'",
         );
-        assert_de_tokens_error::<Tz>(&[Token::Str("")], "'' is not a valid timezone");
     }
 }

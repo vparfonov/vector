@@ -677,22 +677,22 @@ pub const EPOLL_CLOEXEC: ::c_int = 0x0100_0000;
 pub const EPOLL_CTL_ADD: ::c_int = 1;
 pub const EPOLL_CTL_DEL: ::c_int = 2;
 pub const EPOLL_CTL_MOD: ::c_int = 3;
-pub const EPOLLIN: ::c_int = 1;
-pub const EPOLLPRI: ::c_int = 0;
-pub const EPOLLOUT: ::c_int = 2;
-pub const EPOLLRDNORM: ::c_int = 0;
-pub const EPOLLNVAL: ::c_int = 0;
-pub const EPOLLRDBAND: ::c_int = 0;
-pub const EPOLLWRNORM: ::c_int = 0;
-pub const EPOLLWRBAND: ::c_int = 0;
-pub const EPOLLMSG: ::c_int = 0;
-pub const EPOLLERR: ::c_int = 0;
-pub const EPOLLHUP: ::c_int = 0;
-pub const EPOLLRDHUP: ::c_int = 0;
-pub const EPOLLEXCLUSIVE: ::c_int = 0;
-pub const EPOLLWAKEUP: ::c_int = 0;
-pub const EPOLLONESHOT: ::c_int = 0;
-pub const EPOLLET: ::c_int = 0;
+pub const EPOLLIN: ::c_int = 0x001;
+pub const EPOLLPRI: ::c_int = 0x002;
+pub const EPOLLOUT: ::c_int = 0x004;
+pub const EPOLLERR: ::c_int = 0x008;
+pub const EPOLLHUP: ::c_int = 0x010;
+pub const EPOLLNVAL: ::c_int = 0x020;
+pub const EPOLLRDNORM: ::c_int = 0x040;
+pub const EPOLLRDBAND: ::c_int = 0x080;
+pub const EPOLLWRNORM: ::c_int = 0x100;
+pub const EPOLLWRBAND: ::c_int = 0x200;
+pub const EPOLLMSG: ::c_int = 0x400;
+pub const EPOLLRDHUP: ::c_int = 0x2000;
+pub const EPOLLEXCLUSIVE: ::c_int = 1 << 28;
+pub const EPOLLWAKEUP: ::c_int = 1 << 29;
+pub const EPOLLONESHOT: ::c_int = 1 << 30;
+pub const EPOLLET: ::c_int = 1 << 31;
 
 // sys/stat.h
 pub const S_IFMT: ::c_int = 0o0_170_000;
@@ -1082,6 +1082,10 @@ extern "C" {
     pub fn getdtablesize() -> ::c_int;
 
     // grp.h
+    pub fn getgrent() -> *mut ::group;
+    pub fn setgrent();
+    pub fn endgrent();
+    pub fn getgrgid(gid: ::gid_t) -> *mut ::group;
     pub fn getgrgid_r(
         gid: ::gid_t,
         grp: *mut ::group,
@@ -1089,6 +1093,7 @@ extern "C" {
         buflen: ::size_t,
         result: *mut *mut ::group,
     ) -> ::c_int;
+    pub fn getgrnam(name: *const ::c_char) -> *mut ::group;
     pub fn getgrnam_r(
         name: *const ::c_char,
         grp: *mut ::group,

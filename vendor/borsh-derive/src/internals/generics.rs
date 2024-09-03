@@ -156,7 +156,7 @@ impl FindTyParams {
                 params.push(param.clone());
                 params_set.insert(param.clone());
             }
-            if associated_type_params_usage.get(param).is_some() && !params_set.contains(param) {
+            if associated_type_params_usage.contains_key(param) && !params_set.contains(param) {
                 params.push(param.clone());
                 params_set.insert(param.clone());
             }
@@ -209,6 +209,10 @@ impl FindTyParams {
             PathArguments::None => {}
             PathArguments::AngleBracketed(arguments) => {
                 for arg in &arguments.args {
+                    #[cfg_attr(
+                        feature = "force_exhaustive_checks",
+                        deny(non_exhaustive_omitted_patterns)
+                    )]
                     match arg {
                         GenericArgument::Type(arg) => self.visit_type(arg),
                         GenericArgument::AssocType(arg) => self.visit_type(&arg.ty),
@@ -216,10 +220,6 @@ impl FindTyParams {
                         | GenericArgument::Const(_)
                         | GenericArgument::AssocConst(_)
                         | GenericArgument::Constraint(_) => {}
-                        #[cfg_attr(
-                            feature = "force_exhaustive_checks",
-                            deny(non_exhaustive_omitted_patterns)
-                        )]
                         _ => {}
                     }
                 }
@@ -253,13 +253,13 @@ impl FindTyParams {
     }
 
     fn visit_type_param_bound(&mut self, bound: &TypeParamBound) {
+        #[cfg_attr(
+            feature = "force_exhaustive_checks",
+            deny(non_exhaustive_omitted_patterns)
+        )]
         match bound {
             TypeParamBound::Trait(bound) => self.visit_path(&bound.path),
             TypeParamBound::Lifetime(_) | TypeParamBound::Verbatim(_) => {}
-            #[cfg_attr(
-                feature = "force_exhaustive_checks",
-                deny(non_exhaustive_omitted_patterns)
-            )]
             _ => {}
         }
     }
@@ -272,6 +272,10 @@ impl FindTyParams {
     fn visit_macro(&mut self, _mac: &Macro) {}
 
     fn visit_type(&mut self, ty: &Type) {
+        #[cfg_attr(
+            feature = "force_exhaustive_checks",
+            deny(non_exhaustive_omitted_patterns)
+        )]
         match ty {
             Type::Array(ty) => self.visit_type(&ty.elem),
             Type::BareFn(ty) => {
@@ -310,10 +314,6 @@ impl FindTyParams {
 
             Type::Infer(_) | Type::Never(_) | Type::Verbatim(_) => {}
 
-            #[cfg_attr(
-                feature = "force_exhaustive_checks",
-                deny(non_exhaustive_omitted_patterns)
-            )]
             _ => {}
         }
     }

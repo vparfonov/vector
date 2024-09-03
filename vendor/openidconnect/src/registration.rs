@@ -37,7 +37,7 @@ pub trait AdditionalClientMetadata: Debug + DeserializeOwned + Serialize {}
 ///
 /// Empty (default) extra [`ClientMetadata`] fields.
 ///
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct EmptyAdditionalClientMetadata {}
 impl AdditionalClientMetadata for EmptyAdditionalClientMetadata {}
 
@@ -661,7 +661,7 @@ pub trait AdditionalClientRegistrationResponse: Debug + DeserializeOwned + Seria
 ///
 /// Empty (default) extra [`ClientRegistrationResponse`] fields.
 ///
-#[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Default, Deserialize, PartialEq, Eq, Serialize)]
 pub struct EmptyAdditionalClientRegistrationResponse {}
 impl AdditionalClientRegistrationResponse for EmptyAdditionalClientRegistrationResponse {}
 
@@ -1280,11 +1280,15 @@ mod tests {
         );
         assert_eq!(
             registration_response.client_id_issued_at().unwrap(),
-            Utc.timestamp(1523953306, 0)
+            Utc.timestamp_opt(1523953306, 0)
+                .single()
+                .expect("valid timestamp")
         );
         assert_eq!(
             registration_response.client_secret_expires_at().unwrap(),
-            Utc.timestamp(1526545306, 0)
+            Utc.timestamp_opt(1526545306, 0)
+                .single()
+                .expect("valid timestamp")
         );
         assert_eq!(
             *registration_response.redirect_uris(),

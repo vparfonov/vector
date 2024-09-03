@@ -46,3 +46,40 @@ pub(crate) fn get_port_equivalents(mtype: u16, mcode: u16) -> (u16, u16, bool) {
         Err(_) => return (mtype, mcode, true),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::net::Ipv4Addr;
+
+    use crate::calculate_community_id;
+
+    #[test]
+    fn test_icmp_with_ports() {
+        let id = calculate_community_id(
+            0,
+            Ipv4Addr::new(10, 10, 10, 10).into(),
+            Ipv4Addr::new(10, 10, 10, 10).into(),
+            Some(0),
+            Some(8),
+            1,
+            Default::default(),
+        );
+
+        assert_eq!("1:4MHSMLtBw+4q7Wke3ztBRVwtgt0=", id.unwrap());
+    }
+
+    #[test]
+    fn test_icmp_without_ports() {
+        let id = calculate_community_id(
+            0,
+            Ipv4Addr::new(10, 10, 10, 10).into(),
+            Ipv4Addr::new(10, 10, 10, 10).into(),
+            None,
+            None,
+            1,
+            Default::default(),
+        );
+
+        assert_eq!("1:4MHSMLtBw+4q7Wke3ztBRVwtgt0=", id.unwrap());
+    }
+}

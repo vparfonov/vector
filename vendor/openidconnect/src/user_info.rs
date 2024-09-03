@@ -41,6 +41,7 @@ where
     pub(super) access_token: AccessToken,
     pub(super) require_signed_response: bool,
     pub(super) signed_response_verifier: UserInfoVerifier<'static, JE, JS, JT, JU, K>,
+    pub(super) response_type: UserInfoResponseType,
 }
 impl<'a, JE, JS, JT, JU, K> UserInfoRequest<'a, JE, JS, JT, JU, K>
 where
@@ -94,11 +95,15 @@ where
 
     fn prepare_request(&self) -> HttpRequest {
         let (auth_header, auth_value) = auth_bearer(&self.access_token);
+        let accept_value = match self.response_type {
+            UserInfoResponseType::Jwt => MIME_TYPE_JWT,
+            _ => MIME_TYPE_JSON,
+        };
         HttpRequest {
             url: self.url.url().clone(),
             method: Method::GET,
             headers: vec![
-                (ACCEPT, HeaderValue::from_static(MIME_TYPE_JSON)),
+                (ACCEPT, HeaderValue::from_static(accept_value)),
                 (auth_header, auth_value),
             ]
             .into_iter()
@@ -191,6 +196,14 @@ where
         self.signed_response_verifier = self
             .signed_response_verifier
             .require_audience_match(aud_required);
+        self
+    }
+
+    ///
+    /// Specifies the expected response type by setting the `Accept` header. Note that the server can ignore this header.
+    ///
+    pub fn set_response_type(mut self, response_type: UserInfoResponseType) -> Self {
+        self.response_type = response_type;
         self
     }
 }
@@ -291,6 +304,7 @@ where
             set_email_verified -> email_verified[Option<bool>],
             set_gender -> gender[Option<GC>],
             set_birthday -> birthday[Option<EndUserBirthday>],
+            set_birthdate -> birthdate[Option<EndUserBirthday>],
             set_zoneinfo -> zoneinfo[Option<EndUserTimezone>],
             set_locale -> locale[Option<LanguageTag>],
             set_phone_number -> phone_number[Option<EndUserPhoneNumber>],
@@ -444,6 +458,24 @@ new_url_type![
 ];
 
 ///
+/// Indicates via the `Accept` header the body response type the server should use to return the user info. Note that the server can ignore this header.
+///
+/// Defaults to Json.
+///
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub enum UserInfoResponseType {
+    ///
+    /// Sets the `Accept` header to `application/json`.
+    ///
+    Json,
+    ///
+    /// Sets the `Accept` header to `application/jwt`.
+    ///
+    Jwt,
+}
+
+///
 /// Error retrieving user info.
 ///
 #[derive(Debug, Error)]
@@ -496,7 +528,7 @@ mod tests {
     #[test]
     fn test_additional_claims() {
         let claims = UserInfoClaims::<TestClaims, CoreGenderClaim>::from_json::<
-            crate::reqwest::HttpClientError,
+            crate::reqwest::AsyncHttpClientError,
         >(
             "{
                 \"iss\": \"https://server.example.com\",
@@ -519,15 +551,18 @@ mod tests {
              }",
         );
 
-        UserInfoClaims::<TestClaims, CoreGenderClaim>::from_json::<crate::reqwest::HttpClientError>(
+        UserInfoClaims::<TestClaims, CoreGenderClaim>::from_json::<
+            crate::reqwest::AsyncHttpClientError,
+        >(
             "{
                 \"iss\": \"https://server.example.com\",
                 \"sub\": \"24400320\",
                 \"aud\": [\"s6BhdRkqt3\"]
-            }".as_bytes(),
+            }"
+            .as_bytes(),
             None,
         )
-            .expect_err("missing claim should fail to deserialize");
+        .expect_err("missing claim should fail to deserialize");
     }
 
     #[derive(Debug, Deserialize, Serialize)]
@@ -537,7 +572,7 @@ mod tests {
     #[test]
     fn test_catch_all_additional_claims() {
         let claims = UserInfoClaims::<AllOtherClaims, CoreGenderClaim>::from_json::<
-            crate::reqwest::HttpClientError,
+            crate::reqwest::AsyncHttpClientError,
         >(
             "{
                 \"iss\": \"https://server.example.com\",

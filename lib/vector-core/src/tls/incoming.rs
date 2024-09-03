@@ -40,8 +40,8 @@ impl TlsSettings {
                 } else {
                     SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).context(CreateAcceptorSnafu)?
                 };
-                self.apply_context(&mut acceptor)?;
-                return Ok(acceptor.build())
+                self.apply_context_base(&mut acceptor, true)?;
+                Ok(acceptor.build())
             }
         }
     }

@@ -11,7 +11,9 @@ use crate::{
 #[cfg(feature = "alloc")]
 use crate::{Utf16String, Utf32String};
 #[cfg(feature = "alloc")]
+#[allow(unused_imports)]
 use alloc::{borrow::Cow, boxed::Box, string::String};
+#[allow(unused_imports)]
 use core::{
     convert::{AsMut, AsRef, TryFrom},
     fmt::Write,

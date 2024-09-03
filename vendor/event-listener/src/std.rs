@@ -44,6 +44,16 @@ impl<T> List<T> {
             notified: 0,
         }))
     }
+
+    /// Get the total number of listeners without blocking.
+    pub(crate) fn try_total_listeners(&self) -> Option<usize> {
+        self.0.try_lock().ok().map(|list| list.len)
+    }
+
+    /// Get the total number of listeners with blocking.
+    pub(crate) fn total_listeners(&self) -> usize {
+        self.0.lock().unwrap_or_else(|e| e.into_inner()).len
+    }
 }
 
 impl<T> crate::Inner<T> {
@@ -54,41 +64,31 @@ impl<T> crate::Inner<T> {
         }
     }
 
-    /// Whether or not this number of listeners would lead to a notification.
-    pub(crate) fn needs_notification(&self, limit: usize) -> bool {
-        self.notified.load(Ordering::Acquire) < limit
-    }
-
     /// Add a new listener to the list.
-    ///
-    /// Does nothing is the listener is already registered.
     pub(crate) fn insert(&self, mut listener: Pin<&mut Option<Listener<T>>>) {
         let mut inner = self.lock();
 
-        // SAFETY: We are locked, so we can access the inner `link`.
-        let entry = unsafe {
-            if listener.is_some() {
-                return;
-            }
-            listener.as_mut().set(Some(Listener {
-                link: UnsafeCell::new(Link {
-                    state: Cell::new(State::Created),
-                    prev: Cell::new(inner.tail),
-                    next: Cell::new(None),
-                }),
-                _pin: PhantomPinned,
-            }));
-            let listener = listener.as_pin_mut().unwrap();
+        listener.as_mut().set(Some(Listener {
+            link: UnsafeCell::new(Link {
+                state: Cell::new(State::Created),
+                prev: Cell::new(inner.tail),
+                next: Cell::new(None),
+            }),
+            _pin: PhantomPinned,
+        }));
+        let listener = listener.as_pin_mut().unwrap();
 
-            // Get the inner pointer.
-            &*listener.link.get()
-        };
+        {
+            let entry_guard = listener.link.get();
+            // SAFETY: We are locked, so we can access the inner `link`.
+            let entry = unsafe { entry_guard.deref() };
 
-        // Replace the tail with the new entry.
-        match mem::replace(&mut inner.tail, Some(entry.into())) {
-            None => inner.head = Some(entry.into()),
-            Some(t) => unsafe { t.as_ref().next.set(Some(entry.into())) },
-        };
+            // Replace the tail with the new entry.
+            match mem::replace(&mut inner.tail, Some(entry.into())) {
+                None => inner.head = Some(entry.into()),
+                Some(t) => unsafe { t.as_ref().next.set(Some(entry.into())) },
+            };
+        }
 
         // If there are no unnotified entries, this is the first one.
         if inner.next.is_none() {
@@ -124,15 +124,12 @@ impl<T> crate::Inner<T> {
         task: TaskRef<'_>,
     ) -> RegisterResult<T> {
         let mut inner = self.lock();
-
-        // SAFETY: We are locked, so we can access the inner `link`.
-        let entry = unsafe {
-            let listener = match listener.as_mut().as_pin_mut() {
-                Some(listener) => listener,
-                None => return RegisterResult::NeverInserted,
-            };
-            &*listener.link.get()
+        let entry_guard = match listener.as_mut().as_pin_mut() {
+            Some(listener) => listener.link.get(),
+            None => return RegisterResult::NeverInserted,
         };
+        // SAFETY: We are locked, so we can access the inner `link`.
+        let entry = unsafe { entry_guard.deref() };
 
         // Take out the state and check it.
         match entry.state.replace(State::NotifiedTaken) {
@@ -170,12 +167,8 @@ impl<T> Inner<T> {
         mut listener: Pin<&mut Option<Listener<T>>>,
         propagate: bool,
     ) -> Option<State<T>> {
-        let entry = unsafe {
-            let listener = listener.as_mut().as_pin_mut()?;
-
-            // Get the inner pointer.
-            &*listener.link.get()
-        };
+        let entry_guard = listener.as_mut().as_pin_mut()?.link.get();
+        let entry = unsafe { entry_guard.deref() };
 
         let prev = entry.prev.get();
         let next = entry.next.get();
@@ -211,7 +204,11 @@ impl<T> Inner<T> {
                 .into_inner()
         };
 
-        let mut state = entry.state.into_inner();
+        // This State::Created is immediately dropped and exists as a workaround for the absence of
+        // loom::cell::Cell::into_inner. The intent is `let mut state = entry.state.into_inner();`
+        //
+        // refs: https://github.com/tokio-rs/loom/pull/341
+        let mut state = entry.state.replace(State::Created);
 
         // Update the notified count.
         if state.is_notified() {
@@ -304,7 +301,7 @@ impl<T> Drop for ListLock<'_, '_, T> {
         let notified = if list.notified < list.len {
             list.notified
         } else {
-            core::usize::MAX
+            usize::MAX
         };
 
         self.inner.notified.store(notified, Ordering::Release);

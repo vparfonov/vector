@@ -59,14 +59,23 @@
 //! Histograms take floating-point 64-bit numbers.
 //!
 //! ## Emission
-//! Metrics are emitted by utilizing the registration or emission macros.  There is a macro for
-//! registering and emitting each fundamental metric type:
-//! - [`register_counter!`], [`counter!`], and [`increment_counter!`] for counters
-//! - [`register_gauge!`], [`gauge!`], [`increment_gauge!`], and [`decrement_gauge!`] for gauges
-//! - [`register_histogram!`] and [`histogram!`] for histograms
+//!
+//! Metrics are emitted by utilizing the emission methods.  There is a macro for
+//! registering and returning a handle for each fundamental metric type:
+//!
+//! - [`counter!`] returns the [`Counter`] handle then
+//!     - [`Counter::increment`] increments the counter.
+//!     - [`Counter::absolute`] sets the counter.
+//! - [`gauge!`] returns the [`Gauge`] handle then
+//!     - [`Gauge::increment`] increments the gauge.
+//!     - [`Gauge::decrement`] decrements the gauge.
+//!     - [`Gauge::set`] sets the gauge.
+//! - [`histogram!`] for histograms then
+//!     - [`Histogram::record`] records a data point.
 //!
 //! Additionally, metrics can be described -- setting either the unit of measure or long-form
 //! description -- by using the `describe_*` macros:
+//!
 //! - [`describe_counter!`] for counters
 //! - [`describe_gauge!`] for gauges
 //! - [`describe_histogram!`] for histograms
@@ -115,8 +124,8 @@
 //!     let row_count = run_query(query);
 //!     let delta = start.elapsed();
 //!
-//!     histogram!("process.query_time", delta);
-//!     counter!("process.query_row_count", row_count);
+//!     histogram!("process.query_time").record(delta);
+//!     counter!("process.query_row_count").increment(row_count);
 //!
 //!     row_count
 //! }
@@ -148,25 +157,11 @@
 //!
 //! # Development
 //!
-//! The primary interface with `metrics` is through the [`Recorder`] trait, so we'll show examples
-//! below of the trait and implementation notes.
+//! The primary interface with `metrics` is through the [`Recorder`] trait, which is the connection
+//! between the user-facing emission macros -- `counter!`, and so on -- and the actual logic for
+//! handling those metrics and doing something with them, like logging them to the console or
+//! sending them to a remote metrics system.
 //!
-//! ## Installing a basic recorder
-//!
-//! Here's a basic example which writes metrics in text form via the `log` crate.
-//!
-//! ```no_run
-//! # use metrics::{SetRecorderError, NoopRecorder as LogRecorder};
-//! // Recorders are installed by calling the [`set_recorder`] function.  Recorders should provide a
-//! // function that wraps the creation and installation of the recorder:
-//!
-//! static RECORDER: LogRecorder = LogRecorder;
-//!
-//! pub fn init() -> Result<(), SetRecorderError> {
-//!     metrics::set_recorder(&RECORDER)
-//! }
-//! # fn main() {}
-//! ```
 //! ## Keys
 //!
 //! All metrics are, in essence, the combination of a metric type and metric identifier, such as a
@@ -234,17 +229,37 @@
 //!
 //! ## Installing recorders
 //!
-//! In order to actually use an exporter, it must be installed as the "global" recorder.  This is a
-//! static recorder that the registration and emission macros refer to behind-the-scenes.  `metrics`
-//! provides a few methods to do so: [`set_recorder`] and [`set_boxed_recorder`].
+//! Recorders, also referred to as exporters, must be "installed" such that the emission macros can
+//! access them. As users of `metrics`, you'll typically see exporters provide methods to install
+//! themselves that hide the nitty gritty details.  These methods will usually be aptly named, such
+//! as `install`.
 //!
-//! Primarily, you'll use [`set_boxed_recorder`] to pass a boxed version of the exporter to be
-//! installed.  This is due to the fact that most exporters won't be able to be constructed
-//! statically.  If you could construct your exporter statically, though, then you could instead
-//! choose [`set_recorder`].
+//! However, at a low level, this can happen in one of two ways: installing a recorder globally, or
+//! temporarily using it locally.
 //!
-//! As users of `metrics`, you'll typically see exporters provide methods to install themselves that
-//! hide the nitty gritty details.  These methods will usually be aptly named, such as `install`.
+//! ### Global recorder
+//!
+//! The global recorder is the recorder that the macros use by default. It is stored in a static
+//! variable accessible by all portions of the compiled application, including dependencies. This is
+//! what allows us to provide the same "initialize once, benefit everywhere" behavior that users are
+//! familiar with from other telemetry crates like `tracing` and `log`.
+//!
+//! Only one global recorder can be installed in the lifetime of the process. If a global recorder
+//! has already been installed, it cannot be replaced: this is due to the fact that once installed,
+//! the recorder is "leaked" so that a static reference can be obtained to it and used by subsequent
+//! calls to the emission macros, and any downstream crates.
+//!
+//! ### Local recorder
+//!
+//! In many scenarios, such as in unit tests, you may wish to temporarily set a recorder to
+//! influence all calls to the emission macros within a specific section of code, without
+//! influencing other areas of the code, or being limited by the constraints of only one global
+//! recorder being allowed.
+//!
+//! [`with_local_recorder`] allows you to do this by changing the recorder used by the emission macros for
+//! the duration of a given closure. While in that closure, the given recorder will act as if it was
+//! the global recorder for the current thread. Once the closure returns, the true global recorder
+//! takes priority again for the current thread.
 //!
 //! [metrics-exporter-tcp]: https://docs.rs/metrics-exporter-tcp
 //! [metrics-exporter-prometheus]: https://docs.rs/metrics-exporter-prometheus
@@ -257,6 +272,7 @@
 pub mod atomics;
 
 mod common;
+mod macros;
 pub use self::common::*;
 
 mod cow;
@@ -270,528 +286,8 @@ pub use self::key::*;
 mod label;
 pub use self::label::*;
 
+mod metadata;
+pub use self::metadata::*;
+
 mod recorder;
 pub use self::recorder::*;
-
-/// Describes a counter.
-///
-/// Counters represent a single monotonic value, which means the value can only be incremented, not
-/// decremented, and always starts out with an initial value of zero.
-///
-/// Metrics can be described with a free-form string, and optionally, a unit can be provided to
-/// describe the value and/or rate of the metric measurements.  Whether or not the installed
-/// recorder does anything with the description, or optional unit, is implementation defined.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::describe_counter;
-/// # use metrics::Unit;
-/// # fn main() {
-/// // A basic counter:
-/// describe_counter!("some_metric_name", "my favorite counter");
-///
-/// // Providing a unit for a counter:
-/// describe_counter!("some_metric_name", Unit::Bytes, "my favorite counter");
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// describe_counter!(name, "my favorite counter");
-///
-/// describe_counter!(format!("{}_via_format", "name"), "my favorite counter");
-/// # }
-/// ```
-pub use metrics_macros::describe_counter;
-
-/// Describes a gauge.
-///
-/// Gauges represent a single value that can go up or down over time, and always starts out with an
-/// initial value of zero.
-///
-/// Metrics can be described with a free-form string, and optionally, a unit can be provided to
-/// describe the value and/or rate of the metric measurements.  Whether or not the installed
-/// recorder does anything with the description, or optional unit, is implementation defined.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::describe_gauge;
-/// # use metrics::Unit;
-/// # fn main() {
-/// // A basic gauge:
-/// describe_gauge!("some_metric_name", "my favorite gauge");
-///
-/// // Providing a unit for a gauge:
-/// describe_gauge!("some_metric_name", Unit::Bytes, "my favorite gauge");
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// describe_gauge!(name, "my favorite gauge");
-///
-/// describe_gauge!(format!("{}_via_format", "name"), "my favorite gauge");
-/// # }
-/// ```
-pub use metrics_macros::describe_gauge;
-
-/// Describes a histogram.
-///
-/// Histograms measure the distribution of values for a given set of measurements, and start with no
-/// initial values.
-///
-/// Metrics can be described with a free-form string, and optionally, a unit can be provided to
-/// describe the value and/or rate of the metric measurements.  Whether or not the installed
-/// recorder does anything with the description, or optional unit, is implementation defined.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::describe_histogram;
-/// # use metrics::Unit;
-/// # fn main() {
-/// // A basic histogram:
-/// describe_histogram!("some_metric_name", "my favorite histogram");
-///
-/// // Providing a unit for a histogram:
-/// describe_histogram!("some_metric_name", Unit::Bytes, "my favorite histogram");
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// describe_histogram!(name, "my favorite histogram");
-///
-/// describe_histogram!(format!("{}_via_format", "name"), "my favorite histogram");
-/// # }
-/// ```
-pub use metrics_macros::describe_histogram;
-
-/// Registers a counter.
-///
-/// Counters represent a single monotonic value, which means the value can only be incremented, not
-/// decremented, and always starts out with an initial value of zero.
-///
-/// Metrics can be registered, which provides a handle to directly update that metric.  For
-/// counters, [`Counter`] is provided which can be incremented or set to an absolute value.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::register_counter;
-/// # fn main() {
-/// // A basic counter:
-/// let counter = register_counter!("some_metric_name");
-/// counter.increment(1);
-///
-/// // Specifying labels inline, including using constants for either the key or value:
-/// let counter = register_counter!("some_metric_name", "service" => "http");
-/// counter.absolute(42);
-///
-/// const SERVICE_LABEL: &'static str = "service";
-/// const SERVICE_HTTP: &'static str = "http";
-/// let counter = register_counter!("some_metric_name", SERVICE_LABEL => SERVICE_HTTP);
-/// counter.increment(123);
-///
-/// // We can also pass labels by giving a vector or slice of key/value pairs.  In this scenario,
-/// // a unit or description can still be passed in their respective positions:
-/// let dynamic_val = "woo";
-/// let labels = [("dynamic_key", format!("{}!", dynamic_val))];
-/// let counter = register_counter!("some_metric_name", &labels);
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// let counter = register_counter!(name);
-///
-/// let counter = register_counter!(format!("{}_via_format", "name"));
-/// # }
-/// ```
-pub use metrics_macros::register_counter;
-
-/// Registers a gauge.
-///
-/// Gauges represent a single value that can go up or down over time, and always starts out with an
-/// initial value of zero.
-///
-/// Metrics can be registered, which provides a handle to directly update that metric.  For gauges,
-/// [`Gauge`] is provided which can be incremented, decrement, or set to an absolute value.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::register_gauge;
-/// # fn main() {
-/// // A basic gauge:
-/// let gauge = register_gauge!("some_metric_name");
-/// gauge.increment(1.0);
-///
-/// // Specifying labels inline, including using constants for either the key or value:
-/// let gauge = register_gauge!("some_metric_name", "service" => "http");
-/// gauge.decrement(42.0);
-///
-/// const SERVICE_LABEL: &'static str = "service";
-/// const SERVICE_HTTP: &'static str = "http";
-/// let gauge = register_gauge!("some_metric_name", SERVICE_LABEL => SERVICE_HTTP);
-/// gauge.increment(3.14);
-///
-/// // We can also pass labels by giving a vector or slice of key/value pairs.  In this scenario,
-/// // a unit or description can still be passed in their respective positions:
-/// let dynamic_val = "woo";
-/// let labels = [("dynamic_key", format!("{}!", dynamic_val))];
-/// let gauge = register_gauge!("some_metric_name", &labels);
-/// gauge.set(1337.0);
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// let gauge = register_gauge!(name);
-///
-/// let gauge = register_gauge!(format!("{}_via_format", "name"));
-/// # }
-/// ```
-pub use metrics_macros::register_gauge;
-
-/// Registers a histogram.
-///
-/// Histograms measure the distribution of values for a given set of measurements, and start with no
-/// initial values.
-///
-/// Metrics can be registered, which provides a handle to directly update that metric.  For
-/// histograms, [`Histogram`] is provided which can record values.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::register_histogram;
-/// # fn main() {
-/// // A basic histogram:
-/// let histogram = register_histogram!("some_metric_name");
-/// histogram.record(1.0);
-///
-/// // Specifying labels inline, including using constants for either the key or value:
-/// let histogram = register_histogram!("some_metric_name", "service" => "http");
-///
-/// const SERVICE_LABEL: &'static str = "service";
-/// const SERVICE_HTTP: &'static str = "http";
-/// let histogram = register_histogram!("some_metric_name", SERVICE_LABEL => SERVICE_HTTP);
-///
-/// // We can also pass labels by giving a vector or slice of key/value pairs.  In this scenario,
-/// // a unit or description can still be passed in their respective positions:
-/// let dynamic_val = "woo";
-/// let labels = [("dynamic_key", format!("{}!", dynamic_val))];
-/// let histogram = register_histogram!("some_metric_name", &labels);
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// let histogram = register_histogram!(name);
-///
-/// let histogram = register_histogram!(format!("{}_via_format", "name"));
-/// # }
-/// ```
-pub use metrics_macros::register_histogram;
-
-/// Increments a counter.
-///
-/// Counters represent a single monotonic value, which means the value can only be incremented, not
-/// decremented, and always starts out with an initial value of zero.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::counter;
-/// # fn main() {
-/// // A basic counter:
-/// counter!("some_metric_name", 12);
-///
-/// // Specifying labels inline, including using constants for either the key or value:
-/// counter!("some_metric_name", 12, "service" => "http");
-///
-/// const SERVICE_LABEL: &'static str = "service";
-/// const SERVICE_HTTP: &'static str = "http";
-/// counter!("some_metric_name", 12, SERVICE_LABEL => SERVICE_HTTP);
-///
-/// // We can also pass labels by giving a vector or slice of key/value pairs:
-/// let dynamic_val = "woo";
-/// let labels = [("dynamic_key", format!("{}!", dynamic_val))];
-/// counter!("some_metric_name", 12, &labels);
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// counter!(name, 12);
-///
-/// counter!(format!("{}_via_format", "name"), 12);
-/// # }
-/// ```
-pub use metrics_macros::counter;
-
-/// Increments a counter by one.
-///
-/// Counters represent a single monotonic value, which means the value can only be incremented, not
-/// decremented, and always starts out with an initial value of zero.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::increment_counter;
-/// # fn main() {
-/// // A basic increment:
-/// increment_counter!("some_metric_name");
-///
-/// // Specifying labels inline, including using constants for either the key or value:
-/// increment_counter!("some_metric_name", "service" => "http");
-///
-/// const SERVICE_LABEL: &'static str = "service";
-/// const SERVICE_HTTP: &'static str = "http";
-/// increment_counter!("some_metric_name", SERVICE_LABEL => SERVICE_HTTP);
-///
-/// // We can also pass labels by giving a vector or slice of key/value pairs:
-/// let dynamic_val = "woo";
-/// let labels = [("dynamic_key", format!("{}!", dynamic_val))];
-/// increment_counter!("some_metric_name", &labels);
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// increment_counter!(name);
-///
-/// increment_counter!(format!("{}_via_format", "name"));
-/// # }
-/// ```
-pub use metrics_macros::increment_counter;
-
-/// Sets a counter to an absolute value.
-///
-/// Counters represent a single monotonic value, which means the value can only be incremented, not
-/// decremented, and will always start out with an initial value of zero.
-///
-/// Using this macro, users can specify an absolute value for the counter instead of the typical
-/// delta.  This can be useful when dealing with forwarding metrics from an external system into the
-/// normal application metrics, without having to track the delta of the metrics from the external
-/// system.  Users should beware, though, that implementations will enforce the monotonicity
-/// property of counters by refusing to update the value unless it is greater than current value of
-/// the counter.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::absolute_counter;
-/// # fn main() {
-/// // A basic counter:
-/// absolute_counter!("some_metric_name", 12);
-///
-/// // Specifying labels inline, including using constants for either the key or value:
-/// absolute_counter!("some_metric_name", 13, "service" => "http");
-///
-/// const SERVICE_LABEL: &'static str = "service";
-/// const SERVICE_HTTP: &'static str = "http";
-/// absolute_counter!("some_metric_name", 13, SERVICE_LABEL => SERVICE_HTTP);
-///
-/// // We can also pass labels by giving a vector or slice of key/value pairs:
-/// let dynamic_val = "woo";
-/// let labels = [("dynamic_key", format!("{}!", dynamic_val))];
-/// absolute_counter!("some_metric_name", 14, &labels);
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// absolute_counter!(name, 15);
-///
-/// absolute_counter!(format!("{}_via_format", "name"), 16);
-/// # }
-/// ```
-pub use metrics_macros::absolute_counter;
-
-/// Updates a gauge.
-///
-/// Gauges represent a single value that can go up or down over time, and always starts out with an
-/// initial value of zero.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::gauge;
-/// # fn main() {
-/// // A basic gauge:
-/// gauge!("some_metric_name", 42.2222);
-///
-/// // Specifying labels inline, including using constants for either the key or value:
-/// gauge!("some_metric_name", 66.6666, "service" => "http");
-///
-/// const SERVICE_LABEL: &'static str = "service";
-/// const SERVICE_HTTP: &'static str = "http";
-/// gauge!("some_metric_name", 66.6666, SERVICE_LABEL => SERVICE_HTTP);
-///
-/// // We can also pass labels by giving a vector or slice of key/value pairs:
-/// let dynamic_val = "woo";
-/// let labels = [("dynamic_key", format!("{}!", dynamic_val))];
-/// gauge!("some_metric_name", 42.42, &labels);
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// gauge!(name, 800.85);
-///
-/// gauge!(format!("{}_via_format", "name"), 3.14);
-/// # }
-/// ```
-pub use metrics_macros::gauge;
-
-/// Increments a gauge.
-///
-/// Gauges represent a single value that can go up or down over time, and always starts out with an
-/// initial value of zero.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::increment_gauge;
-/// # fn main() {
-/// // A basic gauge:
-/// increment_gauge!("some_metric_name", 42.2222);
-///
-/// // Specifying labels inline, including using constants for either the key or value:
-/// increment_gauge!("some_metric_name", 66.6666, "service" => "http");
-///
-/// const SERVICE_LABEL: &'static str = "service";
-/// const SERVICE_HTTP: &'static str = "http";
-/// increment_gauge!("some_metric_name", 66.6666, SERVICE_LABEL => SERVICE_HTTP);
-///
-/// // We can also pass labels by giving a vector or slice of key/value pairs:
-/// let dynamic_val = "woo";
-/// let labels = [("dynamic_key", format!("{}!", dynamic_val))];
-/// increment_gauge!("some_metric_name", 42.42, &labels);
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// increment_gauge!(name, 800.85);
-///
-/// increment_gauge!(format!("{}_via_format", "name"), 3.14);
-/// # }
-/// ```
-pub use metrics_macros::increment_gauge;
-
-/// Decrements a gauge.
-///
-/// Gauges represent a single value that can go up or down over time, and always starts out with an
-/// initial value of zero.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::decrement_gauge;
-/// # fn main() {
-/// // A basic gauge:
-/// decrement_gauge!("some_metric_name", 42.2222);
-///
-/// // Specifying labels inline, including using constants for either the key or value:
-/// decrement_gauge!("some_metric_name", 66.6666, "service" => "http");
-///
-/// const SERVICE_LABEL: &'static str = "service";
-/// const SERVICE_HTTP: &'static str = "http";
-/// decrement_gauge!("some_metric_name", 66.6666, SERVICE_LABEL => SERVICE_HTTP);
-///
-/// // We can also pass labels by giving a vector or slice of key/value pairs:
-/// let dynamic_val = "woo";
-/// let labels = [("dynamic_key", format!("{}!", dynamic_val))];
-/// decrement_gauge!("some_metric_name", 42.42, &labels);
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// decrement_gauge!(name, 800.85);
-///
-/// decrement_gauge!(format!("{}_via_format", "name"), 3.14);
-/// # }
-/// ```
-pub use metrics_macros::decrement_gauge;
-
-/// Records a histogram.
-///
-/// Histograms measure the distribution of values for a given set of measurements, and start with no
-/// initial values.
-///
-/// # Implicit conversions
-/// Histograms are represented as `f64` values, but often come from another source, such as a time
-/// measurement.  By default, `histogram!` will accept a `f64` directly or a
-/// [`Duration`](std::time::Duration), which uses the floating-point number of seconds represents by
-/// the duration.
-///
-/// External libraries and applications can create their own conversions by implementing the
-/// [`IntoF64`] trait for their types, which is required for the value being passed to `histogram!`.
-///
-/// Metric names are shown below using string literals, but they can also be owned `String` values,
-/// which includes using macros such as `format!` directly at the callsite. String literals are
-/// preferred for performance where possible.
-///
-/// # Example
-/// ```
-/// # use metrics::histogram;
-/// # use std::time::Duration;
-/// # fn main() {
-/// // A basic histogram:
-/// histogram!("some_metric_name", 34.3);
-///
-/// // An implicit conversion from `Duration`:
-/// let d = Duration::from_millis(17);
-/// histogram!("some_metric_name", d);
-///
-/// // Specifying labels inline, including using constants for either the key or value:
-/// histogram!("some_metric_name", 38.0, "service" => "http");
-///
-/// const SERVICE_LABEL: &'static str = "service";
-/// const SERVICE_HTTP: &'static str = "http";
-/// histogram!("some_metric_name", 38.0, SERVICE_LABEL => SERVICE_HTTP);
-///
-/// // We can also pass labels by giving a vector or slice of key/value pairs:
-/// let dynamic_val = "woo";
-/// let labels = [("dynamic_key", format!("{}!", dynamic_val))];
-/// histogram!("some_metric_name", 1337.5, &labels);
-///
-/// // As mentioned in the documentation, metric names also can be owned strings, including ones
-/// // generated at the callsite via things like `format!`:
-/// let name = String::from("some_owned_metric_name");
-/// histogram!(name, 800.85);
-///
-/// histogram!(format!("{}_via_format", "name"), 3.14);
-/// # }
-/// ```
-pub use metrics_macros::histogram;

@@ -1,5 +1,4 @@
 use std::cell::RefCell;
-use std::convert::TryInto;
 use std::os::raw::c_void;
 use std::rc::Rc;
 use std::result::Result as StdResult;
@@ -134,9 +133,7 @@ impl<'lua, 'de> serde::Deserializer<'de> for Deserializer<'lua> {
             Value::Nil => visitor.visit_unit(),
             Value::Boolean(b) => visitor.visit_bool(b),
             #[allow(clippy::useless_conversion)]
-            Value::Integer(i) => {
-                visitor.visit_i64(i.try_into().expect("cannot convert lua_Integer to i64"))
-            }
+            Value::Integer(i) => visitor.visit_i64(i.into()),
             #[allow(clippy::useless_conversion)]
             Value::Number(n) => visitor.visit_f64(n.into()),
             #[cfg(feature = "luau")]
@@ -151,6 +148,14 @@ impl<'lua, 'de> serde::Deserializer<'de> for Deserializer<'lua> {
             Value::UserData(ud) if ud.is_serializable() => {
                 serde_userdata(ud, |value| value.deserialize_any(visitor))
             }
+            #[cfg(feature = "luau")]
+            Value::UserData(ud) if ud.1 == crate::types::SubtypeId::Buffer => unsafe {
+                let mut size = 0usize;
+                let buf = ffi::lua_tobuffer(ud.0.lua.ref_thread(), ud.0.index, &mut size);
+                mlua_assert!(!buf.is_null(), "invalid Luau buffer");
+                let buf = std::slice::from_raw_parts(buf as *const u8, size);
+                visitor.visit_bytes(buf)
+            },
             Value::Function(_)
             | Value::Thread(_)
             | Value::UserData(_)
@@ -655,14 +660,14 @@ impl<'lua, 'de> de::VariantAccess<'de> for VariantDeserializer<'lua> {
 
 // Adds `ptr` to the `visited` map and removes on drop
 // Used to track recursive tables but allow to traverse same tables multiple times
-struct RecursionGuard {
+pub(crate) struct RecursionGuard {
     ptr: *const c_void,
     visited: Rc<RefCell<FxHashSet<*const c_void>>>,
 }
 
 impl RecursionGuard {
     #[inline]
-    fn new(table: &Table, visited: &Rc<RefCell<FxHashSet<*const c_void>>>) -> Self {
+    pub(crate) fn new(table: &Table, visited: &Rc<RefCell<FxHashSet<*const c_void>>>) -> Self {
         let visited = Rc::clone(visited);
         let ptr = table.to_pointer();
         visited.borrow_mut().insert(ptr);

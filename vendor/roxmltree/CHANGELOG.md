@@ -5,6 +5,17 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+
+## [0.20.0] - 2024-05-23
+### Added
+- `Attribute::range`, `Attribute::range_qname`, `Attribute::range_value`.
+  Thanks to [@Jayonas](https://github.com/Jayonas)
+
+### Changed
+- `Attribute::position` is deprecated now.
+- The `positions` build feature uses a bit more memory now to better preserve attribute ranges.
+
+## [0.19.0] - 2023-11-18
 ### Changed
 - `xmlparser` is no longer a dependency and its fork is used internally.
 - ~5% faster parsing.
@@ -267,7 +278,9 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 [@tomjw64]: https://github.com/tomjw64
 
-[Unreleased]: https://github.com/RazrFalcon/roxmltree/compare/v0.18.1..HEAD
+[Unreleased]: https://github.com/RazrFalcon/roxmltree/compare/v0.20.0..HEAD
+[0.20.0]: https://github.com/RazrFalcon/roxmltree/compare/v0.19.0...v0.20.0
+[0.19.0]: https://github.com/RazrFalcon/roxmltree/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/RazrFalcon/roxmltree/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/RazrFalcon/roxmltree/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/RazrFalcon/roxmltree/compare/v0.16.0...v0.17.0

@@ -65,6 +65,7 @@ impl HeadBucket {
             {
                 ::aws_runtime::auth::sigv4a::SCHEME_ID
             },
+            crate::s3_express::auth::SCHEME_ID,
             ::aws_smithy_runtime::client::auth::no_auth::NO_AUTH_SCHEME_ID,
         ]));
         if let ::std::option::Option::Some(config_override) = config_override {
@@ -95,7 +96,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for HeadBuc
             ::aws_smithy_runtime_api::client::auth::static_resolver::StaticAuthSchemeOptionResolverParams::new(),
         ));
 
-        cfg.store_put(::aws_smithy_http::operation::Metadata::new("HeadBucket", "s3"));
+        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new("HeadBucket", "s3"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = false;
         signing_options.content_sha256_header = true;
@@ -116,11 +117,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for HeadBuc
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("HeadBucket")
-            .with_interceptor(
-                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
-                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
-                ),
-            )
+            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
             .with_interceptor(HeadBucketEndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::head_bucket::HeadBucketError,
@@ -128,9 +125,15 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for HeadBuc
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::ModeledAsRetryableClassifier::<
                 crate::operation::head_bucket::HeadBucketError,
             >::new())
-            .with_retry_classifier(::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<
-                crate::operation::head_bucket::HeadBucketError,
-            >::new());
+            .with_retry_classifier(
+                ::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<crate::operation::head_bucket::HeadBucketError>::builder()
+                    .transient_errors({
+                        let mut transient_errors: Vec<&'static str> = ::aws_runtime::retries::classifiers::TRANSIENT_ERRORS.into();
+                        transient_errors.push("InternalError");
+                        ::std::borrow::Cow::Owned(transient_errors)
+                    })
+                    .build(),
+            );
 
         ::std::borrow::Cow::Owned(rcb)
     }
@@ -251,13 +254,18 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for HeadBucketEnd
         ::std::result::Result::Ok(())
     }
 }
+
+// The get_* functions below are generated from JMESPath expressions in the
+// operationContextParams trait. They target the operation's input shape.
+
 #[allow(unreachable_code, unused_variables)]
 #[cfg(test)]
-mod head_bucket_request_test {
-    /// This test case validates https://github.com/awslabs/smithy-rs/issues/456
+mod head_bucket_test {
+
+    /// This test case validates https://github.com/smithy-lang/smithy-rs/issues/456
     /// Test ID: HeadObjectEmptyBody
     #[::tokio::test]
-    #[allow(unused_mut)]
+    #[::tracing_test::traced_test]
     async fn head_object_empty_body_response() {
         let expected_output = crate::types::error::NotFound::builder().build();
         let mut http_response = ::aws_smithy_runtime_api::http::Response::try_from(
@@ -286,8 +294,12 @@ mod head_bucket_request_test {
 
         let parsed = de.deserialize_streaming(&mut http_response);
         let parsed = parsed.unwrap_or_else(|| {
-            let http_response =
-                http_response.map(|body| ::aws_smithy_types::body::SdkBody::from(::bytes::Bytes::copy_from_slice(body.bytes().unwrap())));
+            let http_response = http_response.map(|body| {
+                ::aws_smithy_types::body::SdkBody::from(::bytes::Bytes::copy_from_slice(&::aws_smithy_protocol_test::decode_body_data(
+                    body.bytes().unwrap(),
+                    ::aws_smithy_protocol_test::MediaType::from("application/xml"),
+                )))
+            });
             de.deserialize_nonstreaming(&http_response)
         });
         let parsed = parsed.expect_err("should be error response");

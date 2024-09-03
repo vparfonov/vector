@@ -1,4 +1,5 @@
 # Releases
+
 Unlike the [CHANGELOG](CHANGELOG.md), this file tracks more complicated changes that required
 long-form description and would be too verbose for the changelog alone.
 
@@ -7,6 +8,217 @@ long-form description and would be too verbose for the changelog alone.
 ## [Unreleased] - ReleaseDate
 
 - No notable changes.
+
+## [0.22.3] - 2024-03-16
+
+- No notable changes.
+
+## [0.22.2] - 2024-03-16
+
+- No notable changes.
+
+## [0.22.1] - 2024-02-11
+
+- No notable changes.
+
+## [0.22.0] - 2023-12-24
+
+### Metric metadata
+
+Metrics now support collecting a limited set of metadata field, which can be provided to add context
+on where a metric originates from as well as its verbosity.
+
+In the grand vision of the `metrics` crate, where library authors use it to emit metrics from their
+libraries, and then downstream users get those metrics in their application for free... the biggest
+problem is that users had no way to actually filter out metrics they didn't want. Metric metadata
+aims to provide a solution to this problem.
+
+A new type `Metadata<'a>` has been added to track all of this information, which includes **module
+path**, a **target**, and a **level**. These fields map almost directly to
+[`tracing`](https://docs.rs/tracing) -- the inspiration for adding this metadata support -- and
+provide the ability to:
+
+- group/filter metrics by where they're defined (module path)
+- group/filter metrics by where they're emitted from (target)
+- group/filter metrics by their verbosity (level)
+
+`Metadata<'a>` is passed into the `Recorder` API when registering a metric so that exporters can
+capture it and utilize it.
+
+#### Examples
+
+As an example, users may wish to filter out metrics defined by a particular crate because they don't
+care about them at all. While they might have previously been able to get lucky and simply filter
+the metrics by a common prefix, this still allows for changes to the metric names to break the
+filter configuration. If we instead filtered by module path, where we can simply use the crate name
+itself, then we'd catch all metrics for that crate regardless of their name and regardless of the
+crate version.
+
+Similarly, as another example, users may wish to only emit common metrics related to operation of
+their application/service in order to consume less resources, pay less money for the ingest/storage
+of the metrics, and so on. During an outage, or when debugging an issue, though, they may wish to
+increase the verbosity of metrics they emit in order to capture more granular detail. Being able to
+filter by level now provides a mechanism to do so.
+
+#### Usage
+
+First, it needs to be said that nothing in the core `metrics` crates actually utilizes this
+metadata yet. We'll add support in the future to existing layers, such as the
+[filter][filter_layer_docs] layer, in order to take advantage of this support.
+
+With that said, actually setting this metadata is very easy! As a refresher, you'd normally emit
+metrics with something like this:
+
+```rust
+metrics::increment_counter!("my_counter");
+```
+
+Now, you can specify the additional metadata attributes as fields at the beginning of the macro
+call. This applies to all of the "emission" macros for counters, gauges, and histograms:
+
+```rust
+metrics::increment_counter!(target: "myapp", "my_counter");
+
+metrics::increment_gauge!(level: metrics::Level::DEBUG, "my_gauge", 42.2);
+
+metrics::histogram!(target: "myapp", level: metrics::Level::DEBUG, "my_histogram", 180.1);
+```
+
+These metrics will have the relevant metadata field set, and all of them will get the module path
+provided automatically, as well.
+
+### Macros overhaul
+
+We've reworked the macros to both simplify their implementation and to hopefully provide a more
+ergonomic experience for users.
+
+At a high level, we've:
+
+- removed all the various macros that were tied to specific _operations_ (e.g. `increment_counter!`
+  for incrementing a counter) and replaced them with one macro per metric type
+- removed the standalone registration macros (e.g. `register_counter!`)
+- exposed the operations as methods on the metric handles themselves
+- switched from using procedural macros to declarative macros
+
+#### Fewer macros, more ergonomic usage
+
+Users no longer need to remember the specific macro to use for a given metric operation, such as
+`increment_gauge!` or `decrement_gauge!`. Instead, if the user knows they're working with a gauge,
+they simply call `gauge!(...)` to get the handle, and chain on a method call to perform the
+operation, such as `gauge!(...).increment(42.2)`.
+
+Additionally, because we've condensed the registration macros into the new, simplified macros, the
+same macro is used whether registering the metric to get a handle, or simply performing an operation
+on the metric all at once.
+
+Let's look at a few examples:
+
+```rust
+// This is the old style of registering a metric and then performing an operation on it.
+//
+// We're working with a counter here.
+let counter_handle = metrics::register_counter!("my_counter");
+counter_handle.increment(1);
+
+metrics::increment_counter!("my_counter");
+
+// Now let's use the new, simplified macros instead:
+let counter_handle = metrics::counter!("my_counter");
+counter_handle.increment(1);
+
+metrics::counter!("my_counter").increment(1);
+```
+
+As you can see, users no longer need to know about as many macros, and their usage is consistent
+whether working with a metric handle that is held long-term, or chaining the method call inline with
+the macro call. As a benefit, this also means that IDE completion will be better in some situations,
+as support for autocompletion of method calls is generally well supported, while macro
+autocompletion is effectively nonexistent.
+
+#### Declarative macros
+
+As part of this rework, the macros have also been rewritten declaratively. While the macro code
+itself is slightly more complicated/verbose, it has a major benefit that the `metrics-macros` crate
+was able to be removed. This is one less dependency that has to be compiled, which should hopefully
+help with build times, even if only slightly.
+
+[filter_layer_docs]: https://docs.rs/metrics-util/latest/metrics_util/layers/struct.FilterLayer.html
+
+### Scoped recorders
+
+We've added support for scoped recorders, which should allow both library authors writing exporters,
+as well as downstream users of `metrics`, test their implementations far more easily.
+
+#### Global recorder
+
+Prior to this release, the only way to test either exporters or metrics emission was to install a
+special debug/test recorder as the global recorder. This conceptually works, but quickly runs into a
+few issues:
+
+- it's not thread-safe (the global recorder is, well, global)
+- it requires the recorder be _implemented_ in a thread-safe way
+
+This meant that in order to safely do this type of testing, users would have to use something like
+[`DebuggingRecorder`](https://docs.rs/metrics-util/latest/metrics_util/debugging/struct.DebuggingRecorder.html)
+(which is thread-safe and _could_ be used in a per-thread way, mind you) but that they would have to
+install it for every single test... which could still run into issues with destroying the collected
+metrics of another concurrently running test that took the same approach.
+
+All in all, this was a pretty poor experience that required many compromises and _still_ didn't
+fully allow testing metrics in a deterministic and repeatable way.
+
+#### Scoped recorders
+
+Scoped recorders solve this problem by allowing the temporary overriding of what is considered the
+"global" recorder on the current thread. We've added a new method,
+[`metrics::with_local_recorder`](https://docs.rs/metrics/latest/metrics/fn.set_boxed_recorder.html),
+that allows users to pass a reference to a recorder that is used as the "global" recorder for the
+duration of a closure that the user also passes.
+
+Here's a quick example of what the prior approach looked like, and how it's been simplified by
+adding support for scoped recorders:
+
+```rust
+// This is the old approach, which mind you, still isn't thread-safe if you have concurrent tests
+// doing the same thing:
+let global = DebuggingRecorder::per_thread();
+let snapshotter = global.snapshotter();
+
+unsafe { metrics::clear_recorder(); }
+global.install().expect("global recorder should not be installed");
+
+increment_counter!("my_counter");
+
+let snapshot = snapshotter.snapshot();
+assert_eq!(snapshot.into_vec().len(), 1);
+
+// Now let's use a scoped recorder instead:
+let scoped = DebuggingRecorder::new();
+let snapshotter = scoped.snappshotter();
+
+metrics::with_local_recorder(&scoped, || {
+    increment_counter!("my_counter")
+});
+
+let snapshot = snapppshotter.snapshot();
+assert_eq!(snapshot.into_vec().len(), 1);
+```
+
+There's a lot of boilerplate here, but let's look specifically at what we _don't_ have to do
+anymore:
+
+- unsafely clear the global recorder
+- install as the global recorder
+- transfer ownership of the recorder itself
+
+This means that recorders can now themselves hold references to other resources, without the need to
+do the common `Arc<Mutex<...>>` dance that was previously required. Given the interface of
+`Recorder`, interior mutability still has to be provided somehow, although now it only requires the
+use of something as straightforward as `RefCell`.
+
+Beyond testing, this also opens up additional functionality that wasn't previously available. For
+example, this approach could be used to avoid the need for using thread-safe primitives when users
+don't want to pay that cost (perhaps on an embedded system).
 
 ## [0.21.1] - 2023-07-02
 
@@ -35,6 +247,7 @@ long-form description and would be too verbose for the changelog alone.
 ## [0.18.0] - 2022-01-14
 
 ### Switch to metric handles
+
 `metrics` has now switched to "metric handles."  This requires a small amount of backstory.
 
 #### Evolution of data storage in `metrics`

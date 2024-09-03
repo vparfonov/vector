@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "openssl-src"
-version = "300.2.3+3.2.1"
+version = "300.3.1+3.3.1"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
 exclude = [
     "openssl/fuzz/corpora/*",
@@ -46,6 +46,7 @@ camellia = []
 default = []
 force-engine = []
 idea = []
+ktls = []
 legacy = []
 seed = []
 weak-crypto = []

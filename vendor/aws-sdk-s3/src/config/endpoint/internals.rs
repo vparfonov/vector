@@ -34,6 +34,8 @@ pub(super) fn resolve_endpoint(
     #[allow(unused_variables)]
     let prefix = &_params.prefix;
     #[allow(unused_variables)]
+    let copy_source = &_params.copy_source;
+    #[allow(unused_variables)]
     let disable_access_points = &_params.disable_access_points;
     #[allow(unused_variables)]
     let disable_multi_region_access_points = &_params.disable_multi_region_access_points;
@@ -724,15 +726,31 @@ pub(super) fn resolve_endpoint(
                                                             })
                                                             .property(
                                                                 "authSchemes",
-                                                                vec![::aws_smithy_types::Document::from({
-                                                                    let mut out =
-                                                                        ::std::collections::HashMap::<String, ::aws_smithy_types::Document>::new();
-                                                                    out.insert("disableDoubleEncoding".to_string(), true.into());
-                                                                    out.insert("name".to_string(), "sigv4".to_string().into());
-                                                                    out.insert("signingName".to_string(), "s3-outposts".to_string().into());
-                                                                    out.insert("signingRegion".to_string(), region.to_owned().into());
-                                                                    out
-                                                                })],
+                                                                vec![
+                                                                    ::aws_smithy_types::Document::from({
+                                                                        let mut out =
+                                                                            ::std::collections::HashMap::<String, ::aws_smithy_types::Document>::new(
+                                                                            );
+                                                                        out.insert("disableDoubleEncoding".to_string(), true.into());
+                                                                        out.insert("name".to_string(), "sigv4a".to_string().into());
+                                                                        out.insert("signingName".to_string(), "s3-outposts".to_string().into());
+                                                                        out.insert(
+                                                                            "signingRegionSet".to_string(),
+                                                                            vec![::aws_smithy_types::Document::from("*".to_string())].into(),
+                                                                        );
+                                                                        out
+                                                                    }),
+                                                                    ::aws_smithy_types::Document::from({
+                                                                        let mut out =
+                                                                            ::std::collections::HashMap::<String, ::aws_smithy_types::Document>::new(
+                                                                            );
+                                                                        out.insert("disableDoubleEncoding".to_string(), true.into());
+                                                                        out.insert("name".to_string(), "sigv4".to_string().into());
+                                                                        out.insert("signingName".to_string(), "s3-outposts".to_string().into());
+                                                                        out.insert("signingRegion".to_string(), region.to_owned().into());
+                                                                        out
+                                                                    }),
+                                                                ],
                                                             )
                                                             .build());
                                                     }
@@ -759,14 +777,27 @@ pub(super) fn resolve_endpoint(
                                                 })
                                                 .property(
                                                     "authSchemes",
-                                                    vec![::aws_smithy_types::Document::from({
-                                                        let mut out = ::std::collections::HashMap::<String, ::aws_smithy_types::Document>::new();
-                                                        out.insert("disableDoubleEncoding".to_string(), true.into());
-                                                        out.insert("name".to_string(), "sigv4".to_string().into());
-                                                        out.insert("signingName".to_string(), "s3-outposts".to_string().into());
-                                                        out.insert("signingRegion".to_string(), region.to_owned().into());
-                                                        out
-                                                    })],
+                                                    vec![
+                                                        ::aws_smithy_types::Document::from({
+                                                            let mut out = ::std::collections::HashMap::<String, ::aws_smithy_types::Document>::new();
+                                                            out.insert("disableDoubleEncoding".to_string(), true.into());
+                                                            out.insert("name".to_string(), "sigv4a".to_string().into());
+                                                            out.insert("signingName".to_string(), "s3-outposts".to_string().into());
+                                                            out.insert(
+                                                                "signingRegionSet".to_string(),
+                                                                vec![::aws_smithy_types::Document::from("*".to_string())].into(),
+                                                            );
+                                                            out
+                                                        }),
+                                                        ::aws_smithy_types::Document::from({
+                                                            let mut out = ::std::collections::HashMap::<String, ::aws_smithy_types::Document>::new();
+                                                            out.insert("disableDoubleEncoding".to_string(), true.into());
+                                                            out.insert("name".to_string(), "sigv4".to_string().into());
+                                                            out.insert("signingName".to_string(), "s3-outposts".to_string().into());
+                                                            out.insert("signingRegion".to_string(), region.to_owned().into());
+                                                            out
+                                                        }),
+                                                    ],
                                                 )
                                                 .build());
                                         }
@@ -797,15 +828,31 @@ pub(super) fn resolve_endpoint(
                                                             })
                                                             .property(
                                                                 "authSchemes",
-                                                                vec![::aws_smithy_types::Document::from({
-                                                                    let mut out =
-                                                                        ::std::collections::HashMap::<String, ::aws_smithy_types::Document>::new();
-                                                                    out.insert("disableDoubleEncoding".to_string(), true.into());
-                                                                    out.insert("name".to_string(), "sigv4".to_string().into());
-                                                                    out.insert("signingName".to_string(), "s3-outposts".to_string().into());
-                                                                    out.insert("signingRegion".to_string(), region.to_owned().into());
-                                                                    out
-                                                                })],
+                                                                vec![
+                                                                    ::aws_smithy_types::Document::from({
+                                                                        let mut out =
+                                                                            ::std::collections::HashMap::<String, ::aws_smithy_types::Document>::new(
+                                                                            );
+                                                                        out.insert("disableDoubleEncoding".to_string(), true.into());
+                                                                        out.insert("name".to_string(), "sigv4a".to_string().into());
+                                                                        out.insert("signingName".to_string(), "s3-outposts".to_string().into());
+                                                                        out.insert(
+                                                                            "signingRegionSet".to_string(),
+                                                                            vec![::aws_smithy_types::Document::from("*".to_string())].into(),
+                                                                        );
+                                                                        out
+                                                                    }),
+                                                                    ::aws_smithy_types::Document::from({
+                                                                        let mut out =
+                                                                            ::std::collections::HashMap::<String, ::aws_smithy_types::Document>::new(
+                                                                            );
+                                                                        out.insert("disableDoubleEncoding".to_string(), true.into());
+                                                                        out.insert("name".to_string(), "sigv4".to_string().into());
+                                                                        out.insert("signingName".to_string(), "s3-outposts".to_string().into());
+                                                                        out.insert("signingRegion".to_string(), region.to_owned().into());
+                                                                        out
+                                                                    }),
+                                                                ],
                                                             )
                                                             .build());
                                                     }
@@ -835,14 +882,27 @@ pub(super) fn resolve_endpoint(
                                                 })
                                                 .property(
                                                     "authSchemes",
-                                                    vec![::aws_smithy_types::Document::from({
-                                                        let mut out = ::std::collections::HashMap::<String, ::aws_smithy_types::Document>::new();
-                                                        out.insert("disableDoubleEncoding".to_string(), true.into());
-                                                        out.insert("name".to_string(), "sigv4".to_string().into());
-                                                        out.insert("signingName".to_string(), "s3-outposts".to_string().into());
-                                                        out.insert("signingRegion".to_string(), region.to_owned().into());
-                                                        out
-                                                    })],
+                                                    vec![
+                                                        ::aws_smithy_types::Document::from({
+                                                            let mut out = ::std::collections::HashMap::<String, ::aws_smithy_types::Document>::new();
+                                                            out.insert("disableDoubleEncoding".to_string(), true.into());
+                                                            out.insert("name".to_string(), "sigv4a".to_string().into());
+                                                            out.insert("signingName".to_string(), "s3-outposts".to_string().into());
+                                                            out.insert(
+                                                                "signingRegionSet".to_string(),
+                                                                vec![::aws_smithy_types::Document::from("*".to_string())].into(),
+                                                            );
+                                                            out
+                                                        }),
+                                                        ::aws_smithy_types::Document::from({
+                                                            let mut out = ::std::collections::HashMap::<String, ::aws_smithy_types::Document>::new();
+                                                            out.insert("disableDoubleEncoding".to_string(), true.into());
+                                                            out.insert("name".to_string(), "sigv4".to_string().into());
+                                                            out.insert("signingName".to_string(), "s3-outposts".to_string().into());
+                                                            out.insert("signingRegion".to_string(), region.to_owned().into());
+                                                            out
+                                                        }),
+                                                    ],
                                                 )
                                                 .build());
                                         }
@@ -2792,30 +2852,59 @@ return Err(::aws_smithy_http::endpoint::ResolveEndpointError::message(format!("N
                                                                                     })
                                                                                     .property(
                                                                                         "authSchemes",
-                                                                                        vec![::aws_smithy_types::Document::from({
-                                                                                            let mut out = ::std::collections::HashMap::<
-                                                                                                String,
-                                                                                                ::aws_smithy_types::Document,
-                                                                                            >::new(
-                                                                                            );
-                                                                                            out.insert(
-                                                                                                "disableDoubleEncoding".to_string(),
-                                                                                                true.into(),
-                                                                                            );
-                                                                                            out.insert(
-                                                                                                "name".to_string(),
-                                                                                                "sigv4".to_string().into(),
-                                                                                            );
-                                                                                            out.insert(
-                                                                                                "signingName".to_string(),
-                                                                                                "s3-outposts".to_string().into(),
-                                                                                            );
-                                                                                            out.insert(
-                                                                                                "signingRegion".to_string(),
-                                                                                                bucket_arn.region().to_owned().into(),
-                                                                                            );
-                                                                                            out
-                                                                                        })],
+                                                                                        vec![
+                                                                                            ::aws_smithy_types::Document::from({
+                                                                                                let mut out = ::std::collections::HashMap::<
+                                                                                                    String,
+                                                                                                    ::aws_smithy_types::Document,
+                                                                                                >::new(
+                                                                                                );
+                                                                                                out.insert(
+                                                                                                    "disableDoubleEncoding".to_string(),
+                                                                                                    true.into(),
+                                                                                                );
+                                                                                                out.insert(
+                                                                                                    "name".to_string(),
+                                                                                                    "sigv4a".to_string().into(),
+                                                                                                );
+                                                                                                out.insert(
+                                                                                                    "signingName".to_string(),
+                                                                                                    "s3-outposts".to_string().into(),
+                                                                                                );
+                                                                                                out.insert(
+                                                                                                    "signingRegionSet".to_string(),
+                                                                                                    vec![::aws_smithy_types::Document::from(
+                                                                                                        "*".to_string(),
+                                                                                                    )]
+                                                                                                    .into(),
+                                                                                                );
+                                                                                                out
+                                                                                            }),
+                                                                                            ::aws_smithy_types::Document::from({
+                                                                                                let mut out = ::std::collections::HashMap::<
+                                                                                                    String,
+                                                                                                    ::aws_smithy_types::Document,
+                                                                                                >::new(
+                                                                                                );
+                                                                                                out.insert(
+                                                                                                    "disableDoubleEncoding".to_string(),
+                                                                                                    true.into(),
+                                                                                                );
+                                                                                                out.insert(
+                                                                                                    "name".to_string(),
+                                                                                                    "sigv4".to_string().into(),
+                                                                                                );
+                                                                                                out.insert(
+                                                                                                    "signingName".to_string(),
+                                                                                                    "s3-outposts".to_string().into(),
+                                                                                                );
+                                                                                                out.insert(
+                                                                                                    "signingRegion".to_string(),
+                                                                                                    bucket_arn.region().to_owned().into(),
+                                                                                                );
+                                                                                                out
+                                                                                            }),
+                                                                                        ],
                                                                                     )
                                                                                     .build());
                                                                             }
@@ -2842,24 +2931,45 @@ return Err(::aws_smithy_http::endpoint::ResolveEndpointError::message(format!("N
                                                                             })
                                                                             .property(
                                                                                 "authSchemes",
-                                                                                vec![::aws_smithy_types::Document::from({
-                                                                                    let mut out = ::std::collections::HashMap::<
-                                                                                        String,
-                                                                                        ::aws_smithy_types::Document,
-                                                                                    >::new(
-                                                                                    );
-                                                                                    out.insert("disableDoubleEncoding".to_string(), true.into());
-                                                                                    out.insert("name".to_string(), "sigv4".to_string().into());
-                                                                                    out.insert(
-                                                                                        "signingName".to_string(),
-                                                                                        "s3-outposts".to_string().into(),
-                                                                                    );
-                                                                                    out.insert(
-                                                                                        "signingRegion".to_string(),
-                                                                                        bucket_arn.region().to_owned().into(),
-                                                                                    );
-                                                                                    out
-                                                                                })],
+                                                                                vec![
+                                                                                    ::aws_smithy_types::Document::from({
+                                                                                        let mut out = ::std::collections::HashMap::<
+                                                                                            String,
+                                                                                            ::aws_smithy_types::Document,
+                                                                                        >::new(
+                                                                                        );
+                                                                                        out.insert("disableDoubleEncoding".to_string(), true.into());
+                                                                                        out.insert("name".to_string(), "sigv4a".to_string().into());
+                                                                                        out.insert(
+                                                                                            "signingName".to_string(),
+                                                                                            "s3-outposts".to_string().into(),
+                                                                                        );
+                                                                                        out.insert(
+                                                                                            "signingRegionSet".to_string(),
+                                                                                            vec![::aws_smithy_types::Document::from("*".to_string())]
+                                                                                                .into(),
+                                                                                        );
+                                                                                        out
+                                                                                    }),
+                                                                                    ::aws_smithy_types::Document::from({
+                                                                                        let mut out = ::std::collections::HashMap::<
+                                                                                            String,
+                                                                                            ::aws_smithy_types::Document,
+                                                                                        >::new(
+                                                                                        );
+                                                                                        out.insert("disableDoubleEncoding".to_string(), true.into());
+                                                                                        out.insert("name".to_string(), "sigv4".to_string().into());
+                                                                                        out.insert(
+                                                                                            "signingName".to_string(),
+                                                                                            "s3-outposts".to_string().into(),
+                                                                                        );
+                                                                                        out.insert(
+                                                                                            "signingRegion".to_string(),
+                                                                                            bucket_arn.region().to_owned().into(),
+                                                                                        );
+                                                                                        out
+                                                                                    }),
+                                                                                ],
                                                                             )
                                                                             .build());
                                                                     }

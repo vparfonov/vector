@@ -147,7 +147,7 @@ impl Build {
         // Change the install directory to happen inside of the build directory.
         if host.contains("pc-windows-gnu") {
             configure.arg(&format!("--prefix={}", sanitize_sh(&install_dir)));
-        } else if host.contains("pc-windows-msvc") {
+        } else if host.contains("pc-windows-msvc") || host.contains("win7-windows-msvc") {
             // On Windows, the prefix argument does not support \ path seperators
             // when cross compiling.
             // Always use / as a path seperator instead of \, since that works for both
@@ -217,6 +217,10 @@ impl Build {
 
         if cfg!(not(feature = "seed")) {
             configure.arg("no-seed");
+        }
+
+        if cfg!(feature = "ktls") {
+            configure.arg("enable-ktls");
         }
 
         if target.contains("musl") {
@@ -304,6 +308,7 @@ impl Build {
             "i686-linux-android" => "linux-elf",
             "i686-pc-windows-gnu" => "mingw",
             "i686-pc-windows-msvc" => "VC-WIN32",
+            "i686-win7-windows-msvc" => "VC-WIN32",
             "i686-unknown-freebsd" => "BSD-x86-elf",
             "i686-unknown-haiku" => "haiku-x86",
             "i686-unknown-linux-gnu" => "linux-elf",
@@ -311,6 +316,7 @@ impl Build {
             "i686-unknown-netbsd" => "BSD-x86-elf",
             "i686-uwp-windows-msvc" => "VC-WIN32-UWP",
             "loongarch64-unknown-linux-gnu" => "linux-generic64",
+            "loongarch64-unknown-linux-musl" => "linux-generic64",
             "mips-unknown-linux-gnu" => "linux-mips32",
             "mips-unknown-linux-musl" => "linux-mips32",
             "mips64-unknown-linux-gnuabi64" => "linux64-mips64",
@@ -346,6 +352,7 @@ impl Build {
             "x86_64-linux" => "linux-x86_64",
             "x86_64-pc-windows-gnu" => "mingw64",
             "x86_64-pc-windows-msvc" => "VC-WIN64A",
+            "x86_64-win7-windows-msvc" => "VC-WIN64A",
             "x86_64-unknown-freebsd" => "BSD-x86_64",
             "x86_64-unknown-dragonfly" => "BSD-x86_64",
             "x86_64-unknown-haiku" => "haiku-x86_64",
@@ -363,6 +370,9 @@ impl Build {
             "aarch64-apple-ios" => "ios64-cross",
             "x86_64-apple-ios" => "iossimulator-xcrun",
             "aarch64-apple-ios-sim" => "iossimulator-xcrun",
+            "aarch64-unknown-linux-ohos" => "linux-aarch64",
+            "armv7-unknown-linux-ohos" => "linux-generic32",
+            "x86_64-unknown-linux-ohos" => "linux-x86_64",
             _ => panic!("don't know how to configure OpenSSL for {}", target),
         };
 
@@ -640,12 +650,9 @@ fn cp_r(src: &Path, dst: &Path) {
         if ty.is_dir() {
             fs::create_dir_all(&dst).unwrap();
             cp_r(&path, &dst);
-        } else if ty.is_symlink() {
+        } else if ty.is_symlink() && path.iter().any(|p| p == "cloudflare-quiche") {
             // not needed to build
-            if path.iter().any(|p| p == "cloudflare-quiche") {
-                continue;
-            }
-            panic!("can't copy symlink {path:?}");
+            continue;
         } else {
             let _ = fs::remove_file(&dst);
             if let Err(e) = fs::copy(&path, &dst) {

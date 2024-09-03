@@ -22,7 +22,7 @@ new_type![
     JsonWebTokenType(String)
 ];
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum JsonWebTokenAlgorithm<JE, JS, JT>
 where
@@ -95,7 +95,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
 pub struct JsonWebTokenHeader<JE, JS, JT>
 where
     JE: JweContentEncryptionAlgorithm<JT>,
@@ -133,7 +133,7 @@ where
     fn serialize(payload: &P) -> Result<String, serde_json::Error>;
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JsonWebTokenJsonPayloadSerde;
 impl<P> JsonWebTokenPayloadSerde<P> for JsonWebTokenJsonPayloadSerde
 where
@@ -192,7 +192,7 @@ pub enum JsonWebTokenError {
     SigningError(#[source] SigningError),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct JsonWebToken<JE, JS, JT, P, S>
 where
     JE: JweContentEncryptionAlgorithm<JT>,
@@ -232,11 +232,11 @@ where
 
         let header_json =
             serde_json::to_string(&header).map_err(JsonWebTokenError::SerializationError)?;
-        let header_base64 = base64::encode_config(&header_json, base64::URL_SAFE_NO_PAD);
+        let header_base64 = base64::encode_config(header_json, base64::URL_SAFE_NO_PAD);
 
         let serialized_payload =
             S::serialize(&payload).map_err(JsonWebTokenError::SerializationError)?;
-        let payload_base64 = base64::encode_config(&serialized_payload, base64::URL_SAFE_NO_PAD);
+        let payload_base64 = base64::encode_config(serialized_payload, base64::URL_SAFE_NO_PAD);
 
         let signing_input = format!("{}.{}", header_base64, payload_base64);
 
@@ -500,6 +500,14 @@ pub mod tests {
             \"e\": \"AQAB\"
         }";
 
+    pub const TEST_ED_PUB_KEY_ED25519: &str = r#"{
+        "kty": "OKP",
+        "use": "sig",
+        "alg": "Ed25519",
+        "crv": "Ed25519",
+        "x": "sfliRRhciU_d5qsuC5Vcydi-t8bRfxTg_4qulVatW4A"
+    }"#;
+
     pub const TEST_EC_PUB_KEY_P256: &str = r#"{
         "kty": "EC",
         "kid": "bilbo.baggins@hobbiton.example",
@@ -544,7 +552,7 @@ pub mod tests {
          At4JySm4v+5P7yYBh8B8YD2l9j57z/s8hJAxEbn/q8uHP2ddQqvQKgtsni+pHSk9\n\
          XGBfAoGBANz4qr10DdM8DHhPrAb2YItvPVz/VwkBd1Vqj8zCpyIEKe/07oKOvjWQ\n\
          SgkLDH9x2hBgY01SbP43CvPk0V72invu2TGkI/FXwXWJLLG7tDSgw4YyfhrYrHmg\n\
-         1Vre3XB9HH8MYBVB6UIexaAq4xSeoemRKTBesZro7OKjKT8/GmiO\
+         1Vre3XB9HH8MYBVB6UIexaAq4xSeoemRKTBesZro7OKjKT8/GmiO\n\
          -----END RSA PRIVATE KEY-----";
 
     #[test]
@@ -717,7 +725,7 @@ pub mod tests {
         )
         .unwrap();
         assert_eq!(
-            serde_json::to_value(&new_jwt).expect("failed to serialize"),
+            serde_json::to_value(new_jwt).expect("failed to serialize"),
             serde_json::Value::String(TEST_JWT.to_string())
         );
     }

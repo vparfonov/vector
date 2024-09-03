@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: Apache-2.0 OR MIT
+
 #[derive(Clone, Copy)]
 pub(crate) struct CpuInfo(u32);
 
@@ -48,8 +50,7 @@ impl CpuInfo {
     /// Whether FEAT_LSE is available
     const HAS_LSE: u32 = 1;
     /// Whether FEAT_LSE2 is available
-    // This is currently only used in tests.
-    #[cfg(test)]
+    #[cfg_attr(not(test), allow(dead_code))]
     const HAS_LSE2: u32 = 2;
     /// Whether FEAT_LSE128 is available
     // This is currently only used in tests.
@@ -65,6 +66,22 @@ impl CpuInfo {
     pub(crate) fn has_lse(self) -> bool {
         self.test(CpuInfo::HAS_LSE)
     }
+    #[cfg_attr(not(test), allow(dead_code))]
+    #[cfg(any(test, not(any(target_feature = "lse2", portable_atomic_target_feature = "lse2"))))]
+    #[inline]
+    pub(crate) fn has_lse2(self) -> bool {
+        self.test(CpuInfo::HAS_LSE2)
+    }
+    #[cfg(test)]
+    #[inline]
+    pub(crate) fn has_lse128(self) -> bool {
+        self.test(CpuInfo::HAS_LSE128)
+    }
+    #[cfg(test)]
+    #[inline]
+    pub(crate) fn has_rcpc3(self) -> bool {
+        self.test(CpuInfo::HAS_RCPC3)
+    }
 }
 
 #[cfg(target_arch = "x86_64")]
@@ -72,6 +89,7 @@ impl CpuInfo {
     /// Whether CMPXCHG16B is available
     const HAS_CMPXCHG16B: u32 = 1;
     /// Whether VMOVDQA is atomic
+    #[cfg(target_feature = "sse")]
     const HAS_VMOVDQA_ATOMIC: u32 = 2;
 
     #[cfg(any(
@@ -82,6 +100,7 @@ impl CpuInfo {
     pub(crate) fn has_cmpxchg16b(self) -> bool {
         self.test(CpuInfo::HAS_CMPXCHG16B)
     }
+    #[cfg(target_feature = "sse")]
     #[inline]
     pub(crate) fn has_vmovdqa_atomic(self) -> bool {
         self.test(CpuInfo::HAS_VMOVDQA_ATOMIC)
@@ -128,12 +147,17 @@ mod c_types {
     pub(crate) type c_ulong = u64;
     #[cfg(not(target_pointer_width = "64"))]
     pub(crate) type c_ulong = u32;
-    // c_size_t is usize
+    // c_size_t is currently always usize
     // https://github.com/rust-lang/rust/blob/1.70.0/library/core/src/ffi/mod.rs#L88
     pub(crate) type c_size_t = usize;
-    // c_char is u8 on most non-Apple/non-Windows ARM/PowerPC/RISC-V targets
-    // (Linux/Android/FreeBSD/NetBSD/OpenBSD/VxWorks/Fuchsia/QNX Neutrino/Horizon)
+    // c_char is u8 by default on most non-Apple/non-Windows ARM/PowerPC/RISC-V/s390x/Hexagon targets
+    // (Linux/Android/FreeBSD/NetBSD/OpenBSD/VxWorks/Fuchsia/QNX Neutrino/Horizon/AIX/z/OS)
     // https://github.com/rust-lang/rust/blob/1.70.0/library/core/src/ffi/mod.rs#L104
+    // https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/lldb/source/Utility/ArchSpec.cpp#L712
+    // RISC-V https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/HEAD/riscv-cc.adoc#cc-type-representations
+    // Hexagon https://lists.llvm.org/pipermail/llvm-dev/attachments/20190916/21516a52/attachment-0001.pdf
+    // AIX https://www.ibm.com/docs/en/xl-c-aix/13.1.2?topic=descriptions-qchars
+    // z/OS https://www.ibm.com/docs/en/zos/2.5.0?topic=specifiers-character-types
     // (macOS is currently the only Apple target that uses this module, and Windows currently doesn't use this module)
     #[cfg(not(target_os = "macos"))]
     pub(crate) type c_char = u8;
@@ -240,7 +264,11 @@ mod tests_common {
 
     #[test]
     fn print_features() {
-        use std::{fmt::Write as _, io::Write, string::String};
+        use std::{
+            fmt::Write as _,
+            io::{self, Write},
+            string::String,
+        };
 
         let mut features = String::new();
         macro_rules! print_feature {
@@ -292,7 +320,7 @@ mod tests_common {
                 )),
             );
         }
-        let stdout = std::io::stderr();
+        let stdout = io::stderr();
         let mut stdout = stdout.lock();
         let _ = stdout.write_all(features.as_bytes());
     }
@@ -328,7 +356,7 @@ mod tests_common {
                 assert!(!proc_cpuinfo.lse);
             }
         }
-        if detect().test(CpuInfo::HAS_LSE2) {
+        if detect().has_lse2() {
             assert!(detect().test(CpuInfo::HAS_LSE));
             assert!(detect().test(CpuInfo::HAS_LSE2));
             if let Ok(test_helper::cpuinfo::ProcCpuinfo { lse2: Some(lse2), .. }) = proc_cpuinfo {
@@ -340,14 +368,14 @@ mod tests_common {
                 assert!(!lse2);
             }
         }
-        if detect().test(CpuInfo::HAS_LSE128) {
+        if detect().has_lse128() {
             assert!(detect().test(CpuInfo::HAS_LSE));
             assert!(detect().test(CpuInfo::HAS_LSE2));
             assert!(detect().test(CpuInfo::HAS_LSE128));
         } else {
             assert!(!detect().test(CpuInfo::HAS_LSE128));
         }
-        if detect().test(CpuInfo::HAS_RCPC3) {
+        if detect().has_rcpc3() {
             assert!(detect().test(CpuInfo::HAS_RCPC3));
         } else {
             assert!(!detect().test(CpuInfo::HAS_RCPC3));

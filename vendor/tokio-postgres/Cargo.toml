@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "tokio-postgres"
-version = "0.7.10"
+version = "0.7.11"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 description = "A native, asynchronous PostgreSQL client"
 readme = "README.md"
@@ -24,7 +24,7 @@ keywords = [
     "async",
 ]
 categories = ["database"]
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/sfackler/rust-postgres"
 resolver = "2"
 
@@ -74,10 +74,10 @@ version = "0.11"
 version = "0.2"
 
 [dependencies.postgres-protocol]
-version = "0.6.6"
+version = "0.6.7"
 
 [dependencies.postgres-types]
-version = "0.2.5"
+version = "0.2.7"
 
 [dependencies.rand]
 version = "0.8.5"
@@ -106,14 +106,11 @@ package = "chrono"
 version = "0.5"
 
 [dev-dependencies.env_logger]
-version = "0.10"
-
-[dev-dependencies.eui48-04]
-version = "0.4"
-package = "eui48"
+version = "0.11"
 
 [dev-dependencies.eui48-1]
 version = "1.0"
+default-features = false
 package = "eui48"
 
 [dev-dependencies.futures-executor]
@@ -169,7 +166,10 @@ package = "uuid"
 [features]
 array-impls = ["postgres-types/array-impls"]
 default = ["runtime"]
-js = ["postgres-protocol/js"]
+js = [
+    "postgres-protocol/js",
+    "postgres-types/js",
+]
 runtime = [
     "tokio/net",
     "tokio/time",

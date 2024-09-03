@@ -131,6 +131,16 @@ macro_rules! algos {
                     ),
                 }
             }
+
+            /// Returns the total number of input bytes which have been processed by this compression object.
+            pub fn total_in(&self) -> u64 {
+                self.inner.get_encoder_ref().get_ref().get_ref().total_in()
+            }
+
+            /// Returns the total number of output bytes which have been produced by this compression object.
+            pub fn total_out(&self) -> u64 {
+                self.inner.get_encoder_ref().get_ref().get_ref().total_out()
+            }
         }
         { @dec }
         );
@@ -188,6 +198,17 @@ macro_rules! algos {
             }
         }
         { @dec
+            /// Creates a new decoder, using the specified parameters, which will read compressed
+            /// data from the given stream and emit a decompressed stream.
+            pub fn with_params(inner: $inner, params: &[crate::zstd::DParameter]) -> Self {
+                Self {
+                    inner: crate::$($mod::)+generic::Decoder::new(
+                        inner,
+                        crate::codec::ZstdDecoder::new_with_params(params),
+                    ),
+                }
+            }
+
             /// Creates a new decoder, using the specified compression level and pre-trained
             /// dictionary, which will read compressed data from the given stream and emit an
             /// uncompressed stream.

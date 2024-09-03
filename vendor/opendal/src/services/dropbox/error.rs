@@ -17,7 +17,6 @@
 
 use http::Response;
 use http::StatusCode;
-use http::Uri;
 use serde::Deserialize;
 
 use crate::raw::*;
@@ -39,6 +38,7 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
     let (mut kind, mut retryable) = match parts.status {
         StatusCode::NOT_FOUND => (ErrorKind::NotFound, false),
         StatusCode::FORBIDDEN => (ErrorKind::PermissionDenied, false),
+        StatusCode::TOO_MANY_REQUESTS => (ErrorKind::RateLimited, true),
         StatusCode::INTERNAL_SERVER_ERROR
         | StatusCode::BAD_GATEWAY
         | StatusCode::SERVICE_UNAVAILABLE
@@ -55,14 +55,12 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
             parse_dropbox_error_summary(&dropbox_err.error_summary).unwrap_or((kind, retryable));
     }
 
-    let mut err = Error::new(kind, &message).with_context("response", format!("{parts:?}"));
+    let mut err = Error::new(kind, &message);
+
+    err = with_error_response_context(err, parts);
 
     if retryable {
         err = err.set_temporary();
-    }
-
-    if let Some(uri) = parts.extensions.get::<Uri>() {
-        err = err.with_context("uri", uri.to_string());
     }
 
     Ok(err)

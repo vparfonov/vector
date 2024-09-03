@@ -16,7 +16,7 @@ use node::{Node, NothingProducer, TaskWaiting};
 
 use crate::notify::{GenericNotify, Internal, Notification};
 use crate::sync::atomic::{AtomicBool, Ordering};
-use crate::sync::cell::{Cell, UnsafeCell};
+use crate::sync::cell::{Cell, ConstPtr, UnsafeCell};
 use crate::sync::Arc;
 use crate::{RegisterResult, State, Task, TaskRef};
 
@@ -43,11 +43,6 @@ impl<T> crate::Inner<T> {
     fn queue_update(&self) {
         // Locking and unlocking the mutex will drain the queue if there is no contention.
         drop(self.try_lock());
-    }
-
-    pub(crate) fn needs_notification(&self, _limit: usize) -> bool {
-        // TODO: Figure out a stable way to do this optimization.
-        true
     }
 
     /// Add a new listener to the list.
@@ -240,6 +235,11 @@ impl<T> List<T> {
             queue: concurrent_queue::ConcurrentQueue::unbounded(),
         }
     }
+
+    /// Try to get the total number of listeners without blocking.
+    pub(super) fn try_total_listeners(&self) -> Option<usize> {
+        self.inner.try_lock().map(|lock| lock.listeners.len())
+    }
 }
 
 /// The guard returned by [`Inner::lock`].
@@ -302,7 +302,7 @@ impl<T> Drop for ListGuard<'_, T> {
             let notified = if list.notified < list.len {
                 list.notified
             } else {
-                core::usize::MAX
+                usize::MAX
             };
 
             self.inner.notified.store(notified, Ordering::Release);
@@ -766,7 +766,10 @@ impl<T> Mutex<T> {
             .is_ok()
         {
             // We have successfully locked the mutex.
-            Some(MutexGuard { mutex: self })
+            Some(MutexGuard {
+                mutex: self,
+                guard: self.value.get(),
+            })
         } else {
             self.try_lock_slow()
         }
@@ -785,7 +788,10 @@ impl<T> Mutex<T> {
                 .is_ok()
             {
                 // We have successfully locked the mutex.
-                return Some(MutexGuard { mutex: self });
+                return Some(MutexGuard {
+                    mutex: self,
+                    guard: self.value.get(),
+                });
             }
 
             // Use atomic loads instead of compare-exchange.
@@ -799,6 +805,7 @@ impl<T> Mutex<T> {
 
 pub(crate) struct MutexGuard<'a, T> {
     mutex: &'a Mutex<T>,
+    guard: ConstPtr<T>,
 }
 
 impl<'a, T> Drop for MutexGuard<'a, T> {
@@ -811,13 +818,13 @@ impl<'a, T> ops::Deref for MutexGuard<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &T {
-        unsafe { &*self.mutex.value.get() }
+        unsafe { self.guard.deref() }
     }
 }
 
 impl<'a, T> ops::DerefMut for MutexGuard<'a, T> {
     fn deref_mut(&mut self) -> &mut T {
-        unsafe { &mut *self.mutex.value.get() }
+        unsafe { self.guard.deref_mut() }
     }
 }
 
@@ -827,7 +834,6 @@ unsafe impl<T: Send> Sync for Mutex<T> {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Task;
 
     #[cfg(target_family = "wasm")]
     use wasm_bindgen_test::wasm_bindgen_test as test;
@@ -1267,14 +1273,8 @@ mod tests {
             listeners.listeners[1],
             Entry::Empty(NonZeroUsize::new(4).unwrap())
         );
-        assert_eq!(
-            listeners.listeners[2],
-            Entry::Listener {
-                state: Cell::new(State::Task(Task::Waker(waker))),
-                prev: Cell::new(None),
-                next: Cell::new(Some(key3)),
-            }
-        );
+        assert_eq!(*listeners.listeners[2].prev(), Cell::new(None));
+        assert_eq!(*listeners.listeners[2].next(), Cell::new(Some(key3)));
         assert_eq!(
             listeners.listeners[3],
             Entry::Listener {

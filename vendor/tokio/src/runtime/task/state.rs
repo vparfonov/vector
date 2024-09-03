@@ -2,7 +2,6 @@ use crate::loom::sync::atomic::AtomicUsize;
 
 use std::fmt;
 use std::sync::atomic::Ordering::{AcqRel, Acquire, Release};
-use std::usize;
 
 pub(super) struct State {
     val: AtomicUsize,
@@ -141,7 +140,6 @@ impl State {
 
     /// Transitions the task from `Running` -> `Idle`.
     ///
-    /// Returns `true` if the transition to `Idle` is successful, `false` otherwise.
     /// The transition to `Idle` fails if the task has been flagged to be
     /// cancelled.
     pub(super) fn transition_to_idle(&self) -> TransitionToIdle {

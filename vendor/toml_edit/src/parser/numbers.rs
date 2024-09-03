@@ -78,7 +78,7 @@ pub(crate) fn dec_int<'i>(input: &mut Input<'i>) -> PResult<&'i str> {
                 digit.void(),
             )),
         )
-            .recognize()
+            .take()
             .map(|b: &[u8]| unsafe {
                 from_utf8_unchecked(b, "`digit` and `_` filter out non-ASCII")
             })
@@ -112,7 +112,7 @@ pub(crate) fn hex_int<'i>(input: &mut Input<'i>) -> PResult<&'i str> {
                 )
                 .map(|()| ()),
             ))
-            .recognize(),
+            .take(),
         )
         .map(|b| unsafe { from_utf8_unchecked(b, "`hexdig` and `_` filter out non-ASCII") })
         .context(StrContext::Label("hexadecimal integer")),
@@ -145,7 +145,7 @@ pub(crate) fn oct_int<'i>(input: &mut Input<'i>) -> PResult<&'i str> {
                 )
                 .map(|()| ()),
             ))
-            .recognize(),
+            .take(),
         )
         .map(|b| unsafe { from_utf8_unchecked(b, "`DIGIT0_7` and `_` filter out non-ASCII") })
         .context(StrContext::Label("octal integer")),
@@ -179,7 +179,7 @@ pub(crate) fn bin_int<'i>(input: &mut Input<'i>) -> PResult<&'i str> {
                 )
                 .map(|()| ()),
             ))
-            .recognize(),
+            .take(),
         )
         .map(|b| unsafe { from_utf8_unchecked(b, "`DIGIT0_1` and `_` filter out non-ASCII") })
         .context(StrContext::Label("binary integer")),
@@ -214,7 +214,7 @@ pub(crate) fn float_<'i>(input: &mut Input<'i>) -> PResult<&'i str> {
         dec_int,
         alt((exp.void(), (frac.void(), opt(exp.void())).void())),
     )
-        .recognize()
+        .take()
         .map(|b: &[u8]| unsafe {
             from_utf8_unchecked(
                 b,
@@ -232,7 +232,7 @@ pub(crate) fn frac<'i>(input: &mut Input<'i>) -> PResult<&'i str> {
         cut_err(zero_prefixable_int)
             .context(StrContext::Expected(StrContextValue::Description("digit"))),
     )
-        .recognize()
+        .take()
         .map(|b: &[u8]| unsafe {
             from_utf8_unchecked(
                 b,
@@ -260,7 +260,7 @@ pub(crate) fn zero_prefixable_int<'i>(input: &mut Input<'i>) -> PResult<&'i str>
         )
         .map(|()| ()),
     )
-        .recognize()
+        .take()
         .map(|b: &[u8]| unsafe { from_utf8_unchecked(b, "`digit` and `_` filter out non-ASCII") })
         .parse_next(input)
 }
@@ -273,7 +273,7 @@ pub(crate) fn exp<'i>(input: &mut Input<'i>) -> PResult<&'i str> {
         opt(one_of([b'+', b'-'])),
         cut_err(zero_prefixable_int),
     )
-        .recognize()
+        .take()
         .map(|b: &[u8]| unsafe {
             from_utf8_unchecked(
                 b,
@@ -336,8 +336,8 @@ mod test {
             ("0xF", 15),
             ("0o0_755", 493),
             ("0b1_0_1", 5),
-            (&std::i64::MIN.to_string()[..], std::i64::MIN),
-            (&std::i64::MAX.to_string()[..], std::i64::MAX),
+            (&i64::MIN.to_string()[..], i64::MIN),
+            (&i64::MAX.to_string()[..], i64::MAX),
         ];
         for &(input, expected) in &cases {
             dbg!(input);
@@ -361,7 +361,7 @@ mod test {
         } else {
             dbg!(expected);
             dbg!(actual);
-            assert!((expected - actual).abs() < std::f64::EPSILON);
+            assert!((expected - actual).abs() < f64::EPSILON);
         }
     }
 
@@ -376,15 +376,15 @@ mod test {
             ("-2E-2", -2E-2),
             ("6.626e-34", 6.626e-34),
             ("9_224_617.445_991_228_313", 9_224_617.445_991_227),
-            ("-1.7976931348623157e+308", std::f64::MIN),
-            ("1.7976931348623157e+308", std::f64::MAX),
+            ("-1.7976931348623157e+308", f64::MIN),
+            ("1.7976931348623157e+308", f64::MAX),
             ("nan", f64::NAN.copysign(1.0)),
             ("+nan", f64::NAN.copysign(1.0)),
             ("-nan", f64::NAN.copysign(-1.0)),
             ("inf", f64::INFINITY),
             ("+inf", f64::INFINITY),
             ("-inf", f64::NEG_INFINITY),
-            // ("1e+400", std::f64::INFINITY),
+            // ("1e+400", f64::INFINITY),
         ];
         for &(input, expected) in &cases {
             dbg!(input);

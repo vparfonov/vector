@@ -20,6 +20,9 @@ characteristics:
 On top of this we support many operations that guarantee the same behavior
 across platforms.
 
+For more utilities to manipulate relative paths, see the
+[`relative-path-utils` crate].
+
 <br>
 
 ## Usage
@@ -27,7 +30,7 @@ across platforms.
 Add `relative-path` to your `Cargo.toml`:
 
 ```toml
-relative-path = "1.9.0"
+relative-path = "1.9.2"
 ```
 
 Start using relative paths:
@@ -273,3 +276,4 @@ assert_eq!(
 [`to_path`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_path
 [windows-reserved]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
 [windows-case]: https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity
+[`relative-path-utils` crate]: https://docs.rs/relative-path-utils

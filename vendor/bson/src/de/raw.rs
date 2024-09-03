@@ -14,6 +14,7 @@ use serde::{
 use crate::{
     oid::ObjectId,
     raw::{RawBinaryRef, RAW_ARRAY_NEWTYPE, RAW_BSON_NEWTYPE, RAW_DOCUMENT_NEWTYPE},
+    serde_helpers::HUMAN_READABLE_NEWTYPE,
     spec::{BinarySubtype, ElementType},
     uuid::UUID_NEWTYPE_NAME,
     Bson,
@@ -51,6 +52,8 @@ pub(crate) struct Deserializer<'de> {
     /// but given that there's no difference between deserializing an embedded document and a
     /// top level one, the distinction isn't necessary.
     current_type: ElementType,
+
+    human_readable: bool,
 }
 
 /// Enum used to determine what the type of document being deserialized is in
@@ -65,6 +68,7 @@ impl<'de> Deserializer<'de> {
         Self {
             bytes: BsonBuf::new(buf, utf8_lossy),
             current_type: ElementType::EmbeddedDocument,
+            human_readable: false,
         }
     }
 
@@ -208,15 +212,6 @@ impl<'de> Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        if let DeserializerHint::BinarySubtype(expected_st) = hint {
-            if self.current_type != ElementType::Binary {
-                return Err(Error::custom(format!(
-                    "expected Binary with subtype {:?}, instead got {:?}",
-                    expected_st, self.current_type
-                )));
-            }
-        }
-
         match self.current_type {
             ElementType::Int32 => visitor.visit_i32(read_i32(&mut self.bytes)?),
             ElementType::Int64 => visitor.visit_i64(read_i64(&mut self.bytes)?),
@@ -300,6 +295,7 @@ impl<'de> Deserializer<'de> {
                         let doc = Bson::JavaScriptCode(code).into_extended_document(false);
                         visitor.visit_map(MapDeserializer::new(
                             doc,
+                            #[allow(deprecated)]
                             DeserializerOptions::builder().human_readable(false).build(),
                         ))
                     }
@@ -357,6 +353,7 @@ impl<'de> Deserializer<'de> {
                         let doc = Bson::Symbol(symbol).into_extended_document(false);
                         visitor.visit_map(MapDeserializer::new(
                             doc,
+                            #[allow(deprecated)]
                             DeserializerOptions::builder().human_readable(false).build(),
                         ))
                     }
@@ -463,12 +460,19 @@ impl<'de, 'a> serde::de::Deserializer<'de> for &'a mut Deserializer<'de> {
 
                 self.deserialize_next(visitor, DeserializerHint::RawBson)
             }
+            HUMAN_READABLE_NEWTYPE => {
+                let old = self.human_readable;
+                self.human_readable = true;
+                let result = visitor.visit_newtype_struct(&mut *self);
+                self.human_readable = old;
+                result
+            }
             _ => visitor.visit_newtype_struct(self),
         }
     }
 
     fn is_human_readable(&self) -> bool {
-        false
+        self.human_readable
     }
 
     forward_to_deserialize_any! {
@@ -1316,14 +1320,14 @@ impl<'de, 'a> CodeWithScopeDeserializer<'de, 'a> {
         F: FnOnce(&mut Self) -> Result<O>,
     {
         let start_bytes = self.root_deserializer.bytes.bytes_read();
-        let out = f(self);
+        let out = f(self)?;
         let bytes_read = self.root_deserializer.bytes.bytes_read() - start_bytes;
         self.length_remaining -= bytes_read as i32;
 
         if self.length_remaining < 0 {
             return Err(Error::custom("length of CodeWithScope too short"));
         }
-        out
+        Ok(out)
     }
 }
 

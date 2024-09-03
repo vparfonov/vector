@@ -76,10 +76,6 @@ pub const API_DEFAULT_VERSION: &ClientVersion = &ClientVersion {
     minor_version: 44,
 };
 
-/// 2 years from ct_logs 0.9 release
-#[cfg(feature = "ct_logs")]
-const TIMESTAMP_CT_LOGS_EXPIRY: u64 = 1681908462;
-
 #[derive(Debug, Clone)]
 pub(crate) enum ClientType {
     #[cfg(unix)]
@@ -389,7 +385,6 @@ impl Docker {
     ///  - The certificate directory is sourced from the `DOCKER_CERT_PATH` environment variable.
     ///  - Certificates are named `key.pem`, `cert.pem` and `ca.pem` to indicate the private key,
     ///  the server certificate and the certificate chain respectively.
-    ///  - The number of threads used for the HTTP connection pool defaults to 1.
     ///  - The request timeout defaults to 2 minutes.
     ///
     /// # Examples
@@ -492,7 +487,9 @@ impl Docker {
         let https_connector: HttpsConnector<HttpConnector> =
             HttpsConnector::from((http_connector, config));
 
-        let client_builder = Client::builder(TokioExecutor::new());
+        let mut client_builder = Client::builder(TokioExecutor::new());
+        client_builder.pool_max_idle_per_host(0);
+
         let client = client_builder.build(https_connector);
         let transport = Transport::Https { client };
         let docker = Docker {
@@ -568,7 +565,9 @@ impl Docker {
 
         let http_connector = HttpConnector::new();
 
-        let client_builder = Client::builder(TokioExecutor::new());
+        let mut client_builder = Client::builder(TokioExecutor::new());
+        client_builder.pool_max_idle_per_host(0);
+
         let client = client_builder.build(http_connector);
         let transport = Transport::Http { client };
         let docker = Docker {
@@ -746,7 +745,8 @@ impl Docker {
 
         let unix_connector = UnixConnector;
 
-        let client_builder = Client::builder(TokioExecutor::new());
+        let mut client_builder = Client::builder(TokioExecutor::new());
+        client_builder.pool_max_idle_per_host(0);
 
         let client = client_builder.build(unix_connector);
         let transport = Transport::Unix { client };
@@ -823,6 +823,8 @@ impl Docker {
 
         let mut client_builder = Client::builder(TokioExecutor::new());
         client_builder.http1_title_case_headers(true);
+        client_builder.pool_max_idle_per_host(0);
+
         let client = client_builder.build(named_pipe_connector);
         let transport = Transport::NamedPipe { client };
         let docker = Docker {

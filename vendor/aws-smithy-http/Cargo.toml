@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "aws-smithy-http"
-version = "0.60.7"
+version = "0.60.10"
 authors = [
     "AWS Rust SDK Team <aws-sdk-rust@amazon.com>",
     "Russell Cohen <rcoh@amazon.com>",
@@ -39,14 +39,14 @@ version = "0.60.4"
 optional = true
 
 [dependencies.aws-smithy-runtime-api]
-version = "1.2.0"
+version = "1.7.2"
 features = [
     "client",
     "http-02x",
 ]
 
 [dependencies.aws-smithy-types]
-version = "1.1.8"
+version = "1.2.4"
 features = [
     "byte-stream-poll-next",
     "http-body-0-4-x",
@@ -61,11 +61,13 @@ version = "0.1"
 [dependencies.futures-core]
 version = "0.3.29"
 
-[dependencies.http]
+[dependencies.http-02x]
 version = "0.2.3"
+package = "http"
 
-[dependencies.http-body]
+[dependencies.http-body-04x]
 version = "0.4.4"
+package = "http-body"
 
 [dependencies.once_cell]
 version = "1.10"

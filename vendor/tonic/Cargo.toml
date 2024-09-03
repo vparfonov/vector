@@ -12,13 +12,13 @@
 [package]
 edition = "2021"
 name = "tonic"
-version = "0.10.2"
+version = "0.11.0"
 authors = ["Lucio Franco <luciofranco14@gmail.com>"]
 description = """
 A gRPC over HTTP/2 implementation focused on high performance, interoperability, and flexibility.
 """
 homepage = "https://github.com/hyperium/tonic"
-documentation = "https://docs.rs/tonic/0.10.2"
+documentation = "https://docs.rs/tonic/0.11.0"
 readme = "README.md"
 keywords = [
     "rpc",
@@ -70,7 +70,7 @@ version = "1.0"
 optional = true
 
 [dependencies.h2]
-version = "0.3.17"
+version = "0.3.24"
 optional = true
 
 [dependencies.http]
@@ -100,15 +100,15 @@ features = ["std"]
 optional = true
 default-features = false
 
-[dependencies.rustls]
-version = "0.21.7"
-optional = true
-
 [dependencies.rustls-native-certs]
-version = "0.6.3"
+version = "0.7"
 optional = true
 
 [dependencies.rustls-pemfile]
+version = "2.0"
+optional = true
+
+[dependencies.rustls-pki-types]
 version = "1.0"
 optional = true
 
@@ -116,7 +116,7 @@ optional = true
 version = "1.0.1"
 
 [dependencies.tokio-rustls]
-version = "0.24.1"
+version = "0.25"
 optional = true
 
 [dependencies.tokio-stream]
@@ -147,7 +147,11 @@ version = "0.3"
 version = "0.1"
 
 [dependencies.webpki-roots]
-version = "0.25.0"
+version = "0.26"
+optional = true
+
+[dependencies.zstd]
+version = "0.12.3"
 optional = true
 
 [dev-dependencies.bencher]
@@ -187,10 +191,10 @@ default = [
 gzip = ["dep:flate2"]
 prost = ["dep:prost"]
 tls = [
+    "dep:rustls-pki-types",
     "dep:rustls-pemfile",
     "transport",
     "dep:tokio-rustls",
-    "dep:rustls",
     "tokio/rt",
     "tokio/macros",
 ]
@@ -214,3 +218,4 @@ transport = [
     "dep:tower",
     "dep:hyper-timeout",
 ]
+zstd = ["dep:zstd"]

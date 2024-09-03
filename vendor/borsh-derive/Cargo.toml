@@ -11,10 +11,11 @@
 
 [package]
 edition = "2018"
-rust-version = "1.66.0"
+rust-version = "1.67.0"
 name = "borsh-derive"
-version = "1.2.0"
+version = "1.5.1"
 authors = ["Near Inc <hello@nearprotocol.com>"]
+exclude = ["*.snap"]
 description = """
 Binary Object Representation Serializer for Hashing
 """
@@ -25,7 +26,7 @@ categories = [
     "network-programming",
 ]
 license = "Apache-2.0"
-repository = "https://github.com/nearprotocol/borsh"
+repository = "https://github.com/near/borsh-rs"
 
 [package.metadata.docs.rs]
 features = ["schema"]
@@ -38,7 +39,7 @@ proc-macro = true
 version = "1.18.0"
 
 [dependencies.proc-macro-crate]
-version = "2"
+version = "3"
 
 [dependencies.proc-macro2]
 version = "1"

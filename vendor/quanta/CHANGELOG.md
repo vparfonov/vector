@@ -8,6 +8,13 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased] - ReleaseDate
 
+## [0.12.3] - 2024-03-31
+
+### Changed
+
+- Disabled counter support on iOS targets even if AArch64 is present. This is due to an issue where
+  the necessary CPU instruction for reading the counter is not available on iOS.
+
 ## [0.12.2] - 2023-12-31
 
 ### Fixed
@@ -246,7 +253,8 @@ description for the finer details.  All changes below are part of the aforementi
 - Initial commit.
 
 <!-- next-url -->
-[Unreleased]: https://github.com/metrics-rs/quanta/compare/v0.12.2...HEAD
+[Unreleased]: https://github.com/metrics-rs/quanta/compare/v0.12.3...HEAD
+[0.12.3]: https://github.com/metrics-rs/quanta/compare/v0.12.2...v0.12.3
 [0.12.2]: https://github.com/metrics-rs/quanta/compare/v0.12.1...v0.12.2
 [0.12.1]: https://github.com/metrics-rs/quanta/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/metrics-rs/quanta/compare/v0.11.1...v0.12.0

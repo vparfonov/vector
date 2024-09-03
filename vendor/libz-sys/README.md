@@ -1,6 +1,6 @@
 # libz-sys
 
-A common library for linking `libz` to rust programs (also known as zlib).
+A common library for linking `libz` to Rust programs (also known as zlib).
 
 [Documentation](https://docs.rs/libz-sys)
 
@@ -33,15 +33,21 @@ if any library crate in your dependency graph wants stock zlib, `libz-sys` will
 use stock zlib.
 
 Library crates depending on `libz-sys` should use:
+
+```toml
+libz-sys = { version = "1.1", default-features = false, features = ["libc"] }
 ```
-libz-sys = { version = "1.1.0", default-features = false, features = ["libc"] }
-```
+
 (Omit the `libc` feature if you don't require the corresponding functions.)
 
 This allows higher-level crates depending on your library to opt into zlib-ng
 if desired.
 
-Building zlib-ng requires `cmake`.
+Building zlib-ng requires `cmake` unless the
+`zlib-ng-no-cmake-experimental-community-maintained` feature is enabled,
+in which case `cc` is used instead. Note that this option enables _all_ compiler
+features that are supported for the given target, which may not compile on older
+compilers or targets without certain headers.
 
 Crates that don't require compatibility with the zlib C API, and use zlib
 exclusively from Rust or support the zlib-ng native C API (prefixed with
@@ -60,15 +66,15 @@ but we don't guarantee these will continue to work.
 
 This project is licensed under either of
 
- * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
-   http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT) or
-   http://opensource.org/licenses/MIT)
+* Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
+   <https://www.apache.org/licenses/LICENSE-2.0>)
+* MIT license ([LICENSE-MIT](LICENSE-MIT) or
+   <https://opensource.org/license/mit/>)
 
 at your option.
 
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted
-for inclusion in `libz-sys` by you, as defined in the Apache-2.0 license, shall be
-dual licensed as above, without any additional terms or conditions.
+for inclusion in `libz-sys` by you, as defined in the Apache-2.0 license, shall
+be dual licensed as above, without any additional terms or conditions.

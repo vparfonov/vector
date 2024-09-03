@@ -297,7 +297,7 @@
 //! [`erased-serde`]: https://github.com/dtolnay/erased-serde
 
 #![no_std]
-#![doc(html_root_url = "https://docs.rs/typetag/0.2.16")]
+#![doc(html_root_url = "https://docs.rs/typetag/0.2.18")]
 #![allow(
     clippy::missing_errors_doc,
     clippy::module_name_repetitions,
@@ -312,6 +312,7 @@ mod content;
 mod de;
 mod externally;
 mod internally;
+mod is_serialize_str;
 mod ser;
 
 use self::__private as private;

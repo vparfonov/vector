@@ -21,7 +21,7 @@ use {
 /// [Linux]: https://man7.org/linux/man-pages/man2/chdir.2.html
 #[inline]
 #[cfg(feature = "fs")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "fs")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
 pub fn chdir<P: path::Arg>(path: P) -> io::Result<()> {
     path.into_with_c_str(backend::process::syscalls::chdir)
 }
@@ -52,7 +52,7 @@ pub fn fchdir<Fd: AsFd>(fd: Fd) -> io::Result<()> {
 /// [Linux]: https://man7.org/linux/man-pages/man3/getcwd.3.html
 #[cfg(all(feature = "alloc", feature = "fs"))]
 #[cfg(not(target_os = "wasi"))]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "fs")))]
+#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
 #[inline]
 pub fn getcwd<B: Into<Vec<u8>>>(reuse: B) -> io::Result<CString> {
     _getcwd(reuse.into())
@@ -67,13 +67,15 @@ fn _getcwd(mut buffer: Vec<u8>) -> io::Result<CString> {
     loop {
         match backend::process::syscalls::getcwd(buffer.spare_capacity_mut()) {
             Err(io::Errno::RANGE) => {
-                buffer.reserve(buffer.capacity() + 1); // use `Vec` reallocation strategy to grow capacity exponentially
+                // Use `Vec` reallocation strategy to grow capacity
+                // exponentially.
+                buffer.reserve(buffer.capacity() + 1);
             }
             Ok(_) => {
                 // SAFETY:
                 // - "These functions return a null-terminated string"
-                // - [POSIX definition 3.375: String]: "A contiguous sequence of bytes
-                //   terminated by and including the first null byte."
+                // - [POSIX definition 3.375: String]: "A contiguous sequence
+                //   of bytes terminated by and including the first null byte."
                 //
                 // Thus, there will be a single NUL byte at the end of the
                 // string.

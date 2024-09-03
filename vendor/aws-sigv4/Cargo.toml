@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "aws-sigv4"
-version = "1.2.0"
+version = "1.2.3"
 authors = [
     "AWS Rust SDK Team <aws-sdk-rust@amazon.com>",
     "David Barsky <me@davidbarsky.com>",
@@ -48,21 +48,21 @@ harness = false
 required-features = ["sigv4a"]
 
 [dependencies.aws-credential-types]
-version = "1.1.8"
+version = "1.2.0"
 
 [dependencies.aws-smithy-eventstream]
 version = "0.60.4"
 optional = true
 
 [dependencies.aws-smithy-http]
-version = "0.60.7"
+version = "0.60.9"
 
 [dependencies.aws-smithy-runtime-api]
-version = "1.2.0"
+version = "1.7.1"
 features = ["client"]
 
 [dependencies.aws-smithy-types]
-version = "1.1.8"
+version = "1.2.0"
 
 [dependencies.bytes]
 version = "1"
@@ -124,14 +124,14 @@ version = "^1"
 optional = true
 
 [dev-dependencies.aws-credential-types]
-version = "1.1.8"
+version = "1.2.0"
 features = [
     "test-util",
     "hardcoded-credentials",
 ]
 
 [dev-dependencies.aws-smithy-runtime-api]
-version = "1.2.0"
+version = "1.7.1"
 features = [
     "client",
     "test-util",

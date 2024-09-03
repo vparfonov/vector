@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.63"
+rust-version = "1.64"
 name = "hyper-rustls"
-version = "0.26.0"
+version = "0.27.2"
 description = "Rustls+hyper integration for pure rust HTTPS"
 homepage = "https://github.com/rustls/hyper-rustls"
 documentation = "https://docs.rs/hyper-rustls/"
@@ -22,7 +22,16 @@ license = "Apache-2.0 OR ISC OR MIT"
 repository = "https://github.com/rustls/hyper-rustls"
 
 [package.metadata.docs.rs]
-all-features = true
+features = [
+    "http1",
+    "http2",
+    "webpki-tokio",
+    "native-tokio",
+    "ring",
+    "tls12",
+    "logging",
+]
+no-default-features = true
 rustdoc-args = [
     "--cfg",
     "docsrs",
@@ -39,7 +48,7 @@ required-features = [
 [[example]]
 name = "server"
 path = "examples/server.rs"
-required-features = ["ring"]
+required-features = ["aws-lc-rs"]
 
 [dependencies.futures-util]
 version = "0.3"
@@ -69,18 +78,22 @@ version = "1"
 package = "rustls-pki-types"
 
 [dependencies.rustls]
-version = "0.22"
+version = "0.23"
 default-features = false
 
 [dependencies.rustls-native-certs]
 version = "0.7"
 optional = true
 
+[dependencies.rustls-platform-verifier]
+version = "0.3"
+optional = true
+
 [dependencies.tokio]
 version = "1.0"
 
 [dependencies.tokio-rustls]
-version = "0.25"
+version = "0.26"
 default-features = false
 
 [dependencies.tower-service]
@@ -99,7 +112,7 @@ features = ["server-auto"]
 default-features = false
 
 [dev-dependencies.rustls]
-version = "0.22"
+version = "0.23"
 features = ["tls12"]
 default-features = false
 
@@ -116,12 +129,17 @@ features = [
 ]
 
 [features]
+aws-lc-rs = ["rustls/aws_lc_rs"]
 default = [
     "native-tokio",
     "http1",
     "tls12",
     "logging",
-    "ring",
+    "aws-lc-rs",
+]
+fips = [
+    "aws-lc-rs",
+    "rustls/fips",
 ]
 http1 = ["hyper-util/http1"]
 http2 = ["hyper-util/http2"]

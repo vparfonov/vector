@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.65"
 name = "der"
-version = "0.7.8"
+version = "0.7.9"
 authors = ["RustCrypto Developers"]
 description = """
 Pure Rust embedded-friendly implementation of the Distinguished Encoding Rules

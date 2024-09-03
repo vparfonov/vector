@@ -39,6 +39,7 @@ const AT_HWCAP2: c::c_ulong = 26;
 const AT_SECURE: c::c_ulong = 23;
 const AT_EXECFN: c::c_ulong = 31;
 const AT_SYSINFO_EHDR: c::c_ulong = 33;
+const AT_MINSIGSTKSZ: c::c_ulong = 51;
 
 // Declare `sysconf` ourselves so that we don't depend on all of libc just for
 // this.
@@ -64,6 +65,7 @@ fn test_abi() {
     const_assert_eq!(self::AT_EXECFN, ::libc::AT_EXECFN);
     const_assert_eq!(self::AT_SECURE, ::libc::AT_SECURE);
     const_assert_eq!(self::AT_SYSINFO_EHDR, ::libc::AT_SYSINFO_EHDR);
+    const_assert_eq!(self::AT_MINSIGSTKSZ, ::libc::AT_MINSIGSTKSZ);
     #[cfg(feature = "runtime")]
     const_assert_eq!(self::AT_PHDR, ::libc::AT_PHDR);
     #[cfg(feature = "runtime")]
@@ -110,6 +112,22 @@ pub(crate) fn linux_hwcap() -> (usize, usize) {
 
 #[cfg(feature = "param")]
 #[inline]
+pub(crate) fn linux_minsigstksz() -> usize {
+    #[cfg(not(feature = "runtime"))]
+    if let Some(libc_getauxval) = getauxval.get() {
+        unsafe { libc_getauxval(AT_MINSIGSTKSZ) as usize }
+    } else {
+        0
+    }
+
+    #[cfg(feature = "runtime")]
+    unsafe {
+        getauxval(AT_MINSIGSTKSZ) as usize
+    }
+}
+
+#[cfg(feature = "param")]
+#[inline]
 pub(crate) fn linux_execfn() -> &'static CStr {
     #[cfg(not(feature = "runtime"))]
     unsafe {
@@ -143,8 +161,8 @@ pub(crate) fn exe_phdrs() -> (*const c::c_void, usize, usize) {
     }
 }
 
-/// `AT_SYSINFO_EHDR` isn't present on all platforms in all configurations,
-/// so if we don't see it, this function returns a null pointer.
+/// `AT_SYSINFO_EHDR` isn't present on all platforms in all configurations, so
+/// if we don't see it, this function returns a null pointer.
 #[inline]
 pub(in super::super) fn sysinfo_ehdr() -> *const Elf_Ehdr {
     #[cfg(not(feature = "runtime"))]

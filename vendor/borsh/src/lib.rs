@@ -35,15 +35,18 @@
   Gates implementation of [BorshSerialize] and [BorshDeserialize]
   for [`Rc<T>`](std::rc::Rc)/[`Arc<T>`](std::sync::Arc) respectively.
   In `no_std` setting `Rc`/`Arc` are pulled from `alloc` crate.
+  Serializing and deserializing these types
+  does not preserve identity and may result in multiple copies of the same data.
+  Be sure that this is what you want before enabling this feature.
 * **hashbrown** -
   Pulls in [HashMap](std::collections::HashMap)/[HashSet](std::collections::HashSet) when no `std` is available.
   This feature is set to be mutually exclusive with **std** feature.
 * **bytes** -
   Gates implementation of [BorshSerialize] and [BorshDeserialize]
-  for [Bytes](bytes::Bytes) and [BytesMut](bytes::BytesMut).
+  for [Bytes](https://docs.rs/bytes/1.5.0/bytes/struct.Bytes.html) and [BytesMut](https://docs.rs/bytes/1.5.0/bytes/struct.BytesMut.html).
 * **bson** -
   Gates implementation of [BorshSerialize] and [BorshDeserialize]
-  for [ObjectId](bson::oid::ObjectId).
+  for [ObjectId](https://docs.rs/bson/2.9.0/bson/oid/struct.ObjectId.html).
 * **ascii** -
   Gates implementation of [BorshSerialize], [BorshDeserialize], [BorshSchema] for
   types from [ascii](https://docs.rs/ascii/1.1.0/ascii/) crate.

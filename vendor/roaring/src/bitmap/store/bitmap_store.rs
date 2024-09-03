@@ -3,10 +3,12 @@ use core::cmp::Ordering;
 use core::fmt::{Display, Formatter};
 use core::ops::{BitAndAssign, BitOrAssign, BitXorAssign, RangeInclusive, SubAssign};
 
-use alloc::boxed::Box;
-use alloc::vec::Vec;
-
 use super::ArrayStore;
+
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 pub const BITMAP_LENGTH: usize = 1024;
 
@@ -237,6 +239,10 @@ impl BitmapStore {
 
     pub fn len(&self) -> u64 {
         self.len
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 
     pub fn min(&self) -> Option<u16> {

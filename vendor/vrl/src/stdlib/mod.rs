@@ -59,6 +59,7 @@ cfg_if::cfg_if! {
         mod decode_zstd;
         mod decrypt;
         mod del;
+        mod dns_lookup;
         mod downcase;
         mod encode_base16;
         mod encode_base64;
@@ -204,6 +205,7 @@ cfg_if::cfg_if! {
         mod unique;
         mod unnest;
         mod upcase;
+        mod uuid_from_friendly_id;
         mod uuid_v4;
         mod uuid_v7;
         mod values;
@@ -232,6 +234,7 @@ cfg_if::cfg_if! {
         pub use decode_zstd::DecodeZstd;
         pub use decrypt::Decrypt;
         pub use del::Del;
+        pub use dns_lookup::DnsLookup;
         pub use downcase::Downcase;
         pub use encode_base16::EncodeBase16;
         pub use encode_base64::EncodeBase64;
@@ -373,6 +376,7 @@ cfg_if::cfg_if! {
         pub use unique::Unique;
         pub use unnest::Unnest;
         pub use upcase::Upcase;
+        pub use uuid_from_friendly_id::UuidFromFriendlyId;
         pub use uuid_v4::UuidV4;
         pub use uuid_v7::UuidV7;
         pub use values::Values;
@@ -409,6 +413,7 @@ pub fn all() -> Vec<Box<dyn Function>> {
         Box::new(DecodeZstd),
         Box::new(Decrypt),
         Box::new(Del),
+        Box::new(DnsLookup),
         Box::new(Downcase),
         Box::new(EncodeBase16),
         Box::new(EncodeBase64),
@@ -553,6 +558,7 @@ pub fn all() -> Vec<Box<dyn Function>> {
         Box::new(Unique),
         Box::new(Unnest),
         Box::new(Upcase),
+        Box::new(UuidFromFriendlyId),
         Box::new(UuidV4),
         Box::new(UuidV7),
         Box::new(Values),

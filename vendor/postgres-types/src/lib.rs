@@ -168,6 +168,13 @@
 //!   'Happy'
 //! );
 //! ```
+//!
+//! ```rust
+//! # #[cfg(feature = "derive")]
+//! use postgres_types::{ToSql, FromSql};
+//!
+//! # #[cfg(feature = "derive")]
+//! #[derive(Debug, ToSql, FromSql)]
 //! #[postgres(allow_mismatch)]
 //! enum Mood {
 //!    Happy,
@@ -1215,7 +1222,7 @@ impl ToSql for IpAddr {
 }
 
 fn downcast(len: usize) -> Result<i32, Box<dyn Error + Sync + Send>> {
-    if len > i32::max_value() as usize {
+    if len > i32::MAX as usize {
         Err("value too large to transmit".into())
     } else {
         Ok(len as i32)

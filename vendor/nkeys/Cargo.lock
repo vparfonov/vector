@@ -256,7 +256,7 @@ checksum = "f46882e17999c6cc590af592290432be3bce0428cb0d5f8b6715e4dc7b383eb3"
 dependencies = [
  "proc-macro2 1.0.86",
  "quote 1.0.36",
- "syn 2.0.72",
+ "syn 2.0.71",
 ]
 
 [[package]]
@@ -527,7 +527,7 @@ dependencies = [
 
 [[package]]
 name = "nkeys"
-version = "0.4.3"
+version = "0.4.2"
 dependencies = [
  "crypto_box",
  "data-encoding",
@@ -547,9 +547,9 @@ dependencies = [
 
 [[package]]
 name = "object"
-version = "0.36.2"
+version = "0.36.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f203fa8daa7bb185f760ae12bd8e097f63d17041dcdcaf675ac54cdf863170e"
+checksum = "081b846d1d56ddfc18fdf1a922e4f6e07a11768ea1b92dec44e42b72712ccfce"
 dependencies = [
  "memchr",
 ]
@@ -830,7 +830,7 @@ checksum = "e0cd7e117be63d3c3678776753929474f3b04a43a080c744d6b0ae2a8c28e222"
 dependencies = [
  "proc-macro2 1.0.86",
  "quote 1.0.36",
- "syn 2.0.72",
+ "syn 2.0.71",
 ]
 
 [[package]]
@@ -969,9 +969,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "2.0.72"
+version = "2.0.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc4b9b9bf2add8093d3f2c0204471e951b2285580335de42f9d2534f3ae7a8af"
+checksum = "b146dcf730474b4bcd16c311627b31ede9ab149045db4d6088b3becaea046462"
 dependencies = [
  "proc-macro2 1.0.86",
  "quote 1.0.36",

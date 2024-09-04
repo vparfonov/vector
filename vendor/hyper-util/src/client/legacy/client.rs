@@ -13,13 +13,11 @@ use std::time::Duration;
 
 use futures_util::future::{self, Either, FutureExt, TryFutureExt};
 use http::uri::Scheme;
-use hyper::client::conn::TrySendError as ConnTrySendError;
 use hyper::header::{HeaderValue, HOST};
 use hyper::rt::Timer;
 use hyper::{body::Body, Method, Request, Response, Uri, Version};
 use tracing::{debug, trace, warn};
 
-use super::connect::capture::CaptureConnectionExtension;
 #[cfg(feature = "tokio")]
 use super::connect::HttpConnector;
 use super::connect::{Alpn, Connect, Connected, Connection};
@@ -53,11 +51,10 @@ struct Config {
 }
 
 /// Client errors
+#[derive(Debug)]
 pub struct Error {
     kind: ErrorKind,
     source: Option<Box<dyn StdError + Send + Sync>>,
-    #[cfg(any(feature = "http1", feature = "http2"))]
-    connect_info: Option<Connected>,
 }
 
 #[derive(Debug)]
@@ -76,25 +73,18 @@ macro_rules! e {
         Error {
             kind: ErrorKind::$kind,
             source: None,
-            connect_info: None,
         }
     };
     ($kind:ident, $src:expr) => {
         Error {
             kind: ErrorKind::$kind,
             source: Some($src.into()),
-            connect_info: None,
         }
     };
 }
 
 // We might change this... :shrug:
 type PoolKey = (http::uri::Scheme, http::uri::Authority);
-
-enum TrySendError<B> {
-    Retryable { error: Error, req: Request<B> },
-    Nope(Error),
-}
 
 /// A `Future` that will resolve to an HTTP Response.
 ///
@@ -233,7 +223,8 @@ where
         ResponseFuture::new(self.clone().send_request(req, pool_key))
     }
 
-    async fn send_request(
+    /*
+    async fn retryably_send_request(
         self,
         mut req: Request<B>,
         pool_key: PoolKey,
@@ -241,19 +232,23 @@ where
         let uri = req.uri().clone();
 
         loop {
-            req = match self.try_send_request(req, pool_key.clone()).await {
+            req = match self.send_request(req, pool_key.clone()).await {
                 Ok(resp) => return Ok(resp),
-                Err(TrySendError::Nope(err)) => return Err(err),
-                Err(TrySendError::Retryable { mut req, error }) => {
-                    if !self.config.retry_canceled_requests {
+                Err(ClientError::Normal(err)) => return Err(err),
+                Err(ClientError::Canceled {
+                    connection_reused,
+                    mut req,
+                    reason,
+                }) => {
+                    if !self.config.retry_canceled_requests || !connection_reused {
                         // if client disabled, don't retry
                         // a fresh connection means we definitely can't retry
-                        return Err(error);
+                        return Err(reason);
                     }
 
                     trace!(
                         "unstarted request canceled, trying again (reason={:?})",
-                        error
+                        reason
                     );
                     *req.uri_mut() = uri.clone();
                     req
@@ -261,29 +256,19 @@ where
             }
         }
     }
+    */
 
-    async fn try_send_request(
-        &self,
+    async fn send_request(
+        self,
         mut req: Request<B>,
         pool_key: PoolKey,
-    ) -> Result<Response<hyper::body::Incoming>, TrySendError<B>> {
-        let mut pooled = self
-            .connection_for(pool_key)
-            .await
-            // `connection_for` already retries checkout errors, so if
-            // it returns an error, there's not much else to retry
-            .map_err(TrySendError::Nope)?;
-
-        req.extensions_mut()
-            .get_mut::<CaptureConnectionExtension>()
-            .map(|conn| conn.set(&pooled.conn_info));
+    ) -> Result<Response<hyper::body::Incoming>, Error> {
+        let mut pooled = self.connection_for(pool_key).await?;
 
         if pooled.is_http1() {
             if req.version() == Version::HTTP_2 {
                 warn!("Connection is HTTP/1, but request requires HTTP/2");
-                return Err(TrySendError::Nope(
-                    e!(UserUnsupportedVersion).with_connect_info(pooled.conn_info.clone()),
-                ));
+                return Err(e!(UserUnsupportedVersion));
             }
 
             if self.config.set_host {
@@ -312,30 +297,18 @@ where
             authority_form(req.uri_mut());
         }
 
-        let mut res = match pooled.try_send_request(req).await {
-            Ok(res) => res,
-            Err(mut err) => {
-                return if let Some(req) = err.take_message() {
-                    Err(TrySendError::Retryable {
-                        error: e!(Canceled, err.into_error())
-                            .with_connect_info(pooled.conn_info.clone()),
-                        req,
-                    })
-                } else {
-                    Err(TrySendError::Nope(
-                        e!(SendRequest, err.into_error())
-                            .with_connect_info(pooled.conn_info.clone()),
-                    ))
-                }
-            }
-        };
+        let fut = pooled.send_request(req);
         //.send_request_retryable(req)
         //.map_err(ClientError::map_with_reused(pooled.is_reused()));
 
         // If the Connector included 'extra' info, add to Response...
-        if let Some(extra) = &pooled.conn_info.extra {
-            extra.set(res.extensions_mut());
-        }
+        let extra_info = pooled.conn_info.extra.clone();
+        let fut = fut.map_ok(move |mut res| {
+            if let Some(extra) = extra_info {
+                extra.set(res.extensions_mut());
+            }
+            res
+        });
 
         // As of futures@0.1.21, there is a race condition in the mpsc
         // channel, such that sending when the receiver is closing can
@@ -345,8 +318,10 @@ where
         // To counteract this, we must check if our senders 'want' channel
         // has been closed after having tried to send. If so, error out...
         if pooled.is_closed() {
-            return Ok(res);
+            return fut.await;
         }
+
+        let res = fut.await?;
 
         // If pooled is HTTP/2, we can toss this reference immediately.
         //
@@ -750,10 +725,6 @@ impl<B> PoolClient<B> {
         }
     }
 
-    fn is_poisoned(&self) -> bool {
-        self.conn_info.poisoned.poisoned()
-    }
-
     fn is_ready(&self) -> bool {
         match self.tx {
             #[cfg(feature = "http1")]
@@ -774,36 +745,38 @@ impl<B> PoolClient<B> {
 }
 
 impl<B: Body + 'static> PoolClient<B> {
-    fn try_send_request(
+    fn send_request(
         &mut self,
         req: Request<B>,
-    ) -> impl Future<Output = Result<Response<hyper::body::Incoming>, ConnTrySendError<Request<B>>>>
+    ) -> impl Future<Output = Result<Response<hyper::body::Incoming>, Error>>
     where
         B: Send,
     {
         #[cfg(all(feature = "http1", feature = "http2"))]
         return match self.tx {
             #[cfg(feature = "http1")]
-            PoolTx::Http1(ref mut tx) => Either::Left(tx.try_send_request(req)),
+            PoolTx::Http1(ref mut tx) => Either::Left(tx.send_request(req)),
             #[cfg(feature = "http2")]
-            PoolTx::Http2(ref mut tx) => Either::Right(tx.try_send_request(req)),
-        };
+            PoolTx::Http2(ref mut tx) => Either::Right(tx.send_request(req)),
+        }
+        .map_err(Error::tx);
 
         #[cfg(feature = "http1")]
         #[cfg(not(feature = "http2"))]
         return match self.tx {
             #[cfg(feature = "http1")]
-            PoolTx::Http1(ref mut tx) => tx.try_send_request(req),
-        };
+            PoolTx::Http1(ref mut tx) => tx.send_request(req),
+        }
+        .map_err(Error::tx);
 
         #[cfg(not(feature = "http1"))]
         #[cfg(feature = "http2")]
         return match self.tx {
             #[cfg(feature = "http2")]
-            PoolTx::Http2(ref mut tx) => tx.try_send_request(req),
-        };
+            PoolTx::Http2(ref mut tx) => tx.send_request(req),
+        }
+        .map_err(Error::tx);
     }
-
     /*
     //TODO: can we re-introduce this somehow? Or must people use tower::retry?
     fn send_request_retryable(
@@ -830,7 +803,7 @@ where
     B: Send + 'static,
 {
     fn is_open(&self) -> bool {
-        !self.is_poisoned() && self.is_ready()
+        self.is_ready()
     }
 
     fn reserve(self) -> pool::Reservation<Self> {
@@ -1026,7 +999,7 @@ impl Builder {
             h2_builder: hyper::client::conn::http2::Builder::new(exec),
             pool_config: pool::Config {
                 idle_timeout: Some(Duration::from_secs(90)),
-                max_idle_per_host: usize::MAX,
+                max_idle_per_host: std::usize::MAX,
             },
             pool_timer: None,
         }
@@ -1261,28 +1234,6 @@ impl Builder {
         self
     }
 
-    /// Set the maximum number of headers.
-    ///
-    /// When a response is received, the parser will reserve a buffer to store headers for optimal
-    /// performance.
-    ///
-    /// If client receives more headers than the buffer size, the error "message header too large"
-    /// is returned.
-    ///
-    /// The headers is allocated on the stack by default, which has higher performance. After
-    /// setting this value, headers will be allocated in heap memory, that is, heap memory
-    /// allocation will occur for each response, and there will be a performance drop of about 5%.
-    ///
-    /// Note that this setting does not affect HTTP/2.
-    ///
-    /// Default is 100.
-    #[cfg(feature = "http1")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "http1")))]
-    pub fn http1_max_headers(&mut self, val: usize) -> &mut Self {
-        self.h1_builder.max_headers(val);
-        self
-    }
-
     /// Set whether HTTP/0.9 responses should be tolerated.
     ///
     /// Default is false.
@@ -1307,22 +1258,6 @@ impl Builder {
     #[cfg_attr(docsrs, doc(cfg(feature = "http2")))]
     pub fn http2_only(&mut self, val: bool) -> &mut Self {
         self.client_config.ver = if val { Ver::Http2 } else { Ver::Auto };
-        self
-    }
-
-    /// Configures the maximum number of pending reset streams allowed before a GOAWAY will be sent.
-    ///
-    /// This will default to the default value set by the [`h2` crate](https://crates.io/crates/h2).
-    /// As of v0.4.0, it is 20.
-    ///
-    /// See <https://github.com/hyperium/hyper/issues/2877> for more information.
-    #[cfg(feature = "http2")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "http2")))]
-    pub fn http2_max_pending_accept_reset_streams(
-        &mut self,
-        max: impl Into<Option<usize>>,
-    ) -> &mut Self {
-        self.h2_builder.max_pending_accept_reset_streams(max.into());
         self
     }
 
@@ -1353,26 +1288,6 @@ impl Builder {
         sz: impl Into<Option<u32>>,
     ) -> &mut Self {
         self.h2_builder.initial_connection_window_size(sz.into());
-        self
-    }
-
-    /// Sets the initial maximum of locally initiated (send) streams.
-    ///
-    /// This value will be overwritten by the value included in the initial
-    /// SETTINGS frame received from the peer as part of a [connection preface].
-    ///
-    /// Passing `None` will do nothing.
-    ///
-    /// If not set, hyper will use a default.
-    ///
-    /// [connection preface]: https://httpwg.org/specs/rfc9113.html#preface
-    #[cfg(feature = "http2")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "http2")))]
-    pub fn http2_initial_max_send_streams(
-        &mut self,
-        initial: impl Into<Option<usize>>,
-    ) -> &mut Self {
-        self.h2_builder.initial_max_send_streams(initial);
         self
     }
 
@@ -1541,7 +1456,7 @@ impl Builder {
         self
     }
 
-    /// Build a client with this configuration and the default `HttpConnector`.
+    /// Builder a client with this configuration and the default `HttpConnector`.
     #[cfg(feature = "tokio")]
     pub fn build_http<B>(&self) -> Client<HttpConnector, B>
     where
@@ -1588,17 +1503,6 @@ impl fmt::Debug for Builder {
 
 // ==== impl Error ====
 
-impl fmt::Debug for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut f = f.debug_tuple("hyper_util::client::legacy::Error");
-        f.field(&self.kind);
-        if let Some(ref cause) = self.source {
-            f.field(cause);
-        }
-        f.finish()
-    }
-}
-
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "client error ({:?})", self.kind)
@@ -1617,19 +1521,6 @@ impl Error {
         matches!(self.kind, ErrorKind::Connect)
     }
 
-    /// Returns the info of the client connection on which this error occurred.
-    #[cfg(any(feature = "http1", feature = "http2"))]
-    pub fn connect_info(&self) -> Option<&Connected> {
-        self.connect_info.as_ref()
-    }
-
-    #[cfg(any(feature = "http1", feature = "http2"))]
-    fn with_connect_info(self, connect_info: Connected) -> Self {
-        Self {
-            connect_info: Some(connect_info),
-            ..self
-        }
-    }
     fn is_canceled(&self) -> bool {
         matches!(self.kind, ErrorKind::Canceled)
     }

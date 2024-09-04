@@ -116,17 +116,20 @@ fn array() {
 
 #[test]
 fn empty() {
-    check(&[], rayon::iter::empty::<i32>);
+    let v = vec![42];
+    check(&v[..0], rayon::iter::empty);
 }
 
 #[test]
 fn once() {
-    check(&[42], || rayon::iter::once(42));
+    let v = vec![42];
+    check(&v, || rayon::iter::once(42));
 }
 
 #[test]
 fn option() {
-    check(&[42], || Some(42));
+    let v = vec![42];
+    check(&v, || Some(42));
 }
 
 #[test]

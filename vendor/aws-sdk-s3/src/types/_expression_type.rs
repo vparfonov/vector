@@ -91,11 +91,3 @@ impl ExpressionType {
         }
     }
 }
-impl ::std::fmt::Display for ExpressionType {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            ExpressionType::Sql => write!(f, "SQL"),
-            ExpressionType::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

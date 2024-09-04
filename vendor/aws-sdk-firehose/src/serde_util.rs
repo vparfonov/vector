@@ -165,6 +165,9 @@ pub(crate) fn redshift_destination_description_correct_errors(
             crate::serde_util::copy_command_correct_errors(builder).build().ok()
         }
     }
+    if builder.username.is_none() {
+        builder.username = Some(Default::default())
+    }
     if builder.s3_destination_description.is_none() {
         builder.s3_destination_description = {
             let builder = crate::types::builders::S3DestinationDescriptionBuilder::default();
@@ -217,24 +220,6 @@ pub(crate) fn document_id_options_correct_errors(
     builder
 }
 
-pub(crate) fn secrets_manager_configuration_correct_errors(
-    mut builder: crate::types::builders::SecretsManagerConfigurationBuilder,
-) -> crate::types::builders::SecretsManagerConfigurationBuilder {
-    if builder.enabled.is_none() {
-        builder.enabled = Some(Default::default())
-    }
-    builder
-}
-
-pub(crate) fn snowflake_vpc_configuration_correct_errors(
-    mut builder: crate::types::builders::SnowflakeVpcConfigurationBuilder,
-) -> crate::types::builders::SnowflakeVpcConfigurationBuilder {
-    if builder.private_link_vpce_id.is_none() {
-        builder.private_link_vpce_id = Some(Default::default())
-    }
-    builder
-}
-
 pub(crate) fn vpc_configuration_description_correct_errors(
     mut builder: crate::types::builders::VpcConfigurationDescriptionBuilder,
 ) -> crate::types::builders::VpcConfigurationDescriptionBuilder {
@@ -249,18 +234,6 @@ pub(crate) fn vpc_configuration_description_correct_errors(
     }
     if builder.vpc_id.is_none() {
         builder.vpc_id = Some(Default::default())
-    }
-    builder
-}
-
-pub(crate) fn destination_table_configuration_correct_errors(
-    mut builder: crate::types::builders::DestinationTableConfigurationBuilder,
-) -> crate::types::builders::DestinationTableConfigurationBuilder {
-    if builder.destination_table_name.is_none() {
-        builder.destination_table_name = Some(Default::default())
-    }
-    if builder.destination_database_name.is_none() {
-        builder.destination_database_name = Some(Default::default())
     }
     builder
 }

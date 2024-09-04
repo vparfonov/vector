@@ -11,10 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.63"
+rust-version = "1.61"
 name = "rustls-webpki"
-version = "0.102.7"
-build = false
+version = "0.102.2"
 include = [
     "Cargo.toml",
     "/LICENSE",
@@ -27,7 +26,6 @@ include = [
     "src/der.rs",
     "src/end_entity.rs",
     "src/error.rs",
-    "src/rpk_entity.rs",
     "src/subject_name/dns_name.rs",
     "src/subject_name/ip_address.rs",
     "src/subject_name/mod.rs",
@@ -46,10 +44,6 @@ include = [
     "src/data/**/*",
     "tests/**",
 ]
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 description = "Web PKI X.509 Certificate Verification."
 readme = "README.md"
 categories = [
@@ -90,56 +84,20 @@ rpath = false
 
 [lib]
 name = "webpki"
-path = "src/lib.rs"
 
-[[test]]
-name = "better_tls"
-path = "tests/better_tls.rs"
-
-[[test]]
-name = "cert_v1_unsupported"
-path = "tests/cert_v1_unsupported.rs"
-
-[[test]]
-name = "cert_without_extensions"
-path = "tests/cert_without_extensions.rs"
-
-[[test]]
-name = "client_auth"
-path = "tests/client_auth.rs"
-
-[[test]]
-name = "client_auth_revocation"
-path = "tests/client_auth_revocation.rs"
-
-[[test]]
-name = "crl_tests"
-path = "tests/crl_tests.rs"
-
-[[test]]
-name = "custom_ekus"
-path = "tests/custom_ekus.rs"
-
-[[test]]
-name = "integration"
-path = "tests/integration.rs"
-
-[[test]]
-name = "signatures"
-path = "tests/signatures.rs"
-
-[[test]]
-name = "tls_server_certs"
-path = "tests/tls_server_certs.rs"
+[[bench]]
+name = "benchmarks"
+path = "benches/benchmark.rs"
+harness = false
 
 [dependencies.aws-lc-rs]
-version = "1.8.1"
+version = "1"
 features = ["aws-lc-sys"]
 optional = true
 default-features = false
 
 [dependencies.pki-types]
-version = "1.7"
+version = "1.2"
 default-features = false
 package = "rustls-pki-types"
 
@@ -152,7 +110,7 @@ default-features = false
 version = "0.9"
 
 [dev-dependencies.base64]
-version = "0.22"
+version = "0.21"
 
 [dev-dependencies.bencher]
 version = "0.1.5"
@@ -164,9 +122,7 @@ version = "0.4.4"
 version = "1.17.2"
 
 [dev-dependencies.rcgen]
-version = "0.13"
-features = ["aws_lc_rs"]
-default-features = false
+version = "0.12.0"
 
 [dev-dependencies.serde]
 version = "1.0"

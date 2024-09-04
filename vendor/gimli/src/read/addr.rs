@@ -45,7 +45,17 @@ impl<T> DebugAddr<T> {
     ///
     /// This is useful when `R` implements `Reader` but `T` does not.
     ///
-    /// Used by `DwarfSections::borrow`.
+    /// ## Example Usage
+    ///
+    /// ```rust,no_run
+    /// # let load_section = || unimplemented!();
+    /// // Read the DWARF section into a `Vec` with whatever object loader you're using.
+    /// let owned_section: gimli::DebugAddr<Vec<u8>> = load_section();
+    /// // Create a reference to the DWARF section.
+    /// let section = owned_section.borrow(|section| {
+    ///     gimli::EndianSlice::new(&section, gimli::LittleEndian)
+    /// });
+    /// ```
     pub fn borrow<'a, F, R>(&'a self, mut borrow: F) -> DebugAddr<R>
     where
         F: FnMut(&'a T) -> R,
@@ -80,8 +90,8 @@ mod tests {
 
     #[test]
     fn test_get_address() {
-        for format in [Format::Dwarf32, Format::Dwarf64] {
-            for address_size in [4, 8] {
+        for format in vec![Format::Dwarf32, Format::Dwarf64] {
+            for address_size in vec![4, 8] {
                 let zero = Label::new();
                 let length = Label::new();
                 let start = Label::new();

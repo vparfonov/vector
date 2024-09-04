@@ -6,7 +6,7 @@ use std::io;
 use std::marker::PhantomPinned;
 use std::mem;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll};
 
 pin_project! {
     #[derive(Debug)]

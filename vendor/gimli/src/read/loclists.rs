@@ -38,20 +38,6 @@ where
     }
 }
 
-impl<T> DebugLoc<T> {
-    /// Create a `DebugLoc` section that references the data in `self`.
-    ///
-    /// This is useful when `R` implements `Reader` but `T` does not.
-    ///
-    /// Used by `DwarfSections::borrow`.
-    pub(crate) fn borrow<'a, F, R>(&'a self, mut borrow: F) -> DebugLoc<R>
-    where
-        F: FnMut(&'a T) -> R,
-    {
-        borrow(&self.section).into()
-    }
-}
-
 impl<R> Section<R> for DebugLoc<R> {
     fn id() -> SectionId {
         SectionId::DebugLoc
@@ -95,20 +81,6 @@ where
     /// ```
     pub fn new(section: &'input [u8], endian: Endian) -> Self {
         Self::from(EndianSlice::new(section, endian))
-    }
-}
-
-impl<T> DebugLocLists<T> {
-    /// Create a `DebugLocLists` section that references the data in `self`.
-    ///
-    /// This is useful when `R` implements `Reader` but `T` does not.
-    ///
-    /// Used by `DwarfSections::borrow`.
-    pub(crate) fn borrow<'a, F, R>(&'a self, mut borrow: F) -> DebugLocLists<R>
-    where
-        F: FnMut(&'a T) -> R,
-    {
-        borrow(&self.section).into()
     }
 }
 
@@ -174,7 +146,17 @@ impl<T> LocationLists<T> {
     ///
     /// This is useful when `R` implements `Reader` but `T` does not.
     ///
-    /// Used by `Dwarf::borrow`.
+    /// ## Example Usage
+    ///
+    /// ```rust,no_run
+    /// # let load_section = || unimplemented!();
+    /// // Read the DWARF section into a `Vec` with whatever object loader you're using.
+    /// let owned_section: gimli::LocationLists<Vec<u8>> = load_section();
+    /// // Create a reference to the DWARF section.
+    /// let section = owned_section.borrow(|section| {
+    ///     gimli::EndianSlice::new(&section, gimli::LittleEndian)
+    /// });
+    /// ```
     pub fn borrow<'a, F, R>(&'a self, mut borrow: F) -> LocationLists<R>
     where
         F: FnMut(&'a T) -> R,
@@ -1551,7 +1533,7 @@ mod tests {
 
     #[test]
     fn test_get_offset() {
-        for format in [Format::Dwarf32, Format::Dwarf64] {
+        for format in vec![Format::Dwarf32, Format::Dwarf64] {
             let encoding = Encoding {
                 format,
                 version: 5,

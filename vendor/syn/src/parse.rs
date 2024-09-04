@@ -263,11 +263,10 @@ pub struct ParseBuffer<'a> {
 
 impl<'a> Drop for ParseBuffer<'a> {
     fn drop(&mut self) {
-        if let Some((unexpected_span, delimiter)) = span_of_unexpected_ignoring_nones(self.cursor())
-        {
+        if let Some(unexpected_span) = span_of_unexpected_ignoring_nones(self.cursor()) {
             let (inner, old_span) = inner_unexpected(self);
             if old_span.is_none() {
-                inner.set(Unexpected::Some(unexpected_span, delimiter));
+                inner.set(Unexpected::Some(unexpected_span));
             }
         }
     }
@@ -398,7 +397,7 @@ pub(crate) fn new_parse_buffer(
 
 pub(crate) enum Unexpected {
     None,
-    Some(Span, Delimiter),
+    Some(Span),
     Chain(Rc<Cell<Unexpected>>),
 }
 
@@ -412,7 +411,7 @@ impl Clone for Unexpected {
     fn clone(&self) -> Self {
         match self {
             Unexpected::None => Unexpected::None,
-            Unexpected::Some(span, delimiter) => Unexpected::Some(*span, *delimiter),
+            Unexpected::Some(span) => Unexpected::Some(*span),
             Unexpected::Chain(next) => Unexpected::Chain(next.clone()),
         }
     }
@@ -427,12 +426,12 @@ fn cell_clone<T: Default + Clone>(cell: &Cell<T>) -> T {
     ret
 }
 
-fn inner_unexpected(buffer: &ParseBuffer) -> (Rc<Cell<Unexpected>>, Option<(Span, Delimiter)>) {
+fn inner_unexpected(buffer: &ParseBuffer) -> (Rc<Cell<Unexpected>>, Option<Span>) {
     let mut unexpected = get_unexpected(buffer);
     loop {
         match cell_clone(&unexpected) {
             Unexpected::None => return (unexpected, None),
-            Unexpected::Some(span, delimiter) => return (unexpected, Some((span, delimiter))),
+            Unexpected::Some(span) => return (unexpected, Some(span)),
             Unexpected::Chain(next) => unexpected = next,
         }
     }
@@ -442,7 +441,7 @@ pub(crate) fn get_unexpected(buffer: &ParseBuffer) -> Rc<Cell<Unexpected>> {
     cell_clone(&buffer.unexpected).unwrap()
 }
 
-fn span_of_unexpected_ignoring_nones(mut cursor: Cursor) -> Option<(Span, Delimiter)> {
+fn span_of_unexpected_ignoring_nones(mut cursor: Cursor) -> Option<Span> {
     if cursor.eof() {
         return None;
     }
@@ -455,7 +454,7 @@ fn span_of_unexpected_ignoring_nones(mut cursor: Cursor) -> Option<(Span, Delimi
     if cursor.eof() {
         None
     } else {
-        Some((cursor.span(), cursor.scope_delimiter()))
+        Some(cursor.span())
     }
 }
 
@@ -1151,7 +1150,7 @@ impl<'a> ParseBuffer<'a> {
 
     fn check_unexpected(&self) -> Result<()> {
         match inner_unexpected(self).1 {
-            Some((span, delimiter)) => Err(err_unexpected_token(span, delimiter)),
+            Some(span) => Err(Error::new(span, "unexpected token")),
             None => Ok(()),
         }
     }
@@ -1289,10 +1288,8 @@ where
         let state = tokens_to_parse_buffer(&buf);
         let node = self(&state)?;
         state.check_unexpected()?;
-        if let Some((unexpected_span, delimiter)) =
-            span_of_unexpected_ignoring_nones(state.cursor())
-        {
-            Err(err_unexpected_token(unexpected_span, delimiter))
+        if let Some(unexpected_span) = span_of_unexpected_ignoring_nones(state.cursor()) {
+            Err(Error::new(unexpected_span, "unexpected token"))
         } else {
             Ok(node)
         }
@@ -1305,10 +1302,8 @@ where
         let state = new_parse_buffer(scope, cursor, unexpected);
         let node = self(&state)?;
         state.check_unexpected()?;
-        if let Some((unexpected_span, delimiter)) =
-            span_of_unexpected_ignoring_nones(state.cursor())
-        {
-            Err(err_unexpected_token(unexpected_span, delimiter))
+        if let Some(unexpected_span) = span_of_unexpected_ignoring_nones(state.cursor()) {
+            Err(Error::new(unexpected_span, "unexpected token"))
         } else {
             Ok(node)
         }
@@ -1317,16 +1312,6 @@ where
 
 pub(crate) fn parse_scoped<F: Parser>(f: F, scope: Span, tokens: TokenStream) -> Result<F::Output> {
     f.__parse_scoped(scope, tokens)
-}
-
-fn err_unexpected_token(span: Span, delimiter: Delimiter) -> Error {
-    let msg = match delimiter {
-        Delimiter::Parenthesis => "unexpected token, expected `)`",
-        Delimiter::Brace => "unexpected token, expected `}`",
-        Delimiter::Bracket => "unexpected token, expected `]`",
-        Delimiter::None => "unexpected token",
-    };
-    Error::new(span, msg)
 }
 
 /// An empty syntax tree node that consumes no tokens when parsed.

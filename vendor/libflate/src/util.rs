@@ -1,6 +1,5 @@
 #[cfg(test)]
 pub(crate) mod testonly {
-    use alloc::vec;
     use alloc::vec::Vec;
     use core2::io::{self, Read};
 

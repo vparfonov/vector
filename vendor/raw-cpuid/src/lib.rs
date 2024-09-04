@@ -112,6 +112,12 @@ pub mod native_cpuid {
 ))]
 pub use native_cpuid::CpuIdReaderNative;
 
+#[cfg(not(test))]
+mod std {
+    pub use core::ops;
+    pub use core::option;
+}
+
 /// Macro which queries cpuid directly.
 ///
 /// First parameter is cpuid leaf (EAX register value),
@@ -515,7 +521,7 @@ impl<R: CpuIdReader> CpuId<R> {
                 _eax: res.eax,
                 ebx: ExtendedFeaturesEbx::from_bits_truncate(res.ebx),
                 ecx: ExtendedFeaturesEcx::from_bits_truncate(res.ecx),
-                edx: ExtendedFeaturesEdx::from_bits_truncate(res.edx),
+                _edx: res.edx,
             })
         } else {
             None
@@ -3218,7 +3224,7 @@ pub struct ExtendedFeatures {
     _eax: u32,
     ebx: ExtendedFeaturesEbx,
     ecx: ExtendedFeaturesEcx,
-    edx: ExtendedFeaturesEdx,
+    _edx: u32,
 }
 
 impl ExtendedFeatures {
@@ -3426,7 +3432,7 @@ impl ExtendedFeatures {
     /// Supports AVX512F.
     ///
     /// # Platforms
-    /// ✅ AMD ✅ Intel
+    /// ❌ AMD (reserved) ✅ Intel
     #[inline]
     pub const fn has_avx512f(&self) -> bool {
         self.ebx.contains(ExtendedFeaturesEbx::AVX512F)
@@ -3435,7 +3441,7 @@ impl ExtendedFeatures {
     /// Supports AVX512DQ.
     ///
     /// # Platforms
-    /// ✅ AMD ✅ Intel
+    /// ❌ AMD (reserved) ✅ Intel
     #[inline]
     pub const fn has_avx512dq(&self) -> bool {
         self.ebx.contains(ExtendedFeaturesEbx::AVX512DQ)
@@ -3444,7 +3450,7 @@ impl ExtendedFeatures {
     /// AVX512_IFMA
     ///
     /// # Platforms
-    /// ✅ AMD ✅ Intel
+    /// ❌ AMD (reserved) ✅ Intel
     #[inline]
     pub const fn has_avx512_ifma(&self) -> bool {
         self.ebx.contains(ExtendedFeaturesEbx::AVX512_IFMA)
@@ -3453,7 +3459,7 @@ impl ExtendedFeatures {
     /// AVX512PF
     ///
     /// # Platforms
-    /// ✅ AMD ✅ Intel
+    /// ❌ AMD (reserved) ✅ Intel
     #[inline]
     pub const fn has_avx512pf(&self) -> bool {
         self.ebx.contains(ExtendedFeaturesEbx::AVX512PF)
@@ -3462,7 +3468,7 @@ impl ExtendedFeatures {
     /// AVX512ER
     ///
     /// # Platforms
-    /// ✅ AMD ✅ Intel
+    /// ❌ AMD (reserved) ✅ Intel
     #[inline]
     pub const fn has_avx512er(&self) -> bool {
         self.ebx.contains(ExtendedFeaturesEbx::AVX512ER)
@@ -3471,7 +3477,7 @@ impl ExtendedFeatures {
     /// AVX512CD
     ///
     /// # Platforms
-    /// ✅ AMD ✅ Intel
+    /// ❌ AMD (reserved) ✅ Intel
     #[inline]
     pub const fn has_avx512cd(&self) -> bool {
         self.ebx.contains(ExtendedFeaturesEbx::AVX512CD)
@@ -3480,7 +3486,7 @@ impl ExtendedFeatures {
     /// AVX512BW
     ///
     /// # Platforms
-    /// ✅ AMD ✅ Intel
+    /// ❌ AMD (reserved) ✅ Intel
     #[inline]
     pub const fn has_avx512bw(&self) -> bool {
         self.ebx.contains(ExtendedFeaturesEbx::AVX512BW)
@@ -3489,7 +3495,7 @@ impl ExtendedFeatures {
     /// AVX512VL
     ///
     /// # Platforms
-    /// ✅ AMD ✅ Intel
+    /// ❌ AMD (reserved) ✅ Intel
     #[inline]
     pub const fn has_avx512vl(&self) -> bool {
         self.ebx.contains(ExtendedFeaturesEbx::AVX512VL)
@@ -3551,7 +3557,7 @@ impl ExtendedFeatures {
 
     /// AVX512VBMI2
     ///
-    /// ✅ AMD ✅ Intel
+    /// ❓ AMD ✅ Intel
     #[inline]
     pub const fn has_av512vbmi2(&self) -> bool {
         self.ecx.contains(ExtendedFeaturesEcx::AVX512VBMI2)
@@ -3594,7 +3600,7 @@ impl ExtendedFeatures {
     /// AVX512VNNI
     ///
     /// # Platforms
-    /// ✅ AMD ✅ Intel
+    /// ❌ AMD (reserved) ✅ Intel
     #[inline]
     pub const fn has_avx512vnni(&self) -> bool {
         self.ecx.contains(ExtendedFeaturesEcx::AVX512VNNI)
@@ -3602,7 +3608,7 @@ impl ExtendedFeatures {
 
     /// AVX512BITALG
     ///
-    /// ✅ AMD ✅ Intel
+    /// ❓ AMD ✅ Intel
     #[inline]
     pub const fn has_avx512bitalg(&self) -> bool {
         self.ecx.contains(ExtendedFeaturesEcx::AVX512BITALG)
@@ -3619,7 +3625,7 @@ impl ExtendedFeatures {
 
     /// AVX512VPOPCNTDQ
     ///
-    /// ✅ AMD ✅ Intel
+    /// ❓ AMD ✅ Intel
     #[inline]
     pub const fn has_avx512vpopcntdq(&self) -> bool {
         self.ecx.contains(ExtendedFeaturesEcx::AVX512VPOPCNTDQ)
@@ -3664,69 +3670,6 @@ impl ExtendedFeatures {
     #[inline]
     pub fn mawau_value(&self) -> u8 {
         get_bits(self.ecx.bits(), 17, 21) as u8
-    }
-
-    /// Supports AVX512_4VNNIW.
-    ///
-    /// # Platforms
-    /// ❌ AMD (reserved) ✅ Intel
-    #[inline]
-    pub const fn has_avx512_4vnniw(&self) -> bool {
-        self.edx.contains(ExtendedFeaturesEdx::AVX512_4VNNIW)
-    }
-
-    /// Supports AVX512_4FMAPS.
-    ///
-    /// # Platforms
-    /// ❌ AMD (reserved) ✅ Intel
-    #[inline]
-    pub const fn has_avx512_4fmaps(&self) -> bool {
-        self.edx.contains(ExtendedFeaturesEdx::AVX512_4FMAPS)
-    }
-
-    /// Supports AVX512_VP2INTERSECT.
-    ///
-    /// # Platforms
-    /// ❌ AMD (reserved) ✅ Intel
-    #[inline]
-    pub const fn has_avx512_vp2intersect(&self) -> bool {
-        self.edx.contains(ExtendedFeaturesEdx::AVX512_VP2INTERSECT)
-    }
-
-    /// Supports AMX_BF16.
-    ///
-    /// # Platforms
-    /// ❌ AMD (reserved) ✅ Intel
-    #[inline]
-    pub const fn has_amx_bf16(&self) -> bool {
-        self.edx.contains(ExtendedFeaturesEdx::AMX_BF16)
-    }
-
-    /// Supports AVX512_FP16.
-    ///
-    /// # Platforms
-    /// ❌ AMD (reserved) ✅ Intel
-    #[inline]
-    pub const fn has_avx512_fp16(&self) -> bool {
-        self.edx.contains(ExtendedFeaturesEdx::AVX512_FP16)
-    }
-
-    /// Supports AMX_TILE.
-    ///
-    /// # Platforms
-    /// ❌ AMD (reserved) ✅ Intel
-    #[inline]
-    pub const fn has_amx_tile(&self) -> bool {
-        self.edx.contains(ExtendedFeaturesEdx::AMX_TILE)
-    }
-
-    /// Supports AMX_INT8.
-    ///
-    /// # Platforms
-    /// ❌ AMD (reserved) ✅ Intel
-    #[inline]
-    pub const fn has_amx_int8(&self) -> bool {
-        self.edx.contains(ExtendedFeaturesEdx::AMX_INT8)
     }
 }
 
@@ -3825,7 +3768,7 @@ bitflags! {
         /// Bit 04: OSPKE. If 1, OS has set CR4.PKE to enable protection keys (and the RDPKRU/WRPKRU instruc-tions).
         const OSPKE = 1 << 4;
         /// Bit 5: WAITPKG
-        const WAITPKG = 1 << 5;
+        const WAITPKG = 1 >> 5;
         /// Bit 6: AV512_VBMI2
         const AVX512VBMI2 = 1 << 6;
         /// Bit 7: CET_SS. Supports CET shadow stack features if 1. Processors that set this bit define bits 0..2 of the
@@ -3862,27 +3805,6 @@ bitflags! {
 
         /// Bit 30: SGX_LC. Supports SGX Launch Configuration if 1.
         const SGX_LC = 1 << 30;
-    }
-}
-
-bitflags! {
-    #[repr(transparent)]
-    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-    struct ExtendedFeaturesEdx: u32 {
-        /// Bit 02: AVX512_4VNNIW. (Intel® Xeon Phi™ only).
-        const AVX512_4VNNIW = 1 << 2;
-        /// Bit 03: AVX512_4FMAPS. (Intel® Xeon Phi™ only).
-        const AVX512_4FMAPS = 1 << 3;
-        /// Bit 08: AVX512_VP2INTERSECT.
-        const AVX512_VP2INTERSECT = 1 << 8;
-        /// Bit 22: AMX-BF16. If 1, the processor supports tile computational operations on bfloat16 numbers.
-        const AMX_BF16 = 1 << 22;
-        /// Bit 23: AVX512_FP16.
-        const AVX512_FP16 = 1 << 23;
-        /// Bit 24: AMX-TILE. If 1, the processor supports tile architecture
-        const AMX_TILE = 1 << 24;
-        /// Bit 25: AMX-INT8. If 1, the processor supports tile computational operations on 8-bit integers.
-        const AMX_INT8 = 1 << 25;
     }
 }
 

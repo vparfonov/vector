@@ -1,10 +1,3 @@
-//! Low level terminal capability lookups
-
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
-#![warn(missing_docs)]
-#![warn(clippy::print_stderr)]
-#![warn(clippy::print_stdout)]
-
 pub mod windows;
 
 /// Check [CLICOLOR] status
@@ -32,7 +25,11 @@ pub fn clicolor() -> Option<bool> {
 /// [CLICOLOR_FORCE]: https://bixense.com/clicolors/
 #[inline]
 pub fn clicolor_force() -> bool {
-    non_empty(std::env::var_os("CLICOLOR_FORCE").as_deref())
+    let value = std::env::var_os("CLICOLOR_FORCE");
+    value
+        .as_deref()
+        .unwrap_or_else(|| std::ffi::OsStr::new("0"))
+        != "0"
 }
 
 /// Check [NO_COLOR] status
@@ -47,7 +44,8 @@ pub fn clicolor_force() -> bool {
 /// [NO_COLOR]: https://no-color.org/
 #[inline]
 pub fn no_color() -> bool {
-    non_empty(std::env::var_os("NO_COLOR").as_deref())
+    let value = std::env::var_os("NO_COLOR");
+    value.as_deref().unwrap_or_else(|| std::ffi::OsStr::new("")) != ""
 }
 
 /// Check `TERM` for color support
@@ -133,28 +131,4 @@ pub fn is_ci() -> bool {
     // - Gitlab and Github set it to `true`
     // - Woodpecker sets it to `woodpecker`
     std::env::var_os("CI").is_some()
-}
-
-fn non_empty(var: Option<&std::ffi::OsStr>) -> bool {
-    !var.unwrap_or_default().is_empty()
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn non_empty_not_present() {
-        assert!(!non_empty(None));
-    }
-
-    #[test]
-    fn non_empty_empty() {
-        assert!(!non_empty(Some(std::ffi::OsStr::new(""))));
-    }
-
-    #[test]
-    fn non_empty_texty() {
-        assert!(non_empty(Some(std::ffi::OsStr::new("hello"))));
-    }
 }

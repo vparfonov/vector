@@ -2,7 +2,7 @@
 /// types are safe to cast from non-static type parameters if their types are
 /// equal.
 ///
-/// This trait is used by [`cast!`](crate::cast) to determine what casts are legal on values
+/// This trait is used by [`cast!`] to determine what casts are legal on values
 /// without a `'static` type constraint.
 ///
 /// # Safety
@@ -83,36 +83,13 @@ unsafe impl<T: LifetimeFree> LifetimeFree for core::num::Wrapping<T> {}
 unsafe impl<T: LifetimeFree> LifetimeFree for core::cell::Cell<T> {}
 unsafe impl<T: LifetimeFree> LifetimeFree for core::cell::RefCell<T> {}
 
-macro_rules! tuple_impls {
-    ($( $( $name:ident )+, )+) => {
-        $(
-            unsafe impl<$($name: LifetimeFree),+> LifetimeFree for ($($name,)+) {}
-        )+
-    };
-}
-
-tuple_impls! {
-    T0,
-    T0 T1,
-    T0 T1 T2,
-    T0 T1 T2 T3,
-    T0 T1 T2 T3 T4,
-    T0 T1 T2 T3 T4 T5,
-    T0 T1 T2 T3 T4 T5 T6,
-    T0 T1 T2 T3 T4 T5 T6 T7,
-    T0 T1 T2 T3 T4 T5 T6 T7 T8,
-    T0 T1 T2 T3 T4 T5 T6 T7 T8 T9,
-}
-
-#[cfg(feature = "alloc")]
-mod alloc_impls {
+#[cfg(feature = "std")]
+mod std_impls {
     use super::LifetimeFree;
 
-    unsafe impl LifetimeFree for alloc::string::String {}
+    unsafe impl LifetimeFree for String {}
 
-    unsafe impl<T: LifetimeFree> LifetimeFree for alloc::boxed::Box<T> {}
-    unsafe impl<T: LifetimeFree> LifetimeFree for alloc::vec::Vec<T> {}
-
-    #[rustversion::attr(since(1.60), cfg(target_has_atomic = "ptr"))]
-    unsafe impl<T: LifetimeFree> LifetimeFree for alloc::sync::Arc<T> {}
+    unsafe impl<T: LifetimeFree> LifetimeFree for Box<T> {}
+    unsafe impl<T: LifetimeFree> LifetimeFree for Vec<T> {}
+    unsafe impl<T: LifetimeFree> LifetimeFree for std::sync::Arc<T> {}
 }

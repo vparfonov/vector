@@ -3,16 +3,10 @@ use crate::net::unix::{SocketAddr, UnixStream};
 
 use std::fmt;
 use std::io;
-#[cfg(target_os = "android")]
-use std::os::android::net::SocketAddrExt;
-#[cfg(target_os = "linux")]
-use std::os::linux::net::SocketAddrExt;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net::{self, SocketAddr as StdSocketAddr};
+use std::os::unix::net;
 use std::path::Path;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll};
 
 cfg_net_unix! {
     /// A Unix socket which can accept connections from other Unix sockets.
@@ -76,20 +70,7 @@ impl UnixListener {
     where
         P: AsRef<Path>,
     {
-        // For now, we handle abstract socket paths on linux here.
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        let addr = {
-            let os_str_bytes = path.as_ref().as_os_str().as_bytes();
-            if os_str_bytes.starts_with(b"\0") {
-                StdSocketAddr::from_abstract_name(os_str_bytes)?
-            } else {
-                StdSocketAddr::from_pathname(path)?
-            }
-        };
-        #[cfg(not(any(target_os = "linux", target_os = "android")))]
-        let addr = StdSocketAddr::from_pathname(path)?;
-
-        let listener = mio::net::UnixListener::bind_addr(&addr)?;
+        let listener = mio::net::UnixListener::bind(path)?;
         let io = PollEvented::new(listener)?;
         Ok(UnixListener { io })
     }

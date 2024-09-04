@@ -14,24 +14,6 @@ extern "C" {
     #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
     #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub type MediaStreamTrackGeneratorInit;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `kind` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `MediaStreamTrackGeneratorInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "kind")]
-    pub fn get_kind(this: &MediaStreamTrackGeneratorInit) -> String;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `kind` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `MediaStreamTrackGeneratorInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "kind")]
-    pub fn set_kind(this: &MediaStreamTrackGeneratorInit, val: &str);
 }
 #[cfg(web_sys_unstable_apis)]
 impl MediaStreamTrackGeneratorInit {
@@ -48,9 +30,20 @@ impl MediaStreamTrackGeneratorInit {
         ret
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_kind()` instead."]
+    #[doc = "Change the `kind` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `MediaStreamTrackGeneratorInit`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn kind(&mut self, val: &str) -> &mut Self {
-        self.set_kind(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("kind"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

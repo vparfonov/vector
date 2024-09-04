@@ -27,8 +27,8 @@ impl ListBucketIntelligentTieringConfigurationsInput {
 }
 
 /// A builder for [`ListBucketIntelligentTieringConfigurationsInput`](crate::operation::list_bucket_intelligent_tiering_configurations::ListBucketIntelligentTieringConfigurationsInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct ListBucketIntelligentTieringConfigurationsInputBuilder {
     pub(crate) bucket: ::std::option::Option<::std::string::String>,
     pub(crate) continuation_token: ::std::option::Option<::std::string::String>,

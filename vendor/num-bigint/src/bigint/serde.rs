@@ -1,6 +1,3 @@
-#![cfg(feature = "serde")]
-#![cfg_attr(docsrs, doc(cfg(feature = "serde")))]
-
 use super::{BigInt, Sign};
 
 use serde::de::{Error, Unexpected};

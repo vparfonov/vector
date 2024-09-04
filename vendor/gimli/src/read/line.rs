@@ -86,7 +86,17 @@ impl<T> DebugLine<T> {
     ///
     /// This is useful when `R` implements `Reader` but `T` does not.
     ///
-    /// Used by `DwarfSections::borrow`.
+    /// ## Example Usage
+    ///
+    /// ```rust,no_run
+    /// # let load_section = || unimplemented!();
+    /// // Read the DWARF section into a `Vec` with whatever object loader you're using.
+    /// let owned_section: gimli::DebugLine<Vec<u8>> = load_section();
+    /// // Create a reference to the DWARF section.
+    /// let section = owned_section.borrow(|section| {
+    ///     gimli::EndianSlice::new(&section, gimli::LittleEndian)
+    /// });
+    /// ```
     pub fn borrow<'a, F, R>(&'a self, mut borrow: F) -> DebugLine<R>
     where
         F: FnMut(&'a T) -> R,
@@ -1960,7 +1970,7 @@ mod tests {
         assert_eq!(header.version(), 4);
         assert_eq!(header.minimum_instruction_length(), 1);
         assert_eq!(header.maximum_operations_per_instruction(), 1);
-        assert!(header.default_is_stmt());
+        assert_eq!(header.default_is_stmt(), true);
         assert_eq!(header.line_base(), 0);
         assert_eq!(header.line_range(), 1);
         assert_eq!(header.opcode_base(), 3);
@@ -1995,7 +2005,7 @@ mod tests {
                 md5: [0; 16],
             },
         ];
-        assert_eq!(header.file_names(), &expected_file_names);
+        assert_eq!(&*header.file_names(), &expected_file_names);
     }
 
     #[test]
@@ -2054,7 +2064,7 @@ mod tests {
         let input = &mut EndianSlice::new(&buf, LittleEndian);
 
         match LineProgramHeader::parse(input, DebugLineOffset(0), 4, None, None) {
-            Err(Error::UnexpectedEof(_)) => {}
+            Err(Error::UnexpectedEof(_)) => return,
             otherwise => panic!("Unexpected result: {:?}", otherwise),
         }
     }
@@ -2115,7 +2125,7 @@ mod tests {
         let input = &mut EndianSlice::new(&buf, LittleEndian);
 
         match LineProgramHeader::parse(input, DebugLineOffset(0), 4, None, None) {
-            Err(Error::UnexpectedEof(_)) => {}
+            Err(Error::UnexpectedEof(_)) => return,
             otherwise => panic!("Unexpected result: {:?}", otherwise),
         }
     }
@@ -2209,7 +2219,7 @@ mod tests {
             let expected_rest = [0, 1, 2, 3, 4];
             input.extend_from_slice(&expected_rest);
 
-            let input = EndianSlice::new(&input, LittleEndian);
+            let input = EndianSlice::new(&*input, LittleEndian);
             let header = make_test_header(input);
 
             let mut rest = input;
@@ -2860,7 +2870,7 @@ mod tests {
         let opcode = LineInstruction::DefineFile(file);
         let is_new_row = row.execute(opcode, &mut program);
 
-        assert!(!is_new_row);
+        assert_eq!(is_new_row, false);
         assert_eq!(Some(&file), program.header().file_names.last());
     }
 
@@ -2891,7 +2901,6 @@ mod tests {
     /// Ensure that `LineRows<R,P>` is covariant wrt R.
     /// This only needs to compile.
     #[allow(dead_code, unreachable_code, unused_variables)]
-    #[allow(clippy::diverging_sub_expression)]
     fn test_line_rows_variance<'a, 'b>(_: &'a [u8], _: &'b [u8])
     where
         'a: 'b,
@@ -2928,7 +2937,7 @@ mod tests {
             },
         ];
 
-        for format in [Format::Dwarf32, Format::Dwarf64] {
+        for format in vec![Format::Dwarf32, Format::Dwarf64] {
             let length = Label::new();
             let header_length = Label::new();
             let start = Label::new();
@@ -3005,7 +3014,7 @@ mod tests {
             assert_eq!(header.address_size(), 4);
             assert_eq!(header.minimum_instruction_length(), 1);
             assert_eq!(header.maximum_operations_per_instruction(), 1);
-            assert!(header.default_is_stmt());
+            assert_eq!(header.default_is_stmt(), true);
             assert_eq!(header.line_base(), 0);
             assert_eq!(header.line_range(), 1);
             assert_eq!(header.opcode_base(), expected_lengths.len() as u8 + 1);

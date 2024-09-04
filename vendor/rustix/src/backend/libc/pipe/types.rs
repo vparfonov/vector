@@ -18,7 +18,6 @@ bitflags! {
             solarish,
             target_os = "espidf",
             target_os = "haiku",
-            target_os = "hurd",
             target_os = "nto",
             target_os = "openbsd",
             target_os = "redox",
@@ -37,10 +36,6 @@ bitflags! {
 bitflags! {
     /// `SPLICE_F_*` constants for use with [`splice`], [`vmsplice`], and
     /// [`tee`].
-    ///
-    /// [`splice`]: crate::pipe::splice
-    /// [`vmsplice`]: crate::pipe::splice
-    /// [`tee`]: crate::pipe::tee
     #[repr(transparent)]
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
     pub struct SpliceFlags: c::c_uint {

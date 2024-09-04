@@ -1,13 +1,12 @@
 #![cfg_attr(not(feature = "default"), allow(dead_code), allow(unused_mut))]
 
-use crate::syn_compat::{AttributeExt as _, NestedMeta, ParsedMeta};
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use syn::{
     parse_quote, punctuated::Punctuated, spanned::Spanned, Attribute, Data,
     DeriveInput, Error, Field, Fields, FieldsNamed, FieldsUnnamed, GenericParam,
-    Generics, Ident, ImplGenerics, Index, Result, Token, Type, TypeGenerics,
-    TypeParamBound, Variant, WhereClause,
+    Generics, Ident, ImplGenerics, Index, Meta, NestedMeta, Result, Token, Type,
+    TypeGenerics, TypeParamBound, Variant, WhereClause,
 };
 
 #[derive(Clone, Copy, Default)]
@@ -262,6 +261,7 @@ pub enum DeriveType {
 pub struct State<'input> {
     pub input: &'input DeriveInput,
     pub trait_name: &'static str,
+    pub trait_ident: Ident,
     pub method_ident: Ident,
     pub trait_module: TokenStream,
     pub trait_path: TokenStream,
@@ -535,6 +535,7 @@ impl<'input> State<'input> {
         Ok(State {
             input,
             trait_name,
+            trait_ident,
             method_ident,
             trait_module,
             trait_path,
@@ -594,6 +595,7 @@ impl<'input> State<'input> {
             trait_path,
             trait_path_params: vec![],
             trait_attr,
+            trait_ident,
             method_ident,
             // input,
             fields,
@@ -626,6 +628,7 @@ impl<'input> State<'input> {
             field_type: data.field_types[0],
             member: data.members[0].clone(),
             info: data.infos[0].clone(),
+            field_ident: data.field_idents[0].clone(),
             trait_path: data.trait_path,
             trait_path_with_params: data.trait_path_with_params.clone(),
             casted_trait: data.casted_traits[0].clone(),
@@ -698,9 +701,17 @@ impl<'input> State<'input> {
             panic!("can only derive({}) for enum", self.trait_name)
         }
         let variants = self.enabled_variants();
+        let trait_path = &self.trait_path;
+        let (impl_generics, ty_generics, where_clause) = self.generics.split_for_impl();
         MultiVariantData {
+            input_type: &self.input.ident,
             variants,
             variant_states: self.enabled_variant_states(),
+            infos: self.enabled_infos(),
+            trait_path,
+            impl_generics,
+            ty_generics,
+            where_clause,
         }
     }
 
@@ -782,6 +793,7 @@ pub struct SingleFieldData<'input, 'state> {
     pub input_type: &'input Ident,
     pub field: &'input Field,
     pub field_type: &'input Type,
+    pub field_ident: TokenStream,
     pub member: TokenStream,
     pub info: FullMetaInfo,
     pub trait_path: &'state TokenStream,
@@ -816,8 +828,14 @@ pub struct MultiFieldData<'input, 'state> {
 }
 
 pub struct MultiVariantData<'input, 'state> {
+    pub input_type: &'input Ident,
     pub variants: Vec<&'input Variant>,
     pub variant_states: Vec<&'state State<'input>>,
+    pub infos: Vec<FullMetaInfo>,
+    pub trait_path: &'state TokenStream,
+    pub impl_generics: ImplGenerics<'state>,
+    pub ty_generics: TypeGenerics<'state>,
+    pub where_clause: Option<&'state WhereClause>,
 }
 
 impl<'input, 'state> MultiFieldData<'input, 'state> {
@@ -898,7 +916,7 @@ fn get_meta_info(
     }
 
     let list = match meta.clone() {
-        ParsedMeta::Path(_) => {
+        Meta::Path(_) => {
             if allowed_attr_params.contains(&"ignore") {
                 return Ok(info);
             } else {
@@ -911,8 +929,8 @@ fn get_meta_info(
                 ));
             }
         }
-        ParsedMeta::List(list) => list,
-        ParsedMeta::NameValue(val) => {
+        Meta::List(list) => list,
+        Meta::NameValue(val) => {
             return Err(Error::new(
                 val.span(),
                 "Attribute doesn't support name-value format here",
@@ -943,7 +961,7 @@ fn parse_punctuated_nested_meta(
         };
 
         match meta {
-            ParsedMeta::List(list) if list.path.is_ident("not") => {
+            Meta::List(list) if list.path.is_ident("not") => {
                 if wrapper_name.is_some() {
                     // Only single top-level `not` attribute is allowed.
                     return Err(Error::new(
@@ -959,7 +977,7 @@ fn parse_punctuated_nested_meta(
                 )?;
             }
 
-            ParsedMeta::List(list) => {
+            Meta::List(list) => {
                 let path = &list.path;
                 if !allowed_attr_params.iter().any(|param| path.is_ident(param)) {
                     return Err(Error::new(
@@ -989,7 +1007,7 @@ fn parse_punctuated_nested_meta(
                         for meta in &list.nested {
                             let typ: syn::Type = match meta {
                                 NestedMeta::Meta(meta) => {
-                                    let path = if let ParsedMeta::Path(p) = meta {
+                                    let path = if let Meta::Path(p) = meta {
                                         p
                                     } else {
                                         return Err(Error::new(
@@ -1059,7 +1077,7 @@ fn parse_punctuated_nested_meta(
                 }
             }
 
-            ParsedMeta::Path(path) => {
+            Meta::Path(path) => {
                 if !allowed_attr_params.iter().any(|param| path.is_ident(param)) {
                     return Err(Error::new(
                         meta.span(),
@@ -1095,7 +1113,7 @@ fn parse_punctuated_nested_meta(
                 }
             }
 
-            ParsedMeta::NameValue(val) => {
+            Meta::NameValue(val) => {
                 return Err(Error::new(
                     val.span(),
                     "Attribute doesn't support name-value parameters here",
@@ -1171,7 +1189,7 @@ pub fn get_if_type_parameter_used_in_type(
     if is_type_parameter_used_in_type(type_parameters, ty) {
         match ty {
             syn::Type::Reference(syn::TypeReference { elem: ty, .. }) => {
-                Some((**ty).clone())
+                Some((&**ty).clone())
             }
             ty => Some(ty.clone()),
         }

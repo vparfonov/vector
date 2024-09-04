@@ -37,11 +37,6 @@
 //! let logger = env_filter::FilteredLog::new(PrintLogger, builder.build());
 //! ```
 
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
-#![warn(missing_docs)]
-#![warn(clippy::print_stderr)]
-#![warn(clippy::print_stdout)]
-
 mod directive;
 mod filter;
 mod filtered_log;
@@ -56,4 +51,3 @@ use parser::parse_spec;
 pub use filter::Builder;
 pub use filter::Filter;
 pub use filtered_log::FilteredLog;
-pub use parser::ParseError;

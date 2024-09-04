@@ -12,18 +12,13 @@
 [package]
 edition = "2018"
 name = "tower-service"
-version = "0.3.3"
+version = "0.3.2"
 authors = ["Tower Maintainers <team@tower-rs.com>"]
-build = false
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 description = """
 Trait representing an asynchronous, request / response based, client or server.
 """
 homepage = "https://github.com/tower-rs/tower"
-documentation = "https://docs.rs/tower-service/0.3.3"
+documentation = "https://docs.rs/tower-service/0.3.2"
 readme = "README.md"
 categories = [
     "asynchronous",
@@ -32,20 +27,16 @@ categories = [
 license = "MIT"
 repository = "https://github.com/tower-rs/tower"
 
-[lib]
-name = "tower_service"
-path = "src/lib.rs"
-
 [dependencies]
 
 [dev-dependencies.futures]
-version = "0.3.22"
+version = "0.3"
 
 [dev-dependencies.http]
 version = "0.2"
 
 [dev-dependencies.tokio]
-version = "1.6.2"
+version = "1"
 features = [
     "macros",
     "time",

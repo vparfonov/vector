@@ -3,11 +3,7 @@ use crate::TempDir;
 use std::io;
 use std::path::PathBuf;
 
-pub fn create(
-    path: PathBuf,
-    permissions: Option<&std::fs::Permissions>,
-    keep: bool,
-) -> io::Result<TempDir> {
+pub fn create(path: PathBuf, permissions: Option<&std::fs::Permissions>) -> io::Result<TempDir> {
     let mut dir_options = std::fs::DirBuilder::new();
     #[cfg(not(target_os = "wasi"))]
     {
@@ -21,6 +17,5 @@ pub fn create(
         .with_err_path(|| &path)
         .map(|_| TempDir {
             path: path.into_boxed_path(),
-            keep,
         })
 }

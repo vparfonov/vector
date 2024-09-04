@@ -96,12 +96,3 @@ impl QuoteFields {
         }
     }
 }
-impl ::std::fmt::Display for QuoteFields {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            QuoteFields::Always => write!(f, "ALWAYS"),
-            QuoteFields::Asneeded => write!(f, "ASNEEDED"),
-            QuoteFields::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

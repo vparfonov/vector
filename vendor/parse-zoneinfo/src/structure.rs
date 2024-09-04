@@ -32,7 +32,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::table::Table;
+use table::Table;
 
 /// Trait to put the `structure` method on Tables.
 pub trait Structure {
@@ -71,7 +71,7 @@ impl Structure for Table {
             }
         }
 
-        TableStructure { mappings }
+        TableStructure { mappings: mappings }
     }
 }
 
@@ -94,7 +94,7 @@ impl<'table> IntoIterator for TableStructure<'table> {
 
         Iter {
             structure: self,
-            keys,
+            keys: keys,
         }
     }
 }
@@ -110,15 +110,20 @@ impl<'table> Iterator for Iter<'table> {
     type Item = TableStructureEntry<'table>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let key = self.keys.pop()?;
+        loop {
+            let key = match self.keys.pop() {
+                Some(k) => k,
+                None => return None,
+            };
 
-        // Move the strings out into an (automatically-sorted) vector.
-        let values = self.structure.mappings[key].iter().cloned().collect();
+            // Move the strings out into an (automatically-sorted) vector.
+            let values = self.structure.mappings[key].iter().cloned().collect();
 
-        Some(TableStructureEntry {
-            name: key,
-            children: values,
-        })
+            return Some(TableStructureEntry {
+                name: key,
+                children: values,
+            });
+        }
     }
 }
 
@@ -150,7 +155,7 @@ pub enum Child<'table> {
 #[allow(unused_results)]
 mod test {
     use super::*;
-    use crate::table::Table;
+    use table::Table;
 
     #[test]
     fn empty() {
@@ -179,7 +184,7 @@ mod test {
         assert_eq!(
             structure.next(),
             Some(TableStructureEntry {
-                name: "a",
+                name: &"a".to_owned(),
                 children: vec![Child::TimeZone("b")]
             })
         );
@@ -197,14 +202,14 @@ mod test {
         assert_eq!(
             structure.next(),
             Some(TableStructureEntry {
-                name: "a",
+                name: &"a".to_owned(),
                 children: vec![Child::Submodule("b"), Child::TimeZone("e")]
             })
         );
         assert_eq!(
             structure.next(),
             Some(TableStructureEntry {
-                name: "a/b",
+                name: &"a/b".to_owned(),
                 children: vec![Child::TimeZone("c"), Child::TimeZone("d")]
             })
         );

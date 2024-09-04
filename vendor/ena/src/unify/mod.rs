@@ -304,6 +304,7 @@ impl<S: UnificationStoreBase> UnificationTable<S> {
 }
 
 impl<S: UnificationStoreMut> UnificationTable<S> {
+    /// Starts a new snapshot. Each snapshot must be either
     /// Creates a fresh key with the given value.
     pub fn new_key(&mut self, value: S::Value) -> S::Key {
         let len = self.values.len();

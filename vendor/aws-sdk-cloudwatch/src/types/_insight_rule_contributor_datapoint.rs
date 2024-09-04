@@ -28,8 +28,8 @@ impl InsightRuleContributorDatapoint {
 }
 
 /// A builder for [`InsightRuleContributorDatapoint`](crate::types::InsightRuleContributorDatapoint).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct InsightRuleContributorDatapointBuilder {
     pub(crate) timestamp: ::std::option::Option<::aws_smithy_types::DateTime>,
     pub(crate) approximate_value: ::std::option::Option<f64>,

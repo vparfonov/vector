@@ -805,7 +805,6 @@ async fn item_expiry_greater_than_wheel() {
 
 #[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
 #[tokio::test(start_paused = true)]
-#[cfg(panic = "unwind")]
 async fn remove_after_compact() {
     let now = Instant::now();
     let mut queue = DelayQueue::new();
@@ -823,7 +822,6 @@ async fn remove_after_compact() {
 
 #[cfg_attr(target_os = "wasi", ignore = "FIXME: Does not seem to work with WASI")]
 #[tokio::test(start_paused = true)]
-#[cfg(panic = "unwind")]
 async fn remove_after_compact_poll() {
     let now = Instant::now();
     let mut queue = task::spawn(DelayQueue::new());

@@ -30,9 +30,8 @@
 //! systems and make sure that Rust/JavaScript can work together with
 //! asynchronous and I/O work.
 
-#![cfg_attr(target_feature = "atomics", feature(stdarch_wasm_atomic_wait))]
+#![cfg_attr(target_feature = "atomics", feature(stdsimd))]
 #![deny(missing_docs)]
-#![cfg_attr(docsrs, feature(doc_cfg))]
 
 use js_sys::Promise;
 use std::cell::RefCell;
@@ -44,7 +43,6 @@ use std::task::{Context, Poll, Waker};
 use wasm_bindgen::prelude::*;
 
 mod queue;
-#[cfg_attr(docsrs, doc(cfg(feature = "futures-core-03-stream")))]
 #[cfg(feature = "futures-core-03-stream")]
 pub mod stream;
 

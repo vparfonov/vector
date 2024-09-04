@@ -1,7 +1,5 @@
-#[cfg(feature = "serde")]
-use crate::resolve;
 use crate::PrintFmt;
-use crate::{resolve_frame, trace, BacktraceFmt, Symbol, SymbolName};
+use crate::{resolve, resolve_frame, trace, BacktraceFmt, Symbol, SymbolName};
 use std::ffi::c_void;
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -23,10 +21,14 @@ use serde::{Deserialize, Serialize};
 /// This function requires the `std` feature of the `backtrace` crate to be
 /// enabled, and the `std` feature is enabled by default.
 #[derive(Clone)]
+#[cfg_attr(feature = "serialize-rustc", derive(RustcDecodable, RustcEncodable))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct Backtrace {
     // Frames here are listed from top-to-bottom of the stack
     frames: Vec<BacktraceFrame>,
+    // The index we believe is the actual start of the backtrace, omitting
+    // frames like `Backtrace::new` and `backtrace::trace`.
+    actual_start_index: usize,
 }
 
 fn _assert_send_sync() {
@@ -52,7 +54,7 @@ pub struct BacktraceFrame {
 #[derive(Clone)]
 enum Frame {
     Raw(crate::Frame),
-    #[cfg(feature = "serde")]
+    #[allow(dead_code)]
     Deserialized {
         ip: usize,
         symbol_address: usize,
@@ -64,7 +66,6 @@ impl Frame {
     fn ip(&self) -> *mut c_void {
         match *self {
             Frame::Raw(ref f) => f.ip(),
-            #[cfg(feature = "serde")]
             Frame::Deserialized { ip, .. } => ip as *mut c_void,
         }
     }
@@ -72,7 +73,6 @@ impl Frame {
     fn symbol_address(&self) -> *mut c_void {
         match *self {
             Frame::Raw(ref f) => f.symbol_address(),
-            #[cfg(feature = "serde")]
             Frame::Deserialized { symbol_address, .. } => symbol_address as *mut c_void,
         }
     }
@@ -80,34 +80,11 @@ impl Frame {
     fn module_base_address(&self) -> Option<*mut c_void> {
         match *self {
             Frame::Raw(ref f) => f.module_base_address(),
-            #[cfg(feature = "serde")]
             Frame::Deserialized {
                 module_base_address,
                 ..
             } => module_base_address.map(|addr| addr as *mut c_void),
         }
-    }
-
-    /// Resolve all addresses in the frame to their symbolic names.
-    fn resolve_symbols(&self) -> Vec<BacktraceSymbol> {
-        let mut symbols = Vec::new();
-        let sym = |symbol: &Symbol| {
-            symbols.push(BacktraceSymbol {
-                name: symbol.name().map(|m| m.as_bytes().to_vec()),
-                addr: symbol.addr().map(|a| a as usize),
-                filename: symbol.filename().map(|m| m.to_owned()),
-                lineno: symbol.lineno(),
-                colno: symbol.colno(),
-            });
-        };
-        match *self {
-            Frame::Raw(ref f) => resolve_frame(f, sym),
-            #[cfg(feature = "serde")]
-            Frame::Deserialized { ip, .. } => {
-                resolve(ip as *mut c_void, sym);
-            }
-        }
-        symbols
     }
 }
 
@@ -121,6 +98,7 @@ impl Frame {
 /// This function requires the `std` feature of the `backtrace` crate to be
 /// enabled, and the `std` feature is enabled by default.
 #[derive(Clone)]
+#[cfg_attr(feature = "serialize-rustc", derive(RustcDecodable, RustcEncodable))]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 pub struct BacktraceSymbol {
     name: Option<Vec<u8>>,
@@ -178,9 +156,9 @@ impl Backtrace {
     /// use backtrace::Backtrace;
     ///
     /// let mut current_backtrace = Backtrace::new_unresolved();
-    /// println!("{current_backtrace:?}"); // no symbol names
+    /// println!("{:?}", current_backtrace); // no symbol names
     /// current_backtrace.resolve();
-    /// println!("{current_backtrace:?}"); // symbol names now present
+    /// println!("{:?}", current_backtrace); // symbol names now present
     /// ```
     ///
     /// # Required features
@@ -194,22 +172,23 @@ impl Backtrace {
 
     fn create(ip: usize) -> Backtrace {
         let mut frames = Vec::new();
+        let mut actual_start_index = None;
         trace(|frame| {
             frames.push(BacktraceFrame {
                 frame: Frame::Raw(frame.clone()),
                 symbols: None,
             });
 
-            // clear inner frames, and start with call site.
-            if frame.symbol_address() as usize == ip {
-                frames.clear();
+            if frame.symbol_address() as usize == ip && actual_start_index.is_none() {
+                actual_start_index = Some(frames.len());
             }
-
             true
         });
-        frames.shrink_to_fit();
 
-        Backtrace { frames }
+        Backtrace {
+            frames,
+            actual_start_index: actual_start_index.unwrap_or(0),
+        }
     }
 
     /// Returns the frames from when this backtrace was captured.
@@ -223,7 +202,7 @@ impl Backtrace {
     /// This function requires the `std` feature of the `backtrace` crate to be
     /// enabled, and the `std` feature is enabled by default.
     pub fn frames(&self) -> &[BacktraceFrame] {
-        self.frames.as_slice()
+        &self.frames[self.actual_start_index..]
     }
 
     /// If this backtrace was created from `new_unresolved` then this function
@@ -237,18 +216,41 @@ impl Backtrace {
     /// This function requires the `std` feature of the `backtrace` crate to be
     /// enabled, and the `std` feature is enabled by default.
     pub fn resolve(&mut self) {
-        self.frames.iter_mut().for_each(BacktraceFrame::resolve);
+        for frame in self.frames.iter_mut().filter(|f| f.symbols.is_none()) {
+            let mut symbols = Vec::new();
+            {
+                let sym = |symbol: &Symbol| {
+                    symbols.push(BacktraceSymbol {
+                        name: symbol.name().map(|m| m.as_bytes().to_vec()),
+                        addr: symbol.addr().map(|a| a as usize),
+                        filename: symbol.filename().map(|m| m.to_owned()),
+                        lineno: symbol.lineno(),
+                        colno: symbol.colno(),
+                    });
+                };
+                match frame.frame {
+                    Frame::Raw(ref f) => resolve_frame(f, sym),
+                    Frame::Deserialized { ip, .. } => {
+                        resolve(ip as *mut c_void, sym);
+                    }
+                }
+            }
+            frame.symbols = Some(symbols);
+        }
     }
 }
 
 impl From<Vec<BacktraceFrame>> for Backtrace {
     fn from(frames: Vec<BacktraceFrame>) -> Self {
-        Backtrace { frames }
+        Backtrace {
+            frames,
+            actual_start_index: 0,
+        }
     }
 }
 
 impl From<crate::Frame> for BacktraceFrame {
-    fn from(frame: crate::Frame) -> Self {
+    fn from(frame: crate::Frame) -> BacktraceFrame {
         BacktraceFrame {
             frame: Frame::Raw(frame),
             symbols: None,
@@ -256,9 +258,6 @@ impl From<crate::Frame> for BacktraceFrame {
     }
 }
 
-// we don't want implementing `impl From<Backtrace> for Vec<BacktraceFrame>` on purpose,
-// because "... additional directions for Vec<T> can weaken type inference ..."
-// more information on https://github.com/rust-lang/backtrace-rs/pull/526
 impl Into<Vec<BacktraceFrame>> for Backtrace {
     fn into(self) -> Vec<BacktraceFrame> {
         self.frames
@@ -273,7 +272,7 @@ impl BacktraceFrame {
     /// This function requires the `std` feature of the `backtrace` crate to be
     /// enabled, and the `std` feature is enabled by default.
     pub fn ip(&self) -> *mut c_void {
-        self.frame.ip()
+        self.frame.ip() as *mut c_void
     }
 
     /// Same as `Frame::symbol_address`
@@ -283,7 +282,7 @@ impl BacktraceFrame {
     /// This function requires the `std` feature of the `backtrace` crate to be
     /// enabled, and the `std` feature is enabled by default.
     pub fn symbol_address(&self) -> *mut c_void {
-        self.frame.symbol_address()
+        self.frame.symbol_address() as *mut c_void
     }
 
     /// Same as `Frame::module_base_address`
@@ -293,7 +292,9 @@ impl BacktraceFrame {
     /// This function requires the `std` feature of the `backtrace` crate to be
     /// enabled, and the `std` feature is enabled by default.
     pub fn module_base_address(&self) -> Option<*mut c_void> {
-        self.frame.module_base_address()
+        self.frame
+            .module_base_address()
+            .map(|addr| addr as *mut c_void)
     }
 
     /// Returns the list of symbols that this frame corresponds to.
@@ -312,20 +313,6 @@ impl BacktraceFrame {
     /// enabled, and the `std` feature is enabled by default.
     pub fn symbols(&self) -> &[BacktraceSymbol] {
         self.symbols.as_ref().map(|s| &s[..]).unwrap_or(&[])
-    }
-
-    /// Resolve all addresses in this frame to their symbolic names.
-    ///
-    /// If this frame has been previously resolved, this function does nothing.
-    ///
-    /// # Required features
-    ///
-    /// This function requires the `std` feature of the `backtrace` crate to be
-    /// enabled, and the `std` feature is enabled by default.
-    pub fn resolve(&mut self) {
-        if self.symbols.is_none() {
-            self.symbols = Some(self.frame.resolve_symbols());
-        }
     }
 }
 
@@ -383,10 +370,11 @@ impl BacktraceSymbol {
 
 impl fmt::Debug for Backtrace {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let style = if fmt.alternate() {
-            PrintFmt::Full
+        let full = fmt.alternate();
+        let (frames, style) = if full {
+            (&self.frames[..], PrintFmt::Full)
         } else {
-            PrintFmt::Short
+            (&self.frames[self.actual_start_index..], PrintFmt::Short)
         };
 
         // When printing paths we try to strip the cwd if it exists, otherwise
@@ -397,7 +385,7 @@ impl fmt::Debug for Backtrace {
         let mut print_path =
             move |fmt: &mut fmt::Formatter<'_>, path: crate::BytesOrWideString<'_>| {
                 let path = path.into_path_buf();
-                if style == PrintFmt::Full {
+                if !full {
                     if let Ok(cwd) = &cwd {
                         if let Ok(suffix) = path.strip_prefix(cwd) {
                             return fmt::Display::fmt(&suffix.display(), fmt);
@@ -409,7 +397,7 @@ impl fmt::Debug for Backtrace {
 
         let mut f = BacktraceFmt::new(fmt, style, &mut print_path);
         f.add_context()?;
-        for frame in &self.frames {
+        for frame in frames {
             f.frame().backtrace_frame(frame)?;
         }
         f.finish()?;
@@ -441,6 +429,53 @@ impl fmt::Debug for BacktraceSymbol {
             .field("lineno", &self.lineno())
             .field("colno", &self.colno())
             .finish()
+    }
+}
+
+#[cfg(feature = "serialize-rustc")]
+mod rustc_serialize_impls {
+    use super::*;
+    use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
+
+    #[derive(RustcEncodable, RustcDecodable)]
+    struct SerializedFrame {
+        ip: usize,
+        symbol_address: usize,
+        module_base_address: Option<usize>,
+        symbols: Option<Vec<BacktraceSymbol>>,
+    }
+
+    impl Decodable for BacktraceFrame {
+        fn decode<D>(d: &mut D) -> Result<Self, D::Error>
+        where
+            D: Decoder,
+        {
+            let frame: SerializedFrame = SerializedFrame::decode(d)?;
+            Ok(BacktraceFrame {
+                frame: Frame::Deserialized {
+                    ip: frame.ip,
+                    symbol_address: frame.symbol_address,
+                    module_base_address: frame.module_base_address,
+                },
+                symbols: frame.symbols,
+            })
+        }
+    }
+
+    impl Encodable for BacktraceFrame {
+        fn encode<E>(&self, e: &mut E) -> Result<(), E::Error>
+        where
+            E: Encoder,
+        {
+            let BacktraceFrame { frame, symbols } = self;
+            SerializedFrame {
+                ip: frame.ip() as usize,
+                symbol_address: frame.symbol_address() as usize,
+                module_base_address: frame.module_base_address().map(|addr| addr as usize),
+                symbols: symbols.clone(),
+            }
+            .encode(e)
+        }
     }
 }
 

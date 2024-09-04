@@ -1,8 +1,0 @@
-subscription InvalidSubscription($filter: String) {
-  newDogs {
-    name
-  }
-  dogBirthdays(filter: $filter) {
-    name
-  }
-}

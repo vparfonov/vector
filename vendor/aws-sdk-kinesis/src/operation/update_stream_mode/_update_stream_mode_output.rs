@@ -18,8 +18,8 @@ impl UpdateStreamModeOutput {
 }
 
 /// A builder for [`UpdateStreamModeOutput`](crate::operation::update_stream_mode::UpdateStreamModeOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct UpdateStreamModeOutputBuilder {
     _request_id: Option<String>,
 }

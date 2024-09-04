@@ -12,23 +12,27 @@
 //!
 //! ## Compatibility
 //!
-//! The `num-integer` crate is tested for rustc 1.31 and greater.
+//! The `num-integer` crate is tested for rustc 1.8 and greater.
 
 #![doc(html_root_url = "https://docs.rs/num-integer/0.1")]
 #![no_std]
+#[cfg(feature = "std")]
+extern crate std;
+
+extern crate num_traits as traits;
 
 use core::mem;
 use core::ops::Add;
 
-use num_traits::{Num, Signed, Zero};
+use traits::{Num, Signed, Zero};
 
 mod roots;
-pub use crate::roots::Roots;
-pub use crate::roots::{cbrt, nth_root, sqrt};
+pub use roots::Roots;
+pub use roots::{cbrt, nth_root, sqrt};
 
 mod average;
-pub use crate::average::Average;
-pub use crate::average::{average_ceil, average_floor};
+pub use average::Average;
+pub use average::{average_ceil, average_floor};
 
 pub trait Integer: Sized + Num + PartialOrd + Ord + Eq {
     /// Floored integer division.
@@ -144,6 +148,8 @@ pub trait Integer: Sized + Num + PartialOrd + Ord + Eq {
     /// # Examples
     ///
     /// ~~~
+    /// # extern crate num_integer;
+    /// # extern crate num_traits;
     /// # fn main() {
     /// # use num_integer::{ExtendedGcd, Integer};
     /// # use num_traits::NumAssign;
@@ -201,11 +207,7 @@ pub trait Integer: Sized + Num + PartialOrd + Ord + Eq {
     }
 
     /// Deprecated, use `is_multiple_of` instead.
-    #[deprecated(note = "Please use is_multiple_of instead")]
-    #[inline]
-    fn divides(&self, other: &Self) -> bool {
-        self.is_multiple_of(other)
-    }
+    fn divides(&self, other: &Self) -> bool;
 
     /// Returns `true` if `self` is a multiple of `other`.
     ///
@@ -338,40 +340,6 @@ pub trait Integer: Sized + Num + PartialOrd + Ord + Eq {
         Self: Clone,
     {
         self.clone() - self.mod_floor(other)
-    }
-
-    /// Decrements self by one.
-    ///
-    /// # Examples
-    ///
-    /// ~~~
-    /// # use num_integer::Integer;
-    /// let mut x: i32 = 43;
-    /// x.dec();
-    /// assert_eq!(x, 42);
-    /// ~~~
-    fn dec(&mut self)
-    where
-        Self: Clone,
-    {
-        *self = self.clone() - Self::one()
-    }
-
-    /// Increments self by one.
-    ///
-    /// # Examples
-    ///
-    /// ~~~
-    /// # use num_integer::Integer;
-    /// let mut x: i32 = 41;
-    /// x.inc();
-    /// assert_eq!(x, 42);
-    /// ~~~
-    fn inc(&mut self)
-    where
-        Self: Clone,
-    {
-        *self = self.clone() + Self::one()
     }
 }
 
@@ -563,6 +531,12 @@ macro_rules! impl_integer_for_isize {
                 (gcd, lcm)
             }
 
+            /// Deprecated, use `is_multiple_of` instead.
+            #[inline]
+            fn divides(&self, other: &Self) -> bool {
+                self.is_multiple_of(other)
+            }
+
             /// Returns `true` if the number is a multiple of `other`.
             #[inline]
             fn is_multiple_of(&self, other: &Self) -> bool {
@@ -616,8 +590,8 @@ macro_rules! impl_integer_for_isize {
 
         #[cfg(test)]
         mod $test_mod {
-            use crate::Integer;
             use core::mem;
+            use Integer;
 
             /// Checks that the division rule holds for:
             ///
@@ -636,10 +610,11 @@ macro_rules! impl_integer_for_isize {
                     let separate_div_rem = (n / d, n % d);
                     let combined_div_rem = n.div_rem(&d);
 
-                    test_division_rule(nd, qr);
-
                     assert_eq!(separate_div_rem, qr);
                     assert_eq!(combined_div_rem, qr);
+
+                    test_division_rule(nd, separate_div_rem);
+                    test_division_rule(nd, combined_div_rem);
                 }
 
                 test_nd_dr((8, 3), (2, 2));
@@ -661,10 +636,11 @@ macro_rules! impl_integer_for_isize {
                         (Integer::div_floor(&n, &d), Integer::mod_floor(&n, &d));
                     let combined_div_mod_floor = Integer::div_mod_floor(&n, &d);
 
-                    test_division_rule(nd, dm);
-
                     assert_eq!(separate_div_mod_floor, dm);
                     assert_eq!(combined_div_mod_floor, dm);
+
+                    test_division_rule(nd, separate_div_mod_floor);
+                    test_division_rule(nd, combined_div_mod_floor);
                 }
 
                 test_nd_dm((8, 3), (2, 2));
@@ -703,11 +679,19 @@ macro_rules! impl_integer_for_isize {
 
                 // gcd(-128, b) = 128 is not representable as positive value
                 // for i8
-                for i in -127..=127 {
-                    for j in -127..=127 {
+                for i in -127..127 {
+                    for j in -127..127 {
                         assert_eq!(euclidean_gcd(i, j), i.gcd(&j));
                     }
                 }
+
+                // last value
+                // FIXME: Use inclusive ranges for above loop when implemented
+                let i = 127;
+                for j in -127..127 {
+                    assert_eq!(euclidean_gcd(i, j), i.gcd(&j));
+                }
+                assert_eq!(127.gcd(&127), 127);
             }
 
             #[test]
@@ -774,9 +758,9 @@ macro_rules! impl_integer_for_isize {
 
             #[test]
             fn test_extended_gcd_lcm() {
-                use crate::ExtendedGcd;
                 use core::fmt::Debug;
-                use num_traits::NumAssign;
+                use traits::NumAssign;
+                use ExtendedGcd;
 
                 fn check<A: Copy + Debug + Integer + NumAssign>(a: A, b: A) {
                     let ExtendedGcd { gcd, x, y, .. } = a.extended_gcd(&b);
@@ -842,8 +826,9 @@ impl_integer_for_isize!(i8, test_integer_i8);
 impl_integer_for_isize!(i16, test_integer_i16);
 impl_integer_for_isize!(i32, test_integer_i32);
 impl_integer_for_isize!(i64, test_integer_i64);
-impl_integer_for_isize!(i128, test_integer_i128);
 impl_integer_for_isize!(isize, test_integer_isize);
+#[cfg(has_i128)]
+impl_integer_for_isize!(i128, test_integer_i128);
 
 macro_rules! impl_integer_for_usize {
     ($T:ty, $test_mod:ident) => {
@@ -924,6 +909,12 @@ macro_rules! impl_integer_for_usize {
                 (gcd, lcm)
             }
 
+            /// Deprecated, use `is_multiple_of` instead.
+            #[inline]
+            fn divides(&self, other: &Self) -> bool {
+                self.is_multiple_of(other)
+            }
+
             /// Returns `true` if the number is a multiple of `other`.
             #[inline]
             fn is_multiple_of(&self, other: &Self) -> bool {
@@ -954,8 +945,8 @@ macro_rules! impl_integer_for_usize {
 
         #[cfg(test)]
         mod $test_mod {
-            use crate::Integer;
             use core::mem;
+            use Integer;
 
             #[test]
             fn test_div_mod_floor() {
@@ -990,11 +981,19 @@ macro_rules! impl_integer_for_usize {
                     n
                 }
 
-                for i in 0..=255 {
-                    for j in 0..=255 {
+                for i in 0..255 {
+                    for j in 0..255 {
                         assert_eq!(euclidean_gcd(i, j), i.gcd(&j));
                     }
                 }
+
+                // last value
+                // FIXME: Use inclusive ranges for above loop when implemented
+                let i = 255;
+                for j in 0..255 {
+                    assert_eq!(euclidean_gcd(i, j), i.gcd(&j));
+                }
+                assert_eq!(255.gcd(&255), 255);
             }
 
             #[test]
@@ -1053,8 +1052,9 @@ impl_integer_for_usize!(u8, test_integer_u8);
 impl_integer_for_usize!(u16, test_integer_u16);
 impl_integer_for_usize!(u32, test_integer_u32);
 impl_integer_for_usize!(u64, test_integer_u64);
-impl_integer_for_usize!(u128, test_integer_u128);
 impl_integer_for_usize!(usize, test_integer_usize);
+#[cfg(has_i128)]
+impl_integer_for_usize!(u128, test_integer_u128);
 
 /// An iterator over binomial coefficients.
 pub struct IterBinomial<T> {
@@ -1089,7 +1089,7 @@ where
         IterBinomial {
             k: T::zero(),
             a: T::one(),
-            n,
+            n: n,
         }
     }
 }

@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "lua-src"
-version = "547.0.0"
+version = "546.0.2"
 authors = ["Aleksandr Orlenko <zxteam@protonmail.com>"]
 description = """
 Sources of Lua 5.1/5.2/5.3/5.4 and logic to build them.

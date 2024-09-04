@@ -3,7 +3,7 @@ pub use crate::operation::get_bucket_encryption::_get_bucket_encryption_output::
 
 pub use crate::operation::get_bucket_encryption::_get_bucket_encryption_input::GetBucketEncryptionInputBuilder;
 
-impl crate::operation::get_bucket_encryption::builders::GetBucketEncryptionInputBuilder {
+impl GetBucketEncryptionInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -29,10 +29,8 @@ impl crate::operation::get_bucket_encryption::builders::GetBucketEncryptionInput
 /// <p>To use this operation, you must have permission to perform the <code>s3:GetEncryptionConfiguration</code> action. The bucket owner has this permission by default. The bucket owner can grant this permission to others. For more information about permissions, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-actions.html#using-with-s3-actions-related-to-bucket-subresources">Permissions Related to Bucket Subresource Operations</a> and <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-access-control.html">Managing Access Permissions to Your Amazon S3 Resources</a>.</p>
 /// <p>The following operations are related to <code>GetBucketEncryption</code>:</p>
 /// <ul>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketEncryption.html">PutBucketEncryption</a></p></li>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketEncryption.html">DeleteBucketEncryption</a></p></li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketEncryption.html">PutBucketEncryption</a> </p> </li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketEncryption.html">DeleteBucketEncryption</a> </p> </li>
 /// </ul>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
 pub struct GetBucketEncryptionFluentBuilder {
@@ -59,7 +57,7 @@ impl
     }
 }
 impl GetBucketEncryptionFluentBuilder {
-    /// Creates a new `GetBucketEncryptionFluentBuilder`.
+    /// Creates a new `GetBucketEncryption`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -110,12 +108,12 @@ impl GetBucketEncryptionFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }

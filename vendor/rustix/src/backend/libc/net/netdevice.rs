@@ -1,5 +1,3 @@
-//! Wrappers for netdevice ioctls.
-
 #![allow(unsafe_code)]
 
 #[cfg(feature = "alloc")]

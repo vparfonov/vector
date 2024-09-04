@@ -12,7 +12,7 @@
 // OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 // CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-use super::{limb, BoxedLimbs, Limb, LimbMask, Modulus};
+use super::{elem_add, elem_sub, limb, BoxedLimbs, Limb, LimbMask, Modulus, Prime};
 use crate::error;
 use alloc::boxed::Box;
 
@@ -65,5 +65,14 @@ impl PrivateExponent {
     #[inline]
     pub(super) fn limbs(&self) -> &[Limb] {
         &self.limbs
+    }
+
+    // Returns `p - 2`.
+    pub(super) fn for_flt<P: Prime>(p: &Modulus<P>) -> Self {
+        let two = elem_add(p.one(), p.one(), p);
+        let p_minus_2 = elem_sub(p.zero(), &two, p);
+        Self {
+            limbs: p_minus_2.limbs.into_limbs(),
+        }
     }
 }

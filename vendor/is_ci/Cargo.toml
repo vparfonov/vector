@@ -12,27 +12,14 @@
 [package]
 edition = "2018"
 name = "is_ci"
-version = "1.2.0"
+version = "1.1.1"
 authors = ["Kat Marchán <kzm@zkat.tech>"]
 description = "Super lightweight CI environment checker. Just tells you if you're in CI or not without much fuss."
 documentation = "https://docs.rs/is_ci"
 readme = "README.md"
-keywords = [
-    "ci",
-    "build",
-]
-categories = [
-    "development-tools",
-    "development-tools::build-utils",
-    "development-tools::testing",
-]
+keywords = ["ci", "build"]
+categories = ["development-tools", "development-tools::build-utils", "development-tools::testing"]
 license = "ISC"
 repository = "https://github.com/zkat/is_ci"
-
-[profile.release]
-lto = true
-codegen-units = 1
-panic = "abort"
-strip = true
 
 [dependencies]

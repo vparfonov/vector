@@ -627,11 +627,7 @@ local function wputmrmsib(t, imark, s, vsreg, psz, sk)
 	werror("NYI: rip-relative displacement followed by immediate")
       end
       -- The previous byte in the action buffer cannot be 0xe9 or 0x80-0x8f.
-      if disp[2] == "iPJ" then
-	waction("REL_A", disp[1])
-      else
-	wputlabel("REL_", disp[1], 2)
-      end
+      wputlabel("REL_", disp[1], 2)
     else
       wputdarg(disp)
     end
@@ -748,9 +744,9 @@ local function dispexpr(expr)
     return imm*map_opsizenum[ops]
   end
   local mode, iexpr = immexpr(dispt)
-  if mode == "iJ" or mode == "iPJ" then
+  if mode == "iJ" then
     if c == "-" then werror("cannot invert label reference") end
-    return { iexpr, mode }
+    return { iexpr }
   end
   return expr -- Need to return original signed expression.
 end
@@ -1151,8 +1147,6 @@ local map_op = {
   rep_0 =	"F3",
   repe_0 =	"F3",
   repz_0 =	"F3",
-  endbr32_0 =	"F30F1EFB",
-  endbr64_0 =	"F30F1EFA",
   -- F4: *hlt
   cmc_0 =	"F5",
   -- F6: test... mb,i; div... mb

@@ -62,8 +62,8 @@ const DEFAULT_BUF_SIZE: usize = 8 * 1024;
 /// ```
 pub async fn copy<R, W>(reader: R, writer: W) -> Result<u64>
 where
-    R: AsyncRead,
-    W: AsyncWrite,
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
 {
     pin_project! {
         struct CopyFuture<R, W> {
@@ -78,7 +78,7 @@ where
     impl<R, W> Future for CopyFuture<R, W>
     where
         R: AsyncBufRead,
-        W: AsyncWrite,
+        W: AsyncWrite + Unpin,
     {
         type Output = Result<u64>;
 
@@ -1811,7 +1811,7 @@ fn read_until_internal<R: AsyncBufReadExt + ?Sized>(
         let (done, used) = {
             let available = ready!(reader.as_mut().poll_fill_buf(cx))?;
 
-            if let Some(i) = memchr(byte, available) {
+            if let Some(i) = memchr::memchr(byte, available) {
                 buf.extend_from_slice(&available[..=i]);
                 (true, i + 1)
             } else {
@@ -2698,7 +2698,9 @@ impl<R1: AsyncBufRead, R2: AsyncBufRead> AsyncBufRead for Chain<R1, R2> {
         let this = self.project();
         if !*this.done_first {
             match ready!(this.first.poll_fill_buf(cx)) {
-                Ok([]) => *this.done_first = true,
+                Ok(buf) if buf.is_empty() => {
+                    *this.done_first = true;
+                }
                 Ok(buf) => return Poll::Ready(Ok(buf)),
                 Err(err) => return Poll::Ready(Err(err)),
             }
@@ -3088,13 +3090,4 @@ impl<T: AsyncWrite + Unpin> AsyncWrite for WriteHalf<T> {
         let mut inner = self.0.lock().unwrap();
         Pin::new(&mut *inner).poll_close(cx)
     }
-}
-
-#[cfg(feature = "memchr")]
-use memchr::memchr;
-
-/// Unoptimized memchr fallback.
-#[cfg(not(feature = "memchr"))]
-fn memchr(needle: u8, haystack: &[u8]) -> Option<usize> {
-    haystack.iter().position(|&b| b == needle)
 }

@@ -35,6 +35,5 @@ lint:
 
 msrv-lock:
 	@cargo update -p proptest --precise=1.0.0
-	@cargo update -p byteorder --precise=1.4.0
 
 .PHONY: all doc build check test format format-check lint check-minver msrv-lock

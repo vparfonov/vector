@@ -27,8 +27,8 @@ impl AuthorizeVpcEndpointAccessOutput {
 }
 
 /// A builder for [`AuthorizeVpcEndpointAccessOutput`](crate::operation::authorize_vpc_endpoint_access::AuthorizeVpcEndpointAccessOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct AuthorizeVpcEndpointAccessOutputBuilder {
     pub(crate) authorized_principal: ::std::option::Option<crate::types::AuthorizedPrincipal>,
     _request_id: Option<String>,

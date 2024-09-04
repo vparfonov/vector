@@ -145,7 +145,8 @@ where
     ///     Ok("hello, world!".to_string())
     /// }
     ///
-    /// fn main() -> Result<()> {
+    /// #[tokio::main]
+    /// async fn main() -> Result<()> {
     ///     let retry = fetch.retry(&ExponentialBuilder::default()).notify(
     ///         |err: &anyhow::Error, dur: Duration| {
     ///             println!("retrying error {:?} with sleeping {:?}", err, dur);

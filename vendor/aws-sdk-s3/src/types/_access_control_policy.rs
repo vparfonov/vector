@@ -29,8 +29,8 @@ impl AccessControlPolicy {
 }
 
 /// A builder for [`AccessControlPolicy`](crate::types::AccessControlPolicy).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct AccessControlPolicyBuilder {
     pub(crate) grants: ::std::option::Option<::std::vec::Vec<crate::types::Grant>>,
     pub(crate) owner: ::std::option::Option<crate::types::Owner>,

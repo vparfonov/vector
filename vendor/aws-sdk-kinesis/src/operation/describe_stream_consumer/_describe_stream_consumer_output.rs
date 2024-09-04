@@ -26,8 +26,8 @@ impl DescribeStreamConsumerOutput {
 }
 
 /// A builder for [`DescribeStreamConsumerOutput`](crate::operation::describe_stream_consumer::DescribeStreamConsumerOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DescribeStreamConsumerOutputBuilder {
     pub(crate) consumer_description: ::std::option::Option<crate::types::ConsumerDescription>,
     _request_id: Option<String>,

@@ -17,8 +17,8 @@ use std::os::raw::c_void;
 
 pub use core_foundation_sys::base::*;
 
-use crate::string::CFString;
-use crate::ConcreteCFType;
+use string::CFString;
+use ConcreteCFType;
 
 pub trait CFIndexConvertible {
     /// Always use this method to construct a `CFIndex` value. It performs bounds checking to
@@ -37,7 +37,7 @@ impl CFIndexConvertible for usize {
     }
 }
 
-declare_TCFType! {
+declare_TCFType!{
     /// Superclass of all Core Foundation objects.
     CFType, CFTypeRef
 }
@@ -111,11 +111,13 @@ impl CFType {
 }
 
 impl fmt::Debug for CFType {
-    /// Formats the value using [`CFCopyDescription`].
-    ///
-    /// [`CFCopyDescription`]: https://developer.apple.com/documentation/corefoundation/1521252-cfcopydescription?language=objc
+   /// Formats the value using [`CFCopyDescription`].
+   ///
+   /// [`CFCopyDescription`]: https://developer.apple.com/documentation/corefoundation/1521252-cfcopydescription?language=objc
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let desc = unsafe { CFString::wrap_under_create_rule(CFCopyDescription(self.0)) };
+        let desc = unsafe {
+            CFString::wrap_under_create_rule(CFCopyDescription(self.0))
+        };
         desc.fmt(f)
     }
 }
@@ -123,14 +125,18 @@ impl fmt::Debug for CFType {
 impl Clone for CFType {
     #[inline]
     fn clone(&self) -> CFType {
-        unsafe { TCFType::wrap_under_get_rule(self.0) }
+        unsafe {
+            TCFType::wrap_under_get_rule(self.0)
+        }
     }
 }
 
 impl PartialEq for CFType {
     #[inline]
     fn eq(&self, other: &CFType) -> bool {
-        unsafe { CFEqual(self.as_CFTypeRef(), other.as_CFTypeRef()) != 0 }
+        unsafe {
+            CFEqual(self.as_CFTypeRef(), other.as_CFTypeRef()) != 0
+        }
     }
 }
 
@@ -147,6 +153,7 @@ impl CFAllocator {
     }
 }
 
+
 /// All Core Foundation types implement this trait. The associated type `Ref` specifies the
 /// associated Core Foundation type: e.g. for `CFType` this is `CFTypeRef`; for `CFArray` this is
 /// `CFArrayRef`.
@@ -158,7 +165,7 @@ pub trait TCFType {
     /// The reference type wrapped inside this type.
     type Ref: TCFTypeRef;
 
-    /// Returns the object as its concrete `TypeRef`.
+    /// Returns the object as its concrete TypeRef.
     fn as_concrete_TypeRef(&self) -> Self::Ref;
 
     /// Returns an instance of the object, wrapping the underlying `CFTypeRef` subclass. Use this
@@ -171,7 +178,9 @@ pub trait TCFType {
     /// Returns the object as a wrapped `CFType`. The reference count is incremented by one.
     #[inline]
     fn as_CFType(&self) -> CFType {
-        unsafe { TCFType::wrap_under_get_rule(self.as_CFTypeRef()) }
+        unsafe {
+            TCFType::wrap_under_get_rule(self.as_CFTypeRef())
+        }
     }
 
     /// Returns the object as a wrapped `CFType`. Consumes self and avoids changing the reference
@@ -197,21 +206,27 @@ pub trait TCFType {
     /// whether the return value of this method is greater than zero.
     #[inline]
     fn retain_count(&self) -> CFIndex {
-        unsafe { CFGetRetainCount(self.as_CFTypeRef()) }
+        unsafe {
+            CFGetRetainCount(self.as_CFTypeRef())
+        }
     }
 
     /// Returns the type ID of this object.
     #[inline]
     fn type_of(&self) -> CFTypeID {
-        unsafe { CFGetTypeID(self.as_CFTypeRef()) }
+        unsafe {
+            CFGetTypeID(self.as_CFTypeRef())
+        }
     }
 
     /// Writes a debugging version of this object on standard error.
     fn show(&self) {
-        unsafe { CFShow(self.as_CFTypeRef()) }
+        unsafe {
+            CFShow(self.as_CFTypeRef())
+        }
     }
 
-    /// Returns `true` if this value is an instance of another type.
+    /// Returns true if this value is an instance of another type.
     #[inline]
     fn instance_of<OtherCFType: TCFType>(&self) -> bool {
         self.type_of() == OtherCFType::type_id()
@@ -303,11 +318,9 @@ impl<'a, T: PartialEq> PartialEq for ItemMutRef<'a, T> {
     }
 }
 
-/// A trait describing how to convert from the stored `*mut c_void` to the desired `T`
+/// A trait describing how to convert from the stored *mut c_void to the desired T
 pub unsafe trait FromMutVoid {
-    unsafe fn from_mut_void<'a>(x: *mut c_void) -> ItemMutRef<'a, Self>
-    where
-        Self: std::marker::Sized;
+    unsafe fn from_mut_void<'a>(x: *mut c_void) -> ItemMutRef<'a, Self> where Self: std::marker::Sized;
 }
 
 unsafe impl FromMutVoid for u32 {
@@ -324,18 +337,13 @@ unsafe impl FromMutVoid for *const c_void {
 
 unsafe impl<T: TCFType> FromMutVoid for T {
     unsafe fn from_mut_void<'a>(x: *mut c_void) -> ItemMutRef<'a, Self> {
-        ItemMutRef(
-            ManuallyDrop::new(TCFType::wrap_under_create_rule(T::Ref::from_void_ptr(x))),
-            PhantomData,
-        )
+        ItemMutRef(ManuallyDrop::new(TCFType::wrap_under_create_rule(T::Ref::from_void_ptr(x))), PhantomData)
     }
 }
 
-/// A trait describing how to convert from the stored `*const c_void` to the desired `T`
+/// A trait describing how to convert from the stored *const c_void to the desired T
 pub unsafe trait FromVoid {
-    unsafe fn from_void<'a>(x: *const c_void) -> ItemRef<'a, Self>
-    where
-        Self: std::marker::Sized;
+    unsafe fn from_void<'a>(x: *const c_void) -> ItemRef<'a, Self> where Self: std::marker::Sized;
 }
 
 unsafe impl FromVoid for u32 {
@@ -354,14 +362,11 @@ unsafe impl FromVoid for *const c_void {
 
 unsafe impl<T: TCFType> FromVoid for T {
     unsafe fn from_void<'a>(x: *const c_void) -> ItemRef<'a, Self> {
-        ItemRef(
-            ManuallyDrop::new(TCFType::wrap_under_create_rule(T::Ref::from_void_ptr(x))),
-            PhantomData,
-        )
+        ItemRef(ManuallyDrop::new(TCFType::wrap_under_create_rule(T::Ref::from_void_ptr(x))), PhantomData)
     }
 }
 
-/// A trait describing how to convert from the stored `*const c_void` to the desired `T`
+/// A trait describing how to convert from the stored *const c_void to the desired T
 pub unsafe trait ToVoid<T> {
     fn to_void(&self) -> *const c_void;
 }
@@ -390,11 +395,12 @@ unsafe impl ToVoid<CFType> for CFTypeRef {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::boolean::CFBoolean;
     use std::mem;
+    use boolean::CFBoolean;
 
     #[test]
     fn cftype_instance_of() {
@@ -407,7 +413,7 @@ mod tests {
 
     #[test]
     fn as_cftype_retain_count() {
-        let string = CFString::from_static_string("alongerstring");
+        let string = CFString::from_static_string("bar");
         assert_eq!(string.retain_count(), 1);
         let cftype = string.as_CFType();
         assert_eq!(cftype.retain_count(), 2);
@@ -417,7 +423,7 @@ mod tests {
 
     #[test]
     fn into_cftype_retain_count() {
-        let string = CFString::from_static_string("alongerstring");
+        let string = CFString::from_static_string("bar");
         assert_eq!(string.retain_count(), 1);
         let cftype = string.into_CFType();
         assert_eq!(cftype.retain_count(), 1);
@@ -425,10 +431,10 @@ mod tests {
 
     #[test]
     fn as_cftype_and_downcast() {
-        let string = CFString::from_static_string("alongerstring");
+        let string = CFString::from_static_string("bar");
         let cftype = string.as_CFType();
         let string2 = cftype.downcast::<CFString>().unwrap();
-        assert_eq!(string2.to_string(), "alongerstring");
+        assert_eq!(string2.to_string(), "bar");
 
         assert_eq!(string.retain_count(), 3);
         assert_eq!(cftype.retain_count(), 3);
@@ -437,10 +443,10 @@ mod tests {
 
     #[test]
     fn into_cftype_and_downcast_into() {
-        let string = CFString::from_static_string("alongerstring");
+        let string = CFString::from_static_string("bar");
         let cftype = string.into_CFType();
         let string2 = cftype.downcast_into::<CFString>().unwrap();
-        assert_eq!(string2.to_string(), "alongerstring");
+        assert_eq!(string2.to_string(), "bar");
         assert_eq!(string2.retain_count(), 1);
     }
 }

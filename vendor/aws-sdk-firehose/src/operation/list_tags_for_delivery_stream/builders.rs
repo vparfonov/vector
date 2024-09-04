@@ -3,7 +3,7 @@ pub use crate::operation::list_tags_for_delivery_stream::_list_tags_for_delivery
 
 pub use crate::operation::list_tags_for_delivery_stream::_list_tags_for_delivery_stream_input::ListTagsForDeliveryStreamInputBuilder;
 
-impl crate::operation::list_tags_for_delivery_stream::builders::ListTagsForDeliveryStreamInputBuilder {
+impl ListTagsForDeliveryStreamInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -22,7 +22,7 @@ impl crate::operation::list_tags_for_delivery_stream::builders::ListTagsForDeliv
 }
 /// Fluent builder constructing a request to `ListTagsForDeliveryStream`.
 ///
-/// <p>Lists the tags for the specified delivery stream. This operation has a limit of five transactions per second per account.</p>
+/// <p>Lists the tags for the specified delivery stream. This operation has a limit of five transactions per second per account. </p>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
 pub struct ListTagsForDeliveryStreamFluentBuilder {
     handle: ::std::sync::Arc<crate::client::Handle>,
@@ -48,7 +48,7 @@ impl
     }
 }
 impl ListTagsForDeliveryStreamFluentBuilder {
-    /// Creates a new `ListTagsForDeliveryStreamFluentBuilder`.
+    /// Creates a new `ListTagsForDeliveryStream`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -99,12 +99,12 @@ impl ListTagsForDeliveryStreamFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }
@@ -136,17 +136,17 @@ impl ListTagsForDeliveryStreamFluentBuilder {
     pub fn get_exclusive_start_tag_key(&self) -> &::std::option::Option<::std::string::String> {
         self.inner.get_exclusive_start_tag_key()
     }
-    /// <p>The number of tags to return. If this number is less than the total number of tags associated with the delivery stream, <code>HasMoreTags</code> is set to <code>true</code> in the response. To list additional tags, set <code>ExclusiveStartTagKey</code> to the last key in the response.</p>
+    /// <p>The number of tags to return. If this number is less than the total number of tags associated with the delivery stream, <code>HasMoreTags</code> is set to <code>true</code> in the response. To list additional tags, set <code>ExclusiveStartTagKey</code> to the last key in the response. </p>
     pub fn limit(mut self, input: i32) -> Self {
         self.inner = self.inner.limit(input);
         self
     }
-    /// <p>The number of tags to return. If this number is less than the total number of tags associated with the delivery stream, <code>HasMoreTags</code> is set to <code>true</code> in the response. To list additional tags, set <code>ExclusiveStartTagKey</code> to the last key in the response.</p>
+    /// <p>The number of tags to return. If this number is less than the total number of tags associated with the delivery stream, <code>HasMoreTags</code> is set to <code>true</code> in the response. To list additional tags, set <code>ExclusiveStartTagKey</code> to the last key in the response. </p>
     pub fn set_limit(mut self, input: ::std::option::Option<i32>) -> Self {
         self.inner = self.inner.set_limit(input);
         self
     }
-    /// <p>The number of tags to return. If this number is less than the total number of tags associated with the delivery stream, <code>HasMoreTags</code> is set to <code>true</code> in the response. To list additional tags, set <code>ExclusiveStartTagKey</code> to the last key in the response.</p>
+    /// <p>The number of tags to return. If this number is less than the total number of tags associated with the delivery stream, <code>HasMoreTags</code> is set to <code>true</code> in the response. To list additional tags, set <code>ExclusiveStartTagKey</code> to the last key in the response. </p>
     pub fn get_limit(&self) -> &::std::option::Option<i32> {
         self.inner.get_limit()
     }

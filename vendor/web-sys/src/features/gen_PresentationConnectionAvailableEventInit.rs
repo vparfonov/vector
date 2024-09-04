@@ -10,53 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `PresentationConnectionAvailableEventInit`*"]
     pub type PresentationConnectionAvailableEventInit;
-    #[doc = "Get the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PresentationConnectionAvailableEventInit`*"]
-    #[wasm_bindgen(method, getter = "bubbles")]
-    pub fn get_bubbles(this: &PresentationConnectionAvailableEventInit) -> Option<bool>;
-    #[doc = "Change the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PresentationConnectionAvailableEventInit`*"]
-    #[wasm_bindgen(method, setter = "bubbles")]
-    pub fn set_bubbles(this: &PresentationConnectionAvailableEventInit, val: bool);
-    #[doc = "Get the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PresentationConnectionAvailableEventInit`*"]
-    #[wasm_bindgen(method, getter = "cancelable")]
-    pub fn get_cancelable(this: &PresentationConnectionAvailableEventInit) -> Option<bool>;
-    #[doc = "Change the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PresentationConnectionAvailableEventInit`*"]
-    #[wasm_bindgen(method, setter = "cancelable")]
-    pub fn set_cancelable(this: &PresentationConnectionAvailableEventInit, val: bool);
-    #[doc = "Get the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PresentationConnectionAvailableEventInit`*"]
-    #[wasm_bindgen(method, getter = "composed")]
-    pub fn get_composed(this: &PresentationConnectionAvailableEventInit) -> Option<bool>;
-    #[doc = "Change the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PresentationConnectionAvailableEventInit`*"]
-    #[wasm_bindgen(method, setter = "composed")]
-    pub fn set_composed(this: &PresentationConnectionAvailableEventInit, val: bool);
-    #[cfg(feature = "PresentationConnection")]
-    #[doc = "Get the `connection` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PresentationConnection`, `PresentationConnectionAvailableEventInit`*"]
-    #[wasm_bindgen(method, getter = "connection")]
-    pub fn get_connection(
-        this: &PresentationConnectionAvailableEventInit,
-    ) -> PresentationConnection;
-    #[cfg(feature = "PresentationConnection")]
-    #[doc = "Change the `connection` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PresentationConnection`, `PresentationConnectionAvailableEventInit`*"]
-    #[wasm_bindgen(method, setter = "connection")]
-    pub fn set_connection(
-        this: &PresentationConnectionAvailableEventInit,
-        val: &PresentationConnection,
-    );
 }
 impl PresentationConnectionAvailableEventInit {
     #[cfg(feature = "PresentationConnection")]
@@ -69,25 +22,73 @@ impl PresentationConnectionAvailableEventInit {
         ret.connection(connection);
         ret
     }
-    #[deprecated = "Use `set_bubbles()` instead."]
+    #[doc = "Change the `bubbles` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PresentationConnectionAvailableEventInit`*"]
     pub fn bubbles(&mut self, val: bool) -> &mut Self {
-        self.set_bubbles(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("bubbles"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_cancelable()` instead."]
+    #[doc = "Change the `cancelable` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PresentationConnectionAvailableEventInit`*"]
     pub fn cancelable(&mut self, val: bool) -> &mut Self {
-        self.set_cancelable(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("cancelable"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_composed()` instead."]
+    #[doc = "Change the `composed` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PresentationConnectionAvailableEventInit`*"]
     pub fn composed(&mut self, val: bool) -> &mut Self {
-        self.set_composed(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("composed"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "PresentationConnection")]
-    #[deprecated = "Use `set_connection()` instead."]
+    #[doc = "Change the `connection` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PresentationConnection`, `PresentationConnectionAvailableEventInit`*"]
     pub fn connection(&mut self, val: &PresentationConnection) -> &mut Self {
-        self.set_connection(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("connection"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

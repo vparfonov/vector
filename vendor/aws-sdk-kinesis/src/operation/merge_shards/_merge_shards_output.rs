@@ -18,8 +18,8 @@ impl MergeShardsOutput {
 }
 
 /// A builder for [`MergeShardsOutput`](crate::operation::merge_shards::MergeShardsOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct MergeShardsOutputBuilder {
     _request_id: Option<String>,
 }

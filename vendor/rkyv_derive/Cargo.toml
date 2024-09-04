@@ -12,15 +12,9 @@
 [package]
 edition = "2021"
 name = "rkyv_derive"
-version = "0.7.45"
+version = "0.7.44"
 authors = ["David Koloski <djkoloski@gmail.com>"]
-build = false
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 description = "Derive macro for rkyv"
-readme = false
 license = "MIT"
 repository = "https://github.com/rkyv/rkyv"
 
@@ -28,8 +22,6 @@ repository = "https://github.com/rkyv/rkyv"
 all-features = true
 
 [lib]
-name = "rkyv_derive"
-path = "src/lib.rs"
 proc-macro = true
 
 [dependencies.proc-macro2]

@@ -344,8 +344,7 @@ const MASK_BUF_SIZE: usize = KERNEL_MAX_SIZE + KERNEL_MAX_ALIGN - 1;
 // bugs we have seen on certain platforms (macos) that look like
 // we don't get aligned allocations out of TLS - 16- and 8-byte
 // allocations have been seen, make the minimal align request we can.
-// Align(32) would not work with TLS for s390x.
-#[cfg_attr(not(target_os = "macos"), repr(align(16)))]
+#[cfg_attr(not(target_os = "macos"), repr(align(32)))]
 struct MaskBuffer {
     buffer: [u8; MASK_BUF_SIZE],
 }

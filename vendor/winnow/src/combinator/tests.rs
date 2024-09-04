@@ -9,8 +9,6 @@ use crate::error::ErrorKind;
 use crate::error::InputError;
 use crate::error::Needed;
 use crate::error::ParserError;
-#[cfg(feature = "alloc")]
-use crate::lib::std::borrow::ToOwned;
 use crate::stream::Stream;
 use crate::token::take;
 use crate::unpeek;
@@ -520,36 +518,40 @@ fn alt_test() {
     #[cfg(feature = "alloc")]
     use crate::{
         error::ParserError,
-        lib::std::{fmt::Debug, string::String},
+        lib::std::{
+            fmt::Debug,
+            string::{String, ToString},
+        },
     };
 
     #[cfg(feature = "alloc")]
     #[derive(Debug, Clone, Eq, PartialEq)]
-    struct ErrorStr(String);
+    pub struct ErrorStr(String);
 
     #[cfg(feature = "alloc")]
     impl From<u32> for ErrorStr {
         fn from(i: u32) -> Self {
-            ErrorStr(format!("custom error code: {i}"))
+            ErrorStr(format!("custom error code: {}", i))
         }
     }
 
     #[cfg(feature = "alloc")]
     impl<'a> From<&'a str> for ErrorStr {
         fn from(i: &'a str) -> Self {
-            ErrorStr(format!("custom error message: {i}"))
+            ErrorStr(format!("custom error message: {}", i))
         }
     }
 
     #[cfg(feature = "alloc")]
     impl<I: Stream + Debug> ParserError<I> for ErrorStr {
         fn from_error_kind(input: &I, kind: ErrorKind) -> Self {
-            ErrorStr(format!("custom error message: ({input:?}, {kind:?})"))
+            ErrorStr(format!("custom error message: ({:?}, {:?})", input, kind))
         }
 
         fn append(self, input: &I, _: &<I as Stream>::Checkpoint, kind: ErrorKind) -> Self {
             ErrorStr(format!(
-                "custom error message: ({input:?}, {kind:?}) - {self:?}"
+                "custom error message: ({:?}, {:?}) - {:?}",
+                input, kind, self
             ))
         }
     }
@@ -560,7 +562,7 @@ fn alt_test() {
 
     #[allow(unused_variables)]
     fn dont_work(input: &[u8]) -> IResult<&[u8], &[u8], ErrorStr> {
-        Err(ErrMode::Backtrack(ErrorStr("abcd".to_owned())))
+        Err(ErrMode::Backtrack(ErrorStr("abcd".to_string())))
     }
 
     fn work2(input: &[u8]) -> IResult<&[u8], &[u8], ErrorStr> {
@@ -592,7 +594,7 @@ fn alt_test() {
         Err(ErrMode::Backtrack(error_node_position!(
             &a,
             ErrorKind::Alt,
-            ErrorStr("abcd".to_owned())
+            ErrorStr("abcd".to_string())
         )))
     );
     assert_eq!(alt2(a), Ok((&b""[..], a)));
@@ -667,22 +669,6 @@ fn alt_array() {
         alt1.parse_peek(i),
         Err(ErrMode::Backtrack(error_position!(&i, ErrorKind::Tag)))
     );
-}
-
-#[test]
-fn alt_dynamic_array() {
-    fn alt1<'i>(i: &mut &'i [u8]) -> PResult<&'i [u8]> {
-        alt(&mut ["a", "bc", "def"][..]).parse_next(i)
-    }
-
-    let a = &b"a"[..];
-    assert_eq!(alt1.parse_peek(a), Ok((&b""[..], (&b"a"[..]))));
-
-    let bc = &b"bc"[..];
-    assert_eq!(alt1.parse_peek(bc), Ok((&b""[..], (&b"bc"[..]))));
-
-    let defg = &b"defg"[..];
-    assert_eq!(alt1.parse_peek(defg), Ok((&b"g"[..], (&b"def"[..]))));
 }
 
 #[test]
@@ -1045,7 +1031,7 @@ fn repeat_till_range_test() {
 #[cfg(feature = "std")]
 fn infinite_many() {
     fn tst(input: &[u8]) -> IResult<&[u8], &[u8]> {
-        println!("input: {input:?}");
+        println!("input: {:?}", input);
         Err(ErrMode::Backtrack(error_position!(&input, ErrorKind::Tag)))
     }
 
@@ -1190,7 +1176,7 @@ fn count_zero() {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
-struct NilError;
+pub struct NilError;
 
 impl<I> From<(I, ErrorKind)> for NilError {
     fn from(_: (I, ErrorKind)) -> Self {

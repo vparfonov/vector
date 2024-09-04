@@ -96,6 +96,10 @@ impl RawArrayBuf {
         self.inner.append(self.len.to_string(), value);
         self.len += 1;
     }
+
+    pub(crate) fn into_vec(self) -> Vec<u8> {
+        self.inner.into_bytes()
+    }
 }
 
 impl Debug for RawArrayBuf {

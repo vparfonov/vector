@@ -49,10 +49,10 @@
     unused_extern_crates,
     unused_qualifications
 )]
-#![no_std]
+#![cfg_attr(not(test), no_std)]
 
 extern crate alloc;
-#[cfg(any(feature = "std", test))]
+#[cfg(all(feature = "std", not(test)))]
 extern crate std;
 
 #[cfg(test)]
@@ -69,7 +69,7 @@ use pki_types::PrivateKeyDer;
 #[cfg(feature = "std")]
 use pki_types::{
     CertificateDer, CertificateRevocationListDer, CertificateSigningRequestDer, PrivatePkcs1KeyDer,
-    PrivatePkcs8KeyDer, PrivateSec1KeyDer, SubjectPublicKeyInfoDer,
+    PrivatePkcs8KeyDer, PrivateSec1KeyDer,
 };
 
 #[cfg(feature = "std")]
@@ -104,10 +104,7 @@ pub fn private_key(rd: &mut dyn io::BufRead) -> Result<Option<PrivateKeyDer<'sta
             Item::Pkcs1Key(key) => return Ok(Some(key.into())),
             Item::Pkcs8Key(key) => return Ok(Some(key.into())),
             Item::Sec1Key(key) => return Ok(Some(key.into())),
-            Item::X509Certificate(_)
-            | Item::SubjectPublicKeyInfo(_)
-            | Item::Crl(_)
-            | Item::Csr(_) => continue,
+            Item::X509Certificate(_) | Item::Crl(_) | Item::Csr(_) => continue,
         }
     }
 
@@ -129,7 +126,6 @@ pub fn csr(
             | Item::Pkcs8Key(_)
             | Item::Sec1Key(_)
             | Item::X509Certificate(_)
-            | Item::SubjectPublicKeyInfo(_)
             | Item::Crl(_) => continue,
         }
     }
@@ -192,21 +188,6 @@ pub fn ec_private_keys(
 ) -> impl Iterator<Item = Result<PrivateSec1KeyDer<'static>, io::Error>> + '_ {
     iter::from_fn(move || read_one(rd).transpose()).filter_map(|item| match item {
         Ok(Item::Sec1Key(key)) => Some(Ok(key)),
-        Err(err) => Some(Err(err)),
-        _ => None,
-    })
-}
-
-/// Return an iterator over SPKI-encoded keys from `rd`.
-///
-/// Filters out any PEM sections that are not SPKI-encoded public keys and yields errors if a
-/// problem occurs while trying to extract a SPKI-encoded public key.
-#[cfg(feature = "std")]
-pub fn public_keys(
-    rd: &mut dyn io::BufRead,
-) -> impl Iterator<Item = Result<SubjectPublicKeyInfoDer<'static>, io::Error>> + '_ {
-    iter::from_fn(move || read_one(rd).transpose()).filter_map(|item| match item {
-        Ok(Item::SubjectPublicKeyInfo(key)) => Some(Ok(key)),
         Err(err) => Some(Err(err)),
         _ => None,
     })

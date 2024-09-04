@@ -2,12 +2,9 @@ use std::env;
 use std::ffi::OsString;
 use std::os::windows::ffi::OsStringExt;
 use std::path::PathBuf;
-use std::ptr;
-use std::slice;
 
-use windows_sys::Win32::Foundation::S_OK;
-use windows_sys::Win32::System::Com::CoTaskMemFree;
-use windows_sys::Win32::UI::Shell::{FOLDERID_Profile, SHGetKnownFolderPath, KF_FLAG_DONT_VERIFY};
+use windows_sys::Win32::Foundation::{MAX_PATH, S_OK};
+use windows_sys::Win32::UI::Shell::{SHGetFolderPathW, CSIDL_PROFILE};
 
 pub fn home_dir_inner() -> Option<PathBuf> {
     env::var_os("USERPROFILE")
@@ -19,19 +16,15 @@ pub fn home_dir_inner() -> Option<PathBuf> {
 #[cfg(not(target_vendor = "uwp"))]
 fn home_dir_crt() -> Option<PathBuf> {
     unsafe {
-        let mut path = ptr::null_mut();
-        match SHGetKnownFolderPath(&FOLDERID_Profile, KF_FLAG_DONT_VERIFY as u32, 0, &mut path) {
+        let mut path: Vec<u16> = Vec::with_capacity(MAX_PATH as usize);
+        match SHGetFolderPathW(0, CSIDL_PROFILE as i32, 0, 0, path.as_mut_ptr()) {
             S_OK => {
-                let path_slice = slice::from_raw_parts(path, wcslen(path));
-                let s = OsString::from_wide(&path_slice);
-                CoTaskMemFree(path.cast());
+                let len = wcslen(path.as_ptr());
+                path.set_len(len);
+                let s = OsString::from_wide(&path);
                 Some(PathBuf::from(s))
             }
-            _ => {
-                // Free any allocated memory even on failure. A null ptr is a no-op for `CoTaskMemFree`.
-                CoTaskMemFree(path.cast());
-                None
-            }
+            _ => None,
         }
     }
 }

@@ -3,7 +3,7 @@ pub use crate::operation::delete_bucket_lifecycle::_delete_bucket_lifecycle_outp
 
 pub use crate::operation::delete_bucket_lifecycle::_delete_bucket_lifecycle_input::DeleteBucketLifecycleInputBuilder;
 
-impl crate::operation::delete_bucket_lifecycle::builders::DeleteBucketLifecycleInputBuilder {
+impl DeleteBucketLifecycleInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -31,10 +31,8 @@ impl crate::operation::delete_bucket_lifecycle::builders::DeleteBucketLifecycleI
 /// <p>For more information about the object expiration, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/dev/intro-lifecycle-rules.html#intro-lifecycle-rules-actions">Elements to Describe Lifecycle Actions</a>.</p>
 /// <p>Related actions include:</p>
 /// <ul>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketLifecycleConfiguration.html">PutBucketLifecycleConfiguration</a></p></li>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketLifecycleConfiguration.html">GetBucketLifecycleConfiguration</a></p></li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketLifecycleConfiguration.html">PutBucketLifecycleConfiguration</a> </p> </li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketLifecycleConfiguration.html">GetBucketLifecycleConfiguration</a> </p> </li>
 /// </ul>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
 pub struct DeleteBucketLifecycleFluentBuilder {
@@ -61,7 +59,7 @@ impl
     }
 }
 impl DeleteBucketLifecycleFluentBuilder {
-    /// Creates a new `DeleteBucketLifecycleFluentBuilder`.
+    /// Creates a new `DeleteBucketLifecycle`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -112,12 +110,12 @@ impl DeleteBucketLifecycleFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }

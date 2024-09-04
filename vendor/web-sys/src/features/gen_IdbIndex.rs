@@ -61,7 +61,6 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/locale)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `IdbIndex`*"]
-    #[deprecated]
     pub fn locale(this: &IdbIndex) -> Option<String>;
     # [wasm_bindgen (structural , method , getter , js_class = "IDBIndex" , js_name = isAutoLocale)]
     #[doc = "Getter for the `isAutoLocale` field of this object."]
@@ -69,7 +68,6 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/isAutoLocale)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `IdbIndex`*"]
-    #[deprecated]
     pub fn is_auto_locale(this: &IdbIndex) -> bool;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBIndex" , js_name = count)]
@@ -88,7 +86,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbIndex`, `IdbRequest`*"]
     pub fn count_with_key(
         this: &IdbIndex,
-        query: &::wasm_bindgen::JsValue,
+        key: &::wasm_bindgen::JsValue,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBIndex" , js_name = get)]
@@ -97,7 +95,7 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/get)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `IdbIndex`, `IdbRequest`*"]
-    pub fn get(this: &IdbIndex, query: &::wasm_bindgen::JsValue) -> Result<IdbRequest, JsValue>;
+    pub fn get(this: &IdbIndex, key: &::wasm_bindgen::JsValue) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBIndex" , js_name = getAll)]
     #[doc = "The `getAll()` method."]
@@ -115,7 +113,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbIndex`, `IdbRequest`*"]
     pub fn get_all_with_key(
         this: &IdbIndex,
-        query: &::wasm_bindgen::JsValue,
+        key: &::wasm_bindgen::JsValue,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBIndex" , js_name = getAll)]
@@ -126,8 +124,8 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbIndex`, `IdbRequest`*"]
     pub fn get_all_with_key_and_limit(
         this: &IdbIndex,
-        query: &::wasm_bindgen::JsValue,
-        count: u32,
+        key: &::wasm_bindgen::JsValue,
+        limit: u32,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBIndex" , js_name = getAllKeys)]
@@ -146,7 +144,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbIndex`, `IdbRequest`*"]
     pub fn get_all_keys_with_key(
         this: &IdbIndex,
-        query: &::wasm_bindgen::JsValue,
+        key: &::wasm_bindgen::JsValue,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBIndex" , js_name = getAllKeys)]
@@ -157,8 +155,8 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbIndex`, `IdbRequest`*"]
     pub fn get_all_keys_with_key_and_limit(
         this: &IdbIndex,
-        query: &::wasm_bindgen::JsValue,
-        count: u32,
+        key: &::wasm_bindgen::JsValue,
+        limit: u32,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBIndex" , js_name = getKey)]
@@ -167,8 +165,7 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getKey)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `IdbIndex`, `IdbRequest`*"]
-    pub fn get_key(this: &IdbIndex, query: &::wasm_bindgen::JsValue)
-        -> Result<IdbRequest, JsValue>;
+    pub fn get_key(this: &IdbIndex, key: &::wasm_bindgen::JsValue) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBIndex" , js_name = openCursor)]
     #[doc = "The `openCursor()` method."]
@@ -186,7 +183,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbIndex`, `IdbRequest`*"]
     pub fn open_cursor_with_range(
         this: &IdbIndex,
-        query: &::wasm_bindgen::JsValue,
+        range: &::wasm_bindgen::JsValue,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(all(feature = "IdbCursorDirection", feature = "IdbRequest",))]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBIndex" , js_name = openCursor)]
@@ -197,7 +194,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbCursorDirection`, `IdbIndex`, `IdbRequest`*"]
     pub fn open_cursor_with_range_and_direction(
         this: &IdbIndex,
-        query: &::wasm_bindgen::JsValue,
+        range: &::wasm_bindgen::JsValue,
         direction: IdbCursorDirection,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
@@ -217,7 +214,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbIndex`, `IdbRequest`*"]
     pub fn open_key_cursor_with_range(
         this: &IdbIndex,
-        query: &::wasm_bindgen::JsValue,
+        range: &::wasm_bindgen::JsValue,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(all(feature = "IdbCursorDirection", feature = "IdbRequest",))]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBIndex" , js_name = openKeyCursor)]
@@ -228,7 +225,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbCursorDirection`, `IdbIndex`, `IdbRequest`*"]
     pub fn open_key_cursor_with_range_and_direction(
         this: &IdbIndex,
-        query: &::wasm_bindgen::JsValue,
+        range: &::wasm_bindgen::JsValue,
         direction: IdbCursorDirection,
     ) -> Result<IdbRequest, JsValue>;
 }

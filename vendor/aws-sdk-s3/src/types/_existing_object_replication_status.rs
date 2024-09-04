@@ -96,12 +96,3 @@ impl ExistingObjectReplicationStatus {
         }
     }
 }
-impl ::std::fmt::Display for ExistingObjectReplicationStatus {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            ExistingObjectReplicationStatus::Disabled => write!(f, "Disabled"),
-            ExistingObjectReplicationStatus::Enabled => write!(f, "Enabled"),
-            ExistingObjectReplicationStatus::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

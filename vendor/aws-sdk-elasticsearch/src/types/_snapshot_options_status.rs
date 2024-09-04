@@ -27,8 +27,8 @@ impl SnapshotOptionsStatus {
 }
 
 /// A builder for [`SnapshotOptionsStatus`](crate::types::SnapshotOptionsStatus).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct SnapshotOptionsStatusBuilder {
     pub(crate) options: ::std::option::Option<crate::types::SnapshotOptions>,
     pub(crate) status: ::std::option::Option<crate::types::OptionStatus>,

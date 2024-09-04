@@ -154,16 +154,19 @@ where
 /// # Example
 ///
 /// ```
+///
 /// use duct::cmd;
 /// use std::path::Path;
 ///
-/// let arg1 = "foo";
-/// let arg2 = "bar".to_owned();
-/// let arg3 = Path::new("baz");
+/// fn main() {
+///     let arg1 = "foo";
+///     let arg2 = "bar".to_owned();
+///     let arg3 = Path::new("baz");
 ///
-/// let output = cmd!("echo", arg1, arg2, arg3).read();
+///     let output = cmd!("echo", arg1, arg2, arg3).read();
 ///
-/// assert_eq!("foo bar baz", output.unwrap());
+///     assert_eq!("foo bar baz", output.unwrap());
+/// }
 /// ```
 #[macro_export]
 macro_rules! cmd {
@@ -1200,15 +1203,10 @@ fn start_argv(argv: &[OsString], context: IoContext) -> io::Result<ChildHandle> 
     let exe = canonicalize_exe_path_for_dir(&argv[0], &context)?;
     let mut command = Command::new(exe);
     command.args(&argv[1..]);
-    if !matches!(context.stdin, IoValue::ParentStdin) {
-        command.stdin(context.stdin.into_stdio()?);
-    }
-    if !matches!(context.stdout, IoValue::ParentStdout) {
-        command.stdout(context.stdout.into_stdio()?);
-    }
-    if !matches!(context.stderr, IoValue::ParentStderr) {
-        command.stderr(context.stderr.into_stdio()?);
-    }
+    // TODO: Avoid unnecessary dup'ing here.
+    command.stdin(context.stdin.into_stdio()?);
+    command.stdout(context.stdout.into_stdio()?);
+    command.stderr(context.stderr.into_stdio()?);
     if let Some(dir) = context.dir {
         command.current_dir(dir);
     }
@@ -1224,7 +1222,7 @@ fn start_argv(argv: &[OsString], context: IoContext) -> io::Result<ChildHandle> 
     let command_string = format!("{:?}", argv);
     Ok(ChildHandle {
         child: shared_child,
-        command_string,
+        command_string: command_string,
     })
 }
 
@@ -1242,7 +1240,7 @@ impl ChildHandle {
         };
         if let Some(status) = maybe_status {
             Ok(Some(ExpressionStatus {
-                status,
+                status: status,
                 checked: true,
                 command: self.command_string.clone(),
             }))
@@ -1280,8 +1278,8 @@ impl PipeHandle {
         let right_result = right.0.start(right_context);
         match right_result {
             Ok(right_handle) => Ok(PipeHandle {
-                left_handle,
-                right_handle,
+                left_handle: left_handle,
+                right_handle: right_handle,
             }),
             Err(e) => {
                 // Realistically, kill should never return an error. If it
@@ -1509,11 +1507,9 @@ enum IoExpressionInner {
     BeforeSpawn(BeforeSpawnHook),
 }
 
-type HookFn = Arc<dyn Fn(&mut Command) -> io::Result<()> + Send + Sync>;
-
 #[derive(Clone)]
 struct BeforeSpawnHook {
-    inner: HookFn,
+    inner: Arc<dyn Fn(&mut Command) -> io::Result<()> + Send + Sync>,
 }
 
 impl BeforeSpawnHook {
@@ -1848,7 +1844,13 @@ impl WaitMode {
         // running expression is finished (that is, when the thread is
         // guaranteed to finish soon). Blocking waits should always join, even
         // in the presence of errors.
-        matches!(self, WaitMode::Blocking) || matches!(expression_result, Ok(Some(_)))
+        if let WaitMode::Blocking = self {
+            true
+        } else if let Ok(Some(_)) = expression_result {
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -1885,7 +1887,7 @@ impl OutputCaptureContext {
     }
 
     fn write_pipe(&self) -> io::Result<os_pipe::PipeWriter> {
-        let (_, writer) = self.pair.get_or_try_init(os_pipe::pipe)?;
+        let (_, writer) = self.pair.get_or_try_init(|| os_pipe::pipe())?;
         writer.try_clone()
     }
 
@@ -2031,7 +2033,7 @@ impl<'a> Read for &'a ReaderHandle {
     /// error, just as [`run`](struct.Expression.html#method.run) would.
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let n = (&self.reader).read(buf)?;
-        if n == 0 && !buf.is_empty() {
+        if n == 0 && buf.len() > 0 {
             // EOF detected. Wait on the child to clean it up before returning.
             self.handle.wait()?;
         }

@@ -10,68 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
     pub type GamepadAxisMoveEventInit;
-    #[doc = "Get the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
-    #[wasm_bindgen(method, getter = "bubbles")]
-    pub fn get_bubbles(this: &GamepadAxisMoveEventInit) -> Option<bool>;
-    #[doc = "Change the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
-    #[wasm_bindgen(method, setter = "bubbles")]
-    pub fn set_bubbles(this: &GamepadAxisMoveEventInit, val: bool);
-    #[doc = "Get the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
-    #[wasm_bindgen(method, getter = "cancelable")]
-    pub fn get_cancelable(this: &GamepadAxisMoveEventInit) -> Option<bool>;
-    #[doc = "Change the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
-    #[wasm_bindgen(method, setter = "cancelable")]
-    pub fn set_cancelable(this: &GamepadAxisMoveEventInit, val: bool);
-    #[doc = "Get the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
-    #[wasm_bindgen(method, getter = "composed")]
-    pub fn get_composed(this: &GamepadAxisMoveEventInit) -> Option<bool>;
-    #[doc = "Change the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
-    #[wasm_bindgen(method, setter = "composed")]
-    pub fn set_composed(this: &GamepadAxisMoveEventInit, val: bool);
-    #[cfg(feature = "Gamepad")]
-    #[doc = "Get the `gamepad` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `Gamepad`, `GamepadAxisMoveEventInit`*"]
-    #[wasm_bindgen(method, getter = "gamepad")]
-    pub fn get_gamepad(this: &GamepadAxisMoveEventInit) -> Option<Gamepad>;
-    #[cfg(feature = "Gamepad")]
-    #[doc = "Change the `gamepad` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `Gamepad`, `GamepadAxisMoveEventInit`*"]
-    #[wasm_bindgen(method, setter = "gamepad")]
-    pub fn set_gamepad(this: &GamepadAxisMoveEventInit, val: Option<&Gamepad>);
-    #[doc = "Get the `axis` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
-    #[wasm_bindgen(method, getter = "axis")]
-    pub fn get_axis(this: &GamepadAxisMoveEventInit) -> Option<u32>;
-    #[doc = "Change the `axis` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
-    #[wasm_bindgen(method, setter = "axis")]
-    pub fn set_axis(this: &GamepadAxisMoveEventInit, val: u32);
-    #[doc = "Get the `value` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
-    #[wasm_bindgen(method, getter = "value")]
-    pub fn get_value(this: &GamepadAxisMoveEventInit) -> Option<f64>;
-    #[doc = "Change the `value` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
-    #[wasm_bindgen(method, setter = "value")]
-    pub fn set_value(this: &GamepadAxisMoveEventInit, val: f64);
 }
 impl GamepadAxisMoveEventInit {
     #[doc = "Construct a new `GamepadAxisMoveEventInit`."]
@@ -82,35 +20,99 @@ impl GamepadAxisMoveEventInit {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_bubbles()` instead."]
+    #[doc = "Change the `bubbles` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
     pub fn bubbles(&mut self, val: bool) -> &mut Self {
-        self.set_bubbles(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("bubbles"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_cancelable()` instead."]
+    #[doc = "Change the `cancelable` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
     pub fn cancelable(&mut self, val: bool) -> &mut Self {
-        self.set_cancelable(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("cancelable"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_composed()` instead."]
+    #[doc = "Change the `composed` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
     pub fn composed(&mut self, val: bool) -> &mut Self {
-        self.set_composed(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("composed"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "Gamepad")]
-    #[deprecated = "Use `set_gamepad()` instead."]
+    #[doc = "Change the `gamepad` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `Gamepad`, `GamepadAxisMoveEventInit`*"]
     pub fn gamepad(&mut self, val: Option<&Gamepad>) -> &mut Self {
-        self.set_gamepad(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("gamepad"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_axis()` instead."]
+    #[doc = "Change the `axis` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
     pub fn axis(&mut self, val: u32) -> &mut Self {
-        self.set_axis(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("axis"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_value()` instead."]
+    #[doc = "Change the `value` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `GamepadAxisMoveEventInit`*"]
     pub fn value(&mut self, val: f64) -> &mut Self {
-        self.set_value(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("value"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

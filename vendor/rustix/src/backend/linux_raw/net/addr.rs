@@ -10,8 +10,9 @@ use crate::backend::c;
 use crate::ffi::CStr;
 use crate::{io, path};
 use core::cmp::Ordering;
+use core::fmt;
 use core::hash::{Hash, Hasher};
-use core::{fmt, slice};
+use core::slice;
 
 /// `struct sockaddr_un`
 #[derive(Clone)]
@@ -152,13 +153,13 @@ impl Hash for SocketAddrUnix {
 }
 
 impl fmt::Debug for SocketAddrUnix {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(path) = self.path() {
-            path.fmt(f)
+            path.fmt(fmt)
         } else if let Some(name) = self.abstract_name() {
-            name.fmt(f)
+            name.fmt(fmt)
         } else {
-            "(unnamed)".fmt(f)
+            "(unnamed)".fmt(fmt)
         }
     }
 }

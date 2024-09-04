@@ -32,8 +32,8 @@ impl DeleteObjectTaggingOutput {
 }
 
 /// A builder for [`DeleteObjectTaggingOutput`](crate::operation::delete_object_tagging::DeleteObjectTaggingOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DeleteObjectTaggingOutputBuilder {
     pub(crate) version_id: ::std::option::Option<::std::string::String>,
     _extended_request_id: Option<String>,

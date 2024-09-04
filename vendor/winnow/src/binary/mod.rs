@@ -15,8 +15,9 @@ use crate::error::Needed;
 use crate::error::ParserError;
 use crate::lib::std::ops::{Add, Shl};
 use crate::stream::Accumulate;
-use crate::stream::{Stream, StreamIsPartial};
+use crate::stream::{AsBytes, Stream, StreamIsPartial};
 use crate::stream::{ToUsize, UpdateSlice};
+use crate::token::take;
 use crate::PResult;
 use crate::Parser;
 
@@ -114,6 +115,7 @@ where
 pub fn be_u16<Input, Error>(input: &mut Input) -> PResult<u16, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_u16", move |input: &mut Input| be_uint(input, 2)).parse_next(input)
@@ -158,6 +160,7 @@ where
 pub fn be_u24<Input, Error>(input: &mut Input) -> PResult<u32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_u23", move |input: &mut Input| be_uint(input, 3)).parse_next(input)
@@ -202,6 +205,7 @@ where
 pub fn be_u32<Input, Error>(input: &mut Input) -> PResult<u32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_u32", move |input: &mut Input| be_uint(input, 4)).parse_next(input)
@@ -246,6 +250,7 @@ where
 pub fn be_u64<Input, Error>(input: &mut Input) -> PResult<u64, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_u64", move |input: &mut Input| be_uint(input, 8)).parse_next(input)
@@ -290,6 +295,7 @@ where
 pub fn be_u128<Input, Error>(input: &mut Input) -> PResult<u128, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_u128", move |input: &mut Input| be_uint(input, 16)).parse_next(input)
@@ -299,34 +305,23 @@ where
 fn be_uint<Input, Uint, Error>(input: &mut Input, bound: usize) -> PResult<Uint, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Uint: Default + Shl<u8, Output = Uint> + Add<Uint, Output = Uint> + From<u8>,
     Error: ParserError<Input>,
 {
     debug_assert_ne!(bound, 1, "to_be_uint needs extra work to avoid overflow");
-    match input.offset_at(bound) {
-        Ok(offset) => {
-            let res = to_be_uint(input, offset);
-            input.next_slice(offset);
-            Ok(res)
-        }
-        Err(e) if <Input as StreamIsPartial>::is_partial_supported() && input.is_partial() => {
-            Err(ErrMode::Incomplete(e))
-        }
-        Err(_needed) => Err(ErrMode::from_error_kind(input, ErrorKind::Slice)),
-    }
+    take(bound)
+        .map(|n: <Input as Stream>::Slice| to_be_uint(n.as_bytes()))
+        .parse_next(input)
 }
 
 #[inline]
-fn to_be_uint<Input, Uint>(number: &Input, offset: usize) -> Uint
+fn to_be_uint<Uint>(number: &[u8]) -> Uint
 where
-    Input: Stream,
-    Uint: Default
-        + Shl<u8, Output = Uint>
-        + Add<Uint, Output = Uint>
-        + From<<Input as Stream>::Token>,
+    Uint: Default + Shl<u8, Output = Uint> + Add<Uint, Output = Uint> + From<u8>,
 {
     let mut res = Uint::default();
-    for (_, byte) in number.iter_offsets().take(offset) {
+    for byte in number.iter().copied() {
         res = (res << 8) + byte.into();
     }
 
@@ -416,6 +411,7 @@ where
 pub fn be_i16<Input, Error>(input: &mut Input) -> PResult<i16, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_i16", move |input: &mut Input| {
@@ -463,6 +459,7 @@ where
 pub fn be_i24<Input, Error>(input: &mut Input) -> PResult<i32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_i24", move |input: &mut Input| {
@@ -518,6 +515,7 @@ where
 pub fn be_i32<Input, Error>(input: &mut Input) -> PResult<i32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_i32", move |input: &mut Input| {
@@ -565,6 +563,7 @@ where
 pub fn be_i64<Input, Error>(input: &mut Input) -> PResult<i64, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_i64", move |input: &mut Input| {
@@ -612,6 +611,7 @@ where
 pub fn be_i128<Input, Error>(input: &mut Input) -> PResult<i128, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_i128", move |input: &mut Input| {
@@ -703,6 +703,7 @@ where
 pub fn le_u16<Input, Error>(input: &mut Input) -> PResult<u16, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("le_u16", move |input: &mut Input| le_uint(input, 2)).parse_next(input)
@@ -747,6 +748,7 @@ where
 pub fn le_u24<Input, Error>(input: &mut Input) -> PResult<u32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("le_u24", move |input: &mut Input| le_uint(input, 3)).parse_next(input)
@@ -791,6 +793,7 @@ where
 pub fn le_u32<Input, Error>(input: &mut Input) -> PResult<u32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("le_u32", move |input: &mut Input| le_uint(input, 4)).parse_next(input)
@@ -835,6 +838,7 @@ where
 pub fn le_u64<Input, Error>(input: &mut Input) -> PResult<u64, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("le_u64", move |input: &mut Input| le_uint(input, 8)).parse_next(input)
@@ -879,6 +883,7 @@ where
 pub fn le_u128<Input, Error>(input: &mut Input) -> PResult<u128, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("le_u128", move |input: &mut Input| le_uint(input, 16)).parse_next(input)
@@ -888,33 +893,22 @@ where
 fn le_uint<Input, Uint, Error>(input: &mut Input, bound: usize) -> PResult<Uint, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Uint: Default + Shl<u8, Output = Uint> + Add<Uint, Output = Uint> + From<u8>,
     Error: ParserError<Input>,
 {
-    match input.offset_at(bound) {
-        Ok(offset) => {
-            let res = to_le_uint(input, offset);
-            input.next_slice(offset);
-            Ok(res)
-        }
-        Err(e) if <Input as StreamIsPartial>::is_partial_supported() && input.is_partial() => {
-            Err(ErrMode::Incomplete(e))
-        }
-        Err(_needed) => Err(ErrMode::from_error_kind(input, ErrorKind::Slice)),
-    }
+    take(bound)
+        .map(|n: <Input as Stream>::Slice| to_le_uint(n.as_bytes()))
+        .parse_next(input)
 }
 
 #[inline]
-fn to_le_uint<Input, Uint>(number: &Input, offset: usize) -> Uint
+fn to_le_uint<Uint>(number: &[u8]) -> Uint
 where
-    Input: Stream,
-    Uint: Default
-        + Shl<u8, Output = Uint>
-        + Add<Uint, Output = Uint>
-        + From<<Input as Stream>::Token>,
+    Uint: Default + Shl<u8, Output = Uint> + Add<Uint, Output = Uint> + From<u8>,
 {
     let mut res = Uint::default();
-    for (index, byte) in number.iter_offsets().take(offset) {
+    for (index, byte) in number.iter_offsets() {
         res = res + (Uint::from(byte) << (8 * index as u8));
     }
 
@@ -1004,6 +998,7 @@ where
 pub fn le_i16<Input, Error>(input: &mut Input) -> PResult<i16, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("le_i16", move |input: &mut Input| {
@@ -1051,6 +1046,7 @@ where
 pub fn le_i24<Input, Error>(input: &mut Input) -> PResult<i32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("le_i24", move |input: &mut Input| {
@@ -1106,6 +1102,7 @@ where
 pub fn le_i32<Input, Error>(input: &mut Input) -> PResult<i32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("le_i32", move |input: &mut Input| {
@@ -1153,6 +1150,7 @@ where
 pub fn le_i64<Input, Error>(input: &mut Input) -> PResult<i64, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("le_i64", move |input: &mut Input| {
@@ -1200,6 +1198,7 @@ where
 pub fn le_i128<Input, Error>(input: &mut Input) -> PResult<i128, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("le_i128", move |input: &mut Input| {
@@ -1333,6 +1332,7 @@ where
 pub fn u16<Input, Error>(endian: Endianness) -> impl Parser<Input, u16, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     move |input: &mut Input| {
@@ -1404,6 +1404,7 @@ where
 pub fn u24<Input, Error>(endian: Endianness) -> impl Parser<Input, u32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     move |input: &mut Input| {
@@ -1475,6 +1476,7 @@ where
 pub fn u32<Input, Error>(endian: Endianness) -> impl Parser<Input, u32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     move |input: &mut Input| {
@@ -1546,6 +1548,7 @@ where
 pub fn u64<Input, Error>(endian: Endianness) -> impl Parser<Input, u64, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     move |input: &mut Input| {
@@ -1617,6 +1620,7 @@ where
 pub fn u128<Input, Error>(endian: Endianness) -> impl Parser<Input, u128, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     move |input: &mut Input| {
@@ -1743,6 +1747,7 @@ where
 pub fn i16<Input, Error>(endian: Endianness) -> impl Parser<Input, i16, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     move |input: &mut Input| {
@@ -1814,6 +1819,7 @@ where
 pub fn i24<Input, Error>(endian: Endianness) -> impl Parser<Input, i32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     move |input: &mut Input| {
@@ -1885,6 +1891,7 @@ where
 pub fn i32<Input, Error>(endian: Endianness) -> impl Parser<Input, i32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     move |input: &mut Input| {
@@ -1956,6 +1963,7 @@ where
 pub fn i64<Input, Error>(endian: Endianness) -> impl Parser<Input, i64, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     move |input: &mut Input| {
@@ -2027,6 +2035,7 @@ where
 pub fn i128<Input, Error>(endian: Endianness) -> impl Parser<Input, i128, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     move |input: &mut Input| {
@@ -2081,6 +2090,7 @@ where
 pub fn be_f32<Input, Error>(input: &mut Input) -> PResult<f32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_f32", move |input: &mut Input| {
@@ -2128,6 +2138,7 @@ where
 pub fn be_f64<Input, Error>(input: &mut Input) -> PResult<f64, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_f64", move |input: &mut Input| {
@@ -2175,6 +2186,7 @@ where
 pub fn le_f32<Input, Error>(input: &mut Input) -> PResult<f32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("le_f32", move |input: &mut Input| {
@@ -2222,6 +2234,7 @@ where
 pub fn le_f64<Input, Error>(input: &mut Input) -> PResult<f64, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     trace("be_f64", move |input: &mut Input| {
@@ -2287,6 +2300,7 @@ where
 pub fn f32<Input, Error>(endian: Endianness) -> impl Parser<Input, f32, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     move |input: &mut Input| {
@@ -2358,6 +2372,7 @@ where
 pub fn f64<Input, Error>(endian: Endianness) -> impl Parser<Input, f64, Error>
 where
     Input: StreamIsPartial + Stream<Token = u8>,
+    <Input as Stream>::Slice: AsBytes,
     Error: ParserError<Input>,
 {
     move |input: &mut Input| {

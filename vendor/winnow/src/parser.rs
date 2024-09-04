@@ -3,12 +3,10 @@
 use crate::ascii::Caseless as AsciiCaseless;
 use crate::combinator::*;
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 use crate::error::FromRecoverableError;
 use crate::error::{AddContext, FromExternalError, IResult, PResult, ParseError, ParserError};
 use crate::stream::{Compare, Location, ParseSlice, Stream, StreamIsPartial};
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 use crate::stream::{Recover, Recoverable};
 
 /// Core trait for parsing
@@ -54,6 +52,7 @@ pub trait Parser<I, O, E> {
         I: Stream,
         // Force users to deal with `Incomplete` when `StreamIsPartial<true>`
         I: StreamIsPartial,
+        I: Clone,
         E: ParserError<I>,
     {
         debug_assert!(
@@ -254,37 +253,25 @@ pub trait Parser<I, O, E> {
     /// use winnow::combinator::separated_pair;
     /// # fn main() {
     ///
-    /// let mut parser = separated_pair(alpha1, ',', alpha1).take();
+    /// let mut parser = separated_pair(alpha1, ',', alpha1).recognize();
     ///
     /// assert_eq!(parser.parse_peek("abcd,efgh"), Ok(("", "abcd,efgh")));
     /// assert_eq!(parser.parse_peek("abcd;"),Err(ErrMode::Backtrack(InputError::new(";", ErrorKind::Tag))));
     /// # }
     /// ```
     #[doc(alias = "concat")]
-    #[doc(alias = "recognize")]
     #[inline(always)]
-    fn take(self) -> Take<Self, I, O, E>
+    fn recognize(self) -> Recognize<Self, I, O, E>
     where
         Self: core::marker::Sized,
         I: Stream,
     {
-        Take::new(self)
-    }
-
-    /// Replaced with [`Parser::take`]
-    #[inline(always)]
-    #[deprecated(since = "0.6.14", note = "Replaced with `Parser::take`")]
-    fn recognize(self) -> Take<Self, I, O, E>
-    where
-        Self: core::marker::Sized,
-        I: Stream,
-    {
-        Take::new(self)
+        Recognize::new(self)
     }
 
     /// Produce the consumed input with the output
     ///
-    /// Functions similarly to [take][Parser::take] except it
+    /// Functions similarly to [recognize][Parser::recognize] except it
     /// returns the parser output as well.
     ///
     /// This can be useful especially in cases where the output is not the same type
@@ -305,39 +292,27 @@ pub trait Parser<I, O, E> {
     ///     "1234".value(true).parse_next(input)
     /// }
     ///
-    /// let mut consumed_parser = separated_pair(alpha1, ',', alpha1).value(true).with_taken();
+    /// let mut consumed_parser = separated_pair(alpha1, ',', alpha1).value(true).with_recognized();
     ///
     /// assert_eq!(consumed_parser.parse_peek("abcd,efgh1"), Ok(("1", (true, "abcd,efgh"))));
     /// assert_eq!(consumed_parser.parse_peek("abcd;"),Err(ErrMode::Backtrack(InputError::new(";", ErrorKind::Tag))));
     ///
     /// // the second output (representing the consumed input)
-    /// // should be the same as that of the `take` parser.
-    /// let mut take_parser = inner_parser.take();
-    /// let mut consumed_parser = inner_parser.with_taken().map(|(output, consumed)| consumed);
+    /// // should be the same as that of the `recognize` parser.
+    /// let mut recognize_parser = inner_parser.recognize();
+    /// let mut consumed_parser = inner_parser.with_recognized().map(|(output, consumed)| consumed);
     ///
-    /// assert_eq!(take_parser.parse_peek("1234"), consumed_parser.parse_peek("1234"));
-    /// assert_eq!(take_parser.parse_peek("abcd"), consumed_parser.parse_peek("abcd"));
+    /// assert_eq!(recognize_parser.parse_peek("1234"), consumed_parser.parse_peek("1234"));
+    /// assert_eq!(recognize_parser.parse_peek("abcd"), consumed_parser.parse_peek("abcd"));
     /// ```
     #[doc(alias = "consumed")]
-    #[doc(alias = "with_recognized")]
     #[inline(always)]
-    fn with_taken(self) -> WithTaken<Self, I, O, E>
+    fn with_recognized(self) -> WithRecognized<Self, I, O, E>
     where
         Self: core::marker::Sized,
         I: Stream,
     {
-        WithTaken::new(self)
-    }
-
-    /// Replaced with [`Parser::with_taken`]
-    #[inline(always)]
-    #[deprecated(since = "0.6.14", note = "Replaced with `Parser::with_taken`")]
-    fn with_recognized(self) -> WithTaken<Self, I, O, E>
-    where
-        Self: core::marker::Sized,
-        I: Stream,
-    {
-        WithTaken::new(self)
+        WithRecognized::new(self)
     }
 
     /// Produce the location of the consumed input as produced value.
@@ -398,11 +373,11 @@ pub trait Parser<I, O, E> {
     ///
     /// // the second output (representing the consumed input)
     /// // should be the same as that of the `span` parser.
-    /// let mut span_parser = inner_parser.span();
+    /// let mut recognize_parser = inner_parser.span();
     /// let mut consumed_parser = inner_parser.with_span().map(|(output, consumed)| consumed);
     ///
-    /// assert_eq!(span_parser.parse_peek(Located::new("1234")), consumed_parser.parse_peek(Located::new("1234")));
-    /// assert_eq!(span_parser.parse_peek(Located::new("abcd")), consumed_parser.parse_peek(Located::new("abcd")));
+    /// assert_eq!(recognize_parser.parse_peek(Located::new("1234")), consumed_parser.parse_peek(Located::new("1234")));
+    /// assert_eq!(recognize_parser.parse_peek(Located::new("abcd")), consumed_parser.parse_peek(Located::new("abcd")));
     /// # }
     /// ```
     #[inline(always)]
@@ -701,7 +676,6 @@ pub trait Parser<I, O, E> {
     /// [`winnow::combinator::alt`][crate::combinator::alt].
     #[inline(always)]
     #[cfg(feature = "unstable-recover")]
-    #[cfg(feature = "std")]
     fn retry_after<R>(self, recover: R) -> RetryAfter<Self, R, I, O, E>
     where
         Self: core::marker::Sized,
@@ -719,7 +693,6 @@ pub trait Parser<I, O, E> {
     /// [`winnow::combinator::alt`][crate::combinator::alt].
     #[inline(always)]
     #[cfg(feature = "unstable-recover")]
-    #[cfg(feature = "std")]
     fn resume_after<R>(self, recover: R) -> ResumeAfter<Self, R, I, O, E>
     where
         Self: core::marker::Sized,
@@ -1026,7 +999,6 @@ macro_rules! impl_parser_for_tuples {
 ///
 /// [`Parser`]s will need to use [`Recoverable<I, _>`] for their input.
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 pub trait RecoverableParser<I, O, R, E> {
     /// Collect all errors when parsing the input
     ///
@@ -1039,7 +1011,6 @@ pub trait RecoverableParser<I, O, R, E> {
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<P, I, O, R, E> RecoverableParser<I, O, R, E> for P
 where
     P: Parser<Recoverable<I, R>, O, E>,
@@ -1114,7 +1085,7 @@ impl_parser_for_tuples!(
 );
 
 #[cfg(feature = "alloc")]
-use crate::lib::std::boxed::Box;
+use alloc::boxed::Box;
 
 #[cfg(feature = "alloc")]
 impl<'a, I, O, E> Parser<I, O, E> for Box<dyn Parser<I, O, E> + 'a> {

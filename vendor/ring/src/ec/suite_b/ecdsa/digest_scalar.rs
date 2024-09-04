@@ -14,7 +14,11 @@
 
 //! ECDSA Signatures using the P-256 and P-384 curves.
 
-use crate::{digest, ec::suite_b::ops::*};
+use crate::{
+    digest,
+    ec::suite_b::ops::*,
+    limb::{self, LIMB_BYTES},
+};
 
 /// Calculate the digest of `msg` using the digest algorithm `digest_alg`. Then
 /// convert the digest to a scalar in the range [0, n) as described in
@@ -54,15 +58,17 @@ pub(crate) fn digest_bytes_scalar(ops: &ScalarOps, digest: &[u8]) -> Scalar {
 // This is a separate function solely so that we can test specific digest
 // values like all-zero values and values larger than `n`.
 fn digest_scalar_(ops: &ScalarOps, digest: &[u8]) -> Scalar {
-    let len = ops.scalar_bytes_len();
-    let digest = if digest.len() > len {
-        &digest[..len]
+    let cops = ops.common;
+    let num_limbs = cops.num_limbs;
+    let digest = if digest.len() > num_limbs * LIMB_BYTES {
+        &digest[..(num_limbs * LIMB_BYTES)]
     } else {
         digest
     };
 
     scalar_parse_big_endian_partially_reduced_variable_consttime(
-        ops.common,
+        cops,
+        limb::AllowZero::Yes,
         untrusted::Input::from(digest),
     )
     .unwrap()
@@ -71,7 +77,12 @@ fn digest_scalar_(ops: &ScalarOps, digest: &[u8]) -> Scalar {
 #[cfg(test)]
 mod tests {
     use super::digest_bytes_scalar;
-    use crate::{digest, ec::suite_b::ops::*, limb, test};
+    use crate::{
+        digest,
+        ec::suite_b::ops::*,
+        limb::{self, LIMB_BYTES},
+        test,
+    };
 
     #[test]
     fn test() {
@@ -95,8 +106,12 @@ mod tests {
                     }
                 };
 
+                let num_limbs = ops.public_key_ops.common.num_limbs;
                 assert_eq!(input.len(), digest_alg.output_len());
-                assert_eq!(output.len(), ops.scalar_ops.scalar_bytes_len());
+                assert_eq!(
+                    output.len(),
+                    ops.public_key_ops.common.num_limbs * LIMB_BYTES
+                );
 
                 let expected = scalar_parse_big_endian_variable(
                     ops.public_key_ops.common,
@@ -106,10 +121,8 @@ mod tests {
                 .unwrap();
 
                 let actual = digest_bytes_scalar(ops.scalar_ops, &input);
-                assert_eq!(
-                    ops.scalar_ops.leak_limbs(&actual),
-                    ops.scalar_ops.leak_limbs(&expected)
-                );
+
+                assert_eq!(actual.limbs[..num_limbs], expected.limbs[..num_limbs]);
 
                 Ok(())
             },

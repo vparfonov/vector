@@ -358,7 +358,7 @@ impl<D: Fallible + ?Sized> DeserializeUnsized<str, D> for <str as ArchiveUnsized
         mut alloc: impl FnMut(Layout) -> *mut u8,
     ) -> Result<*mut (), D::Error> {
         if self.is_empty() {
-            Ok(ptr::NonNull::<u8>::dangling().as_ptr().cast())
+            Ok(ptr::null_mut())
         } else {
             let bytes = alloc(Layout::array::<u8>(self.len()).unwrap());
             assert!(!bytes.is_null());

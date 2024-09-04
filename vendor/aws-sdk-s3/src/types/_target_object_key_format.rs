@@ -27,8 +27,8 @@ impl TargetObjectKeyFormat {
 }
 
 /// A builder for [`TargetObjectKeyFormat`](crate::types::TargetObjectKeyFormat).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct TargetObjectKeyFormatBuilder {
     pub(crate) simple_prefix: ::std::option::Option<crate::types::SimplePrefix>,
     pub(crate) partitioned_prefix: ::std::option::Option<crate::types::PartitionedPrefix>,

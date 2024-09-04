@@ -15,12 +15,12 @@ fn main() {
     #[cfg(feature = "color")]
     {
         use clap::builder::styling;
-        const STYLES: styling::Styles = styling::Styles::styled()
-            .header(styling::AnsiColor::Green.on_default().bold())
-            .usage(styling::AnsiColor::Green.on_default().bold())
-            .literal(styling::AnsiColor::Blue.on_default().bold())
+        let styles = styling::Styles::styled()
+            .header(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
+            .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
+            .literal(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
             .placeholder(styling::AnsiColor::Cyan.on_default());
-        cmd = cmd.styles(STYLES);
+        cmd = cmd.styles(styles);
     }
     cmd.get_matches();
 }

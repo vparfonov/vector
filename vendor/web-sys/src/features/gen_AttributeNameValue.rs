@@ -10,26 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `AttributeNameValue`*"]
     pub type AttributeNameValue;
-    #[doc = "Get the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AttributeNameValue`*"]
-    #[wasm_bindgen(method, getter = "name")]
-    pub fn get_name(this: &AttributeNameValue) -> String;
-    #[doc = "Change the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AttributeNameValue`*"]
-    #[wasm_bindgen(method, setter = "name")]
-    pub fn set_name(this: &AttributeNameValue, val: &str);
-    #[doc = "Get the `value` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AttributeNameValue`*"]
-    #[wasm_bindgen(method, getter = "value")]
-    pub fn get_value(this: &AttributeNameValue) -> String;
-    #[doc = "Change the `value` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AttributeNameValue`*"]
-    #[wasm_bindgen(method, setter = "value")]
-    pub fn set_value(this: &AttributeNameValue, val: &str);
 }
 impl AttributeNameValue {
     #[doc = "Construct a new `AttributeNameValue`."]
@@ -42,14 +22,30 @@ impl AttributeNameValue {
         ret.value(value);
         ret
     }
-    #[deprecated = "Use `set_name()` instead."]
+    #[doc = "Change the `name` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AttributeNameValue`*"]
     pub fn name(&mut self, val: &str) -> &mut Self {
-        self.set_name(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("name"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_value()` instead."]
+    #[doc = "Change the `value` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AttributeNameValue`*"]
     pub fn value(&mut self, val: &str) -> &mut Self {
-        self.set_value(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("value"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

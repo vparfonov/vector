@@ -99,10 +99,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for UpdateS
             ::aws_smithy_runtime_api::client::auth::static_resolver::StaticAuthSchemeOptionResolverParams::new(),
         ));
 
-        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new(
-            "UpdateSecret",
-            "secretsmanager",
-        ));
+        cfg.store_put(::aws_smithy_http::operation::Metadata::new("UpdateSecret", "secretsmanager"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = true;
         signing_options.content_sha256_header = false;
@@ -123,7 +120,11 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for UpdateS
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("UpdateSecret")
-            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
+            .with_interceptor(
+                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
+                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
+                ),
+            )
             .with_interceptor(UpdateSecretEndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::update_secret::UpdateSecretError,
@@ -249,14 +250,11 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for UpdateSecretE
     }
 }
 
-// The get_* functions below are generated from JMESPath expressions in the
-// operationContextParams trait. They target the operation's input shape.
-
 /// Error type for the `UpdateSecretError` operation.
 #[non_exhaustive]
 #[derive(::std::fmt::Debug)]
 pub enum UpdateSecretError {
-    /// <p>Secrets Manager can't decrypt the protected secret text using the provided KMS key.</p>
+    /// <p>Secrets Manager can't decrypt the protected secret text using the provided KMS key. </p>
     DecryptionFailure(crate::types::error::DecryptionFailure),
     /// <p>Secrets Manager can't encrypt the protected secret text using the provided KMS key. Check that the KMS key is available, enabled, and not in an invalid state. For more information, see <a href="https://docs.aws.amazon.com/kms/latest/developerguide/key-state.html">Key state: Effect on your KMS key</a>.</p>
     EncryptionFailure(crate::types::error::EncryptionFailure),
@@ -267,12 +265,9 @@ pub enum UpdateSecretError {
     /// <p>A parameter value is not valid for the current state of the resource.</p>
     /// <p>Possible causes:</p>
     /// <ul>
-    /// <li>
-    /// <p>The secret is scheduled for deletion.</p></li>
-    /// <li>
-    /// <p>You tried to enable rotation on a secret that doesn't already have a Lambda function ARN configured and you didn't include such an ARN as a parameter in this call.</p></li>
-    /// <li>
-    /// <p>The secret is managed by another service, and you must use that service to update it. For more information, see <a href="https://docs.aws.amazon.com/secretsmanager/latest/userguide/service-linked-secrets.html">Secrets managed by other Amazon Web Services services</a>.</p></li>
+    /// <li> <p>The secret is scheduled for deletion.</p> </li>
+    /// <li> <p>You tried to enable rotation on a secret that doesn't already have a Lambda function ARN configured and you didn't include such an ARN as a parameter in this call. </p> </li>
+    /// <li> <p>The secret is managed by another service, and you must use that service to update it. For more information, see <a href="https://docs.aws.amazon.com/secretsmanager/latest/userguide/service-linked-secrets.html">Secrets managed by other Amazon Web Services services</a>.</p> </li>
     /// </ul>
     InvalidRequestException(crate::types::error::InvalidRequestException),
     /// <p>The request failed because it would exceed one of the Secrets Manager quotas.</p>

@@ -92,10 +92,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for GetRand
         ));
 
         cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::SensitiveOutput);
-        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new(
-            "GetRandomPassword",
-            "secretsmanager",
-        ));
+        cfg.store_put(::aws_smithy_http::operation::Metadata::new("GetRandomPassword", "secretsmanager"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = true;
         signing_options.content_sha256_header = false;
@@ -116,7 +113,11 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for GetRand
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("GetRandomPassword")
-            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
+            .with_interceptor(
+                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
+                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
+                ),
+            )
             .with_interceptor(GetRandomPasswordEndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::get_random_password::GetRandomPasswordError,
@@ -242,9 +243,6 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for GetRandomPass
     }
 }
 
-// The get_* functions below are generated from JMESPath expressions in the
-// operationContextParams trait. They target the operation's input shape.
-
 /// Error type for the `GetRandomPasswordError` operation.
 #[non_exhaustive]
 #[derive(::std::fmt::Debug)]
@@ -256,12 +254,9 @@ pub enum GetRandomPasswordError {
     /// <p>A parameter value is not valid for the current state of the resource.</p>
     /// <p>Possible causes:</p>
     /// <ul>
-    /// <li>
-    /// <p>The secret is scheduled for deletion.</p></li>
-    /// <li>
-    /// <p>You tried to enable rotation on a secret that doesn't already have a Lambda function ARN configured and you didn't include such an ARN as a parameter in this call.</p></li>
-    /// <li>
-    /// <p>The secret is managed by another service, and you must use that service to update it. For more information, see <a href="https://docs.aws.amazon.com/secretsmanager/latest/userguide/service-linked-secrets.html">Secrets managed by other Amazon Web Services services</a>.</p></li>
+    /// <li> <p>The secret is scheduled for deletion.</p> </li>
+    /// <li> <p>You tried to enable rotation on a secret that doesn't already have a Lambda function ARN configured and you didn't include such an ARN as a parameter in this call. </p> </li>
+    /// <li> <p>The secret is managed by another service, and you must use that service to update it. For more information, see <a href="https://docs.aws.amazon.com/secretsmanager/latest/userguide/service-linked-secrets.html">Secrets managed by other Amazon Web Services services</a>.</p> </li>
     /// </ul>
     InvalidRequestException(crate::types::error::InvalidRequestException),
     /// An unexpected error occurred (e.g., invalid JSON returned by the service or an unknown error code).

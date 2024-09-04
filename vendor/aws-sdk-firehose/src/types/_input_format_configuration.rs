@@ -21,8 +21,8 @@ impl InputFormatConfiguration {
 }
 
 /// A builder for [`InputFormatConfiguration`](crate::types::InputFormatConfiguration).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct InputFormatConfigurationBuilder {
     pub(crate) deserializer: ::std::option::Option<crate::types::Deserializer>,
 }

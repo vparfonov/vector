@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.58"
 name = "widestring"
-version = "1.1.0"
+version = "1.0.2"
 exclude = [
     ".git*",
     ".editorconfig",
@@ -35,6 +35,7 @@ categories = [
 ]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/starkat99/widestring-rs"
+resolver = "2"
 
 [package.metadata.docs.rs]
 rustc-args = [
@@ -42,24 +43,11 @@ rustc-args = [
     "docsrs",
 ]
 
-[[test]]
-name = "debugger_visualizer"
-path = "tests/debugger_visualizer.rs"
-test = false
-required-features = ["debugger_visualizer"]
-
-[dev-dependencies.debugger_test]
-version = "0.1"
-
-[dev-dependencies.debugger_test_parser]
-version = "0.1"
-
 [dev-dependencies.winapi]
 version = "0.3"
 features = ["winbase"]
 
 [features]
 alloc = []
-debugger_visualizer = ["alloc"]
 default = ["std"]
 std = ["alloc"]

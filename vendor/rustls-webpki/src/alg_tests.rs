@@ -14,13 +14,12 @@
 
 #![allow(clippy::duplicate_mod)]
 
-use std::prelude::v1::*;
-
 use base64::{engine::general_purpose, Engine as _};
 
 use crate::error::{DerTypeId, Error};
 use crate::verify_cert::Budget;
 use crate::{der, signed_data};
+use alloc::{string::String, vec::Vec};
 
 use super::{
     INVALID_SIGNATURE_FOR_RSA_KEY, OK_IF_RSA_AVAILABLE, SUPPORTED_ALGORITHMS_IN_TESTS,
@@ -370,7 +369,7 @@ fn parse_test_signed_data(file_contents: &[u8]) -> TestSignedData {
 
 use alloc::str::Lines;
 
-fn read_pem_section(lines: &mut Lines<'_>, section_name: &str) -> Vec<u8> {
+fn read_pem_section(lines: &mut Lines, section_name: &str) -> Vec<u8> {
     // Skip comments and header
     let begin_section = format!("-----BEGIN {}-----", section_name);
     loop {

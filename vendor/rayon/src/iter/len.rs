@@ -1,5 +1,6 @@
 use super::plumbing::*;
 use super::*;
+use std::cmp;
 
 /// `MinLen` is an iterator that imposes a minimum length on iterator splits.
 /// This struct is created by the [`with_min_len()`] method on [`IndexedParallelIterator`]
@@ -106,7 +107,7 @@ where
     }
 
     fn min_len(&self) -> usize {
-        Ord::max(self.min, self.base.min_len())
+        cmp::max(self.min, self.base.min_len())
     }
 
     fn max_len(&self) -> usize {
@@ -244,7 +245,7 @@ where
     }
 
     fn max_len(&self) -> usize {
-        Ord::min(self.max, self.base.max_len())
+        cmp::min(self.max, self.base.max_len())
     }
 
     fn split_at(self, index: usize) -> (Self, Self) {

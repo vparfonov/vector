@@ -1,5 +1,3 @@
-//! ANSI escape code parsing state machine
-
 #[cfg(test)]
 mod codegen;
 mod definitions;

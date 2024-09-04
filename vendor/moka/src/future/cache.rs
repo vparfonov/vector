@@ -313,9 +313,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// //
 /// // [dependencies]
 /// // moka = { version = "0.12", features = ["future"] }
-/// // tokio = { version = "1", features = ["rt-multi-thread", "macros", "time" ] }
+/// // tokio = { version = "1", features = ["rt-multi-thread", "macros" ] }
 ///
-/// use moka::{future::Cache, Expiry};
+/// use moka::{future::{Cache, FutureExt}, Expiry, notification::ListenerFuture};
 /// use std::time::{Duration, Instant};
 ///
 /// // In this example, we will create a `future::Cache` with `u32` as the key, and
@@ -403,7 +403,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///     // Sleep for 6 seconds. Key 0 should expire.
 ///     println!("\nSleeping for 6 seconds...\n");
 ///     tokio::time::sleep(Duration::from_secs(6)).await;
-///     cache.run_pending_tasks().await;
 ///     println!("Entry count: {}", cache.entry_count());
 ///
 ///     // Verify that key 0 has been evicted.
@@ -414,7 +413,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///     // Sleep for 10 more seconds. Key 1 should expire.
 ///     println!("\nSleeping for 10 seconds...\n");
 ///     tokio::time::sleep(Duration::from_secs(10)).await;
-///     cache.run_pending_tasks().await;
 ///     println!("Entry count: {}", cache.entry_count());
 ///
 ///     // Verify that key 1 has been evicted.
@@ -427,7 +425,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 ///
 ///     println!("\nSleeping for a second...\n");
 ///     tokio::time::sleep(Duration::from_secs(1)).await;
-///     cache.run_pending_tasks().await;
 ///     println!("Entry count: {}", cache.entry_count());
 ///
 ///     println!("\nDone!");

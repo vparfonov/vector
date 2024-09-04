@@ -96,12 +96,3 @@ impl InventoryIncludedObjectVersions {
         }
     }
 }
-impl ::std::fmt::Display for InventoryIncludedObjectVersions {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            InventoryIncludedObjectVersions::All => write!(f, "All"),
-            InventoryIncludedObjectVersions::Current => write!(f, "Current"),
-            InventoryIncludedObjectVersions::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

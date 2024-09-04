@@ -1143,7 +1143,7 @@ impl BufferWriter {
         }
         let mut stream = self.stream.wrap(self.stream.get_ref().lock());
         if let Some(ref sep) = self.separator {
-            if self.printed.load(Ordering::Relaxed) {
+            if self.printed.load(Ordering::SeqCst) {
                 stream.write_all(sep)?;
                 stream.write_all(b"\n")?;
             }
@@ -1163,7 +1163,7 @@ impl BufferWriter {
                 b.print(&mut *console, &mut stream)?;
             }
         }
-        self.printed.store(true, Ordering::Relaxed);
+        self.printed.store(true, Ordering::SeqCst);
         Ok(())
     }
 }
@@ -1179,11 +1179,11 @@ impl BufferWriter {
 /// method, which will take color preferences and the environment into
 /// account. However, buffers can also be manually created using `no_color`,
 /// `ansi` or `console` (on Windows).
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Buffer(BufferInner);
 
 /// BufferInner is an enumeration of different buffer types.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 enum BufferInner {
     /// No coloring information should be applied. This ignores all coloring
     /// directives.
@@ -1383,7 +1383,7 @@ impl WriteColor for Buffer {
 }
 
 /// Satisfies `WriteColor` but ignores all color options.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct NoColor<W>(W);
 
 impl<W: Write> NoColor<W> {
@@ -1454,7 +1454,7 @@ impl<W: io::Write> WriteColor for NoColor<W> {
 }
 
 /// Satisfies `WriteColor` using standard ANSI escape sequences.
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Ansi<W>(W);
 
 impl<W: Write> Ansi<W> {

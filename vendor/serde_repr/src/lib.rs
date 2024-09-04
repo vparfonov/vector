@@ -34,7 +34,7 @@
 //! }
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/serde_repr/0.1.19")]
+#![doc(html_root_url = "https://docs.rs/serde_repr/0.1.17")]
 #![allow(clippy::single_match_else)]
 
 extern crate proc_macro;
@@ -61,7 +61,6 @@ pub fn derive_serialize(input: TokenStream) -> TokenStream {
     });
 
     TokenStream::from(quote! {
-        #[allow(deprecated)]
         impl serde::Serialize for #ident {
             #[allow(clippy::use_self)]
             fn serialize<S>(&self, serializer: S) -> ::core::result::Result<S::Ok, S::Error>
@@ -119,7 +118,6 @@ pub fn derive_deserialize(input: TokenStream) -> TokenStream {
     };
 
     TokenStream::from(quote! {
-        #[allow(deprecated)]
         impl<'de> serde::Deserialize<'de> for #ident {
             #[allow(clippy::use_self)]
             fn deserialize<D>(deserializer: D) -> ::core::result::Result<Self, D::Error>

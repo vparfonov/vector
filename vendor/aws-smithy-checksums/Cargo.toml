@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "aws-smithy-checksums"
-version = "0.60.12"
+version = "0.60.0"
 authors = [
     "AWS Rust SDK Team <aws-sdk-rust@amazon.com>",
     "Zelda Hessler <zhessler@amazon.com>",
@@ -24,10 +24,6 @@ repository = "https://github.com/smithy-lang/smithy-rs"
 
 [package.metadata.docs.rs]
 all-features = true
-cargo-args = [
-    "-Zunstable-options",
-    "-Zrustdoc-scrape-examples",
-]
 rustdoc-args = [
     "--cfg",
     "docsrs",
@@ -35,16 +31,16 @@ rustdoc-args = [
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies.aws-smithy-http]
-version = "0.60.9"
+version = "0.60.0"
 
 [dependencies.aws-smithy-types]
-version = "1.2.0"
+version = "1.0.0"
 
 [dependencies.bytes]
 version = "1"
 
 [dependencies.crc32c]
-version = "0.6.8"
+version = "0.6"
 
 [dependencies.crc32fast]
 version = "1.3"

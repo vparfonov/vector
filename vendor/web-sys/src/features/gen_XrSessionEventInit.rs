@@ -14,80 +14,6 @@ extern "C" {
     #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
     #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub type XrSessionEventInit;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrSessionEventInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "bubbles")]
-    pub fn get_bubbles(this: &XrSessionEventInit) -> Option<bool>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrSessionEventInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "bubbles")]
-    pub fn set_bubbles(this: &XrSessionEventInit, val: bool);
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrSessionEventInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "cancelable")]
-    pub fn get_cancelable(this: &XrSessionEventInit) -> Option<bool>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrSessionEventInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "cancelable")]
-    pub fn set_cancelable(this: &XrSessionEventInit, val: bool);
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrSessionEventInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "composed")]
-    pub fn get_composed(this: &XrSessionEventInit) -> Option<bool>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrSessionEventInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "composed")]
-    pub fn set_composed(this: &XrSessionEventInit, val: bool);
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "XrSession")]
-    #[doc = "Get the `session` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrSession`, `XrSessionEventInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "session")]
-    pub fn get_session(this: &XrSessionEventInit) -> XrSession;
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "XrSession")]
-    #[doc = "Change the `session` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrSession`, `XrSessionEventInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "session")]
-    pub fn set_session(this: &XrSessionEventInit, val: &XrSession);
 }
 #[cfg(web_sys_unstable_apis)]
 impl XrSessionEventInit {
@@ -105,28 +31,88 @@ impl XrSessionEventInit {
         ret
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_bubbles()` instead."]
+    #[doc = "Change the `bubbles` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `XrSessionEventInit`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn bubbles(&mut self, val: bool) -> &mut Self {
-        self.set_bubbles(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("bubbles"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_cancelable()` instead."]
+    #[doc = "Change the `cancelable` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `XrSessionEventInit`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn cancelable(&mut self, val: bool) -> &mut Self {
-        self.set_cancelable(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("cancelable"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_composed()` instead."]
+    #[doc = "Change the `composed` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `XrSessionEventInit`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn composed(&mut self, val: bool) -> &mut Self {
-        self.set_composed(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("composed"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
     #[cfg(feature = "XrSession")]
-    #[deprecated = "Use `set_session()` instead."]
+    #[doc = "Change the `session` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `XrSession`, `XrSessionEventInit`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn session(&mut self, val: &XrSession) -> &mut Self {
-        self.set_session(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("session"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

@@ -79,7 +79,7 @@ impl<'a> ExtractAttribute for FromTypeParamImpl<'a> {
         self.attr_names
     }
 
-    fn forward_attrs(&self) -> &ForwardAttrs<'_> {
+    fn forward_attrs(&self) -> &ForwardAttrs {
         &self.forward_attrs
     }
 

@@ -1,24 +1,24 @@
 use std::{io, mem};
 
-use windows_sys::Win32::Foundation::HANDLE;
-use windows_sys::Win32::System::Console::{GetConsoleMode, SetConsoleMode};
-use windows_sys::Win32::System::Console::{
-    GetConsoleScreenBufferInfo, SetConsoleTextAttribute,
-    CONSOLE_SCREEN_BUFFER_INFO, ENABLE_VIRTUAL_TERMINAL_PROCESSING,
-    FOREGROUND_BLUE, FOREGROUND_GREEN, FOREGROUND_INTENSITY, FOREGROUND_RED,
+use winapi::{
+    shared::minwindef::WORD,
+    um::{
+        consoleapi::{GetConsoleMode, SetConsoleMode},
+        wincon::{
+            self, GetConsoleScreenBufferInfo, SetConsoleTextAttribute,
+            CONSOLE_SCREEN_BUFFER_INFO, FOREGROUND_BLUE as FG_BLUE,
+            FOREGROUND_GREEN as FG_GREEN,
+            FOREGROUND_INTENSITY as FG_INTENSITY, FOREGROUND_RED as FG_RED,
+        },
+    },
 };
 
 use crate::{AsHandleRef, HandleRef};
 
-use FOREGROUND_BLUE as FG_BLUE;
-use FOREGROUND_GREEN as FG_GREEN;
-use FOREGROUND_INTENSITY as FG_INTENSITY;
-use FOREGROUND_RED as FG_RED;
-
-const FG_CYAN: u16 = FG_BLUE | FG_GREEN;
-const FG_MAGENTA: u16 = FG_BLUE | FG_RED;
-const FG_YELLOW: u16 = FG_GREEN | FG_RED;
-const FG_WHITE: u16 = FG_BLUE | FG_GREEN | FG_RED;
+const FG_CYAN: WORD = FG_BLUE | FG_GREEN;
+const FG_MAGENTA: WORD = FG_BLUE | FG_RED;
+const FG_YELLOW: WORD = FG_GREEN | FG_RED;
+const FG_WHITE: WORD = FG_BLUE | FG_GREEN | FG_RED;
 
 /// Query the given handle for information about the console's screen buffer.
 ///
@@ -33,7 +33,7 @@ pub fn screen_buffer_info<H: AsHandleRef>(
 ) -> io::Result<ScreenBufferInfo> {
     unsafe {
         let mut info: CONSOLE_SCREEN_BUFFER_INFO = mem::zeroed();
-        let rc = GetConsoleScreenBufferInfo(h.as_raw() as HANDLE, &mut info);
+        let rc = GetConsoleScreenBufferInfo(h.as_raw(), &mut info);
         if rc == 0 {
             return Err(io::Error::last_os_error());
         }
@@ -50,9 +50,7 @@ pub fn set_text_attributes<H: AsHandleRef>(
     h: H,
     attributes: u16,
 ) -> io::Result<()> {
-    if unsafe { SetConsoleTextAttribute(h.as_raw() as HANDLE, attributes) }
-        == 0
-    {
+    if unsafe { SetConsoleTextAttribute(h.as_raw(), attributes) } == 0 {
         Err(io::Error::last_os_error())
     } else {
         Ok(())
@@ -67,7 +65,7 @@ pub fn set_text_attributes<H: AsHandleRef>(
 /// [`GetConsoleMode`]: https://docs.microsoft.com/en-us/windows/console/getconsolemode
 pub fn mode<H: AsHandleRef>(h: H) -> io::Result<u32> {
     let mut mode = 0;
-    if unsafe { GetConsoleMode(h.as_raw() as HANDLE, &mut mode) } == 0 {
+    if unsafe { GetConsoleMode(h.as_raw(), &mut mode) } == 0 {
         Err(io::Error::last_os_error())
     } else {
         Ok(mode)
@@ -81,7 +79,7 @@ pub fn mode<H: AsHandleRef>(h: H) -> io::Result<u32> {
 ///
 /// [`SetConsoleMode`]: https://docs.microsoft.com/en-us/windows/console/setconsolemode
 pub fn set_mode<H: AsHandleRef>(h: H, mode: u32) -> io::Result<()> {
-    if unsafe { SetConsoleMode(h.as_raw() as HANDLE, mode) } == 0 {
+    if unsafe { SetConsoleMode(h.as_raw(), mode) } == 0 {
         Err(io::Error::last_os_error())
     } else {
         Ok(())
@@ -282,7 +280,7 @@ impl Console {
         &mut self,
         yes: bool,
     ) -> io::Result<()> {
-        let vt = ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+        let vt = wincon::ENABLE_VIRTUAL_TERMINAL_PROCESSING;
 
         let handle = self.kind.handle();
         let old_mode = mode(&handle)?;
@@ -304,7 +302,7 @@ struct TextAttributes {
 }
 
 impl TextAttributes {
-    fn to_word(&self) -> u16 {
+    fn to_word(&self) -> WORD {
         let mut w = 0;
         w |= self.fg_color.to_fg();
         w |= self.fg_intense.to_fg();
@@ -313,7 +311,7 @@ impl TextAttributes {
         w
     }
 
-    fn from_word(word: u16) -> TextAttributes {
+    fn from_word(word: WORD) -> TextAttributes {
         TextAttributes {
             fg_color: Color::from_fg(word),
             fg_intense: Intense::from_fg(word),
@@ -332,22 +330,22 @@ pub enum Intense {
 }
 
 impl Intense {
-    fn to_bg(&self) -> u16 {
+    fn to_bg(&self) -> WORD {
         self.to_fg() << 4
     }
 
-    fn from_bg(word: u16) -> Intense {
+    fn from_bg(word: WORD) -> Intense {
         Intense::from_fg(word >> 4)
     }
 
-    fn to_fg(&self) -> u16 {
+    fn to_fg(&self) -> WORD {
         match *self {
             Intense::No => 0,
             Intense::Yes => FG_INTENSITY,
         }
     }
 
-    fn from_fg(word: u16) -> Intense {
+    fn from_fg(word: WORD) -> Intense {
         if word & FG_INTENSITY > 0 {
             Intense::Yes
         } else {
@@ -371,15 +369,15 @@ pub enum Color {
 }
 
 impl Color {
-    fn to_bg(&self) -> u16 {
+    fn to_bg(&self) -> WORD {
         self.to_fg() << 4
     }
 
-    fn from_bg(word: u16) -> Color {
+    fn from_bg(word: WORD) -> Color {
         Color::from_fg(word >> 4)
     }
 
-    fn to_fg(&self) -> u16 {
+    fn to_fg(&self) -> WORD {
         match *self {
             Color::Black => 0,
             Color::Blue => FG_BLUE,
@@ -392,7 +390,7 @@ impl Color {
         }
     }
 
-    fn from_fg(word: u16) -> Color {
+    fn from_fg(word: WORD) -> Color {
         match word & 0b111 {
             FG_BLUE => Color::Blue,
             FG_GREEN => Color::Green,

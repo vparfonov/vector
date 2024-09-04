@@ -10,28 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `PushSubscriptionJson`*"]
     pub type PushSubscriptionJson;
-    #[doc = "Get the `endpoint` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PushSubscriptionJson`*"]
-    #[wasm_bindgen(method, getter = "endpoint")]
-    pub fn get_endpoint(this: &PushSubscriptionJson) -> Option<String>;
-    #[doc = "Change the `endpoint` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PushSubscriptionJson`*"]
-    #[wasm_bindgen(method, setter = "endpoint")]
-    pub fn set_endpoint(this: &PushSubscriptionJson, val: &str);
-    #[cfg(feature = "PushSubscriptionKeys")]
-    #[doc = "Get the `keys` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PushSubscriptionJson`, `PushSubscriptionKeys`*"]
-    #[wasm_bindgen(method, getter = "keys")]
-    pub fn get_keys(this: &PushSubscriptionJson) -> Option<PushSubscriptionKeys>;
-    #[cfg(feature = "PushSubscriptionKeys")]
-    #[doc = "Change the `keys` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PushSubscriptionJson`, `PushSubscriptionKeys`*"]
-    #[wasm_bindgen(method, setter = "keys")]
-    pub fn set_keys(this: &PushSubscriptionJson, val: &PushSubscriptionKeys);
 }
 impl PushSubscriptionJson {
     #[doc = "Construct a new `PushSubscriptionJson`."]
@@ -42,15 +20,35 @@ impl PushSubscriptionJson {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_endpoint()` instead."]
+    #[doc = "Change the `endpoint` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PushSubscriptionJson`*"]
     pub fn endpoint(&mut self, val: &str) -> &mut Self {
-        self.set_endpoint(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("endpoint"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "PushSubscriptionKeys")]
-    #[deprecated = "Use `set_keys()` instead."]
+    #[doc = "Change the `keys` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PushSubscriptionJson`, `PushSubscriptionKeys`*"]
     pub fn keys(&mut self, val: &PushSubscriptionKeys) -> &mut Self {
-        self.set_keys(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("keys"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

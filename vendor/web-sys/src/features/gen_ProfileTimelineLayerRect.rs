@@ -10,46 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
     pub type ProfileTimelineLayerRect;
-    #[doc = "Get the `height` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
-    #[wasm_bindgen(method, getter = "height")]
-    pub fn get_height(this: &ProfileTimelineLayerRect) -> Option<i32>;
-    #[doc = "Change the `height` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
-    #[wasm_bindgen(method, setter = "height")]
-    pub fn set_height(this: &ProfileTimelineLayerRect, val: i32);
-    #[doc = "Get the `width` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
-    #[wasm_bindgen(method, getter = "width")]
-    pub fn get_width(this: &ProfileTimelineLayerRect) -> Option<i32>;
-    #[doc = "Change the `width` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
-    #[wasm_bindgen(method, setter = "width")]
-    pub fn set_width(this: &ProfileTimelineLayerRect, val: i32);
-    #[doc = "Get the `x` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
-    #[wasm_bindgen(method, getter = "x")]
-    pub fn get_x(this: &ProfileTimelineLayerRect) -> Option<i32>;
-    #[doc = "Change the `x` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
-    #[wasm_bindgen(method, setter = "x")]
-    pub fn set_x(this: &ProfileTimelineLayerRect, val: i32);
-    #[doc = "Get the `y` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
-    #[wasm_bindgen(method, getter = "y")]
-    pub fn get_y(this: &ProfileTimelineLayerRect) -> Option<i32>;
-    #[doc = "Change the `y` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
-    #[wasm_bindgen(method, setter = "y")]
-    pub fn set_y(this: &ProfileTimelineLayerRect, val: i32);
 }
 impl ProfileTimelineLayerRect {
     #[doc = "Construct a new `ProfileTimelineLayerRect`."]
@@ -60,24 +20,57 @@ impl ProfileTimelineLayerRect {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_height()` instead."]
+    #[doc = "Change the `height` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
     pub fn height(&mut self, val: i32) -> &mut Self {
-        self.set_height(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("height"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_width()` instead."]
+    #[doc = "Change the `width` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
     pub fn width(&mut self, val: i32) -> &mut Self {
-        self.set_width(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("width"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_x()` instead."]
+    #[doc = "Change the `x` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
     pub fn x(&mut self, val: i32) -> &mut Self {
-        self.set_x(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("x"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_y()` instead."]
+    #[doc = "Change the `y` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ProfileTimelineLayerRect`*"]
     pub fn y(&mut self, val: i32) -> &mut Self {
-        self.set_y(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("y"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

@@ -41,8 +41,7 @@ enum_builder! {
         BadCertificateHashValue => 0x72,
         UnknownPSKIdentity => 0x73,
         CertificateRequired => 0x74,
-        NoApplicationProtocol => 0x78,
-        EncryptedClientHelloRequired => 0x79, // https://datatracker.ietf.org/doc/html/draft-ietf-tls-esni-18#section-11.2
+        NoApplicationProtocol => 0x78
     }
 }
 
@@ -70,8 +69,7 @@ enum_builder! {
         CertificateURL => 0x15,
         CertificateStatus => 0x16,
         KeyUpdate => 0x18,
-        CompressedCertificate => 0x19,
-        MessageHash => 0xfe,
+        MessageHash => 0xfe
     }
 }
 
@@ -85,7 +83,7 @@ enum_builder! {
         Alert => 0x15,
         Handshake => 0x16,
         ApplicationData => 0x17,
-        Heartbeat => 0x18,
+        Heartbeat => 0x18
     }
 }
 
@@ -103,7 +101,7 @@ enum_builder! {
         TLSv1_3 => 0x0304,
         DTLSv1_0 => 0xFEFF,
         DTLSv1_2 => 0xFEFD,
-        DTLSv1_3 => 0xFEFC,
+        DTLSv1_3 => 0xFEFC
     }
 }
 
@@ -488,7 +486,7 @@ enum_builder! {
         TLS_DHE_PSK_WITH_CHACHA20_POLY1305_SHA256 => 0xccad,
         TLS_RSA_PSK_WITH_CHACHA20_POLY1305_SHA256 => 0xccae,
         SSL_RSA_FIPS_WITH_DES_CBC_SHA => 0xfefe,
-        SSL_RSA_FIPS_WITH_3DES_EDE_CBC_SHA => 0xfeff,
+        SSL_RSA_FIPS_WITH_3DES_EDE_CBC_SHA => 0xfeff
     }
 }
 
@@ -510,12 +508,12 @@ enum_builder! {
         RSA_PSS_SHA384 => 0x0805,
         RSA_PSS_SHA512 => 0x0806,
         ED25519 => 0x0807,
-        ED448 => 0x0808,
+        ED448 => 0x0808
     }
 }
 
 impl SignatureScheme {
-    pub(crate) fn algorithm(&self) -> SignatureAlgorithm {
+    pub(crate) fn sign(&self) -> SignatureAlgorithm {
         match *self {
             Self::RSA_PKCS1_SHA1
             | Self::RSA_PKCS1_SHA256
@@ -566,40 +564,14 @@ enum_builder! {
         DSA => 0x02,
         ECDSA => 0x03,
         ED25519 => 0x07,
-        ED448 => 0x08,
-    }
-}
-
-enum_builder! {
-    /// The "TLS Certificate Compression Algorithm IDs" TLS protocol enum.
-    /// Values in this enum are taken from [RFC8879].
-    ///
-    /// [RFC8879]: https://www.rfc-editor.org/rfc/rfc8879.html#section-7.3
-    @U16
-    pub enum CertificateCompressionAlgorithm {
-        Zlib => 1,
-        Brotli => 2,
-        Zstd => 3,
-    }
-}
-
-enum_builder! {
-    /// The type of Encrypted Client Hello (`EchClientHelloType`).
-    ///
-    /// Specified in [draft-ietf-tls-esni Section 5].
-    ///
-    /// [draft-ietf-tls-esni Section 5]: <https://www.ietf.org/archive/id/draft-ietf-tls-esni-18.html#section-5>
-    @U8
-    pub enum EchClientHelloType {
-        ClientHelloOuter => 0,
-        ClientHelloInner => 1
+        ED448 => 0x08
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::msgs::enums::tests::{test_enum16, test_enum8};
+    use crate::msgs::enums::tests::test_enum8;
 
     #[test]
     fn test_enums() {
@@ -609,10 +581,6 @@ mod tests {
         test_enum8::<AlertDescription>(
             AlertDescription::CloseNotify,
             AlertDescription::NoApplicationProtocol,
-        );
-        test_enum16::<CertificateCompressionAlgorithm>(
-            CertificateCompressionAlgorithm::Zlib,
-            CertificateCompressionAlgorithm::Zstd,
         );
     }
 }

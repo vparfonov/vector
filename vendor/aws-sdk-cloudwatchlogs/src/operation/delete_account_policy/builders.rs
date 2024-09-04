@@ -3,7 +3,7 @@ pub use crate::operation::delete_account_policy::_delete_account_policy_output::
 
 pub use crate::operation::delete_account_policy::_delete_account_policy_input::DeleteAccountPolicyInputBuilder;
 
-impl crate::operation::delete_account_policy::builders::DeleteAccountPolicyInputBuilder {
+impl DeleteAccountPolicyInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -22,14 +22,8 @@ impl crate::operation::delete_account_policy::builders::DeleteAccountPolicyInput
 }
 /// Fluent builder constructing a request to `DeleteAccountPolicy`.
 ///
-/// <p>Deletes a CloudWatch Logs account policy. This stops the policy from applying to all log groups or a subset of log groups in the account. Log-group level policies will still be in effect.</p>
-/// <p>To use this operation, you must be signed on with the correct permissions depending on the type of policy that you are deleting.</p>
-/// <ul>
-/// <li>
-/// <p>To delete a data protection policy, you must have the <code>logs:DeleteDataProtectionPolicy</code> and <code>logs:DeleteAccountPolicy</code> permissions.</p></li>
-/// <li>
-/// <p>To delete a subscription filter policy, you must have the <code>logs:DeleteSubscriptionFilter</code> and <code>logs:DeleteAccountPolicy</code> permissions.</p></li>
-/// </ul>
+/// <p>Deletes a CloudWatch Logs account policy.</p>
+/// <p>To use this operation, you must be signed on with the <code>logs:DeleteDataProtectionPolicy</code> and <code>logs:DeleteAccountPolicy</code> permissions.</p>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
 pub struct DeleteAccountPolicyFluentBuilder {
     handle: ::std::sync::Arc<crate::client::Handle>,
@@ -55,7 +49,7 @@ impl
     }
 }
 impl DeleteAccountPolicyFluentBuilder {
-    /// Creates a new `DeleteAccountPolicyFluentBuilder`.
+    /// Creates a new `DeleteAccountPolicy`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -106,12 +100,12 @@ impl DeleteAccountPolicyFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }
@@ -129,17 +123,17 @@ impl DeleteAccountPolicyFluentBuilder {
     pub fn get_policy_name(&self) -> &::std::option::Option<::std::string::String> {
         self.inner.get_policy_name()
     }
-    /// <p>The type of policy to delete.</p>
+    /// <p>The type of policy to delete. Currently, the only valid value is <code>DATA_PROTECTION_POLICY</code>.</p>
     pub fn policy_type(mut self, input: crate::types::PolicyType) -> Self {
         self.inner = self.inner.policy_type(input);
         self
     }
-    /// <p>The type of policy to delete.</p>
+    /// <p>The type of policy to delete. Currently, the only valid value is <code>DATA_PROTECTION_POLICY</code>.</p>
     pub fn set_policy_type(mut self, input: ::std::option::Option<crate::types::PolicyType>) -> Self {
         self.inner = self.inner.set_policy_type(input);
         self
     }
-    /// <p>The type of policy to delete.</p>
+    /// <p>The type of policy to delete. Currently, the only valid value is <code>DATA_PROTECTION_POLICY</code>.</p>
     pub fn get_policy_type(&self) -> &::std::option::Option<crate::types::PolicyType> {
         self.inner.get_policy_type()
     }

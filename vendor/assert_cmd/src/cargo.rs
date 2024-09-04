@@ -155,7 +155,7 @@ pub(crate) fn cargo_runner() -> Option<Vec<String>> {
         "CARGO_TARGET_{}_RUNNER",
         CURRENT_TARGET.replace('-', "_").to_uppercase()
     );
-    let runner = env::var(runner_env).ok()?;
+    let runner = std::env::var(runner_env).ok()?;
     Some(runner.split(' ').map(str::to_string).collect())
 }
 
@@ -213,7 +213,7 @@ fn target_dir() -> path::PathBuf {
             }
             path
         })
-        .expect("this should only be used where a `current_exe` can be set")
+        .unwrap()
 }
 
 /// Look up the path to a cargo-built binary within an integration test.
@@ -223,7 +223,7 @@ pub fn cargo_bin<S: AsRef<str>>(name: S) -> path::PathBuf {
 
 fn cargo_bin_str(name: &str) -> path::PathBuf {
     let env_var = format!("CARGO_BIN_EXE_{}", name);
-    env::var_os(env_var)
+    std::env::var_os(env_var)
         .map(|p| p.into())
         .unwrap_or_else(|| target_dir().join(format!("{}{}", name, env::consts::EXE_SUFFIX)))
 }

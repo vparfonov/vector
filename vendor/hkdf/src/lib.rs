@@ -6,13 +6,6 @@
 //! Material (IKM) and an optional salt, then you expand it (perhaps multiple times)
 //! into some Output Key Material (OKM) bound to an "info" context string.
 //!
-//! There are two usage options for the salt:
-//!
-//! - [`None`] or static for domain separation in a private setting
-//! -  guaranteed to be uniformly-distributed and unique in a public setting
-//!
-//! Other non fitting data should be added to the `IKM` or `info`.
-//!
 //! ```rust
 //! use sha2::Sha256;
 //! use hkdf::Hkdf;
@@ -89,7 +82,8 @@
 #![no_std]
 #![doc(
     html_logo_url = "https://raw.githubusercontent.com/RustCrypto/media/6ee8e381/logo.svg",
-    html_favicon_url = "https://raw.githubusercontent.com/RustCrypto/media/6ee8e381/logo.svg"
+    html_favicon_url = "https://raw.githubusercontent.com/RustCrypto/media/6ee8e381/logo.svg",
+    html_root_url = "https://docs.rs/hkdf/0.12.3"
 )]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![forbid(unsafe_code)]
@@ -172,20 +166,17 @@ where
 
 impl<H, I> fmt::Debug for HkdfExtract<H, I>
 where
-    H: OutputSizeUser,
+    H: OutputSizeUser + AlgorithmName,
     I: HmacImpl<H>,
-    I::Core: AlgorithmName,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("HkdfExtract<")?;
-        <I::Core as AlgorithmName>::write_alg_name(f)?;
+        <H as AlgorithmName>::write_alg_name(f)?;
         f.write_str("> { ... }")
     }
 }
 
 /// Structure representing the HKDF, capable of HKDF-Expand and HKDF-Extract operations.
-/// Recommendations for the correct usage of the parameters can be found in the
-/// [crate root](index.html#usage).
 #[derive(Clone)]
 pub struct Hkdf<H: OutputSizeUser, I: HmacImpl<H> = Hmac<H>> {
     hmac: I::Core,
@@ -273,13 +264,12 @@ impl<H: OutputSizeUser, I: HmacImpl<H>> Hkdf<H, I> {
 
 impl<H, I> fmt::Debug for Hkdf<H, I>
 where
-    H: OutputSizeUser,
+    H: OutputSizeUser + AlgorithmName,
     I: HmacImpl<H>,
-    I::Core: AlgorithmName,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Hkdf<")?;
-        <I::Core as AlgorithmName>::write_alg_name(f)?;
+        <H as AlgorithmName>::write_alg_name(f)?;
         f.write_str("> { ... }")
     }
 }

@@ -21,8 +21,8 @@ impl GlacierJobParameters {
 }
 
 /// A builder for [`GlacierJobParameters`](crate::types::GlacierJobParameters).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct GlacierJobParametersBuilder {
     pub(crate) tier: ::std::option::Option<crate::types::Tier>,
 }

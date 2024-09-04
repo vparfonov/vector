@@ -3,7 +3,7 @@ use crate::io::{AsyncRead, AsyncWrite, ReadBuf};
 use std::future::Future;
 use std::io;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll};
 
 #[derive(Debug)]
 pub(super) struct CopyBuffer {

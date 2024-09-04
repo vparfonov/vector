@@ -11,7 +11,6 @@ use crate::{
 /**
 A defined flags value that may be named or unnamed.
 */
-#[derive(Debug)]
 pub struct Flag<B> {
     name: &'static str,
     value: B,

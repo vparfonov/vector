@@ -96,12 +96,3 @@ impl MetadataDirective {
         }
     }
 }
-impl ::std::fmt::Display for MetadataDirective {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            MetadataDirective::Copy => write!(f, "COPY"),
-            MetadataDirective::Replace => write!(f, "REPLACE"),
-            MetadataDirective::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

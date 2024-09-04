@@ -34,6 +34,7 @@
 //! # Examples
 //!
 //! ```rust
+//! # use std::convert::TryFrom;
 //! # use bytes::Bytes;
 //! # use bytes_utils::{Str, StrMut};
 //! let mut builder = StrMut::new();
@@ -76,7 +77,7 @@ use alloc::boxed::Box;
 use alloc::string::String;
 use core::borrow::{Borrow, BorrowMut};
 use core::cmp::Ordering;
-use core::convert::Infallible;
+use core::convert::{Infallible, TryFrom};
 use core::fmt::{Debug, Display, Formatter, Result as FmtResult, Write};
 use core::hash::{Hash, Hasher};
 use core::iter::{self, FromIterator};
@@ -319,7 +320,7 @@ unsafe impl StorageMut for BytesMut {
 /// For technical reasons, both are implemented in one go as this type. For the same reason, most
 /// of the documentation can be found here. Users are expected to use the [Str] and [StrMut]
 /// instead.
-#[derive(Clone, Default)]
+#[derive(Copy, Clone, Default)]
 pub struct StrInner<S>(S);
 
 impl<S: Storage> StrInner<S> {
@@ -647,9 +648,9 @@ impl<'a, S: StorageMut> Extend<&'a char> for StrInner<S> {
     }
 }
 
-macro_rules! impl_extend {
-    ($ty:ty $(, $lifetimes:lifetime )* ) => {
-        impl<$($lifetimes, )* S: StorageMut> Extend<$ty> for StrInner<S> {
+macro_rules! e {
+    ($ty: ty) => {
+        impl<'a, S: StorageMut> Extend<$ty> for StrInner<S> {
             fn extend<T: IntoIterator<Item = $ty>>(&mut self, iter: T) {
                 for i in iter {
                     self.push_str(i.as_ref());
@@ -657,7 +658,7 @@ macro_rules! impl_extend {
             }
         }
 
-        impl<$($lifetimes, )* S> FromIterator<$ty> for StrInner<S>
+        impl<'a, S> FromIterator<$ty> for StrInner<S>
         where
             S: Storage,
         {
@@ -667,18 +668,8 @@ macro_rules! impl_extend {
                 StrInner(S::from_creator(creator.0))
             }
         }
-    };
-}
 
-impl_extend!(String);
-impl_extend!(Box<str>);
-impl_extend!(&'a String, 'a);
-impl_extend!(&'a str, 'a);
-impl_extend!(Cow<'a, str>, 'a);
-
-macro_rules! impl_from {
-    ($ty:ty $(, $lifetimes:lifetime )* ) => {
-        impl<$($lifetimes, )* S> From<$ty> for StrInner<S>
+        impl<'a, S> From<$ty> for StrInner<S>
         where
             S: Storage,
         {
@@ -689,28 +680,13 @@ macro_rules! impl_from {
     };
 }
 
-impl_from!(&'a String, 'a);
-impl_from!(&'a str, 'a);
-impl_from!(Cow<'a, str>, 'a);
+e!(String);
+e!(&'a String);
+e!(Box<str>);
+e!(&'a str);
+e!(Cow<'a, str>);
 
-impl From<String> for Str {
-    fn from(s: String) -> Self {
-        let inner = Bytes::from(s.into_bytes());
-        // Safety: inner is constructed from a str
-        unsafe { Str::from_inner_unchecked(inner) }
-    }
-}
-
-impl From<Box<str>> for Str {
-    fn from(s: Box<str>) -> Self {
-        let s: Box<[u8]> = s.into();
-        let inner = Bytes::from(s);
-        // Safety: inner is constructed from a str
-        unsafe { Str::from_inner_unchecked(inner) }
-    }
-}
-
-macro_rules! impl_try_from {
+macro_rules! t {
     ($ty: ty) => {
         impl TryFrom<$ty> for StrInner<$ty> {
             type Error = Utf8Error<$ty>;
@@ -727,8 +703,8 @@ macro_rules! impl_try_from {
     };
 }
 
-impl_try_from!(Bytes);
-impl_try_from!(BytesMut);
+t!(Bytes);
+t!(BytesMut);
 
 impl From<StrMut> for Str {
     fn from(s: StrMut) -> Self {
@@ -764,27 +740,27 @@ impl<S: Storage> Ord for StrInner<S> {
     }
 }
 
-macro_rules! impl_partrial_eq {
-    ($ty: ty $(, $lifetimes:lifetime )* ) => {
-        impl<$($lifetimes, )* S: Storage> PartialEq<$ty> for StrInner<S> {
+macro_rules! c {
+    ($ty: ty) => {
+        impl<'a, S: Storage> PartialEq<$ty> for StrInner<S> {
             fn eq(&self, other: &$ty) -> bool {
                 self.deref() == other.deref()
             }
         }
 
-        impl<$($lifetimes, )* S: Storage> PartialEq<StrInner<S>> for $ty {
+        impl<'a, S: Storage> PartialEq<StrInner<S>> for $ty {
             fn eq(&self, other: &StrInner<S>) -> bool {
                 self.deref() == other.deref()
             }
         }
 
-        impl<$($lifetimes, )* S: Storage> PartialOrd<$ty> for StrInner<S> {
+        impl<'a, S: Storage> PartialOrd<$ty> for StrInner<S> {
             fn partial_cmp(&self, other: &$ty) -> Option<Ordering> {
                 Some(self.deref().cmp(other.deref()))
             }
         }
 
-        impl<$($lifetimes, )* S: Storage> PartialOrd<StrInner<S>> for $ty {
+        impl<'a, S: Storage> PartialOrd<StrInner<S>> for $ty {
             fn partial_cmp(&self, other: &StrInner<S>) -> Option<Ordering> {
                 Some(self.deref().cmp(other.deref()))
             }
@@ -792,11 +768,11 @@ macro_rules! impl_partrial_eq {
     };
 }
 
-impl_partrial_eq!(String);
-impl_partrial_eq!(Box<str>);
-impl_partrial_eq!(&'a str, 'a);
-impl_partrial_eq!(&'a mut str, 'a);
-impl_partrial_eq!(Cow<'a, str>, 'a);
+c!(&'a str);
+c!(&'a mut str);
+c!(String);
+c!(Box<str>);
+c!(Cow<'a, str>);
 
 impl<S: StorageMut> Write for StrInner<S> {
     fn write_str(&mut self, s: &str) -> FmtResult {
@@ -804,6 +780,7 @@ impl<S: StorageMut> Write for StrInner<S> {
         Ok(())
     }
 }
+
 /// The [format] macro, but returning [Str].
 ///
 /// # Examples
@@ -913,8 +890,10 @@ impl StrMut {
 
 #[cfg(test)]
 mod tests {
-    use itertools::Itertools;
     use std::panic;
+
+    use itertools::Itertools;
+    use proptest::prelude::*;
 
     use super::*;
 
@@ -980,95 +959,88 @@ mod tests {
         panic::catch_unwind(|| v.split_at_bytes(2)).unwrap_err();
     }
 
-    #[cfg(not(miri))]
-    mod proptests {
-        use proptest::prelude::*;
+    proptest! {
+        #[test]
+        fn split_whitespace(s: String) {
+            let bstring = Str::from(&s);
 
-        use super::*;
+            let bw = bstring.split_whitespace_bytes();
+            let sw = s.split_whitespace();
 
-        proptest! {
-            #[test]
-            fn split_whitespace(s: String) {
-                let bstring = Str::from(&s);
-
-                let bw = bstring.split_whitespace_bytes();
-                let sw = s.split_whitespace();
-
-                for (b, s) in bw.zip_eq(sw) {
-                    prop_assert_eq!(b, s);
-                }
+            for (b, s) in bw.zip_eq(sw) {
+                prop_assert_eq!(b, s);
             }
+        }
 
-            #[test]
-            fn split_ascii_whitespace(s: String) {
-                let bstring = Str::from(&s);
+        #[test]
+        fn split_ascii_whitespace(s: String) {
+            let bstring = Str::from(&s);
 
-                let bw = bstring.split_ascii_whitespace_bytes();
-                let sw = s.split_ascii_whitespace();
+            let bw = bstring.split_ascii_whitespace_bytes();
+            let sw = s.split_ascii_whitespace();
 
-                for (b, s) in bw.zip_eq(sw) {
-                    prop_assert_eq!(b, s);
-                }
+            for (b, s) in bw.zip_eq(sw) {
+                prop_assert_eq!(b, s);
             }
+        }
 
-            #[test]
-            fn lines(s: String) {
-                let bstring = Str::from(&s);
+        #[test]
+        fn lines(s: String) {
+            let bstring = Str::from(&s);
 
-                let bl = bstring.lines_bytes();
-                let sl = s.lines();
+            let bl = bstring.lines_bytes();
+            let sl = s.lines();
 
-                for (b, s) in bl.zip_eq(sl) {
-                    prop_assert_eq!(b, s);
-                }
+            for (b, s) in bl.zip_eq(sl) {
+                prop_assert_eq!(b, s);
             }
+        }
 
-            #[test]
-            fn split(s: String, pat: String) {
-                let bstring = Str::from(&s);
+        #[test]
+        fn split(s: String, pat: String) {
+            let bstring = Str::from(&s);
 
-                let bs = bstring.split_bytes(&pat);
-                let ss = s.split(&pat);
+            let bs = bstring.split_bytes(&pat);
+            let ss = s.split(&pat);
 
-                for (b, s) in bs.zip_eq(ss) {
-                    prop_assert_eq!(b, s);
-                }
+            for (b, s) in bs.zip_eq(ss) {
+                prop_assert_eq!(b, s);
             }
+        }
 
-            #[test]
-            fn split_n(s: String, pat: String, n in 0..5usize) {
-                let bstring = Str::from(&s);
+        #[test]
+        fn split_n(s: String, pat: String, n in 0..5usize) {
+            let bstring = Str::from(&s);
 
-                let bs = bstring.splitn_bytes(n, &pat);
-                let ss = s.splitn(n, &pat);
+            let bs = bstring.splitn_bytes(n, &pat);
+            let ss = s.splitn(n, &pat);
 
-                for (b, s) in bs.zip_eq(ss) {
-                    prop_assert_eq!(b, s);
-                }
+            for (b, s) in bs.zip_eq(ss) {
+                prop_assert_eq!(b, s);
             }
+        }
 
-            #[test]
-            fn rsplit(s: String, pat: String) {
-                let bstring = Str::from(&s);
+        #[test]
+        fn rsplit(s: String, pat: String) {
+            let bstring = Str::from(&s);
 
-                let bs = bstring.rsplit_bytes(&pat);
-                let ss = s.rsplit(&pat);
+            let bs = bstring.rsplit_bytes(&pat);
+            let ss = s.rsplit(&pat);
 
-                for (b, s) in bs.zip_eq(ss) {
-                    prop_assert_eq!(b, s);
-                }
+            for (b, s) in bs.zip_eq(ss) {
+                prop_assert_eq!(b, s);
             }
+        }
 
-            #[test]
-            fn rsplit_n(s: String, pat: String, n in 0..5usize) {
-                let bstring = Str::from(&s);
+        #[test]
+        fn rsplit_n(s: String, pat: String, n in 0..5usize) {
+            let bstring = Str::from(&s);
 
-                let bs = bstring.rsplitn_bytes(n, &pat);
-                let ss = s.rsplitn(n, &pat);
+            let bs = bstring.rsplitn_bytes(n, &pat);
+            let ss = s.rsplitn(n, &pat);
 
-                for (b, s) in bs.zip_eq(ss) {
-                    prop_assert_eq!(b, s);
-                }
+            for (b, s) in bs.zip_eq(ss) {
+                prop_assert_eq!(b, s);
             }
         }
     }

@@ -25,17 +25,17 @@ use aws_credential_types::Credentials;
 /// ProfileChain is a direct representation of the Profile. It can contain named providers
 /// that don't actually have implementations.
 #[derive(Debug)]
-pub(crate) struct ProfileChain<'a> {
-    pub(crate) base: BaseProvider<'a>,
-    pub(crate) chain: Vec<RoleArn<'a>>,
+pub(super) struct ProfileChain<'a> {
+    pub(super) base: BaseProvider<'a>,
+    pub(super) chain: Vec<RoleArn<'a>>,
 }
 
 impl<'a> ProfileChain<'a> {
-    pub(crate) fn base(&self) -> &BaseProvider<'a> {
+    pub(super) fn base(&self) -> &BaseProvider<'a> {
         &self.base
     }
 
-    pub(crate) fn chain(&self) -> &[RoleArn<'a>] {
+    pub(super) fn chain(&self) -> &[RoleArn<'a>] {
         self.chain.as_slice()
     }
 }
@@ -46,7 +46,7 @@ impl<'a> ProfileChain<'a> {
 /// e.g. IMDS, ECS, Environment variables
 #[derive(Clone, Debug)]
 #[non_exhaustive]
-pub(crate) enum BaseProvider<'a> {
+pub(super) enum BaseProvider<'a> {
     /// A profile that specifies a named credential source
     /// Eg: `credential_source = Ec2InstanceMetadata`
     ///
@@ -78,13 +78,10 @@ pub(crate) enum BaseProvider<'a> {
 
     /// An SSO Provider
     Sso {
-        sso_session_name: Option<&'a str>,
+        sso_account_id: &'a str,
         sso_region: &'a str,
+        sso_role_name: &'a str,
         sso_start_url: &'a str,
-
-        // Credentials from SSO fields
-        sso_account_id: Option<&'a str>,
-        sso_role_name: Option<&'a str>,
     },
 
     /// A profile that specifies a `credential_process`
@@ -100,18 +97,18 @@ pub(crate) enum BaseProvider<'a> {
 /// A RoleArn can only be created from either a profile with `source_profile`
 /// or one with `credential_source`.
 #[derive(Debug)]
-pub(crate) struct RoleArn<'a> {
+pub(super) struct RoleArn<'a> {
     /// Role to assume
-    pub(crate) role_arn: &'a str,
+    pub(super) role_arn: &'a str,
     /// external_id parameter to pass to the assume role provider
-    pub(crate) external_id: Option<&'a str>,
+    pub(super) external_id: Option<&'a str>,
 
     /// session name parameter to pass to the assume role provider
-    pub(crate) session_name: Option<&'a str>,
+    pub(super) session_name: Option<&'a str>,
 }
 
 /// Resolve a ProfileChain from a ProfileSet or return an error
-pub(crate) fn resolve_chain(
+pub(super) fn resolve_chain(
     profile_set: &ProfileSet,
 ) -> Result<ProfileChain<'_>, ProfileFileError> {
     // If there are no profiles, allow flowing into the next provider
@@ -175,7 +172,7 @@ pub(crate) fn resolve_chain(
                 chain.push(role_provider);
                 next
             } else {
-                break base_provider(profile_set, profile).map_err(|err| {
+                break base_provider(profile).map_err(|err| {
                     // It's possible for base_provider to return a `ProfileFileError::ProfileDidNotContainCredentials`
                     // if we're still looking at the first provider we want to surface it. However,
                     // if we're looking at any provider after the first we want to instead return a `ProfileFileError::InvalidCredentialSource`
@@ -196,7 +193,7 @@ pub(crate) fn resolve_chain(
                 // self referential profile, don't go through the loop because it will error
                 // on the infinite loop check. Instead, reload this profile as a base profile
                 // and exit.
-                break base_provider(profile_set, profile)?;
+                break base_provider(profile)?;
             }
             NextProfile::Named(name) => source_profile_name = name,
         }
@@ -219,7 +216,6 @@ mod sso {
     pub(super) const REGION: &str = "sso_region";
     pub(super) const ROLE_NAME: &str = "sso_role_name";
     pub(super) const START_URL: &str = "sso_start_url";
-    pub(super) const SESSION_NAME: &str = "sso_session";
 }
 
 mod web_identity_token {
@@ -238,15 +234,12 @@ mod credential_process {
 
 const PROVIDER_NAME: &str = "ProfileFile";
 
-fn base_provider<'a>(
-    profile_set: &'a ProfileSet,
-    profile: &'a Profile,
-) -> Result<BaseProvider<'a>, ProfileFileError> {
+fn base_provider(profile: &Profile) -> Result<BaseProvider<'_>, ProfileFileError> {
     // the profile must define either a `CredentialsSource` or a concrete set of access keys
     match profile.get(role::CREDENTIAL_SOURCE) {
         Some(source) => Ok(BaseProvider::NamedSource(source)),
         None => web_identity_token_from_profile(profile)
-            .or_else(|| sso_from_profile(profile_set, profile).transpose())
+            .or_else(|| sso_from_profile(profile))
             .or_else(|| credential_process_from_profile(profile))
             .unwrap_or_else(|| Ok(BaseProvider::AccessKey(static_creds_from_profile(profile)?))),
     }
@@ -299,93 +292,39 @@ fn role_arn_from_profile(profile: &Profile) -> Option<RoleArn<'_>> {
     })
 }
 
-fn sso_from_profile<'a>(
-    profile_set: &'a ProfileSet,
-    profile: &'a Profile,
-) -> Result<Option<BaseProvider<'a>>, ProfileFileError> {
+fn sso_from_profile(profile: &Profile) -> Option<Result<BaseProvider<'_>, ProfileFileError>> {
     /*
-    -- Sample without sso-session: --
-
+    Sample:
     [profile sample-profile]
     sso_account_id = 012345678901
     sso_region = us-east-1
     sso_role_name = SampleRole
-    sso_start_url = https://d-abc123.awsapps.com/start-beta
-
-    -- Sample with sso-session: --
-
-    [profile sample-profile]
-    sso_session = dev
-    sso_account_id = 012345678901
-    sso_role_name = SampleRole
-
-    [sso-session dev]
-    sso_region = us-east-1
     sso_start_url = https://d-abc123.awsapps.com/start-beta
     */
-    let sso_account_id = profile.get(sso::ACCOUNT_ID);
-    let mut sso_region = profile.get(sso::REGION);
-    let sso_role_name = profile.get(sso::ROLE_NAME);
-    let mut sso_start_url = profile.get(sso::START_URL);
-    let sso_session_name = profile.get(sso::SESSION_NAME);
-    if [
-        sso_account_id,
-        sso_region,
-        sso_role_name,
-        sso_start_url,
-        sso_session_name,
-    ]
-    .iter()
-    .all(Option::is_none)
+    let account_id = profile.get(sso::ACCOUNT_ID);
+    let region = profile.get(sso::REGION);
+    let role_name = profile.get(sso::ROLE_NAME);
+    let start_url = profile.get(sso::START_URL);
+    if [account_id, region, role_name, start_url]
+        .iter()
+        .all(|field| field.is_none())
     {
-        return Ok(None);
+        return None;
     }
-
-    let invalid_sso_config = |s: &str| ProfileFileError::InvalidSsoConfig {
-        profile: profile.name().into(),
-        message: format!(
-            "`{s}` can only be specified in the [sso-session] config when a session name is given"
-        )
-        .into(),
-    };
-    if let Some(sso_session_name) = sso_session_name {
-        if sso_start_url.is_some() {
-            return Err(invalid_sso_config(sso::START_URL));
-        }
-        if sso_region.is_some() {
-            return Err(invalid_sso_config(sso::REGION));
-        }
-        if let Some(session) = profile_set.sso_session(sso_session_name) {
-            sso_start_url = session.get(sso::START_URL);
-            sso_region = session.get(sso::REGION);
-        } else {
-            return Err(ProfileFileError::MissingSsoSession {
-                profile: profile.name().into(),
-                sso_session: sso_session_name.into(),
-            });
-        }
-    }
-
-    let invalid_sso_creds = |left: &str, right: &str| ProfileFileError::InvalidSsoConfig {
-        profile: profile.name().into(),
-        message: format!("if `{left}` is set, then `{right}` must also be set").into(),
-    };
-    match (sso_account_id, sso_role_name) {
-        (Some(_), Some(_)) | (None, None) => { /* good */ }
-        (Some(_), None) => return Err(invalid_sso_creds(sso::ACCOUNT_ID, sso::ROLE_NAME)),
-        (None, Some(_)) => return Err(invalid_sso_creds(sso::ROLE_NAME, sso::ACCOUNT_ID)),
-    }
-
     let missing_field = |s| move || ProfileFileError::missing_field(profile, s);
-    let sso_region = sso_region.ok_or_else(missing_field(sso::REGION))?;
-    let sso_start_url = sso_start_url.ok_or_else(missing_field(sso::START_URL))?;
-    Ok(Some(BaseProvider::Sso {
-        sso_account_id,
-        sso_region,
-        sso_role_name,
-        sso_start_url,
-        sso_session_name,
-    }))
+    let parse_profile = || {
+        let sso_account_id = account_id.ok_or_else(missing_field(sso::ACCOUNT_ID))?;
+        let sso_region = region.ok_or_else(missing_field(sso::REGION))?;
+        let sso_role_name = role_name.ok_or_else(missing_field(sso::ROLE_NAME))?;
+        let sso_start_url = start_url.ok_or_else(missing_field(sso::START_URL))?;
+        Ok(BaseProvider::Sso {
+            sso_account_id,
+            sso_region,
+            sso_role_name,
+            sso_start_url,
+        })
+    };
+    Some(parse_profile())
 }
 
 fn web_identity_token_from_profile(
@@ -469,16 +408,18 @@ fn credential_process_from_profile(
 
 #[cfg(test)]
 mod tests {
-    use crate::profile::credentials::repr::BaseProvider;
+    use crate::profile::credentials::repr::{resolve_chain, BaseProvider, ProfileChain};
+    use crate::profile::ProfileSet;
     use crate::sensitive_command::CommandWithSensitiveArgs;
     use serde::Deserialize;
+    use std::collections::HashMap;
+    use std::error::Error;
+    use std::fs;
 
-    #[cfg(feature = "test-utils")]
     #[test]
-    fn run_test_cases() -> Result<(), Box<dyn std::error::Error>> {
-        let test_cases: Vec<TestCase> = serde_json::from_str(&std::fs::read_to_string(
-            "./test-data/assume-role-tests.json",
-        )?)?;
+    fn run_test_cases() -> Result<(), Box<dyn Error>> {
+        let test_cases: Vec<TestCase> =
+            serde_json::from_str(&fs::read_to_string("./test-data/assume-role-tests.json")?)?;
         for test_case in test_cases {
             print!("checking: {}...", test_case.docs);
             check(test_case);
@@ -487,15 +428,8 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "test-utils")]
     fn check(test_case: TestCase) {
-        use aws_runtime::profile::profile_set::ProfileSet;
-        crate::profile::credentials::repr::resolve_chain;
-        let source = ProfileSet::new(
-            test_case.input.profiles,
-            test_case.input.selected_profile,
-            test_case.input.sso_sessions,
-        );
+        let source = ProfileSet::new(test_case.input.profile, test_case.input.selected_profile);
         let actual = resolve_chain(&source);
         let expected = test_case.output;
         match (expected, actual) {
@@ -515,7 +449,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "test-utils")]
     #[derive(Deserialize)]
     struct TestCase {
         docs: String,
@@ -523,16 +456,12 @@ mod tests {
         output: TestOutput,
     }
 
-    #[cfg(feature = "test-utils")]
     #[derive(Deserialize)]
     struct TestInput {
-        profiles: HashMap<String, HashMap<String, String>>,
+        profile: HashMap<String, HashMap<String, String>>,
         selected_profile: String,
-        #[serde(default)]
-        sso_sessions: HashMap<String, HashMap<String, String>>,
     }
 
-    #[cfg(feature = "test-utils")]
     fn to_test_output(profile_chain: ProfileChain<'_>) -> Vec<Provider> {
         let mut output = vec![];
         match profile_chain.base {
@@ -555,17 +484,15 @@ mod tests {
                 role_session_name: session_name.map(|sess| sess.to_string()),
             }),
             BaseProvider::Sso {
-                sso_region,
-                sso_start_url,
-                sso_session_name,
                 sso_account_id,
+                sso_region,
                 sso_role_name,
+                sso_start_url,
             } => output.push(Provider::Sso {
+                sso_account_id: sso_account_id.into(),
                 sso_region: sso_region.into(),
+                sso_role_name: sso_role_name.into(),
                 sso_start_url: sso_start_url.into(),
-                sso_session: sso_session_name.map(|s| s.to_string()),
-                sso_account_id: sso_account_id.map(|s| s.to_string()),
-                sso_role_name: sso_role_name.map(|s| s.to_string()),
             }),
         };
         for role in profile_chain.chain {
@@ -604,12 +531,10 @@ mod tests {
             role_session_name: Option<String>,
         },
         Sso {
+            sso_account_id: String,
             sso_region: String,
+            sso_role_name: String,
             sso_start_url: String,
-            sso_session: Option<String>,
-
-            sso_account_id: Option<String>,
-            sso_role_name: Option<String>,
         },
     }
 

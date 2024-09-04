@@ -261,7 +261,8 @@ mod tests {
     #[test]
     fn test_linux_like() {
         use c_types::*;
-        use std::{arch::asm, mem, vec};
+        use core::{arch::asm, mem};
+        use std::vec;
         use test_helper::{libc, sys};
 
         // Linux kernel 6.4 has added a way to read auxv without depending on either libc or mrs trap.
@@ -282,7 +283,7 @@ mod tests {
                         // arg4 and arg5 must be zero.
                         in("x3") 0_u64,
                         in("x4") 0_u64,
-                        options(nostack, preserves_flags),
+                        options(nostack, preserves_flags)
                     );
                 }
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -314,7 +315,7 @@ mod tests {
                         out("r11") _,
                         out("r12") _,
                         out("cr0") _,
-                        options(nostack, preserves_flags),
+                        options(nostack, preserves_flags)
                     );
                 }
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -351,8 +352,7 @@ mod tests {
             let mut digits = release.split('.');
             let major = digits.next().unwrap().parse::<u32>().unwrap();
             let minor = digits.next().unwrap().parse::<u32>().unwrap();
-            // TODO: qemu-user bug?
-            if (major, minor) < (6, 4) || cfg!(qemu) {
+            if (major, minor) < (6, 4) {
                 std::eprintln!("kernel version: {major}.{minor} (no pr_get_auxv)");
                 assert_eq!(getauxval_pr_get_auxv(ffi::AT_HWCAP).unwrap_err(), -22);
                 assert_eq!(getauxval_pr_get_auxv(ffi::AT_HWCAP2).unwrap_err(), -22);
@@ -396,7 +396,7 @@ mod tests {
     #[test]
     fn test_freebsd() {
         use c_types::*;
-        use std::{arch::asm, mem, ptr};
+        use core::{arch::asm, mem, ptr};
         use test_helper::sys;
 
         // This is almost equivalent to what elf_aux_info does.
@@ -586,7 +586,7 @@ mod tests {
                         out("r11") _,
                         out("r12") _,
                         out("cr0") _,
-                        options(nostack, preserves_flags),
+                        options(nostack, preserves_flags)
                     );
                     if r as c_int == -1 {
                         Err(n as c_int)

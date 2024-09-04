@@ -43,7 +43,7 @@ impl OuterFrom {
         })
     }
 
-    pub fn as_forward_attrs(&self) -> ForwardAttrs<'_> {
+    pub fn as_forward_attrs(&self) -> ForwardAttrs {
         ForwardAttrs {
             field: self.attrs.as_ref(),
             filter: self.forward_attrs.as_ref(),
@@ -78,7 +78,7 @@ impl ParseData for OuterFrom {
     fn parse_field(&mut self, field: &Field) -> Result<()> {
         match field.ident.as_ref().map(|v| v.to_string()).as_deref() {
             Some("ident") => {
-                self.ident.clone_from(&field.ident);
+                self.ident = field.ident.clone();
                 Ok(())
             }
             Some("attrs") => {

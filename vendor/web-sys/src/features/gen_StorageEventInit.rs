@@ -10,88 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
     pub type StorageEventInit;
-    #[doc = "Get the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, getter = "bubbles")]
-    pub fn get_bubbles(this: &StorageEventInit) -> Option<bool>;
-    #[doc = "Change the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, setter = "bubbles")]
-    pub fn set_bubbles(this: &StorageEventInit, val: bool);
-    #[doc = "Get the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, getter = "cancelable")]
-    pub fn get_cancelable(this: &StorageEventInit) -> Option<bool>;
-    #[doc = "Change the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, setter = "cancelable")]
-    pub fn set_cancelable(this: &StorageEventInit, val: bool);
-    #[doc = "Get the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, getter = "composed")]
-    pub fn get_composed(this: &StorageEventInit) -> Option<bool>;
-    #[doc = "Change the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, setter = "composed")]
-    pub fn set_composed(this: &StorageEventInit, val: bool);
-    #[doc = "Get the `key` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, getter = "key")]
-    pub fn get_key(this: &StorageEventInit) -> Option<String>;
-    #[doc = "Change the `key` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, setter = "key")]
-    pub fn set_key(this: &StorageEventInit, val: Option<&str>);
-    #[doc = "Get the `newValue` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, getter = "newValue")]
-    pub fn get_new_value(this: &StorageEventInit) -> Option<String>;
-    #[doc = "Change the `newValue` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, setter = "newValue")]
-    pub fn set_new_value(this: &StorageEventInit, val: Option<&str>);
-    #[doc = "Get the `oldValue` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, getter = "oldValue")]
-    pub fn get_old_value(this: &StorageEventInit) -> Option<String>;
-    #[doc = "Change the `oldValue` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, setter = "oldValue")]
-    pub fn set_old_value(this: &StorageEventInit, val: Option<&str>);
-    #[cfg(feature = "Storage")]
-    #[doc = "Get the `storageArea` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `Storage`, `StorageEventInit`*"]
-    #[wasm_bindgen(method, getter = "storageArea")]
-    pub fn get_storage_area(this: &StorageEventInit) -> Option<Storage>;
-    #[cfg(feature = "Storage")]
-    #[doc = "Change the `storageArea` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `Storage`, `StorageEventInit`*"]
-    #[wasm_bindgen(method, setter = "storageArea")]
-    pub fn set_storage_area(this: &StorageEventInit, val: Option<&Storage>);
-    #[doc = "Get the `url` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, getter = "url")]
-    pub fn get_url(this: &StorageEventInit) -> Option<String>;
-    #[doc = "Change the `url` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
-    #[wasm_bindgen(method, setter = "url")]
-    pub fn set_url(this: &StorageEventInit, val: &str);
 }
 impl StorageEventInit {
     #[doc = "Construct a new `StorageEventInit`."]
@@ -102,45 +20,133 @@ impl StorageEventInit {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_bubbles()` instead."]
+    #[doc = "Change the `bubbles` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
     pub fn bubbles(&mut self, val: bool) -> &mut Self {
-        self.set_bubbles(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("bubbles"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_cancelable()` instead."]
+    #[doc = "Change the `cancelable` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
     pub fn cancelable(&mut self, val: bool) -> &mut Self {
-        self.set_cancelable(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("cancelable"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_composed()` instead."]
+    #[doc = "Change the `composed` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
     pub fn composed(&mut self, val: bool) -> &mut Self {
-        self.set_composed(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("composed"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_key()` instead."]
+    #[doc = "Change the `key` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
     pub fn key(&mut self, val: Option<&str>) -> &mut Self {
-        self.set_key(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("key"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_new_value()` instead."]
+    #[doc = "Change the `newValue` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
     pub fn new_value(&mut self, val: Option<&str>) -> &mut Self {
-        self.set_new_value(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("newValue"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_old_value()` instead."]
+    #[doc = "Change the `oldValue` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
     pub fn old_value(&mut self, val: Option<&str>) -> &mut Self {
-        self.set_old_value(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("oldValue"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "Storage")]
-    #[deprecated = "Use `set_storage_area()` instead."]
+    #[doc = "Change the `storageArea` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `Storage`, `StorageEventInit`*"]
     pub fn storage_area(&mut self, val: Option<&Storage>) -> &mut Self {
-        self.set_storage_area(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("storageArea"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_url()` instead."]
+    #[doc = "Change the `url` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `StorageEventInit`*"]
     pub fn url(&mut self, val: &str) -> &mut Self {
-        self.set_url(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("url"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

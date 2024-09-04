@@ -10,48 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `RtcPeerConnectionIceEventInit`*"]
     pub type RtcPeerConnectionIceEventInit;
-    #[doc = "Get the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcPeerConnectionIceEventInit`*"]
-    #[wasm_bindgen(method, getter = "bubbles")]
-    pub fn get_bubbles(this: &RtcPeerConnectionIceEventInit) -> Option<bool>;
-    #[doc = "Change the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcPeerConnectionIceEventInit`*"]
-    #[wasm_bindgen(method, setter = "bubbles")]
-    pub fn set_bubbles(this: &RtcPeerConnectionIceEventInit, val: bool);
-    #[doc = "Get the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcPeerConnectionIceEventInit`*"]
-    #[wasm_bindgen(method, getter = "cancelable")]
-    pub fn get_cancelable(this: &RtcPeerConnectionIceEventInit) -> Option<bool>;
-    #[doc = "Change the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcPeerConnectionIceEventInit`*"]
-    #[wasm_bindgen(method, setter = "cancelable")]
-    pub fn set_cancelable(this: &RtcPeerConnectionIceEventInit, val: bool);
-    #[doc = "Get the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcPeerConnectionIceEventInit`*"]
-    #[wasm_bindgen(method, getter = "composed")]
-    pub fn get_composed(this: &RtcPeerConnectionIceEventInit) -> Option<bool>;
-    #[doc = "Change the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcPeerConnectionIceEventInit`*"]
-    #[wasm_bindgen(method, setter = "composed")]
-    pub fn set_composed(this: &RtcPeerConnectionIceEventInit, val: bool);
-    #[cfg(feature = "RtcIceCandidate")]
-    #[doc = "Get the `candidate` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcIceCandidate`, `RtcPeerConnectionIceEventInit`*"]
-    #[wasm_bindgen(method, getter = "candidate")]
-    pub fn get_candidate(this: &RtcPeerConnectionIceEventInit) -> Option<RtcIceCandidate>;
-    #[cfg(feature = "RtcIceCandidate")]
-    #[doc = "Change the `candidate` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcIceCandidate`, `RtcPeerConnectionIceEventInit`*"]
-    #[wasm_bindgen(method, setter = "candidate")]
-    pub fn set_candidate(this: &RtcPeerConnectionIceEventInit, val: Option<&RtcIceCandidate>);
 }
 impl RtcPeerConnectionIceEventInit {
     #[doc = "Construct a new `RtcPeerConnectionIceEventInit`."]
@@ -62,25 +20,73 @@ impl RtcPeerConnectionIceEventInit {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_bubbles()` instead."]
+    #[doc = "Change the `bubbles` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcPeerConnectionIceEventInit`*"]
     pub fn bubbles(&mut self, val: bool) -> &mut Self {
-        self.set_bubbles(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("bubbles"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_cancelable()` instead."]
+    #[doc = "Change the `cancelable` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcPeerConnectionIceEventInit`*"]
     pub fn cancelable(&mut self, val: bool) -> &mut Self {
-        self.set_cancelable(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("cancelable"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_composed()` instead."]
+    #[doc = "Change the `composed` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcPeerConnectionIceEventInit`*"]
     pub fn composed(&mut self, val: bool) -> &mut Self {
-        self.set_composed(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("composed"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "RtcIceCandidate")]
-    #[deprecated = "Use `set_candidate()` instead."]
+    #[doc = "Change the `candidate` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcIceCandidate`, `RtcPeerConnectionIceEventInit`*"]
     pub fn candidate(&mut self, val: Option<&RtcIceCandidate>) -> &mut Self {
-        self.set_candidate(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("candidate"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

@@ -103,14 +103,6 @@ impl RootCertStore {
     }
 }
 
-impl FromIterator<TrustAnchor<'static>> for RootCertStore {
-    fn from_iter<T: IntoIterator<Item = TrustAnchor<'static>>>(iter: T) -> Self {
-        Self {
-            roots: iter.into_iter().collect(),
-        }
-    }
-}
-
 impl Extend<TrustAnchor<'static>> for RootCertStore {
     fn extend<T: IntoIterator<Item = TrustAnchor<'static>>>(&mut self, iter: T) {
         self.roots.extend(iter);
@@ -128,15 +120,15 @@ impl fmt::Debug for RootCertStore {
 #[test]
 fn root_cert_store_debug() {
     use core::iter;
-
     use pki_types::Der;
 
+    let mut store = RootCertStore::empty();
     let ta = TrustAnchor {
         subject: Der::from_slice(&[]),
         subject_public_key_info: Der::from_slice(&[]),
         name_constraints: None,
     };
-    let store = RootCertStore::from_iter(iter::repeat(ta).take(138));
+    store.extend(iter::repeat(ta).take(138));
 
     assert_eq!(
         format!("{:?}", store),

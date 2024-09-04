@@ -26,8 +26,8 @@ impl RegisterStreamConsumerOutput {
 }
 
 /// A builder for [`RegisterStreamConsumerOutput`](crate::operation::register_stream_consumer::RegisterStreamConsumerOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct RegisterStreamConsumerOutputBuilder {
     pub(crate) consumer: ::std::option::Option<crate::types::Consumer>,
     _request_id: Option<String>,

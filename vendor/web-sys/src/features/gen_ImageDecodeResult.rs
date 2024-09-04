@@ -14,44 +14,6 @@ extern "C" {
     #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
     #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub type ImageDecodeResult;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `complete` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ImageDecodeResult`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "complete")]
-    pub fn get_complete(this: &ImageDecodeResult) -> bool;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `complete` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ImageDecodeResult`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "complete")]
-    pub fn set_complete(this: &ImageDecodeResult, val: bool);
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "VideoFrame")]
-    #[doc = "Get the `image` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ImageDecodeResult`, `VideoFrame`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "image")]
-    pub fn get_image(this: &ImageDecodeResult) -> VideoFrame;
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "VideoFrame")]
-    #[doc = "Change the `image` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ImageDecodeResult`, `VideoFrame`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "image")]
-    pub fn set_image(this: &ImageDecodeResult, val: &VideoFrame);
 }
 #[cfg(web_sys_unstable_apis)]
 impl ImageDecodeResult {
@@ -70,16 +32,42 @@ impl ImageDecodeResult {
         ret
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_complete()` instead."]
+    #[doc = "Change the `complete` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ImageDecodeResult`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn complete(&mut self, val: bool) -> &mut Self {
-        self.set_complete(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("complete"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
     #[cfg(feature = "VideoFrame")]
-    #[deprecated = "Use `set_image()` instead."]
+    #[doc = "Change the `image` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ImageDecodeResult`, `VideoFrame`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn image(&mut self, val: &VideoFrame) -> &mut Self {
-        self.set_image(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("image"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

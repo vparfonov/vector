@@ -839,7 +839,10 @@ impl Prioritize {
                         }),
                         None => {
                             if let Some(reason) = stream.state.get_scheduled_reset() {
-                                stream.set_reset(reason, Initiator::Library);
+                                let stream_id = stream.id;
+                                stream
+                                    .state
+                                    .set_reset(stream_id, reason, Initiator::Library);
 
                                 let frame = frame::Reset::new(stream.id, reason);
                                 Frame::Reset(frame)

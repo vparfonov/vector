@@ -16,10 +16,8 @@ pub struct DeliveryStreamDescription {
     pub delivery_stream_encryption_configuration: ::std::option::Option<crate::types::DeliveryStreamEncryptionConfiguration>,
     /// <p>The delivery stream type. This can be one of the following values:</p>
     /// <ul>
-    /// <li>
-    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
-    /// <li>
-    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
+    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
+    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
     /// </ul>
     pub delivery_stream_type: crate::types::DeliveryStreamType,
     /// <p>Each time the destination is updated for a delivery stream, the version ID is changed, and the current version ID is required when updating the destination. This is so that the service knows it is applying the changes to the correct version of the delivery stream.</p>
@@ -60,10 +58,8 @@ impl DeliveryStreamDescription {
     }
     /// <p>The delivery stream type. This can be one of the following values:</p>
     /// <ul>
-    /// <li>
-    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
-    /// <li>
-    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
+    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
+    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
     /// </ul>
     pub fn delivery_stream_type(&self) -> &crate::types::DeliveryStreamType {
         &self.delivery_stream_type
@@ -103,8 +99,8 @@ impl DeliveryStreamDescription {
 }
 
 /// A builder for [`DeliveryStreamDescription`](crate::types::DeliveryStreamDescription).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DeliveryStreamDescriptionBuilder {
     pub(crate) delivery_stream_name: ::std::option::Option<::std::string::String>,
     pub(crate) delivery_stream_arn: ::std::option::Option<::std::string::String>,
@@ -198,10 +194,8 @@ impl DeliveryStreamDescriptionBuilder {
     }
     /// <p>The delivery stream type. This can be one of the following values:</p>
     /// <ul>
-    /// <li>
-    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
-    /// <li>
-    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
+    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
+    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
     /// </ul>
     /// This field is required.
     pub fn delivery_stream_type(mut self, input: crate::types::DeliveryStreamType) -> Self {
@@ -210,10 +204,8 @@ impl DeliveryStreamDescriptionBuilder {
     }
     /// <p>The delivery stream type. This can be one of the following values:</p>
     /// <ul>
-    /// <li>
-    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
-    /// <li>
-    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
+    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
+    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
     /// </ul>
     pub fn set_delivery_stream_type(mut self, input: ::std::option::Option<crate::types::DeliveryStreamType>) -> Self {
         self.delivery_stream_type = input;
@@ -221,10 +213,8 @@ impl DeliveryStreamDescriptionBuilder {
     }
     /// <p>The delivery stream type. This can be one of the following values:</p>
     /// <ul>
-    /// <li>
-    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
-    /// <li>
-    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
+    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
+    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
     /// </ul>
     pub fn get_delivery_stream_type(&self) -> &::std::option::Option<crate::types::DeliveryStreamType> {
         &self.delivery_stream_type

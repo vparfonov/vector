@@ -36,11 +36,6 @@ impl<'a> Iterator for UnicodeWords<'a> {
     fn next(&mut self) -> Option<&'a str> {
         self.inner.next()
     }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
-    }
 }
 impl<'a> DoubleEndedIterator for UnicodeWords<'a> {
     #[inline]
@@ -72,11 +67,6 @@ impl<'a> Iterator for UnicodeWordIndices<'a> {
     #[inline]
     fn next(&mut self) -> Option<(usize, &'a str)> {
         self.inner.next()
-    }
-
-    #[inline]
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.inner.size_hint()
     }
 }
 impl<'a> DoubleEndedIterator for UnicodeWordIndices<'a> {

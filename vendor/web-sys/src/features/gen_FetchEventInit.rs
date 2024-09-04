@@ -10,68 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
     pub type FetchEventInit;
-    #[doc = "Get the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
-    #[wasm_bindgen(method, getter = "bubbles")]
-    pub fn get_bubbles(this: &FetchEventInit) -> Option<bool>;
-    #[doc = "Change the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
-    #[wasm_bindgen(method, setter = "bubbles")]
-    pub fn set_bubbles(this: &FetchEventInit, val: bool);
-    #[doc = "Get the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
-    #[wasm_bindgen(method, getter = "cancelable")]
-    pub fn get_cancelable(this: &FetchEventInit) -> Option<bool>;
-    #[doc = "Change the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
-    #[wasm_bindgen(method, setter = "cancelable")]
-    pub fn set_cancelable(this: &FetchEventInit, val: bool);
-    #[doc = "Get the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
-    #[wasm_bindgen(method, getter = "composed")]
-    pub fn get_composed(this: &FetchEventInit) -> Option<bool>;
-    #[doc = "Change the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
-    #[wasm_bindgen(method, setter = "composed")]
-    pub fn set_composed(this: &FetchEventInit, val: bool);
-    #[doc = "Get the `clientId` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
-    #[wasm_bindgen(method, getter = "clientId")]
-    pub fn get_client_id(this: &FetchEventInit) -> Option<String>;
-    #[doc = "Change the `clientId` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
-    #[wasm_bindgen(method, setter = "clientId")]
-    pub fn set_client_id(this: &FetchEventInit, val: Option<&str>);
-    #[doc = "Get the `isReload` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
-    #[wasm_bindgen(method, getter = "isReload")]
-    pub fn get_is_reload(this: &FetchEventInit) -> Option<bool>;
-    #[doc = "Change the `isReload` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
-    #[wasm_bindgen(method, setter = "isReload")]
-    pub fn set_is_reload(this: &FetchEventInit, val: bool);
-    #[cfg(feature = "Request")]
-    #[doc = "Get the `request` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`, `Request`*"]
-    #[wasm_bindgen(method, getter = "request")]
-    pub fn get_request(this: &FetchEventInit) -> Request;
-    #[cfg(feature = "Request")]
-    #[doc = "Change the `request` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`, `Request`*"]
-    #[wasm_bindgen(method, setter = "request")]
-    pub fn set_request(this: &FetchEventInit, val: &Request);
 }
 impl FetchEventInit {
     #[cfg(feature = "Request")]
@@ -84,35 +22,107 @@ impl FetchEventInit {
         ret.request(request);
         ret
     }
-    #[deprecated = "Use `set_bubbles()` instead."]
+    #[doc = "Change the `bubbles` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
     pub fn bubbles(&mut self, val: bool) -> &mut Self {
-        self.set_bubbles(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("bubbles"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_cancelable()` instead."]
+    #[doc = "Change the `cancelable` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
     pub fn cancelable(&mut self, val: bool) -> &mut Self {
-        self.set_cancelable(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("cancelable"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_composed()` instead."]
+    #[doc = "Change the `composed` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
     pub fn composed(&mut self, val: bool) -> &mut Self {
-        self.set_composed(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("composed"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_client_id()` instead."]
+    #[doc = "Change the `clientId` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
     pub fn client_id(&mut self, val: Option<&str>) -> &mut Self {
-        self.set_client_id(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("clientId"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_is_reload()` instead."]
+    #[doc = "Change the `isReload` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`*"]
     pub fn is_reload(&mut self, val: bool) -> &mut Self {
-        self.set_is_reload(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("isReload"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "Request")]
-    #[deprecated = "Use `set_request()` instead."]
+    #[doc = "Change the `request` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FetchEventInit`, `Request`*"]
     pub fn request(&mut self, val: &Request) -> &mut Self {
-        self.set_request(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("request"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

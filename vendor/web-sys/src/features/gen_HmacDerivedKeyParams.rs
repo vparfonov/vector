@@ -10,36 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `HmacDerivedKeyParams`*"]
     pub type HmacDerivedKeyParams;
-    #[doc = "Get the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HmacDerivedKeyParams`*"]
-    #[wasm_bindgen(method, getter = "name")]
-    pub fn get_name(this: &HmacDerivedKeyParams) -> String;
-    #[doc = "Change the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HmacDerivedKeyParams`*"]
-    #[wasm_bindgen(method, setter = "name")]
-    pub fn set_name(this: &HmacDerivedKeyParams, val: &str);
-    #[doc = "Get the `hash` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HmacDerivedKeyParams`*"]
-    #[wasm_bindgen(method, getter = "hash")]
-    pub fn get_hash(this: &HmacDerivedKeyParams) -> ::wasm_bindgen::JsValue;
-    #[doc = "Change the `hash` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HmacDerivedKeyParams`*"]
-    #[wasm_bindgen(method, setter = "hash")]
-    pub fn set_hash(this: &HmacDerivedKeyParams, val: &::wasm_bindgen::JsValue);
-    #[doc = "Get the `length` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HmacDerivedKeyParams`*"]
-    #[wasm_bindgen(method, getter = "length")]
-    pub fn get_length(this: &HmacDerivedKeyParams) -> Option<u32>;
-    #[doc = "Change the `length` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HmacDerivedKeyParams`*"]
-    #[wasm_bindgen(method, setter = "length")]
-    pub fn set_length(this: &HmacDerivedKeyParams, val: u32);
 }
 impl HmacDerivedKeyParams {
     #[doc = "Construct a new `HmacDerivedKeyParams`."]
@@ -52,19 +22,44 @@ impl HmacDerivedKeyParams {
         ret.hash(hash);
         ret
     }
-    #[deprecated = "Use `set_name()` instead."]
+    #[doc = "Change the `name` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `HmacDerivedKeyParams`*"]
     pub fn name(&mut self, val: &str) -> &mut Self {
-        self.set_name(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("name"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_hash()` instead."]
+    #[doc = "Change the `hash` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `HmacDerivedKeyParams`*"]
     pub fn hash(&mut self, val: &::wasm_bindgen::JsValue) -> &mut Self {
-        self.set_hash(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("hash"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_length()` instead."]
+    #[doc = "Change the `length` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `HmacDerivedKeyParams`*"]
     pub fn length(&mut self, val: u32) -> &mut Self {
-        self.set_length(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("length"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

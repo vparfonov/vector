@@ -3,7 +3,7 @@ pub use crate::operation::put_metric_filter::_put_metric_filter_output::PutMetri
 
 pub use crate::operation::put_metric_filter::_put_metric_filter_input::PutMetricFilterInputBuilder;
 
-impl crate::operation::put_metric_filter::builders::PutMetricFilterInputBuilder {
+impl PutMetricFilterInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -24,10 +24,10 @@ impl crate::operation::put_metric_filter::builders::PutMetricFilterInputBuilder 
 ///
 /// <p>Creates or updates a metric filter and associates it with the specified log group. With metric filters, you can configure rules to extract metric data from log events ingested through <a href="https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutLogEvents.html">PutLogEvents</a>.</p>
 /// <p>The maximum number of metric filters that can be associated with a log group is 100.</p>
-/// <p>When you create a metric filter, you can also optionally assign a unit and dimensions to the metric that is created.</p><important>
-/// <p>Metrics extracted from log events are charged as custom metrics. To prevent unexpected high charges, do not specify high-cardinality fields such as <code>IPAddress</code> or <code>requestID</code> as dimensions. Each different value found for a dimension is treated as a separate metric and accrues charges as a separate custom metric.</p>
+/// <p>When you create a metric filter, you can also optionally assign a unit and dimensions to the metric that is created.</p> <important>
+/// <p>Metrics extracted from log events are charged as custom metrics. To prevent unexpected high charges, do not specify high-cardinality fields such as <code>IPAddress</code> or <code>requestID</code> as dimensions. Each different value found for a dimension is treated as a separate metric and accrues charges as a separate custom metric. </p>
 /// <p>CloudWatch Logs might disable a metric filter if it generates 1,000 different name/value pairs for your specified dimensions within one hour.</p>
-/// <p>You can also set up a billing alarm to alert you if your charges are higher than expected. For more information, see <a href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/monitor_estimated_charges_with_cloudwatch.html"> Creating a Billing Alarm to Monitor Your Estimated Amazon Web Services Charges</a>.</p>
+/// <p>You can also set up a billing alarm to alert you if your charges are higher than expected. For more information, see <a href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/monitor_estimated_charges_with_cloudwatch.html"> Creating a Billing Alarm to Monitor Your Estimated Amazon Web Services Charges</a>. </p>
 /// </important>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
 pub struct PutMetricFilterFluentBuilder {
@@ -54,7 +54,7 @@ impl
     }
 }
 impl PutMetricFilterFluentBuilder {
-    /// Creates a new `PutMetricFilterFluentBuilder`.
+    /// Creates a new `PutMetricFilter`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -105,12 +105,12 @@ impl PutMetricFilterFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }
@@ -156,7 +156,6 @@ impl PutMetricFilterFluentBuilder {
     pub fn get_filter_pattern(&self) -> &::std::option::Option<::std::string::String> {
         self.inner.get_filter_pattern()
     }
-    ///
     /// Appends an item to `metricTransformations`.
     ///
     /// To override the contents of this collection use [`set_metric_transformations`](Self::set_metric_transformations).

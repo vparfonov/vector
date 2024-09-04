@@ -27,8 +27,8 @@ impl ListVpcEndpointAccessInput {
 }
 
 /// A builder for [`ListVpcEndpointAccessInput`](crate::operation::list_vpc_endpoint_access::ListVpcEndpointAccessInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct ListVpcEndpointAccessInputBuilder {
     pub(crate) domain_name: ::std::option::Option<::std::string::String>,
     pub(crate) next_token: ::std::option::Option<::std::string::String>,

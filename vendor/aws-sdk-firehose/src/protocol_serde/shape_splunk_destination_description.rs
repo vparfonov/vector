@@ -67,15 +67,6 @@ where
                                 crate::protocol_serde::shape_cloud_watch_logging_options::de_cloud_watch_logging_options(tokens)?,
                             );
                         }
-                        "BufferingHints" => {
-                            builder =
-                                builder.set_buffering_hints(crate::protocol_serde::shape_splunk_buffering_hints::de_splunk_buffering_hints(tokens)?);
-                        }
-                        "SecretsManagerConfiguration" => {
-                            builder = builder.set_secrets_manager_configuration(
-                                crate::protocol_serde::shape_secrets_manager_configuration::de_secrets_manager_configuration(tokens)?,
-                            );
-                        }
                         _ => ::aws_smithy_json::deserialize::token::skip_value(tokens)?,
                     },
                     other => {

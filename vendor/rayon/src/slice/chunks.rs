@@ -1,6 +1,7 @@
 use crate::iter::plumbing::*;
 use crate::iter::*;
 use crate::math::div_round_up;
+use std::cmp;
 
 /// Parallel iterator over immutable non-overlapping chunks of a slice
 #[derive(Debug)]
@@ -73,7 +74,7 @@ impl<'data, T: 'data + Sync> Producer for ChunksProducer<'data, T> {
     }
 
     fn split_at(self, index: usize) -> (Self, Self) {
-        let elem_index = Ord::min(index * self.chunk_size, self.slice.len());
+        let elem_index = cmp::min(index * self.chunk_size, self.slice.len());
         let (left, right) = self.slice.split_at(elem_index);
         (
             ChunksProducer {
@@ -254,7 +255,7 @@ impl<'data, T: 'data + Send> Producer for ChunksMutProducer<'data, T> {
     }
 
     fn split_at(self, index: usize) -> (Self, Self) {
-        let elem_index = Ord::min(index * self.chunk_size, self.slice.len());
+        let elem_index = cmp::min(index * self.chunk_size, self.slice.len());
         let (left, right) = self.slice.split_at_mut(elem_index);
         (
             ChunksMutProducer {

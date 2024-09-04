@@ -165,10 +165,9 @@ impl Encoder {
         trailers: HeaderMap,
         title_case_headers: bool,
     ) -> Option<EncodedBuf<B>> {
-        trace!("encoding trailers");
         match &self.kind {
-            Kind::Chunked(Some(allowed_trailer_fields)) => {
-                let allowed_trailer_field_map = allowed_trailer_field_map(allowed_trailer_fields);
+            Kind::Chunked(Some(ref allowed_trailer_fields)) => {
+                let allowed_trailer_field_map = allowed_trailer_field_map(&allowed_trailer_fields);
 
                 let mut cur_name = None;
                 let mut allowed_trailers = HeaderMap::new();
@@ -179,14 +178,10 @@ impl Encoder {
                     }
                     let name = cur_name.as_ref().expect("current header name");
 
-                    if allowed_trailer_field_map.contains_key(name.as_str()) {
-                        if is_valid_trailer_field(name) {
-                            allowed_trailers.insert(name, value);
-                        } else {
-                            debug!("trailer field is not valid: {}", &name);
-                        }
-                    } else {
-                        debug!("trailer header name not found in trailer header: {}", &name);
+                    if allowed_trailer_field_map.contains_key(name.as_str())
+                        && is_valid_trailer_field(name)
+                    {
+                        allowed_trailers.insert(name, value);
                     }
                 }
 
@@ -204,10 +199,6 @@ impl Encoder {
                 Some(EncodedBuf {
                     kind: BufKind::Trailers(b"0\r\n".chain(Bytes::from(buf)).chain(b"\r\n")),
                 })
-            }
-            Kind::Chunked(None) => {
-                debug!("attempted to encode trailers, but the trailer header is not set");
-                None
             }
             _ => {
                 debug!("attempted to encode trailers for non-chunked response");

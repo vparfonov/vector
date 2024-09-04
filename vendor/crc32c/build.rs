@@ -1,8 +1,7 @@
 #![allow(clippy::uninit_assumed_init)]
 extern crate rustc_version;
 
-use rustc_version::{version, Version};
-use std::io::Write;
+use rustc_version::{version_meta, Channel};
 use std::path::Path;
 use std::{io, ops};
 
@@ -13,7 +12,7 @@ pub const POLYNOMIAL: u32 = 0x82_F6_3B_78;
 fn sw_table() -> [[u32; 256]; 8] {
     let mut table: [[u32; 256]; 8] = [[0u32; 256]; 8];
 
-    for n in 0..256_u32 {
+    for n in 0..256 {
         let mut crc = n;
 
         for _ in 0..8 {
@@ -46,8 +45,8 @@ pub struct Matrix([u32; 32]);
 
 impl Matrix {
     /// Allocates space for a new matrix.
-    const fn new() -> Self {
-        Self([0u32; 32])
+    fn new() -> Self {
+        Matrix([0u32; 32])
     }
 
     /// Multiplies a matrix by itself.
@@ -137,10 +136,10 @@ fn hw_table(len: usize) -> [[u32; 256]; 4] {
     let mut zeroes: [[u32; 256]; 4] = [[0u32; 256]; 4];
     let op = create_zero_operator(len);
 
-    for n in 0..256_u32 {
-        for i in 0..4_u32 {
+    for n in 0..256 {
+        for i in 0..4 {
             let shift = i * 8;
-            zeroes[i as usize][n as usize] = op * (n << shift);
+            zeroes[i as usize][n] = op * ((n << shift) as u32);
         }
     }
 
@@ -152,17 +151,20 @@ pub const LONG: usize = 8192;
 pub const SHORT: usize = 256;
 
 fn write_table(table: &[[u32; 256]], path: &Path) -> io::Result<()> {
+    use std::fs;
+
     let mut file = {
-        let file = std::fs::File::create(path)?;
+        let file = fs::File::create(path)?;
         io::BufWriter::new(file)
     };
 
+    use std::io::Write;
     write!(file, "[")?;
 
-    for row in table {
+    for row in table.iter() {
         write!(file, "[")?;
-        for element in row {
-            write!(file, "{element}, ")?;
+        for element in row.iter() {
+            write!(file, "{}, ", element)?;
         }
         write!(file, "],")?;
     }
@@ -184,16 +186,8 @@ fn write_tables() -> io::Result<()> {
 
 fn main() {
     write_tables().expect("Failed to write CRC tables");
-    let min_version = Version::new(1, 80, 0);
 
-    let current_version = {
-        // remove prerelease tag for now, if it exists.
-        let vers = version().unwrap();
-        Version::new(vers.major, vers.minor, vers.patch)
-    };
-
-    if current_version >= min_version {
-        println!("cargo::rustc-check-cfg=cfg(armsimd)");
-        println!("cargo::rustc-cfg=armsimd");
+    if let Channel::Nightly = version_meta().unwrap().channel {
+        println!("cargo:rustc-cfg=nightly");
     }
 }

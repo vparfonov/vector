@@ -14,8 +14,6 @@ use std::ptr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Once;
 
-use windows_sys::Wdk::Foundation::OBJECT_ATTRIBUTES;
-use windows_sys::Wdk::Storage::FileSystem::FILE_OPEN;
 use windows_sys::Win32::Foundation::{
     CloseHandle, HANDLE, HMODULE, NTSTATUS, STATUS_NOT_FOUND, STATUS_PENDING, STATUS_SUCCESS,
     UNICODE_STRING,
@@ -23,9 +21,11 @@ use windows_sys::Win32::Foundation::{
 use windows_sys::Win32::Networking::WinSock::{
     WSAIoctl, SIO_BASE_HANDLE, SIO_BSP_HANDLE_POLL, SOCKET_ERROR,
 };
-use windows_sys::Win32::Storage::FileSystem::{FILE_SHARE_READ, FILE_SHARE_WRITE, SYNCHRONIZE};
+use windows_sys::Win32::Storage::FileSystem::{
+    FILE_OPEN, FILE_SHARE_READ, FILE_SHARE_WRITE, SYNCHRONIZE,
+};
 use windows_sys::Win32::System::LibraryLoader::{GetModuleHandleW, GetProcAddress};
-use windows_sys::Win32::System::IO::IO_STATUS_BLOCK;
+use windows_sys::Win32::System::WindowsProgramming::{IO_STATUS_BLOCK, OBJECT_ATTRIBUTES};
 
 #[derive(Default)]
 #[repr(C)]
@@ -43,6 +43,7 @@ pub(super) struct AfdPollInfo {
     handles: [AfdPollHandleInfo; 1],
 }
 
+#[derive(Default)]
 #[repr(C)]
 struct AfdPollHandleInfo {
     /// The handle to poll.
@@ -53,16 +54,6 @@ struct AfdPollHandleInfo {
 
     /// The status of the poll.
     status: NTSTATUS,
-}
-
-impl Default for AfdPollHandleInfo {
-    fn default() -> Self {
-        Self {
-            handle: ptr::null_mut(),
-            events: Default::default(),
-            status: Default::default(),
-        }
-    }
 }
 
 impl AfdPollInfo {
@@ -297,7 +288,7 @@ impl NtdllImports {
             .get_or_init(|| unsafe {
                 let ntdll = GetModuleHandleW(NTDLL_NAME.as_ptr() as *const _);
 
-                if ntdll.is_null() {
+                if ntdll == 0 {
                     tracing::error!("Failed to load ntdll.dll");
                     return Err(io::Error::last_os_error());
                 }
@@ -329,7 +320,7 @@ impl<T> fmt::Debug for Afd<T> {
 
         impl fmt::Debug for WriteAsHex {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{:010x}", self.0 as usize)
+                write!(f, "{:010x}", self.0)
             }
         }
 
@@ -394,7 +385,7 @@ where
         };
         let mut device_attributes = OBJECT_ATTRIBUTES {
             Length: size_of::<OBJECT_ATTRIBUTES>() as u32,
-            RootDirectory: ptr::null_mut(),
+            RootDirectory: 0,
             ObjectName: &mut device_name,
             Attributes: 0,
             SecurityDescriptor: ptr::null_mut(),
@@ -477,7 +468,7 @@ where
         let result = unsafe {
             ntdll.NtDeviceIoControlFile(
                 self.handle,
-                ptr::null_mut(),
+                0,
                 ptr::null_mut(),
                 iosb.cast(),
                 iosb.cast(),

@@ -57,8 +57,8 @@ impl SubscriptionFilter {
 }
 
 /// A builder for [`SubscriptionFilter`](crate::types::SubscriptionFilter).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct SubscriptionFilterBuilder {
     pub(crate) filter_name: ::std::option::Option<::std::string::String>,
     pub(crate) log_group_name: ::std::option::Option<::std::string::String>,

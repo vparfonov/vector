@@ -20,8 +20,8 @@ impl ListTagsForResourceInput {
 }
 
 /// A builder for [`ListTagsForResourceInput`](crate::operation::list_tags_for_resource::ListTagsForResourceInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct ListTagsForResourceInputBuilder {
     pub(crate) resource_arn: ::std::option::Option<::std::string::String>,
 }

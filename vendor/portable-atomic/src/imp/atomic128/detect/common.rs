@@ -89,7 +89,6 @@ impl CpuInfo {
     /// Whether CMPXCHG16B is available
     const HAS_CMPXCHG16B: u32 = 1;
     /// Whether VMOVDQA is atomic
-    #[cfg(target_feature = "sse")]
     const HAS_VMOVDQA_ATOMIC: u32 = 2;
 
     #[cfg(any(
@@ -100,7 +99,6 @@ impl CpuInfo {
     pub(crate) fn has_cmpxchg16b(self) -> bool {
         self.test(CpuInfo::HAS_CMPXCHG16B)
     }
-    #[cfg(target_feature = "sse")]
     #[inline]
     pub(crate) fn has_vmovdqa_atomic(self) -> bool {
         self.test(CpuInfo::HAS_VMOVDQA_ATOMIC)
@@ -153,7 +151,7 @@ mod c_types {
     // c_char is u8 by default on most non-Apple/non-Windows ARM/PowerPC/RISC-V/s390x/Hexagon targets
     // (Linux/Android/FreeBSD/NetBSD/OpenBSD/VxWorks/Fuchsia/QNX Neutrino/Horizon/AIX/z/OS)
     // https://github.com/rust-lang/rust/blob/1.70.0/library/core/src/ffi/mod.rs#L104
-    // https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/lldb/source/Utility/ArchSpec.cpp#L712
+    // https://github.com/llvm/llvm-project/blob/9734b2256d89cb4c61a4dbf4a3c3f3f942fe9b8c/lldb/source/Utility/ArchSpec.cpp#L712
     // RISC-V https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/HEAD/riscv-cc.adoc#cc-type-representations
     // Hexagon https://lists.llvm.org/pipermail/llvm-dev/attachments/20190916/21516a52/attachment-0001.pdf
     // AIX https://www.ibm.com/docs/en/xl-c-aix/13.1.2?topic=descriptions-qchars
@@ -264,11 +262,7 @@ mod tests_common {
 
     #[test]
     fn print_features() {
-        use std::{
-            fmt::Write as _,
-            io::{self, Write},
-            string::String,
-        };
+        use std::{fmt::Write as _, io::Write, string::String};
 
         let mut features = String::new();
         macro_rules! print_feature {
@@ -320,7 +314,7 @@ mod tests_common {
                 )),
             );
         }
-        let stdout = io::stderr();
+        let stdout = std::io::stderr();
         let mut stdout = stdout.lock();
         let _ = stdout.write_all(features.as_bytes());
     }

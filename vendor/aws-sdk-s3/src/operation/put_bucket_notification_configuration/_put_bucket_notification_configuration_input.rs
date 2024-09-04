@@ -38,8 +38,8 @@ impl PutBucketNotificationConfigurationInput {
 }
 
 /// A builder for [`PutBucketNotificationConfigurationInput`](crate::operation::put_bucket_notification_configuration::PutBucketNotificationConfigurationInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct PutBucketNotificationConfigurationInputBuilder {
     pub(crate) bucket: ::std::option::Option<::std::string::String>,
     pub(crate) notification_configuration: ::std::option::Option<crate::types::NotificationConfiguration>,

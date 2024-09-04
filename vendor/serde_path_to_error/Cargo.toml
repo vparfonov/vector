@@ -13,10 +13,9 @@
 edition = "2021"
 rust-version = "1.56"
 name = "serde_path_to_error"
-version = "0.1.16"
+version = "0.1.14"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 description = "Path to the element that failed to deserialize"
-documentation = "https://docs.rs/serde_path_to_error"
 readme = "README.md"
 keywords = [
     "serde",
@@ -37,10 +36,10 @@ doc-scrape-examples = false
 version = "1.0"
 
 [dependencies.serde]
-version = "1.0.194"
+version = "1.0.166"
 
 [dev-dependencies.serde_derive]
-version = "1.0.194"
+version = "1.0.166"
 
 [dev-dependencies.serde_json]
 version = "1.0.100"

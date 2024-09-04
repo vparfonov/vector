@@ -1,7 +1,6 @@
 use crate::big_digit::{self, BigDigit};
+use crate::std_alloc::{String, Vec};
 
-use alloc::string::String;
-use alloc::vec::Vec;
 use core::cmp;
 use core::cmp::Ordering;
 use core::default::Default;
@@ -9,23 +8,28 @@ use core::fmt;
 use core::hash;
 use core::mem;
 use core::str;
+use core::{u32, u64, u8};
 
 use num_integer::{Integer, Roots};
-use num_traits::{ConstZero, Num, One, Pow, ToPrimitive, Unsigned, Zero};
+use num_traits::{Num, One, Pow, ToPrimitive, Unsigned, Zero};
 
 mod addition;
 mod division;
 mod multiplication;
 mod subtraction;
 
-mod arbitrary;
 mod bits;
 mod convert;
 mod iter;
 mod monty;
 mod power;
-mod serde;
 mod shift;
+
+#[cfg(any(feature = "quickcheck", feature = "arbitrary"))]
+mod arbitrary;
+
+#[cfg(feature = "serde")]
+mod serde;
 
 pub(crate) use self::convert::to_str_radix_reversed;
 pub use self::iter::{U32Digits, U64Digits};
@@ -97,7 +101,7 @@ fn cmp_slice(a: &[BigDigit], b: &[BigDigit]) -> Ordering {
 impl Default for BigUint {
     #[inline]
     fn default() -> BigUint {
-        Self::ZERO
+        Zero::zero()
     }
 }
 
@@ -142,7 +146,7 @@ impl fmt::Octal for BigUint {
 impl Zero for BigUint {
     #[inline]
     fn zero() -> BigUint {
-        Self::ZERO
+        BigUint { data: Vec::new() }
     }
 
     #[inline]
@@ -154,11 +158,6 @@ impl Zero for BigUint {
     fn is_zero(&self) -> bool {
         self.data.is_empty()
     }
-}
-
-impl ConstZero for BigUint {
-    // forward to the inherent const
-    const ZERO: Self = Self::ZERO; // BigUint { data: Vec::new() };
 }
 
 impl One for BigUint {
@@ -256,7 +255,7 @@ impl Integer for BigUint {
     #[inline]
     fn lcm(&self, other: &BigUint) -> BigUint {
         if self.is_zero() && other.is_zero() {
-            Self::ZERO
+            Self::zero()
         } else {
             self / self.gcd(other) * other
         }
@@ -268,7 +267,7 @@ impl Integer for BigUint {
     fn gcd_lcm(&self, other: &Self) -> (Self, Self) {
         let gcd = self.gcd(other);
         let lcm = if gcd.is_zero() {
-            Self::ZERO
+            Self::zero()
         } else {
             self / &gcd * other
         };
@@ -320,14 +319,6 @@ impl Integer for BigUint {
     #[inline]
     fn prev_multiple_of(&self, other: &Self) -> Self {
         self - self.mod_floor(other)
-    }
-
-    fn dec(&mut self) {
-        *self -= 1u32;
-    }
-
-    fn inc(&mut self) {
-        *self += 1u32;
     }
 }
 
@@ -406,7 +397,7 @@ impl Roots for BigUint {
             _ => {
                 // Try to guess by scaling down such that it does fit in `f64`.
                 // With some (x * 2ⁿᵏ), its nth root ≈ (ⁿ√x * 2ᵏ)
-                let extra_bits = bits - (f64::MAX_EXP as u64 - 1);
+                let extra_bits = bits - (core::f64::MAX_EXP as u64 - 1);
                 let root_scale = Integer::div_ceil(&extra_bits, &n64);
                 let scale = root_scale * n64;
                 if scale < bits && bits - scale > n64 {
@@ -454,7 +445,7 @@ impl Roots for BigUint {
             _ => {
                 // Try to guess by scaling down such that it does fit in `f64`.
                 // With some (x * 2²ᵏ), its sqrt ≈ (√x * 2ᵏ)
-                let extra_bits = bits - (f64::MAX_EXP as u64 - 1);
+                let extra_bits = bits - (core::f64::MAX_EXP as u64 - 1);
                 let root_scale = (extra_bits + 1) / 2;
                 let scale = root_scale * 2;
                 (self >> scale).sqrt() << root_scale
@@ -495,7 +486,7 @@ impl Roots for BigUint {
             _ => {
                 // Try to guess by scaling down such that it does fit in `f64`.
                 // With some (x * 2³ᵏ), its cbrt ≈ (∛x * 2ᵏ)
-                let extra_bits = bits - (f64::MAX_EXP as u64 - 1);
+                let extra_bits = bits - (core::f64::MAX_EXP as u64 - 1);
                 let root_scale = (extra_bits + 2) / 3;
                 let scale = root_scale * 3;
                 (self >> scale).cbrt() << root_scale
@@ -528,23 +519,21 @@ pub(crate) fn biguint_from_vec(digits: Vec<BigDigit>) -> BigUint {
 }
 
 impl BigUint {
-    /// A constant `BigUint` with value 0, useful for static initialization.
-    pub const ZERO: Self = BigUint { data: Vec::new() };
-
     /// Creates and initializes a [`BigUint`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
     pub fn new(digits: Vec<u32>) -> BigUint {
-        let mut big = Self::ZERO;
+        let mut big = BigUint::zero();
 
-        cfg_digit_expr!(
-            {
-                big.data = digits;
-                big.normalize();
-            },
-            big.assign_from_slice(&digits)
-        );
+        #[cfg(not(u64_digit))]
+        {
+            big.data = digits;
+            big.normalize();
+        }
+
+        #[cfg(u64_digit)]
+        big.assign_from_slice(&digits);
 
         big
     }
@@ -554,7 +543,7 @@ impl BigUint {
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
     #[inline]
     pub fn from_slice(slice: &[u32]) -> BigUint {
-        let mut big = Self::ZERO;
+        let mut big = BigUint::zero();
         big.assign_from_slice(slice);
         big
     }
@@ -566,10 +555,11 @@ impl BigUint {
     pub fn assign_from_slice(&mut self, slice: &[u32]) {
         self.data.clear();
 
-        cfg_digit_expr!(
-            self.data.extend_from_slice(slice),
-            self.data.extend(slice.chunks(2).map(u32_chunk_to_u64))
-        );
+        #[cfg(not(u64_digit))]
+        self.data.extend_from_slice(slice);
+
+        #[cfg(u64_digit)]
+        self.data.extend(slice.chunks(2).map(u32_chunk_to_u64));
 
         self.normalize();
     }
@@ -595,7 +585,7 @@ impl BigUint {
     #[inline]
     pub fn from_bytes_be(bytes: &[u8]) -> BigUint {
         if bytes.is_empty() {
-            Self::ZERO
+            Zero::zero()
         } else {
             let mut v = bytes.to_vec();
             v.reverse();
@@ -609,7 +599,7 @@ impl BigUint {
     #[inline]
     pub fn from_bytes_le(bytes: &[u8]) -> BigUint {
         if bytes.is_empty() {
-            Self::ZERO
+            Zero::zero()
         } else {
             convert::from_bitwise_digits_le(bytes, 8)
         }
@@ -887,86 +877,6 @@ impl BigUint {
         power::modpow(self, exponent, modulus)
     }
 
-    /// Returns the modular multiplicative inverse if it exists, otherwise `None`.
-    ///
-    /// This solves for `x` in the interval `[0, modulus)` such that `self * x ≡ 1 (mod modulus)`.
-    /// The solution exists if and only if `gcd(self, modulus) == 1`.
-    ///
-    /// ```
-    /// use num_bigint::BigUint;
-    /// use num_traits::{One, Zero};
-    ///
-    /// let m = BigUint::from(383_u32);
-    ///
-    /// // Trivial cases
-    /// assert_eq!(BigUint::zero().modinv(&m), None);
-    /// assert_eq!(BigUint::one().modinv(&m), Some(BigUint::one()));
-    /// let neg1 = &m - 1u32;
-    /// assert_eq!(neg1.modinv(&m), Some(neg1));
-    ///
-    /// let a = BigUint::from(271_u32);
-    /// let x = a.modinv(&m).unwrap();
-    /// assert_eq!(x, BigUint::from(106_u32));
-    /// assert_eq!(x.modinv(&m).unwrap(), a);
-    /// assert!((a * x % m).is_one());
-    /// ```
-    pub fn modinv(&self, modulus: &Self) -> Option<Self> {
-        // Based on the inverse pseudocode listed here:
-        // https://en.wikipedia.org/wiki/Extended_Euclidean_algorithm#Modular_integers
-        // TODO: consider Binary or Lehmer's GCD algorithms for optimization.
-
-        assert!(
-            !modulus.is_zero(),
-            "attempt to calculate with zero modulus!"
-        );
-        if modulus.is_one() {
-            return Some(Self::zero());
-        }
-
-        let mut r0; // = modulus.clone();
-        let mut r1 = self % modulus;
-        let mut t0; // = Self::zero();
-        let mut t1; // = Self::one();
-
-        // Lift and simplify the first iteration to avoid some initial allocations.
-        if r1.is_zero() {
-            return None;
-        } else if r1.is_one() {
-            return Some(r1);
-        } else {
-            let (q, r2) = modulus.div_rem(&r1);
-            if r2.is_zero() {
-                return None;
-            }
-            r0 = r1;
-            r1 = r2;
-            t0 = Self::one();
-            t1 = modulus - q;
-        }
-
-        while !r1.is_zero() {
-            let (q, r2) = r0.div_rem(&r1);
-            r0 = r1;
-            r1 = r2;
-
-            // let t2 = (t0 - q * t1) % modulus;
-            let qt1 = q * &t1 % modulus;
-            let t2 = if t0 < qt1 {
-                t0 + (modulus - qt1)
-            } else {
-                t0 - qt1
-            };
-            t0 = t1;
-            t1 = t2;
-        }
-
-        if r0.is_one() {
-            Some(t0)
-        } else {
-            None
-        }
-    }
-
     /// Returns the truncated principal square root of `self` --
     /// see [Roots::sqrt](https://docs.rs/num-integer/0.1/num_integer/trait.Roots.html#method.sqrt)
     pub fn sqrt(&self) -> Self {
@@ -996,7 +906,10 @@ impl BigUint {
     /// Returns the number of least-significant bits that are ones.
     pub fn trailing_ones(&self) -> u64 {
         if let Some(i) = self.data.iter().position(|&digit| !digit != 0) {
-            let ones: u64 = self.data[i].trailing_ones().into();
+            // XXX u64::trailing_ones() introduced in Rust 1.46,
+            // but we need to be compatible further back.
+            // Thanks to cuviper for this workaround.
+            let ones: u64 = (!self.data[i]).trailing_zeros().into();
             i as u64 * u64::from(big_digit::BITS) + ones
         } else {
             self.data.len() as u64 * u64::from(big_digit::BITS)
@@ -1028,7 +941,9 @@ impl BigUint {
         // Note: we're saturating `digit_index` and `new_len` -- any such case is guaranteed to
         // fail allocation, and that's more consistent than adding our own overflow panics.
         let bits_per_digit = u64::from(big_digit::BITS);
-        let digit_index = (bit / bits_per_digit).to_usize().unwrap_or(usize::MAX);
+        let digit_index = (bit / bits_per_digit)
+            .to_usize()
+            .unwrap_or(core::usize::MAX);
         let bit_mask = (1 as BigDigit) << (bit % bits_per_digit);
         if value {
             if digit_index >= self.data.len() {
@@ -1110,77 +1025,86 @@ fn u32_chunk_to_u64(chunk: &[u32]) -> u64 {
     digit
 }
 
-cfg_32_or_test!(
-    /// Combine four `u32`s into a single `u128`.
-    #[inline]
-    fn u32_to_u128(a: u32, b: u32, c: u32, d: u32) -> u128 {
-        u128::from(d) | (u128::from(c) << 32) | (u128::from(b) << 64) | (u128::from(a) << 96)
-    }
-);
+/// Combine four `u32`s into a single `u128`.
+#[cfg(any(test, not(u64_digit)))]
+#[inline]
+fn u32_to_u128(a: u32, b: u32, c: u32, d: u32) -> u128 {
+    u128::from(d) | (u128::from(c) << 32) | (u128::from(b) << 64) | (u128::from(a) << 96)
+}
 
-cfg_32_or_test!(
-    /// Split a single `u128` into four `u32`.
-    #[inline]
-    fn u32_from_u128(n: u128) -> (u32, u32, u32, u32) {
-        (
-            (n >> 96) as u32,
-            (n >> 64) as u32,
-            (n >> 32) as u32,
-            n as u32,
-        )
-    }
-);
+/// Split a single `u128` into four `u32`.
+#[cfg(any(test, not(u64_digit)))]
+#[inline]
+fn u32_from_u128(n: u128) -> (u32, u32, u32, u32) {
+    (
+        (n >> 96) as u32,
+        (n >> 64) as u32,
+        (n >> 32) as u32,
+        n as u32,
+    )
+}
 
-cfg_digit!(
-    #[test]
-    fn test_from_slice() {
-        fn check(slice: &[u32], data: &[BigDigit]) {
-            assert_eq!(BigUint::from_slice(slice).data, data);
-        }
-        check(&[1], &[1]);
-        check(&[0, 0, 0], &[]);
-        check(&[1, 2, 0, 0], &[1, 2]);
-        check(&[0, 0, 1, 2], &[0, 0, 1, 2]);
-        check(&[0, 0, 1, 2, 0, 0], &[0, 0, 1, 2]);
-        check(&[-1i32 as u32], &[-1i32 as BigDigit]);
+#[cfg(not(u64_digit))]
+#[test]
+fn test_from_slice() {
+    fn check(slice: &[u32], data: &[BigDigit]) {
+        assert_eq!(BigUint::from_slice(slice).data, data);
     }
+    check(&[1], &[1]);
+    check(&[0, 0, 0], &[]);
+    check(&[1, 2, 0, 0], &[1, 2]);
+    check(&[0, 0, 1, 2], &[0, 0, 1, 2]);
+    check(&[0, 0, 1, 2, 0, 0], &[0, 0, 1, 2]);
+    check(&[-1i32 as u32], &[-1i32 as BigDigit]);
+}
 
-    #[test]
-    fn test_from_slice() {
-        fn check(slice: &[u32], data: &[BigDigit]) {
-            assert_eq!(
-                BigUint::from_slice(slice).data,
-                data,
-                "from {:?}, to {:?}",
-                slice,
-                data
-            );
-        }
-        check(&[1], &[1]);
-        check(&[0, 0, 0], &[]);
-        check(&[1, 2], &[8_589_934_593]);
-        check(&[1, 2, 0, 0], &[8_589_934_593]);
-        check(&[0, 0, 1, 2], &[0, 8_589_934_593]);
-        check(&[0, 0, 1, 2, 0, 0], &[0, 8_589_934_593]);
-        check(&[-1i32 as u32], &[(-1i32 as u32) as BigDigit]);
+#[cfg(u64_digit)]
+#[test]
+fn test_from_slice() {
+    fn check(slice: &[u32], data: &[BigDigit]) {
+        assert_eq!(
+            BigUint::from_slice(slice).data,
+            data,
+            "from {:?}, to {:?}",
+            slice,
+            data
+        );
     }
-);
+    check(&[1], &[1]);
+    check(&[0, 0, 0], &[]);
+    check(&[1, 2], &[8_589_934_593]);
+    check(&[1, 2, 0, 0], &[8_589_934_593]);
+    check(&[0, 0, 1, 2], &[0, 8_589_934_593]);
+    check(&[0, 0, 1, 2, 0, 0], &[0, 8_589_934_593]);
+    check(&[-1i32 as u32], &[(-1i32 as u32) as BigDigit]);
+}
 
 #[test]
 fn test_u32_u128() {
     assert_eq!(u32_from_u128(0u128), (0, 0, 0, 0));
     assert_eq!(
-        u32_from_u128(u128::MAX),
-        (u32::MAX, u32::MAX, u32::MAX, u32::MAX)
+        u32_from_u128(u128::max_value()),
+        (
+            u32::max_value(),
+            u32::max_value(),
+            u32::max_value(),
+            u32::max_value()
+        )
     );
 
-    assert_eq!(u32_from_u128(u32::MAX as u128), (0, 0, 0, u32::MAX));
-
-    assert_eq!(u32_from_u128(u64::MAX as u128), (0, 0, u32::MAX, u32::MAX));
+    assert_eq!(
+        u32_from_u128(u32::max_value() as u128),
+        (0, 0, 0, u32::max_value())
+    );
 
     assert_eq!(
-        u32_from_u128((u64::MAX as u128) + u32::MAX as u128),
-        (0, 1, 0, u32::MAX - 1)
+        u32_from_u128(u64::max_value() as u128),
+        (0, 0, u32::max_value(), u32::max_value())
+    );
+
+    assert_eq!(
+        u32_from_u128((u64::max_value() as u128) + u32::max_value() as u128),
+        (0, 1, 0, u32::max_value() - 1)
     );
 
     assert_eq!(u32_from_u128(36_893_488_151_714_070_528), (0, 2, 1, 0));
@@ -1192,11 +1116,11 @@ fn test_u128_u32_roundtrip() {
     let values = vec![
         0u128,
         1u128,
-        u64::MAX as u128 * 3,
-        u32::MAX as u128,
-        u64::MAX as u128,
-        (u64::MAX as u128) + u32::MAX as u128,
-        u128::MAX,
+        u64::max_value() as u128 * 3,
+        u32::max_value() as u128,
+        u64::max_value() as u128,
+        (u64::max_value() as u128) + u32::max_value() as u128,
+        u128::max_value(),
     ];
 
     for val in &values {

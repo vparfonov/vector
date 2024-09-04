@@ -14,60 +14,6 @@ extern "C" {
     #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
     #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub type SerialOutputSignals;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `break` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SerialOutputSignals`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "break")]
-    pub fn get_break(this: &SerialOutputSignals) -> Option<bool>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `break` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SerialOutputSignals`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "break")]
-    pub fn set_break(this: &SerialOutputSignals, val: bool);
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `dataTerminalReady` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SerialOutputSignals`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "dataTerminalReady")]
-    pub fn get_data_terminal_ready(this: &SerialOutputSignals) -> Option<bool>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `dataTerminalReady` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SerialOutputSignals`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "dataTerminalReady")]
-    pub fn set_data_terminal_ready(this: &SerialOutputSignals, val: bool);
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `requestToSend` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SerialOutputSignals`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "requestToSend")]
-    pub fn get_request_to_send(this: &SerialOutputSignals) -> Option<bool>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `requestToSend` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SerialOutputSignals`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "requestToSend")]
-    pub fn set_request_to_send(this: &SerialOutputSignals, val: bool);
 }
 #[cfg(web_sys_unstable_apis)]
 impl SerialOutputSignals {
@@ -83,21 +29,62 @@ impl SerialOutputSignals {
         ret
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_break()` instead."]
+    #[doc = "Change the `break` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `SerialOutputSignals`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn break_(&mut self, val: bool) -> &mut Self {
-        self.set_break(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("break"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_data_terminal_ready()` instead."]
+    #[doc = "Change the `dataTerminalReady` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `SerialOutputSignals`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn data_terminal_ready(&mut self, val: bool) -> &mut Self {
-        self.set_data_terminal_ready(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("dataTerminalReady"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_request_to_send()` instead."]
+    #[doc = "Change the `requestToSend` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `SerialOutputSignals`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn request_to_send(&mut self, val: bool) -> &mut Self {
-        self.set_request_to_send(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("requestToSend"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

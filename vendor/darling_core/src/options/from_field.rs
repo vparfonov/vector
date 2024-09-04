@@ -39,11 +39,11 @@ impl ParseData for FromFieldOptions {
     fn parse_field(&mut self, field: &syn::Field) -> Result<()> {
         match field.ident.as_ref().map(|v| v.to_string()).as_deref() {
             Some("vis") => {
-                self.vis.clone_from(&field.ident);
+                self.vis = field.ident.clone();
                 Ok(())
             }
             Some("ty") => {
-                self.ty.clone_from(&field.ident);
+                self.ty = field.ident.clone();
                 Ok(())
             }
             _ => self.base.parse_field(field),

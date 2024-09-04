@@ -22,17 +22,12 @@ mod point_series;
 mod surface;
 
 #[cfg(feature = "area_series")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "area_series")))]
 pub use area_series::AreaSeries;
 #[cfg(feature = "histogram")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "histogram")))]
 pub use histogram::Histogram;
 #[cfg(feature = "line_series")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "line_series")))]
-pub use line_series::{DashedLineSeries, DottedLineSeries, LineSeries};
+pub use line_series::LineSeries;
 #[cfg(feature = "point_series")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "point_series")))]
 pub use point_series::PointSeries;
 #[cfg(feature = "surface_series")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "surface_series")))]
 pub use surface::SurfaceSeries;

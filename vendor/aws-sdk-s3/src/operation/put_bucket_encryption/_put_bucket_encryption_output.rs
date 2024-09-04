@@ -24,8 +24,8 @@ impl PutBucketEncryptionOutput {
 }
 
 /// A builder for [`PutBucketEncryptionOutput`](crate::operation::put_bucket_encryption::PutBucketEncryptionOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct PutBucketEncryptionOutputBuilder {
     _extended_request_id: Option<String>,
     _request_id: Option<String>,

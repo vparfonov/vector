@@ -91,7 +91,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -107,7 +106,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -130,7 +128,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -143,7 +140,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -156,7 +152,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -168,7 +163,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -181,7 +175,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -197,7 +190,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -210,7 +202,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -222,7 +213,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -239,7 +229,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -252,7 +241,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -265,7 +253,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -278,7 +265,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -291,7 +277,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -306,7 +291,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -319,7 +303,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -332,7 +315,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -345,7 +327,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -358,7 +339,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -371,7 +351,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -383,7 +362,6 @@ impl AddressFamily {
         windows,
         target_os = "aix",
         target_os = "espidf",
-        target_os = "hurd",
         target_os = "vita",
     )))]
     pub const BLUETOOTH: Self = Self(c::AF_BLUETOOTH as _);
@@ -395,7 +373,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -408,7 +385,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -420,7 +396,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "vita",
     )))]
     pub const ISDN: Self = Self(c::AF_ISDN as _);
@@ -432,7 +407,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -445,7 +419,6 @@ impl AddressFamily {
         target_os = "aix",
         target_os = "espidf",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
     )))]
@@ -643,10 +616,8 @@ const fn new_raw_protocol(u: u32) -> RawProtocol {
 }
 
 /// `IPPROTO_*` and other constants for use with [`socket`], [`socket_with`],
-/// and [`socketpair`] when a nondefault value is desired.
-///
-/// See the [`ipproto`], [`sysproto`], and [`netlink`] modules for possible
-/// values.
+/// and [`socketpair`] when a nondefault value is desired. See the [`ipproto`],
+/// [`sysproto`], and [`netlink`] modules for possible values.
 ///
 /// For the default values, such as `IPPROTO_IP` or `NETLINK_ROUTE`, pass
 /// `None` as the `protocol` argument in these functions.
@@ -1494,10 +1465,10 @@ pub mod xdp {
         }
     }
 
-    // Constant needs to be cast because bindgen does generate a u32 but the struct
-    // expects a u16. https://github.com/torvalds/linux/blob/v6.6/include/uapi/linux/if_xdp.h#L15-L44
+    // Constant needs to be cast because bindgen does generate a u32 but the struct expects a u16.
+    // https://github.com/torvalds/linux/blob/v6.6/include/uapi/linux/if_xdp.h#L15-L44
     bitflags! {
-        /// `XDP_*` constants for use in [`SocketAddrXdp`].
+        /// `XDP_*` constants for use in [`SockaddrXdp`].
         #[repr(transparent)]
         #[derive(Copy, Clone, PartialEq, PartialOrd, Eq, Ord, Hash, Debug)]
         pub struct SockaddrXdpFlags: u16 {
@@ -1751,12 +1722,11 @@ pub mod xdp {
     /// Offset for mmapping completion ring.
     pub const XDP_UMEM_PGOFF_COMPLETION_RING: u64 = c::XDP_UMEM_PGOFF_COMPLETION_RING;
 
-    /// Offset used to shift the [`XdpDesc`] addr to the right to extract the
-    /// address offset in unaligned mode.
-    pub const XSK_UNALIGNED_BUF_OFFSET_SHIFT: u64 = c::XSK_UNALIGNED_BUF_OFFSET_SHIFT as u64;
-    /// Mask used to binary `and` the [`XdpDesc`] addr to extract the address
-    /// without the offset carried in the upper 16 bits of the address in
+    /// Offset used to shift the [`XdpDesc`] addr to the right to extract the address offset in
     /// unaligned mode.
+    pub const XSK_UNALIGNED_BUF_OFFSET_SHIFT: u64 = c::XSK_UNALIGNED_BUF_OFFSET_SHIFT as u64;
+    /// Mask used to binary `and` the [`XdpDesc`] addr to extract the address without the offset
+    /// carried in the upper 16 bits of the address in unaligned mode.
     pub const XSK_UNALIGNED_BUF_ADDR_MASK: u64 = c::XSK_UNALIGNED_BUF_ADDR_MASK;
 }
 

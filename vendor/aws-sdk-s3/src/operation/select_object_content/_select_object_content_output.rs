@@ -36,8 +36,8 @@ impl SelectObjectContentOutput {
 }
 
 /// A builder for [`SelectObjectContentOutput`](crate::operation::select_object_content::SelectObjectContentOutput).
-#[derive(::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::default::Default, ::std::fmt::Debug)]
 pub struct SelectObjectContentOutputBuilder {
     pub(crate) payload: ::std::option::Option<
         crate::event_receiver::EventReceiver<crate::types::SelectObjectContentEventStream, crate::types::error::SelectObjectContentEventStreamError>,

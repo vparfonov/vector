@@ -65,7 +65,6 @@ impl CopyObject {
             {
                 ::aws_runtime::auth::sigv4a::SCHEME_ID
             },
-            crate::s3_express::auth::SCHEME_ID,
             ::aws_smithy_runtime::client::auth::no_auth::NO_AUTH_SCHEME_ID,
         ]));
         if let ::std::option::Option::Some(config_override) = config_override {
@@ -97,7 +96,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for CopyObj
         ));
 
         cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::SensitiveOutput);
-        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new("CopyObject", "s3"));
+        cfg.store_put(::aws_smithy_http::operation::Metadata::new("CopyObject", "s3"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = false;
         signing_options.content_sha256_header = true;
@@ -118,6 +117,11 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for CopyObj
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("CopyObject")
+            .with_interceptor(
+                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
+                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
+                ),
+            )
             .with_interceptor(CopyObjectEndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::copy_object::CopyObjectError,
@@ -125,15 +129,9 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for CopyObj
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::ModeledAsRetryableClassifier::<
                 crate::operation::copy_object::CopyObjectError,
             >::new())
-            .with_retry_classifier(
-                ::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<crate::operation::copy_object::CopyObjectError>::builder()
-                    .transient_errors({
-                        let mut transient_errors: Vec<&'static str> = ::aws_runtime::retries::classifiers::TRANSIENT_ERRORS.into();
-                        transient_errors.push("InternalError");
-                        ::std::borrow::Cow::Owned(transient_errors)
-                    })
-                    .build(),
-            );
+            .with_retry_classifier(::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<
+                crate::operation::copy_object::CopyObjectError,
+            >::new());
 
         ::std::borrow::Cow::Owned(rcb)
     }
@@ -266,20 +264,6 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for CopyObjectEnd
                     .filter(|f| !AsRef::<str>::as_ref(f).trim().is_empty())
                     .ok_or_else(|| ::aws_smithy_types::error::operation::BuildError::missing_field("bucket", "A required field was not set"))?,
             ))
-            .set_copy_source(Some(
-                _input
-                    .copy_source
-                    .clone()
-                    .filter(|f| !AsRef::<str>::as_ref(f).trim().is_empty())
-                    .ok_or_else(|| ::aws_smithy_types::error::operation::BuildError::missing_field("copy_source", "A required field was not set"))?,
-            ))
-            .set_key(Some(
-                _input
-                    .key
-                    .clone()
-                    .filter(|f| !AsRef::<str>::as_ref(f).trim().is_empty())
-                    .ok_or_else(|| ::aws_smithy_types::error::operation::BuildError::missing_field("key", "A required field was not set"))?,
-            ))
             .build()
             .map_err(|err| {
                 ::aws_smithy_runtime_api::client::interceptors::error::ContextAttachedError::new("endpoint params could not be built", err)
@@ -289,9 +273,6 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for CopyObjectEnd
         ::std::result::Result::Ok(())
     }
 }
-
-// The get_* functions below are generated from JMESPath expressions in the
-// operationContextParams trait. They target the operation's input shape.
 
 /// Error type for the `CopyObjectError` operation.
 #[non_exhaustive]

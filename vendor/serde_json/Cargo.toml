@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.56"
 name = "serde_json"
-version = "1.0.127"
+version = "1.0.120"
 authors = [
     "Erick Tryzelaar <erick.tryzelaar@gmail.com>",
     "David Tolnay <dtolnay@gmail.com>",
@@ -91,10 +91,6 @@ optional = true
 [dependencies.itoa]
 version = "1.0"
 
-[dependencies.memchr]
-version = "2"
-default-features = false
-
 [dependencies.ryu]
 version = "1.0"
 
@@ -141,8 +137,5 @@ preserve_order = [
     "std",
 ]
 raw_value = []
-std = [
-    "memchr/std",
-    "serde/std",
-]
+std = ["serde/std"]
 unbounded_depth = []

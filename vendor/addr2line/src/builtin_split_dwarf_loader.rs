@@ -27,14 +27,14 @@ fn convert_path<R: gimli::Reader<Endian = gimli::RunTimeEndian>>(
     Ok(PathBuf::from(s))
 }
 
-fn load_section<'data, O, R, F>(
+fn load_section<'data: 'file, 'file, O, R, F>(
     id: gimli::SectionId,
-    file: &O,
+    file: &'file O,
     endian: R::Endian,
     loader: &mut F,
 ) -> Result<R, gimli::Error>
 where
-    O: object::Object<'data>,
+    O: object::Object<'data, 'file>,
     R: gimli::Reader<Endian = gimli::RunTimeEndian>,
     F: FnMut(Cow<'data, [u8]>, R::Endian) -> R,
 {

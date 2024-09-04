@@ -13,18 +13,13 @@
 edition = "2021"
 rust-version = "1.67.0"
 name = "proc-macro-crate"
-version = "3.2.0"
+version = "3.1.0"
 authors = ["Bastian Köcher <git@kchr.de>"]
-build = false
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 description = """
 Replacement for crate (macro_rules keyword) in proc-macros
 """
 documentation = "https://docs.rs/proc-macro-crate"
-readme = "README.md"
+readme = "./README.md"
 keywords = [
     "macro-rules",
     "crate",
@@ -35,22 +30,14 @@ categories = ["development-tools::procedural-macro-helpers"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/bkchr/proc-macro-crate"
 
-[lib]
-name = "proc_macro_crate"
-path = "src/lib.rs"
-
-[[test]]
-name = "workspace_deps"
-path = "tests/workspace_deps.rs"
-
 [dependencies.toml_edit]
-version = "0.22.20"
+version = "0.21.0"
 
 [dev-dependencies.proc-macro2]
-version = "1.0.86"
+version = "1.0.67"
 
 [dev-dependencies.quote]
-version = "1.0.37"
+version = "1.0.33"
 
 [dev-dependencies.syn]
-version = "2.0.76"
+version = "2.0.37"

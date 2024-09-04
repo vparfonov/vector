@@ -1,12 +1,18 @@
-use alloc::sync::Arc;
+use crate::client;
+use crate::enums::SignatureScheme;
+use crate::error::Error;
+use crate::limited_cache;
+use crate::msgs::handshake::CertificateChain;
+use crate::msgs::persist;
+use crate::sign;
+use crate::NamedGroup;
 
 use pki_types::ServerName;
 
-use crate::enums::SignatureScheme;
-use crate::error::Error;
-use crate::msgs::handshake::CertificateChain;
-use crate::msgs::persist;
-use crate::{client, sign, NamedGroup};
+use alloc::collections::VecDeque;
+use alloc::sync::Arc;
+use core::fmt;
+use std::sync::Mutex;
 
 /// An implementer of `ClientSessionStore` which does nothing.
 #[derive(Debug)]
@@ -34,166 +40,137 @@ impl client::ClientSessionStore for NoClientSessionStorage {
     }
 }
 
-#[cfg(any(feature = "std", feature = "hashbrown"))]
-mod cache {
-    use alloc::collections::VecDeque;
-    use core::fmt;
+const MAX_TLS13_TICKETS_PER_SERVER: usize = 8;
 
-    use pki_types::ServerName;
+struct ServerData {
+    kx_hint: Option<NamedGroup>,
 
-    use crate::lock::Mutex;
-    use crate::msgs::persist;
-    use crate::{limited_cache, NamedGroup};
+    // Zero or one TLS1.2 sessions.
+    #[cfg(feature = "tls12")]
+    tls12: Option<persist::Tls12ClientSessionValue>,
 
-    const MAX_TLS13_TICKETS_PER_SERVER: usize = 8;
+    // Up to MAX_TLS13_TICKETS_PER_SERVER TLS1.3 tickets, oldest first.
+    tls13: VecDeque<persist::Tls13ClientSessionValue>,
+}
 
-    struct ServerData {
-        kx_hint: Option<NamedGroup>,
-
-        // Zero or one TLS1.2 sessions.
-        #[cfg(feature = "tls12")]
-        tls12: Option<persist::Tls12ClientSessionValue>,
-
-        // Up to MAX_TLS13_TICKETS_PER_SERVER TLS1.3 tickets, oldest first.
-        tls13: VecDeque<persist::Tls13ClientSessionValue>,
-    }
-
-    impl Default for ServerData {
-        fn default() -> Self {
-            Self {
-                kx_hint: None,
-                #[cfg(feature = "tls12")]
-                tls12: None,
-                tls13: VecDeque::with_capacity(MAX_TLS13_TICKETS_PER_SERVER),
-            }
-        }
-    }
-
-    /// An implementer of `ClientSessionStore` that stores everything
-    /// in memory.
-    ///
-    /// It enforces a limit on the number of entries to bound memory usage.
-    pub struct ClientSessionMemoryCache {
-        servers: Mutex<limited_cache::LimitedCache<ServerName<'static>, ServerData>>,
-    }
-
-    impl ClientSessionMemoryCache {
-        /// Make a new ClientSessionMemoryCache.  `size` is the
-        /// maximum number of stored sessions.
-        #[cfg(feature = "std")]
-        pub fn new(size: usize) -> Self {
-            let max_servers = size.saturating_add(MAX_TLS13_TICKETS_PER_SERVER - 1)
-                / MAX_TLS13_TICKETS_PER_SERVER;
-            Self {
-                servers: Mutex::new(limited_cache::LimitedCache::new(max_servers)),
-            }
-        }
-
-        /// Make a new ClientSessionMemoryCache.  `size` is the
-        /// maximum number of stored sessions.
-        #[cfg(not(feature = "std"))]
-        pub fn new<M: crate::lock::MakeMutex>(size: usize) -> Self {
-            let max_servers = size.saturating_add(MAX_TLS13_TICKETS_PER_SERVER - 1)
-                / MAX_TLS13_TICKETS_PER_SERVER;
-            Self {
-                servers: Mutex::new::<M>(limited_cache::LimitedCache::new(max_servers)),
-            }
-        }
-    }
-
-    impl super::client::ClientSessionStore for ClientSessionMemoryCache {
-        fn set_kx_hint(&self, server_name: ServerName<'static>, group: NamedGroup) {
-            self.servers
-                .lock()
-                .unwrap()
-                .get_or_insert_default_and_edit(server_name, |data| data.kx_hint = Some(group));
-        }
-
-        fn kx_hint(&self, server_name: &ServerName<'_>) -> Option<NamedGroup> {
-            self.servers
-                .lock()
-                .unwrap()
-                .get(server_name)
-                .and_then(|sd| sd.kx_hint)
-        }
-
-        fn set_tls12_session(
-            &self,
-            _server_name: ServerName<'static>,
-            _value: persist::Tls12ClientSessionValue,
-        ) {
+impl Default for ServerData {
+    fn default() -> Self {
+        Self {
+            kx_hint: None,
             #[cfg(feature = "tls12")]
-            self.servers
-                .lock()
-                .unwrap()
-                .get_or_insert_default_and_edit(_server_name.clone(), |data| {
-                    data.tls12 = Some(_value)
-                });
-        }
-
-        fn tls12_session(
-            &self,
-            _server_name: &ServerName<'_>,
-        ) -> Option<persist::Tls12ClientSessionValue> {
-            #[cfg(not(feature = "tls12"))]
-            return None;
-
-            #[cfg(feature = "tls12")]
-            self.servers
-                .lock()
-                .unwrap()
-                .get(_server_name)
-                .and_then(|sd| sd.tls12.as_ref().cloned())
-        }
-
-        fn remove_tls12_session(&self, _server_name: &ServerName<'static>) {
-            #[cfg(feature = "tls12")]
-            self.servers
-                .lock()
-                .unwrap()
-                .get_mut(_server_name)
-                .and_then(|data| data.tls12.take());
-        }
-
-        fn insert_tls13_ticket(
-            &self,
-            server_name: ServerName<'static>,
-            value: persist::Tls13ClientSessionValue,
-        ) {
-            self.servers
-                .lock()
-                .unwrap()
-                .get_or_insert_default_and_edit(server_name.clone(), |data| {
-                    if data.tls13.len() == data.tls13.capacity() {
-                        data.tls13.pop_front();
-                    }
-                    data.tls13.push_back(value);
-                });
-        }
-
-        fn take_tls13_ticket(
-            &self,
-            server_name: &ServerName<'static>,
-        ) -> Option<persist::Tls13ClientSessionValue> {
-            self.servers
-                .lock()
-                .unwrap()
-                .get_mut(server_name)
-                .and_then(|data| data.tls13.pop_back())
-        }
-    }
-
-    impl fmt::Debug for ClientSessionMemoryCache {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            // Note: we omit self.servers as it may contain sensitive data.
-            f.debug_struct("ClientSessionMemoryCache")
-                .finish()
+            tls12: None,
+            tls13: VecDeque::with_capacity(MAX_TLS13_TICKETS_PER_SERVER),
         }
     }
 }
 
-#[cfg(any(feature = "std", feature = "hashbrown"))]
-pub use cache::ClientSessionMemoryCache;
+/// An implementer of `ClientSessionStore` that stores everything
+/// in memory.
+///
+/// It enforces a limit on the number of entries to bound memory usage.
+pub struct ClientSessionMemoryCache {
+    servers: Mutex<limited_cache::LimitedCache<ServerName<'static>, ServerData>>,
+}
+
+impl ClientSessionMemoryCache {
+    /// Make a new ClientSessionMemoryCache.  `size` is the
+    /// maximum number of stored sessions.
+    pub fn new(size: usize) -> Self {
+        let max_servers =
+            size.saturating_add(MAX_TLS13_TICKETS_PER_SERVER - 1) / MAX_TLS13_TICKETS_PER_SERVER;
+        Self {
+            servers: Mutex::new(limited_cache::LimitedCache::new(max_servers)),
+        }
+    }
+}
+
+impl client::ClientSessionStore for ClientSessionMemoryCache {
+    fn set_kx_hint(&self, server_name: ServerName<'static>, group: NamedGroup) {
+        self.servers
+            .lock()
+            .unwrap()
+            .get_or_insert_default_and_edit(server_name, |data| data.kx_hint = Some(group));
+    }
+
+    fn kx_hint(&self, server_name: &ServerName<'_>) -> Option<NamedGroup> {
+        self.servers
+            .lock()
+            .unwrap()
+            .get(server_name)
+            .and_then(|sd| sd.kx_hint)
+    }
+
+    fn set_tls12_session(
+        &self,
+        _server_name: ServerName<'static>,
+        _value: persist::Tls12ClientSessionValue,
+    ) {
+        #[cfg(feature = "tls12")]
+        self.servers
+            .lock()
+            .unwrap()
+            .get_or_insert_default_and_edit(_server_name.clone(), |data| data.tls12 = Some(_value));
+    }
+
+    fn tls12_session(
+        &self,
+        _server_name: &ServerName<'_>,
+    ) -> Option<persist::Tls12ClientSessionValue> {
+        #[cfg(not(feature = "tls12"))]
+        return None;
+
+        #[cfg(feature = "tls12")]
+        self.servers
+            .lock()
+            .unwrap()
+            .get(_server_name)
+            .and_then(|sd| sd.tls12.as_ref().cloned())
+    }
+
+    fn remove_tls12_session(&self, _server_name: &ServerName<'static>) {
+        #[cfg(feature = "tls12")]
+        self.servers
+            .lock()
+            .unwrap()
+            .get_mut(_server_name)
+            .and_then(|data| data.tls12.take());
+    }
+
+    fn insert_tls13_ticket(
+        &self,
+        server_name: ServerName<'static>,
+        value: persist::Tls13ClientSessionValue,
+    ) {
+        self.servers
+            .lock()
+            .unwrap()
+            .get_or_insert_default_and_edit(server_name.clone(), |data| {
+                if data.tls13.len() == data.tls13.capacity() {
+                    data.tls13.pop_front();
+                }
+                data.tls13.push_back(value);
+            });
+    }
+
+    fn take_tls13_ticket(
+        &self,
+        server_name: &ServerName<'static>,
+    ) -> Option<persist::Tls13ClientSessionValue> {
+        self.servers
+            .lock()
+            .unwrap()
+            .get_mut(server_name)
+            .and_then(|data| data.tls13.pop_back())
+    }
+}
+
+impl fmt::Debug for ClientSessionMemoryCache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        // Note: we omit self.servers as it may contain sensitive data.
+        f.debug_struct("ClientSessionMemoryCache")
+            .finish()
+    }
+}
 
 #[derive(Debug)]
 pub(super) struct FailResolveClientCert {}
@@ -218,7 +195,7 @@ pub(super) struct AlwaysResolvesClientCert(Arc<sign::CertifiedKey>);
 impl AlwaysResolvesClientCert {
     pub(super) fn new(
         private_key: Arc<dyn sign::SigningKey>,
-        chain: CertificateChain<'static>,
+        chain: CertificateChain,
     ) -> Result<Self, Error> {
         Ok(Self(Arc::new(sign::CertifiedKey::new(
             chain.0,
@@ -241,8 +218,8 @@ impl client::ResolvesClientCert for AlwaysResolvesClientCert {
     }
 }
 
-test_for_each_provider! {
-    use std::prelude::v1::*;
+#[cfg(all(test, any(feature = "ring", feature = "aws_lc_rs")))]
+mod tests {
     use super::NoClientSessionStorage;
     use crate::client::ClientSessionStore;
     use crate::msgs::enums::NamedGroup;
@@ -251,7 +228,8 @@ test_for_each_provider! {
     use crate::msgs::handshake::SessionId;
     use crate::msgs::persist::Tls13ClientSessionValue;
     use crate::suites::SupportedCipherSuite;
-    use provider::cipher_suite;
+    use crate::test_provider::cipher_suite;
+    use alloc::vec::Vec;
 
     use pki_types::{ServerName, UnixTime};
 

@@ -91,7 +91,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for AssumeR
         ));
 
         cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::SensitiveOutput);
-        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new("AssumeRole", "sts"));
+        cfg.store_put(::aws_smithy_http::operation::Metadata::new("AssumeRole", "sts"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = true;
         signing_options.content_sha256_header = false;
@@ -112,7 +112,11 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for AssumeR
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("AssumeRole")
-            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
+            .with_interceptor(
+                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
+                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
+                ),
+            )
             .with_interceptor(AssumeRoleEndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::assume_role::AssumeRoleError,
@@ -231,9 +235,6 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for AssumeRoleEnd
         ::std::result::Result::Ok(())
     }
 }
-
-// The get_* functions below are generated from JMESPath expressions in the
-// operationContextParams trait. They target the operation's input shape.
 
 /// Error type for the `AssumeRoleError` operation.
 #[non_exhaustive]

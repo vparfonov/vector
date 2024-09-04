@@ -96,12 +96,3 @@ impl EsWarmPartitionInstanceType {
         }
     }
 }
-impl ::std::fmt::Display for EsWarmPartitionInstanceType {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            EsWarmPartitionInstanceType::Ultrawarm1LargeElasticsearch => write!(f, "ultrawarm1.large.elasticsearch"),
-            EsWarmPartitionInstanceType::Ultrawarm1MediumElasticsearch => write!(f, "ultrawarm1.medium.elasticsearch"),
-            EsWarmPartitionInstanceType::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

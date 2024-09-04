@@ -45,8 +45,8 @@ impl MalformedPolicyDocumentException {
 }
 
 /// A builder for [`MalformedPolicyDocumentException`](crate::types::error::MalformedPolicyDocumentException).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct MalformedPolicyDocumentExceptionBuilder {
     pub(crate) message: ::std::option::Option<::std::string::String>,
     meta: std::option::Option<::aws_smithy_types::error::ErrorMetadata>,

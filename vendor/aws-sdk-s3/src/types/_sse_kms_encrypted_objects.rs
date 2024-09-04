@@ -21,8 +21,8 @@ impl SseKmsEncryptedObjects {
 }
 
 /// A builder for [`SseKmsEncryptedObjects`](crate::types::SseKmsEncryptedObjects).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct SseKmsEncryptedObjectsBuilder {
     pub(crate) status: ::std::option::Option<crate::types::SseKmsEncryptedObjectsStatus>,
 }

@@ -116,32 +116,34 @@
 //! can reproduce the example above in a single line of code, with no
 //! risk of deadlocks and no risk of leaking [zombie
 //! children](https://en.wikipedia.org/wiki/Zombie_process).
+//!
+//! # Cargo features
+//!
+//! The `io_safety` feature is currently off by default but enabled for
+//! [docs.rs](https://docs.rs/os_pipe/latest/os_pipe/). It enables conversions to and from the
+//! [`OwnedFd`](https://doc.rust-lang.org/stable/std/os/unix/io/struct.OwnedFd.html) and
+//! [`BorrowedFd`](https://doc.rust-lang.org/stable/std/os/unix/io/struct.BorrowedFd.html) IO
+//! safety types (and their [Windows
+//! counterparts](https://doc.rust-lang.org/stable/std/os/windows/io/index.html)) introduced in
+//! Rust 1.63. Eventually these conversions will be available unconditionally and this feature will
+//! become a no-op.
 
 use std::fs::File;
 use std::io;
 use std::process::Stdio;
-
-#[cfg(not(windows))]
-#[path = "unix.rs"]
-mod sys;
-#[cfg(windows)]
-#[path = "windows.rs"]
-mod sys;
 
 /// The reading end of a pipe, returned by [`pipe`](fn.pipe.html).
 ///
 /// `PipeReader` implements `Into<Stdio>`, so you can pass it as an argument to
 /// `Command::stdin` to spawn a child process that reads from the pipe.
 #[derive(Debug)]
-pub struct PipeReader(
-    // We use std::fs::File here for two reasons: OwnedFd and OwnedHandle are platform-specific,
-    // and this gives us read/write/flush for free.
-    File,
-);
+pub struct PipeReader(File);
 
 impl PipeReader {
     pub fn try_clone(&self) -> io::Result<PipeReader> {
-        self.0.try_clone().map(PipeReader)
+        // Do *not* use File::try_clone here. It's buggy on windows. See
+        // comments on windows.rs::dup().
+        sys::dup(&self.0).map(PipeReader)
     }
 }
 
@@ -153,7 +155,8 @@ impl io::Read for PipeReader {
 
 impl<'a> io::Read for &'a PipeReader {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        (&self.0).read(buf)
+        let mut file_ref = &self.0;
+        file_ref.read(buf)
     }
 }
 
@@ -173,7 +176,9 @@ pub struct PipeWriter(File);
 
 impl PipeWriter {
     pub fn try_clone(&self) -> io::Result<PipeWriter> {
-        self.0.try_clone().map(PipeWriter)
+        // Do *not* use File::try_clone here. It's buggy on windows. See
+        // comments on windows.rs::dup().
+        sys::dup(&self.0).map(PipeWriter)
     }
 }
 
@@ -189,11 +194,13 @@ impl io::Write for PipeWriter {
 
 impl<'a> io::Write for &'a PipeWriter {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        (&self.0).write(buf)
+        let mut file_ref = &self.0;
+        file_ref.write(buf)
     }
 
     fn flush(&mut self) -> io::Result<()> {
-        (&self.0).flush()
+        let mut file_ref = &self.0;
+        file_ref.flush()
     }
 }
 
@@ -232,7 +239,7 @@ pub fn pipe() -> io::Result<(PipeReader, PipeWriter)> {
 /// [`Command::stdin`]: https://doc.rust-lang.org/std/process/struct.Command.html#method.stdin
 /// [`Stdio::inherit`]: https://doc.rust-lang.org/std/process/struct.Stdio.html#method.inherit
 pub fn dup_stdin() -> io::Result<PipeReader> {
-    sys::dup(io::stdin()).map(PipeReader::from)
+    sys::dup(&io::stdin()).map(PipeReader)
 }
 
 /// Get a duplicated copy of the current process's standard output, as a
@@ -251,7 +258,7 @@ pub fn dup_stdin() -> io::Result<PipeReader> {
 /// [`Command::stderr`]: https://doc.rust-lang.org/std/process/struct.Command.html#method.stderr
 /// [`Stdio::inherit`]: https://doc.rust-lang.org/std/process/struct.Stdio.html#method.inherit
 pub fn dup_stdout() -> io::Result<PipeWriter> {
-    sys::dup(io::stdout()).map(PipeWriter::from)
+    sys::dup(&io::stdout()).map(PipeWriter)
 }
 
 /// Get a duplicated copy of the current process's standard error, as a
@@ -270,8 +277,15 @@ pub fn dup_stdout() -> io::Result<PipeWriter> {
 /// [`Command::stderr`]: https://doc.rust-lang.org/std/process/struct.Command.html#method.stderr
 /// [`Stdio::inherit`]: https://doc.rust-lang.org/std/process/struct.Stdio.html#method.inherit
 pub fn dup_stderr() -> io::Result<PipeWriter> {
-    sys::dup(io::stderr()).map(PipeWriter::from)
+    sys::dup(&io::stderr()).map(PipeWriter)
 }
+
+#[cfg(not(windows))]
+#[path = "unix.rs"]
+mod sys;
+#[cfg(windows)]
+#[path = "windows.rs"]
+mod sys;
 
 #[cfg(test)]
 mod tests {
@@ -485,6 +499,6 @@ mod tests {
     #[test]
     fn test_debug() {
         let (reader, writer) = crate::pipe().unwrap();
-        _ = format!("{:?} {:?}", reader, writer);
+        format!("{:?} {:?}", reader, writer);
     }
 }

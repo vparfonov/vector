@@ -11,9 +11,9 @@
 
 [package]
 edition = "2018"
-rust-version = "1.60"
+rust-version = "1.41"
 name = "similar"
-version = "2.6.0"
+version = "2.3.0"
 authors = [
     "Armin Ronacher <armin.ronacher@active-4.com>",
     "Pierre-Étienne Meunier <pe@pijul.org>",
@@ -84,7 +84,7 @@ required-features = [
 ]
 
 [dependencies.bstr]
-version = "1.5.0"
+version = "0.2.14"
 optional = true
 default-features = false
 
@@ -117,6 +117,5 @@ text = []
 unicode = [
     "text",
     "unicode-segmentation",
-    "bstr?/unicode",
-    "bstr?/std",
+    "bstr/unicode",
 ]

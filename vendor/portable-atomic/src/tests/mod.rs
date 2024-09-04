@@ -143,6 +143,7 @@ fn test_is_lock_free() {
         {
             let has_cmpxchg16b = cfg!(all(
                 feature = "fallback",
+                not(portable_atomic_no_cmpxchg16b_target_feature),
                 not(portable_atomic_no_outline_atomics),
                 not(any(target_env = "sgx", miri)),
                 not(portable_atomic_test_outline_atomics_detect_false),
@@ -316,7 +317,6 @@ LLVM version: 15.0.3",
 }
 
 #[cfg(feature = "serde")]
-#[allow(clippy::as_underscore)]
 #[test]
 fn test_serde() {
     use test_helper::serde::{assert_tokens, DebugPartialEq, Token};
@@ -352,7 +352,6 @@ fn test_serde() {
     #[cfg(feature = "float")]
     t!(AtomicF32, f32, F32);
     #[cfg(feature = "float")]
-    // TODO: fixed in LLVM 18?
     #[cfg(not(target_arch = "mips"))] // LLVM 17 (nightly-2023-08-09) bug: assertion failed at core/src/num/diy_float.rs:78:9
     t!(AtomicF64, f64, F64);
 }

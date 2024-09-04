@@ -14,62 +14,6 @@ extern "C" {
     #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
     #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub type GpuBindGroupDescriptor;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `label` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GpuBindGroupDescriptor`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "label")]
-    pub fn get_label(this: &GpuBindGroupDescriptor) -> Option<String>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `label` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GpuBindGroupDescriptor`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "label")]
-    pub fn set_label(this: &GpuBindGroupDescriptor, val: &str);
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `entries` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GpuBindGroupDescriptor`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "entries")]
-    pub fn get_entries(this: &GpuBindGroupDescriptor) -> ::js_sys::Array;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `entries` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GpuBindGroupDescriptor`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "entries")]
-    pub fn set_entries(this: &GpuBindGroupDescriptor, val: &::wasm_bindgen::JsValue);
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "GpuBindGroupLayout")]
-    #[doc = "Get the `layout` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GpuBindGroupDescriptor`, `GpuBindGroupLayout`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "layout")]
-    pub fn get_layout(this: &GpuBindGroupDescriptor) -> GpuBindGroupLayout;
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "GpuBindGroupLayout")]
-    #[doc = "Change the `layout` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GpuBindGroupDescriptor`, `GpuBindGroupLayout`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "layout")]
-    pub fn set_layout(this: &GpuBindGroupDescriptor, val: &GpuBindGroupLayout);
 }
 #[cfg(web_sys_unstable_apis)]
 impl GpuBindGroupDescriptor {
@@ -88,22 +32,60 @@ impl GpuBindGroupDescriptor {
         ret
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_label()` instead."]
+    #[doc = "Change the `label` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `GpuBindGroupDescriptor`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn label(&mut self, val: &str) -> &mut Self {
-        self.set_label(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("label"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_entries()` instead."]
+    #[doc = "Change the `entries` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `GpuBindGroupDescriptor`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn entries(&mut self, val: &::wasm_bindgen::JsValue) -> &mut Self {
-        self.set_entries(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("entries"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
     #[cfg(feature = "GpuBindGroupLayout")]
-    #[deprecated = "Use `set_layout()` instead."]
+    #[doc = "Change the `layout` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `GpuBindGroupDescriptor`, `GpuBindGroupLayout`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn layout(&mut self, val: &GpuBindGroupLayout) -> &mut Self {
-        self.set_layout(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("layout"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

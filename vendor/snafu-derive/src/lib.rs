@@ -1496,10 +1496,9 @@ trait GenericAwareNames {
 
     fn provided_generic_types_without_defaults(&self) -> Vec<proc_macro2::TokenStream> {
         use syn::TypeParam;
-
         self.generics()
             .type_params()
-            .map(|t| {
+            .map(|t: &TypeParam| {
                 let TypeParam {
                     attrs,
                     ident,
@@ -1521,46 +1520,20 @@ trait GenericAwareNames {
         self.provided_generic_lifetimes()
             .into_iter()
             .chain(self.provided_generic_types_without_defaults())
-            .chain(self.provided_generic_consts_without_defaults())
             .collect()
     }
 
     fn provided_generic_lifetimes(&self) -> Vec<proc_macro2::TokenStream> {
-        use syn::LifetimeParam;
+        use syn::{GenericParam, LifetimeParam};
 
         self.generics()
-            .lifetimes()
-            .map(|l| {
-                let LifetimeParam {
-                    attrs, lifetime, ..
-                } = l;
-                quote! {
-                    #(#attrs)*
-                    #lifetime
+            .params
+            .iter()
+            .flat_map(|p| match p {
+                GenericParam::Lifetime(LifetimeParam { lifetime, .. }) => {
+                    Some(quote! { #lifetime })
                 }
-            })
-            .collect()
-    }
-
-    fn provided_generic_consts_without_defaults(&self) -> Vec<proc_macro2::TokenStream> {
-        self.generics()
-            .const_params()
-            .map(|c| {
-                let syn::ConstParam {
-                    attrs,
-                    const_token,
-                    ident,
-                    colon_token,
-                    ty,
-                    ..
-                } = c;
-                quote! {
-                    #(#attrs)*
-                    #const_token
-                    #ident
-                    #colon_token
-                    #ty
-                }
+                _ => None,
             })
             .collect()
     }

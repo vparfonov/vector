@@ -9,7 +9,7 @@ pub struct UpdateDestinationInput {
     pub current_delivery_stream_version_id: ::std::option::Option<::std::string::String>,
     /// <p>The ID of the destination.</p>
     pub destination_id: ::std::option::Option<::std::string::String>,
-    /// <p>\[Deprecated\] Describes an update for a destination in Amazon S3.</p>
+    /// <p>[Deprecated] Describes an update for a destination in Amazon S3.</p>
     #[deprecated]
     pub s3_destination_update: ::std::option::Option<crate::types::S3DestinationUpdate>,
     /// <p>Describes an update for a destination in Amazon S3.</p>
@@ -26,11 +26,6 @@ pub struct UpdateDestinationInput {
     pub http_endpoint_destination_update: ::std::option::Option<crate::types::HttpEndpointDestinationUpdate>,
     /// <p>Describes an update for a destination in the Serverless offering for Amazon OpenSearch Service.</p>
     pub amazon_open_search_serverless_destination_update: ::std::option::Option<crate::types::AmazonOpenSearchServerlessDestinationUpdate>,
-    /// <p>Update to the Snowflake destination configuration settings.</p>
-    pub snowflake_destination_update: ::std::option::Option<crate::types::SnowflakeDestinationUpdate>,
-    /// <p>Describes an update for a destination in Apache Iceberg Tables.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub iceberg_destination_update: ::std::option::Option<crate::types::IcebergDestinationUpdate>,
 }
 impl UpdateDestinationInput {
     /// <p>The name of the delivery stream.</p>
@@ -45,7 +40,7 @@ impl UpdateDestinationInput {
     pub fn destination_id(&self) -> ::std::option::Option<&str> {
         self.destination_id.as_deref()
     }
-    /// <p>\[Deprecated\] Describes an update for a destination in Amazon S3.</p>
+    /// <p>[Deprecated] Describes an update for a destination in Amazon S3.</p>
     #[deprecated]
     pub fn s3_destination_update(&self) -> ::std::option::Option<&crate::types::S3DestinationUpdate> {
         self.s3_destination_update.as_ref()
@@ -80,15 +75,6 @@ impl UpdateDestinationInput {
     ) -> ::std::option::Option<&crate::types::AmazonOpenSearchServerlessDestinationUpdate> {
         self.amazon_open_search_serverless_destination_update.as_ref()
     }
-    /// <p>Update to the Snowflake destination configuration settings.</p>
-    pub fn snowflake_destination_update(&self) -> ::std::option::Option<&crate::types::SnowflakeDestinationUpdate> {
-        self.snowflake_destination_update.as_ref()
-    }
-    /// <p>Describes an update for a destination in Apache Iceberg Tables.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub fn iceberg_destination_update(&self) -> ::std::option::Option<&crate::types::IcebergDestinationUpdate> {
-        self.iceberg_destination_update.as_ref()
-    }
 }
 impl UpdateDestinationInput {
     /// Creates a new builder-style object to manufacture [`UpdateDestinationInput`](crate::operation::update_destination::UpdateDestinationInput).
@@ -98,8 +84,8 @@ impl UpdateDestinationInput {
 }
 
 /// A builder for [`UpdateDestinationInput`](crate::operation::update_destination::UpdateDestinationInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct UpdateDestinationInputBuilder {
     pub(crate) delivery_stream_name: ::std::option::Option<::std::string::String>,
     pub(crate) current_delivery_stream_version_id: ::std::option::Option<::std::string::String>,
@@ -112,8 +98,6 @@ pub struct UpdateDestinationInputBuilder {
     pub(crate) splunk_destination_update: ::std::option::Option<crate::types::SplunkDestinationUpdate>,
     pub(crate) http_endpoint_destination_update: ::std::option::Option<crate::types::HttpEndpointDestinationUpdate>,
     pub(crate) amazon_open_search_serverless_destination_update: ::std::option::Option<crate::types::AmazonOpenSearchServerlessDestinationUpdate>,
-    pub(crate) snowflake_destination_update: ::std::option::Option<crate::types::SnowflakeDestinationUpdate>,
-    pub(crate) iceberg_destination_update: ::std::option::Option<crate::types::IcebergDestinationUpdate>,
 }
 impl UpdateDestinationInputBuilder {
     /// <p>The name of the delivery stream.</p>
@@ -161,19 +145,19 @@ impl UpdateDestinationInputBuilder {
     pub fn get_destination_id(&self) -> &::std::option::Option<::std::string::String> {
         &self.destination_id
     }
-    /// <p>\[Deprecated\] Describes an update for a destination in Amazon S3.</p>
+    /// <p>[Deprecated] Describes an update for a destination in Amazon S3.</p>
     #[deprecated]
     pub fn s3_destination_update(mut self, input: crate::types::S3DestinationUpdate) -> Self {
         self.s3_destination_update = ::std::option::Option::Some(input);
         self
     }
-    /// <p>\[Deprecated\] Describes an update for a destination in Amazon S3.</p>
+    /// <p>[Deprecated] Describes an update for a destination in Amazon S3.</p>
     #[deprecated]
     pub fn set_s3_destination_update(mut self, input: ::std::option::Option<crate::types::S3DestinationUpdate>) -> Self {
         self.s3_destination_update = input;
         self
     }
-    /// <p>\[Deprecated\] Describes an update for a destination in Amazon S3.</p>
+    /// <p>[Deprecated] Describes an update for a destination in Amazon S3.</p>
     #[deprecated]
     pub fn get_s3_destination_update(&self) -> &::std::option::Option<crate::types::S3DestinationUpdate> {
         &self.s3_destination_update
@@ -284,37 +268,6 @@ impl UpdateDestinationInputBuilder {
     ) -> &::std::option::Option<crate::types::AmazonOpenSearchServerlessDestinationUpdate> {
         &self.amazon_open_search_serverless_destination_update
     }
-    /// <p>Update to the Snowflake destination configuration settings.</p>
-    pub fn snowflake_destination_update(mut self, input: crate::types::SnowflakeDestinationUpdate) -> Self {
-        self.snowflake_destination_update = ::std::option::Option::Some(input);
-        self
-    }
-    /// <p>Update to the Snowflake destination configuration settings.</p>
-    pub fn set_snowflake_destination_update(mut self, input: ::std::option::Option<crate::types::SnowflakeDestinationUpdate>) -> Self {
-        self.snowflake_destination_update = input;
-        self
-    }
-    /// <p>Update to the Snowflake destination configuration settings.</p>
-    pub fn get_snowflake_destination_update(&self) -> &::std::option::Option<crate::types::SnowflakeDestinationUpdate> {
-        &self.snowflake_destination_update
-    }
-    /// <p>Describes an update for a destination in Apache Iceberg Tables.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub fn iceberg_destination_update(mut self, input: crate::types::IcebergDestinationUpdate) -> Self {
-        self.iceberg_destination_update = ::std::option::Option::Some(input);
-        self
-    }
-    /// <p>Describes an update for a destination in Apache Iceberg Tables.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub fn set_iceberg_destination_update(mut self, input: ::std::option::Option<crate::types::IcebergDestinationUpdate>) -> Self {
-        self.iceberg_destination_update = input;
-        self
-    }
-    /// <p>Describes an update for a destination in Apache Iceberg Tables.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub fn get_iceberg_destination_update(&self) -> &::std::option::Option<crate::types::IcebergDestinationUpdate> {
-        &self.iceberg_destination_update
-    }
     /// Consumes the builder and constructs a [`UpdateDestinationInput`](crate::operation::update_destination::UpdateDestinationInput).
     pub fn build(
         self,
@@ -331,8 +284,6 @@ impl UpdateDestinationInputBuilder {
             splunk_destination_update: self.splunk_destination_update,
             http_endpoint_destination_update: self.http_endpoint_destination_update,
             amazon_open_search_serverless_destination_update: self.amazon_open_search_serverless_destination_update,
-            snowflake_destination_update: self.snowflake_destination_update,
-            iceberg_destination_update: self.iceberg_destination_update,
         })
     }
 }

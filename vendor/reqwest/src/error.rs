@@ -172,7 +172,7 @@ impl fmt::Debug for Error {
         builder.field("kind", &self.inner.kind);
 
         if let Some(ref url) = self.inner.url {
-            builder.field("url", &url.as_str());
+            builder.field("url", url);
         }
         if let Some(ref source) = self.inner.source {
             builder.field("source", source);
@@ -287,13 +287,6 @@ pub(crate) fn upgrade<E: Into<BoxError>>(e: E) -> Error {
 
 // io::Error helpers
 
-#[cfg(any(
-    feature = "gzip",
-    feature = "zstd",
-    feature = "brotli",
-    feature = "deflate",
-    feature = "blocking",
-))]
 pub(crate) fn into_io(e: BoxError) -> io::Error {
     io::Error::new(io::ErrorKind::Other, e)
 }

@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.60.0"
 name = "pem"
-version = "3.0.4"
+version = "3.0.2"
 authors = ["Jonathan Creekmore <jonathan@thecreekmores.org>"]
 description = "Parse and encode PEM-encoded data."
 homepage = "https://github.com/jcreekmore/pem-rs.git"
@@ -34,7 +34,7 @@ name = "pem_benchmark"
 harness = false
 
 [dependencies.base64]
-version = "0.22.0"
+version = "0.21.0"
 features = ["alloc"]
 default-features = false
 

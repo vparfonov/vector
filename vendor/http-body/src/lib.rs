@@ -2,6 +2,7 @@
     missing_debug_implementations,
     missing_docs,
     unreachable_pub,
+    rustdoc::broken_intra_doc_links,
     clippy::missing_safety_doc,
     clippy::undocumented_unsafe_blocks
 )]

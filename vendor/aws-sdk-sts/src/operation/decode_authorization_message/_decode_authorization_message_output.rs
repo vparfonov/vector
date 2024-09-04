@@ -27,8 +27,8 @@ impl DecodeAuthorizationMessageOutput {
 }
 
 /// A builder for [`DecodeAuthorizationMessageOutput`](crate::operation::decode_authorization_message::DecodeAuthorizationMessageOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DecodeAuthorizationMessageOutputBuilder {
     pub(crate) decoded_message: ::std::option::Option<::std::string::String>,
     _request_id: Option<String>,

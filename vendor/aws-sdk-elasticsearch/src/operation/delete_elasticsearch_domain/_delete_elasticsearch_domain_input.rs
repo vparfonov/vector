@@ -21,8 +21,8 @@ impl DeleteElasticsearchDomainInput {
 }
 
 /// A builder for [`DeleteElasticsearchDomainInput`](crate::operation::delete_elasticsearch_domain::DeleteElasticsearchDomainInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DeleteElasticsearchDomainInputBuilder {
     pub(crate) domain_name: ::std::option::Option<::std::string::String>,
 }

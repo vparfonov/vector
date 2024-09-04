@@ -10,16 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `KeyIdsInitData`*"]
     pub type KeyIdsInitData;
-    #[doc = "Get the `kids` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `KeyIdsInitData`*"]
-    #[wasm_bindgen(method, getter = "kids")]
-    pub fn get_kids(this: &KeyIdsInitData) -> ::js_sys::Array;
-    #[doc = "Change the `kids` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `KeyIdsInitData`*"]
-    #[wasm_bindgen(method, setter = "kids")]
-    pub fn set_kids(this: &KeyIdsInitData, val: &::wasm_bindgen::JsValue);
 }
 impl KeyIdsInitData {
     #[doc = "Construct a new `KeyIdsInitData`."]
@@ -31,9 +21,17 @@ impl KeyIdsInitData {
         ret.kids(kids);
         ret
     }
-    #[deprecated = "Use `set_kids()` instead."]
+    #[doc = "Change the `kids` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `KeyIdsInitData`*"]
     pub fn kids(&mut self, val: &::wasm_bindgen::JsValue) -> &mut Self {
-        self.set_kids(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("kids"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

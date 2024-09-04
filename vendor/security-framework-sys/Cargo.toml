@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "security-framework-sys"
-version = "2.11.1"
+version = "2.10.0"
 authors = [
     "Steven Fackler <sfackler@gmail.com>",
     "Kornel <kornel@geekhood.net>",
@@ -41,10 +41,10 @@ targets = [
 ]
 
 [dependencies.core-foundation-sys]
-version = "0.8.6"
+version = "0.8.3"
 
 [dependencies.libc]
-version = "0.2.150"
+version = "0.2.139"
 
 [features]
 OSX_10_10 = ["OSX_10_9"]
@@ -54,7 +54,7 @@ OSX_10_13 = ["OSX_10_12"]
 OSX_10_14 = ["OSX_10_13"]
 OSX_10_15 = ["OSX_10_14"]
 OSX_10_9 = []
-default = ["OSX_10_12"]
+default = ["OSX_10_11"]
 
 [badges.maintenance]
 status = "looking-for-maintainer"

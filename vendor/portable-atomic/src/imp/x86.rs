@@ -12,7 +12,7 @@
 // - x86 and amd64 instruction reference https://www.felixcloutier.com/x86
 //
 // Generated asm:
-// - x86_64 https://godbolt.org/z/Kcsj1jd9c
+// - x86_64 https://godbolt.org/z/d17eTs5Ec
 
 use core::{arch::asm, sync::atomic::Ordering};
 
@@ -148,7 +148,6 @@ macro_rules! atomic_bit_opts {
                         // Do not use `preserves_flags` because BTS modifies the CF flag.
                         options(nostack),
                     );
-                    crate::utils::assert_unchecked(r == 0 || r == 1); // may help remove extra test
                     r != 0
                 }
             }
@@ -173,7 +172,6 @@ macro_rules! atomic_bit_opts {
                         // Do not use `preserves_flags` because BTR modifies the CF flag.
                         options(nostack),
                     );
-                    crate::utils::assert_unchecked(r == 0 || r == 1); // may help remove extra test
                     r != 0
                 }
             }
@@ -198,7 +196,6 @@ macro_rules! atomic_bit_opts {
                         // Do not use `preserves_flags` because BTC modifies the CF flag.
                         options(nostack),
                     );
-                    crate::utils::assert_unchecked(r == 0 || r == 1); // may help remove extra test
                     r != 0
                 }
             }

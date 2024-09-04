@@ -341,8 +341,7 @@ static int narrow_conv_backprop(NarrowConv *nc, IRRef ref, int depth)
       NarrowIns *savesp = nc->sp;
       int count = narrow_conv_backprop(nc, ir->op1, depth);
       count += narrow_conv_backprop(nc, ir->op2, depth);
-      /* Limit total number of conversions. */
-      if (count <= 1 && nc->sp < nc->maxsp) {
+      if (count <= 1) {  /* Limit total number of conversions. */
 	*nc->sp++ = NARROWINS(IRT(ir->o, nc->t), ref);
 	return count;
       }

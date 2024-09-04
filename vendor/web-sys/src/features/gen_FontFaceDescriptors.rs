@@ -10,86 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
     pub type FontFaceDescriptors;
-    #[doc = "Get the `display` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, getter = "display")]
-    pub fn get_display(this: &FontFaceDescriptors) -> Option<String>;
-    #[doc = "Change the `display` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, setter = "display")]
-    pub fn set_display(this: &FontFaceDescriptors, val: &str);
-    #[doc = "Get the `featureSettings` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, getter = "featureSettings")]
-    pub fn get_feature_settings(this: &FontFaceDescriptors) -> Option<String>;
-    #[doc = "Change the `featureSettings` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, setter = "featureSettings")]
-    pub fn set_feature_settings(this: &FontFaceDescriptors, val: &str);
-    #[doc = "Get the `stretch` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, getter = "stretch")]
-    pub fn get_stretch(this: &FontFaceDescriptors) -> Option<String>;
-    #[doc = "Change the `stretch` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, setter = "stretch")]
-    pub fn set_stretch(this: &FontFaceDescriptors, val: &str);
-    #[doc = "Get the `style` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, getter = "style")]
-    pub fn get_style(this: &FontFaceDescriptors) -> Option<String>;
-    #[doc = "Change the `style` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, setter = "style")]
-    pub fn set_style(this: &FontFaceDescriptors, val: &str);
-    #[doc = "Get the `unicodeRange` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, getter = "unicodeRange")]
-    pub fn get_unicode_range(this: &FontFaceDescriptors) -> Option<String>;
-    #[doc = "Change the `unicodeRange` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, setter = "unicodeRange")]
-    pub fn set_unicode_range(this: &FontFaceDescriptors, val: &str);
-    #[doc = "Get the `variant` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, getter = "variant")]
-    pub fn get_variant(this: &FontFaceDescriptors) -> Option<String>;
-    #[doc = "Change the `variant` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, setter = "variant")]
-    pub fn set_variant(this: &FontFaceDescriptors, val: &str);
-    #[doc = "Get the `variationSettings` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, getter = "variationSettings")]
-    pub fn get_variation_settings(this: &FontFaceDescriptors) -> Option<String>;
-    #[doc = "Change the `variationSettings` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, setter = "variationSettings")]
-    pub fn set_variation_settings(this: &FontFaceDescriptors, val: &str);
-    #[doc = "Get the `weight` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, getter = "weight")]
-    pub fn get_weight(this: &FontFaceDescriptors) -> Option<String>;
-    #[doc = "Change the `weight` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
-    #[wasm_bindgen(method, setter = "weight")]
-    pub fn set_weight(this: &FontFaceDescriptors, val: &str);
 }
 impl FontFaceDescriptors {
     #[doc = "Construct a new `FontFaceDescriptors`."]
@@ -100,44 +20,133 @@ impl FontFaceDescriptors {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_display()` instead."]
+    #[doc = "Change the `display` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
     pub fn display(&mut self, val: &str) -> &mut Self {
-        self.set_display(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("display"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_feature_settings()` instead."]
+    #[doc = "Change the `featureSettings` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
     pub fn feature_settings(&mut self, val: &str) -> &mut Self {
-        self.set_feature_settings(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("featureSettings"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_stretch()` instead."]
+    #[doc = "Change the `stretch` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
     pub fn stretch(&mut self, val: &str) -> &mut Self {
-        self.set_stretch(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("stretch"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_style()` instead."]
+    #[doc = "Change the `style` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
     pub fn style(&mut self, val: &str) -> &mut Self {
-        self.set_style(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("style"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_unicode_range()` instead."]
+    #[doc = "Change the `unicodeRange` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
     pub fn unicode_range(&mut self, val: &str) -> &mut Self {
-        self.set_unicode_range(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("unicodeRange"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_variant()` instead."]
+    #[doc = "Change the `variant` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
     pub fn variant(&mut self, val: &str) -> &mut Self {
-        self.set_variant(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("variant"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_variation_settings()` instead."]
+    #[doc = "Change the `variationSettings` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
     pub fn variation_settings(&mut self, val: &str) -> &mut Self {
-        self.set_variation_settings(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("variationSettings"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_weight()` instead."]
+    #[doc = "Change the `weight` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FontFaceDescriptors`*"]
     pub fn weight(&mut self, val: &str) -> &mut Self {
-        self.set_weight(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("weight"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

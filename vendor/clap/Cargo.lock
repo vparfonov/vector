@@ -34,9 +34,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle"
-version = "1.0.8"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bec1de6f59aedf83baf9ff929c98f2ad654b97c9510f4e70cf6f661d49fd5b1"
+checksum = "038dfcf04a5feb68e9c60b21c9625a54c2c0616e79b72b0fd87075a056ae1d1b"
 
 [[package]]
 name = "anstyle-parse"
@@ -112,10 +112,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "clap"
-version = "4.5.16"
+version = "4.5.10"
 dependencies = [
  "automod",
- "clap-cargo",
  "clap_builder",
  "clap_derive",
  "humantime",
@@ -127,19 +126,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "clap-cargo"
-version = "0.14.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23b2ea69cefa96b848b73ad516ad1d59a195cdf9263087d977f648a818c8b43e"
-dependencies = [
- "anstyle",
-]
-
-[[package]]
 name = "clap_builder"
-version = "4.5.15"
+version = "4.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "216aec2b177652e3846684cbfe25c9964d18ec45234f0f5da5157b207ed1aab6"
+checksum = "5ca6706fd5224857d9ac5eb9355f6683563cc0541c7cd9d014043b57cbec78ac"
 dependencies = [
  "anstream",
  "anstyle",
@@ -153,9 +143,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.5.13"
+version = "4.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "501d359d5f3dcaf6ecdeee48833ae73ec6e42723a1e52419c79abf9507eec0a0"
+checksum = "2bac35c6dafb060fd4d275d9a4ffae97917c13a6327903a8be2153cd964f7085"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -483,9 +473,9 @@ checksum = "fa42c91313f1d05da9b26f267f931cf178d4aba455b4c4622dd7355eb80c6640"
 
 [[package]]
 name = "snapbox"
-version = "0.6.16"
+version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "027c936207f85d10d015e21faf5c676c7e08c453ed371adf55c0874c443ca77a"
+checksum = "699c824ef8c2061c39efb3af4f334310b3acbfb2a50c6d1f867e4d95dcff94be"
 dependencies = [
  "anstream",
  "anstyle",
@@ -501,9 +491,9 @@ dependencies = [
 
 [[package]]
 name = "snapbox-macros"
-version = "0.3.10"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16569f53ca23a41bb6f62e0a5084aa1661f4814a67fa33696a79073e03a664af"
+checksum = "b1f4c14672714436c09254801c934b203196a51182a5107fb76591c7cc56424d"
 dependencies = [
  "anstream",
 ]
@@ -580,9 +570,9 @@ dependencies = [
 
 [[package]]
 name = "trybuild"
-version = "1.0.99"
+version = "1.0.97"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "207aa50d36c4be8d8c6ea829478be44a372c6a77669937bb39c698e52f1491e8"
+checksum = "5b1e5645f2ee8025c2f1d75e1138f2dd034d74e6ba54620f3c569ba2a2a1ea06"
 dependencies = [
  "glob",
  "serde",
@@ -594,9 +584,9 @@ dependencies = [
 
 [[package]]
 name = "trycmd"
-version = "0.15.6"
+version = "0.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e8673f1dc45acdff8e25a06cc62f8e529563e8acd84237ce83d5a28e2befa12"
+checksum = "59709bd8eccada6a3fded26d22a7f2dcee406c18d3bd7ad2605ca3eeb8f6f6ec"
 dependencies = [
  "automod",
  "glob",

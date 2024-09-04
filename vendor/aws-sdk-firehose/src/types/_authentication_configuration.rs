@@ -28,8 +28,8 @@ impl AuthenticationConfiguration {
 }
 
 /// A builder for [`AuthenticationConfiguration`](crate::types::AuthenticationConfiguration).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct AuthenticationConfigurationBuilder {
     pub(crate) role_arn: ::std::option::Option<::std::string::String>,
     pub(crate) connectivity: ::std::option::Option<crate::types::Connectivity>,

@@ -15,16 +15,14 @@ mod default_with_lifetime {
         S: std::error::Error + AsErrorSource,
     {
         #[snafu(display("Boom: {value}"))]
-        _Boom {
+        Boom {
             value: T,
             name: &'a str,
         },
-
-        _WithSource {
+        WithSource {
             source: S,
         },
-
-        _Empty,
+        Empty,
     }
 
     #[test]

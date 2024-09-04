@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.63"
 name = "linux-raw-sys"
-version = "0.4.14"
+version = "0.4.12"
 authors = ["Dan Gohman <dev@sunfishcode.online>"]
 exclude = [
     "/gen",
@@ -34,20 +34,13 @@ repository = "https://github.com/sunfishcode/linux-raw-sys"
 [package.metadata.docs.rs]
 features = [
     "default",
-    "bootparam",
     "ioctl",
     "netlink",
     "io_uring",
-    "if_arp",
     "if_ether",
-    "if_packet",
     "net",
     "prctl",
     "elf",
-    "xdp",
-    "mempolicy",
-    "system",
-    "loop_device",
 ]
 targets = [
     "x86_64-unknown-linux-gnu",
@@ -70,7 +63,6 @@ version = "0.2.100"
 version = "1.1.0"
 
 [features]
-bootparam = []
 default = [
     "std",
     "general",
@@ -79,12 +71,9 @@ default = [
 elf = []
 errno = []
 general = []
-if_arp = []
 if_ether = []
-if_packet = []
 io_uring = []
 ioctl = []
-loop_device = []
 mempolicy = []
 net = []
 netlink = []

@@ -1,13 +1,15 @@
 use crate::style::{HSLColor, RGBAColor, RGBColor};
 
+use num_traits::{Float, FromPrimitive, ToPrimitive};
+
 /// Converts scalar values to colors.
 pub trait ColorMap<ColorType: crate::prelude::Color, FloatType = f32>
 where
-    FloatType: num_traits::Float,
+    FloatType: Float,
 {
     /// Takes a scalar value 0.0 <= h <= 1.0 and returns the corresponding color.
     /// Typically color-scales are named according to which color-type they return.
-    /// To use upper and lower bounds with this function see [get_color_normalized](ColorMap::get_color_normalized).
+    /// To use upper and lower bounds with ths function see [get_color_normalized](ColorMap::get_color_normalized).
     fn get_color(&self, h: FloatType) -> ColorType {
         self.get_color_normalized(h, FloatType::zero(), FloatType::one())
     }
@@ -45,8 +47,6 @@ impl<ColorType: crate::style::Color + Clone> DerivedColorMap<ColorType> {
     }
 }
 
-#[macro_export]
-#[doc(hidden)]
 macro_rules! calculate_new_color_value(
     ($relative_difference:expr, $colors:expr, $index_upper:expr, $index_lower:expr, RGBColor) => {
         RGBColor(
@@ -81,34 +81,20 @@ macro_rules! calculate_new_color_value(
     };
 );
 
-// Helper function to calculate the lower and upper index nearest to a provided float value.
-//
-// Used to obtain colors from a colorscale given a value h between 0.0 and 1.0.
-// It also returns the relative difference which can then be used to calculate a linear interpolation between the two nearest colors.
-// ```
-// # use plotters::prelude::*;
-// let r = calculate_relative_difference_index_lower_upper(1.2, 1.0, 3.0, 4);
-// let (relative_difference, lower_index, upper_index) = r;
-//
-// assert_eq!(relative_difference, 0.7000000000000001);
-// assert_eq!(lower_index, 0);
-// assert_eq!(upper_index, 1);
-// ```
-#[doc(hidden)]
-pub fn calculate_relative_difference_index_lower_upper<
-    FloatType: num_traits::Float + num_traits::FromPrimitive + num_traits::ToPrimitive,
+fn calculate_relative_difference_index_lower_upper<
+    FloatType: Float + FromPrimitive + ToPrimitive,
 >(
     h: FloatType,
     min: FloatType,
     max: FloatType,
-    n_steps: usize,
+    n_colors: usize,
 ) -> (FloatType, usize, usize) {
     // Ensure that we do have a value in bounds
     let h = num_traits::clamp(h, min, max);
     // Next calculate a normalized value between 0.0 and 1.0
     let t = (h - min) / (max - min);
     let approximate_index =
-        t * (FloatType::from_usize(n_steps).unwrap() - FloatType::one()).max(FloatType::zero());
+        t * (FloatType::from_usize(n_colors).unwrap() - FloatType::one()).max(FloatType::zero());
     // Calculate which index are the two most nearest of the supplied value
     let index_lower = approximate_index.floor().to_usize().unwrap();
     let index_upper = approximate_index.ceil().to_usize().unwrap();
@@ -120,7 +106,7 @@ pub fn calculate_relative_difference_index_lower_upper<
 macro_rules! implement_color_scale_for_derived_color_map{
     ($($color_type:ident),+) => {
         $(
-            impl<FloatType: num_traits::Float + num_traits::FromPrimitive + num_traits::ToPrimitive> ColorMap<$color_type, FloatType> for DerivedColorMap<$color_type> {
+            impl<FloatType: Float + FromPrimitive + ToPrimitive> ColorMap<$color_type, FloatType> for DerivedColorMap<$color_type> {
                 fn get_color_normalized(&self, h: FloatType, min: FloatType, max: FloatType) -> $color_type {
                     let (
                         relative_difference,
@@ -133,7 +119,7 @@ macro_rules! implement_color_scale_for_derived_color_map{
                         self.colors.len()
                     );
                     // Interpolate the final color linearly
-                    $crate::calculate_new_color_value!(
+                    calculate_new_color_value!(
                         relative_difference,
                         self.colors,
                         index_upper,
@@ -148,30 +134,11 @@ macro_rules! implement_color_scale_for_derived_color_map{
 
 implement_color_scale_for_derived_color_map! {RGBAColor, RGBColor, HSLColor}
 
-#[macro_export]
-#[doc(hidden)]
-// Counts the number of arguments which are separated by spaces
-//
-// This macro is used internally to determine the size of an array to hold all new colors.
-// ```
-// # use plotters::count;
-// let counted = count!{Plotting is fun};
-// assert_eq!(counted, 3);
-//
-// let counted2 = count!{0_usize was my favourite 1_f64 last century};
-// assert_eq!(counted2, 7);
-//
-// let new_array = ["Hello"; count!(Plotting is fun)];
-// assert_eq!(new_array, ["Hello"; 3]);
-// ```
 macro_rules! count {
     () => (0usize);
-    ($x:tt $($xs:tt)* ) => (1usize + $crate::count!($($xs)*));
+    ($x:tt $($xs:tt)* ) => (1usize + count!($($xs)*));
 }
 
-#[macro_export]
-#[doc(hidden)]
-/// Converts a given color identifier and a sequence of colors to an array of them.
 macro_rules! define_colors_from_list_of_values_or_directly{
     ($color_type:ident, $(($($color_value:expr),+)),+) => {
         [$($color_type($($color_value),+)),+]
@@ -181,12 +148,9 @@ macro_rules! define_colors_from_list_of_values_or_directly{
     };
 }
 
-#[macro_export]
-#[doc(hidden)]
-/// Implements the [ColorMap] trait on a given color scale.
 macro_rules! implement_linear_interpolation_color_map {
     ($color_scale_name:ident, $color_type:ident) => {
-        impl<FloatType: std::fmt::Debug + num_traits::Float + num_traits::FromPrimitive + num_traits::ToPrimitive>
+        impl<FloatType: std::fmt::Debug + Float + FromPrimitive + ToPrimitive>
             ColorMap<$color_type, FloatType> for $color_scale_name
         {
             fn get_color_normalized(
@@ -206,7 +170,7 @@ macro_rules! implement_linear_interpolation_color_map {
                     Self::COLORS.len()
                 );
                 // Interpolate the final color linearly
-                $crate::calculate_new_color_value!(
+                calculate_new_color_value!(
                     relative_difference,
                     Self::COLORS,
                     index_upper,
@@ -220,7 +184,7 @@ macro_rules! implement_linear_interpolation_color_map {
             #[doc = "Get color value from `"]
             #[doc = stringify!($color_scale_name)]
             #[doc = "` by supplying a parameter 0.0 <= h <= 1.0"]
-            pub fn get_color<FloatType: std::fmt::Debug + num_traits::Float + num_traits::FromPrimitive + num_traits::ToPrimitive>(
+            pub fn get_color<FloatType: std::fmt::Debug + Float + FromPrimitive + ToPrimitive>(
                 h: FloatType,
             ) -> $color_type {
                 let color_scale = $color_scale_name {};
@@ -231,7 +195,7 @@ macro_rules! implement_linear_interpolation_color_map {
             #[doc = stringify!($color_scale_name)]
             #[doc = "` by supplying lower and upper bounds min, max and a parameter h where min <= h <= max"]
             pub fn get_color_normalized<
-                FloatType: std::fmt::Debug + num_traits::Float + num_traits::FromPrimitive + num_traits::ToPrimitive,
+                FloatType: std::fmt::Debug + Float + FromPrimitive + ToPrimitive,
             >(
                 h: FloatType,
                 min: FloatType,
@@ -244,57 +208,34 @@ macro_rules! implement_linear_interpolation_color_map {
     };
 }
 
-#[doc(inline)]
-pub use crate::def_linear_colormap;
-
 #[macro_export]
-#[doc(hidden)]
-/// Create a new colormap with evenly spaced colors and interpolates between them automatically.
-///
-/// This macro works by taking a identifier (name) for the colormap, the type of color to specify, a
-/// docstring and a list of colors and constructs an empty struct on which it implements the [ColorMap] trait.
-///
-/// ```
-/// use plotters::prelude::*;
-/// def_linear_colormap! {
-///     BlackWhite,
-///     RGBColor,
-///     "Simple chromatic colormap from black to white.",
-///     (  0,   0,   0),
-///     (255, 255,   255)
-/// }
-///
-/// assert_eq!(BlackWhite::get_color(0.0), RGBColor(0,0,0));
-/// ```
-///
-/// Hint: Some helper macros and functions have been deliberately hidden from end users.
-/// Look for them in the source code if you are interested.
-macro_rules! def_linear_colormap{
+/// Macro to create a new colormap with evenly spaced colors at compile-time.
+macro_rules! define_linear_interpolation_color_map{
     ($color_scale_name:ident, $color_type:ident, $doc:expr, $(($($color_value:expr),+)),*) => {
         #[doc = $doc]
-        pub struct $color_scale_name;
+        pub struct $color_scale_name {}
 
         impl $color_scale_name {
             // const COLORS: [$color_type; $number_colors] = [$($color_type($($color_value),+)),+];
-            // const COLORS: [$color_type; $crate::count!($(($($color_value:expr),+))*)] = [$($color_type($($color_value),+)),+];
-            const COLORS: [$color_type; $crate::count!($(($($color_value:expr),+))*)] = $crate::define_colors_from_list_of_values_or_directly!{$color_type, $(($($color_value),+)),*};
+            // const COLORS: [$color_type; count!($(($($color_value:expr),+))*)] = [$($color_type($($color_value),+)),+];
+            const COLORS: [$color_type; count!($(($($color_value:expr),+))*)] = define_colors_from_list_of_values_or_directly!{$color_type, $(($($color_value),+)),*};
         }
 
-        $crate::implement_linear_interpolation_color_map!{$color_scale_name, $color_type}
+        implement_linear_interpolation_color_map!{$color_scale_name, $color_type}
     };
     ($color_scale_name:ident, $color_type:ident, $doc:expr, $($color_complete:tt),+) => {
         #[doc = $doc]
-        pub struct $color_scale_name;
+        pub struct $color_scale_name {}
 
         impl $color_scale_name {
-            const COLORS: [$color_type; $crate::count!($($color_complete)*)] = $crate::define_colors_from_list_of_values_or_directly!{$($color_complete),+};
+            const COLORS: [$color_type; count!($($color_complete)*)] = define_colors_from_list_of_values_or_directly!{$($color_complete),+};
         }
 
-        $crate::implement_linear_interpolation_color_map!{$color_scale_name, $color_type}
+        implement_linear_interpolation_color_map!{$color_scale_name, $color_type}
     }
 }
 
-def_linear_colormap! {
+define_linear_interpolation_color_map! {
     ViridisRGBA,
     RGBAColor,
     "A colormap optimized for visually impaired people (RGBA format).
@@ -310,7 +251,7 @@ def_linear_colormap! {
     (254, 232,  37, 1.0)
 }
 
-def_linear_colormap! {
+define_linear_interpolation_color_map! {
     ViridisRGB,
     RGBColor,
     "A colormap optimized for visually impaired people (RGB Format).
@@ -326,7 +267,7 @@ def_linear_colormap! {
     (254, 232,  37)
 }
 
-def_linear_colormap! {
+define_linear_interpolation_color_map! {
     BlackWhite,
     RGBColor,
     "Simple chromatic colormap from black to white.",
@@ -334,7 +275,7 @@ def_linear_colormap! {
     (255, 255,   255)
 }
 
-def_linear_colormap! {
+define_linear_interpolation_color_map! {
     MandelbrotHSL,
     HSLColor,
     "Colormap created to replace the one used in the mandelbrot example.",
@@ -342,7 +283,7 @@ def_linear_colormap! {
     (1.0, 1.0, 0.5)
 }
 
-def_linear_colormap! {
+define_linear_interpolation_color_map! {
     VulcanoHSL,
     HSLColor,
     "A vulcanic colormap that display red/orange and black colors",
@@ -351,7 +292,7 @@ def_linear_colormap! {
 }
 
 use super::full_palette::*;
-def_linear_colormap! {
+define_linear_interpolation_color_map! {
     Bone,
     RGBColor,
     "Dark colormap going from black over blue to white.",
@@ -360,7 +301,7 @@ def_linear_colormap! {
     WHITE
 }
 
-def_linear_colormap! {
+define_linear_interpolation_color_map! {
     Copper,
     RGBColor,
     "Friendly black to brown colormap.",

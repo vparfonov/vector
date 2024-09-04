@@ -65,7 +65,6 @@ impl HeadObject {
             {
                 ::aws_runtime::auth::sigv4a::SCHEME_ID
             },
-            crate::s3_express::auth::SCHEME_ID,
             ::aws_smithy_runtime::client::auth::no_auth::NO_AUTH_SCHEME_ID,
         ]));
         if let ::std::option::Option::Some(config_override) = config_override {
@@ -97,7 +96,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for HeadObj
         ));
 
         cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::SensitiveOutput);
-        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new("HeadObject", "s3"));
+        cfg.store_put(::aws_smithy_http::operation::Metadata::new("HeadObject", "s3"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = false;
         signing_options.content_sha256_header = true;
@@ -118,24 +117,21 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for HeadObj
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("HeadObject")
-            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
+            .with_interceptor(
+                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
+                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
+                ),
+            )
             .with_interceptor(HeadObjectEndpointParamsInterceptor)
-            .with_interceptor(crate::s3_expires_interceptor::S3ExpiresInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::head_object::HeadObjectError,
             >::new())
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::ModeledAsRetryableClassifier::<
                 crate::operation::head_object::HeadObjectError,
             >::new())
-            .with_retry_classifier(
-                ::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<crate::operation::head_object::HeadObjectError>::builder()
-                    .transient_errors({
-                        let mut transient_errors: Vec<&'static str> = ::aws_runtime::retries::classifiers::TRANSIENT_ERRORS.into();
-                        transient_errors.push("InternalError");
-                        ::std::borrow::Cow::Owned(transient_errors)
-                    })
-                    .build(),
-            );
+            .with_retry_classifier(::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<
+                crate::operation::head_object::HeadObjectError,
+            >::new());
 
         ::std::borrow::Cow::Owned(rcb)
     }
@@ -205,47 +201,14 @@ impl ::aws_smithy_runtime_api::client::ser_de::SerializeRequest for HeadObjectRe
                 mut output: &mut ::std::string::String,
             ) -> ::std::result::Result<(), ::aws_smithy_types::error::operation::BuildError> {
                 let mut query = ::aws_smithy_http::query::Writer::new(output);
-                if let ::std::option::Option::Some(inner_2) = &_input.response_cache_control {
+                if let ::std::option::Option::Some(inner_2) = &_input.version_id {
                     {
-                        query.push_kv("response-cache-control", &::aws_smithy_http::query::fmt_string(inner_2));
+                        query.push_kv("versionId", &::aws_smithy_http::query::fmt_string(&inner_2));
                     }
                 }
-                if let ::std::option::Option::Some(inner_3) = &_input.response_content_disposition {
-                    {
-                        query.push_kv("response-content-disposition", &::aws_smithy_http::query::fmt_string(inner_3));
-                    }
-                }
-                if let ::std::option::Option::Some(inner_4) = &_input.response_content_encoding {
-                    {
-                        query.push_kv("response-content-encoding", &::aws_smithy_http::query::fmt_string(inner_4));
-                    }
-                }
-                if let ::std::option::Option::Some(inner_5) = &_input.response_content_language {
-                    {
-                        query.push_kv("response-content-language", &::aws_smithy_http::query::fmt_string(inner_5));
-                    }
-                }
-                if let ::std::option::Option::Some(inner_6) = &_input.response_content_type {
-                    {
-                        query.push_kv("response-content-type", &::aws_smithy_http::query::fmt_string(inner_6));
-                    }
-                }
-                if let ::std::option::Option::Some(inner_7) = &_input.response_expires {
-                    {
-                        query.push_kv(
-                            "response-expires",
-                            &::aws_smithy_http::query::fmt_timestamp(inner_7, ::aws_smithy_types::date_time::Format::HttpDate)?,
-                        );
-                    }
-                }
-                if let ::std::option::Option::Some(inner_8) = &_input.version_id {
-                    {
-                        query.push_kv("versionId", &::aws_smithy_http::query::fmt_string(inner_8));
-                    }
-                }
-                if let ::std::option::Option::Some(inner_9) = &_input.part_number {
-                    {
-                        query.push_kv("partNumber", ::aws_smithy_types::primitive::Encoder::from(*inner_9).encode());
+                if let ::std::option::Option::Some(inner_3) = &_input.part_number {
+                    if *inner_3 != 0 {
+                        query.push_kv("partNumber", ::aws_smithy_types::primitive::Encoder::from(*inner_3).encode());
                     }
                 }
                 ::std::result::Result::Ok(())
@@ -325,18 +288,13 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for HeadObjectEnd
         ::std::result::Result::Ok(())
     }
 }
-
-// The get_* functions below are generated from JMESPath expressions in the
-// operationContextParams trait. They target the operation's input shape.
-
 #[allow(unreachable_code, unused_variables)]
 #[cfg(test)]
-mod head_object_test {
-
+mod head_object_request_test {
     /// https://github.com/awslabs/aws-sdk-rust/issues/331
     /// Test ID: HeadObjectUriEncoding
     #[::tokio::test]
-    #[::tracing_test::traced_test]
+    #[allow(unused_mut)]
     async fn head_object_uri_encoding_request() {
         let (http_client, request_receiver) = ::aws_smithy_runtime::client::http::test_util::capture_request(None);
         let config_builder = crate::config::Config::builder().with_test_defaults().endpoint_url("https://example.com");
@@ -358,11 +316,10 @@ mod head_object_test {
         ::pretty_assertions::assert_eq!(http_request.method(), "HEAD", "method was incorrect");
         ::pretty_assertions::assert_eq!(uri.path(), "/%3C%3E%20%60%3F%F0%9F%90%B1", "path was incorrect");
     }
-
-    /// This test case validates https://github.com/smithy-lang/smithy-rs/issues/456
+    /// This test case validates https://github.com/awslabs/smithy-rs/issues/456
     /// Test ID: HeadObjectEmptyBody
     #[::tokio::test]
-    #[::tracing_test::traced_test]
+    #[allow(unused_mut)]
     async fn head_object_empty_body_response() {
         let expected_output = crate::types::error::NotFound::builder().build();
         let mut http_response = ::aws_smithy_runtime_api::http::Response::try_from(
@@ -391,12 +348,8 @@ mod head_object_test {
 
         let parsed = de.deserialize_streaming(&mut http_response);
         let parsed = parsed.unwrap_or_else(|| {
-            let http_response = http_response.map(|body| {
-                ::aws_smithy_types::body::SdkBody::from(::bytes::Bytes::copy_from_slice(&::aws_smithy_protocol_test::decode_body_data(
-                    body.bytes().unwrap(),
-                    ::aws_smithy_protocol_test::MediaType::from("application/xml"),
-                )))
-            });
+            let http_response =
+                http_response.map(|body| ::aws_smithy_types::body::SdkBody::from(::bytes::Bytes::copy_from_slice(body.bytes().unwrap())));
             de.deserialize_nonstreaming(&http_response)
         });
         let parsed = parsed.expect_err("should be error response");

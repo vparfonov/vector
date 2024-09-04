@@ -12,8 +12,6 @@
 // ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 // OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-#[cfg(feature = "alloc")]
-use alloc::vec::Vec;
 use core::marker::PhantomData;
 
 use crate::{error::DerTypeId, Error};
@@ -214,47 +212,6 @@ pub(crate) fn read_tag_and_get_value_limited<'a>(
     Ok((tag, inner))
 }
 
-/// Prepend `bytes` with the given ASN.1 [`Tag`] and appropriately encoded length byte(s).
-/// Useful for "adding back" ASN.1 bytes to parsed content.
-#[cfg(feature = "alloc")]
-#[allow(clippy::as_conversions)]
-pub(crate) fn asn1_wrap(tag: Tag, bytes: &[u8]) -> Vec<u8> {
-    let len = bytes.len();
-    // The length is encoded differently depending on how many bytes there are
-    if len < SHORT_FORM_LEN_MAX.into() {
-        // Short form: the length is encoded using a single byte
-        // Contents: Tag byte, single length byte, and passed bytes
-        let mut ret = Vec::with_capacity(2 + len);
-        ret.push(tag.into()); // Tag byte
-        ret.push(len as u8); // Single length byte
-        ret.extend_from_slice(bytes); // Passed bytes
-        ret
-    } else {
-        // Long form: The length is encoded using multiple bytes
-        // Contents: Tag byte, number-of-length-bytes byte, length bytes, and passed bytes
-        // The first byte indicates how many more bytes will be used to encode the length
-        // First, get a big-endian representation of the byte slice's length
-        let size = len.to_be_bytes();
-        // Find the number of leading empty bytes in that representation
-        // This will determine the smallest number of bytes we need to encode the length
-        let leading_zero_bytes = size
-            .iter()
-            .position(|&byte| byte != 0)
-            .unwrap_or(size.len());
-        assert!(leading_zero_bytes < size.len());
-        // Number of bytes used - number of not needed bytes = smallest number needed
-        let encoded_bytes = size.len() - leading_zero_bytes;
-        let mut ret = Vec::with_capacity(2 + encoded_bytes + len);
-        // Indicate this is a number-of-length-bytes byte by setting the high order bit
-        let number_of_length_bytes_byte = SHORT_FORM_LEN_MAX + encoded_bytes as u8;
-        ret.push(tag.into()); // Tag byte
-        ret.push(number_of_length_bytes_byte); // Number-of-length-bytes byte
-        ret.extend_from_slice(&size[leading_zero_bytes..]); // Length bytes
-        ret.extend_from_slice(bytes); // Passed bytes
-        ret
-    }
-}
-
 // Long-form DER encoded lengths of two bytes can express lengths up to the following limit.
 //
 // The upstream ring::io::der::read_tag_and_get_value() function limits itself to up to two byte
@@ -364,7 +321,7 @@ impl<'a> BitStringFlags<'a> {
 //
 // [0]: https://security.stackexchange.com/a/10396
 // [1]: https://www.itu.int/ITU-T/studygroups/com17/languages/X.690-0207.pdf
-pub(crate) fn bit_string_flags(input: untrusted::Input<'_>) -> Result<BitStringFlags<'_>, Error> {
+pub(crate) fn bit_string_flags(input: untrusted::Input) -> Result<BitStringFlags<'_>, Error> {
     input.read_all(Error::BadDer, |bit_string| {
         // ITU X690-0207 11.2:
         //   "The initial octet shall encode, as an unsigned binary integer with bit 1 as the least
@@ -466,64 +423,6 @@ macro_rules! oid {
 #[cfg(test)]
 mod tests {
     use super::DerTypeId;
-    use std::prelude::v1::*;
-
-    #[cfg(feature = "alloc")]
-    #[test]
-    fn test_asn1_wrap() {
-        // Prepend stuff to `bytes` to put it in a DER SEQUENCE.
-        let wrap_in_sequence = |bytes: &[u8]| super::asn1_wrap(super::Tag::Sequence, bytes);
-
-        // Empty slice
-        assert_eq!(vec![0x30, 0x00], wrap_in_sequence(&[]));
-
-        // Small size
-        assert_eq!(
-            vec![0x30, 0x04, 0x00, 0x11, 0x22, 0x33],
-            wrap_in_sequence(&[0x00, 0x11, 0x22, 0x33])
-        );
-
-        // Medium size
-        let mut val = Vec::new();
-        val.resize(255, 0x12);
-        assert_eq!(
-            vec![0x30, 0x81, 0xff, 0x12, 0x12, 0x12],
-            wrap_in_sequence(&val)[..6]
-        );
-
-        // Large size
-        let mut val = Vec::new();
-        val.resize(4660, 0x12);
-        wrap_in_sequence(&val);
-        assert_eq!(
-            vec![0x30, 0x82, 0x12, 0x34, 0x12, 0x12],
-            wrap_in_sequence(&val)[..6]
-        );
-
-        // Huge size
-        let mut val = Vec::new();
-        val.resize(0xffff, 0x12);
-        let result = wrap_in_sequence(&val);
-        assert_eq!(vec![0x30, 0x82, 0xff, 0xff, 0x12, 0x12], result[..6]);
-        assert_eq!(result.len(), 0xffff + 4);
-
-        // Gigantic size
-        let mut val = Vec::new();
-        val.resize(0x100000, 0x12);
-        let result = wrap_in_sequence(&val);
-        assert_eq!(vec![0x30, 0x83, 0x10, 0x00, 0x00, 0x12, 0x12], result[..7]);
-        assert_eq!(result.len(), 0x100000 + 5);
-
-        // Ludicrous size
-        let mut val = Vec::new();
-        val.resize(0x1000000, 0x12);
-        let result = wrap_in_sequence(&val);
-        assert_eq!(
-            vec![0x30, 0x84, 0x01, 0x00, 0x00, 0x00, 0x12, 0x12],
-            result[..8]
-        );
-        assert_eq!(result.len(), 0x1000000 + 6);
-    }
 
     #[test]
     fn test_optional_boolean() {
@@ -586,7 +485,7 @@ mod tests {
         );
     }
 
-    fn bytes_reader(bytes: &[u8]) -> untrusted::Reader<'_> {
+    fn bytes_reader(bytes: &[u8]) -> untrusted::Reader {
         return untrusted::Reader::new(untrusted::Input::from(bytes));
     }
 

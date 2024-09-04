@@ -1,3 +1,4 @@
+#![cfg(feature = "inline")]
 use std::borrow::Cow;
 use std::fmt;
 
@@ -6,7 +7,7 @@ use crate::types::{Algorithm, Change, ChangeTag, DiffOp, DiffTag};
 use crate::{capture_diff_deadline, get_diff_ratio};
 
 use std::ops::Index;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use super::utils::upper_seq_ratio;
 
@@ -146,12 +147,6 @@ impl<'s, T: DiffableStr + ?Sized> InlineChange<'s, T> {
     ///
     /// Each item is a tuple in the form `(emphasized, value)` where `emphasized`
     /// is true if it should be highlighted as an inline diff.
-    ///
-    /// By default, words are split by whitespace, which results in coarser diff.
-    /// For example: `"f(x) y"` is tokenized as `["f(x)", "y"]`.
-    ///
-    /// If you want it to be tokenized instead as `["f(", "x", ")"]`,
-    /// you should enable the `"unicode"` flag.
     pub fn iter_strings_lossy(&self) -> impl Iterator<Item = (bool, Cow<'_, str>)> {
         self.values()
             .iter()
@@ -194,11 +189,11 @@ impl<'s, T: DiffableStr + ?Sized> fmt::Display for InlineChange<'s, T> {
 }
 
 const MIN_RATIO: f32 = 0.5;
+const TIMEOUT_MS: u64 = 500;
 
 pub(crate) fn iter_inline_changes<'x, 'diff, 'old, 'new, 'bufs, T>(
     diff: &'diff TextDiff<'old, 'new, 'bufs, T>,
     op: &DiffOp,
-    deadline: Option<Instant>,
 ) -> impl Iterator<Item = InlineChange<'x, T>> + 'diff
 where
     T: DiffableStr + ?Sized,
@@ -230,7 +225,7 @@ where
         0..old_lookup.len(),
         &new_lookup,
         0..new_lookup.len(),
-        deadline,
+        Some(Instant::now() + Duration::from_millis(TIMEOUT_MS)),
     );
 
     if get_diff_ratio(&ops, old_lookup.len(), new_lookup.len()) < MIN_RATIO {

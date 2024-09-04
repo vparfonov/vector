@@ -1,10 +1,11 @@
 #![deny(rust_2018_idioms)]
 
+use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use tempfile::{env, tempdir, Builder, NamedTempFile, TempPath};
+use tempfile::{tempdir, Builder, NamedTempFile, TempPath};
 
 fn exists<P: AsRef<Path>>(path: P) -> bool {
     std::fs::metadata(path.as_ref()).is_ok()
@@ -275,10 +276,10 @@ fn test_write_after_close() {
 
 #[test]
 fn test_change_dir() {
-    std::env::set_current_dir(env::temp_dir()).unwrap();
+    env::set_current_dir(env::temp_dir()).unwrap();
     let tmpfile = NamedTempFile::new_in(".").unwrap();
-    let path = std::env::current_dir().unwrap().join(tmpfile.path());
-    std::env::set_current_dir("/").unwrap();
+    let path = env::current_dir().unwrap().join(tmpfile.path());
+    env::set_current_dir("/").unwrap();
     drop(tmpfile);
     assert!(!exists(path))
 }
@@ -338,23 +339,6 @@ fn test_keep() {
         // Try opening it again.
         let mut f = File::open(&path).unwrap();
         f.seek(SeekFrom::Start(0)).unwrap();
-        let mut buf = String::new();
-        f.read_to_string(&mut buf).unwrap();
-        assert_eq!("abcde", buf);
-    }
-    std::fs::remove_file(&path).unwrap();
-}
-
-#[test]
-fn test_builder_keep() {
-    let mut tmpfile = Builder::new().keep(true).tempfile().unwrap();
-    write!(tmpfile, "abcde").unwrap();
-    let path = tmpfile.path().to_owned();
-    drop(tmpfile);
-
-    {
-        // Try opening it again.
-        let mut f = File::open(&path).unwrap();
         let mut buf = String::new();
         f.read_to_string(&mut buf).unwrap();
         assert_eq!("abcde", buf);

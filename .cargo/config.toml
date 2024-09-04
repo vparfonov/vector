@@ -1,0 +1,84 @@
+[alias]
+vdev = "run --quiet --package vdev --"
+
+[env]
+# Build with large pages so that Vector runs on systems with 64k pages or less (e.g. 4k) to support
+# CentOS 7, 8, and a few other Linux distributions.
+JEMALLOC_SYS_WITH_LG_PAGE = "16"
+
+[target.'cfg(all())']
+rustflags = [
+  "-Dclippy::print_stdout",
+  "-Dclippy::print_stderr",
+  "-Dclippy::dbg_macro",
+]
+
+# We need to bring in `libstdc++` for things that build against C++ (librdkafka, etc) which comes along in the
+# `cross` base image but _isn't_ in a path searched by the linker normally. Additionally, our custom Docker image that
+# we base on the `cross` image moves `libstdc++` into this custom-looking directory to avoid some _other_ libraries
+# included in the `cross` base image from having a higher precedence than some of the "self-contained" libraries that
+# Rust will bundle/use for specific targets like MUSL.
+[target.x86_64-unknown-linux-musl]
+rustflags = "-Lnative=/lib/native-libs"
+
+[target.aarch64-unknown-linux-musl]
+rustflags = "-Lnative=/lib/native-libs"
+
+[target.armv7-unknown-linux-musleabihf]
+rustflags = "-Lnative=/lib/native-libs"
+
+[target.x86_64-unknown-linux-gnu]
+rustflags = ["-C", "link-args=-rdynamic"]
+
+[target.aarch64-unknown-linux-gnu]
+rustflags = ["-C", "link-args=-rdynamic"]
+
+[target.x86_64-pc-windows-msvc]
+# https://github.com/dtolnay/inventory/issues/58
+rustflags = ["-C", "codegen-units=1"]
+
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/GreptimeTeam/greptime-proto.git?tag=v0.4.1"]
+git = "https://github.com/GreptimeTeam/greptime-proto.git"
+tag = "v0.4.1"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/GreptimeTeam/greptimedb-ingester-rust.git?rev=d21dbcff680139ed2065b62100bac3123da7c789"]
+git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust.git"
+rev = "d21dbcff680139ed2065b62100bac3123da7c789"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/MSxDOS/ntapi.git?rev=24fc1e47677fc9f6e38e5f154e6011dc9b270da6"]
+git = "https://github.com/MSxDOS/ntapi.git"
+rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/tokio-rs/tracing?rev=e0642d949891546a3bb7e47080365ee7274f05cd"]
+git = "https://github.com/tokio-rs/tracing"
+rev = "e0642d949891546a3bb7e47080365ee7274f05cd"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"]
+git = "https://github.com/vectordotdev/aws-sdk-rust"
+rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/vectordotdev/heim.git?branch=update-nix"]
+git = "https://github.com/vectordotdev/heim.git"
+branch = "update-nix"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/vectordotdev/nix.git?branch=memfd/gnu/musl"]
+git = "https://github.com/vectordotdev/nix.git"
+branch = "memfd/gnu/musl"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/vectordotdev/tokio?branch=tokio-util-0.7.8-framed-read-continue-on-error"]
+git = "https://github.com/vectordotdev/tokio"
+branch = "tokio-util-0.7.8-framed-read-continue-on-error"
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"

@@ -10,16 +10,10 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
-rust-version = "1.63"
+edition = "2018"
 name = "os_pipe"
-version = "1.2.1"
+version = "1.1.4"
 authors = ["Jack O'Connor"]
-build = false
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 description = "a cross-platform library for opening OS pipes"
 documentation = "https://docs.rs/os_pipe"
 readme = "README.md"
@@ -32,21 +26,8 @@ keywords = [
 license = "MIT"
 repository = "https://github.com/oconnor663/os_pipe.rs"
 
-[lib]
-name = "os_pipe"
-path = "src/lib.rs"
-
-[[bin]]
-name = "cat"
-path = "src/bin/cat.rs"
-
-[[bin]]
-name = "cat_both"
-path = "src/bin/cat_both.rs"
-
-[[bin]]
-name = "swap"
-path = "src/bin/swap.rs"
+[package.metadata.docs.rs]
+features = ["io_safety"]
 
 [features]
 io_safety = []
@@ -55,9 +36,10 @@ io_safety = []
 version = "0.2.62"
 
 [target."cfg(windows)".dependencies.windows-sys]
-version = "0.59.0"
+version = "0.48.0"
 features = [
     "Win32_Foundation",
     "Win32_System_Pipes",
     "Win32_Security",
+    "Win32_System_Threading",
 ]

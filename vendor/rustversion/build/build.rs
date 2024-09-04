@@ -9,7 +9,6 @@ mod rustc;
 use std::env;
 use std::ffi::OsString;
 use std::fs;
-use std::iter;
 use std::path::Path;
 use std::process::{self, Command};
 
@@ -17,14 +16,10 @@ fn main() {
     println!("cargo:rerun-if-changed=build/build.rs");
 
     let rustc = env::var_os("RUSTC").unwrap_or_else(|| OsString::from("rustc"));
-    let rustc_wrapper = env::var_os("RUSTC_WRAPPER").filter(|wrapper| !wrapper.is_empty());
-    let wrapped_rustc = rustc_wrapper.iter().chain(iter::once(&rustc));
 
     let mut is_clippy_driver = false;
     let version = loop {
-        let mut wrapped_rustc = wrapped_rustc.clone();
-        let mut command = Command::new(wrapped_rustc.next().unwrap());
-        command.args(wrapped_rustc);
+        let mut command = Command::new(&rustc);
         if is_clippy_driver {
             command.arg("--rustc");
         }
@@ -73,18 +68,8 @@ fn main() {
         println!("cargo:rustc-cfg=cfg_macro_not_allowed");
     }
 
-    if version.minor >= 80 {
-        println!("cargo:rustc-check-cfg=cfg(cfg_macro_not_allowed)");
-        println!("cargo:rustc-check-cfg=cfg(host_os, values(\"windows\"))");
-    }
-
     let version = format!("{:#?}\n", version);
     let out_dir = env::var_os("OUT_DIR").expect("OUT_DIR not set");
     let out_file = Path::new(&out_dir).join("version.expr");
     fs::write(out_file, version).expect("failed to write version.expr");
-
-    let host = env::var_os("HOST").expect("HOST not set");
-    if let Some("windows") = host.to_str().unwrap().split('-').nth(2) {
-        println!("cargo:rustc-cfg=host_os=\"windows\"");
-    }
 }

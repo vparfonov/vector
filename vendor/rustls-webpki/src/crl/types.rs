@@ -66,7 +66,7 @@ impl<'a> CertRevocationList<'a> {
 
     /// Try to find a revoked certificate in the CRL by DER encoded serial number. This
     /// may yield an error if the CRL has malformed revoked certificates.
-    pub fn find_serial(&self, serial: &[u8]) -> Result<Option<BorrowedRevokedCert<'_>>, Error> {
+    pub fn find_serial(&self, serial: &[u8]) -> Result<Option<BorrowedRevokedCert>, Error> {
         match self {
             #[cfg(feature = "alloc")]
             CertRevocationList::Owned(crl) => crl.find_serial(serial),
@@ -86,8 +86,6 @@ impl<'a> CertRevocationList<'a> {
     ///       distribution point extension with a scope that includes the certificate, and at least
     ///       one distribution point full name is a URI type general name that can also be found in
     ///       the CRL issuing distribution point full name general name sequence.
-    ///     * Or, the certificate has CRL distribution points, and the CRL has no issuing
-    ///       distribution point extension.
     ///
     /// In all other circumstances the CRL is not considered authoritative.
     pub(crate) fn authoritative(&self, path: &PathNode<'_>) -> bool {
@@ -97,20 +95,22 @@ impl<'a> CertRevocationList<'a> {
             return false;
         }
 
-        let crl_idp = match self.issuing_distribution_point() {
+        let crl_idp = match (
+            path.cert.crl_distribution_points(),
+            self.issuing_distribution_point(),
+        ) {
+            // If the certificate has no CRL distribution points, and the CRL has no issuing distribution point,
+            // then we can consider this CRL authoritative based on the issuer matching.
+            (cert_dps, None) => return cert_dps.is_none(),
+
             // If the CRL has an issuing distribution point, parse it so we can consider its scope
             // and compare against the cert CRL distribution points, if present.
-            Some(crl_idp) => {
+            (_, Some(crl_idp)) => {
                 match IssuingDistributionPoint::from_der(untrusted::Input::from(crl_idp)) {
                     Ok(crl_idp) => crl_idp,
                     Err(_) => return false, // Note: shouldn't happen - we verify IDP at CRL-load.
                 }
             }
-            // If the CRL has no issuing distribution point we assume the CRL scope
-            // to be "everything" and consider the CRL authoritative for the cert based on the
-            // issuer matching. We do not need to consider the certificate's CRL distribution point
-            // extension (see also https://github.com/rustls/webpki/issues/228).
-            None => return true,
         };
 
         crl_idp.authoritative_for(path)
@@ -121,7 +121,7 @@ impl<'a> CertRevocationList<'a> {
     pub(crate) fn verify_signature(
         &self,
         supported_sig_algs: &[&dyn SignatureVerificationAlgorithm],
-        issuer_spki: untrusted::Input<'_>,
+        issuer_spki: untrusted::Input,
         budget: &mut Budget,
     ) -> Result<(), Error> {
         signed_data::verify_signed_data(
@@ -140,21 +140,6 @@ impl<'a> CertRevocationList<'a> {
         )
         .map_err(crl_signature_err)
     }
-
-    /// Checks the verification time is before the time in the CRL nextUpdate field.
-    pub(crate) fn check_expiration(&self, time: UnixTime) -> Result<(), Error> {
-        let next_update = match self {
-            #[cfg(feature = "alloc")]
-            CertRevocationList::Owned(crl) => crl.next_update,
-            CertRevocationList::Borrowed(crl) => crl.next_update,
-        };
-
-        if time >= next_update {
-            return Err(Error::CrlExpired);
-        }
-
-        Ok(())
-    }
 }
 
 /// Owned representation of a RFC 5280[^1] profile Certificate Revocation List (CRL).
@@ -172,8 +157,6 @@ pub struct OwnedCertRevocationList {
     issuing_distribution_point: Option<Vec<u8>>,
 
     signed_data: signed_data::OwnedSignedData,
-
-    next_update: UnixTime,
 }
 
 #[cfg(feature = "alloc")]
@@ -194,7 +177,7 @@ impl OwnedCertRevocationList {
         BorrowedCertRevocationList::from_der(crl_der)?.to_owned()
     }
 
-    fn find_serial(&self, serial: &[u8]) -> Result<Option<BorrowedRevokedCert<'_>>, Error> {
+    fn find_serial(&self, serial: &[u8]) -> Result<Option<BorrowedRevokedCert>, Error> {
         // note: this is infallible for the owned representation because we process all
         // revoked certificates at the time of construction to build the `revoked_certs` map,
         // returning any encountered errors at that time.
@@ -222,8 +205,6 @@ pub struct BorrowedCertRevocationList<'a> {
 
     /// List of certificates revoked by the issuer in this CRL.
     revoked_certs: untrusted::Input<'a>,
-
-    next_update: UnixTime,
 }
 
 impl<'a> BorrowedCertRevocationList<'a> {
@@ -261,7 +242,6 @@ impl<'a> BorrowedCertRevocationList<'a> {
                 .issuing_distribution_point
                 .map(|idp| idp.as_slice_less_safe().to_vec()),
             revoked_certs,
-            next_update: self.next_update,
         })
     }
 
@@ -309,7 +289,7 @@ impl<'a> BorrowedCertRevocationList<'a> {
         })
     }
 
-    fn find_serial(&self, serial: &[u8]) -> Result<Option<BorrowedRevokedCert<'_>>, Error> {
+    fn find_serial(&self, serial: &[u8]) -> Result<Option<BorrowedRevokedCert>, Error> {
         for revoked_cert_result in self {
             match revoked_cert_result {
                 Err(e) => return Err(e),
@@ -383,7 +363,7 @@ impl<'a> FromDer<'a> for BorrowedCertRevocationList<'a> {
             //   Conforming CRL issuers MUST include the nextUpdate field in all CRLs.
             // We do not presently enforce the correct choice of UTCTime or GeneralizedTime based on
             // whether the date is post 2050.
-            let next_update = UnixTime::from_der(tbs_cert_list)?;
+            UnixTime::from_der(tbs_cert_list)?;
 
             // RFC 5280 §5.1.2.6:
             //   When there are no revoked certificates, the revoked certificates list
@@ -404,7 +384,6 @@ impl<'a> FromDer<'a> for BorrowedCertRevocationList<'a> {
                 issuer,
                 revoked_certs,
                 issuing_distribution_point: None,
-                next_update,
             };
 
             // RFC 5280 §5.1.2.7:
@@ -471,7 +450,7 @@ pub(crate) struct IssuingDistributionPoint<'a> {
 }
 
 impl<'a> IssuingDistributionPoint<'a> {
-    pub(crate) fn from_der(der: untrusted::Input<'a>) -> Result<Self, Error> {
+    pub(crate) fn from_der(der: untrusted::Input<'a>) -> Result<IssuingDistributionPoint, Error> {
         const DISTRIBUTION_POINT_TAG: u8 = CONTEXT_SPECIFIC | CONSTRUCTED;
         const ONLY_CONTAINS_USER_CERTS_TAG: u8 = CONTEXT_SPECIFIC | 1;
         const ONLY_CONTAINS_CA_CERTS_TAG: u8 = CONTEXT_SPECIFIC | 2;
@@ -491,7 +470,7 @@ impl<'a> IssuingDistributionPoint<'a> {
         // Note: we can't use der::optional_boolean here because the distribution point
         //       booleans are context specific primitives and der::optional_boolean expects
         //       to unwrap a Tag::Boolean constructed value.
-        fn decode_bool(value: untrusted::Input<'_>) -> Result<bool, Error> {
+        fn decode_bool(value: untrusted::Input) -> Result<bool, Error> {
             let mut reader = untrusted::Reader::new(value);
             let value = reader.read_byte().map_err(der::end_of_input_err)?;
             if !reader.at_end() {
@@ -693,7 +672,7 @@ pub struct OwnedRevokedCert {
 #[cfg(feature = "alloc")]
 impl OwnedRevokedCert {
     /// Convert the owned representation of this revoked cert to a borrowed version.
-    pub fn borrow(&self) -> BorrowedRevokedCert<'_> {
+    pub fn borrow(&self) -> BorrowedRevokedCert {
         BorrowedRevokedCert {
             serial_number: &self.serial_number,
             revocation_date: self.revocation_date,
@@ -841,9 +820,9 @@ impl<'a> FromDer<'a> for BorrowedRevokedCert<'a> {
 }
 
 /// Identifies the reason a certificate was revoked.
-/// See [RFC 5280 §5.3.1][1]
+/// See RFC 5280 §5.3.1[^1]
 ///
-/// [1]: <https://www.rfc-editor.org/rfc/rfc5280#section-5.3.1>
+/// [^1] <https://www.rfc-editor.org/rfc/rfc5280#section-5.3.1>
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 #[allow(missing_docs)] // Not much to add above the code name.
 pub enum RevocationReason {
@@ -865,7 +844,7 @@ pub enum RevocationReason {
 
 impl RevocationReason {
     /// Return an iterator over all possible [RevocationReason] variants.
-    pub fn iter() -> impl Iterator<Item = Self> {
+    pub fn iter() -> impl Iterator<Item = RevocationReason> {
         use RevocationReason::*;
         [
             Unspecified,
@@ -901,17 +880,17 @@ impl TryFrom<u8> for RevocationReason {
     fn try_from(value: u8) -> Result<Self, Self::Error> {
         // See https://www.rfc-editor.org/rfc/rfc5280#section-5.3.1
         match value {
-            0 => Ok(Self::Unspecified),
-            1 => Ok(Self::KeyCompromise),
-            2 => Ok(Self::CaCompromise),
-            3 => Ok(Self::AffiliationChanged),
-            4 => Ok(Self::Superseded),
-            5 => Ok(Self::CessationOfOperation),
-            6 => Ok(Self::CertificateHold),
+            0 => Ok(RevocationReason::Unspecified),
+            1 => Ok(RevocationReason::KeyCompromise),
+            2 => Ok(RevocationReason::CaCompromise),
+            3 => Ok(RevocationReason::AffiliationChanged),
+            4 => Ok(RevocationReason::Superseded),
+            5 => Ok(RevocationReason::CessationOfOperation),
+            6 => Ok(RevocationReason::CertificateHold),
             // 7 is not used.
-            8 => Ok(Self::RemoveFromCrl),
-            9 => Ok(Self::PrivilegeWithdrawn),
-            10 => Ok(Self::AaCompromise),
+            8 => Ok(RevocationReason::RemoveFromCrl),
+            9 => Ok(RevocationReason::PrivilegeWithdrawn),
+            10 => Ok(RevocationReason::AaCompromise),
             _ => Err(Error::UnsupportedRevocationReason),
         }
     }
@@ -920,11 +899,7 @@ impl TryFrom<u8> for RevocationReason {
 #[cfg(feature = "alloc")]
 #[cfg(test)]
 mod tests {
-    use std::time::Duration;
-
     use pki_types::CertificateDer;
-    use std::prelude::v1::*;
-    use std::println;
 
     use super::*;
     use crate::cert::Cert;
@@ -1211,15 +1186,17 @@ mod tests {
         let owned_crl = borrowed_crl.to_owned().unwrap();
 
         // It should be possible to convert a BorrowedCertRevocationList to a CertRevocationList.
-        let _crl = CertRevocationList::from(borrowed_crl);
+        let _crl: CertRevocationList = borrowed_crl.into();
         // And similar for an OwnedCertRevocationList.
-        let _crl = CertRevocationList::from(owned_crl);
+        let _crl: CertRevocationList = owned_crl.into();
     }
 
     #[test]
     fn test_crl_authoritative_issuer_mismatch() {
         let crl = include_bytes!("../../tests/crls/crl.valid.der");
-        let crl = CertRevocationList::from(BorrowedCertRevocationList::from_der(&crl[..]).unwrap());
+        let crl: CertRevocationList = BorrowedCertRevocationList::from_der(&crl[..])
+            .unwrap()
+            .into();
 
         let ee = CertificateDer::from(
             &include_bytes!("../../tests/client_auth_revocation/no_ku_chain.ee.der")[..],
@@ -1235,7 +1212,9 @@ mod tests {
     fn test_crl_authoritative_no_idp_no_cert_dp() {
         let crl =
             include_bytes!("../../tests/client_auth_revocation/ee_revoked_crl_ku_ee_depth.crl.der");
-        let crl = CertRevocationList::from(BorrowedCertRevocationList::from_der(&crl[..]).unwrap());
+        let crl: CertRevocationList = BorrowedCertRevocationList::from_der(&crl[..])
+            .unwrap()
+            .into();
 
         let ee = CertificateDer::from(
             &include_bytes!("../../tests/client_auth_revocation/ku_chain.ee.der")[..],
@@ -1246,27 +1225,6 @@ mod tests {
         // The CRL should be considered authoritative, the issuers match, the CRL has no IDP and the
         // cert has no CRL DPs.
         assert!(crl.authoritative(&path.node()));
-    }
-
-    #[test]
-    fn test_crl_expired() {
-        let crl = include_bytes!("../../tests/crls/crl.valid.der");
-        let crl = CertRevocationList::from(BorrowedCertRevocationList::from_der(&crl[..]).unwrap());
-        //  Friday, February 2, 2024 8:26:19 PM GMT
-        let time = UnixTime::since_unix_epoch(Duration::from_secs(1_706_905_579));
-
-        assert!(matches!(crl.check_expiration(time), Err(Error::CrlExpired)));
-    }
-
-    #[test]
-    fn test_crl_not_expired() {
-        let crl = include_bytes!("../../tests/crls/crl.valid.der");
-        let crl = CertRevocationList::from(BorrowedCertRevocationList::from_der(&crl[..]).unwrap());
-        // Wednesday, October 19, 2022 8:12:06 PM GMT
-        let expiration_time = 1_666_210_326;
-        let time = UnixTime::since_unix_epoch(Duration::from_secs(expiration_time - 1000));
-
-        assert!(matches!(crl.check_expiration(time), Ok(())));
     }
 
     #[test]

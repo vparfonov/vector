@@ -1,9 +1,3 @@
-use alloc::sync::Arc;
-
-use pki_types::PrivateKeyDer;
-pub(crate) use ring as ring_like;
-use webpki::ring as webpki_algs;
-
 use crate::crypto::{CryptoProvider, KeyProvider, SecureRandom};
 use crate::enums::SignatureScheme;
 use crate::rand::GetRandomFailed;
@@ -12,15 +6,20 @@ use crate::suites::SupportedCipherSuite;
 use crate::webpki::WebPkiSupportedAlgorithms;
 use crate::Error;
 
+use pki_types::PrivateKeyDer;
+use webpki::ring as webpki_algs;
+
+use alloc::sync::Arc;
+
+pub(crate) use ring as ring_like;
+
 /// Using software keys for authentication.
 pub mod sign;
 
 pub(crate) mod hash;
-#[cfg(any(test, feature = "tls12"))]
 pub(crate) mod hmac;
 pub(crate) mod kx;
 pub(crate) mod quic;
-#[cfg(any(feature = "std", feature = "hashbrown"))]
 pub(crate) mod ticketer;
 #[cfg(feature = "tls12")]
 pub(crate) mod tls12;
@@ -167,11 +166,12 @@ static SUPPORTED_SIG_ALGS: WebPkiSupportedAlgorithms = WebPkiSupportedAlgorithms
 ///
 /// [`ALL_KX_GROUPS`] is provided as an array of all of these values.
 pub mod kx_group {
-    pub use super::kx::{SECP256R1, SECP384R1, X25519};
+    pub use super::kx::SECP256R1;
+    pub use super::kx::SECP384R1;
+    pub use super::kx::X25519;
 }
 
 pub use kx::ALL_KX_GROUPS;
-#[cfg(any(feature = "std", feature = "hashbrown"))]
 pub use ticketer::Ticketer;
 
 /// Compatibility shims between ring 0.16.x and 0.17.x API
@@ -188,12 +188,4 @@ mod ring_shim {
         })
         .map_err(|_| ())
     }
-}
-
-/// AEAD algorithm that is used by `mod ticketer`.
-#[cfg(any(feature = "std", feature = "hashbrown"))]
-pub(super) static TICKETER_AEAD: &ring_like::aead::Algorithm = &ring_like::aead::CHACHA20_POLY1305;
-
-pub(super) fn fips() -> bool {
-    false
 }

@@ -3,7 +3,7 @@ pub use crate::operation::put_bucket_request_payment::_put_bucket_request_paymen
 
 pub use crate::operation::put_bucket_request_payment::_put_bucket_request_payment_input::PutBucketRequestPaymentInputBuilder;
 
-impl crate::operation::put_bucket_request_payment::builders::PutBucketRequestPaymentInputBuilder {
+impl PutBucketRequestPaymentInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -28,10 +28,8 @@ impl crate::operation::put_bucket_request_payment::builders::PutBucketRequestPay
 /// <p>Sets the request payment configuration for a bucket. By default, the bucket owner pays for downloads from the bucket. This configuration parameter enables the bucket owner (only) to specify that the person requesting the download will be charged for the download. For more information, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/dev/RequesterPaysBuckets.html">Requester Pays Buckets</a>.</p>
 /// <p>The following operations are related to <code>PutBucketRequestPayment</code>:</p>
 /// <ul>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateBucket.html">CreateBucket</a></p></li>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketRequestPayment.html">GetBucketRequestPayment</a></p></li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateBucket.html">CreateBucket</a> </p> </li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketRequestPayment.html">GetBucketRequestPayment</a> </p> </li>
 /// </ul>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
 pub struct PutBucketRequestPaymentFluentBuilder {
@@ -58,7 +56,7 @@ impl
     }
 }
 impl PutBucketRequestPaymentFluentBuilder {
-    /// Creates a new `PutBucketRequestPaymentFluentBuilder`.
+    /// Creates a new `PutBucketRequestPayment`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -109,12 +107,12 @@ impl PutBucketRequestPaymentFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }

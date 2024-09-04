@@ -10,40 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `WorkerOptions`*"]
     pub type WorkerOptions;
-    #[cfg(feature = "RequestCredentials")]
-    #[doc = "Get the `credentials` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RequestCredentials`, `WorkerOptions`*"]
-    #[wasm_bindgen(method, getter = "credentials")]
-    pub fn get_credentials(this: &WorkerOptions) -> Option<RequestCredentials>;
-    #[cfg(feature = "RequestCredentials")]
-    #[doc = "Change the `credentials` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RequestCredentials`, `WorkerOptions`*"]
-    #[wasm_bindgen(method, setter = "credentials")]
-    pub fn set_credentials(this: &WorkerOptions, val: RequestCredentials);
-    #[doc = "Get the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `WorkerOptions`*"]
-    #[wasm_bindgen(method, getter = "name")]
-    pub fn get_name(this: &WorkerOptions) -> Option<String>;
-    #[doc = "Change the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `WorkerOptions`*"]
-    #[wasm_bindgen(method, setter = "name")]
-    pub fn set_name(this: &WorkerOptions, val: &str);
-    #[cfg(feature = "WorkerType")]
-    #[doc = "Get the `type` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `WorkerOptions`, `WorkerType`*"]
-    #[wasm_bindgen(method, getter = "type")]
-    pub fn get_type(this: &WorkerOptions) -> Option<WorkerType>;
-    #[cfg(feature = "WorkerType")]
-    #[doc = "Change the `type` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `WorkerOptions`, `WorkerType`*"]
-    #[wasm_bindgen(method, setter = "type")]
-    pub fn set_type(this: &WorkerOptions, val: WorkerType);
 }
 impl WorkerOptions {
     #[doc = "Construct a new `WorkerOptions`."]
@@ -55,20 +21,48 @@ impl WorkerOptions {
         ret
     }
     #[cfg(feature = "RequestCredentials")]
-    #[deprecated = "Use `set_credentials()` instead."]
+    #[doc = "Change the `credentials` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RequestCredentials`, `WorkerOptions`*"]
     pub fn credentials(&mut self, val: RequestCredentials) -> &mut Self {
-        self.set_credentials(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("credentials"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_name()` instead."]
+    #[doc = "Change the `name` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `WorkerOptions`*"]
     pub fn name(&mut self, val: &str) -> &mut Self {
-        self.set_name(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("name"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "WorkerType")]
-    #[deprecated = "Use `set_type()` instead."]
+    #[doc = "Change the `type` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `WorkerOptions`, `WorkerType`*"]
     pub fn type_(&mut self, val: WorkerType) -> &mut Self {
-        self.set_type(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("type"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

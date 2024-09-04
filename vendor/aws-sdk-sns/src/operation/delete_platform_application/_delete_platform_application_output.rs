@@ -18,8 +18,8 @@ impl DeletePlatformApplicationOutput {
 }
 
 /// A builder for [`DeletePlatformApplicationOutput`](crate::operation::delete_platform_application::DeletePlatformApplicationOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DeletePlatformApplicationOutputBuilder {
     _request_id: Option<String>,
 }

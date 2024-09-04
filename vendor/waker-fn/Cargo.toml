@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.51"
 name = "waker-fn"
-version = "1.2.0"
+version = "1.1.1"
 authors = ["Stjepan Glavina <stjepang@gmail.com>"]
 exclude = ["/.*"]
 description = "Convert closures into wakers"
@@ -30,12 +30,3 @@ keywords = [
 categories = ["concurrency"]
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/smol-rs/waker-fn"
-
-[dependencies.portable-atomic-util]
-version = "0.2"
-features = ["alloc"]
-optional = true
-default-features = false
-
-[features]
-portable-atomic = ["portable-atomic-util"]

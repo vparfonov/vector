@@ -115,11 +115,7 @@ impl Parse for ClassMarker {
     fn parse(input: ParseStream) -> SynResult<Self> {
         let class = input.parse::<syn::Ident>()?;
         input.parse::<Token![=]>()?;
-        let mut js_class = input.parse::<syn::LitStr>()?.value();
-        js_class = js_class
-            .strip_prefix("r#")
-            .map(String::from)
-            .unwrap_or(js_class);
+        let js_class = input.parse::<syn::LitStr>()?.value();
 
         let mut wasm_bindgen = None;
         let mut wasm_bindgen_futures = None;

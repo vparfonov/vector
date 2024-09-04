@@ -70,8 +70,7 @@ fn test_rng() -> impl RngCore {
         }
 
         fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
-            self.fill_bytes(dest);
-            Ok(())
+            Ok(self.fill_bytes(dest))
         }
     }
 
@@ -95,7 +94,7 @@ fn generic_standard_f64() {
     let mut rng = test_rng();
     let dist = ComplexDistribution::new(Standard, Standard);
     for _ in 0..100 {
-        let c: Complex<f64> = rng.sample(dist);
+        let c: Complex<f64> = rng.sample(&dist);
         assert!(c.re >= 0.0 && c.re < 1.0);
         assert!(c.im >= 0.0 && c.im < 1.0);
     }
@@ -111,7 +110,7 @@ fn generic_uniform_f64() {
     let dist = ComplexDistribution::new(re, im);
     for _ in 0..100 {
         // no type annotation required, since `Uniform` only produces one type.
-        let c = rng.sample(dist);
+        let c = rng.sample(&dist);
         assert!(c.re >= -100.0 && c.re < 0.0);
         assert!(c.im >= 0.0 && c.im < 100.0);
     }
@@ -126,7 +125,7 @@ fn generic_mixed_f64() {
     let dist = ComplexDistribution::new(re, Standard);
     for _ in 0..100 {
         // no type annotation required, since `Uniform` only produces one type.
-        let c = rng.sample(dist);
+        let c = rng.sample(&dist);
         assert!(c.re >= -100.0 && c.re < 0.0);
         assert!(c.im >= 0.0 && c.im < 1.0);
     }
@@ -142,7 +141,7 @@ fn generic_uniform_i32() {
     let dist = ComplexDistribution::new(re, im);
     for _ in 0..100 {
         // no type annotation required, since `Uniform` only produces one type.
-        let c = rng.sample(dist);
+        let c = rng.sample(&dist);
         assert!(c.re >= -100 && c.re < 0);
         assert!(c.im >= 0 && c.im < 100);
     }

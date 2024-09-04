@@ -10,46 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
     pub type AesGcmParams;
-    #[doc = "Get the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
-    #[wasm_bindgen(method, getter = "name")]
-    pub fn get_name(this: &AesGcmParams) -> String;
-    #[doc = "Change the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
-    #[wasm_bindgen(method, setter = "name")]
-    pub fn set_name(this: &AesGcmParams, val: &str);
-    #[doc = "Get the `additionalData` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
-    #[wasm_bindgen(method, getter = "additionalData")]
-    pub fn get_additional_data(this: &AesGcmParams) -> Option<::js_sys::Object>;
-    #[doc = "Change the `additionalData` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
-    #[wasm_bindgen(method, setter = "additionalData")]
-    pub fn set_additional_data(this: &AesGcmParams, val: &::js_sys::Object);
-    #[doc = "Get the `iv` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
-    #[wasm_bindgen(method, getter = "iv")]
-    pub fn get_iv(this: &AesGcmParams) -> ::js_sys::Object;
-    #[doc = "Change the `iv` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
-    #[wasm_bindgen(method, setter = "iv")]
-    pub fn set_iv(this: &AesGcmParams, val: &::js_sys::Object);
-    #[doc = "Get the `tagLength` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
-    #[wasm_bindgen(method, getter = "tagLength")]
-    pub fn get_tag_length(this: &AesGcmParams) -> Option<u8>;
-    #[doc = "Change the `tagLength` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
-    #[wasm_bindgen(method, setter = "tagLength")]
-    pub fn set_tag_length(this: &AesGcmParams, val: u8);
 }
 impl AesGcmParams {
     #[doc = "Construct a new `AesGcmParams`."]
@@ -62,24 +22,64 @@ impl AesGcmParams {
         ret.iv(iv);
         ret
     }
-    #[deprecated = "Use `set_name()` instead."]
+    #[doc = "Change the `name` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
     pub fn name(&mut self, val: &str) -> &mut Self {
-        self.set_name(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("name"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_additional_data()` instead."]
+    #[doc = "Change the `additionalData` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
     pub fn additional_data(&mut self, val: &::js_sys::Object) -> &mut Self {
-        self.set_additional_data(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("additionalData"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_iv()` instead."]
+    #[doc = "Change the `iv` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
     pub fn iv(&mut self, val: &::js_sys::Object) -> &mut Self {
-        self.set_iv(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("iv"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_tag_length()` instead."]
+    #[doc = "Change the `tagLength` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AesGcmParams`*"]
     pub fn tag_length(&mut self, val: u8) -> &mut Self {
-        self.set_tag_length(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("tagLength"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

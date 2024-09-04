@@ -1,4 +1,3 @@
-#[allow(clippy::wildcard_imports)] // false positive
 use assert_cmd::prelude::*;
 
 use std::process::Command;

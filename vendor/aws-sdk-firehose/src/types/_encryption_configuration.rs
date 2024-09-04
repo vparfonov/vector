@@ -27,8 +27,8 @@ impl EncryptionConfiguration {
 }
 
 /// A builder for [`EncryptionConfiguration`](crate::types::EncryptionConfiguration).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct EncryptionConfigurationBuilder {
     pub(crate) no_encryption_config: ::std::option::Option<crate::types::NoEncryptionConfig>,
     pub(crate) kms_encryption_config: ::std::option::Option<crate::types::KmsEncryptionConfig>,

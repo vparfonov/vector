@@ -10,10 +10,9 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
-rust-version = "1.56"
+edition = "2018"
 name = "darling"
-version = "0.20.10"
+version = "0.20.8"
 authors = ["Ted Driggs <ted.driggs@outlook.com>"]
 exclude = [
     "/.travis.yml",
@@ -24,16 +23,16 @@ description = """
 A proc-macro library for reading attributes into structs when
 implementing custom derives.
 """
-documentation = "https://docs.rs/darling/0.20.10"
+documentation = "https://docs.rs/darling/0.20.8"
 readme = "README.md"
 license = "MIT"
 repository = "https://github.com/TedDriggs/darling"
 
 [dependencies.darling_core]
-version = "=0.20.10"
+version = "=0.20.8"
 
 [dependencies.darling_macro]
-version = "=0.20.10"
+version = "=0.20.8"
 
 [dev-dependencies.proc-macro2]
 version = "1.0.37"

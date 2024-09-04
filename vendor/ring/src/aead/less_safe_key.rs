@@ -13,7 +13,7 @@
 // CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
 use super::{Aad, Algorithm, KeyInner, Nonce, Tag, UnboundKey, TAG_LEN};
-use crate::{constant_time, cpu, error};
+use crate::{constant_time, cpu, error, polyfill};
 use core::ops::RangeFrom;
 
 /// Immutable keys for use in situations where `OpeningKey`/`SealingKey` and
@@ -169,9 +169,9 @@ fn open_within_<'in_out>(
     src: RangeFrom<usize>,
 ) -> Result<&'in_out mut [u8], error::Unspecified> {
     let ciphertext_len = in_out.get(src.clone()).ok_or(error::Unspecified)?.len();
+    check_per_nonce_max_bytes(key.algorithm, ciphertext_len)?;
 
-    let Tag(calculated_tag) =
-        (key.algorithm.open)(&key.inner, nonce, aad, in_out, src, cpu::features())?;
+    let Tag(calculated_tag) = (key.algorithm.open)(&key.inner, nonce, aad, in_out, src);
 
     if constant_time::verify_slices_are_equal(calculated_tag.as_ref(), received_tag.as_ref())
         .is_err()
@@ -197,7 +197,15 @@ pub(super) fn seal_in_place_separate_tag_(
     aad: Aad<&[u8]>,
     in_out: &mut [u8],
 ) -> Result<Tag, error::Unspecified> {
-    (key.algorithm.seal)(&key.inner, nonce, aad, in_out, cpu::features())
+    check_per_nonce_max_bytes(key.algorithm(), in_out.len())?;
+    Ok((key.algorithm.seal)(&key.inner, nonce, aad, in_out))
+}
+
+fn check_per_nonce_max_bytes(alg: &Algorithm, in_out_len: usize) -> Result<(), error::Unspecified> {
+    if polyfill::u64_from_usize(in_out_len) > alg.max_input_len {
+        return Err(error::Unspecified);
+    }
+    Ok(())
 }
 
 impl core::fmt::Debug for LessSafeKey {

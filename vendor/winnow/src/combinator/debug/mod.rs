@@ -7,6 +7,9 @@ use crate::error::ErrMode;
 use crate::stream::Stream;
 use crate::Parser;
 
+#[cfg(all(feature = "debug", not(feature = "std")))]
+compile_error!("`debug` requires `std`");
+
 /// Trace the execution of the parser
 ///
 /// Note that [`Parser::context`] also provides high level trace information.

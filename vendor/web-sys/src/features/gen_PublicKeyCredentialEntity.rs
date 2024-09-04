@@ -10,28 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialEntity`*"]
     pub type PublicKeyCredentialEntity;
-    #[doc = "Get the `icon` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialEntity`*"]
-    #[deprecated]
-    #[wasm_bindgen(method, getter = "icon")]
-    pub fn get_icon(this: &PublicKeyCredentialEntity) -> Option<String>;
-    #[doc = "Change the `icon` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialEntity`*"]
-    #[deprecated]
-    #[wasm_bindgen(method, setter = "icon")]
-    pub fn set_icon(this: &PublicKeyCredentialEntity, val: &str);
-    #[doc = "Get the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialEntity`*"]
-    #[wasm_bindgen(method, getter = "name")]
-    pub fn get_name(this: &PublicKeyCredentialEntity) -> String;
-    #[doc = "Change the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialEntity`*"]
-    #[wasm_bindgen(method, setter = "name")]
-    pub fn set_name(this: &PublicKeyCredentialEntity, val: &str);
 }
 impl PublicKeyCredentialEntity {
     #[doc = "Construct a new `PublicKeyCredentialEntity`."]
@@ -43,14 +21,30 @@ impl PublicKeyCredentialEntity {
         ret.name(name);
         ret
     }
-    #[deprecated = "Use `set_icon()` instead."]
+    #[doc = "Change the `icon` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialEntity`*"]
     pub fn icon(&mut self, val: &str) -> &mut Self {
-        self.set_icon(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("icon"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_name()` instead."]
+    #[doc = "Change the `name` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialEntity`*"]
     pub fn name(&mut self, val: &str) -> &mut Self {
-        self.set_name(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("name"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

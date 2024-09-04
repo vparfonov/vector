@@ -6,7 +6,7 @@ use pin_project_lite::pin_project;
 use std::future::Future;
 use std::panic::Location;
 use std::pin::Pin;
-use std::task::{self, ready, Poll};
+use std::task::{self, Poll};
 
 /// Waits until `deadline` is reached.
 ///
@@ -267,7 +267,6 @@ impl Sleep {
 
             let location = location.expect("should have location if tracing");
             let resource_span = tracing::trace_span!(
-                parent: None,
                 "runtime.resource",
                 concrete_type = "Sleep",
                 kind = "timer",

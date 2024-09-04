@@ -309,12 +309,13 @@ TOML parse error at line 1, column 1
     bad!(
         "a = [ \r ]",
         str![[r#"
-TOML parse error at line 1, column 8
+TOML parse error at line 1, column 7
   |
 1 | a = [ 
  ]
-  |        ^
-
+  |       ^
+invalid array
+expected `]`
 
 "#]]
     );

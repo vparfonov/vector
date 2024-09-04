@@ -10,26 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `RsaPssParams`*"]
     pub type RsaPssParams;
-    #[doc = "Get the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RsaPssParams`*"]
-    #[wasm_bindgen(method, getter = "name")]
-    pub fn get_name(this: &RsaPssParams) -> String;
-    #[doc = "Change the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RsaPssParams`*"]
-    #[wasm_bindgen(method, setter = "name")]
-    pub fn set_name(this: &RsaPssParams, val: &str);
-    #[doc = "Get the `saltLength` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RsaPssParams`*"]
-    #[wasm_bindgen(method, getter = "saltLength")]
-    pub fn get_salt_length(this: &RsaPssParams) -> u32;
-    #[doc = "Change the `saltLength` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RsaPssParams`*"]
-    #[wasm_bindgen(method, setter = "saltLength")]
-    pub fn set_salt_length(this: &RsaPssParams, val: u32);
 }
 impl RsaPssParams {
     #[doc = "Construct a new `RsaPssParams`."]
@@ -42,14 +22,34 @@ impl RsaPssParams {
         ret.salt_length(salt_length);
         ret
     }
-    #[deprecated = "Use `set_name()` instead."]
+    #[doc = "Change the `name` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RsaPssParams`*"]
     pub fn name(&mut self, val: &str) -> &mut Self {
-        self.set_name(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("name"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_salt_length()` instead."]
+    #[doc = "Change the `saltLength` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RsaPssParams`*"]
     pub fn salt_length(&mut self, val: u32) -> &mut Self {
-        self.set_salt_length(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("saltLength"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

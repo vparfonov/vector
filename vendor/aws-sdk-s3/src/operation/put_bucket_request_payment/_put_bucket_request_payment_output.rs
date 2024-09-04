@@ -24,8 +24,8 @@ impl PutBucketRequestPaymentOutput {
 }
 
 /// A builder for [`PutBucketRequestPaymentOutput`](crate::operation::put_bucket_request_payment::PutBucketRequestPaymentOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct PutBucketRequestPaymentOutputBuilder {
     _extended_request_id: Option<String>,
     _request_id: Option<String>,

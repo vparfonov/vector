@@ -18,8 +18,8 @@ impl DeleteLogStreamOutput {
 }
 
 /// A builder for [`DeleteLogStreamOutput`](crate::operation::delete_log_stream::DeleteLogStreamOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DeleteLogStreamOutputBuilder {
     _request_id: Option<String>,
 }

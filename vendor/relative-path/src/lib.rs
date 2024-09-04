@@ -17,9 +17,6 @@
 //! On top of this we support many operations that guarantee the same behavior
 //! across platforms.
 //!
-//! For more utilities to manipulate relative paths, see the
-//! [`relative-path-utils` crate].
-//!
 //! <br>
 //!
 //! ## Usage
@@ -27,7 +24,7 @@
 //! Add `relative-path` to your `Cargo.toml`:
 //!
 //! ```toml
-//! relative-path = "1.9.2"
+//! relative-path = "1.9.0"
 //! ```
 //!
 //! Start using relative paths:
@@ -282,13 +279,11 @@
 //! [`to_path`]: https://docs.rs/relative-path/1/relative_path/struct.RelativePath.html#method.to_path
 //! [windows-reserved]: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
 //! [windows-case]: https://learn.microsoft.com/en-us/windows/wsl/case-sensitivity
-//! [`relative-path-utils` crate]: https://docs.rs/relative-path-utils
 
 // This file contains parts that are Copyright 2015 The Rust Project Developers, copied from:
 // https://github.com/rust-lang/rust
 // cb2a656cdfb6400ac0200c661267f91fabf237e2 src/libstd/path.rs
 
-#![allow(clippy::manual_let_else)]
 #![deny(missing_docs)]
 
 mod path_ext;
@@ -305,7 +300,7 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::iter::FromIterator;
 use std::mem;
-use std::ops;
+use std::ops::{self, Deref};
 use std::path;
 use std::rc::Rc;
 use std::str;
@@ -346,8 +341,10 @@ where
         let mut iter_next = iter.clone();
         match (iter_next.next(), prefix.next()) {
             (Some(x), Some(y)) if x == y => (),
-            (Some(_) | None, Some(_)) => return None,
-            (Some(_) | None, None) => return Some(iter),
+            (Some(_), Some(_)) => return None,
+            (Some(_), None) => return Some(iter),
+            (None, None) => return Some(iter),
+            (None, Some(_)) => return None,
         }
         iter = iter_next;
     }
@@ -355,7 +352,7 @@ where
 
 /// A single path component.
 ///
-/// Accessed using the [`RelativePath::components`] iterator.
+/// Accessed using the [RelativePath::components] iterator.
 ///
 /// # Examples
 ///
@@ -383,9 +380,7 @@ pub enum Component<'a> {
 }
 
 impl<'a> Component<'a> {
-    /// Extracts the underlying [`str`] slice.
-    ///
-    /// [`str`]: prim@str
+    /// Extracts the underlying [`str`][std::str] slice.
     ///
     /// # Examples
     ///
@@ -396,9 +391,8 @@ impl<'a> Component<'a> {
     /// let components: Vec<_> = path.components().map(Component::as_str).collect();
     /// assert_eq!(&components, &[".", "tmp", "..", "foo", "bar.txt"]);
     /// ```
-    #[must_use]
     pub fn as_str(self) -> &'a str {
-        use self::Component::{CurDir, Normal, ParentDir};
+        use self::Component::*;
 
         match self {
             CurDir => CURRENT_STR,
@@ -447,7 +441,7 @@ fn relative_traversal<'a, C>(buf: &mut RelativePathBuf, components: C)
 where
     C: IntoIterator<Item = Component<'a>>,
 {
-    use self::Component::{CurDir, Normal, ParentDir};
+    use self::Component::*;
 
     for c in components {
         match c {
@@ -538,8 +532,6 @@ impl<'a> Components<'a> {
     ///
     /// assert_eq!("bar.txt", components.as_relative_path());
     /// ```
-    #[must_use]
-    #[inline]
     pub fn as_relative_path(&self) -> &'a RelativePath {
         RelativePath::new(self.source)
     }
@@ -551,12 +543,10 @@ impl<'a> cmp::PartialEq for Components<'a> {
     }
 }
 
-/// An iterator over the [`Component`]s of a [`RelativePath`], as [`str`]
-/// slices.
+/// An iterator over the [`Component`]s of a [`RelativePath`], as
+/// [`str`][std::str] slices.
 ///
 /// This `struct` is created by the [`iter`][RelativePath::iter] method.
-///
-/// [`str`]: prim@str
 #[derive(Clone)]
 pub struct Iter<'a> {
     inner: Components<'a>,
@@ -610,7 +600,6 @@ impl FromPathError {
     ///
     /// assert_eq!(FromPathErrorKind::NonRelative, e.kind());
     /// ```
-    #[must_use]
     pub fn kind(&self) -> FromPathErrorKind {
         self.kind
     }
@@ -646,7 +635,6 @@ pub struct RelativePathBuf {
 
 impl RelativePathBuf {
     /// Create a new relative path buffer.
-    #[must_use]
     pub fn new() -> RelativePathBuf {
         RelativePathBuf {
             inner: String::new(),
@@ -675,16 +663,8 @@ impl RelativePathBuf {
     ///     RelativePathBuf::from_path(Path::new("foo/bar"))
     /// );
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// This will error in case the provided path is not a relative path, which
-    /// is identifier by it having a [`Prefix`] or [`RootDir`] component.
-    ///
-    /// [`Prefix`]: std::path::Component::Prefix
-    /// [`RootDir`]: std::path::Component::RootDir
     pub fn from_path<P: AsRef<path::Path>>(path: P) -> Result<RelativePathBuf, FromPathError> {
-        use std::path::Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
+        use std::path::Component::*;
 
         let mut buffer = RelativePathBuf::new();
 
@@ -702,27 +682,20 @@ impl RelativePathBuf {
 
     /// Extends `self` with `path`.
     ///
+    /// If `path` is absolute, it replaces the current path.
+    ///
     /// # Examples
     ///
     /// ```
-    /// use relative_path::RelativePathBuf;
+    /// use relative_path::{RelativePathBuf, RelativePath};
     ///
     /// let mut path = RelativePathBuf::new();
     /// path.push("foo");
     /// path.push("bar");
     ///
     /// assert_eq!("foo/bar", path);
-    ///
-    /// let mut path = RelativePathBuf::new();
-    /// path.push("foo");
-    /// path.push("/bar");
-    ///
-    /// assert_eq!("foo/bar", path);
     /// ```
-    pub fn push<P>(&mut self, path: P)
-    where
-        P: AsRef<RelativePath>,
-    {
+    pub fn push<P: AsRef<RelativePath>>(&mut self, path: P) {
         let other = path.as_ref();
 
         let other = if other.starts_with_sep() {
@@ -735,7 +708,7 @@ impl RelativePathBuf {
             self.inner.push(SEP);
         }
 
-        self.inner.push_str(other);
+        self.inner.push_str(other)
     }
 
     /// Updates [`file_name`] to `file_name`.
@@ -854,7 +827,6 @@ impl RelativePathBuf {
     }
 
     /// Coerce to a [`RelativePath`] slice.
-    #[must_use]
     pub fn as_relative_path(&self) -> &RelativePath {
         self
     }
@@ -870,14 +842,12 @@ impl RelativePathBuf {
     /// let string = p.into_string();
     /// assert_eq!(string, "/the/head".to_owned());
     /// ```
-    #[must_use]
     pub fn into_string(self) -> String {
         self.inner
     }
 
     /// Converts this `RelativePathBuf` into a [boxed][std::boxed::Box]
     /// [`RelativePath`].
-    #[must_use]
     pub fn into_boxed_relative_path(self) -> Box<RelativePath> {
         let rw = Box::into_raw(self.inner.into_boxed_str()) as *mut RelativePath;
         unsafe { Box::from_raw(rw) }
@@ -923,9 +893,8 @@ impl AsRef<str> for RelativePath {
 }
 
 impl Borrow<RelativePath> for RelativePathBuf {
-    #[inline]
     fn borrow(&self) -> &RelativePath {
-        self
+        self.deref()
     }
 }
 
@@ -966,14 +935,12 @@ impl cmp::PartialEq for RelativePathBuf {
 impl cmp::Eq for RelativePathBuf {}
 
 impl cmp::PartialOrd for RelativePathBuf {
-    #[inline]
     fn partial_cmp(&self, other: &RelativePathBuf) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
+        self.components().partial_cmp(other.components())
     }
 }
 
 impl cmp::Ord for RelativePathBuf {
-    #[inline]
     fn cmp(&self, other: &RelativePathBuf) -> cmp::Ordering {
         self.components().cmp(other.components())
     }
@@ -981,24 +948,18 @@ impl cmp::Ord for RelativePathBuf {
 
 impl Hash for RelativePathBuf {
     fn hash<H: Hasher>(&self, h: &mut H) {
-        self.as_relative_path().hash(h);
+        self.as_relative_path().hash(h)
     }
 }
 
-impl<P> Extend<P> for RelativePathBuf
-where
-    P: AsRef<RelativePath>,
-{
+impl<P: AsRef<RelativePath>> Extend<P> for RelativePathBuf {
     #[inline]
     fn extend<I: IntoIterator<Item = P>>(&mut self, iter: I) {
         iter.into_iter().for_each(move |p| self.push(p.as_ref()));
     }
 }
 
-impl<P> FromIterator<P> for RelativePathBuf
-where
-    P: AsRef<RelativePath>,
-{
+impl<P: AsRef<RelativePath>> FromIterator<P> for RelativePathBuf {
     #[inline]
     fn from_iter<I: IntoIterator<Item = P>>(iter: I) -> RelativePathBuf {
         let mut buf = RelativePathBuf::new();
@@ -1013,9 +974,9 @@ pub struct RelativePath {
     inner: str,
 }
 
-/// An error returned from [`strip_prefix`] if the prefix was not found.
+/// An error returned from [strip_prefix] if the prefix was not found.
 ///
-/// [`strip_prefix`]: RelativePath::strip_prefix
+/// [strip_prefix]: RelativePath::strip_prefix
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StripPrefixError(());
 
@@ -1059,7 +1020,7 @@ impl RelativePath {
     pub fn from_path<P: ?Sized + AsRef<path::Path>>(
         path: &P,
     ) -> Result<&RelativePath, FromPathError> {
-        use std::path::Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
+        use std::path::Component::*;
 
         let other = path.as_ref();
 
@@ -1073,8 +1034,9 @@ impl RelativePath {
         // check that the component compositions are equal.
         for (a, b) in other.components().zip(rel.components()) {
             match (a, b) {
-                (Prefix(_) | RootDir, _) => return Err(FromPathErrorKind::NonRelative.into()),
-                (CurDir, Component::CurDir) | (ParentDir, Component::ParentDir) => continue,
+                (Prefix(_), _) | (RootDir, _) => return Err(FromPathErrorKind::NonRelative.into()),
+                (CurDir, Component::CurDir) => continue,
+                (ParentDir, Component::ParentDir) => continue,
                 (Normal(a), Component::Normal(b)) if a == b => continue,
                 _ => return Err(FromPathErrorKind::BadSeparator.into()),
             }
@@ -1083,9 +1045,7 @@ impl RelativePath {
         Ok(rel)
     }
 
-    /// Yields the underlying [`str`] slice.
-    ///
-    /// [`str`]: prim@str
+    /// Yields the underlying [`str`][std::str] slice.
     ///
     /// # Examples
     ///
@@ -1094,7 +1054,6 @@ impl RelativePath {
     ///
     /// assert_eq!(RelativePath::new("foo.txt").as_str(), "foo.txt");
     /// ```
-    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.inner
     }
@@ -1111,7 +1070,6 @@ impl RelativePath {
     /// println!("{}", path.display());
     /// ```
     #[deprecated(note = "RelativePath implements std::fmt::Display directly")]
-    #[must_use]
     pub fn display(&self) -> Display {
         Display { path: self }
     }
@@ -1126,10 +1084,7 @@ impl RelativePath {
     /// let path = RelativePath::new("foo/bar");
     /// assert_eq!("foo/bar/baz", path.join("baz"));
     /// ```
-    pub fn join<P>(&self, path: P) -> RelativePathBuf
-    where
-        P: AsRef<RelativePath>,
-    {
+    pub fn join<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
         let mut out = self.to_relative_path_buf();
         out.push(path);
         out
@@ -1150,18 +1105,15 @@ impl RelativePath {
     /// assert_eq!(Some(Component::Normal("baz")), it.next());
     /// assert_eq!(None, it.next());
     /// ```
-    #[must_use]
     pub fn components(&self) -> Components {
         Components::new(&self.inner)
     }
 
-    /// Produces an iterator over the path's components viewed as [`str`]
-    /// slices.
+    /// Produces an iterator over the path's components viewed as
+    /// [`str`][std::str] slices.
     ///
     /// For more information about the particulars of how the path is separated
     /// into components, see [`components`][Self::components].
-    ///
-    /// [`str`]: prim@str
     ///
     /// # Examples
     ///
@@ -1173,7 +1125,6 @@ impl RelativePath {
     /// assert_eq!(it.next(), Some("foo.txt"));
     /// assert_eq!(it.next(), None)
     /// ```
-    #[must_use]
     pub fn iter(&self) -> Iter {
         Iter {
             inner: self.components(),
@@ -1181,7 +1132,6 @@ impl RelativePath {
     }
 
     /// Convert to an owned [`RelativePathBuf`].
-    #[must_use]
     pub fn to_relative_path_buf(&self) -> RelativePathBuf {
         RelativePathBuf::from(self.inner.to_owned())
     }
@@ -1250,17 +1200,15 @@ impl RelativePath {
     /// Build an owned [`PathBuf`] relative to `base` for the current relative
     /// path.
     ///
-    /// This is similar to [`to_path`] except that it doesn't just
-    /// unconditionally append one path to the other, instead it performs the
-    /// following operations depending on its own components:
+    /// This is similar to [`to_path`][RelativePath::to_path] except that it
+    /// doesn't just unconditionally append one path to the other, instead it
+    /// performs the following operations depending on its own components:
     ///
-    /// * [`Component::CurDir`] leaves the `base` unmodified.
-    /// * [`Component::ParentDir`] removes a component from `base` using
-    ///   [`path::PathBuf::pop`].
-    /// * [`Component::Normal`] pushes the given path component onto `base`
-    ///   using the same mechanism as [`to_path`].
-    ///
-    /// [`to_path`]: RelativePath::to_path
+    /// * [Component::CurDir] leaves the `base` unmodified.
+    /// * [Component::ParentDir] removes a component from `base` using
+    ///   [path::PathBuf::pop].
+    /// * [Component::Normal] pushes the given path component onto `base` using
+    ///   the same mechanism as [`to_path`][RelativePath::to_path].
     ///
     /// Note that the exact semantics of the path operation is determined by the
     /// corresponding [`PathBuf`] operation. E.g. popping a component off a path
@@ -1325,7 +1273,7 @@ impl RelativePath {
     /// [`PathBuf`]: std::path::PathBuf
     /// [`PathBuf::push`]: std::path::PathBuf::push
     pub fn to_logical_path<P: AsRef<path::Path>>(&self, base: P) -> path::PathBuf {
-        use self::Component::{CurDir, Normal, ParentDir};
+        use self::Component::*;
 
         let mut p = base.as_ref().to_path_buf().into_os_string();
 
@@ -1361,9 +1309,8 @@ impl RelativePath {
     /// assert_eq!(Some(RelativePath::new("")), RelativePath::new("foo").parent());
     /// assert_eq!(None, RelativePath::new("").parent());
     /// ```
-    #[must_use]
     pub fn parent(&self) -> Option<&RelativePath> {
-        use self::Component::CurDir;
+        use self::Component::*;
 
         if self.inner.is_empty() {
             return None;
@@ -1394,9 +1341,8 @@ impl RelativePath {
     /// assert_eq!(None, RelativePath::new("foo.txt/..").file_name());
     /// assert_eq!(None, RelativePath::new("/").file_name());
     /// ```
-    #[must_use]
     pub fn file_name(&self) -> Option<&str> {
-        use self::Component::{CurDir, Normal, ParentDir};
+        use self::Component::*;
 
         let mut it = self.components();
 
@@ -1404,7 +1350,7 @@ impl RelativePath {
             return match c {
                 CurDir => continue,
                 Normal(name) => Some(name),
-                ParentDir => None,
+                _ => None,
             };
         }
 
@@ -1415,10 +1361,8 @@ impl RelativePath {
     ///
     /// # Errors
     ///
-    /// If `base` is not a prefix of `self` (i.e. [`starts_with`] returns
-    /// `false`), returns [`Err`].
-    ///
-    /// [`starts_with`]: Self::starts_with
+    /// If `base` is not a prefix of `self` (i.e.
+    /// [starts_with][Self::starts_with] returns `false`), returns [`Err`].
     ///
     /// # Examples
     ///
@@ -1431,10 +1375,10 @@ impl RelativePath {
     /// assert_eq!(path.strip_prefix("test").is_ok(), true);
     /// assert_eq!(path.strip_prefix("haha").is_ok(), false);
     /// ```
-    pub fn strip_prefix<P>(&self, base: P) -> Result<&RelativePath, StripPrefixError>
-    where
-        P: AsRef<RelativePath>,
-    {
+    pub fn strip_prefix<P: AsRef<RelativePath>>(
+        &self,
+        base: P,
+    ) -> Result<&RelativePath, StripPrefixError> {
         iter_after(self.components(), base.as_ref().components())
             .map(|c| c.as_relative_path())
             .ok_or(StripPrefixError(()))
@@ -1455,10 +1399,7 @@ impl RelativePath {
     ///
     /// assert!(!path.starts_with("e"));
     /// ```
-    pub fn starts_with<P>(&self, base: P) -> bool
-    where
-        P: AsRef<RelativePath>,
-    {
+    pub fn starts_with<P: AsRef<RelativePath>>(&self, base: P) -> bool {
         iter_after(self.components(), base.as_ref().components()).is_some()
     }
 
@@ -1475,10 +1416,7 @@ impl RelativePath {
     ///
     /// assert!(path.ends_with("passwd"));
     /// ```
-    pub fn ends_with<P>(&self, child: P) -> bool
-    where
-        P: AsRef<RelativePath>,
-    {
+    pub fn ends_with<P: AsRef<RelativePath>>(&self, child: P) -> bool {
         iter_after(self.components().rev(), child.as_ref().components().rev()).is_some()
     }
 
@@ -1506,7 +1444,6 @@ impl RelativePath {
     /// assert!(!RelativePath::new("foo/./baz.txt").is_normalized());
     /// assert!(!RelativePath::new("../foo/./bar/../baz.txt").is_normalized());
     /// ```
-    #[must_use]
     pub fn is_normalized(&self) -> bool {
         self.components()
             .skip_while(|c| matches!(c, Component::ParentDir))
@@ -1516,9 +1453,7 @@ impl RelativePath {
     /// Creates an owned [`RelativePathBuf`] like `self` but with the given file
     /// name.
     ///
-    /// See [`set_file_name`] for more details.
-    ///
-    /// [`set_file_name`]: RelativePathBuf::set_file_name
+    /// See [set_file_name][RelativePathBuf::set_file_name] for more details.
     ///
     /// # Examples
     ///
@@ -1588,9 +1523,7 @@ impl RelativePath {
     /// Creates an owned [`RelativePathBuf`] like `self` but with the given
     /// extension.
     ///
-    /// See [`set_extension`] for more details.
-    ///
-    /// [`set_extension`]: RelativePathBuf::set_extension
+    /// See [set_extension][RelativePathBuf::set_extension] for more details.
     ///
     /// # Examples
     ///
@@ -1624,10 +1557,7 @@ impl RelativePath {
     ///     RelativePath::new("../foo/bar").join_normalized("../baz.txt").as_relative_path()
     /// );
     /// ```
-    pub fn join_normalized<P>(&self, path: P) -> RelativePathBuf
-    where
-        P: AsRef<RelativePath>,
-    {
+    pub fn join_normalized<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
         let mut buf = RelativePathBuf::new();
         relative_traversal(&mut buf, self.components());
         relative_traversal(&mut buf, path.as_ref().components());
@@ -1665,7 +1595,6 @@ impl RelativePath {
     ///     RelativePath::new(".").normalize()
     /// );
     /// ```
-    #[must_use]
     pub fn normalize(&self) -> RelativePathBuf {
         let mut buf = RelativePathBuf::with_capacity(self.inner.len());
         relative_traversal(&mut buf, self.components());
@@ -1734,10 +1663,7 @@ impl RelativePath {
     /// assert_eq!("../../../../../arch/foo.h", a.relative(b));
     /// assert_eq!("", b.relative(a));
     /// ```
-    pub fn relative<P>(&self, path: P) -> RelativePathBuf
-    where
-        P: AsRef<RelativePath>,
-    {
+    pub fn relative<P: AsRef<RelativePath>>(&self, path: P) -> RelativePathBuf {
         let mut from = RelativePathBuf::with_capacity(self.inner.len());
         let mut to = RelativePathBuf::with_capacity(path.as_ref().inner.len());
 
@@ -1790,16 +1716,6 @@ impl RelativePath {
     #[inline]
     fn ends_with_sep(&self) -> bool {
         self.inner.ends_with(SEP)
-    }
-}
-
-impl<'a> IntoIterator for &'a RelativePath {
-    type IntoIter = Iter<'a>;
-    type Item = &'a str;
-
-    #[inline]
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
     }
 }
 
@@ -1885,7 +1801,7 @@ impl Clone for Box<RelativePath> {
     }
 }
 
-/// Conversion from [`RelativePath`] to [`Arc<RelativePath>`].
+/// Conversion from [RelativePath] to [`Arc<RelativePath>`].
 ///
 /// # Examples
 ///
@@ -2067,7 +1983,7 @@ impl cmp::Eq for RelativePath {}
 impl cmp::PartialOrd for RelativePath {
     #[inline]
     fn partial_cmp(&self, other: &RelativePath) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
+        self.components().partial_cmp(other.components())
     }
 }
 
@@ -2127,7 +2043,7 @@ impl<'a> fmt::Display for Display<'a> {
     }
 }
 
-/// [`serde::ser::Serialize`] implementation for [`RelativePathBuf`].
+/// [serde::ser::Serialize] implementation for [`RelativePathBuf`].
 ///
 /// ```
 /// use serde::Serialize;
@@ -2245,7 +2161,7 @@ impl<'de> serde::de::Deserialize<'de> for Box<RelativePath> {
     }
 }
 
-/// [`serde::de::Deserialize`] implementation for a [`RelativePath`] reference.
+/// [`serde::de::Deserialize`] implementation for a [RelativePath] reference.
 ///
 /// ```
 /// use serde::Deserialize;
@@ -2297,7 +2213,7 @@ impl<'de: 'a, 'a> serde::de::Deserialize<'de> for &'a RelativePath {
     }
 }
 
-/// [`serde::ser::Serialize`] implementation for [`RelativePath`].
+/// [serde::ser::Serialize] implementation for [RelativePath].
 ///
 /// ```
 /// use serde::Serialize;

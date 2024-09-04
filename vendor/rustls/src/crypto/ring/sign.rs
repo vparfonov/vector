@@ -1,21 +1,22 @@
 #![allow(clippy::duplicate_mod)]
 
-use alloc::boxed::Box;
-use alloc::string::ToString;
-use alloc::sync::Arc;
-use alloc::vec::Vec;
-use alloc::{format, vec};
-use core::fmt::{self, Debug, Formatter};
-
-use pki_types::{PrivateKeyDer, PrivatePkcs8KeyDer, SubjectPublicKeyInfoDer};
-use webpki::alg_id;
-
-use super::ring_like::rand::{SecureRandom, SystemRandom};
-use super::ring_like::signature::{self, EcdsaKeyPair, Ed25519KeyPair, KeyPair, RsaKeyPair};
-use crate::crypto::signer::{public_key_to_spki, Signer, SigningKey};
 use crate::enums::{SignatureAlgorithm, SignatureScheme};
 use crate::error::Error;
-use crate::x509::{wrap_concat_in_sequence, wrap_in_octet_string};
+use crate::sign::{Signer, SigningKey};
+use crate::x509::{asn1_wrap, wrap_in_sequence};
+
+use super::ring_like::io::der;
+use super::ring_like::rand::{SecureRandom, SystemRandom};
+use super::ring_like::signature::{self, EcdsaKeyPair, Ed25519KeyPair, RsaKeyPair};
+use pki_types::{PrivateKeyDer, PrivatePkcs8KeyDer};
+
+use alloc::boxed::Box;
+use alloc::format;
+use alloc::string::ToString;
+use alloc::sync::Arc;
+use alloc::vec;
+use alloc::vec::Vec;
+use core::fmt::{self, Debug, Formatter};
 
 /// Parse `der` as any supported key encoding/type, returning
 /// the first which works.
@@ -121,13 +122,6 @@ impl SigningKey for RsaSigningKey {
             .iter()
             .find(|scheme| offered.contains(scheme))
             .map(|scheme| RsaSigner::new(Arc::clone(&self.key), *scheme))
-    }
-
-    fn public_key(&self) -> Option<SubjectPublicKeyInfoDer<'_>> {
-        Some(public_key_to_spki(
-            &alg_id::RSA_ENCRYPTION,
-            self.key.public_key(),
-        ))
     }
 
     fn algorithm(&self) -> SignatureAlgorithm {
@@ -250,10 +244,13 @@ impl EcdsaSigningKey {
             _ => unreachable!(), // all callers are in this file
         };
 
-        let sec1_wrap = wrap_in_octet_string(maybe_sec1_der);
-        let pkcs8 = wrap_concat_in_sequence(pkcs8_prefix, &sec1_wrap);
+        let sec1_wrap = asn1_wrap(der::Tag::OctetString as u8, maybe_sec1_der);
 
-        EcdsaKeyPair::from_pkcs8(sigalg, &pkcs8, rng).map_err(|_| ())
+        let mut pkcs8_inner = Vec::with_capacity(pkcs8_prefix.len() + sec1_wrap.len());
+        pkcs8_inner.extend_from_slice(pkcs8_prefix);
+        pkcs8_inner.extend_from_slice(&sec1_wrap);
+
+        EcdsaKeyPair::from_pkcs8(sigalg, &wrap_in_sequence(&pkcs8_inner), rng).map_err(|_| ())
     }
 }
 
@@ -289,18 +286,8 @@ impl SigningKey for EcdsaSigningKey {
         }
     }
 
-    fn public_key(&self) -> Option<SubjectPublicKeyInfoDer<'_>> {
-        let id = match self.scheme {
-            SignatureScheme::ECDSA_NISTP256_SHA256 => alg_id::ECDSA_P256,
-            SignatureScheme::ECDSA_NISTP384_SHA384 => alg_id::ECDSA_P384,
-            _ => unreachable!(),
-        };
-
-        Some(public_key_to_spki(&id, self.key.public_key()))
-    }
-
     fn algorithm(&self) -> SignatureAlgorithm {
-        self.scheme.algorithm()
+        self.scheme.sign()
     }
 }
 
@@ -383,12 +370,8 @@ impl SigningKey for Ed25519SigningKey {
         }
     }
 
-    fn public_key(&self) -> Option<SubjectPublicKeyInfoDer<'_>> {
-        Some(public_key_to_spki(&alg_id::ED25519, self.key.public_key()))
-    }
-
     fn algorithm(&self) -> SignatureAlgorithm {
-        self.scheme.algorithm()
+        self.scheme.sign()
     }
 }
 
@@ -425,11 +408,9 @@ impl Debug for Ed25519Signer {
 
 #[cfg(test)]
 mod tests {
-    use alloc::format;
-
-    use pki_types::{PrivatePkcs1KeyDer, PrivateSec1KeyDer};
-
     use super::*;
+    use alloc::format;
+    use pki_types::{PrivatePkcs1KeyDer, PrivateSec1KeyDer};
 
     #[test]
     fn can_load_ecdsa_nistp256_pkcs8() {

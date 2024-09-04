@@ -10,40 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `HitRegionOptions`*"]
     pub type HitRegionOptions;
-    #[cfg(feature = "Element")]
-    #[doc = "Get the `control` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `Element`, `HitRegionOptions`*"]
-    #[wasm_bindgen(method, getter = "control")]
-    pub fn get_control(this: &HitRegionOptions) -> Option<Element>;
-    #[cfg(feature = "Element")]
-    #[doc = "Change the `control` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `Element`, `HitRegionOptions`*"]
-    #[wasm_bindgen(method, setter = "control")]
-    pub fn set_control(this: &HitRegionOptions, val: Option<&Element>);
-    #[doc = "Get the `id` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HitRegionOptions`*"]
-    #[wasm_bindgen(method, getter = "id")]
-    pub fn get_id(this: &HitRegionOptions) -> Option<String>;
-    #[doc = "Change the `id` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HitRegionOptions`*"]
-    #[wasm_bindgen(method, setter = "id")]
-    pub fn set_id(this: &HitRegionOptions, val: &str);
-    #[cfg(feature = "Path2d")]
-    #[doc = "Get the `path` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HitRegionOptions`, `Path2d`*"]
-    #[wasm_bindgen(method, getter = "path")]
-    pub fn get_path(this: &HitRegionOptions) -> Option<Path2d>;
-    #[cfg(feature = "Path2d")]
-    #[doc = "Change the `path` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HitRegionOptions`, `Path2d`*"]
-    #[wasm_bindgen(method, setter = "path")]
-    pub fn set_path(this: &HitRegionOptions, val: Option<&Path2d>);
 }
 impl HitRegionOptions {
     #[doc = "Construct a new `HitRegionOptions`."]
@@ -55,20 +21,48 @@ impl HitRegionOptions {
         ret
     }
     #[cfg(feature = "Element")]
-    #[deprecated = "Use `set_control()` instead."]
+    #[doc = "Change the `control` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `Element`, `HitRegionOptions`*"]
     pub fn control(&mut self, val: Option<&Element>) -> &mut Self {
-        self.set_control(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("control"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_id()` instead."]
+    #[doc = "Change the `id` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `HitRegionOptions`*"]
     pub fn id(&mut self, val: &str) -> &mut Self {
-        self.set_id(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("id"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "Path2d")]
-    #[deprecated = "Use `set_path()` instead."]
+    #[doc = "Change the `path` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `HitRegionOptions`, `Path2d`*"]
     pub fn path(&mut self, val: Option<&Path2d>) -> &mut Self {
-        self.set_path(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("path"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

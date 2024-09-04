@@ -1,11 +1,11 @@
 //! Portable interface to epoll, kqueue, event ports, and IOCP.
 //!
 //! Supported platforms:
-//! - [epoll](https://en.wikipedia.org/wiki/Epoll): Linux, Android, RedoxOS
+//! - [epoll](https://en.wikipedia.org/wiki/Epoll): Linux, Android
 //! - [kqueue](https://en.wikipedia.org/wiki/Kqueue): macOS, iOS, tvOS, watchOS, FreeBSD, NetBSD, OpenBSD,
 //!   DragonFly BSD
 //! - [event ports](https://illumos.org/man/port_create): illumos, Solaris
-//! - [poll](https://en.wikipedia.org/wiki/Poll_(Unix)): VxWorks, Fuchsia, HermitOS, other Unix systems
+//! - [poll](https://en.wikipedia.org/wiki/Poll_(Unix)): VxWorks, Fuchsia, other Unix systems
 //! - [IOCP](https://learn.microsoft.com/en-us/windows/win32/fileio/i-o-completion-ports): Windows, Wine (version 7.13+)
 //!
 //! By default, polling is done in oneshot mode, which means interest in I/O events needs to
@@ -80,11 +80,7 @@ cfg_if! {
     if #[cfg(polling_test_poll_backend)] {
         mod poll;
         use poll as sys;
-    } else if #[cfg(any(
-        target_os = "linux",
-        target_os = "android",
-        target_os = "redox"
-    ))] {
+    } else if #[cfg(any(target_os = "linux", target_os = "android"))] {
         mod epoll;
         use epoll as sys;
     } else if #[cfg(any(
@@ -107,7 +103,6 @@ cfg_if! {
         use kqueue as sys;
     } else if #[cfg(any(
         target_os = "vxworks",
-        target_os = "hermit",
         target_os = "fuchsia",
         target_os = "horizon",
         unix,
@@ -335,86 +330,6 @@ impl Event {
     #[inline]
     pub fn is_priority(&self) -> bool {
         self.extra.is_pri()
-    }
-
-    /// Tells if this event is the result of a connection failure.
-    ///
-    /// This function checks if a TCP connection has failed. It corresponds to the `EPOLLERR`  or `EPOLLHUP` event in Linux
-    /// and `CONNECT_FAILED` event in Windows IOCP.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use std::{io, net};
-    /// // Assuming polling and socket2 are included as dependencies in Cargo.toml
-    /// use polling::Event;
-    /// use socket2::Type;
-    ///
-    /// fn main() -> io::Result<()> {
-    ///     let socket = socket2::Socket::new(socket2::Domain::IPV4, Type::STREAM, None)?;
-    ///     let poller = polling::Poller::new()?;
-    ///     unsafe {
-    ///         poller.add(&socket, Event::new(0, true, true))?;
-    ///     }
-    ///     let addr = net::SocketAddr::new(net::Ipv4Addr::LOCALHOST.into(), 8080);
-    ///     socket.set_nonblocking(true)?;
-    ///     let _ = socket.connect(&addr.into());
-    ///
-    ///     let mut events = polling::Events::new();
-    ///
-    ///     events.clear();
-    ///     poller.wait(&mut events, None)?;
-    ///
-    ///     let event = events.iter().next();
-    ///
-    ///     let event = match event {
-    ///         Some(event) => event,
-    ///         None => {
-    ///             println!("no event");
-    ///             return Ok(());
-    ///         },
-    ///     };
-    ///
-    ///     println!("event: {:?}", event);
-    ///     if event
-    ///         .is_connect_failed()
-    ///         .unwrap_or_default()
-    ///     {
-    ///         println!("connect failed");
-    ///     }
-    ///
-    ///     Ok(())
-    /// }
-    /// ```
-    ///
-    /// # Returns
-    ///
-    /// Returns `Some(true)` if the connection has failed, `Some(false)` if the connection has not failed,
-    /// or `None` if the platform does not support detecting this condition.
-    #[inline]
-    #[deprecated(
-        since = "3.4.0",
-        note = "use `is_err` in combination of is_hup instead, see documentation for `is_err`"
-    )]
-    pub fn is_connect_failed(&self) -> Option<bool> {
-        self.extra.is_connect_failed()
-    }
-
-    /// Tells if this event is the result of a connection failure.
-    ///
-    /// This function checks if an error exist, particularly useful in detecting if TCP connection failed. It corresponds to the `EPOLLERR` event in Linux
-    /// and `CONNECT_FAILED` event in Windows IOCP.
-    ///
-    /// ## Caveats
-    ///
-    /// In `epoll`, a TCP connection failure is indicated by `EPOLLERR` + `EPOLLHUP`, though just `EPOLLERR` is enough to indicate a connection failure.
-    /// EPOLLHUP may happen when we haven't event called `connect` on the socket, but it is still a valid event to check for.
-    ///
-    /// Returns `Some(true)` if the connection has failed, `Some(false)` if there is no error,
-    /// or `None` if the platform does not support detecting this condition.
-    #[inline]
-    pub fn is_err(&self) -> Option<bool> {
-        self.extra.is_err()
     }
 
     /// Remove any extra information from this event.
@@ -1039,11 +954,8 @@ impl fmt::Debug for Poller {
 }
 
 cfg_if! {
-    if #[cfg(any(unix, target_os = "hermit"))] {
-        #[cfg(unix)]
+    if #[cfg(unix)] {
         use std::os::unix::io::{AsRawFd, RawFd, AsFd, BorrowedFd};
-        #[cfg(target_os = "hermit")]
-        use std::os::hermit::io::{AsRawFd, RawFd, AsFd, BorrowedFd};
 
         /// A resource with a raw file descriptor.
         pub trait AsRawSource {

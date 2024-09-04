@@ -35,7 +35,7 @@ pub struct Response {
 
 impl Response {
     pub(super) fn new(
-        res: hyper::Response<ResponseBody>,
+        res: hyper::Response<hyper::body::Incoming>,
         url: Url,
         accepts: Accepts,
         total_timeout: Option<Pin<Box<Sleep>>>,
@@ -432,7 +432,7 @@ impl Response {
 impl fmt::Debug for Response {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Response")
-            .field("url", &self.url().as_str())
+            .field("url", self.url())
             .field("status", &self.status())
             .field("headers", self.headers())
             .finish()
@@ -447,7 +447,7 @@ impl From<Response> for Body {
 }
 
 // I'm not sure this conversion is that useful... People should be encouraged
-// to use `http::Response`, not `reqwest::Response`.
+// to use `http::Resposne`, not `reqwest::Response`.
 impl<T: Into<Body>> From<http::Response<T>> for Response {
     fn from(r: http::Response<T>) -> Response {
         use crate::response::ResponseUrl;

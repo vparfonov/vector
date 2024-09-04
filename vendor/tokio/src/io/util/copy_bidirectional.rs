@@ -5,7 +5,7 @@ use crate::io::{AsyncRead, AsyncWrite};
 
 use std::io;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll};
 
 enum TransferState {
     Running(CopyBuffer),

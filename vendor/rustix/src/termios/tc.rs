@@ -82,7 +82,7 @@ pub fn tcsetpgrp<Fd: AsFd>(fd: Fd, pid: Pid) -> io::Result<()> {
 
 /// `tcsetattr(fd)`—Set terminal attributes.
 ///
-/// Also known as the `TCSETS` (or `TCSETS2` on Linux) operation with `ioctl`.
+/// Also known as the `TCSETS` (or `TCSETS2 on Linux) operation with `ioctl`.
 ///
 /// # References
 ///  - [POSIX `tcsetattr`]
@@ -107,13 +107,11 @@ pub fn tcsetattr<Fd: AsFd>(
 
 /// `tcsendbreak(fd, 0)`—Transmit zero-valued bits.
 ///
-/// This transmits zero-valued bits for at least 0.25 seconds.
+/// Also known as the `TCSBRK` operation with `ioctl`, with a duration of 0.
 ///
-/// This function does not have a `duration` parameter, and always uses the
-/// implementation-defined value, which transmits for at least 0.25 seconds.
-///
-/// Also known as the `TCSBRK` operation with `ioctl`, with a duration
-/// parameter of 0.
+/// This function always uses an effective duration parameter of zero. For the
+/// equivalent of a `tcsendbreak` with a non-zero duration parameter, use
+/// `tcdrain`.
 ///
 /// # References
 ///  - [POSIX `tcsendbreak`]

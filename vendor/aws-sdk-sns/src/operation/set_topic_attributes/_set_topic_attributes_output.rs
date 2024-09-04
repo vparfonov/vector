@@ -18,8 +18,8 @@ impl SetTopicAttributesOutput {
 }
 
 /// A builder for [`SetTopicAttributesOutput`](crate::operation::set_topic_attributes::SetTopicAttributesOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct SetTopicAttributesOutputBuilder {
     _request_id: Option<String>,
 }

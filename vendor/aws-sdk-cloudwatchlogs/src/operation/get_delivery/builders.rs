@@ -3,7 +3,7 @@ pub use crate::operation::get_delivery::_get_delivery_output::GetDeliveryOutputB
 
 pub use crate::operation::get_delivery::_get_delivery_input::GetDeliveryInputBuilder;
 
-impl crate::operation::get_delivery::builders::GetDeliveryInputBuilder {
+impl GetDeliveryInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -22,8 +22,7 @@ impl crate::operation::get_delivery::builders::GetDeliveryInputBuilder {
 }
 /// Fluent builder constructing a request to `GetDelivery`.
 ///
-/// <p>Returns complete information about one logical <i>delivery</i>. A delivery is a connection between a <a href="https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutDeliverySource.html"> <i>delivery source</i> </a> and a <a href="https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_PutDeliveryDestination.html"> <i>delivery destination</i> </a>.</p>
-/// <p>A delivery source represents an Amazon Web Services resource that sends logs to an logs delivery destination. The destination can be CloudWatch Logs, Amazon S3, or Firehose. Only some Amazon Web Services services support being configured as a delivery source. These services are listed in <a href="https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/AWS-logs-and-resource-policy.html">Enable logging from Amazon Web Services services.</a></p>
+/// <p>Returns complete information about one <i>delivery</i>. A delivery is a connection between a logical <i>delivery source</i> and a logical <i>delivery destination</i> </p>
 /// <p>You need to specify the delivery <code>id</code> in this operation. You can find the IDs of the deliveries in your account with the <a href="https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeDeliveries.html">DescribeDeliveries</a> operation.</p>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
 pub struct GetDeliveryFluentBuilder {
@@ -50,7 +49,7 @@ impl
     }
 }
 impl GetDeliveryFluentBuilder {
-    /// Creates a new `GetDeliveryFluentBuilder`.
+    /// Creates a new `GetDelivery`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -101,12 +100,12 @@ impl GetDeliveryFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }

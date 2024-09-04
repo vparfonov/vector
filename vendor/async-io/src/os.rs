@@ -14,6 +14,3 @@ pub mod unix;
     target_os = "dragonfly",
 ))]
 pub mod kqueue;
-
-#[cfg(windows)]
-pub mod windows;

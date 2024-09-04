@@ -1,5 +1,4 @@
 #![allow(deprecated)]
-#![allow(unknown_lints)]
 #![allow(clippy::module_inception)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
@@ -11,12 +10,8 @@
 #![allow(clippy::needless_return)]
 #![allow(clippy::derive_partial_eq_without_eq)]
 #![allow(clippy::result_large_err)]
-#![allow(clippy::unnecessary_map_on_constructor)]
 #![allow(rustdoc::bare_urls)]
-#![allow(rustdoc::redundant_explicit_links)]
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 //! Security Token Service (STS) enables you to request temporary, limited-privilege credentials for users. This guide provides descriptions of the STS API. For more information about using this service, see [Temporary Security Credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp.html).
 //!
 //! ## Getting Started
@@ -30,8 +25,8 @@
 //!
 //! ```toml
 //! [dependencies]
-//! aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
-//! aws-sdk-sts = "1.40.0"
+//! aws-config = { version = "1.0.1", features = ["behavior-version-latest"] }
+//! aws-sdk-sts = "1.3.1"
 //! tokio = { version = "1", features = ["full"] }
 //! ```
 //!

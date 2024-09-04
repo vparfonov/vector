@@ -1,5 +1,4 @@
 /// Reset terminal formatting
-#[allow(clippy::exhaustive_structs)]
 #[derive(Copy, Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Reset;
 
@@ -8,7 +7,7 @@ impl Reset {
     ///
     /// `Reset` also implements `Display` directly, so calling this method is optional.
     #[inline]
-    pub fn render(self) -> impl core::fmt::Display + Copy {
+    pub fn render(self) -> impl core::fmt::Display + Copy + Clone {
         self
     }
 }

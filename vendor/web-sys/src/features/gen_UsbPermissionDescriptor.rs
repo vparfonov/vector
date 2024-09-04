@@ -14,44 +14,6 @@ extern "C" {
     #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
     #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub type UsbPermissionDescriptor;
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "PermissionName")]
-    #[doc = "Get the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PermissionName`, `UsbPermissionDescriptor`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "name")]
-    pub fn get_name(this: &UsbPermissionDescriptor) -> PermissionName;
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "PermissionName")]
-    #[doc = "Change the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PermissionName`, `UsbPermissionDescriptor`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "name")]
-    pub fn set_name(this: &UsbPermissionDescriptor, val: PermissionName);
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `filters` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `UsbPermissionDescriptor`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "filters")]
-    pub fn get_filters(this: &UsbPermissionDescriptor) -> Option<::js_sys::Array>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `filters` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `UsbPermissionDescriptor`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "filters")]
-    pub fn set_filters(this: &UsbPermissionDescriptor, val: &::wasm_bindgen::JsValue);
 }
 #[cfg(web_sys_unstable_apis)]
 impl UsbPermissionDescriptor {
@@ -70,15 +32,41 @@ impl UsbPermissionDescriptor {
     }
     #[cfg(web_sys_unstable_apis)]
     #[cfg(feature = "PermissionName")]
-    #[deprecated = "Use `set_name()` instead."]
+    #[doc = "Change the `name` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PermissionName`, `UsbPermissionDescriptor`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn name(&mut self, val: PermissionName) -> &mut Self {
-        self.set_name(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("name"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_filters()` instead."]
+    #[doc = "Change the `filters` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `UsbPermissionDescriptor`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn filters(&mut self, val: &::wasm_bindgen::JsValue) -> &mut Self {
-        self.set_filters(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("filters"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

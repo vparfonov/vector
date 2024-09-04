@@ -18,8 +18,8 @@ impl DecreaseStreamRetentionPeriodOutput {
 }
 
 /// A builder for [`DecreaseStreamRetentionPeriodOutput`](crate::operation::decrease_stream_retention_period::DecreaseStreamRetentionPeriodOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DecreaseStreamRetentionPeriodOutputBuilder {
     _request_id: Option<String>,
 }

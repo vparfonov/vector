@@ -11,9 +11,9 @@
 
 pub use core_foundation_sys::characterset::*;
 
-use crate::base::TCFType;
+use base::TCFType;
 
-declare_TCFType! {
+declare_TCFType!{
     /// An immutable set of Unicde characters.
     CFCharacterSet, CFCharacterSetRef
 }

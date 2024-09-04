@@ -13,8 +13,7 @@
 edition = "2021"
 rust-version = "1.65"
 name = "serde_spanned"
-version = "0.6.7"
-build = false
+version = "0.6.6"
 include = [
     "build.rs",
     "src/**/*",
@@ -26,10 +25,6 @@ include = [
     "examples/**/*",
     "tests/**/*",
 ]
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 description = "Serde-compatible spanned Value"
 homepage = "https://github.com/toml-rs/toml"
 readme = "README.md"
@@ -87,10 +82,6 @@ replace = """
 <!-- next-url -->
 [Unreleased]: https://github.com/toml-rs/toml/compare/{{tag_name}}...HEAD"""
 search = "<!-- next-url -->"
-
-[lib]
-name = "serde_spanned"
-path = "src/lib.rs"
 
 [dependencies.serde]
 version = "1.0.145"

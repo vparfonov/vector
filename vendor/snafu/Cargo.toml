@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.56"
 name = "snafu"
-version = "0.8.4"
+version = "0.8.0"
 authors = ["Jake Goulding <jake.goulding@gmail.com>"]
 exclude = [
     "/.cirrus.yml",
@@ -64,7 +64,7 @@ optional = true
 default-features = false
 
 [dependencies.snafu-derive]
-version = "0.8.4"
+version = "0.8.0"
 
 [features]
 backtraces-impl-backtrace-crate = ["backtrace"]

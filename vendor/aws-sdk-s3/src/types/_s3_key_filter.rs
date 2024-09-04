@@ -23,8 +23,8 @@ impl S3KeyFilter {
 }
 
 /// A builder for [`S3KeyFilter`](crate::types::S3KeyFilter).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct S3KeyFilterBuilder {
     pub(crate) filter_rules: ::std::option::Option<::std::vec::Vec<crate::types::FilterRule>>,
 }

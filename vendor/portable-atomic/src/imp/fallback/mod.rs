@@ -15,6 +15,7 @@
     any(
         all(
             target_arch = "x86_64",
+            not(portable_atomic_no_cmpxchg16b_target_feature),
             not(portable_atomic_no_outline_atomics),
             not(any(target_env = "sgx", miri)),
         ),
@@ -91,6 +92,7 @@ fn lock(addr: usize) -> &'static SeqLock {
     // crossbeam-utils 0.8.7 uses 97 here but does not use CachePadded,
     // so the actual concurrency level will be smaller.
     const LEN: usize = 67;
+    #[allow(clippy::declare_interior_mutable_const)]
     const L: CachePadded<SeqLock> = CachePadded::new(SeqLock::new());
     static LOCKS: [CachePadded<SeqLock>; LEN] = [
         L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L, L,
@@ -201,6 +203,11 @@ macro_rules! atomic {
                 // SAFETY: the mutable reference guarantees unique ownership.
                 // (UnsafeCell::get_mut requires Rust 1.50)
                 unsafe { &mut *self.v.get() }
+            }
+
+            #[inline]
+            pub(crate) fn into_inner(self) -> $int_type {
+                self.v.into_inner()
             }
 
             #[inline]

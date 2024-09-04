@@ -6,7 +6,7 @@ use crate::error::ErrMode;
 use crate::stream::Stream;
 use crate::*;
 
-pub(crate) struct Trace<P, D, I, O, E>
+pub struct Trace<P, D, I, O, E>
 where
     P: Parser<I, O, E>,
     I: Stream,
@@ -27,7 +27,7 @@ where
     D: std::fmt::Display,
 {
     #[inline(always)]
-    pub(crate) fn new(parser: P, name: D) -> Self {
+    pub fn new(parser: P, name: D) -> Self {
         Self {
             parser,
             name,
@@ -62,19 +62,19 @@ where
     }
 }
 
-pub(crate) struct Depth {
+pub struct Depth {
     depth: usize,
     inc: bool,
 }
 
 impl Depth {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         let depth = DEPTH.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let inc = true;
         Self { depth, inc }
     }
 
-    pub(crate) fn existing() -> Self {
+    pub fn existing() -> Self {
         let depth = DEPTH.load(std::sync::atomic::Ordering::SeqCst);
         let inc = false;
         Self { depth, inc }
@@ -107,7 +107,7 @@ impl crate::lib::std::ops::Deref for Depth {
 
 static DEPTH: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
-pub(crate) enum Severity {
+pub enum Severity {
     Success,
     Backtrack,
     Cut,
@@ -115,7 +115,7 @@ pub(crate) enum Severity {
 }
 
 impl Severity {
-    pub(crate) fn with_result<T, E>(result: &Result<T, ErrMode<E>>) -> Self {
+    pub fn with_result<T, E>(result: &Result<T, ErrMode<E>>) -> Self {
         match result {
             Ok(_) => Self::Success,
             Err(ErrMode::Backtrack(_)) => Self::Backtrack,
@@ -125,7 +125,7 @@ impl Severity {
     }
 }
 
-pub(crate) fn start<I: Stream>(
+pub fn start<I: Stream>(
     depth: usize,
     name: &dyn crate::lib::std::fmt::Display,
     count: usize,
@@ -178,7 +178,7 @@ pub(crate) fn start<I: Stream>(
     );
 }
 
-pub(crate) fn end(
+pub fn end(
     depth: usize,
     name: &dyn crate::lib::std::fmt::Display,
     count: usize,
@@ -199,7 +199,7 @@ pub(crate) fn end(
     let (status_style, status) = match severity {
         Severity::Success => {
             let style = anstyle::Style::new().fg_color(Some(anstyle::AnsiColor::Green.into()));
-            let status = format!("+{consumed}");
+            let status = format!("+{}", consumed);
             (style, status)
         }
         Severity::Backtrack => (
@@ -228,7 +228,7 @@ pub(crate) fn end(
     );
 }
 
-pub(crate) fn result(depth: usize, name: &dyn crate::lib::std::fmt::Display, severity: Severity) {
+pub fn result(depth: usize, name: &dyn crate::lib::std::fmt::Display, severity: Severity) {
     let gutter_style = anstyle::Style::new().bold();
 
     let (call_width, _) = column_widths();

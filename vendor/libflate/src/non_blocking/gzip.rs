@@ -157,7 +157,6 @@ mod tests {
     use super::*;
     use crate::gzip::Encoder;
     use crate::util::{nb_read_to_end, WouldBlockReader};
-    use alloc::vec::Vec;
     use core2::io::Write;
 
     fn decode_all(buf: &[u8]) -> io::Result<Vec<u8>> {

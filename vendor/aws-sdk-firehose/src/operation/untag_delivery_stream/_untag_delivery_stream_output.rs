@@ -18,8 +18,8 @@ impl UntagDeliveryStreamOutput {
 }
 
 /// A builder for [`UntagDeliveryStreamOutput`](crate::operation::untag_delivery_stream::UntagDeliveryStreamOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct UntagDeliveryStreamOutputBuilder {
     _request_id: Option<String>,
 }

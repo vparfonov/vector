@@ -95,11 +95,3 @@ impl RequestCharged {
         }
     }
 }
-impl ::std::fmt::Display for RequestCharged {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            RequestCharged::Requester => write!(f, "requester"),
-            RequestCharged::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

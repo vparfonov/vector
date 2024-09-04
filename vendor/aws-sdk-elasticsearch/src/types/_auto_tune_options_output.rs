@@ -27,8 +27,8 @@ impl AutoTuneOptionsOutput {
 }
 
 /// A builder for [`AutoTuneOptionsOutput`](crate::types::AutoTuneOptionsOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct AutoTuneOptionsOutputBuilder {
     pub(crate) state: ::std::option::Option<crate::types::AutoTuneState>,
     pub(crate) error_message: ::std::option::Option<::std::string::String>,

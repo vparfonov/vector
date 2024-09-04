@@ -18,8 +18,8 @@ impl AssociateKmsKeyOutput {
 }
 
 /// A builder for [`AssociateKmsKeyOutput`](crate::operation::associate_kms_key::AssociateKmsKeyOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct AssociateKmsKeyOutputBuilder {
     _request_id: Option<String>,
 }

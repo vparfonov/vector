@@ -4,7 +4,7 @@
 [![crates.io release][release-badge]][crate]
 [![docs][docs-badge]][docs]
 [![dependency status][deps-rs-badge]][deps-rs]
-[![codecov][codecov-badge]][codecov]
+<!-- [![coverage status][coveralls-badge]][coveralls] -->
 [![license][license-badge]](#license)
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmoka-rs%2Fmoka.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmoka-rs%2Fmoka?ref=badge_shield)
 
@@ -27,7 +27,7 @@ algorithm to determine which entries to evict when the capacity is exceeded.
 [release-badge]: https://img.shields.io/crates/v/moka.svg
 [docs-badge]: https://docs.rs/moka/badge.svg
 [deps-rs-badge]: https://deps.rs/repo/github/moka-rs/moka/status.svg
-[codecov-badge]: https://codecov.io/gh/moka-rs/moka/graph/badge.svg?token=7GYZNS7O67
+[coveralls-badge]: https://coveralls.io/repos/github/moka-rs/moka/badge.svg?branch=main
 [license-badge]: https://img.shields.io/crates/l/moka.svg
 [fossa-badge]: https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmoka-rs%2Fmoka.svg?type=shield
 
@@ -35,7 +35,7 @@ algorithm to determine which entries to evict when the capacity is exceeded.
 [crate]: https://crates.io/crates/moka
 [docs]: https://docs.rs/moka
 [deps-rs]: https://deps.rs/repo/github/moka-rs/moka
-[codecov]: https://codecov.io/gh/moka-rs/moka
+[coveralls]: https://coveralls.io/github/moka-rs/moka?branch=main
 [fossa]: https://app.fossa.com/projects/git%2Bgithub.com%2Fmoka-rs%2Fmoka?ref=badge_shield
 
 [caffeine-git]: https://github.com/ben-manes/caffeine
@@ -133,7 +133,6 @@ routers. Here are some highlights:
     - [Choosing the right cache for your use case](#choosing-the-right-cache-for-your-use-case)
 - [Moka in Production](#moka-in-production)
 - [Change Log](#change-log)
-- [Supported Platforms](#supported-platforms)
 - [Usage](#usage)
 - Examples (Part 1)
     - [Synchronous Cache](#example-synchronous-cache)
@@ -152,35 +151,6 @@ routers. Here are some highlights:
 - [License](#license)
 
 
-## Supported Platforms
-
-Moka should work on most 64-bit and 32-bit platforms if Rust `std` library is
-available with threading support. However, WebAssembly (Wasm) and WASI targets are
-not supported.
-
-The following platforms are tested on CI:
-
-- Linux 64-bit (x86_64, arm aarch64)
-- Linux 32-bit (i646, armv7, armv5, mips)
-    - If you get compile errors on 32-bit platforms, see
-      [troubleshooting](#compile-errors-on-some-32-bit-platforms).
-
-The following platforms are not tested on CI but should work:
-
-- macOS (arm64)
-- Windows (x86_64 msvc and gnu)
-- iOS (arm64)
-
-The following platforms are _not_ supported:
-
-- WebAssembly (Wasm) and WASI targets are not supported.
-  (See [this project task][gh-proj-49877487])
-- `nostd` environment (platforms without `std` library) are not supported.
-- 16-bit platforms are not supported.
-
-[gh-proj-49877487]: https://github.com/orgs/moka-rs/projects/1?pane=issue&itemId=49877487
-
-
 ## Usage
 
 To add Moka to your dependencies, run `cargo add` as the followings:
@@ -192,8 +162,6 @@ cargo add moka --features sync
 # To use the asynchronous cache:
 cargo add moka --features future
 ```
-
-If you want to use the cache under an async runtime such as `tokio` or `async-std`, you should specify the `future` feature. Otherwise, specify the `sync` feature.
 
 
 ## Example: Synchronous Cache
@@ -547,12 +515,6 @@ $ cargo +nightly -Z unstable-options --config 'build.rustdocflags="--cfg docsrs"
 
 ## Roadmap
 
-See the [project roadmap][gh-proj-1] for the updated and detailed plans.
-
-But here are some highlights:
-
-[gh-proj-1]: https://github.com/orgs/moka-rs/projects/1/views/1
-
 - [x] Size-aware eviction. (`v0.7.0` via [#24][gh-pull-024])
 - [x] API stabilization. (Smaller core API, shorter names for frequently used
        methods) (`v0.8.0` via [#105][gh-pull-105])
@@ -567,8 +529,8 @@ But here are some highlights:
   [#316][gh-pull-316])
 - [x] Add upsert and compute methods. (`v0.12.3` via [#370][gh-pull-370])
 - [ ] Cache statistics (Hit rate, etc.). ([details][cache-stats])
-- [ ] Upgrade TinyLFU to Window-TinyLFU. ([details][tiny-lfu])
 - [ ] Restore cache from a snapshot. ([details][restore])
+- [ ] Upgrade TinyLFU to Window-TinyLFU. ([details][tiny-lfu])
 
 [gh-pull-024]: https://github.com/moka-rs/moka/pull/24
 [gh-pull-105]: https://github.com/moka-rs/moka/pull/105
@@ -627,6 +589,4 @@ at your option.
 
 See [LICENSE-MIT](LICENSE-MIT) and [LICENSE-APACHE](LICENSE-APACHE) for details.
 
-<!--
 [![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fmoka-rs%2Fmoka.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fmoka-rs%2Fmoka?ref=badge_large)
--->

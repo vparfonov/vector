@@ -15,9 +15,9 @@ pub fn de_retention(inp: &[u8]) -> Result<crate::types::ObjectLockRetention, ::a
     #[allow(unused_mut)]
     let mut decoder = doc.root_element()?;
     let start_el = decoder.start_el();
-    if !(start_el.matches("Retention")) {
+    if !(start_el.matches("ObjectLockRetention")) {
         return Err(::aws_smithy_xml::decode::XmlDecodeError::custom(format!(
-            "invalid root, expected Retention got {:?}",
+            "invalid root, expected ObjectLockRetention got {:?}",
             start_el
         )));
     }

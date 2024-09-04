@@ -116,16 +116,3 @@ impl DeliveryStreamEncryptionStatus {
         }
     }
 }
-impl ::std::fmt::Display for DeliveryStreamEncryptionStatus {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            DeliveryStreamEncryptionStatus::Disabled => write!(f, "DISABLED"),
-            DeliveryStreamEncryptionStatus::Disabling => write!(f, "DISABLING"),
-            DeliveryStreamEncryptionStatus::DisablingFailed => write!(f, "DISABLING_FAILED"),
-            DeliveryStreamEncryptionStatus::Enabled => write!(f, "ENABLED"),
-            DeliveryStreamEncryptionStatus::Enabling => write!(f, "ENABLING"),
-            DeliveryStreamEncryptionStatus::EnablingFailed => write!(f, "ENABLING_FAILED"),
-            DeliveryStreamEncryptionStatus::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

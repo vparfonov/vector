@@ -222,7 +222,7 @@ mod oid {
     use const_oid::ObjectIdentifier;
 
     /// A trait which associates an RSA-specific OID with a type.
-    pub trait RsaSignatureAssociatedOid {
+    pub(crate) trait RsaSignatureAssociatedOid {
         /// The OID associated with this type.
         const OID: ObjectIdentifier;
     }
@@ -257,8 +257,6 @@ mod oid {
             const_oid::ObjectIdentifier::new_unwrap("1.2.840.113549.1.1.13");
     }
 }
-
-pub use oid::RsaSignatureAssociatedOid;
 
 #[cfg(test)]
 mod tests {

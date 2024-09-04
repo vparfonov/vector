@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "redox_syscall"
-version = "0.5.3"
+version = "0.4.1"
 authors = ["Jeremy Soller <jackpot51@gmail.com>"]
 description = "A Rust library to access raw Redox system calls"
 documentation = "https://docs.rs/redox_syscall"
@@ -24,7 +24,7 @@ repository = "https://gitlab.redox-os.org/redox-os/syscall"
 name = "syscall"
 
 [dependencies.bitflags]
-version = "2.4"
+version = "1.1.0"
 
 [dependencies.core]
 version = "1.0.0"
@@ -36,7 +36,3 @@ rustc-dep-of-std = [
     "core",
     "bitflags/rustc-dep-of-std",
 ]
-std = []
-
-[target."cfg(loom)".dev-dependencies.loom]
-version = "0.7"

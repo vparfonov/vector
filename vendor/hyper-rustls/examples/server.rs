@@ -7,6 +7,7 @@
 
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
+use std::vec::Vec;
 use std::{env, fs, io};
 
 use http::{Method, Request, Response, StatusCode};
@@ -34,12 +35,6 @@ fn error(err: String) -> io::Error {
 
 #[tokio::main]
 async fn run_server() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    // Set a process wide default crypto provider.
-    #[cfg(feature = "ring")]
-    let _ = rustls::crypto::ring::default_provider().install_default();
-    #[cfg(feature = "aws-lc-rs")]
-    let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
-
     // First parameter is port number (optional, defaults to 1337)
     let port = match env::args().nth(1) {
         Some(ref p) => p.parse()?,

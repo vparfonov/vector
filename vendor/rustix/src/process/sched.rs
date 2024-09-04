@@ -1,6 +1,5 @@
 use crate::process::Pid;
 use crate::{backend, io};
-use core::{fmt, hash};
 
 /// `CpuSet` represents a bit-mask of CPUs.
 ///
@@ -14,7 +13,7 @@ use core::{fmt, hash};
 /// [`sched_setaffinity`]: crate::process::sched_setaffinity
 /// [`sched_getaffinity`]: crate::process::sched_getaffinity
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct CpuSet {
     cpu_set: backend::process::types::RawCpuSet,
 }
@@ -76,41 +75,6 @@ impl Default for CpuSet {
     }
 }
 
-impl fmt::Debug for CpuSet {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "CpuSet {{")?;
-        let mut first = true;
-        for i in 0..Self::MAX_CPU {
-            if self.is_set(i) {
-                if first {
-                    write!(f, " ")?;
-                    first = false;
-                } else {
-                    write!(f, ", ")?;
-                }
-                write!(f, "cpu{}", i)?;
-            }
-        }
-        write!(f, " }}")
-    }
-}
-
-impl hash::Hash for CpuSet {
-    fn hash<H: hash::Hasher>(&self, state: &mut H) {
-        for i in 0..Self::MAX_CPU {
-            self.is_set(i).hash(state);
-        }
-    }
-}
-
-impl Eq for CpuSet {}
-
-impl PartialEq for CpuSet {
-    fn eq(&self, other: &Self) -> bool {
-        backend::process::cpu_set::CPU_EQUAL(&self.cpu_set, &other.cpu_set)
-    }
-}
-
 /// `sched_setaffinity(pid, cpuset)`—Set a thread's CPU affinity mask.
 ///
 /// `pid` is the thread ID to update. If pid is `None`, then the current thread
@@ -151,7 +115,7 @@ pub fn sched_getaffinity(pid: Option<Pid>) -> io::Result<CpuSet> {
 ///  - [Linux]
 ///  - [DragonFly BSD]
 ///
-/// [Linux]: https://man7.org/linux/man-pages/man3/sched_getcpu.3.html
+/// [Linux]: https://man7.org/linux/man-pages/man2/sched_getcpu.2.html
 /// [DragonFly BSD]: https://man.dragonflybsd.org/?command=sched_getcpu&section=2
 // FreeBSD added `sched_getcpu` in 13.0.
 #[cfg(any(linux_kernel, target_os = "dragonfly"))]

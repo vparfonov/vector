@@ -1,5 +1,4 @@
-#![cfg_attr(not(any(feature = "std", test)), no_std)]
-#![allow(unexpected_cfgs)] // why does this even exist?
+#![cfg_attr(not(test), no_std)]
 
 #[cfg(test)]
 extern crate core;
@@ -11,6 +10,7 @@ pub use self::error::*;
 pub use self::flag::*;
 pub use self::io::*;
 pub use self::number::*;
+pub use self::scheme::*;
 
 #[cfg(all(any(target_os = "none", target_os = "redox"), target_arch = "arm"))]
 #[path="arch/nonredox.rs"]
@@ -54,11 +54,8 @@ pub mod io;
 /// Call numbers used by each system call
 pub mod number;
 
-/// ABI for shared memory based signals
-pub mod sigabi;
-
-/// V2 scheme format
-pub mod schemev2;
-
+/// A trait useful for scheme handlers
 pub mod scheme;
-pub use scheme::*;
+
+#[cfg(test)]
+mod tests;

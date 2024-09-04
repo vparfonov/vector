@@ -10,101 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
     pub type CollectedClientData;
-    #[doc = "Get the `challenge` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
-    #[wasm_bindgen(method, getter = "challenge")]
-    pub fn get_challenge(this: &CollectedClientData) -> String;
-    #[doc = "Change the `challenge` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
-    #[wasm_bindgen(method, setter = "challenge")]
-    pub fn set_challenge(this: &CollectedClientData, val: &str);
-    #[cfg(feature = "AuthenticationExtensionsClientInputs")]
-    #[doc = "Get the `clientExtensions` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AuthenticationExtensionsClientInputs`, `CollectedClientData`*"]
-    #[deprecated]
-    #[wasm_bindgen(method, getter = "clientExtensions")]
-    pub fn get_client_extensions(
-        this: &CollectedClientData,
-    ) -> Option<AuthenticationExtensionsClientInputs>;
-    #[cfg(feature = "AuthenticationExtensionsClientInputs")]
-    #[doc = "Change the `clientExtensions` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AuthenticationExtensionsClientInputs`, `CollectedClientData`*"]
-    #[deprecated]
-    #[wasm_bindgen(method, setter = "clientExtensions")]
-    pub fn set_client_extensions(
-        this: &CollectedClientData,
-        val: &AuthenticationExtensionsClientInputs,
-    );
-    #[doc = "Get the `crossOrigin` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
-    #[wasm_bindgen(method, getter = "crossOrigin")]
-    pub fn get_cross_origin(this: &CollectedClientData) -> Option<bool>;
-    #[doc = "Change the `crossOrigin` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
-    #[wasm_bindgen(method, setter = "crossOrigin")]
-    pub fn set_cross_origin(this: &CollectedClientData, val: bool);
-    #[doc = "Get the `hashAlgorithm` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
-    #[deprecated]
-    #[wasm_bindgen(method, getter = "hashAlgorithm")]
-    pub fn get_hash_algorithm(this: &CollectedClientData) -> String;
-    #[doc = "Change the `hashAlgorithm` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
-    #[deprecated]
-    #[wasm_bindgen(method, setter = "hashAlgorithm")]
-    pub fn set_hash_algorithm(this: &CollectedClientData, val: &str);
-    #[doc = "Get the `origin` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
-    #[wasm_bindgen(method, getter = "origin")]
-    pub fn get_origin(this: &CollectedClientData) -> String;
-    #[doc = "Change the `origin` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
-    #[wasm_bindgen(method, setter = "origin")]
-    pub fn set_origin(this: &CollectedClientData, val: &str);
-    #[cfg(feature = "TokenBinding")]
-    #[doc = "Get the `tokenBinding` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`, `TokenBinding`*"]
-    #[wasm_bindgen(method, getter = "tokenBinding")]
-    pub fn get_token_binding(this: &CollectedClientData) -> Option<TokenBinding>;
-    #[cfg(feature = "TokenBinding")]
-    #[doc = "Change the `tokenBinding` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`, `TokenBinding`*"]
-    #[wasm_bindgen(method, setter = "tokenBinding")]
-    pub fn set_token_binding(this: &CollectedClientData, val: &TokenBinding);
-    #[doc = "Get the `tokenBindingId` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
-    #[deprecated]
-    #[wasm_bindgen(method, getter = "tokenBindingId")]
-    pub fn get_token_binding_id(this: &CollectedClientData) -> Option<String>;
-    #[doc = "Change the `tokenBindingId` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
-    #[deprecated]
-    #[wasm_bindgen(method, setter = "tokenBindingId")]
-    pub fn set_token_binding_id(this: &CollectedClientData, val: &str);
-    #[doc = "Get the `type` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
-    #[wasm_bindgen(method, getter = "type")]
-    pub fn get_type(this: &CollectedClientData) -> String;
-    #[doc = "Change the `type` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
-    #[wasm_bindgen(method, setter = "type")]
-    pub fn set_type(this: &CollectedClientData, val: &str);
 }
 impl CollectedClientData {
     #[doc = "Construct a new `CollectedClientData`."]
@@ -119,46 +24,100 @@ impl CollectedClientData {
         ret.type_(type_);
         ret
     }
-    #[deprecated = "Use `set_challenge()` instead."]
+    #[doc = "Change the `challenge` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
     pub fn challenge(&mut self, val: &str) -> &mut Self {
-        self.set_challenge(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("challenge"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "AuthenticationExtensionsClientInputs")]
-    #[deprecated = "Use `set_client_extensions()` instead."]
+    #[doc = "Change the `clientExtensions` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AuthenticationExtensionsClientInputs`, `CollectedClientData`*"]
     pub fn client_extensions(&mut self, val: &AuthenticationExtensionsClientInputs) -> &mut Self {
-        self.set_client_extensions(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("clientExtensions"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_cross_origin()` instead."]
-    pub fn cross_origin(&mut self, val: bool) -> &mut Self {
-        self.set_cross_origin(val);
-        self
-    }
-    #[deprecated = "Use `set_hash_algorithm()` instead."]
+    #[doc = "Change the `hashAlgorithm` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
     pub fn hash_algorithm(&mut self, val: &str) -> &mut Self {
-        self.set_hash_algorithm(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("hashAlgorithm"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_origin()` instead."]
+    #[doc = "Change the `origin` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
     pub fn origin(&mut self, val: &str) -> &mut Self {
-        self.set_origin(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("origin"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[cfg(feature = "TokenBinding")]
-    #[deprecated = "Use `set_token_binding()` instead."]
-    pub fn token_binding(&mut self, val: &TokenBinding) -> &mut Self {
-        self.set_token_binding(val);
-        self
-    }
-    #[deprecated = "Use `set_token_binding_id()` instead."]
+    #[doc = "Change the `tokenBindingId` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
     pub fn token_binding_id(&mut self, val: &str) -> &mut Self {
-        self.set_token_binding_id(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("tokenBindingId"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_type()` instead."]
+    #[doc = "Change the `type` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `CollectedClientData`*"]
     pub fn type_(&mut self, val: &str) -> &mut Self {
-        self.set_type(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("type"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

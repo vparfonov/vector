@@ -4,7 +4,6 @@ use std::fmt;
 use std::marker::PhantomData;
 use std::mem;
 use std::time::{Duration, Instant};
-use std::vec::Vec;
 
 use crossbeam_utils::Backoff;
 
@@ -177,7 +176,6 @@ enum Timeout {
 fn run_select(
     handles: &mut [(&dyn SelectHandle, usize, *const u8)],
     timeout: Timeout,
-    is_biased: bool,
 ) -> Option<(Token, usize, *const u8)> {
     if handles.is_empty() {
         // Wait until the timeout and return.
@@ -194,10 +192,8 @@ fn run_select(
         }
     }
 
-    if !is_biased {
-        // Shuffle the operations for fairness.
-        utils::shuffle(handles);
-    }
+    // Shuffle the operations for fairness.
+    utils::shuffle(handles);
 
     // Create a token, which serves as a temporary variable that gets initialized in this function
     // and is later used by a call to `channel::read()` or `channel::write()` that completes the
@@ -328,7 +324,6 @@ fn run_select(
 fn run_ready(
     handles: &mut [(&dyn SelectHandle, usize, *const u8)],
     timeout: Timeout,
-    is_biased: bool,
 ) -> Option<usize> {
     if handles.is_empty() {
         // Wait until the timeout and return.
@@ -345,10 +340,8 @@ fn run_ready(
         }
     }
 
-    if !is_biased {
-        // Shuffle the operations for fairness.
-        utils::shuffle(handles);
-    }
+    // Shuffle the operations for fairness.
+    utils::shuffle(handles);
 
     loop {
         let backoff = Backoff::new();
@@ -456,9 +449,8 @@ fn run_ready(
 #[inline]
 pub fn try_select<'a>(
     handles: &mut [(&'a dyn SelectHandle, usize, *const u8)],
-    is_biased: bool,
 ) -> Result<SelectedOperation<'a>, TrySelectError> {
-    match run_select(handles, Timeout::Now, is_biased) {
+    match run_select(handles, Timeout::Now) {
         None => Err(TrySelectError),
         Some((token, index, ptr)) => Ok(SelectedOperation {
             token,
@@ -474,13 +466,12 @@ pub fn try_select<'a>(
 #[inline]
 pub fn select<'a>(
     handles: &mut [(&'a dyn SelectHandle, usize, *const u8)],
-    is_biased: bool,
 ) -> SelectedOperation<'a> {
     if handles.is_empty() {
         panic!("no operations have been added to `Select`");
     }
 
-    let (token, index, ptr) = run_select(handles, Timeout::Never, is_biased).unwrap();
+    let (token, index, ptr) = run_select(handles, Timeout::Never).unwrap();
     SelectedOperation {
         token,
         index,
@@ -495,11 +486,10 @@ pub fn select<'a>(
 pub fn select_timeout<'a>(
     handles: &mut [(&'a dyn SelectHandle, usize, *const u8)],
     timeout: Duration,
-    is_biased: bool,
 ) -> Result<SelectedOperation<'a>, SelectTimeoutError> {
     match Instant::now().checked_add(timeout) {
-        Some(deadline) => select_deadline(handles, deadline, is_biased),
-        None => Ok(select(handles, is_biased)),
+        Some(deadline) => select_deadline(handles, deadline),
+        None => Ok(select(handles)),
     }
 }
 
@@ -508,9 +498,8 @@ pub fn select_timeout<'a>(
 pub(crate) fn select_deadline<'a>(
     handles: &mut [(&'a dyn SelectHandle, usize, *const u8)],
     deadline: Instant,
-    is_biased: bool,
 ) -> Result<SelectedOperation<'a>, SelectTimeoutError> {
-    match run_select(handles, Timeout::At(deadline), is_biased) {
+    match run_select(handles, Timeout::At(deadline)) {
         None => Err(SelectTimeoutError),
         Some((token, index, ptr)) => Ok(SelectedOperation {
             token,
@@ -774,7 +763,7 @@ impl<'a> Select<'a> {
     /// }
     /// ```
     pub fn try_select(&mut self) -> Result<SelectedOperation<'a>, TrySelectError> {
-        try_select(&mut self.handles, false)
+        try_select(&mut self.handles)
     }
 
     /// Blocks until one of the operations becomes ready and selects it.
@@ -821,7 +810,7 @@ impl<'a> Select<'a> {
     /// }
     /// ```
     pub fn select(&mut self) -> SelectedOperation<'a> {
-        select(&mut self.handles, false)
+        select(&mut self.handles)
     }
 
     /// Blocks for a limited time until one of the operations becomes ready and selects it.
@@ -871,7 +860,7 @@ impl<'a> Select<'a> {
         &mut self,
         timeout: Duration,
     ) -> Result<SelectedOperation<'a>, SelectTimeoutError> {
-        select_timeout(&mut self.handles, timeout, false)
+        select_timeout(&mut self.handles, timeout)
     }
 
     /// Blocks until a given deadline, or until one of the operations becomes ready and selects it.
@@ -923,7 +912,7 @@ impl<'a> Select<'a> {
         &mut self,
         deadline: Instant,
     ) -> Result<SelectedOperation<'a>, SelectTimeoutError> {
-        select_deadline(&mut self.handles, deadline, false)
+        select_deadline(&mut self.handles, deadline)
     }
 
     /// Attempts to find a ready operation without blocking.
@@ -962,7 +951,7 @@ impl<'a> Select<'a> {
     /// }
     /// ```
     pub fn try_ready(&mut self) -> Result<usize, TryReadyError> {
-        match run_ready(&mut self.handles, Timeout::Now, false) {
+        match run_ready(&mut self.handles, Timeout::Now) {
             None => Err(TryReadyError),
             Some(index) => Ok(index),
         }
@@ -1015,7 +1004,7 @@ impl<'a> Select<'a> {
             panic!("no operations have been added to `Select`");
         }
 
-        run_ready(&mut self.handles, Timeout::Never, false).unwrap()
+        run_ready(&mut self.handles, Timeout::Never).unwrap()
     }
 
     /// Blocks for a limited time until one of the operations becomes ready.
@@ -1108,7 +1097,7 @@ impl<'a> Select<'a> {
     /// }
     /// ```
     pub fn ready_deadline(&mut self, deadline: Instant) -> Result<usize, ReadyTimeoutError> {
-        match run_ready(&mut self.handles, Timeout::At(deadline), false) {
+        match run_ready(&mut self.handles, Timeout::At(deadline)) {
             None => Err(ReadyTimeoutError),
             Some(index) => Ok(index),
         }

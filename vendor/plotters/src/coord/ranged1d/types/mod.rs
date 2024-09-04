@@ -1,7 +1,6 @@
 #[cfg(feature = "chrono")]
 mod datetime;
 #[cfg(feature = "chrono")]
-#[cfg_attr(doc_cfg, doc(cfg(feature = "chrono")))]
 pub use datetime::{
     IntoMonthly, IntoYearly, Monthly, RangedDate, RangedDateTime, RangedDuration, Yearly,
 };

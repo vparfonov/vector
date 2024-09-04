@@ -12,13 +12,8 @@
 [package]
 edition = "2021"
 name = "nkeys"
-version = "0.4.3"
+version = "0.4.2"
 authors = ["wasmCloud Team"]
-build = false
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 description = "Rust implementation of the NATS nkeys library"
 homepage = "https://github.com/wasmcloud/nkeys"
 documentation = "https://docs.rs/nkeys"
@@ -36,16 +31,8 @@ categories = [
 license = "Apache-2.0"
 repository = "https://github.com/wasmcloud/nkeys"
 
-[package.metadata.docs.rs]
-all_features = true
-
-[lib]
-name = "nkeys"
-path = "src/lib.rs"
-
 [[bin]]
 name = "nk"
-path = "src/bin/nk/main.rs"
 required-features = ["cli"]
 
 [dependencies.crypto_box]
@@ -108,7 +95,7 @@ cli = [
 ]
 xkeys = ["dep:crypto_box"]
 
-[target.'cfg(target_arch = "wasm32")'.dependencies.getrandom]
+[target."cfg(target_arch = \"wasm32\")".dependencies.getrandom]
 version = "0.2"
 features = ["custom"]
 default-features = false

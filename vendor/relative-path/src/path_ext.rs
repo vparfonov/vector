@@ -113,22 +113,12 @@ pub trait PathExt: sealed::Sealed {
     /// assert_eq!(bar.relative_to(qux)?, RelativePath::new("../"));
     /// # Ok::<_, relative_path::RelativeToError>(())
     /// ```
-    ///
-    /// # Errors
-    ///
-    /// Errors in case the provided path contains components which cannot be
-    /// converted into a relative path as needed, such as non-utf8 data.
-    fn relative_to<P>(&self, root: P) -> Result<RelativePathBuf, RelativeToError>
-    where
-        P: AsRef<Path>;
+    fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, RelativeToError>;
 }
 
 impl PathExt for Path {
-    fn relative_to<P>(&self, root: P) -> Result<RelativePathBuf, RelativeToError>
-    where
-        P: AsRef<Path>,
-    {
-        use std::path::Component::{CurDir, Normal, ParentDir, Prefix, RootDir};
+    fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, RelativeToError> {
+        use std::path::Component::*;
 
         // Helper function to convert from a std::path::Component to a
         // relative_path::Component.
@@ -167,14 +157,15 @@ impl PathExt for Path {
         let mut buf = RelativePathBuf::new();
 
         loop {
-            let a = if let Some(a) = a_it.next() {
-                a
-            } else {
-                for _ in b_it {
-                    buf.push(Component::ParentDir);
-                }
+            let a = match a_it.next() {
+                Some(a) => a,
+                None => {
+                    for _ in b_it {
+                        buf.push(Component::ParentDir);
+                    }
 
-                break;
+                    break;
+                }
             };
 
             match b_it.next() {
@@ -216,10 +207,7 @@ impl PathExt for Path {
 
 impl PathExt for PathBuf {
     #[inline]
-    fn relative_to<P>(&self, root: P) -> Result<RelativePathBuf, RelativeToError>
-    where
-        P: AsRef<Path>,
-    {
+    fn relative_to<P: AsRef<Path>>(&self, root: P) -> Result<RelativePathBuf, RelativeToError> {
         self.as_path().relative_to(root)
     }
 }

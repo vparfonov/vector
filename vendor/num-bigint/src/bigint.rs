@@ -1,17 +1,18 @@
 // `Add`/`Sub` ops may flip from `BigInt` to its `BigUint` magnitude
 #![allow(clippy::suspicious_arithmetic_impl)]
 
-use alloc::string::String;
-use alloc::vec::Vec;
+use crate::std_alloc::{String, Vec};
 use core::cmp::Ordering::{self, Equal};
 use core::default::Default;
 use core::fmt;
 use core::hash;
 use core::ops::{Neg, Not};
 use core::str;
+use core::{i128, u128};
+use core::{i64, u64};
 
 use num_integer::{Integer, Roots};
-use num_traits::{ConstZero, Num, One, Pow, Signed, Zero};
+use num_traits::{Num, One, Pow, Signed, Zero};
 
 use self::Sign::{Minus, NoSign, Plus};
 
@@ -24,12 +25,16 @@ mod division;
 mod multiplication;
 mod subtraction;
 
-mod arbitrary;
 mod bits;
 mod convert;
 mod power;
-mod serde;
 mod shift;
+
+#[cfg(any(feature = "quickcheck", feature = "arbitrary"))]
+mod arbitrary;
+
+#[cfg(feature = "serde")]
+mod serde;
 
 /// A `Sign` is a [`BigInt`]'s composing element.
 #[derive(PartialEq, PartialOrd, Eq, Ord, Copy, Clone, Debug, Hash)]
@@ -127,7 +132,7 @@ impl Ord for BigInt {
 impl Default for BigInt {
     #[inline]
     fn default() -> BigInt {
-        Self::ZERO
+        Zero::zero()
     }
 }
 
@@ -206,7 +211,10 @@ impl Not for &BigInt {
 impl Zero for BigInt {
     #[inline]
     fn zero() -> BigInt {
-        Self::ZERO
+        BigInt {
+            sign: NoSign,
+            data: BigUint::zero(),
+        }
     }
 
     #[inline]
@@ -219,11 +227,6 @@ impl Zero for BigInt {
     fn is_zero(&self) -> bool {
         self.sign == NoSign
     }
-}
-
-impl ConstZero for BigInt {
-    // forward to the inherent const
-    const ZERO: Self = Self::ZERO;
 }
 
 impl One for BigInt {
@@ -259,7 +262,7 @@ impl Signed for BigInt {
     #[inline]
     fn abs_sub(&self, other: &BigInt) -> BigInt {
         if *self <= *other {
-            Self::ZERO
+            Zero::zero()
         } else {
             self - other
         }
@@ -270,7 +273,7 @@ impl Signed for BigInt {
         match self.sign {
             Plus => BigInt::one(),
             Minus => -BigInt::one(),
-            NoSign => Self::ZERO,
+            NoSign => BigInt::zero(),
         }
     }
 
@@ -288,6 +291,10 @@ impl Signed for BigInt {
 trait UnsignedAbs {
     type Unsigned;
 
+    /// A convenience method for getting the absolute value of a signed primitive as unsigned
+    /// See also `unsigned_abs`: <https://github.com/rust-lang/rust/issues/74913>
+    fn uabs(self) -> Self::Unsigned;
+
     fn checked_uabs(self) -> CheckedUnsignedAbs<Self::Unsigned>;
 }
 
@@ -301,6 +308,11 @@ macro_rules! impl_unsigned_abs {
     ($Signed:ty, $Unsigned:ty) => {
         impl UnsignedAbs for $Signed {
             type Unsigned = $Unsigned;
+
+            #[inline]
+            fn uabs(self) -> $Unsigned {
+                self.wrapping_abs() as $Unsigned
+            }
 
             #[inline]
             fn checked_uabs(self) -> CheckedUnsignedAbs<Self::Unsigned> {
@@ -450,7 +462,7 @@ impl Integer for BigInt {
     fn extended_gcd_lcm(&self, other: &BigInt) -> (num_integer::ExtendedGcd<BigInt>, BigInt) {
         let egcd = self.extended_gcd(other);
         let lcm = if egcd.gcd.is_zero() {
-            Self::ZERO
+            BigInt::zero()
         } else {
             BigInt::from(&self.data / &egcd.gcd.data * &other.data)
         };
@@ -495,14 +507,6 @@ impl Integer for BigInt {
     #[inline]
     fn prev_multiple_of(&self, other: &Self) -> Self {
         self - self.mod_floor(other)
-    }
-
-    fn dec(&mut self) {
-        *self -= 1u32;
-    }
-
-    fn inc(&mut self) {
-        *self += 1u32;
     }
 }
 
@@ -563,12 +567,6 @@ pub trait ToBigInt {
 }
 
 impl BigInt {
-    /// A constant `BigInt` with value 0, useful for static initialization.
-    pub const ZERO: Self = BigInt {
-        sign: NoSign,
-        data: BigUint::ZERO,
-    };
-
     /// Creates and initializes a [`BigInt`].
     ///
     /// The base 2<sup>32</sup> digits are ordered least significant digit first.
@@ -924,10 +922,11 @@ impl BigInt {
     ///
     /// ```
     /// use num_bigint::{BigInt, Sign};
+    /// use num_traits::Zero;
     ///
     /// assert_eq!(BigInt::from(1234).sign(), Sign::Plus);
     /// assert_eq!(BigInt::from(-4321).sign(), Sign::Minus);
-    /// assert_eq!(BigInt::ZERO.sign(), Sign::NoSign);
+    /// assert_eq!(BigInt::zero().sign(), Sign::NoSign);
     /// ```
     #[inline]
     pub fn sign(&self) -> Sign {
@@ -944,7 +943,7 @@ impl BigInt {
     ///
     /// assert_eq!(BigInt::from(1234).magnitude(), &BigUint::from(1234u32));
     /// assert_eq!(BigInt::from(-4321).magnitude(), &BigUint::from(4321u32));
-    /// assert!(BigInt::ZERO.magnitude().is_zero());
+    /// assert!(BigInt::zero().magnitude().is_zero());
     /// ```
     #[inline]
     pub fn magnitude(&self) -> &BigUint {
@@ -958,10 +957,11 @@ impl BigInt {
     ///
     /// ```
     /// use num_bigint::{BigInt, BigUint, Sign};
+    /// use num_traits::Zero;
     ///
     /// assert_eq!(BigInt::from(1234).into_parts(), (Sign::Plus, BigUint::from(1234u32)));
     /// assert_eq!(BigInt::from(-4321).into_parts(), (Sign::Minus, BigUint::from(4321u32)));
-    /// assert_eq!(BigInt::ZERO.into_parts(), (Sign::NoSign, BigUint::ZERO));
+    /// assert_eq!(BigInt::zero().into_parts(), (Sign::NoSign, BigUint::zero()));
     /// ```
     #[inline]
     pub fn into_parts(self) -> (Sign, BigUint) {
@@ -980,7 +980,7 @@ impl BigInt {
     pub fn to_biguint(&self) -> Option<BigUint> {
         match self.sign {
             Plus => Some(self.data.clone()),
-            NoSign => Some(BigUint::ZERO),
+            NoSign => Some(Zero::zero()),
             Minus => None,
         }
     }
@@ -1023,64 +1023,6 @@ impl BigInt {
     /// Panics if the exponent is negative or the modulus is zero.
     pub fn modpow(&self, exponent: &Self, modulus: &Self) -> Self {
         power::modpow(self, exponent, modulus)
-    }
-
-    /// Returns the modular multiplicative inverse if it exists, otherwise `None`.
-    ///
-    /// This solves for `x` such that `self * x ≡ 1 (mod modulus)`.
-    /// Note that this rounds like `mod_floor`, not like the `%` operator,
-    /// which makes a difference when given a negative `self` or `modulus`.
-    /// The solution will be in the interval `[0, modulus)` for `modulus > 0`,
-    /// or in the interval `(modulus, 0]` for `modulus < 0`,
-    /// and it exists if and only if `gcd(self, modulus) == 1`.
-    ///
-    /// ```
-    /// use num_bigint::BigInt;
-    /// use num_integer::Integer;
-    /// use num_traits::{One, Zero};
-    ///
-    /// let m = BigInt::from(383);
-    ///
-    /// // Trivial cases
-    /// assert_eq!(BigInt::zero().modinv(&m), None);
-    /// assert_eq!(BigInt::one().modinv(&m), Some(BigInt::one()));
-    /// let neg1 = &m - 1u32;
-    /// assert_eq!(neg1.modinv(&m), Some(neg1));
-    ///
-    /// // Positive self and modulus
-    /// let a = BigInt::from(271);
-    /// let x = a.modinv(&m).unwrap();
-    /// assert_eq!(x, BigInt::from(106));
-    /// assert_eq!(x.modinv(&m).unwrap(), a);
-    /// assert_eq!((&a * x).mod_floor(&m), BigInt::one());
-    ///
-    /// // Negative self and positive modulus
-    /// let b = -&a;
-    /// let x = b.modinv(&m).unwrap();
-    /// assert_eq!(x, BigInt::from(277));
-    /// assert_eq!((&b * x).mod_floor(&m), BigInt::one());
-    ///
-    /// // Positive self and negative modulus
-    /// let n = -&m;
-    /// let x = a.modinv(&n).unwrap();
-    /// assert_eq!(x, BigInt::from(-277));
-    /// assert_eq!((&a * x).mod_floor(&n), &n + 1);
-    ///
-    /// // Negative self and modulus
-    /// let x = b.modinv(&n).unwrap();
-    /// assert_eq!(x, BigInt::from(-106));
-    /// assert_eq!((&b * x).mod_floor(&n), &n + 1);
-    /// ```
-    pub fn modinv(&self, modulus: &Self) -> Option<Self> {
-        let result = self.data.modinv(&modulus.data)?;
-        // The sign of the result follows the modulus, like `mod_floor`.
-        let (sign, mag) = match (self.is_negative(), modulus.is_negative()) {
-            (false, false) => (Plus, result),
-            (true, false) => (Plus, &modulus.data - result),
-            (false, true) => (Minus, &modulus.data - result),
-            (true, true) => (Minus, result),
-        };
-        Some(BigInt::from_biguint(sign, mag))
     }
 
     /// Returns the truncated principal square root of `self` --

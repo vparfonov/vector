@@ -1,31 +1,5 @@
 # `bytemuck` changelog
 
-## 1.17.1
-
-* Adds `#[repr(C)]` to the `union Transmute<A, B>` type that's used internally
-  for most of the transmutations. This doesn't matter in any current case and
-  there's no actual bug being fixed here, but it's a mild futureproof, and it's
-  probably best practice to have for when people who know the code less deeply
-  try to copy what we're doing into other contexts, so we'll go with it.
-
-## 1.17.0
-
-* Makes the `must_cast` versions of the by-value and by-ref casts be `const`.
-  The mut ref cast is unaffected for now (mut references aren't yet stable in `const fn`).
-  This increases the MSRV of using that particular feature from 1.57 to 1.64.
-
-## 1.16.3
-
-* Fully described in https://github.com/Lokathor/bytemuck/pull/256, This makes
-  casting slices to/from ZST elements more consistent between the crate's core
-  module and other modules.
-
-## 1.16.2
-
-* Fixes potential UB where `BoxBytes` could attempt to free a dangling pointer
-  if the `Layout` is zero sized. This type was introduced in 1.14.1, so that
-  version and the others up to and including 1.16.1 are now yanked for safety.
-
 ## 1.16.1
 
 * **NOT SEMVER SUPPORTED:** Adds the  `nightly_float` Cargo feature. This

@@ -14,7 +14,7 @@ pub struct Identity {
 
 impl Identity {
     /// Create a new [`Identity`] value
-    pub const fn new() -> Identity {
+    pub fn new() -> Identity {
         Identity { _p: () }
     }
 }

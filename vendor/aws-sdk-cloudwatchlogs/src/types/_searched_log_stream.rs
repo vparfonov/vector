@@ -27,8 +27,8 @@ impl SearchedLogStream {
 }
 
 /// A builder for [`SearchedLogStream`](crate::types::SearchedLogStream).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct SearchedLogStreamBuilder {
     pub(crate) log_stream_name: ::std::option::Option<::std::string::String>,
     pub(crate) searched_completely: ::std::option::Option<bool>,

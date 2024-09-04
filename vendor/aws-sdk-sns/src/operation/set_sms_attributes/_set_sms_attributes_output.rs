@@ -19,8 +19,8 @@ impl SetSmsAttributesOutput {
 }
 
 /// A builder for [`SetSmsAttributesOutput`](crate::operation::set_sms_attributes::SetSmsAttributesOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct SetSmsAttributesOutputBuilder {
     _request_id: Option<String>,
 }

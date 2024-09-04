@@ -10,16 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `EventSourceInit`*"]
     pub type EventSourceInit;
-    #[doc = "Get the `withCredentials` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `EventSourceInit`*"]
-    #[wasm_bindgen(method, getter = "withCredentials")]
-    pub fn get_with_credentials(this: &EventSourceInit) -> Option<bool>;
-    #[doc = "Change the `withCredentials` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `EventSourceInit`*"]
-    #[wasm_bindgen(method, setter = "withCredentials")]
-    pub fn set_with_credentials(this: &EventSourceInit, val: bool);
 }
 impl EventSourceInit {
     #[doc = "Construct a new `EventSourceInit`."]
@@ -30,9 +20,21 @@ impl EventSourceInit {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_with_credentials()` instead."]
+    #[doc = "Change the `withCredentials` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `EventSourceInit`*"]
     pub fn with_credentials(&mut self, val: bool) -> &mut Self {
-        self.set_with_credentials(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("withCredentials"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

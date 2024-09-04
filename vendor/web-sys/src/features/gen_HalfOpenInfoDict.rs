@@ -10,16 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `HalfOpenInfoDict`*"]
     pub type HalfOpenInfoDict;
-    #[doc = "Get the `speculative` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HalfOpenInfoDict`*"]
-    #[wasm_bindgen(method, getter = "speculative")]
-    pub fn get_speculative(this: &HalfOpenInfoDict) -> Option<bool>;
-    #[doc = "Change the `speculative` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HalfOpenInfoDict`*"]
-    #[wasm_bindgen(method, setter = "speculative")]
-    pub fn set_speculative(this: &HalfOpenInfoDict, val: bool);
 }
 impl HalfOpenInfoDict {
     #[doc = "Construct a new `HalfOpenInfoDict`."]
@@ -30,9 +20,21 @@ impl HalfOpenInfoDict {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_speculative()` instead."]
+    #[doc = "Change the `speculative` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `HalfOpenInfoDict`*"]
     pub fn speculative(&mut self, val: bool) -> &mut Self {
-        self.set_speculative(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("speculative"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

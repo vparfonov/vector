@@ -2,8 +2,8 @@
 
 //! Precalculated large powers for limbs.
 
-#[cfg(fast_arithmetic = "32")]
+#[cfg(limb_width_32)]
 pub(crate) use super::large_powers32::*;
 
-#[cfg(fast_arithmetic = "64")]
+#[cfg(limb_width_64)]
 pub(crate) use super::large_powers64::*;

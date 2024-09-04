@@ -59,8 +59,8 @@ impl ResourceNotFoundException {
 }
 
 /// A builder for [`ResourceNotFoundException`](crate::types::error::ResourceNotFoundException).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct ResourceNotFoundExceptionBuilder {
     pub(crate) resource_type: ::std::option::Option<::std::string::String>,
     pub(crate) resource_id: ::std::option::Option<::std::string::String>,

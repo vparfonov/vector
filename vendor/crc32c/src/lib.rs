@@ -18,13 +18,15 @@
 //! then the hardware-optimized version will be compiled into the code.
 //!
 //! Otherwise, the crate will use `cpuid` at runtime to detect the
-//! running CPU's features, and enable the appropriate algorithm.
+//! running CPU's features, and enable the appropiate algorithm.
+
+#![cfg_attr(nightly, feature(stdsimd))]
 
 mod combine;
 mod hasher;
-#[cfg(all(target_arch = "aarch64", armsimd))]
+#[cfg(all(target_arch = "aarch64", nightly))]
 mod hw_aarch64;
-#[cfg(any(target_arch = "x86_64", target_arch = "aarch64"))]
+#[cfg(any(target_arch = "x86_64", all(target_arch = "aarch64", nightly)))]
 mod hw_tables;
 #[cfg(target_arch = "x86_64")]
 mod hw_x86_64;
@@ -54,7 +56,7 @@ pub fn crc32c_append(crc: u32, data: &[u8]) -> u32 {
         }
     }
 
-    #[cfg(all(target_arch = "aarch64", armsimd))]
+    #[cfg(all(target_arch = "aarch64", nightly))]
     {
         if std::arch::is_aarch64_feature_detected!("crc") {
             return unsafe { hw_aarch64::crc32c(crc, data) };

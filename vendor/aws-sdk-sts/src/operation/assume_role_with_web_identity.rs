@@ -93,10 +93,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for AssumeR
         ));
 
         cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::SensitiveOutput);
-        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new(
-            "AssumeRoleWithWebIdentity",
-            "sts",
-        ));
+        cfg.store_put(::aws_smithy_http::operation::Metadata::new("AssumeRoleWithWebIdentity", "sts"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = true;
         signing_options.content_sha256_header = false;
@@ -117,7 +114,11 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for AssumeR
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("AssumeRoleWithWebIdentity")
-            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
+            .with_interceptor(
+                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
+                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
+                ),
+            )
             .with_interceptor(AssumeRoleWithWebIdentityEndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::assume_role_with_web_identity::AssumeRoleWithWebIdentityError,
@@ -240,9 +241,6 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for AssumeRoleWit
     }
 }
 
-// The get_* functions below are generated from JMESPath expressions in the
-// operationContextParams trait. They target the operation's input shape.
-
 /// Error type for the `AssumeRoleWithWebIdentityError` operation.
 #[non_exhaustive]
 #[derive(::std::fmt::Debug)]
@@ -252,7 +250,7 @@ pub enum AssumeRoleWithWebIdentityError {
     /// <p>The request could not be fulfilled because the identity provider (IDP) that was asked to verify the incoming identity token could not be reached. This is often a transient error caused by network conditions. Retry the request a limited number of times so that you don't exceed the request rate. If the error persists, the identity provider might be down or not responding.</p>
     IdpCommunicationErrorException(crate::types::error::IdpCommunicationErrorException),
     /// <p>The identity provider (IdP) reported that authentication failed. This might be because the claim is invalid.</p>
-    /// <p>If this error is returned for the <code>AssumeRoleWithWebIdentity</code> operation, it can also mean that the claim has expired or has been explicitly revoked.</p>
+    /// <p>If this error is returned for the <code>AssumeRoleWithWebIdentity</code> operation, it can also mean that the claim has expired or has been explicitly revoked. </p>
     IdpRejectedClaimException(crate::types::error::IdpRejectedClaimException),
     /// <p>The web identity token that was passed could not be validated by Amazon Web Services. Get a new identity token from the identity provider and then retry the request.</p>
     InvalidIdentityTokenException(crate::types::error::InvalidIdentityTokenException),

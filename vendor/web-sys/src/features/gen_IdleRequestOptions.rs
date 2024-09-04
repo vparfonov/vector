@@ -10,16 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `IdleRequestOptions`*"]
     pub type IdleRequestOptions;
-    #[doc = "Get the `timeout` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `IdleRequestOptions`*"]
-    #[wasm_bindgen(method, getter = "timeout")]
-    pub fn get_timeout(this: &IdleRequestOptions) -> Option<u32>;
-    #[doc = "Change the `timeout` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `IdleRequestOptions`*"]
-    #[wasm_bindgen(method, setter = "timeout")]
-    pub fn set_timeout(this: &IdleRequestOptions, val: u32);
 }
 impl IdleRequestOptions {
     #[doc = "Construct a new `IdleRequestOptions`."]
@@ -30,9 +20,21 @@ impl IdleRequestOptions {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_timeout()` instead."]
+    #[doc = "Change the `timeout` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `IdleRequestOptions`*"]
     pub fn timeout(&mut self, val: u32) -> &mut Self {
-        self.set_timeout(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("timeout"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

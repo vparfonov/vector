@@ -1,4 +1,3 @@
-#![allow(clippy::unusual_byte_groupings)]
 use std::env;
 
 fn main() {

@@ -113,7 +113,6 @@ use std::cmp::{min, Ordering};
 use std::fmt;
 use std::fs::{self, ReadDir};
 use std::io;
-use std::iter;
 use std::path::{Path, PathBuf};
 use std::result;
 use std::vec;
@@ -1002,8 +1001,6 @@ impl IntoIter {
     }
 }
 
-impl iter::FusedIterator for IntoIter {}
-
 impl DirList {
     fn close(&mut self) {
         if let DirList::Opened { .. } = *self {
@@ -1084,11 +1081,6 @@ where
             return Some(Ok(dent));
         }
     }
-}
-
-impl<P> iter::FusedIterator for FilterEntry<IntoIter, P> where
-    P: FnMut(&DirEntry) -> bool
-{
 }
 
 impl<P> FilterEntry<IntoIter, P>

@@ -96,12 +96,3 @@ impl SplunkS3BackupMode {
         }
     }
 }
-impl ::std::fmt::Display for SplunkS3BackupMode {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            SplunkS3BackupMode::AllEvents => write!(f, "AllEvents"),
-            SplunkS3BackupMode::FailedEventsOnly => write!(f, "FailedEventsOnly"),
-            SplunkS3BackupMode::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

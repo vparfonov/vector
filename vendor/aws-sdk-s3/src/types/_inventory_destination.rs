@@ -21,8 +21,8 @@ impl InventoryDestination {
 }
 
 /// A builder for [`InventoryDestination`](crate::types::InventoryDestination).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct InventoryDestinationBuilder {
     pub(crate) s3_bucket_destination: ::std::option::Option<crate::types::InventoryS3BucketDestination>,
 }

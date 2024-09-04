@@ -1,30 +1,21 @@
 //! Experimental low-level implementation details for libc-like runtime
 //! libraries such as [Origin].
 //!
-//! ⚠ These are not normal functions. ⚠
-//!
-//!  - Some of the functions in this module cannot be used in a process which
-//!    also has a libc present. This can be true even for functions that have
-//!    the same name as a libc function that Rust code can use.
-//!
-//!  - Some of the functions in this module don't behave exactly the same way
-//!    as functions in libc with similar names. Sometimes information about the
-//!    differences is included in the Linux documentation under “C
-//!    library/kernel differences” sections. But not always.
-//!
-//!  - The safety requirements of the functions in this module are not fully
-//!    documented.
-//!
-//!  - The API for these functions is not considered stable, and this module is
-//!    `doc(hidden)`.
-//!
-//! ⚠ Caution is indicated. ⚠
+//! Do not use the functions in this module unless you've read all of their
+//! code. They don't always behave the same way as functions with similar names
+//! in `libc`. Sometimes information about the differences is included in the
+//! Linux documentation under “C library/kernel differences” sections. And, if
+//! there is a libc in the process, these functions may have surprising
+//! interactions with it.
 //!
 //! These functions are for implementing thread-local storage (TLS), managing
 //! threads, loaded libraries, and other process-wide resources. Most of
 //! `rustix` doesn't care about what other libraries are linked into the
 //! program or what they're doing, but the features in this module generally
 //! can only be used by one entity within a process.
+//!
+//! The API for these functions is not stable, and this module is
+//! `doc(hidden)`.
 //!
 //! [Origin]: https://github.com/sunfishcode/origin#readme
 //!
@@ -329,12 +320,7 @@ pub unsafe fn fork() -> io::Result<Fork> {
 /// the child can just do `getpid`. That's true, but it's more fun if it
 /// doesn't have to.
 pub enum Fork {
-    /// This is returned in the child process after a `fork`. It holds the PID
-    /// of the child.
     Child(Pid),
-
-    /// This is returned in the parent process after a `fork`. It holds the PID
-    /// of the child.
     Parent(Pid),
 }
 
@@ -352,7 +338,7 @@ pub enum Fork {
 /// [Linux]: https://man7.org/linux/man-pages/man2/execveat.2.html
 #[inline]
 #[cfg(feature = "fs")]
-#[cfg_attr(docsrs, doc(cfg(feature = "fs")))]
+#[cfg_attr(doc_cfg, doc(cfg(feature = "fs")))]
 pub unsafe fn execveat<Fd: AsFd>(
     dirfd: Fd,
     path: &CStr,
@@ -422,8 +408,8 @@ pub unsafe fn sigaltstack(new: Option<Stack>) -> io::Result<Stack> {
 /// # Safety
 ///
 /// You're on your own. And on top of all the troubles with signal handlers,
-/// this implementation is highly experimental. Also, this is not `tgkill`, so
-/// the warning about the hazard of recycled thread ID's applies.
+/// this implementation is highly experimental. The warning about the hazard
+/// of recycled thread ID's applies.
 ///
 /// # References
 ///  - [Linux]
@@ -434,7 +420,7 @@ pub unsafe fn tkill(tid: Pid, sig: Signal) -> io::Result<()> {
     backend::runtime::syscalls::tkill(tid, sig)
 }
 
-/// `rt_sigprocmask(how, set, oldset)`—Adjust the process signal mask.
+/// `sigprocmask(how, set, oldset)`—Adjust the process signal mask.
 ///
 /// # Safety
 ///
@@ -443,14 +429,13 @@ pub unsafe fn tkill(tid: Pid, sig: Signal) -> io::Result<()> {
 /// the libc `sigprocmask` in several non-obvious and unsafe ways.
 ///
 /// # References
-///  - [Linux `rt_sigprocmask`]
+///  - [Linux `sigprocmask`]
 ///  - [Linux `pthread_sigmask`]
 ///
-/// [Linux `rt_sigprocmask`]: https://man7.org/linux/man-pages/man2/rt_sigprocmask.2.html
+/// [Linux `sigprocmask`]: https://man7.org/linux/man-pages/man2/sigprocmask.2.html
 /// [Linux `pthread_sigmask`]: https://man7.org/linux/man-pages/man3/pthread_sigmask.3.html
 #[inline]
 #[doc(alias = "pthread_sigmask")]
-#[doc(alias = "rt_sigprocmask")]
 pub unsafe fn sigprocmask(how: How, set: Option<&Sigset>) -> io::Result<Sigset> {
     backend::runtime::syscalls::sigprocmask(how, set)
 }
@@ -588,7 +573,7 @@ pub const SIGRTMAX: u32 = {
         linux_raw_sys::general::SIGRTMAX
     }
 
-    // On platforms that don't, derive it from `_NSIG`.
+    // On platfoms that don't, derive it from `_NSIG`.
     #[cfg(any(target_arch = "arm", target_arch = "x86", target_arch = "x86_64"))]
     {
         linux_raw_sys::general::_NSIG - 1

@@ -4,7 +4,6 @@ use crate::Rng;
 
 use std::cell::Cell;
 use std::ops::RangeBounds;
-use std::vec::Vec;
 
 // Chosen by fair roll of the dice.
 const DEFAULT_RNG_SEED: u64 = 0xef6f79ed30ba75a;
@@ -27,7 +26,7 @@ impl Rng {
     }
 }
 
-std::thread_local! {
+thread_local! {
     static RNG: Cell<Rng> = Cell::new(Rng(random_seed().unwrap_or(DEFAULT_RNG_SEED)));
 }
 
@@ -193,7 +192,8 @@ fn random_seed() -> Option<u64> {
     let mut hasher = DefaultHasher::new();
     Instant::now().hash(&mut hasher);
     thread::current().id().hash(&mut hasher);
-    Some(hasher.finish())
+    let hash = hasher.finish();
+    Some((hash << 1) | 1)
 }
 
 #[cfg(all(

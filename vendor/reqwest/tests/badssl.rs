@@ -1,5 +1,4 @@
 #![cfg(not(target_arch = "wasm32"))]
-#![cfg(not(feature = "rustls-tls-manual-roots-no-provider"))]
 
 #[cfg(all(feature = "__tls", not(feature = "rustls-tls-manual-roots")))]
 #[tokio::test]
@@ -75,7 +74,7 @@ async fn test_badssl_no_built_in_roots() {
     assert!(result.is_err());
 }
 
-#[cfg(any(feature = "native-tls", feature = "rustls-tls"))]
+#[cfg(feature = "native-tls")]
 #[tokio::test]
 async fn test_badssl_wrong_host() {
     let text = reqwest::Client::builder()

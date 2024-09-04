@@ -1,4 +1,3 @@
-#[cfg(not(miri))]
 use std::mem;
 use std::panic::catch_unwind;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -39,7 +38,6 @@ fn executor_cancels_everything() {
     assert_eq!(DROP.load(Ordering::SeqCst), 1);
 }
 
-#[cfg(not(miri))]
 #[test]
 fn leaked_executor_leaks_everything() {
     static DROP: AtomicUsize = AtomicUsize::new(0);
@@ -119,20 +117,6 @@ fn drop_finished_task_and_then_drop_executor() {
     assert_eq!(DROP.load(Ordering::SeqCst), 1);
     drop(ex);
     assert_eq!(DROP.load(Ordering::SeqCst), 1);
-}
-
-#[test]
-fn iterator_panics_mid_run() {
-    let ex = Executor::new();
-
-    let panic = std::panic::catch_unwind(|| {
-        let mut handles = vec![];
-        ex.spawn_many(
-            (0..50).map(|i| if i == 25 { panic!() } else { future::ready(i) }),
-            &mut handles,
-        )
-    });
-    assert!(panic.is_err());
 }
 
 struct CallOnDrop<F: Fn()>(F);

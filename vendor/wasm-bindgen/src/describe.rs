@@ -3,9 +3,6 @@
 
 #![doc(hidden)]
 
-use alloc::boxed::Box;
-use alloc::string::String;
-use alloc::vec::Vec;
 use core::ptr::NonNull;
 
 use crate::{Clamped, JsError, JsObject, JsValue};
@@ -45,7 +42,6 @@ tys! {
     EXTERNREF
     NAMED_EXTERNREF
     ENUM
-    STRING_ENUM
     RUST_STRUCT
     CHAR
     OPTIONAL
@@ -56,7 +52,6 @@ tys! {
 }
 
 #[inline(always)] // see the wasm-interpreter crate
-#[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
 pub fn inform(a: u32) {
     unsafe { super::__wbindgen_describe(a) }
 }
@@ -74,7 +69,6 @@ pub trait WasmDescribeVector {
 macro_rules! simple {
     ($($t:ident => $d:ident)*) => ($(
         impl WasmDescribe for $t {
-            #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
             fn describe() { inform($d) }
         }
     )*)
@@ -112,28 +106,24 @@ cfg_if! {
 }
 
 impl<T> WasmDescribe for *const T {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
     fn describe() {
         inform(U32)
     }
 }
 
 impl<T> WasmDescribe for *mut T {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
     fn describe() {
         inform(U32)
     }
 }
 
 impl<T> WasmDescribe for NonNull<T> {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
     fn describe() {
         inform(NONNULL)
     }
 }
 
 impl<T: WasmDescribe> WasmDescribe for [T] {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
     fn describe() {
         inform(SLICE);
         T::describe();
@@ -141,7 +131,6 @@ impl<T: WasmDescribe> WasmDescribe for [T] {
 }
 
 impl<'a, T: WasmDescribe + ?Sized> WasmDescribe for &'a T {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
     fn describe() {
         inform(REF);
         T::describe();
@@ -149,61 +138,56 @@ impl<'a, T: WasmDescribe + ?Sized> WasmDescribe for &'a T {
 }
 
 impl<'a, T: WasmDescribe + ?Sized> WasmDescribe for &'a mut T {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
     fn describe() {
         inform(REFMUT);
         T::describe();
     }
 }
 
-cfg_if! {
-    if #[cfg(feature = "enable-interning")] {
-        simple! {
-            String => CACHED_STRING
+if_std! {
+    use std::prelude::v1::*;
+
+    cfg_if! {
+        if #[cfg(feature = "enable-interning")] {
+            simple! {
+                String => CACHED_STRING
+            }
+
+        } else {
+            simple! {
+                String => STRING
+            }
         }
+    }
 
-    } else {
-        simple! {
-            String => STRING
+    impl WasmDescribeVector for JsValue {
+        fn describe_vector() {
+            inform(VECTOR);
+            JsValue::describe();
         }
     }
-}
 
-impl WasmDescribeVector for JsValue {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
-    fn describe_vector() {
-        inform(VECTOR);
-        JsValue::describe();
+    impl<T: JsObject> WasmDescribeVector for T {
+        fn describe_vector() {
+            inform(VECTOR);
+            T::describe();
+        }
     }
-}
 
-impl<T: JsObject> WasmDescribeVector for T {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
-    fn describe_vector() {
-        inform(VECTOR);
-        T::describe();
+    impl<T: WasmDescribeVector> WasmDescribe for Box<[T]> {
+        fn describe() {
+            T::describe_vector();
+        }
     }
-}
 
-impl<T: WasmDescribeVector> WasmDescribe for Box<[T]> {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
-    fn describe() {
-        T::describe_vector();
-    }
-}
-
-impl<T> WasmDescribe for Vec<T>
-where
-    Box<[T]>: WasmDescribe,
-{
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
-    fn describe() {
-        <Box<[T]>>::describe();
+    impl<T> WasmDescribe for Vec<T> where Box<[T]>: WasmDescribe {
+        fn describe() {
+            <Box<[T]>>::describe();
+        }
     }
 }
 
 impl<T: WasmDescribe> WasmDescribe for Option<T> {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
     fn describe() {
         inform(OPTIONAL);
         T::describe();
@@ -211,14 +195,12 @@ impl<T: WasmDescribe> WasmDescribe for Option<T> {
 }
 
 impl WasmDescribe for () {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
     fn describe() {
         inform(UNIT)
     }
 }
 
 impl<T: WasmDescribe, E: Into<JsValue>> WasmDescribe for Result<T, E> {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
     fn describe() {
         inform(RESULT);
         T::describe();
@@ -226,7 +208,6 @@ impl<T: WasmDescribe, E: Into<JsValue>> WasmDescribe for Result<T, E> {
 }
 
 impl<T: WasmDescribe> WasmDescribe for Clamped<T> {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
     fn describe() {
         inform(CLAMPED);
         T::describe();
@@ -234,7 +215,6 @@ impl<T: WasmDescribe> WasmDescribe for Clamped<T> {
 }
 
 impl WasmDescribe for JsError {
-    #[cfg_attr(wasm_bindgen_unstable_test_coverage, coverage(off))]
     fn describe() {
         JsValue::describe();
     }

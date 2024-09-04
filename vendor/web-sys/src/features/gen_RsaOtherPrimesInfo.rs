@@ -10,36 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `RsaOtherPrimesInfo`*"]
     pub type RsaOtherPrimesInfo;
-    #[doc = "Get the `d` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RsaOtherPrimesInfo`*"]
-    #[wasm_bindgen(method, getter = "d")]
-    pub fn get_d(this: &RsaOtherPrimesInfo) -> String;
-    #[doc = "Change the `d` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RsaOtherPrimesInfo`*"]
-    #[wasm_bindgen(method, setter = "d")]
-    pub fn set_d(this: &RsaOtherPrimesInfo, val: &str);
-    #[doc = "Get the `r` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RsaOtherPrimesInfo`*"]
-    #[wasm_bindgen(method, getter = "r")]
-    pub fn get_r(this: &RsaOtherPrimesInfo) -> String;
-    #[doc = "Change the `r` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RsaOtherPrimesInfo`*"]
-    #[wasm_bindgen(method, setter = "r")]
-    pub fn set_r(this: &RsaOtherPrimesInfo, val: &str);
-    #[doc = "Get the `t` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RsaOtherPrimesInfo`*"]
-    #[wasm_bindgen(method, getter = "t")]
-    pub fn get_t(this: &RsaOtherPrimesInfo) -> String;
-    #[doc = "Change the `t` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RsaOtherPrimesInfo`*"]
-    #[wasm_bindgen(method, setter = "t")]
-    pub fn set_t(this: &RsaOtherPrimesInfo, val: &str);
 }
 impl RsaOtherPrimesInfo {
     #[doc = "Construct a new `RsaOtherPrimesInfo`."]
@@ -53,19 +23,43 @@ impl RsaOtherPrimesInfo {
         ret.t(t);
         ret
     }
-    #[deprecated = "Use `set_d()` instead."]
+    #[doc = "Change the `d` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RsaOtherPrimesInfo`*"]
     pub fn d(&mut self, val: &str) -> &mut Self {
-        self.set_d(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("d"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_r()` instead."]
+    #[doc = "Change the `r` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RsaOtherPrimesInfo`*"]
     pub fn r(&mut self, val: &str) -> &mut Self {
-        self.set_r(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("r"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_t()` instead."]
+    #[doc = "Change the `t` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RsaOtherPrimesInfo`*"]
     pub fn t(&mut self, val: &str) -> &mut Self {
-        self.set_t(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("t"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

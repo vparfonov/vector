@@ -97,7 +97,6 @@ macro_rules! cmsg_aligned_space {
     }};
 }
 
-/// Helper function for [`cmsg_space`].
 #[doc(hidden)]
 pub const fn __cmsg_space(len: usize) -> usize {
     // Add `align_of::<c::cmsghdr>()` so that we can align the user-provided
@@ -107,7 +106,6 @@ pub const fn __cmsg_space(len: usize) -> usize {
     __cmsg_aligned_space(len)
 }
 
-/// Helper function for [`cmsg_aligned_space`].
 #[doc(hidden)]
 pub const fn __cmsg_aligned_space(len: usize) -> usize {
     // Convert `len` to `u32` for `CMSG_SPACE`. This would be `try_into()` if
@@ -442,7 +440,8 @@ impl<'buf> RecvAncillaryBuffer<'buf> {
     pub fn drain(&mut self) -> AncillaryDrain<'_> {
         AncillaryDrain {
             messages: messages::Messages::new(&mut self.buffer[self.read..][..self.length]),
-            read_and_length: Some((&mut self.read, &mut self.length)),
+            read: &mut self.read,
+            length: &mut self.length,
         }
     }
 }
@@ -475,41 +474,25 @@ pub struct AncillaryDrain<'buf> {
     messages: messages::Messages<'buf>,
 
     /// Increment the number of messages we've read.
+    read: &'buf mut usize,
+
     /// Decrement the total length.
-    read_and_length: Option<(&'buf mut usize, &'buf mut usize)>,
+    length: &'buf mut usize,
 }
 
 impl<'buf> AncillaryDrain<'buf> {
-    /// Create an iterator for control messages that were received without
-    /// [`RecvAncillaryBuffer`].
-    ///
-    /// # Safety
-    ///
-    /// The buffer must contain valid message data (or be empty).
-    pub unsafe fn parse(buffer: &'buf mut [u8]) -> Self {
-        Self {
-            messages: messages::Messages::new(buffer),
-            read_and_length: None,
-        }
-    }
-
-    fn advance(
-        read_and_length: &mut Option<(&'buf mut usize, &'buf mut usize)>,
+    /// A closure that converts a message into a [`RecvAncillaryMessage`].
+    fn cvt_msg(
+        read: &mut usize,
+        length: &mut usize,
         msg: &c::cmsghdr,
     ) -> Option<RecvAncillaryMessage<'buf>> {
-        // Advance the `read` pointer.
-        if let Some((read, length)) = read_and_length {
-            let msg_len = msg.cmsg_len as usize;
-            **read += msg_len;
-            **length -= msg_len;
-        }
-
-        Self::cvt_msg(msg)
-    }
-
-    /// A closure that converts a message into a [`RecvAncillaryMessage`].
-    fn cvt_msg(msg: &c::cmsghdr) -> Option<RecvAncillaryMessage<'buf>> {
         unsafe {
+            // Advance the `read` pointer.
+            let msg_len = msg.cmsg_len as usize;
+            *read += msg_len;
+            *length -= msg_len;
+
             // Get a pointer to the payload.
             let payload = c::CMSG_DATA(msg);
             let payload_len = msg.cmsg_len as usize - c::CMSG_LEN(0) as usize;
@@ -545,8 +528,9 @@ impl<'buf> Iterator for AncillaryDrain<'buf> {
     type Item = RecvAncillaryMessage<'buf>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.messages
-            .find_map(|ev| Self::advance(&mut self.read_and_length, ev))
+        let read = &mut self.read;
+        let length = &mut self.length;
+        self.messages.find_map(|ev| Self::cvt_msg(read, length, ev))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -554,37 +538,45 @@ impl<'buf> Iterator for AncillaryDrain<'buf> {
         (0, max)
     }
 
-    fn fold<B, F>(mut self, init: B, f: F) -> B
+    fn fold<B, F>(self, init: B, f: F) -> B
     where
         Self: Sized,
         F: FnMut(B, Self::Item) -> B,
     {
+        let read = self.read;
+        let length = self.length;
         self.messages
-            .filter_map(|ev| Self::advance(&mut self.read_and_length, ev))
+            .filter_map(|ev| Self::cvt_msg(read, length, ev))
             .fold(init, f)
     }
 
-    fn count(mut self) -> usize {
+    fn count(self) -> usize {
+        let read = self.read;
+        let length = self.length;
         self.messages
-            .filter_map(|ev| Self::advance(&mut self.read_and_length, ev))
+            .filter_map(|ev| Self::cvt_msg(read, length, ev))
             .count()
     }
 
-    fn last(mut self) -> Option<Self::Item>
+    fn last(self) -> Option<Self::Item>
     where
         Self: Sized,
     {
+        let read = self.read;
+        let length = self.length;
         self.messages
-            .filter_map(|ev| Self::advance(&mut self.read_and_length, ev))
+            .filter_map(|ev| Self::cvt_msg(read, length, ev))
             .last()
     }
 
-    fn collect<B: FromIterator<Self::Item>>(mut self) -> B
+    fn collect<B: FromIterator<Self::Item>>(self) -> B
     where
         Self: Sized,
     {
+        let read = self.read;
+        let length = self.length;
         self.messages
-            .filter_map(|ev| Self::advance(&mut self.read_and_length, ev))
+            .filter_map(|ev| Self::cvt_msg(read, length, ev))
             .collect()
     }
 }
@@ -944,7 +936,7 @@ mod messages {
             let msghdr = {
                 let mut h = msghdr::zero_msghdr();
                 h.msg_control = buf.as_mut_ptr().cast();
-                h.msg_controllen = buf.len().try_into().unwrap();
+                h.msg_controllen = buf.len().try_into().expect("buffer too large for msghdr");
                 h
             };
 

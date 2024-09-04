@@ -1,8 +1,0 @@
-query Heights($buildingId: ID!, $mountainName: String) {
-  mountainHeight(name: $mountainName)
-  buildingHeight(id: $buildingId)
-}
-
-query Echo($msg: String) {
-  echo(msg: $msg)
-}

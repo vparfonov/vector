@@ -50,7 +50,6 @@ pub enum Signal {
         solarish,
         target_os = "aix",
         target_os = "haiku",
-        target_os = "hurd",
         target_os = "nto",
         target_os = "vita",
         all(
@@ -109,7 +108,7 @@ pub enum Signal {
     #[cfg(not(any(target_os = "haiku", target_os = "vita")))]
     Io = c::SIGIO,
     /// `SIGPWR`
-    #[cfg(not(any(bsd, target_os = "haiku", target_os = "hurd", target_os = "vita")))]
+    #[cfg(not(any(bsd, target_os = "haiku", target_os = "vita")))]
     #[doc(alias = "Pwr")]
     Power = c::SIGPWR,
     /// `SIGSYS`, aka `SIGUNUSED`
@@ -172,7 +171,6 @@ impl Signal {
                 solarish,
                 target_os = "aix",
                 target_os = "haiku",
-                target_os = "hurd",
                 target_os = "nto",
                 target_os = "vita",
                 all(
@@ -214,7 +212,7 @@ impl Signal {
             c::SIGWINCH => Some(Self::Winch),
             #[cfg(not(any(target_os = "haiku", target_os = "vita")))]
             c::SIGIO => Some(Self::Io),
-            #[cfg(not(any(bsd, target_os = "haiku", target_os = "hurd", target_os = "vita")))]
+            #[cfg(not(any(bsd, target_os = "haiku", target_os = "vita")))]
             c::SIGPWR => Some(Self::Power),
             c::SIGSYS => Some(Self::Sys),
             #[cfg(any(

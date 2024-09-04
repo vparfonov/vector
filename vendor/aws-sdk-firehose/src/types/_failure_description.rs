@@ -28,8 +28,8 @@ impl FailureDescription {
 }
 
 /// A builder for [`FailureDescription`](crate::types::FailureDescription).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct FailureDescriptionBuilder {
     pub(crate) r#type: ::std::option::Option<crate::types::DeliveryStreamFailureType>,
     pub(crate) details: ::std::option::Option<::std::string::String>,

@@ -96,12 +96,3 @@ impl ElasticsearchS3BackupMode {
         }
     }
 }
-impl ::std::fmt::Display for ElasticsearchS3BackupMode {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            ElasticsearchS3BackupMode::AllDocuments => write!(f, "AllDocuments"),
-            ElasticsearchS3BackupMode::FailedDocumentsOnly => write!(f, "FailedDocumentsOnly"),
-            ElasticsearchS3BackupMode::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

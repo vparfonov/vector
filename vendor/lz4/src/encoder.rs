@@ -14,15 +14,12 @@ struct EncoderContext {
 pub struct EncoderBuilder {
     block_size: BlockSize,
     block_mode: BlockMode,
-    // 1: each block followed by a checksum of block's compressed data; 0: disabled (default)
-    block_checksum: BlockChecksum,
     checksum: ContentChecksum,
     // 0 == default (fast mode); values above 16 count as 16; values below 0 count as 0
     level: u32,
     // 1 == always flush (reduce need for tmp buffer)
     auto_flush: bool,
     favor_dec_speed: bool,
-    content_size: u64,
 }
 
 #[derive(Debug)]
@@ -39,11 +36,9 @@ impl EncoderBuilder {
             block_size: BlockSize::Default,
             block_mode: BlockMode::Linked,
             checksum: ContentChecksum::ChecksumEnabled,
-            block_checksum: BlockChecksum::NoBlockChecksum,
             level: 0,
             auto_flush: false,
             favor_dec_speed: false,
-            content_size: 0,
         }
     }
 
@@ -54,11 +49,6 @@ impl EncoderBuilder {
 
     pub fn block_mode(&mut self, block_mode: BlockMode) -> &mut Self {
         self.block_mode = block_mode;
-        self
-    }
-
-    pub fn block_checksum(&mut self, block_checksum: BlockChecksum) -> &mut Self {
-        self.block_checksum = block_checksum;
         self
     }
 
@@ -84,11 +74,6 @@ impl EncoderBuilder {
         self
     }
 
-    pub fn content_size(&mut self, content_size: u64) -> &mut Self {
-        self.content_size = content_size;
-        self
-    }
-
     pub fn build<W: Write>(&self, w: W) -> Result<Encoder<W>> {
         let block_size = self.block_size.get_size();
         let preferences = LZ4FPreferences {
@@ -96,10 +81,7 @@ impl EncoderBuilder {
                 block_size_id: self.block_size.clone(),
                 block_mode: self.block_mode.clone(),
                 content_checksum_flag: self.checksum.clone(),
-                content_size: self.content_size.clone(),
-                frame_type: FrameType::Frame,
-                dict_id: 0,
-                block_checksum_flag: BlockChecksum::BlockChecksumEnabled,
+                reserved: [0; 5],
             },
             compression_level: self.level,
             auto_flush: if self.auto_flush { 1 } else { 0 },
@@ -233,43 +215,15 @@ mod test {
     #[test]
     fn test_encoder_random() {
         let mut encoder = EncoderBuilder::new().level(1).build(Vec::new()).unwrap();
-        let mut input = Vec::new();
+        let mut buffer = Vec::new();
         let mut rnd: u32 = 42;
         for _ in 0..1024 * 1024 {
-            input.push((rnd & 0xFF) as u8);
+            buffer.push((rnd & 0xFF) as u8);
             rnd = ((1664525 as u64) * (rnd as u64) + (1013904223 as u64)) as u32;
         }
-        encoder.write(&input).unwrap();
-        let (compressed, result) = encoder.finish();
+        encoder.write(&buffer).unwrap();
+        let (_, result) = encoder.finish();
         result.unwrap();
-
-        let mut dec = crate::decoder::Decoder::new(&compressed[..]).unwrap();
-        let mut output = Vec::new();
-        dec.read_to_end(&mut output).unwrap();
-        assert_eq!(input, output);
-    }
-
-    #[test]
-    fn test_encoder_content_size() {
-        let mut encoder = EncoderBuilder::new()
-            .level(1)
-            .content_size(1024 * 1024)
-            .build(Vec::new())
-            .unwrap();
-        let mut input = Vec::new();
-        let mut rnd: u32 = 42;
-        for _ in 0..1024 * 1024 {
-            input.push((rnd & 0xFF) as u8);
-            rnd = ((1664525 as u64) * (rnd as u64) + (1013904223 as u64)) as u32;
-        }
-        encoder.write(&input).unwrap();
-        let (compressed, result) = encoder.finish();
-        result.unwrap();
-
-        let mut dec = crate::decoder::Decoder::new(&compressed[..]).unwrap();
-        let mut output = Vec::new();
-        dec.read_to_end(&mut output).unwrap();
-        assert_eq!(input, output);
     }
 
     #[test]

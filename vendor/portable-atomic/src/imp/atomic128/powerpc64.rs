@@ -2,12 +2,12 @@
 
 // Atomic{I,U}128 implementation on PowerPC64.
 //
-// powerpc64 on pwr8+ support 128-bit atomics (load/store/LL/SC):
+// powerpc64 on pwr8+ support 128-bit atomics:
 // https://github.com/llvm/llvm-project/commit/549e118e93c666914a1045fde38a2cac33e1e445
-// https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/test/CodeGen/PowerPC/atomics-i128-ldst.ll
-// https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/test/CodeGen/PowerPC/atomics-i128.ll
+// https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/test/CodeGen/PowerPC/atomics-i128-ldst.ll
+// https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/test/CodeGen/PowerPC/atomics-i128.ll
 //
-// powerpc64le is pwr8+ by default https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/lib/Target/PowerPC/PPC.td#L674
+// powerpc64le is pwr8+ by default https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/lib/Target/PowerPC/PPC.td#L663
 // See also https://github.com/rust-lang/rust/issues/59932
 //
 // Note that we do not separate LL and SC into separate functions, but handle
@@ -24,8 +24,8 @@
 // - atomic-maybe-uninit https://github.com/taiki-e/atomic-maybe-uninit
 //
 // Generated asm:
-// - powerpc64 (pwr8) https://godbolt.org/z/71xGhY9qf
-// - powerpc64le https://godbolt.org/z/4TexcjGEz
+// - powerpc64 (pwr8) https://godbolt.org/z/nG5dGa38a
+// - powerpc64le https://godbolt.org/z/6c99s75e4
 
 include!("macros.rs");
 
@@ -114,7 +114,7 @@ macro_rules! atomic_rmw {
             Ordering::Release => $op!("", "lwsync"),
             Ordering::AcqRel => $op!("lwsync", "lwsync"),
             Ordering::SeqCst => $op!("lwsync", "sync"),
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", $order),
         }
     };
 }
@@ -176,7 +176,7 @@ unsafe fn atomic_load(src: *mut u128, order: Ordering) -> u128 {
                     }
                 })
             }
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", order),
         }
     }
 }
@@ -229,7 +229,7 @@ unsafe fn atomic_load_pwr8(src: *mut u128, order: Ordering) -> u128 {
             }
             Ordering::Acquire => atomic_load_acquire!(""),
             Ordering::SeqCst => atomic_load_acquire!("sync"),
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", order),
         }
         U128 { pair: Pair { hi: out_hi, lo: out_lo } }.whole
     }
@@ -286,7 +286,7 @@ unsafe fn atomic_store(dst: *mut u128, val: u128, order: Ordering) {
                     }
                 });
             }
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", order),
         }
     }
 }
@@ -320,7 +320,7 @@ unsafe fn atomic_store_pwr8(dst: *mut u128, val: u128, order: Ordering) {
             Ordering::Relaxed => atomic_store!(""),
             Ordering::Release => atomic_store!("lwsync"),
             Ordering::SeqCst => atomic_store!("sync"),
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", order),
         }
     }
 }
@@ -816,7 +816,7 @@ macro_rules! atomic_rmw_with_ifunc {
                             }
                         })
                     }
-                    _ => unreachable!(),
+                    _ => unreachable!("{:?}", order),
                 }
             }
         }

@@ -96,12 +96,3 @@ impl ReplicationRuleStatus {
         }
     }
 }
-impl ::std::fmt::Display for ReplicationRuleStatus {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            ReplicationRuleStatus::Disabled => write!(f, "Disabled"),
-            ReplicationRuleStatus::Enabled => write!(f, "Enabled"),
-            ReplicationRuleStatus::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

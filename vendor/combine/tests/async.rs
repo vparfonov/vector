@@ -277,6 +277,8 @@ fn content_length<'a, Input>(
 ) -> impl Parser<Input, Output = String, PartialState = AnySendPartialState> + 'a
 where
     Input: RangeStream<Token = char, Range = &'a str> + 'a,
+    // Necessary due to rust-lang/rust#24159
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     let content_length = range("Content-Length: ").with(
         range::recognize(skip_many1(digit())).and_then(|digits: &str| {
@@ -632,7 +634,7 @@ fn skip_count_min_max_test() {
     assert_eq!(result.unwrap(), [""]);
 }
 
-const WORDS_IN_README: usize = 773;
+const WORDS_IN_README: usize = 824;
 
 #[test]
 fn decode_std() {
@@ -848,5 +850,5 @@ async fn decode_loop() {
             }
         }
     }
-    assert_eq!(WORDS_IN_README, count);
+    assert_eq!(824, count);
 }

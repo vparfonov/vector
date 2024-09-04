@@ -6,7 +6,6 @@
 //! Load a region from an AWS profile
 
 use crate::meta::region::{future, ProvideRegion};
-#[allow(deprecated)]
 use crate::profile::profile_file::ProfileFiles;
 use crate::profile::ProfileSet;
 use crate::provider_config::ProviderConfig;
@@ -46,7 +45,6 @@ pub struct ProfileFileRegionProvider {
 pub struct Builder {
     config: Option<ProviderConfig>,
     profile_override: Option<String>,
-    #[allow(deprecated)]
     profile_files: Option<ProfileFiles>,
 }
 
@@ -64,7 +62,6 @@ impl Builder {
     }
 
     /// Set the profile file that should be used by the [`ProfileFileRegionProvider`]
-    #[allow(deprecated)]
     pub fn profile_files(mut self, profile_files: ProfileFiles) -> Self {
         self.profile_files = Some(profile_files);
         self

@@ -122,15 +122,6 @@ impl AsyncWrite for Expected {
 
 #[tokio::test]
 async fn stream_good() -> io::Result<()> {
-    stream_good_impl(false).await
-}
-
-#[tokio::test]
-async fn stream_good_vectored() -> io::Result<()> {
-    stream_good_impl(true).await
-}
-
-async fn stream_good_impl(vectored: bool) -> io::Result<()> {
     const FILE: &[u8] = include_bytes!("../../README.md");
 
     let (server, mut client) = make_pair();
@@ -148,7 +139,7 @@ async fn stream_good_impl(vectored: bool) -> io::Result<()> {
         dbg!(stream.read_to_end(&mut buf).await)?;
         assert_eq!(buf, FILE);
 
-        dbg!(utils::write(&mut stream, b"Hello World!", vectored).await)?;
+        dbg!(stream.write_all(b"Hello World!").await)?;
         stream.session.send_close_notify();
 
         dbg!(stream.shutdown().await)?;

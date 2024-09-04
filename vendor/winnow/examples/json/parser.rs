@@ -14,7 +14,7 @@ use winnow::{
 
 use crate::json::JsonValue;
 
-pub(crate) type Stream<'i> = &'i str;
+pub type Stream<'i> = &'i str;
 
 /// The root element of a JSON parser is any value
 ///
@@ -28,7 +28,7 @@ pub(crate) type Stream<'i> = &'i str;
 /// Here we use `&str` as input type, but parsers can be generic over
 /// the input type, work directly with `&[u8]`, or any other type that
 /// implements the required traits.
-pub(crate) fn json<'i, E: ParserError<Stream<'i>> + AddContext<Stream<'i>, &'static str>>(
+pub fn json<'i, E: ParserError<Stream<'i>> + AddContext<Stream<'i>, &'static str>>(
     input: &mut Stream<'i>,
 ) -> PResult<JsonValue, E> {
     delimited(ws, json_value, ws).parse_next(input)
@@ -52,7 +52,7 @@ fn json_value<'i, E: ParserError<Stream<'i>> + AddContext<Stream<'i>, &'static s
     .parse_next(input)
 }
 
-/// `literal(string)` generates a parser that takes the argument string.
+/// `literal(string)` generates a parser that recognizes the argument string.
 ///
 /// This also shows returning a sub-slice of the original input
 fn null<'i, E: ParserError<Stream<'i>>>(input: &mut Stream<'i>) -> PResult<&'i str, E> {
@@ -75,7 +75,7 @@ fn boolean<'i, E: ParserError<Stream<'i>>>(input: &mut Stream<'i>) -> PResult<bo
     alt((parse_true, parse_false)).parse_next(input)
 }
 
-/// This parser gathers all `char`s up into a `String`with a parse to take the double quote
+/// This parser gathers all `char`s up into a `String`with a parse to recognize the double quote
 /// character, before the string (using `preceded`) and after the string (using `terminated`).
 fn string<'i, E: ParserError<Stream<'i>> + AddContext<Stream<'i>, &'static str>>(
     input: &mut Stream<'i>,
@@ -216,20 +216,20 @@ mod test {
     fn json_string() {
         assert_eq!(
             string::<Error<'_>>.parse_peek("\"\""),
-            Ok(("", "".to_owned()))
+            Ok(("", "".to_string()))
         );
         assert_eq!(
             string::<Error<'_>>.parse_peek("\"abc\""),
-            Ok(("", "abc".to_owned()))
+            Ok(("", "abc".to_string()))
         );
         assert_eq!(
             string::<Error<'_>>
                 .parse_peek("\"abc\\\"\\\\\\/\\b\\f\\n\\r\\t\\u0001\\u2014\u{2014}def\""),
-            Ok(("", "abc\"\\/\x08\x0C\n\r\t\x01——def".to_owned())),
+            Ok(("", "abc\"\\/\x08\x0C\n\r\t\x01——def".to_string())),
         );
         assert_eq!(
             string::<Error<'_>>.parse_peek("\"\\uD83D\\uDE10\""),
-            Ok(("", "😐".to_owned()))
+            Ok(("", "😐".to_string()))
         );
 
         assert!(string::<Error<'_>>.parse_peek("\"").is_err());
@@ -251,8 +251,8 @@ mod test {
 
         let expected = Object(
             vec![
-                ("a".to_owned(), Num(42.0)),
-                ("b".to_owned(), Str("x".to_owned())),
+                ("a".to_string(), Num(42.0)),
+                ("b".to_string(), Str("x".to_string())),
             ]
             .into_iter()
             .collect(),
@@ -267,7 +267,7 @@ mod test {
 
         let input = r#"[42,"x"]"#;
 
-        let expected = Array(vec![Num(42.0), Str("x".to_owned())]);
+        let expected = Array(vec![Num(42.0), Str("x".to_string())]);
 
         assert_eq!(json::<Error<'_>>.parse_peek(input), Ok(("", expected)));
     }
@@ -296,28 +296,28 @@ mod test {
                 "",
                 Object(
                     vec![
-                        ("null".to_owned(), Null),
-                        ("true".to_owned(), Boolean(true)),
-                        ("false".to_owned(), Boolean(false)),
-                        ("number".to_owned(), Num(123e4)),
-                        ("string".to_owned(), Str(" abc 123 ".to_owned())),
+                        ("null".to_string(), Null),
+                        ("true".to_string(), Boolean(true)),
+                        ("false".to_string(), Boolean(false)),
+                        ("number".to_string(), Num(123e4)),
+                        ("string".to_string(), Str(" abc 123 ".to_string())),
                         (
-                            "array".to_owned(),
-                            Array(vec![Boolean(false), Num(1.0), Str("two".to_owned())])
+                            "array".to_string(),
+                            Array(vec![Boolean(false), Num(1.0), Str("two".to_string())])
                         ),
                         (
-                            "object".to_owned(),
+                            "object".to_string(),
                             Object(
                                 vec![
-                                    ("a".to_owned(), Num(1.0)),
-                                    ("b".to_owned(), Str("c".to_owned())),
+                                    ("a".to_string(), Num(1.0)),
+                                    ("b".to_string(), Str("c".to_string())),
                                 ]
                                 .into_iter()
                                 .collect()
                             )
                         ),
-                        ("empty_array".to_owned(), Array(vec![]),),
-                        ("empty_object".to_owned(), Object(HashMap::new()),),
+                        ("empty_array".to_string(), Array(vec![]),),
+                        ("empty_object".to_string(), Object(HashMap::new()),),
                     ]
                     .into_iter()
                     .collect()

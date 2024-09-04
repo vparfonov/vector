@@ -77,7 +77,7 @@ mod tests {
         }
 
         thread_local! {
-            static FOO: Foo = const { Foo };
+            static FOO: Foo = Foo;
         }
 
         thread::scope(|scope| {

@@ -10,16 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `ReadableStreamIteratorOptions`*"]
     pub type ReadableStreamIteratorOptions;
-    #[doc = "Get the `preventCancel` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ReadableStreamIteratorOptions`*"]
-    #[wasm_bindgen(method, getter = "preventCancel")]
-    pub fn get_prevent_cancel(this: &ReadableStreamIteratorOptions) -> Option<bool>;
-    #[doc = "Change the `preventCancel` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ReadableStreamIteratorOptions`*"]
-    #[wasm_bindgen(method, setter = "preventCancel")]
-    pub fn set_prevent_cancel(this: &ReadableStreamIteratorOptions, val: bool);
 }
 impl ReadableStreamIteratorOptions {
     #[doc = "Construct a new `ReadableStreamIteratorOptions`."]
@@ -30,9 +20,21 @@ impl ReadableStreamIteratorOptions {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_prevent_cancel()` instead."]
+    #[doc = "Change the `preventCancel` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ReadableStreamIteratorOptions`*"]
     pub fn prevent_cancel(&mut self, val: bool) -> &mut Self {
-        self.set_prevent_cancel(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("preventCancel"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

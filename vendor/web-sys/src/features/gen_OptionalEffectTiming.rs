@@ -10,90 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
     pub type OptionalEffectTiming;
-    #[doc = "Get the `delay` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, getter = "delay")]
-    pub fn get_delay(this: &OptionalEffectTiming) -> Option<f64>;
-    #[doc = "Change the `delay` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, setter = "delay")]
-    pub fn set_delay(this: &OptionalEffectTiming, val: f64);
-    #[cfg(feature = "PlaybackDirection")]
-    #[doc = "Get the `direction` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`, `PlaybackDirection`*"]
-    #[wasm_bindgen(method, getter = "direction")]
-    pub fn get_direction(this: &OptionalEffectTiming) -> Option<PlaybackDirection>;
-    #[cfg(feature = "PlaybackDirection")]
-    #[doc = "Change the `direction` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`, `PlaybackDirection`*"]
-    #[wasm_bindgen(method, setter = "direction")]
-    pub fn set_direction(this: &OptionalEffectTiming, val: PlaybackDirection);
-    #[doc = "Get the `duration` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, getter = "duration")]
-    pub fn get_duration(this: &OptionalEffectTiming) -> ::wasm_bindgen::JsValue;
-    #[doc = "Change the `duration` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, setter = "duration")]
-    pub fn set_duration(this: &OptionalEffectTiming, val: &::wasm_bindgen::JsValue);
-    #[doc = "Get the `easing` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, getter = "easing")]
-    pub fn get_easing(this: &OptionalEffectTiming) -> Option<String>;
-    #[doc = "Change the `easing` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, setter = "easing")]
-    pub fn set_easing(this: &OptionalEffectTiming, val: &str);
-    #[doc = "Get the `endDelay` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, getter = "endDelay")]
-    pub fn get_end_delay(this: &OptionalEffectTiming) -> Option<f64>;
-    #[doc = "Change the `endDelay` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, setter = "endDelay")]
-    pub fn set_end_delay(this: &OptionalEffectTiming, val: f64);
-    #[cfg(feature = "FillMode")]
-    #[doc = "Get the `fill` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FillMode`, `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, getter = "fill")]
-    pub fn get_fill(this: &OptionalEffectTiming) -> Option<FillMode>;
-    #[cfg(feature = "FillMode")]
-    #[doc = "Change the `fill` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `FillMode`, `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, setter = "fill")]
-    pub fn set_fill(this: &OptionalEffectTiming, val: FillMode);
-    #[doc = "Get the `iterationStart` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, getter = "iterationStart")]
-    pub fn get_iteration_start(this: &OptionalEffectTiming) -> Option<f64>;
-    #[doc = "Change the `iterationStart` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, setter = "iterationStart")]
-    pub fn set_iteration_start(this: &OptionalEffectTiming, val: f64);
-    #[doc = "Get the `iterations` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, getter = "iterations")]
-    pub fn get_iterations(this: &OptionalEffectTiming) -> Option<f64>;
-    #[doc = "Change the `iterations` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
-    #[wasm_bindgen(method, setter = "iterations")]
-    pub fn set_iterations(this: &OptionalEffectTiming, val: f64);
 }
 impl OptionalEffectTiming {
     #[doc = "Construct a new `OptionalEffectTiming`."]
@@ -104,46 +20,131 @@ impl OptionalEffectTiming {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_delay()` instead."]
+    #[doc = "Change the `delay` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
     pub fn delay(&mut self, val: f64) -> &mut Self {
-        self.set_delay(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("delay"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "PlaybackDirection")]
-    #[deprecated = "Use `set_direction()` instead."]
+    #[doc = "Change the `direction` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`, `PlaybackDirection`*"]
     pub fn direction(&mut self, val: PlaybackDirection) -> &mut Self {
-        self.set_direction(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("direction"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_duration()` instead."]
+    #[doc = "Change the `duration` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
     pub fn duration(&mut self, val: &::wasm_bindgen::JsValue) -> &mut Self {
-        self.set_duration(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("duration"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_easing()` instead."]
+    #[doc = "Change the `easing` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
     pub fn easing(&mut self, val: &str) -> &mut Self {
-        self.set_easing(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("easing"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_end_delay()` instead."]
+    #[doc = "Change the `endDelay` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
     pub fn end_delay(&mut self, val: f64) -> &mut Self {
-        self.set_end_delay(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("endDelay"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "FillMode")]
-    #[deprecated = "Use `set_fill()` instead."]
+    #[doc = "Change the `fill` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `FillMode`, `OptionalEffectTiming`*"]
     pub fn fill(&mut self, val: FillMode) -> &mut Self {
-        self.set_fill(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("fill"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_iteration_start()` instead."]
+    #[doc = "Change the `iterationStart` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
     pub fn iteration_start(&mut self, val: f64) -> &mut Self {
-        self.set_iteration_start(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("iterationStart"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_iterations()` instead."]
+    #[doc = "Change the `iterations` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `OptionalEffectTiming`*"]
     pub fn iterations(&mut self, val: f64) -> &mut Self {
-        self.set_iterations(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("iterations"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

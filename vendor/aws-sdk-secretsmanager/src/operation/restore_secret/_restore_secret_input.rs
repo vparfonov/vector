@@ -22,8 +22,8 @@ impl RestoreSecretInput {
 }
 
 /// A builder for [`RestoreSecretInput`](crate::operation::restore_secret::RestoreSecretInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct RestoreSecretInputBuilder {
     pub(crate) secret_id: ::std::option::Option<::std::string::String>,
 }

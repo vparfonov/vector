@@ -4,6 +4,7 @@ use core::{
 };
 use std::net::IpAddr;
 
+use super::from_str::cidr_from_str;
 use crate::{
 	errors::*,
 	Family,
@@ -243,11 +244,11 @@ impl FromStr for AnyIpCidr {
 	type Err = NetworkParseError;
 
 	fn from_str(s: &str) -> Result<Self, NetworkParseError> {
-		// TODO: use strict FromStr::from_str address parsing with version bump
-		crate::parsers::parse_any_cidr(
-			s,
-			crate::local_addr_parser::ParseableAddress::address_from_str,
-		)
+		if s == "any" {
+			Ok(Self::Any)
+		} else {
+			cidr_from_str::<IpCidr>(s).map(Self::from)
+		}
 	}
 }
 

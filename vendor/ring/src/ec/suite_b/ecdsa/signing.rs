@@ -14,8 +14,6 @@
 
 //! ECDSA Signatures using the P-256 and P-384 curves.
 
-#![allow(clippy::cast_possible_truncation)] // XXX
-
 use super::digest_scalar::digest_scalar;
 use crate::{
     arithmetic::montgomery::*,
@@ -156,7 +154,10 @@ impl EcdsaKeyPair {
     ) -> Result<Self, error::KeyRejected> {
         let (seed, public_key) = key_pair.split();
         let d = private_key::private_key_as_scalar(alg.private_key_ops, &seed);
-        let d = alg.private_scalar_ops.to_mont(&d);
+        let d = alg
+            .private_scalar_ops
+            .scalar_ops
+            .scalar_product(&d, &alg.private_scalar_ops.oneRR_mod_n);
 
         let nonce_key = NonceRandomKey::new(alg, &seed, rng)?;
         Ok(Self {
@@ -240,7 +241,7 @@ impl EcdsaKeyPair {
             // XXX: iteration conut?
             // Step 1.
             let k = private_key::random_scalar(self.alg.private_key_ops, rng)?;
-            let k_inv = ops.scalar_inv_to_mont(&k);
+            let k_inv = scalar_ops.scalar_inv_to_mont(&k);
 
             // Step 2.
             let r = private_key_ops.point_mul_base(&k);
@@ -263,7 +264,7 @@ impl EcdsaKeyPair {
             // Step 6.
             let s = {
                 let dr = scalar_ops.scalar_product(&self.d, &r);
-                let e_plus_dr = scalar_sum(cops, &e, dr);
+                let e_plus_dr = scalar_sum(cops, &e, &dr);
                 scalar_ops.scalar_product(&k_inv, &e_plus_dr)
             };
             if cops.is_zero(&s) {
@@ -383,10 +384,10 @@ fn format_rs_fixed(ops: &'static ScalarOps, r: &Scalar, s: &Scalar, out: &mut [u
     let scalar_len = ops.scalar_bytes_len();
 
     let (r_out, rest) = out.split_at_mut(scalar_len);
-    limb::big_endian_from_limbs(ops.leak_limbs(r), r_out);
+    limb::big_endian_from_limbs(&r.limbs[..ops.common.num_limbs], r_out);
 
     let (s_out, _) = rest.split_at_mut(scalar_len);
-    limb::big_endian_from_limbs(ops.leak_limbs(s), s_out);
+    limb::big_endian_from_limbs(&s.limbs[..ops.common.num_limbs], s_out);
 
     2 * scalar_len
 }
@@ -397,7 +398,7 @@ fn format_rs_asn1(ops: &'static ScalarOps, r: &Scalar, s: &Scalar, out: &mut [u8
     fn format_integer_tlv(ops: &ScalarOps, a: &Scalar, out: &mut [u8]) -> usize {
         let mut fixed = [0u8; ec::SCALAR_MAX_BYTES + 1];
         let fixed = &mut fixed[..(ops.scalar_bytes_len() + 1)];
-        limb::big_endian_from_limbs(ops.leak_limbs(a), &mut fixed[1..]);
+        limb::big_endian_from_limbs(&a.limbs[..ops.common.num_limbs], &mut fixed[1..]);
 
         // Since `a_fixed_out` is an extra byte long, it is guaranteed to start
         // with a zero.

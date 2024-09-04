@@ -14,7 +14,6 @@ use core::num::NonZeroUsize;
 
 use crate::ascii::Caseless as AsciiCaseless;
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 use crate::error::FromRecoverableError;
 use crate::error::Needed;
 use crate::lib::std::iter::{Cloned, Enumerate};
@@ -48,7 +47,7 @@ mod tests;
 pub type Str<'i> = &'i str;
 
 /// Improved `Debug` experience for `&[u8]` byte streams
-#[allow(clippy::derived_hash_with_manual_eq)]
+#[allow(clippy::derive_hash_xor_eq)]
 #[derive(Hash)]
 #[repr(transparent)]
 pub struct Bytes([u8]);
@@ -72,7 +71,7 @@ impl Bytes {
 }
 
 /// Improved `Debug` experience for `&[u8]` UTF-8-ish streams
-#[allow(clippy::derived_hash_with_manual_eq)]
+#[allow(clippy::derive_hash_xor_eq)]
 #[derive(Hash)]
 #[repr(transparent)]
 pub struct BStr([u8]);
@@ -107,7 +106,7 @@ impl BStr {
 /// byte offsets to line numbers.
 ///
 /// See [`Parser::span`][crate::Parser::span] and [`Parser::with_span`][crate::Parser::with_span] for more details
-#[derive(Copy, Clone, Default, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Default, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[doc(alias = "LocatedSpan")]
 pub struct Located<I> {
     initial: I,
@@ -151,20 +150,12 @@ impl<I: crate::lib::std::fmt::Display> crate::lib::std::fmt::Display for Located
     }
 }
 
-impl<I: crate::lib::std::fmt::Debug> crate::lib::std::fmt::Debug for Located<I> {
-    #[inline]
-    fn fmt(&self, f: &mut crate::lib::std::fmt::Formatter<'_>) -> crate::lib::std::fmt::Result {
-        self.input.fmt(f)
-    }
-}
-
 /// Allow recovering from parse errors, capturing them as the parser continues
 ///
 /// Generally, this will be used indirectly via
 /// [`RecoverableParser::recoverable_parse`][crate::RecoverableParser::recoverable_parse].
 #[cfg(feature = "unstable-recover")]
-#[derive(Clone)]
-#[cfg(feature = "std")]
+#[derive(Clone, Debug)]
 pub struct Recoverable<I, E>
 where
     I: Stream,
@@ -175,18 +166,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
-impl<I, E> Default for Recoverable<I, E>
-where
-    I: Default + Stream,
-{
-    fn default() -> Self {
-        Self::new(I::default())
-    }
-}
-
-#[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> Recoverable<I, E>
 where
     I: Stream,
@@ -216,7 +195,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> AsRef<I> for Recoverable<I, E>
 where
     I: Stream,
@@ -228,7 +206,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> crate::lib::std::ops::Deref for Recoverable<I, E>
 where
     I: Stream,
@@ -242,32 +219,12 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I: crate::lib::std::fmt::Display, E> crate::lib::std::fmt::Display for Recoverable<I, E>
 where
     I: Stream,
 {
     fn fmt(&self, f: &mut crate::lib::std::fmt::Formatter<'_>) -> crate::lib::std::fmt::Result {
         crate::lib::std::fmt::Display::fmt(&self.input, f)
-    }
-}
-
-#[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
-impl<I: Stream + crate::lib::std::fmt::Debug, E: crate::lib::std::fmt::Debug>
-    crate::lib::std::fmt::Debug for Recoverable<I, E>
-{
-    #[inline]
-    fn fmt(&self, f: &mut crate::lib::std::fmt::Formatter<'_>) -> crate::lib::std::fmt::Result {
-        if f.alternate() {
-            self.input.fmt(f)
-        } else {
-            f.debug_struct("Recoverable")
-                .field("input", &self.input)
-                .field("errors", &self.errors)
-                .field("is_recoverable", &self.is_recoverable)
-                .finish()
-        }
     }
 }
 
@@ -287,12 +244,12 @@ impl<I: Stream + crate::lib::std::fmt::Debug, E: crate::lib::std::fmt::Debug>
 /// # use winnow::ascii::alpha1;
 /// # type Error = ();
 ///
-/// #[derive(Debug)]
-/// struct State<'s>(&'s mut u32);
+/// #[derive(Clone, Debug)]
+/// struct State<'s>(&'s Cell<u32>);
 ///
 /// impl<'s> State<'s> {
-///     fn count(&mut self) {
-///         *self.0 += 1;
+///     fn count(&self) {
+///         self.0.set(self.0.get() + 1);
 ///     }
 /// }
 ///
@@ -304,12 +261,12 @@ impl<I: Stream + crate::lib::std::fmt::Debug, E: crate::lib::std::fmt::Debug>
 /// }
 ///
 /// let data = "Hello";
-/// let mut state = 0;
-/// let input = Stream { input: data, state: State(&mut state) };
+/// let state = Cell::new(0);
+/// let input = Stream { input: data, state: State(&state) };
 /// let output = word.parse(input).unwrap();
-/// assert_eq!(state, 1);
+/// assert_eq!(state.get(), 1);
 /// ```
-#[derive(Clone, Copy, Default, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[doc(alias = "LocatedSpan")]
 pub struct Stateful<I, S> {
     /// Inner input being wrapped in state
@@ -337,22 +294,6 @@ impl<I, S> crate::lib::std::ops::Deref for Stateful<I, S> {
 impl<I: crate::lib::std::fmt::Display, S> crate::lib::std::fmt::Display for Stateful<I, S> {
     fn fmt(&self, f: &mut crate::lib::std::fmt::Formatter<'_>) -> crate::lib::std::fmt::Result {
         self.input.fmt(f)
-    }
-}
-
-impl<I: crate::lib::std::fmt::Debug, S: crate::lib::std::fmt::Debug> crate::lib::std::fmt::Debug
-    for Stateful<I, S>
-{
-    #[inline]
-    fn fmt(&self, f: &mut crate::lib::std::fmt::Formatter<'_>) -> crate::lib::std::fmt::Result {
-        if f.alternate() {
-            self.input.fmt(f)
-        } else {
-            f.debug_struct("Stateful")
-                .field("input", &self.input)
-                .field("state", &self.state)
-                .finish()
-        }
     }
 }
 
@@ -399,7 +340,7 @@ impl<I: crate::lib::std::fmt::Debug, S: crate::lib::std::fmt::Debug> crate::lib:
 /// // but the complete parser will return an error
 /// assert_eq!(take_complete.parse_peek(&b"abc"[..]), Err(ErrMode::Backtrack(InputError::new(&b"abc"[..], ErrorKind::Slice))));
 ///
-/// // the alpha0 function takes 0 or more alphabetic characters
+/// // the alpha0 function recognizes 0 or more alphabetic characters
 /// fn alpha0_partial<'s>(i: &mut Partial<&'s str>) -> PResult<&'s str, InputError<Partial<&'s str>>> {
 ///   ascii::alpha0.parse_next(i)
 /// }
@@ -408,19 +349,19 @@ impl<I: crate::lib::std::fmt::Debug, S: crate::lib::std::fmt::Debug> crate::lib:
 ///   ascii::alpha0.parse_next(i)
 /// }
 ///
-/// // if there's a clear limit to the taken characters, both parsers work the same way
+/// // if there's a clear limit to the recognized characters, both parsers work the same way
 /// assert_eq!(alpha0_partial.parse_peek(Partial::new("abcd;")), Ok((Partial::new(";"), "abcd")));
 /// assert_eq!(alpha0_complete.parse_peek("abcd;"), Ok((";", "abcd")));
 ///
 /// // but when there's no limit, the partial version returns `Incomplete`, because it cannot
-/// // know if more input data should be taken. The whole input could be "abcd;", or
+/// // know if more input data should be recognized. The whole input could be "abcd;", or
 /// // "abcde;"
 /// assert_eq!(alpha0_partial.parse_peek(Partial::new("abcd")), Err(ErrMode::Incomplete(Needed::new(1))));
 ///
 /// // while the complete version knows that all of the data is there
 /// assert_eq!(alpha0_complete.parse_peek("abcd"), Ok(("", "abcd")));
 /// ```
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Partial<I> {
     input: I,
     partial: bool,
@@ -468,20 +409,6 @@ impl<I> crate::lib::std::ops::Deref for Partial<I> {
 impl<I: crate::lib::std::fmt::Display> crate::lib::std::fmt::Display for Partial<I> {
     fn fmt(&self, f: &mut crate::lib::std::fmt::Formatter<'_>) -> crate::lib::std::fmt::Result {
         self.input.fmt(f)
-    }
-}
-
-impl<I: crate::lib::std::fmt::Debug> crate::lib::std::fmt::Debug for Partial<I> {
-    #[inline]
-    fn fmt(&self, f: &mut crate::lib::std::fmt::Formatter<'_>) -> crate::lib::std::fmt::Result {
-        if f.alternate() {
-            self.input.fmt(f)
-        } else {
-            f.debug_struct("Partial")
-                .field("input", &self.input)
-                .field("partial", &self.partial)
-                .finish()
-        }
     }
 }
 
@@ -576,7 +503,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> SliceLen for Recoverable<I, E>
 where
     I: SliceLen,
@@ -1156,7 +1082,6 @@ impl<I: Stream> Stream for Located<I> {
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E: crate::lib::std::fmt::Debug> Stream for Recoverable<I, E>
 where
     I: Stream,
@@ -1338,7 +1263,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> Location for Recoverable<I, E>
 where
     I: Location,
@@ -1374,7 +1298,6 @@ where
 ///
 /// See [`Recoverable`] for adding error recovery tracking to your [`Stream`]
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 pub trait Recover<E>: Stream {
     /// Capture a top-level error
     ///
@@ -1392,7 +1315,6 @@ pub trait Recover<E>: Stream {
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<'a, T, E> Recover<E> for &'a [T]
 where
     &'a [T]: Stream,
@@ -1415,7 +1337,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<'a, E> Recover<E> for &'a str {
     #[inline(always)]
     fn record_err(
@@ -1435,7 +1356,6 @@ impl<'a, E> Recover<E> for &'a str {
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<'a, E> Recover<E> for &'a Bytes {
     #[inline(always)]
     fn record_err(
@@ -1455,7 +1375,6 @@ impl<'a, E> Recover<E> for &'a Bytes {
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<'a, E> Recover<E> for &'a BStr {
     #[inline(always)]
     fn record_err(
@@ -1475,7 +1394,6 @@ impl<'a, E> Recover<E> for &'a BStr {
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> Recover<E> for (I, usize)
 where
     I: Recover<E>,
@@ -1499,7 +1417,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> Recover<E> for Located<I>
 where
     I: Recover<E>,
@@ -1523,7 +1440,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E, R> Recover<E> for Recoverable<I, R>
 where
     I: Stream,
@@ -1558,7 +1474,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E, S> Recover<E> for Stateful<I, S>
 where
     I: Recover<E>,
@@ -1583,7 +1498,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> Recover<E> for Partial<I>
 where
     I: Recover<E>,
@@ -1739,7 +1653,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> StreamIsPartial for Recoverable<I, E>
 where
     I: StreamIsPartial,
@@ -1932,7 +1845,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> Offset for Recoverable<I, E>
 where
     I: Stream,
@@ -1945,7 +1857,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> Offset<<Recoverable<I, E> as Stream>::Checkpoint> for Recoverable<I, E>
 where
     I: Stream,
@@ -2040,7 +1951,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> AsBytes for Recoverable<I, E>
 where
     I: Stream,
@@ -2110,7 +2020,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> AsBStr for Recoverable<I, E>
 where
     I: Stream,
@@ -2332,7 +2241,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E, U> Compare<U> for Recoverable<I, E>
 where
     I: Stream,
@@ -2606,7 +2514,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E, T> FindSlice<T> for Recoverable<I, E>
 where
     I: Stream,
@@ -2710,7 +2617,6 @@ where
 }
 
 #[cfg(feature = "unstable-recover")]
-#[cfg(feature = "std")]
 impl<I, E> UpdateSlice for Recoverable<I, E>
 where
     I: Stream,
@@ -2767,7 +2673,6 @@ impl<T, S> Checkpoint<T, S> {
 impl<T: Copy, S> Copy for Checkpoint<T, S> {}
 
 impl<T: Clone, S> Clone for Checkpoint<T, S> {
-    #[inline(always)]
     fn clone(&self) -> Self {
         Self {
             inner: self.inner.clone(),
@@ -2775,29 +2680,6 @@ impl<T: Clone, S> Clone for Checkpoint<T, S> {
         }
     }
 }
-
-impl<T: PartialOrd, S> PartialOrd for Checkpoint<T, S> {
-    #[inline(always)]
-    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
-        self.inner.partial_cmp(&other.inner)
-    }
-}
-
-impl<T: Ord, S> Ord for Checkpoint<T, S> {
-    #[inline(always)]
-    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
-        self.inner.cmp(&other.inner)
-    }
-}
-
-impl<T: PartialEq, S> PartialEq for Checkpoint<T, S> {
-    #[inline(always)]
-    fn eq(&self, other: &Self) -> bool {
-        self.inner.eq(&other.inner)
-    }
-}
-
-impl<T: Eq, S> Eq for Checkpoint<T, S> {}
 
 impl<T: crate::lib::std::fmt::Debug, S> crate::lib::std::fmt::Debug for Checkpoint<T, S> {
     fn fmt(&self, f: &mut crate::lib::std::fmt::Formatter<'_>) -> crate::lib::std::fmt::Result {
@@ -2809,7 +2691,6 @@ impl<T: crate::lib::std::fmt::Debug, S> crate::lib::std::fmt::Debug for Checkpoi
 ///
 /// This is flexible in what can be converted to a [Range]:
 /// ```rust
-/// # #[cfg(feature = "std")] {
 /// # use winnow::prelude::*;
 /// # use winnow::token::any;
 /// # use winnow::combinator::repeat;
@@ -2831,7 +2712,6 @@ impl<T: crate::lib::std::fmt::Debug, S> crate::lib::std::fmt::Debug for Checkpoi
 /// # let mut input = "0123456789012345678901234567890123456789";
 /// # let input = &mut input;
 /// let parser: Vec<_> = repeat(5..=8, inner).parse_next(input).unwrap();
-/// # }
 /// ```
 #[derive(PartialEq, Eq)]
 pub struct Range {
@@ -3193,7 +3073,7 @@ pub trait AsChar {
 
     /// Tests that self is an alphabetic character
     ///
-    /// **Warning:** for `&str` it matches alphabetic
+    /// **Warning:** for `&str` it recognizes alphabetic
     /// characters outside of the 52 ASCII letters
     fn is_alpha(self) -> bool;
 

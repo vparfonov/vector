@@ -11,11 +11,10 @@
 
 [package]
 edition = "2021"
-rust-version = "1.63"
+rust-version = "1.61"
 name = "rustls"
-version = "0.23.12"
+version = "0.22.4"
 build = "build.rs"
-autotests = false
 autobenches = false
 description = "Rustls is a modern TLS library written in Rust."
 homepage = "https://github.com/rustls/rustls"
@@ -34,10 +33,7 @@ allowed_external_types = [
 ]
 
 [package.metadata.docs.rs]
-features = [
-    "read_buf",
-    "ring",
-]
+all-features = true
 rustdoc-args = [
     "--cfg",
     "docsrs",
@@ -52,47 +48,6 @@ required-features = ["tls12"]
 name = "bench"
 path = "examples/internal/bench.rs"
 
-[[example]]
-name = "test_ca"
-path = "examples/internal/test_ca.rs"
-
-[[test]]
-name = "api"
-path = "tests/runners/api.rs"
-
-[[test]]
-name = "api_ffdhe"
-path = "tests/runners/api_ffdhe.rs"
-required-features = ["tls12"]
-
-[[test]]
-name = "bogo"
-path = "tests/bogo.rs"
-
-[[test]]
-name = "client_cert_verifier"
-path = "tests/runners/client_cert_verifier.rs"
-
-[[test]]
-name = "ech"
-path = "tests/ech.rs"
-
-[[test]]
-name = "key_log_file_env"
-path = "tests/runners/key_log_file_env.rs"
-
-[[test]]
-name = "process_provider"
-path = "tests/process_provider.rs"
-
-[[test]]
-name = "server_cert_verifier"
-path = "tests/runners/server_cert_verifier.rs"
-
-[[test]]
-name = "unbuffered"
-path = "tests/runners/unbuffered.rs"
-
 [[bench]]
 name = "benchmarks"
 path = "benches/benchmarks.rs"
@@ -100,45 +55,16 @@ harness = false
 required-features = ["ring"]
 
 [dependencies.aws-lc-rs]
-version = "1.8.1"
-features = ["aws-lc-sys"]
+version = "1.5"
 optional = true
-default-features = false
-
-[dependencies.brotli]
-version = "6"
-features = ["std"]
-optional = true
-default-features = false
-
-[dependencies.brotli-decompressor]
-version = "4.0.1"
-optional = true
-
-[dependencies.hashbrown]
-version = "0.14"
-features = [
-    "ahash",
-    "inline-more",
-]
-optional = true
-default-features = false
 
 [dependencies.log]
 version = "0.4.4"
 optional = true
 
-[dependencies.once_cell]
-version = "1.16"
-features = [
-    "alloc",
-    "race",
-]
-default-features = false
-
 [dependencies.pki-types]
-version = "1.7"
-features = ["alloc"]
+version = "1"
+features = ["std"]
 package = "rustls-pki-types"
 
 [dependencies.ring]
@@ -150,64 +76,28 @@ version = "2.5.0"
 default-features = false
 
 [dependencies.webpki]
-version = "0.102.6"
-features = ["alloc"]
+version = "0.102.1"
+features = ["std"]
 default-features = false
 package = "rustls-webpki"
 
 [dependencies.zeroize]
-version = "1.7"
-
-[dependencies.zlib-rs]
-version = "0.2"
-optional = true
+version = "1.6.0"
 
 [dev-dependencies.base64]
-version = "0.22"
+version = "0.21"
 
 [dev-dependencies.bencher]
 version = "0.1.5"
 
-[dev-dependencies.clap]
-version = "4"
-features = [
-    "derive",
-    "env",
-]
-
 [dev-dependencies.env_logger]
 version = "0.10"
-
-[dev-dependencies.hex]
-version = "0.4"
 
 [dev-dependencies.log]
 version = "0.4.4"
 
-[dev-dependencies.num-bigint]
-version = "0.4.4"
-
-[dev-dependencies.rcgen]
-version = "0.13"
-features = [
-    "aws_lc_rs",
-    "pem",
-]
-default-features = false
-
 [dev-dependencies.rustls-pemfile]
 version = "2"
-
-[dev-dependencies.serde]
-version = "1"
-features = ["derive"]
-
-[dev-dependencies.serde_json]
-version = "1"
-
-[dev-dependencies.time]
-version = "0.3.6"
-default-features = false
 
 [dev-dependencies.webpki-roots]
 version = "0.26"
@@ -217,42 +107,19 @@ version = "1.0.6"
 optional = true
 
 [features]
-aws-lc-rs = ["aws_lc_rs"]
 aws_lc_rs = [
     "dep:aws-lc-rs",
     "webpki/aws_lc_rs",
 ]
-brotli = [
-    "dep:brotli",
-    "dep:brotli-decompressor",
-    "std",
-]
 default = [
-    "aws_lc_rs",
     "logging",
-    "std",
+    "ring",
     "tls12",
 ]
-fips = [
-    "aws_lc_rs",
-    "aws-lc-rs?/fips",
-]
 logging = ["log"]
-read_buf = [
-    "rustversion",
-    "std",
-]
+read_buf = ["rustversion"]
 ring = [
     "dep:ring",
     "webpki/ring",
 ]
-std = [
-    "webpki/std",
-    "pki-types/std",
-    "once_cell/std",
-]
 tls12 = []
-zlib = ["dep:zlib-rs"]
-
-[target."cfg(not(target_env = \"msvc\"))".dev-dependencies.tikv-jemallocator]
-version = "0.6"

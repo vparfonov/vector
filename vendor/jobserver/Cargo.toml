@@ -10,19 +10,18 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
-rust-version = "1.63"
+edition = "2018"
 name = "jobserver"
-version = "0.1.32"
+version = "0.1.27"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
 description = """
-An implementation of the GNU Make jobserver for Rust.
+An implementation of the GNU make jobserver for Rust
 """
-homepage = "https://github.com/rust-lang/jobserver-rs"
+homepage = "https://github.com/alexcrichton/jobserver-rs"
 documentation = "https://docs.rs/jobserver"
 readme = "README.md"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/rust-lang/jobserver-rs"
+license = "MIT/Apache-2.0"
+repository = "https://github.com/alexcrichton/jobserver-rs"
 
 [[test]]
 name = "client"
@@ -47,12 +46,20 @@ harness = false
 name = "helper"
 path = "tests/helper.rs"
 
+[dev-dependencies.futures]
+version = "0.1"
+
+[dev-dependencies.num_cpus]
+version = "1.0"
+
 [dev-dependencies.tempfile]
-version = "3.10.1"
+version = "3"
+
+[dev-dependencies.tokio-core]
+version = "0.1"
+
+[dev-dependencies.tokio-process]
+version = "0.2"
 
 [target."cfg(unix)".dependencies.libc]
-version = "0.2.87"
-
-[target."cfg(unix)".dev-dependencies.nix]
-version = "0.28.0"
-features = ["fs"]
+version = "0.2.50"

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Clone)]
-pub(crate) enum JsonValue {
+pub enum JsonValue {
     Null,
     Boolean(bool),
     Str(String),

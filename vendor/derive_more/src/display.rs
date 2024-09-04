@@ -1,12 +1,10 @@
 use std::{fmt::Display, str::FromStr as _};
 
-use crate::syn_compat::{AttributeExt as _, NestedMeta, ParsedMeta};
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::{quote, quote_spanned};
 use syn::{
     parse::Parser as _, punctuated::Punctuated, spanned::Spanned as _, Error, Result,
 };
-use syn::{Expr, ExprLit};
 
 use crate::utils;
 use utils::{HashMap, HashSet};
@@ -222,11 +220,11 @@ impl<'a, 'b> State<'a, 'b> {
         &self,
         attrs: &[syn::Attribute],
         meta_key: &str,
-    ) -> Result<Option<ParsedMeta>> {
+    ) -> Result<Option<syn::Meta>> {
         let mut metas = Vec::new();
         for meta in attrs.iter().filter_map(|attr| attr.parse_meta().ok()) {
             let meta_list = match &meta {
-                ParsedMeta::List(meta) => meta,
+                syn::Meta::List(meta) => meta,
                 _ => continue,
             };
 
@@ -234,8 +232,9 @@ impl<'a, 'b> State<'a, 'b> {
                 continue;
             }
 
+            use syn::{Meta, NestedMeta};
             let meta_nv = match meta_list.nested.first() {
-                Some(NestedMeta::Meta(ParsedMeta::NameValue(meta_nv))) => meta_nv,
+                Some(NestedMeta::Meta(Meta::NameValue(meta_nv))) => meta_nv,
                 _ => {
                     // If the given attribute is not MetaNameValue, it most likely implies that the
                     // user is writing an incorrect format. For example:
@@ -338,24 +337,20 @@ impl<'a, 'b> State<'a, 'b> {
     }
     fn parse_meta_fmt(
         &self,
-        meta: &ParsedMeta,
+        meta: &syn::Meta,
         outer_enum: bool,
     ) -> Result<(TokenStream, bool)> {
         let list = match meta {
-            ParsedMeta::List(list) => list,
+            syn::Meta::List(list) => list,
             _ => {
                 return Err(Error::new(meta.span(), self.get_proper_fmt_syntax()));
             }
         };
 
         match &list.nested[0] {
-            NestedMeta::Meta(ParsedMeta::NameValue(syn::MetaNameValue {
+            syn::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
                 path,
-                value:
-                    Expr::Lit(ExprLit {
-                        lit: syn::Lit::Str(fmt),
-                        ..
-                    }),
+                lit: syn::Lit::Str(fmt),
                 ..
             })) => match path {
                 op if op.segments.first().expect("path shouldn't be empty").ident
@@ -371,14 +366,10 @@ impl<'a, 'b> State<'a, 'b> {
                         }
                         // TODO: Check for a single `Display` group?
                         let fmt_string = match &list.nested[0] {
-                            NestedMeta::Meta(ParsedMeta::NameValue(
+                            syn::NestedMeta::Meta(syn::Meta::NameValue(
                                 syn::MetaNameValue {
                                     path,
-                                    value:
-                                        Expr::Lit(ExprLit {
-                                            lit: syn::Lit::Str(s),
-                                            ..
-                                        }),
+                                    lit: syn::Lit::Str(s),
                                     ..
                                 },
                             )) if path
@@ -412,8 +403,8 @@ impl<'a, 'b> State<'a, 'b> {
                         .skip(1) // skip fmt = "..."
                         .try_fold(TokenStream::new(), |args, arg| {
                             let arg = match arg {
-                                NestedMeta::Lit(syn::Lit::Str(s)) => s,
-                                NestedMeta::Meta(ParsedMeta::Path(i)) => {
+                                syn::NestedMeta::Lit(syn::Lit::Str(s)) => s,
+                                syn::NestedMeta::Meta(syn::Meta::Path(i)) => {
                                     return Ok(quote_spanned!(list.span()=> #args #i,));
                                 }
                                 _ => {
@@ -595,7 +586,7 @@ impl<'a, 'b> State<'a, 'b> {
         let span = meta.span();
 
         let meta = match meta {
-            ParsedMeta::List(meta) => meta.nested,
+            syn::Meta::List(meta) => meta.nested,
             _ => return Err(Error::new(span, self.get_proper_bound_syntax())),
         };
 
@@ -604,15 +595,12 @@ impl<'a, 'b> State<'a, 'b> {
         }
 
         let meta = match &meta[0] {
-            NestedMeta::Meta(ParsedMeta::NameValue(meta)) => meta,
+            syn::NestedMeta::Meta(syn::Meta::NameValue(meta)) => meta,
             _ => return Err(Error::new(span, self.get_proper_bound_syntax())),
         };
 
-        let extra_bounds = match &meta.value {
-            Expr::Lit(ExprLit {
-                lit: syn::Lit::Str(extra_bounds),
-                ..
-            }) => extra_bounds,
+        let extra_bounds = match &meta.lit {
+            syn::Lit::Str(extra_bounds) => extra_bounds,
             _ => return Err(Error::new(span, self.get_proper_bound_syntax())),
         };
 
@@ -627,7 +615,7 @@ impl<'a, 'b> State<'a, 'b> {
     fn get_used_type_params_bounds(
         &self,
         fields: &syn::Fields,
-        meta: &ParsedMeta,
+        meta: &syn::Meta,
     ) -> HashMap<syn::Type, HashSet<syn::TraitBound>> {
         if self.type_params.is_empty() {
             return HashMap::default();
@@ -657,7 +645,7 @@ impl<'a, 'b> State<'a, 'b> {
         }
 
         let list = match meta {
-            ParsedMeta::List(list) => list,
+            syn::Meta::List(list) => list,
             // This one has been checked already in get_meta_fmt() method.
             _ => unreachable!(),
         };
@@ -667,10 +655,10 @@ impl<'a, 'b> State<'a, 'b> {
             .skip(1) // skip fmt = "..."
             .enumerate()
             .filter_map(|(i, arg)| match arg {
-                NestedMeta::Lit(syn::Lit::Str(ref s)) => {
+                syn::NestedMeta::Lit(syn::Lit::Str(ref s)) => {
                     syn::parse_str(&s.value()).ok().map(|id| (i, id))
                 }
-                NestedMeta::Meta(ParsedMeta::Path(ref id)) => Some((i, id.clone())),
+                syn::NestedMeta::Meta(syn::Meta::Path(ref id)) => Some((i, id.clone())),
                 // This one has been checked already in get_meta_fmt() method.
                 _ => unreachable!(),
             })
@@ -679,13 +667,9 @@ impl<'a, 'b> State<'a, 'b> {
             return HashMap::default();
         }
         let fmt_string = match &list.nested[0] {
-            NestedMeta::Meta(ParsedMeta::NameValue(syn::MetaNameValue {
+            syn::NestedMeta::Meta(syn::Meta::NameValue(syn::MetaNameValue {
                 path,
-                value:
-                    Expr::Lit(ExprLit {
-                        lit: syn::Lit::Str(s),
-                        ..
-                    }),
+                lit: syn::Lit::Str(s),
                 ..
             })) if path
                 .segments
@@ -707,7 +691,7 @@ impl<'a, 'b> State<'a, 'b> {
                     if fields_type_params.contains_key(arg) {
                         bounds
                             .entry(fields_type_params[arg].clone())
-                            .or_default()
+                            .or_insert_with(HashSet::default)
                             .insert(trait_name_to_trait_bound(pl.trait_name));
                     }
                 }

@@ -3,7 +3,7 @@ pub use crate::operation::put_bucket_accelerate_configuration::_put_bucket_accel
 
 pub use crate::operation::put_bucket_accelerate_configuration::_put_bucket_accelerate_configuration_input::PutBucketAccelerateConfigurationInputBuilder;
 
-impl crate::operation::put_bucket_accelerate_configuration::builders::PutBucketAccelerateConfigurationInputBuilder {
+impl PutBucketAccelerateConfigurationInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -26,24 +26,20 @@ impl crate::operation::put_bucket_accelerate_configuration::builders::PutBucketA
 /// <p>This operation is not supported by directory buckets.</p>
 /// </note>
 /// <p>Sets the accelerate configuration of an existing bucket. Amazon S3 Transfer Acceleration is a bucket-level feature that enables you to perform faster data transfers to Amazon S3.</p>
-/// <p>To use this operation, you must have permission to perform the <code>s3:PutAccelerateConfiguration</code> action. The bucket owner has this permission by default. The bucket owner can grant this permission to others. For more information about permissions, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-actions.html#using-with-s3-actions-related-to-bucket-subresources">Permissions Related to Bucket Subresource Operations</a> and <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-access-control.html">Managing Access Permissions to Your Amazon S3 Resources</a>.</p>
-/// <p>The Transfer Acceleration state of a bucket can be set to one of the following two values:</p>
+/// <p> To use this operation, you must have permission to perform the <code>s3:PutAccelerateConfiguration</code> action. The bucket owner has this permission by default. The bucket owner can grant this permission to others. For more information about permissions, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/using-with-s3-actions.html#using-with-s3-actions-related-to-bucket-subresources">Permissions Related to Bucket Subresource Operations</a> and <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/s3-access-control.html">Managing Access Permissions to Your Amazon S3 Resources</a>.</p>
+/// <p> The Transfer Acceleration state of a bucket can be set to one of the following two values:</p>
 /// <ul>
-/// <li>
-/// <p>Enabled – Enables accelerated data transfers to the bucket.</p></li>
-/// <li>
-/// <p>Suspended – Disables accelerated data transfers to the bucket.</p></li>
+/// <li> <p> Enabled – Enables accelerated data transfers to the bucket.</p> </li>
+/// <li> <p> Suspended – Disables accelerated data transfers to the bucket.</p> </li>
 /// </ul>
 /// <p>The <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAccelerateConfiguration.html">GetBucketAccelerateConfiguration</a> action returns the transfer acceleration state of a bucket.</p>
 /// <p>After setting the Transfer Acceleration state of a bucket to Enabled, it might take up to thirty minutes before the data transfer rates to the bucket increase.</p>
-/// <p>The name of the bucket used for Transfer Acceleration must be DNS-compliant and must not contain periods (".").</p>
-/// <p>For more information about transfer acceleration, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/dev/transfer-acceleration.html">Transfer Acceleration</a>.</p>
+/// <p> The name of the bucket used for Transfer Acceleration must be DNS-compliant and must not contain periods (".").</p>
+/// <p> For more information about transfer acceleration, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/dev/transfer-acceleration.html">Transfer Acceleration</a>.</p>
 /// <p>The following operations are related to <code>PutBucketAccelerateConfiguration</code>:</p>
 /// <ul>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAccelerateConfiguration.html">GetBucketAccelerateConfiguration</a></p></li>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateBucket.html">CreateBucket</a></p></li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketAccelerateConfiguration.html">GetBucketAccelerateConfiguration</a> </p> </li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_CreateBucket.html">CreateBucket</a> </p> </li>
 /// </ul>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
 pub struct PutBucketAccelerateConfigurationFluentBuilder {
@@ -70,7 +66,7 @@ impl
     }
 }
 impl PutBucketAccelerateConfigurationFluentBuilder {
-    /// Creates a new `PutBucketAccelerateConfigurationFluentBuilder`.
+    /// Creates a new `PutBucketAccelerateConfiguration`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -121,12 +117,12 @@ impl PutBucketAccelerateConfigurationFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }

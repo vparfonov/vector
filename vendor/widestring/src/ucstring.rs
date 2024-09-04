@@ -3,7 +3,6 @@
 //! This module contains wide C strings and related types.
 
 use crate::{error::ContainsNul, U16CStr, U16Str, U16String, U32CStr, U32Str, U32String};
-#[allow(unused_imports)]
 use alloc::{
     borrow::{Cow, ToOwned},
     boxed::Box,
@@ -11,8 +10,7 @@ use alloc::{
 };
 use core::{
     borrow::{Borrow, BorrowMut},
-    cmp,
-    mem::{self, ManuallyDrop},
+    cmp, mem,
     ops::{Deref, DerefMut, Index},
     ptr,
     slice::{self, SliceIndex},
@@ -378,10 +376,9 @@ macro_rules! ucstring_common_impl {
 
             /// Bypass "move out of struct which implements [`Drop`] trait" restriction.
             fn into_inner(self) -> Box<[$uchar]> {
-                let v = ManuallyDrop::new(self);
-                unsafe {
-                    ptr::read(&v.inner)
-                }
+                let result = unsafe { ptr::read(&self.inner) };
+                mem::forget(self);
+                result
             }
         }
 
@@ -1382,7 +1379,7 @@ impl U32CString {
         Self::from_chars_unchecked(v)
     }
 
-    /// Constructs a [`U32CString`] copy from a [`str`], encoding it as UTF-32, truncating at the
+    /// Constructs a [`U16CString`] copy from a [`str`], encoding it as UTF-32, truncating at the
     /// first nul terminator.
     ///
     /// This makes a string copy of the [`str`]. Since [`str`] will always be valid UTF-8, the
@@ -1539,7 +1536,7 @@ impl U32CString {
     ///
     /// This function will return an error if the data contains a nul value anywhere except the
     /// last character.
-    /// The returned error will contain a [`Vec<u32>`] as well as the position of the nul value.
+    /// The returned error will contain a [`Vec<u16>`] as well as the position of the nul value.
     ///
     /// # Examples
     ///

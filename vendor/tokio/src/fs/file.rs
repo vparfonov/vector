@@ -14,7 +14,8 @@ use std::io::{self, Seek, SeekFrom};
 use std::path::Path;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::task::{ready, Context, Poll};
+use std::task::Context;
+use std::task::Poll;
 
 #[cfg(test)]
 use super::mocks::JoinHandle;

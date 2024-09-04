@@ -18,8 +18,8 @@ impl CreateSmsSandboxPhoneNumberOutput {
 }
 
 /// A builder for [`CreateSmsSandboxPhoneNumberOutput`](crate::operation::create_sms_sandbox_phone_number::CreateSmsSandboxPhoneNumberOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct CreateSmsSandboxPhoneNumberOutputBuilder {
     _request_id: Option<String>,
 }

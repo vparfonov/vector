@@ -147,7 +147,17 @@ impl<T> DebugInfo<T> {
     ///
     /// This is useful when `R` implements `Reader` but `T` does not.
     ///
-    /// Used by `DwarfSections::borrow`.
+    /// ## Example Usage
+    ///
+    /// ```rust,no_run
+    /// # let load_section = || unimplemented!();
+    /// // Read the DWARF section into a `Vec` with whatever object loader you're using.
+    /// let owned_section: gimli::DebugInfo<Vec<u8>> = load_section();
+    /// // Create a reference to the DWARF section.
+    /// let section = owned_section.borrow(|section| {
+    ///     gimli::EndianSlice::new(&section, gimli::LittleEndian)
+    /// });
+    /// ```
     pub fn borrow<'a, F, R>(&'a self, mut borrow: F) -> DebugInfo<R>
     where
         F: FnMut(&'a T) -> R,
@@ -3089,7 +3099,17 @@ impl<T> DebugTypes<T> {
     ///
     /// This is useful when `R` implements `Reader` but `T` does not.
     ///
-    /// Used by `DwarfSections::borrow`.
+    /// ## Example Usage
+    ///
+    /// ```rust,no_run
+    /// # let load_section = || unimplemented!();
+    /// // Read the DWARF section into a `Vec` with whatever object loader you're using.
+    /// let owned_section: gimli::DebugTypes<Vec<u8>> = load_section();
+    /// // Create a reference to the DWARF section.
+    /// let section = owned_section.borrow(|section| {
+    ///     gimli::EndianSlice::new(&section, gimli::LittleEndian)
+    /// });
+    /// ```
     pub fn borrow<'a, F, R>(&'a self, mut borrow: F) -> DebugTypes<R>
     where
         F: FnMut(&'a T) -> R,
@@ -3205,7 +3225,7 @@ mod tests {
     // Mixin methods for `Section` to help define binary test data.
 
     trait UnitSectionMethods {
-        fn unit<E>(self, unit: &mut UnitHeader<EndianSlice<'_, E>>) -> Self
+        fn unit<'input, E>(self, unit: &mut UnitHeader<EndianSlice<'input, E>>) -> Self
         where
             E: Endianity;
         fn die<F>(self, code: u64, attr: F) -> Self
@@ -3218,7 +3238,7 @@ mod tests {
     }
 
     impl UnitSectionMethods for Section {
-        fn unit<E>(self, unit: &mut UnitHeader<EndianSlice<'_, E>>) -> Self
+        fn unit<'input, E>(self, unit: &mut UnitHeader<EndianSlice<'input, E>>) -> Self
         where
             E: Endianity,
         {
@@ -3233,7 +3253,7 @@ mod tests {
             };
 
             let section = match unit.version() {
-                2..=4 => section
+                2 | 3 | 4 => section
                     .mark(&start)
                     .L16(unit.version())
                     .offset(unit.debug_abbrev_offset.0, unit.format())
@@ -3340,7 +3360,7 @@ mod tests {
         let buf = &mut EndianSlice::new(&buf, LittleEndian);
 
         match parse_debug_abbrev_offset(buf, Format::Dwarf32) {
-            Err(Error::UnexpectedEof(_)) => {}
+            Err(Error::UnexpectedEof(_)) => assert!(true),
             otherwise => panic!("Unexpected result: {:?}", otherwise),
         };
     }
@@ -3364,7 +3384,7 @@ mod tests {
         let buf = &mut EndianSlice::new(&buf, LittleEndian);
 
         match parse_debug_abbrev_offset(buf, Format::Dwarf64) {
-            Err(Error::UnexpectedEof(_)) => {}
+            Err(Error::UnexpectedEof(_)) => assert!(true),
             otherwise => panic!("Unexpected result: {:?}", otherwise),
         };
     }
@@ -3387,7 +3407,7 @@ mod tests {
         let buf = &mut EndianSlice::new(&buf, LittleEndian);
 
         match parse_debug_info_offset(buf, Format::Dwarf32) {
-            Err(Error::UnexpectedEof(_)) => {}
+            Err(Error::UnexpectedEof(_)) => assert!(true),
             otherwise => panic!("Unexpected result: {:?}", otherwise),
         };
     }
@@ -3411,7 +3431,7 @@ mod tests {
         let buf = &mut EndianSlice::new(&buf, LittleEndian);
 
         match parse_debug_info_offset(buf, Format::Dwarf64) {
-            Err(Error::UnexpectedEof(_)) => {}
+            Err(Error::UnexpectedEof(_)) => assert!(true),
             otherwise => panic!("Unexpected result: {:?}", otherwise),
         };
     }
@@ -3463,7 +3483,7 @@ mod tests {
         let rest = &mut EndianSlice::new(&buf, LittleEndian);
 
         match parse_unit_header(rest, DebugInfoOffset(0).into()) {
-            Err(Error::UnknownVersion(0xcdab)) => {}
+            Err(Error::UnknownVersion(0xcdab)) => assert!(true),
             otherwise => panic!("Unexpected result: {:?}", otherwise),
         };
 
@@ -3471,7 +3491,7 @@ mod tests {
         let rest = &mut EndianSlice::new(&buf, LittleEndian);
 
         match parse_unit_header(rest, DebugInfoOffset(0).into()) {
-            Err(Error::UnknownVersion(1)) => {}
+            Err(Error::UnknownVersion(1)) => assert!(true),
             otherwise => panic!("Unexpected result: {:?}", otherwise),
         };
     }
@@ -3482,7 +3502,7 @@ mod tests {
         let rest = &mut EndianSlice::new(&buf, LittleEndian);
 
         match parse_unit_header(rest, DebugInfoOffset(0).into()) {
-            Err(Error::UnexpectedEof(_)) => {}
+            Err(Error::UnexpectedEof(_)) => assert!(true),
             otherwise => panic!("Unexpected result: {:?}", otherwise),
         };
     }
@@ -3818,7 +3838,7 @@ mod tests {
         let rest = &mut EndianSlice::new(&buf, LittleEndian);
 
         match parse_type_offset(rest, Format::Dwarf32) {
-            Err(Error::UnexpectedEof(_)) => {}
+            Err(Error::UnexpectedEof(_)) => assert!(true),
             otherwise => panic!("Unexpected result: {:?}", otherwise),
         };
     }
@@ -4187,7 +4207,6 @@ mod tests {
 
     #[test]
     fn test_attribute_udata_sdata_value() {
-        #[allow(clippy::type_complexity)]
         let tests: &[(
             AttributeValue<EndianSlice<LittleEndian>>,
             Option<u64>,
@@ -4286,7 +4305,7 @@ mod tests {
                 }
             }
             otherwise => {
-                panic!("Unexpected parse result = {:#?}", otherwise);
+                assert!(false, "Unexpected parse result = {:#?}", otherwise);
             }
         };
     }
@@ -4910,7 +4929,7 @@ mod tests {
                 );
             }
             otherwise => {
-                panic!("Unexpected parse result = {:#?}", otherwise);
+                assert!(false, "Unexpected parse result = {:#?}", otherwise);
             }
         }
 
@@ -4927,7 +4946,7 @@ mod tests {
                 );
             }
             otherwise => {
-                panic!("Unexpected parse result = {:#?}", otherwise);
+                assert!(false, "Unexpected parse result = {:#?}", otherwise);
             }
         }
 
@@ -4944,7 +4963,7 @@ mod tests {
                 );
             }
             otherwise => {
-                panic!("Unexpected parse result = {:#?}", otherwise);
+                assert!(false, "Unexpected parse result = {:#?}", otherwise);
             }
         }
 
@@ -5018,7 +5037,7 @@ mod tests {
                 );
             }
             otherwise => {
-                panic!("Unexpected parse result = {:#?}", otherwise);
+                assert!(false, "Unexpected parse result = {:#?}", otherwise);
             }
         }
 
@@ -5502,7 +5521,7 @@ mod tests {
 
         // Now iterate all children of the root via `next_sibling`.
 
-        assert_valid_sibling_ptr(cursor);
+        assert_valid_sibling_ptr(&cursor);
         assert_next_sibling(cursor, "004");
         assert_next_sibling(cursor, "006");
         assert_next_sibling(cursor, "010");
@@ -5625,7 +5644,7 @@ mod tests {
         match cursor {
             Err(Error::OffsetOutOfBounds) => {}
             otherwise => {
-                panic!("Unexpected parse result = {:#?}", otherwise);
+                assert!(false, "Unexpected parse result = {:#?}", otherwise);
             }
         }
     }
@@ -5704,7 +5723,7 @@ mod tests {
             match node {
                 Ok(None) => {}
                 otherwise => {
-                    panic!("Unexpected parse result = {:#?}", otherwise);
+                    assert!(false, "Unexpected parse result = {:#?}", otherwise);
                 }
             }
         }
@@ -5808,8 +5827,8 @@ mod tests {
 
     #[test]
     fn test_entries_raw() {
-        fn assert_abbrev<'abbrev, Endian>(
-            entries: &mut EntriesRaw<'abbrev, '_, EndianSlice<'_, Endian>>,
+        fn assert_abbrev<'input, 'abbrev, 'unit, Endian>(
+            entries: &mut EntriesRaw<'abbrev, 'unit, EndianSlice<'input, Endian>>,
             tag: DwTag,
         ) -> &'abbrev Abbreviation
         where
@@ -5823,20 +5842,21 @@ mod tests {
             abbrev
         }
 
-        fn assert_null<Endian>(entries: &mut EntriesRaw<'_, '_, EndianSlice<'_, Endian>>)
-        where
+        fn assert_null<'input, 'abbrev, 'unit, Endian>(
+            entries: &mut EntriesRaw<'abbrev, 'unit, EndianSlice<'input, Endian>>,
+        ) where
             Endian: Endianity,
         {
             match entries.read_abbreviation() {
                 Ok(None) => {}
                 otherwise => {
-                    panic!("Unexpected parse result = {:#?}", otherwise);
+                    assert!(false, "Unexpected parse result = {:#?}", otherwise);
                 }
             }
         }
 
-        fn assert_attr<Endian>(
-            entries: &mut EntriesRaw<'_, '_, EndianSlice<'_, Endian>>,
+        fn assert_attr<'input, 'abbrev, 'unit, Endian>(
+            entries: &mut EntriesRaw<'abbrev, 'unit, EndianSlice<'input, Endian>>,
             spec: Option<AttributeSpecification>,
             name: DwAt,
             value: &str,

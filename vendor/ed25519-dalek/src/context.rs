@@ -80,8 +80,6 @@ impl<'k, 'v, K> Context<'k, 'v, K> {
 
 #[cfg(all(test, feature = "digest"))]
 mod test {
-    #![allow(clippy::unwrap_used)]
-
     use crate::{Signature, SigningKey, VerifyingKey};
     use curve25519_dalek::digest::Digest;
     use ed25519::signature::{DigestSigner, DigestVerifier};

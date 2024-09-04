@@ -101,13 +101,3 @@ impl DeliveryStreamType {
         }
     }
 }
-impl ::std::fmt::Display for DeliveryStreamType {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            DeliveryStreamType::DirectPut => write!(f, "DirectPut"),
-            DeliveryStreamType::KinesisStreamAsSource => write!(f, "KinesisStreamAsSource"),
-            DeliveryStreamType::MskAsSource => write!(f, "MSKAsSource"),
-            DeliveryStreamType::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

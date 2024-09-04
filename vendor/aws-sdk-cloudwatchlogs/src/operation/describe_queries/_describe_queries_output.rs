@@ -34,8 +34,8 @@ impl DescribeQueriesOutput {
 }
 
 /// A builder for [`DescribeQueriesOutput`](crate::operation::describe_queries::DescribeQueriesOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DescribeQueriesOutputBuilder {
     pub(crate) queries: ::std::option::Option<::std::vec::Vec<crate::types::QueryInfo>>,
     pub(crate) next_token: ::std::option::Option<::std::string::String>,

@@ -1,5 +1,5 @@
 use crate::{Category, MessageBuf, ErrorCode};
-use crate::utils::write_fallback_code;
+use crate::utils::write_message_buf;
 use crate::types::c_int;
 
 use core::{ptr, str};
@@ -18,86 +18,82 @@ fn equivalent(code: c_int, other: &ErrorCode) -> bool {
     ptr::eq(&POSIX_CATEGORY, other.category()) && code == other.raw_code()
 }
 
-#[cfg(not(any(target_os = "cloudabi", target_os = "unknown")))]
 pub(crate) fn get_last_error() -> c_int {
-    //Reference:
-    //https://github.com/rust-lang/rust/blob/2ae1bb671183a072b54ed8ed39abfcd72990a3e7/library/std/src/sys/pal/unix/os.rs#L42
-    extern {
-        #[cfg(not(any(target_os = "dragonfly", target_os = "vxworks")))]
-        #[cfg_attr(
-            any(
-                target_os = "linux",
-                target_os = "emscripten",
-                target_os = "fuchsia",
-                target_os = "l4re",
-                target_os = "hurd",
-                target_os = "teeos",
-                target_os = "wasi"
-            ),
-            link_name = "__errno_location"
-        )]
-        #[cfg_attr(
-            any(
-                target_os = "netbsd",
-                target_os = "openbsd",
-                target_os = "android",
-                target_os = "redox",
-                target_env = "newlib"
-            ),
-            link_name = "__errno"
-        )]
-        #[cfg_attr(any(target_os = "solaris", target_os = "illumos"), link_name = "___errno")]
-        #[cfg_attr(target_os = "nto", link_name = "__get_errno_ptr")]
-        #[cfg_attr(
-            any(
-                target_os = "macos",
-                target_os = "ios",
-                target_os = "tvos",
-                target_os = "freebsd",
-                target_os = "watchos"
-            ),
-            link_name = "__error"
-        )]
-        #[cfg_attr(target_os = "haiku", link_name = "_errnop")]
-        #[cfg_attr(target_os = "aix", link_name = "_Errno")]
-        #[cfg_attr(target_os = "windows", link_name = "_errno")]
-        fn errno_location() -> *mut c_int;
+    #[cfg(not(any(target_os = "wasi", target_os = "cloudabi", target_os = "unknown")))]
+    {
+        extern {
+            #[cfg(not(target_os = "dragonfly"))]
+            #[cfg_attr(any(target_os = "macos", target_os = "ios", target_os = "freebsd"), link_name = "__error")]
+            #[cfg_attr(
+                any(
+                    target_os = "openbsd",
+                    target_os = "netbsd",
+                    target_os = "bitrig",
+                    target_os = "android",
+                    target_os = "espidf"
+                ),
+                link_name = "__errno"
+            )]
+            #[cfg_attr(
+                any(target_os = "solaris", target_os = "illumos"),
+                link_name = "___errno"
+            )]
+            #[cfg_attr(target_os = "haiku", link_name = "_errnop")]
+            #[cfg_attr(
+                any(target_os = "linux", target_os = "hurd", target_os = "redox"),
+                link_name = "__errno_location"
+            )]
+            #[cfg_attr(target_os = "aix", link_name = "_Errno")]
+            #[cfg_attr(target_os = "nto", link_name = "__get_errno_ptr")]
+            #[cfg_attr(target_os = "windows", link_name = "_errno")]
+            fn errno_location() -> *mut c_int;
+        }
+
+        return unsafe {
+            *(errno_location())
+        }
     }
 
-    unsafe {
-        *(errno_location())
-    }
-}
+    #[cfg(any(target_os = "cloudabi", target_os = "wasi"))]
+    {
+        extern {
+            #[thread_local]
+            static errno: c_int;
+        }
 
-#[cfg(any(target_os = "cloudabi", target_os = "dragonfly"))]
-pub(crate) fn get_last_error() -> c_int {
-    //WASI implements it as thread local, but thread local are not stable :(
-    extern {
-        #[thread_local]
-        static errno: c_int;
+        return errno;
     }
 
-    errno
-}
+    #[cfg(target_os = "vxworks")]
+    {
+        extern "C" {
+            pub fn errnoGet() -> c_int;
+        }
 
-#[cfg(target_os = "vxworks")]
-pub(crate) fn get_last_error() -> c_int {
-    extern "C" {
-        pub fn errnoGet() -> c_int;
+        return unsafe {
+            errnoGet();
+        }
     }
 
-    unsafe {
-        errnoGet()
-    }
-}
+    #[cfg(target_env = "newlib")]
+    {
+        extern "C" {
+            fn __errno() -> *mut c_int;
+        }
 
-#[cfg(all(target_os = "unknown", not(target_env = "newlib")))]
-pub(crate) fn get_last_error() -> c_int {
-    0
+        return unsafe {
+            *(__errno())
+        }
+    }
+
+    #[cfg(all(target_os = "unknown", not(target_env = "newlib")))]
+    {
+        return 0;
+    }
 }
 
 pub(crate) fn message(_code: c_int, out: &mut MessageBuf) -> &str {
-    #[cfg(any(windows, target_os = "wasi", all(unix, not(target_env = "gnu"))))]
+    #[cfg(any(windows, all(unix, not(target_env = "gnu"))))]
     extern "C" {
         ///Only GNU impl is thread unsafe
         fn strerror(code: c_int) -> *const i8;
@@ -116,7 +112,7 @@ pub(crate) fn message(_code: c_int, out: &mut MessageBuf) -> &str {
         strerror_l(code, ptr::null_mut())
     }
 
-    #[cfg(any(windows, unix, target_os = "wasi"))]
+    #[cfg(any(windows, unix))]
     {
         let err = unsafe {
             strerror(_code)
@@ -132,21 +128,22 @@ pub(crate) fn message(_code: c_int, out: &mut MessageBuf) -> &str {
                 core::slice::from_raw_parts(out.as_ptr() as *const u8, err_len)
             };
 
-            if let Ok(msg) = str::from_utf8(err_slice) {
-                return msg
-            }
+            match str::from_utf8(err_slice) {
+                Ok(msg) => return msg,
+                Err(_) => return write_message_buf(out, crate::FAIL_ERROR_FORMAT),
+            };
         }
     }
 
-    write_fallback_code(out, _code)
+    write_message_buf(out, crate::UNKNOWN_ERROR)
 }
 
-#[cfg(not(any(windows, unix, target_os = "wasi")))]
+#[cfg(not(any(windows, unix)))]
 pub(crate) fn is_would_block(_: c_int) -> bool {
     false
 }
 
-#[cfg(any(windows, unix, target_os = "wasi"))]
+#[cfg(any(windows, unix))]
 pub(crate) fn is_would_block(code: c_int) -> bool {
     code == crate::defs::EWOULDBLOCK || code == crate::defs::EAGAIN
 }

@@ -91,11 +91,3 @@ impl DataRedundancy {
         }
     }
 }
-impl ::std::fmt::Display for DataRedundancy {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            DataRedundancy::SingleAvailabilityZone => write!(f, "SingleAvailabilityZone"),
-            DataRedundancy::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

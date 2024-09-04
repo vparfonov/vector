@@ -27,8 +27,8 @@ impl AuthorizedPrincipal {
 }
 
 /// A builder for [`AuthorizedPrincipal`](crate::types::AuthorizedPrincipal).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct AuthorizedPrincipalBuilder {
     pub(crate) principal_type: ::std::option::Option<crate::types::PrincipalType>,
     pub(crate) principal: ::std::option::Option<::std::string::String>,

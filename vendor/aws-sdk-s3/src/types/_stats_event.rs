@@ -21,8 +21,8 @@ impl StatsEvent {
 }
 
 /// A builder for [`StatsEvent`](crate::types::StatsEvent).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct StatsEventBuilder {
     pub(crate) details: ::std::option::Option<crate::types::Stats>,
 }

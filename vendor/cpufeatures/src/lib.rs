@@ -177,24 +177,19 @@ macro_rules! new {
                 }
             }
 
-            /// Get stored value and initialization token,
-            /// initializing underlying storage if needed.
+            /// Initialize underlying storage if needed and get
+            /// stored value and initialization token.
             #[inline]
             pub fn init_get() -> (InitToken, bool) {
                 let res = $crate::__unless_target_features! {
                     $($tf),+ => {
-                        #[cold]
-                        fn init_inner() -> bool {
-                            let res = $crate::__detect_target_features!($($tf),+);
-                            STORAGE.store(res as u8, Relaxed);
-                            res
-                        }
-
                         // Relaxed ordering is fine, as we only have a single atomic variable.
                         let val = STORAGE.load(Relaxed);
 
                         if val == UNINIT {
-                            init_inner()
+                            let res = $crate::__detect_target_features!($($tf),+);
+                            STORAGE.store(res as u8, Relaxed);
+                            res
                         } else {
                             val == 1
                         }
@@ -204,13 +199,15 @@ macro_rules! new {
                 (InitToken(()), res)
             }
 
-            /// Initialize underlying storage if needed and get initialization token.
+            /// Initialize underlying storage if needed and get
+            /// initialization token.
             #[inline]
             pub fn init() -> InitToken {
                 init_get().0
             }
 
-            /// Initialize underlying storage if needed and get stored value.
+            /// Initialize underlying storage if needed and get
+            /// stored value.
             #[inline]
             pub fn get() -> bool {
                 init_get().1

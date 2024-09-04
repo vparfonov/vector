@@ -27,8 +27,8 @@ impl ObjectLockRetention {
 }
 
 /// A builder for [`ObjectLockRetention`](crate::types::ObjectLockRetention).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct ObjectLockRetentionBuilder {
     pub(crate) mode: ::std::option::Option<crate::types::ObjectLockRetentionMode>,
     pub(crate) retain_until_date: ::std::option::Option<::aws_smithy_types::DateTime>,

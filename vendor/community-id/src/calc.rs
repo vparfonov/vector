@@ -2,7 +2,7 @@ use std::net::IpAddr;
 
 use anyhow::{anyhow, Result};
 
-use crate::{ipv4, ipv6, IPPROTO_SCTP, IPPROTO_TCP, IPPROTO_UDP};
+use crate::{ipv4, ipv6, IPPROTO_ICMP, IPPROTO_ICMPV6, IPPROTO_SCTP, IPPROTO_TCP, IPPROTO_UDP};
 
 /// Main function to calculate community id.
 ///
@@ -23,10 +23,10 @@ pub fn calculate_community_id(
     disable_base64: bool,
 ) -> Result<String> {
     match ip_proto {
-        IPPROTO_TCP | IPPROTO_UDP | IPPROTO_SCTP => {
+        IPPROTO_ICMP | IPPROTO_ICMPV6 | IPPROTO_TCP | IPPROTO_UDP | IPPROTO_SCTP => {
             if src_port.is_none() || dst_port.is_none() {
                 return Err(anyhow!(
-                    "src port and dst port should be set when protocol is tcp/udp/sctp"
+                    "src port and dst port should be set when protocol is icmp/icmp6/tcp/udp/sctp"
                 ));
             }
         }
@@ -89,7 +89,7 @@ mod tests {
         );
         assert!(id.is_err());
         assert_eq!(
-            "src port and dst port should be set when protocol is tcp/udp/sctp",
+            "src port and dst port should be set when protocol is icmp/icmp6/tcp/udp/sctp",
             id.err().unwrap().to_string()
         );
     }

@@ -10,30 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `CryptoKeyPair`*"]
     pub type CryptoKeyPair;
-    #[cfg(feature = "CryptoKey")]
-    #[doc = "Get the `privateKey` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CryptoKey`, `CryptoKeyPair`*"]
-    #[wasm_bindgen(method, getter = "privateKey")]
-    pub fn get_private_key(this: &CryptoKeyPair) -> CryptoKey;
-    #[cfg(feature = "CryptoKey")]
-    #[doc = "Change the `privateKey` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CryptoKey`, `CryptoKeyPair`*"]
-    #[wasm_bindgen(method, setter = "privateKey")]
-    pub fn set_private_key(this: &CryptoKeyPair, val: &CryptoKey);
-    #[cfg(feature = "CryptoKey")]
-    #[doc = "Get the `publicKey` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CryptoKey`, `CryptoKeyPair`*"]
-    #[wasm_bindgen(method, getter = "publicKey")]
-    pub fn get_public_key(this: &CryptoKeyPair) -> CryptoKey;
-    #[cfg(feature = "CryptoKey")]
-    #[doc = "Change the `publicKey` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `CryptoKey`, `CryptoKeyPair`*"]
-    #[wasm_bindgen(method, setter = "publicKey")]
-    pub fn set_public_key(this: &CryptoKeyPair, val: &CryptoKey);
 }
 impl CryptoKeyPair {
     #[cfg(feature = "CryptoKey")]
@@ -48,15 +24,39 @@ impl CryptoKeyPair {
         ret
     }
     #[cfg(feature = "CryptoKey")]
-    #[deprecated = "Use `set_private_key()` instead."]
+    #[doc = "Change the `privateKey` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `CryptoKey`, `CryptoKeyPair`*"]
     pub fn private_key(&mut self, val: &CryptoKey) -> &mut Self {
-        self.set_private_key(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("privateKey"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "CryptoKey")]
-    #[deprecated = "Use `set_public_key()` instead."]
+    #[doc = "Change the `publicKey` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `CryptoKey`, `CryptoKeyPair`*"]
     pub fn public_key(&mut self, val: &CryptoKey) -> &mut Self {
-        self.set_public_key(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("publicKey"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

@@ -20,8 +20,8 @@ impl DeleteMetricStreamInput {
 }
 
 /// A builder for [`DeleteMetricStreamInput`](crate::operation::delete_metric_stream::DeleteMetricStreamInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DeleteMetricStreamInputBuilder {
     pub(crate) name: ::std::option::Option<::std::string::String>,
 }

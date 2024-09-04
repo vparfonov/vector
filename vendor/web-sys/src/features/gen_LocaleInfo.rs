@@ -10,26 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `LocaleInfo`*"]
     pub type LocaleInfo;
-    #[doc = "Get the `direction` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `LocaleInfo`*"]
-    #[wasm_bindgen(method, getter = "direction")]
-    pub fn get_direction(this: &LocaleInfo) -> Option<String>;
-    #[doc = "Change the `direction` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `LocaleInfo`*"]
-    #[wasm_bindgen(method, setter = "direction")]
-    pub fn set_direction(this: &LocaleInfo, val: &str);
-    #[doc = "Get the `locale` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `LocaleInfo`*"]
-    #[wasm_bindgen(method, getter = "locale")]
-    pub fn get_locale(this: &LocaleInfo) -> Option<String>;
-    #[doc = "Change the `locale` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `LocaleInfo`*"]
-    #[wasm_bindgen(method, setter = "locale")]
-    pub fn set_locale(this: &LocaleInfo, val: &str);
 }
 impl LocaleInfo {
     #[doc = "Construct a new `LocaleInfo`."]
@@ -40,14 +20,35 @@ impl LocaleInfo {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_direction()` instead."]
+    #[doc = "Change the `direction` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `LocaleInfo`*"]
     pub fn direction(&mut self, val: &str) -> &mut Self {
-        self.set_direction(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("direction"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_locale()` instead."]
+    #[doc = "Change the `locale` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `LocaleInfo`*"]
     pub fn locale(&mut self, val: &str) -> &mut Self {
-        self.set_locale(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("locale"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

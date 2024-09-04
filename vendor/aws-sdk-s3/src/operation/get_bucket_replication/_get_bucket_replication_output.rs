@@ -32,8 +32,8 @@ impl GetBucketReplicationOutput {
 }
 
 /// A builder for [`GetBucketReplicationOutput`](crate::operation::get_bucket_replication::GetBucketReplicationOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct GetBucketReplicationOutputBuilder {
     pub(crate) replication_configuration: ::std::option::Option<crate::types::ReplicationConfiguration>,
     _extended_request_id: Option<String>,

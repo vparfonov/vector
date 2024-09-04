@@ -96,12 +96,3 @@ impl OrderBy {
         }
     }
 }
-impl ::std::fmt::Display for OrderBy {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            OrderBy::LastEventTime => write!(f, "LastEventTime"),
-            OrderBy::LogStreamName => write!(f, "LogStreamName"),
-            OrderBy::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

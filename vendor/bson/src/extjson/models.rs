@@ -188,7 +188,7 @@ impl Binary {
 #[serde(deny_unknown_fields)]
 pub(crate) struct Uuid {
     #[serde(rename = "$uuid")]
-    pub(crate) value: String,
+    value: String,
 }
 
 impl Uuid {
@@ -225,7 +225,7 @@ pub(crate) struct Timestamp {
     body: TimestampBody,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct TimestampBody {
     #[serde(serialize_with = "crate::serde_helpers::serialize_u32_as_i64")]

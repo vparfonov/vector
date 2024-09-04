@@ -5,7 +5,7 @@ use std::future::Future;
 use std::marker::PhantomData;
 use std::panic::{RefUnwindSafe, UnwindSafe};
 use std::pin::Pin;
-use std::task::{ready, Context, Poll, Waker};
+use std::task::{Context, Poll, Waker};
 
 cfg_rt! {
     /// An owned permission to join on a task (await its termination).
@@ -296,7 +296,6 @@ impl<T> JoinHandle<T> {
     /// # }
     /// ```
     /// [cancelled]: method@super::error::JoinError::is_cancelled
-    #[must_use = "abort handles do nothing unless `.abort` is called"]
     pub fn abort_handle(&self) -> super::AbortHandle {
         self.raw.ref_inc();
         super::AbortHandle::new(self.raw)

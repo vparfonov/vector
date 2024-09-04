@@ -7,27 +7,27 @@ mod std {}
 mod snafu {}
 
 #[derive(Debug, Snafu)]
-enum _VariantNamedNone {
+enum VariantNamedNone {
     #[snafu(context(suffix(false)))]
     None,
 }
 
 #[derive(Debug, Snafu)]
-enum _VariantNamedSome<T> {
+enum VariantNamedSome<T> {
     Some { value: T },
 }
 
 #[derive(Debug, Snafu)]
-enum _VariantNamedOk<T> {
+enum VariantNamedOk<T> {
     Ok { value: T },
 }
 
 #[derive(Debug, Snafu)]
-enum _VariantNamedErr<T> {
+enum VariantNamedErr<T> {
     Err { value: T },
 }
 
-fn _using_ensure() -> Result<u8, _VariantNamedNone> {
+fn _using_ensure() -> Result<u8, VariantNamedNone> {
     ensure!(false, None);
     Ok(0)
 }

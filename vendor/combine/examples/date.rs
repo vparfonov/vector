@@ -9,6 +9,7 @@ use std::{
 
 use combine::{
     choice,
+    error::ParseError,
     many, optional,
     parser::char::{char, digit},
     stream::position,
@@ -62,6 +63,8 @@ pub struct DateTime {
 fn two_digits<Input>() -> impl Parser<Input, Output = i32>
 where
     Input: Stream<Token = char>,
+    // Necessary due to rust-lang/rust#24159
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     (digit(), digit()).map(|(x, y): (char, char)| {
         let x = x.to_digit(10).expect("digit");
@@ -78,6 +81,7 @@ where
 fn time_zone<Input>() -> impl Parser<Input, Output = i32>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     let utc = char('Z').map(|_| 0);
     let offset = (
@@ -102,6 +106,7 @@ where
 fn date<Input>() -> impl Parser<Input, Output = Date>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     (
         many::<String, _, _>(digit()),
@@ -125,6 +130,7 @@ where
 fn time<Input>() -> impl Parser<Input, Output = Time>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     (
         two_digits(),
@@ -150,6 +156,7 @@ where
 fn date_time<Input>() -> impl Parser<Input, Output = DateTime>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     (date(), char('T'), time()).map(|(date, _, time)| DateTime { date, time })
 }

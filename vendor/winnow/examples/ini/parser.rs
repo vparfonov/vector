@@ -10,11 +10,9 @@ use winnow::{
     token::take_while,
 };
 
-pub(crate) type Stream<'i> = &'i [u8];
+pub type Stream<'i> = &'i [u8];
 
-pub(crate) fn categories<'s>(
-    i: &mut Stream<'s>,
-) -> PResult<HashMap<&'s str, HashMap<&'s str, &'s str>>> {
+pub fn categories<'s>(i: &mut Stream<'s>) -> PResult<HashMap<&'s str, HashMap<&'s str, &'s str>>> {
     repeat(
         0..,
         separated_pair(
@@ -32,7 +30,7 @@ fn category<'s>(i: &mut Stream<'s>) -> PResult<&'s str> {
         .parse_next(i)
 }
 
-pub(crate) fn key_value<'s>(i: &mut Stream<'s>) -> PResult<(&'s str, &'s str)> {
+pub fn key_value<'s>(i: &mut Stream<'s>) -> PResult<(&'s str, &'s str)> {
     let key = alphanumeric.try_map(str::from_utf8).parse_next(i)?;
     let _ = (opt(space), '=', opt(space)).parse_next(i)?;
     let val = take_while(0.., |c| c != b'\n' && c != b';')
@@ -53,7 +51,7 @@ key = value2"[..];
 key = value2"[..];
 
     let res = category.parse_peek(ini_file);
-    println!("{res:?}");
+    println!("{:?}", res);
     match res {
         Ok((i, o)) => println!("i: {:?} | o: {:?}", str::from_utf8(i), o),
         _ => println!("error"),
@@ -70,7 +68,7 @@ key = value2"[..];
     let ini_without_key_value = &b"\nkey = value2"[..];
 
     let res = key_value.parse_peek(ini_file);
-    println!("{res:?}");
+    println!("{:?}", res);
     match res {
         Ok((i, (o1, o2))) => println!("i: {:?} | o: ({:?},{:?})", str::from_utf8(i), o1, o2),
         _ => println!("error"),
@@ -87,7 +85,7 @@ key = value2"[..];
     let ini_without_key_value = &b"\nkey = value2"[..];
 
     let res = key_value.parse_peek(ini_file);
-    println!("{res:?}");
+    println!("{:?}", res);
     match res {
         Ok((i, (o1, o2))) => println!("i: {:?} | o: ({:?},{:?})", str::from_utf8(i), o1, o2),
         _ => println!("error"),
@@ -104,7 +102,7 @@ key = value2"[..];
     let ini_without_key_value = &b"\nkey = value2"[..];
 
     let res = key_value.parse_peek(ini_file);
-    println!("{res:?}");
+    println!("{:?}", res);
     match res {
         Ok((i, (o1, o2))) => println!("i: {:?} | o: ({:?},{:?})", str::from_utf8(i), o1, o2),
         _ => println!("error"),

@@ -1,5 +1,4 @@
 use crate::{backend, io};
-use core::fmt;
 
 pub use crate::timespec::Timespec;
 
@@ -89,7 +88,7 @@ pub fn nanosleep(request: &Timespec) -> NanosleepRelativeResult {
 }
 
 /// A return type for `nanosleep` and `clock_nanosleep_relative`.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 #[must_use]
 pub enum NanosleepRelativeResult {
     /// The sleep completed normally.
@@ -98,18 +97,4 @@ pub enum NanosleepRelativeResult {
     Interrupted(Timespec),
     /// An invalid time value was provided.
     Err(io::Errno),
-}
-
-impl fmt::Debug for NanosleepRelativeResult {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Ok => f.write_str("Ok"),
-            Self::Interrupted(remaining) => write!(
-                f,
-                "Interrupted(Timespec {{ tv_sec: {:?}, tv_nsec: {:?} }})",
-                remaining.tv_sec, remaining.tv_nsec
-            ),
-            Self::Err(err) => write!(f, "Err({:?})", err),
-        }
-    }
 }

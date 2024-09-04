@@ -2,7 +2,7 @@
 
 [![Build Status](https://github.com/TedDriggs/darling/workflows/CI/badge.svg)](https://github.com/TedDriggs/darling/actions)
 [![Latest Version](https://img.shields.io/crates/v/darling.svg)](https://crates.io/crates/darling)
-![Rustc Version 1.56+](https://img.shields.io/badge/rustc-1.56+-lightgray.svg)
+[![Rustc Version 1.56+](https://img.shields.io/badge/rustc-1.56+-lightgray.svg)]
 
 `darling` is a crate for proc macro authors, which enables parsing attributes into structs. It is heavily inspired by `serde` both in its internals and in its API.
 
@@ -25,12 +25,14 @@
 
 -   `darling::ast` provides generic types for representing the AST.
 -   `darling::usage` provides traits and functions for determining where type parameters and lifetimes are used in a struct or enum.
--   `darling::util` provides helper types with special `FromMeta` implementations, such as `PathList`.
+-   `darling::util` provides helper types with special `FromMeta` implementations, such as `IdentList`.
 
 # Example
 
 ```rust,ignore
-use darling::{FromDeriveInput, FromMeta};
+#[macro_use]
+extern crate darling;
+extern crate syn;
 
 #[derive(Default, FromMeta)]
 #[darling(default)]
@@ -61,7 +63,7 @@ pub struct ConsumingType;
 # Attribute Macros
 
 Non-derive attribute macros are supported.
-To parse arguments for attribute macros, derive `FromMeta` on the argument receiver type, then use `darling::ast::NestedMeta::parse_meta_list` to convert the arguments `TokenStream` to a `Vec<NestedMeta>`, then pass that to the derived `from_list` method on your argument receiver type.
+To parse arguments for attribute macros, derive `FromMeta` on the argument receiver type, then pass `&syn::AttributeArgs` to the `from_list` method.
 This will produce a normal `darling::Result<T>` that can be used the same as a result from parsing a `DeriveInput`.
 
 ## Macro Code

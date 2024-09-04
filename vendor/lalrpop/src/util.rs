@@ -1,5 +1,6 @@
 use std::fmt::{Display, Error, Formatter};
 
+pub use std::collections::btree_map as map;
 pub struct Sep<S>(pub &'static str, pub S);
 
 impl<'a, S: Display> Display for Sep<&'a Vec<S>> {

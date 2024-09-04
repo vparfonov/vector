@@ -16,9 +16,8 @@ use pin_project_lite::pin_project;
 pub struct TokioExecutor {}
 
 pin_project! {
-    /// A wrapper that implements Tokio's IO traits for an inner type that
-    /// implements hyper's IO traits, or vice versa (implements hyper's IO
-    /// traits for a type that implements Tokio's IO traits).
+    /// A wrapping implementing hyper IO traits for a type that
+    /// implements Tokio's IO traits.
     #[derive(Debug)]
     pub struct TokioIo<T> {
         #[pin]
@@ -63,7 +62,7 @@ impl TokioExecutor {
 // ==== impl TokioIo =====
 
 impl<T> TokioIo<T> {
-    /// Wrap a type implementing Tokio's or hyper's IO traits.
+    /// Wrap a type implementing Tokio's IO traits.
     pub fn new(inner: T) -> Self {
         Self { inner }
     }

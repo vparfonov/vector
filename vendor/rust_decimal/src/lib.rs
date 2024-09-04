@@ -2,7 +2,6 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::print_stdout, clippy::print_stderr)]
 #![cfg_attr(not(feature = "std"), no_std)]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 extern crate alloc;
 
 mod constants;
@@ -18,12 +17,13 @@ mod arithmetic_impls;
 mod fuzz;
 #[cfg(feature = "maths")]
 mod maths;
-#[cfg(feature = "db-diesel-mysql")]
+#[cfg(any(feature = "db-diesel1-mysql", feature = "db-diesel2-mysql"))]
 mod mysql;
 #[cfg(any(
     feature = "db-tokio-postgres",
     feature = "db-postgres",
-    feature = "db-diesel-postgres",
+    feature = "db-diesel1-postgres",
+    feature = "db-diesel2-postgres",
 ))]
 mod postgres;
 #[cfg(feature = "proptest")]
@@ -57,9 +57,6 @@ pub use error::Error;
 #[cfg(feature = "maths")]
 pub use maths::MathematicalOps;
 
-// #[cfg(feature = "macros")]
-// pub use rust_decimal_macros::dec;
-
 /// A convenience module appropriate for glob imports (`use rust_decimal::prelude::*;`).
 pub mod prelude {
     #[cfg(feature = "maths")]
@@ -67,12 +64,14 @@ pub mod prelude {
     pub use crate::{Decimal, RoundingStrategy};
     pub use core::str::FromStr;
     pub use num_traits::{FromPrimitive, One, Signed, ToPrimitive, Zero};
-    // #[cfg(feature = "macros")]
-    // pub use rust_decimal_macros::dec;
 }
 
-#[cfg(feature = "diesel")]
-extern crate diesel;
+#[cfg(all(feature = "diesel1", not(feature = "diesel2")))]
+#[macro_use]
+extern crate diesel1 as diesel;
+
+#[cfg(feature = "diesel2")]
+extern crate diesel2 as diesel;
 
 /// Shortcut for `core::result::Result<T, rust_decimal::Error>`. Useful to distinguish
 /// between `rust_decimal` and `std` types.

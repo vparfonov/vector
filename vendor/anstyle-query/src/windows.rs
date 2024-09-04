@@ -1,5 +1,3 @@
-//! Windows-specific style queries
-
 #[cfg(windows)]
 mod windows_console {
     use std::os::windows::io::AsRawHandle;
@@ -32,7 +30,7 @@ mod windows_console {
         }
     }
 
-    pub fn enable_virtual_terminal_processing() -> std::io::Result<()> {
+    fn enable_ansi_colors_raw() -> std::io::Result<()> {
         let stdout = std::io::stdout();
         let stdout_handle = stdout.as_raw_handle();
         let stderr = std::io::stderr();
@@ -47,32 +45,17 @@ mod windows_console {
     }
 
     #[inline]
-    pub(crate) fn enable_ansi_colors() -> Option<bool> {
-        Some(
-            enable_virtual_terminal_processing()
-                .map(|_| true)
-                .unwrap_or(false),
-        )
+    pub fn enable_ansi_colors() -> Option<bool> {
+        Some(enable_ansi_colors_raw().map(|_| true).unwrap_or(false))
     }
 }
 
 #[cfg(not(windows))]
 mod windows_console {
     #[inline]
-    pub(crate) fn enable_ansi_colors() -> Option<bool> {
+    pub fn enable_ansi_colors() -> Option<bool> {
         None
     }
 }
 
-/// Enable ANSI escape codes ([`ENABLE_VIRTUAL_TERMINAL_PROCESSING`](https://learn.microsoft.com/en-us/windows/console/console-virtual-terminal-sequences#output-sequences))
-///
-/// For non-windows systems, returns `None`
-pub fn enable_ansi_colors() -> Option<bool> {
-    windows_console::enable_ansi_colors()
-}
-
-/// Raw ENABLE_VIRTUAL_TERMINAL_PROCESSING on stdout/stderr
-#[cfg(windows)]
-pub fn enable_virtual_terminal_processing() -> std::io::Result<()> {
-    windows_console::enable_virtual_terminal_processing()
-}
+pub use self::windows_console::enable_ansi_colors;

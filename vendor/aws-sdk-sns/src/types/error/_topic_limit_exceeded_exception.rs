@@ -45,8 +45,8 @@ impl TopicLimitExceededException {
 }
 
 /// A builder for [`TopicLimitExceededException`](crate::types::error::TopicLimitExceededException).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct TopicLimitExceededExceptionBuilder {
     pub(crate) message: ::std::option::Option<::std::string::String>,
     meta: std::option::Option<::aws_smithy_types::error::ErrorMetadata>,

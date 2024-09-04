@@ -5,7 +5,7 @@ pub enum Error {
     Regex(regex::Error),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Matcher {
     regex: regex::bytes::Regex,
     device_replacement: Option<String>,

@@ -3,7 +3,7 @@ pub use crate::operation::create_export_task::_create_export_task_output::Create
 
 pub use crate::operation::create_export_task::_create_export_task_input::CreateExportTaskInputBuilder;
 
-impl crate::operation::create_export_task::builders::CreateExportTaskInputBuilder {
+impl CreateExportTaskInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -24,9 +24,9 @@ impl crate::operation::create_export_task::builders::CreateExportTaskInputBuilde
 ///
 /// <p>Creates an export task so that you can efficiently export data from a log group to an Amazon S3 bucket. When you perform a <code>CreateExportTask</code> operation, you must use credentials that have permission to write to the S3 bucket that you specify as the destination.</p>
 /// <p>Exporting log data to S3 buckets that are encrypted by KMS is supported. Exporting log data to Amazon S3 buckets that have S3 Object Lock enabled with a retention period is also supported.</p>
-/// <p>Exporting to S3 buckets that are encrypted with AES-256 is supported.</p>
+/// <p>Exporting to S3 buckets that are encrypted with AES-256 is supported. </p>
 /// <p>This is an asynchronous call. If all the required information is provided, this operation initiates an export task and responds with the ID of the task. After the task has started, you can use <a href="https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_DescribeExportTasks.html">DescribeExportTasks</a> to get the status of the export task. Each account can only have one active (<code>RUNNING</code> or <code>PENDING</code>) export task at a time. To cancel an export task, use <a href="https://docs.aws.amazon.com/AmazonCloudWatchLogs/latest/APIReference/API_CancelExportTask.html">CancelExportTask</a>.</p>
-/// <p>You can export logs from multiple log groups or multiple time ranges to the same S3 bucket. To separate log data for each export task, specify a prefix to be used as the Amazon S3 key prefix for all exported objects.</p><note>
+/// <p>You can export logs from multiple log groups or multiple time ranges to the same S3 bucket. To separate log data for each export task, specify a prefix to be used as the Amazon S3 key prefix for all exported objects.</p> <note>
 /// <p>Time-based sorting on chunks of log data inside an exported file is not guaranteed. You can sort the exported log field data by using Linux utilities.</p>
 /// </note>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
@@ -54,7 +54,7 @@ impl
     }
 }
 impl CreateExportTaskFluentBuilder {
-    /// Creates a new `CreateExportTaskFluentBuilder`.
+    /// Creates a new `CreateExportTask`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -105,12 +105,12 @@ impl CreateExportTaskFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }

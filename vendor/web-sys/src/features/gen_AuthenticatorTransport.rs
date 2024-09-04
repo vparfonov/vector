@@ -10,5 +10,4 @@ pub enum AuthenticatorTransport {
     Usb = "usb",
     Nfc = "nfc",
     Ble = "ble",
-    Internal = "internal",
 }

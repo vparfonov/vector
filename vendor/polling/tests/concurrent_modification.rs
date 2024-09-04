@@ -76,7 +76,7 @@ fn concurrent_modify() -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(all(unix, not(target_os = "vita")))]
+#[cfg(unix)]
 #[test]
 fn concurrent_interruption() -> io::Result<()> {
     struct MakeItSend<T>(T);

@@ -10,12 +10,12 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
-rust-version = "1.31"
 name = "num-iter"
-version = "0.1.45"
+version = "0.1.43"
 authors = ["The Rust Project Developers"]
+build = "build.rs"
 exclude = [
+    "/bors.toml",
     "/ci/*",
     "/.github/*",
 ]
@@ -39,13 +39,11 @@ repository = "https://github.com/rust-num/num-iter"
 features = ["std"]
 
 [dependencies.num-integer]
-version = "0.1.46"
-features = ["i128"]
+version = "0.1.42"
 default-features = false
 
 [dependencies.num-traits]
 version = "0.2.11"
-features = ["i128"]
 default-features = false
 
 [build-dependencies.autocfg]
@@ -53,7 +51,10 @@ version = "1"
 
 [features]
 default = ["std"]
-i128 = []
+i128 = [
+    "num-integer/i128",
+    "num-traits/i128",
+]
 std = [
     "num-integer/std",
     "num-traits/std",

@@ -91,11 +91,3 @@ impl AutoTuneType {
         }
     }
 }
-impl ::std::fmt::Display for AutoTuneType {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            AutoTuneType::ScheduledAction => write!(f, "SCHEDULED_ACTION"),
-            AutoTuneType::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

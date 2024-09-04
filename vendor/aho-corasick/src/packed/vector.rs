@@ -89,7 +89,6 @@ pub(crate) trait Vector:
     ///
     /// Callers must ensure that this is okay to call in the current target for
     /// the current CPU.
-    #[allow(dead_code)] // unused, but useful enough to keep around?
     unsafe fn or(self, vector2: Self) -> Self;
 
     /// Shift each 8-bit lane in this vector to the right by the number of
@@ -596,11 +595,7 @@ mod x86_64_avx2 {
     }
 }
 
-#[cfg(all(
-    target_arch = "aarch64",
-    target_feature = "neon",
-    target_endian = "little"
-))]
+#[cfg(target_arch = "aarch64")]
 mod aarch64_neon {
     use core::arch::aarch64::*;
 

@@ -91,10 +91,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for DeleteL
             ::aws_smithy_runtime_api::client::auth::static_resolver::StaticAuthSchemeOptionResolverParams::new(),
         ));
 
-        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new(
-            "DeleteLogGroup",
-            "cloudwatchlogs",
-        ));
+        cfg.store_put(::aws_smithy_http::operation::Metadata::new("DeleteLogGroup", "cloudwatchlogs"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = true;
         signing_options.content_sha256_header = false;
@@ -115,7 +112,11 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for DeleteL
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("DeleteLogGroup")
-            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
+            .with_interceptor(
+                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
+                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
+                ),
+            )
             .with_interceptor(DeleteLogGroupEndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::delete_log_group::DeleteLogGroupError,
@@ -241,19 +242,16 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for DeleteLogGrou
     }
 }
 
-// The get_* functions below are generated from JMESPath expressions in the
-// operationContextParams trait. They target the operation's input shape.
-
 /// Error type for the `DeleteLogGroupError` operation.
 #[non_exhaustive]
 #[derive(::std::fmt::Debug)]
 pub enum DeleteLogGroupError {
-    /// <p>The specified resource does not exist.</p>
-    ResourceNotFoundException(crate::types::error::ResourceNotFoundException),
     /// <p>A parameter is specified incorrectly.</p>
     InvalidParameterException(crate::types::error::InvalidParameterException),
     /// <p>Multiple concurrent requests to update the same resource were in conflict.</p>
     OperationAbortedException(crate::types::error::OperationAbortedException),
+    /// <p>The specified resource does not exist.</p>
+    ResourceNotFoundException(crate::types::error::ResourceNotFoundException),
     /// <p>The service cannot complete the request.</p>
     ServiceUnavailableException(crate::types::error::ServiceUnavailableException),
     /// An unexpected error occurred (e.g., invalid JSON returned by the service or an unknown error code).
@@ -289,16 +287,12 @@ impl DeleteLogGroupError {
     ///
     pub fn meta(&self) -> &::aws_smithy_types::error::ErrorMetadata {
         match self {
-            Self::ResourceNotFoundException(e) => ::aws_smithy_types::error::metadata::ProvideErrorMetadata::meta(e),
             Self::InvalidParameterException(e) => ::aws_smithy_types::error::metadata::ProvideErrorMetadata::meta(e),
             Self::OperationAbortedException(e) => ::aws_smithy_types::error::metadata::ProvideErrorMetadata::meta(e),
+            Self::ResourceNotFoundException(e) => ::aws_smithy_types::error::metadata::ProvideErrorMetadata::meta(e),
             Self::ServiceUnavailableException(e) => ::aws_smithy_types::error::metadata::ProvideErrorMetadata::meta(e),
             Self::Unhandled(e) => &e.meta,
         }
-    }
-    /// Returns `true` if the error kind is `DeleteLogGroupError::ResourceNotFoundException`.
-    pub fn is_resource_not_found_exception(&self) -> bool {
-        matches!(self, Self::ResourceNotFoundException(_))
     }
     /// Returns `true` if the error kind is `DeleteLogGroupError::InvalidParameterException`.
     pub fn is_invalid_parameter_exception(&self) -> bool {
@@ -308,6 +302,10 @@ impl DeleteLogGroupError {
     pub fn is_operation_aborted_exception(&self) -> bool {
         matches!(self, Self::OperationAbortedException(_))
     }
+    /// Returns `true` if the error kind is `DeleteLogGroupError::ResourceNotFoundException`.
+    pub fn is_resource_not_found_exception(&self) -> bool {
+        matches!(self, Self::ResourceNotFoundException(_))
+    }
     /// Returns `true` if the error kind is `DeleteLogGroupError::ServiceUnavailableException`.
     pub fn is_service_unavailable_exception(&self) -> bool {
         matches!(self, Self::ServiceUnavailableException(_))
@@ -316,9 +314,9 @@ impl DeleteLogGroupError {
 impl ::std::error::Error for DeleteLogGroupError {
     fn source(&self) -> ::std::option::Option<&(dyn ::std::error::Error + 'static)> {
         match self {
-            Self::ResourceNotFoundException(_inner) => ::std::option::Option::Some(_inner),
             Self::InvalidParameterException(_inner) => ::std::option::Option::Some(_inner),
             Self::OperationAbortedException(_inner) => ::std::option::Option::Some(_inner),
+            Self::ResourceNotFoundException(_inner) => ::std::option::Option::Some(_inner),
             Self::ServiceUnavailableException(_inner) => ::std::option::Option::Some(_inner),
             Self::Unhandled(_inner) => ::std::option::Option::Some(&*_inner.source),
         }
@@ -327,9 +325,9 @@ impl ::std::error::Error for DeleteLogGroupError {
 impl ::std::fmt::Display for DeleteLogGroupError {
     fn fmt(&self, f: &mut ::std::fmt::Formatter<'_>) -> ::std::fmt::Result {
         match self {
-            Self::ResourceNotFoundException(_inner) => _inner.fmt(f),
             Self::InvalidParameterException(_inner) => _inner.fmt(f),
             Self::OperationAbortedException(_inner) => _inner.fmt(f),
+            Self::ResourceNotFoundException(_inner) => _inner.fmt(f),
             Self::ServiceUnavailableException(_inner) => _inner.fmt(f),
             Self::Unhandled(_inner) => {
                 if let ::std::option::Option::Some(code) = ::aws_smithy_types::error::metadata::ProvideErrorMetadata::code(self) {
@@ -352,9 +350,9 @@ impl ::aws_smithy_types::retry::ProvideErrorKind for DeleteLogGroupError {
 impl ::aws_smithy_types::error::metadata::ProvideErrorMetadata for DeleteLogGroupError {
     fn meta(&self) -> &::aws_smithy_types::error::ErrorMetadata {
         match self {
-            Self::ResourceNotFoundException(_inner) => ::aws_smithy_types::error::metadata::ProvideErrorMetadata::meta(_inner),
             Self::InvalidParameterException(_inner) => ::aws_smithy_types::error::metadata::ProvideErrorMetadata::meta(_inner),
             Self::OperationAbortedException(_inner) => ::aws_smithy_types::error::metadata::ProvideErrorMetadata::meta(_inner),
+            Self::ResourceNotFoundException(_inner) => ::aws_smithy_types::error::metadata::ProvideErrorMetadata::meta(_inner),
             Self::ServiceUnavailableException(_inner) => ::aws_smithy_types::error::metadata::ProvideErrorMetadata::meta(_inner),
             Self::Unhandled(_inner) => &_inner.meta,
         }

@@ -250,7 +250,8 @@ use std::io;
 use std::path::Path;
 use std::pin::Pin;
 use std::process::{Command as StdCommand, ExitStatus, Output, Stdio};
-use std::task::{ready, Context, Poll};
+use std::task::Context;
+use std::task::Poll;
 
 #[cfg(unix)]
 use std::os::unix::process::CommandExt;
@@ -750,34 +751,29 @@ impl Command {
     ///
     /// Process groups determine which processes receive signals.
     ///
-    /// # Examples
+    /// **Note**: This is an [unstable API][unstable] but will be stabilised once
+    /// tokio's `MSRV` is sufficiently new. See [the documentation on
+    /// unstable features][unstable] for details about using unstable features.
     ///
-    /// Pressing Ctrl-C in a terminal will send `SIGINT` to all processes
-    /// in the current foreground process group. By spawning the `sleep`
-    /// subprocess in a new process group, it will not receive `SIGINT`
-    /// from the terminal.
+    /// If you want similar behavior without using this unstable feature you can
+    /// create a [`std::process::Command`] and convert that into a
+    /// [`tokio::process::Command`] using the `From` trait.
     ///
-    /// The parent process could install a [signal handler] and manage the
-    /// process on its own terms.
-    ///
-    /// A process group ID of 0 will use the process ID as the PGID.
+    /// [unstable]: crate#unstable-features
+    /// [`tokio::process::Command`]: crate::process::Command
     ///
     /// ```no_run
     /// # async fn test() { // allow using await
     /// use tokio::process::Command;
     ///
-    /// let output = Command::new("sleep")
-    ///     .arg("10")
-    ///     .process_group(0)
-    ///     .output()
-    ///     .await
-    ///     .unwrap();
+    /// let output = Command::new("ls")
+    ///         .process_group(0)
+    ///         .output().await.unwrap();
     /// # }
     /// ```
-    ///
-    /// [signal handler]: crate::signal
     #[cfg(unix)]
-    #[cfg_attr(docsrs, doc(cfg(unix)))]
+    #[cfg(tokio_unstable)]
+    #[cfg_attr(docsrs, doc(cfg(all(unix, tokio_unstable))))]
     pub fn process_group(&mut self, pgroup: i32) -> &mut Command {
         self.std.process_group(pgroup);
         self

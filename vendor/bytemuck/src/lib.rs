@@ -123,18 +123,6 @@ macro_rules! transmute {
   ($val:expr) => {
     ::core::mem::transmute_copy(&::core::mem::ManuallyDrop::new($val))
   };
-  // This arm is for use in const contexts, where the borrow required to use transmute_copy poses an issue
-  // since the compiler hedges that the type being borrowed could have interior mutability.
-  ($srcty:ty; $dstty:ty; $val:expr) => {
-    {
-      #[repr(C)]
-      union Transmute<A, B> {
-        src: ::core::mem::ManuallyDrop<A>,
-        dst: ::core::mem::ManuallyDrop<B>,
-      }
-      ::core::mem::ManuallyDrop::into_inner(Transmute::<$srcty, $dstty> { src: ::core::mem::ManuallyDrop::new($val) }.dst)
-    }
-  }
 }
 
 /// A macro to implement marker traits for various simd types.
@@ -210,14 +198,15 @@ pub use bytemuck_derive::{
 /// The things that can go wrong when casting between [`Pod`] data forms.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PodCastError {
-  /// You tried to cast a reference into a reference to a type with a higher alignment
-  /// requirement but the input reference wasn't aligned.
+  /// You tried to cast a slice to an element type with a higher alignment
+  /// requirement but the slice wasn't aligned.
   TargetAlignmentGreaterAndInputNotAligned,
-  /// If the element size of a slice changes, then the output slice changes length
-  /// accordingly. If the output slice wouldn't be a whole number of elements,
+  /// If the element size changes then the output slice changes length
+  /// accordingly. If the output slice wouldn't be a whole number of elements
   /// then the conversion fails.
   OutputSliceWouldHaveSlop,
-  /// When casting an individual `T`, `&T`, or `&mut T` value the
+  /// When casting a slice you can't convert between ZST elements and non-ZST
+  /// elements. When casting an individual `T`, `&T`, or `&mut T` value the
   /// source size and destination size must be an exact match.
   SizeMismatch,
   /// For this type of cast the alignments must be exactly the same and they

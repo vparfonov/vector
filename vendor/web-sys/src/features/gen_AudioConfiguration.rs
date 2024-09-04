@@ -10,46 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
     pub type AudioConfiguration;
-    #[doc = "Get the `bitrate` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
-    #[wasm_bindgen(method, getter = "bitrate")]
-    pub fn get_bitrate(this: &AudioConfiguration) -> Option<f64>;
-    #[doc = "Change the `bitrate` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
-    #[wasm_bindgen(method, setter = "bitrate")]
-    pub fn set_bitrate(this: &AudioConfiguration, val: f64);
-    #[doc = "Get the `channels` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
-    #[wasm_bindgen(method, getter = "channels")]
-    pub fn get_channels(this: &AudioConfiguration) -> Option<String>;
-    #[doc = "Change the `channels` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
-    #[wasm_bindgen(method, setter = "channels")]
-    pub fn set_channels(this: &AudioConfiguration, val: &str);
-    #[doc = "Get the `contentType` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
-    #[wasm_bindgen(method, getter = "contentType")]
-    pub fn get_content_type(this: &AudioConfiguration) -> Option<String>;
-    #[doc = "Change the `contentType` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
-    #[wasm_bindgen(method, setter = "contentType")]
-    pub fn set_content_type(this: &AudioConfiguration, val: &str);
-    #[doc = "Get the `samplerate` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
-    #[wasm_bindgen(method, getter = "samplerate")]
-    pub fn get_samplerate(this: &AudioConfiguration) -> Option<u32>;
-    #[doc = "Change the `samplerate` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
-    #[wasm_bindgen(method, setter = "samplerate")]
-    pub fn set_samplerate(this: &AudioConfiguration, val: u32);
 }
 impl AudioConfiguration {
     #[doc = "Construct a new `AudioConfiguration`."]
@@ -60,24 +20,72 @@ impl AudioConfiguration {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_bitrate()` instead."]
+    #[doc = "Change the `bitrate` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
     pub fn bitrate(&mut self, val: f64) -> &mut Self {
-        self.set_bitrate(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("bitrate"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_channels()` instead."]
+    #[doc = "Change the `channels` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
     pub fn channels(&mut self, val: &str) -> &mut Self {
-        self.set_channels(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("channels"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_content_type()` instead."]
+    #[doc = "Change the `contentType` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
     pub fn content_type(&mut self, val: &str) -> &mut Self {
-        self.set_content_type(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("contentType"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_samplerate()` instead."]
+    #[doc = "Change the `samplerate` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AudioConfiguration`*"]
     pub fn samplerate(&mut self, val: u32) -> &mut Self {
-        self.set_samplerate(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("samplerate"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

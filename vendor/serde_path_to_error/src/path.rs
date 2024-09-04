@@ -77,10 +77,17 @@ impl Display for Path {
 
         let mut separator = "";
         for segment in self {
-            if !matches!(segment, Segment::Seq { .. }) {
-                formatter.write_str(separator)?;
+            match segment {
+                Segment::Seq { index } => {
+                    write!(formatter, "[{}]", index)?;
+                }
+                Segment::Map { key } | Segment::Enum { variant: key } => {
+                    write!(formatter, "{}{}", separator, key)?;
+                }
+                Segment::Unknown => {
+                    write!(formatter, "{}?", separator)?;
+                }
             }
-            write!(formatter, "{}", segment)?;
             separator = ".";
         }
 
@@ -138,18 +145,6 @@ impl Path {
 
     pub(crate) fn is_only_unknown(&self) -> bool {
         self.segments.iter().all(Segment::is_unknown)
-    }
-}
-
-impl Display for Segment {
-    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            Segment::Seq { index } => write!(formatter, "[{}]", index),
-            Segment::Map { key } | Segment::Enum { variant: key } => {
-                write!(formatter, "{}", key)
-            }
-            Segment::Unknown => formatter.write_str("?"),
-        }
     }
 }
 

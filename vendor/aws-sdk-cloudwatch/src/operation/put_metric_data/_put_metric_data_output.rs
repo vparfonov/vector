@@ -18,8 +18,8 @@ impl PutMetricDataOutput {
 }
 
 /// A builder for [`PutMetricDataOutput`](crate::operation::put_metric_data::PutMetricDataOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct PutMetricDataOutputBuilder {
     _request_id: Option<String>,
 }

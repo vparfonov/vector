@@ -10,28 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `RtcIdentityAssertionResult`*"]
     pub type RtcIdentityAssertionResult;
-    #[doc = "Get the `assertion` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcIdentityAssertionResult`*"]
-    #[wasm_bindgen(method, getter = "assertion")]
-    pub fn get_assertion(this: &RtcIdentityAssertionResult) -> String;
-    #[doc = "Change the `assertion` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcIdentityAssertionResult`*"]
-    #[wasm_bindgen(method, setter = "assertion")]
-    pub fn set_assertion(this: &RtcIdentityAssertionResult, val: &str);
-    #[cfg(feature = "RtcIdentityProviderDetails")]
-    #[doc = "Get the `idp` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcIdentityAssertionResult`, `RtcIdentityProviderDetails`*"]
-    #[wasm_bindgen(method, getter = "idp")]
-    pub fn get_idp(this: &RtcIdentityAssertionResult) -> RtcIdentityProviderDetails;
-    #[cfg(feature = "RtcIdentityProviderDetails")]
-    #[doc = "Change the `idp` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcIdentityAssertionResult`, `RtcIdentityProviderDetails`*"]
-    #[wasm_bindgen(method, setter = "idp")]
-    pub fn set_idp(this: &RtcIdentityAssertionResult, val: &RtcIdentityProviderDetails);
 }
 impl RtcIdentityAssertionResult {
     #[cfg(feature = "RtcIdentityProviderDetails")]
@@ -45,15 +23,35 @@ impl RtcIdentityAssertionResult {
         ret.idp(idp);
         ret
     }
-    #[deprecated = "Use `set_assertion()` instead."]
+    #[doc = "Change the `assertion` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcIdentityAssertionResult`*"]
     pub fn assertion(&mut self, val: &str) -> &mut Self {
-        self.set_assertion(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("assertion"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "RtcIdentityProviderDetails")]
-    #[deprecated = "Use `set_idp()` instead."]
+    #[doc = "Change the `idp` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcIdentityAssertionResult`, `RtcIdentityProviderDetails`*"]
     pub fn idp(&mut self, val: &RtcIdentityProviderDetails) -> &mut Self {
-        self.set_idp(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("idp"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

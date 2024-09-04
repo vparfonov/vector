@@ -30,7 +30,7 @@ fn use_while_exiting() {
     }
 
     thread_local! {
-        static FOO: Foo = const { Foo };
+        static FOO: Foo = Foo;
     }
 
     let (s, r) = unbounded::<()>();

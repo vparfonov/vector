@@ -18,8 +18,8 @@ impl DeleteMetricStreamOutput {
 }
 
 /// A builder for [`DeleteMetricStreamOutput`](crate::operation::delete_metric_stream::DeleteMetricStreamOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DeleteMetricStreamOutputBuilder {
     _request_id: Option<String>,
 }

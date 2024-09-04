@@ -268,13 +268,6 @@ mod bstring {
         }
     }
 
-    impl<'a> From<&'a BString> for Cow<'a, BStr> {
-        #[inline]
-        fn from(s: &'a BString) -> Cow<'a, BStr> {
-            Cow::Borrowed(s.as_bstr())
-        }
-    }
-
     impl TryFrom<BString> for String {
         type Error = crate::FromUtf8Error;
 

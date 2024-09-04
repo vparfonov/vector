@@ -10,16 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `ConsoleTimerStart`*"]
     pub type ConsoleTimerStart;
-    #[doc = "Get the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleTimerStart`*"]
-    #[wasm_bindgen(method, getter = "name")]
-    pub fn get_name(this: &ConsoleTimerStart) -> Option<String>;
-    #[doc = "Change the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleTimerStart`*"]
-    #[wasm_bindgen(method, setter = "name")]
-    pub fn set_name(this: &ConsoleTimerStart, val: &str);
 }
 impl ConsoleTimerStart {
     #[doc = "Construct a new `ConsoleTimerStart`."]
@@ -30,9 +20,17 @@ impl ConsoleTimerStart {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_name()` instead."]
+    #[doc = "Change the `name` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ConsoleTimerStart`*"]
     pub fn name(&mut self, val: &str) -> &mut Self {
-        self.set_name(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("name"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

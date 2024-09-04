@@ -38,7 +38,8 @@ const DEFAULT_CONN_WINDOW: u32 = 1024 * 1024; // 1mb
 const DEFAULT_STREAM_WINDOW: u32 = 1024 * 1024; // 1mb
 const DEFAULT_MAX_FRAME_SIZE: u32 = 1024 * 16; // 16kb
 const DEFAULT_MAX_SEND_BUF_SIZE: usize = 1024 * 400; // 400kb
-const DEFAULT_SETTINGS_MAX_HEADER_LIST_SIZE: u32 = 1024 * 16; // 16kb
+                                                     // 16 MB "sane default" taken from golang http2
+const DEFAULT_SETTINGS_MAX_HEADER_LIST_SIZE: u32 = 16 << 20;
 const DEFAULT_MAX_LOCAL_ERROR_RESET_STREAMS: usize = 1024;
 
 #[derive(Clone, Debug)]
@@ -55,7 +56,6 @@ pub(crate) struct Config {
     pub(crate) keep_alive_timeout: Duration,
     pub(crate) max_send_buffer_size: usize,
     pub(crate) max_header_list_size: u32,
-    pub(crate) date_header: bool,
 }
 
 impl Default for Config {
@@ -73,7 +73,6 @@ impl Default for Config {
             keep_alive_timeout: Duration::from_secs(20),
             max_send_buffer_size: DEFAULT_MAX_SEND_BUF_SIZE,
             max_header_list_size: DEFAULT_SETTINGS_MAX_HEADER_LIST_SIZE,
-            date_header: true,
         }
     }
 }
@@ -88,7 +87,6 @@ pin_project! {
         timer: Time,
         service: S,
         state: State<T, B>,
-        date_header: bool,
     }
 }
 
@@ -111,7 +109,6 @@ where
     ping: Option<(ping::Recorder, ping::Ponger)>,
     conn: Connection<Compat<T>, SendBuf<B::Data>>,
     closing: Option<crate::Error>,
-    date_header: bool,
 }
 
 impl<T, S, B, E> Server<T, S, B, E>
@@ -171,7 +168,6 @@ where
                 hs: handshake,
             },
             service,
-            date_header: config.date_header,
         }
     }
 
@@ -224,7 +220,6 @@ where
                         ping,
                         conn,
                         closing: None,
-                        date_header: me.date_header,
                     })
                 }
                 State::Serving(ref mut srv) => {
@@ -308,13 +303,7 @@ where
                             req.extensions_mut().insert(Protocol::from_inner(protocol));
                         }
 
-                        let fut = H2Stream::new(
-                            service.call(req),
-                            connect_parts,
-                            respond,
-                            self.date_header,
-                        );
-
+                        let fut = H2Stream::new(service.call(req), connect_parts, respond);
                         exec.execute_h2stream(fut);
                     }
                     Some(Err(e)) => {
@@ -369,7 +358,6 @@ pin_project! {
         reply: SendResponse<SendBuf<B::Data>>,
         #[pin]
         state: H2StreamState<F, B>,
-        date_header: bool,
     }
 }
 
@@ -405,12 +393,10 @@ where
         fut: F,
         connect_parts: Option<ConnectParts>,
         respond: SendResponse<SendBuf<B::Data>>,
-        date_header: bool,
     ) -> H2Stream<F, B> {
         H2Stream {
             reply: respond,
             state: H2StreamState::Service { fut, connect_parts },
-            date_header,
         }
     }
 }
@@ -469,12 +455,10 @@ where
                     let mut res = ::http::Response::from_parts(head, ());
                     super::strip_connection_headers(res.headers_mut(), false);
 
-                    // set Date header if it isn't already set if instructed
-                    if *me.date_header {
-                        res.headers_mut()
-                            .entry(::http::header::DATE)
-                            .or_insert_with(date::update_and_header_value);
-                    }
+                    // set Date header if it isn't already set...
+                    res.headers_mut()
+                        .entry(::http::header::DATE)
+                        .or_insert_with(date::update_and_header_value);
 
                     if let Some(connect_parts) = connect_parts.take() {
                         if res.status().is_success() {

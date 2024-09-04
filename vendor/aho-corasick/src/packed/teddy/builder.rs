@@ -230,11 +230,7 @@ impl Builder {
                 }
             }
         }
-        #[cfg(all(
-            target_arch = "aarch64",
-            target_feature = "neon",
-            target_endian = "little"
-        ))]
+        #[cfg(target_arch = "aarch64")]
         {
             use self::aarch64::SlimNeon;
 
@@ -305,11 +301,7 @@ impl Builder {
         }
         #[cfg(not(any(
             all(target_arch = "x86_64", target_feature = "sse2"),
-            all(
-                target_arch = "aarch64",
-                target_feature = "neon",
-                target_endian = "little"
-            )
+            target_arch = "aarch64"
         )))]
         {
             None
@@ -713,11 +705,7 @@ mod x86_64 {
     }
 }
 
-#[cfg(all(
-    target_arch = "aarch64",
-    target_feature = "neon",
-    target_endian = "little"
-))]
+#[cfg(target_arch = "aarch64")]
 mod aarch64 {
     use core::arch::aarch64::uint8x16_t;
 

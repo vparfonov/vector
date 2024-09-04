@@ -1,5 +1,3 @@
-//! Write ANSI escape code colored text
-
 use std::io::Write;
 
 fn main() -> Result<(), lexopt::Error> {
@@ -8,31 +6,31 @@ fn main() -> Result<(), lexopt::Error> {
     let mut stdout = stdout.lock();
 
     for fixed in 0..16 {
-        let color = anstyle::Ansi256Color(fixed)
-            .into_ansi()
-            .expect("4-bit range used");
-        let style = style(color, args.layer, args.effects);
+        let style = style(fixed, args.layer, args.effects);
         let _ = print_number(&mut stdout, fixed, style);
         if fixed == 7 || fixed == 15 {
             let _ = writeln!(&mut stdout);
         }
     }
 
-    for fixed in 16..232 {
-        let col = (fixed - 16) % 36;
-        if col == 0 {
+    for r in 0..6 {
+        let _ = writeln!(stdout);
+        for g in 0..6 {
+            for b in 0..6 {
+                let fixed = r * 36 + g * 6 + b + 16;
+                let style = style(fixed, args.layer, args.effects);
+                let _ = print_number(&mut stdout, fixed, style);
+            }
             let _ = writeln!(stdout);
         }
-        let color = anstyle::Ansi256Color(fixed);
-        let style = style(color, args.layer, args.effects);
-        let _ = print_number(&mut stdout, fixed, style);
     }
 
-    let _ = writeln!(stdout);
-    let _ = writeln!(stdout);
-    for fixed in 232..=255 {
-        let color = anstyle::Ansi256Color(fixed);
-        let style = style(color, args.layer, args.effects);
+    for c in 0..24 {
+        if 0 == c % 8 {
+            let _ = writeln!(stdout);
+        }
+        let fixed = 232 + c;
+        let style = style(fixed, args.layer, args.effects);
         let _ = print_number(&mut stdout, fixed, style);
     }
 
@@ -41,12 +39,8 @@ fn main() -> Result<(), lexopt::Error> {
     Ok(())
 }
 
-fn style(
-    color: impl Into<anstyle::Color>,
-    layer: Layer,
-    effects: anstyle::Effects,
-) -> anstyle::Style {
-    let color = color.into();
+fn style(fixed: u8, layer: Layer, effects: anstyle::Effects) -> anstyle::Style {
+    let color = anstyle::Ansi256Color(fixed).into();
     (match layer {
         Layer::Fg => anstyle::Style::new().fg_color(Some(color)),
         Layer::Bg => anstyle::Style::new().bg_color(Some(color)),
@@ -59,7 +53,13 @@ fn print_number(
     fixed: u8,
     style: anstyle::Style,
 ) -> std::io::Result<()> {
-    write!(stdout, "{style}{fixed:>3X}{style:#}",)
+    write!(
+        stdout,
+        "{}{:>4}{}",
+        style.render(),
+        fixed,
+        anstyle::Reset.render()
+    )
 }
 
 #[derive(Default)]

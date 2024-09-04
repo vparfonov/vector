@@ -31,11 +31,9 @@ pub enum Error {
     UserAgent(UserAgentError),
 }
 
-impl std::error::Error for Error {}
-
 /// Handles the actual parsing of a user agent string by delegating to
 /// the respective `SubParser`
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct UserAgentParser {
     device_matchers: Vec<device::Matcher>,
     os_matchers: Vec<os::Matcher>,
@@ -78,7 +76,6 @@ impl Parser for UserAgentParser {
 }
 
 impl UserAgentParser {
-    #[must_use]
     pub fn builder() -> UserAgentParserBuilder {
         UserAgentParserBuilder::new()
     }
@@ -198,7 +195,7 @@ impl UserAgentParser {
 }
 
 #[inline]
-fn none_if_empty<T: AsRef<str>>(s: T) -> Option<T> {
+pub(self) fn none_if_empty<T: AsRef<str>>(s: T) -> Option<T> {
     if s.as_ref().is_empty() {
         None
     } else {
@@ -207,12 +204,12 @@ fn none_if_empty<T: AsRef<str>>(s: T) -> Option<T> {
 }
 
 #[inline]
-fn has_group(replacement: &str) -> bool {
+pub(self) fn has_group(replacement: &str) -> bool {
     replacement.contains('$')
 }
 
 #[inline]
-fn replace_cow<'a>(
+pub(self) fn replace_cow<'a>(
     replacement: &str,
     replacement_has_group: bool,
     captures: &regex::bytes::Captures,
@@ -222,18 +219,16 @@ fn replace_cow<'a>(
         let raw_replacement = replacement.as_bytes();
         captures.expand(raw_replacement, &mut target);
         std::str::from_utf8(&target)
+            .map(|s| Cow::Owned(s.trim().to_owned()))
             // What is the behavior if we can't parse a string???
-            .map_or_else(
-                |_| Cow::Owned(replacement.to_owned()),
-                |s| Cow::Owned(s.trim().to_owned()),
-            )
+            .unwrap_or_else(|_| Cow::Owned(replacement.to_owned()))
     } else {
         Cow::Owned(replacement.to_owned())
     }
 }
 
 #[inline]
-fn match_to_str(m: regex::bytes::Match) -> Option<&str> {
+pub(self) fn match_to_str(m: regex::bytes::Match) -> Option<&str> {
     std::str::from_utf8(m.as_bytes()).ok()
 }
 

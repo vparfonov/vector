@@ -12,6 +12,4 @@ use wasm_bindgen::prelude::*;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GpuStorageTextureAccess {
     WriteOnly = "write-only",
-    ReadOnly = "read-only",
-    ReadWrite = "read-write",
 }

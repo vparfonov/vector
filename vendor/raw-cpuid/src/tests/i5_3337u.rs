@@ -239,7 +239,7 @@ fn extended_features() {
         _eax: 0,
         ebx: ExtendedFeaturesEbx::from_bits_truncate(641),
         ecx: ExtendedFeaturesEcx::from_bits_truncate(0),
-        edx: ExtendedFeaturesEdx::from_bits_truncate(0),
+        _edx: 0,
     };
     assert!(tpfeatures._eax == 0);
     assert!(tpfeatures.has_fsgsbase());
@@ -273,7 +273,7 @@ fn extended_features() {
             | ExtendedFeaturesEbx::CLFLUSHOPT
             | ExtendedFeaturesEbx::PROCESSOR_TRACE,
         ecx: ExtendedFeaturesEcx::from_bits_truncate(0),
-        edx: ExtendedFeaturesEdx::from_bits_truncate(201326592),
+        _edx: 201326592,
     };
 
     assert!(tpfeatures2.has_fsgsbase());
@@ -291,14 +291,6 @@ fn extended_features() {
     assert!(tpfeatures2.has_smap());
     assert!(tpfeatures2.has_clflushopt());
     assert!(tpfeatures2.has_processor_trace());
-
-    assert!(!tpfeatures2.has_avx512_4vnniw());
-    assert!(!tpfeatures2.has_avx512_4fmaps());
-    assert!(!tpfeatures2.has_avx512_vp2intersect());
-    assert!(!tpfeatures2.has_amx_bf16());
-    assert!(!tpfeatures2.has_avx512_fp16());
-    assert!(!tpfeatures2.has_amx_tile());
-    assert!(!tpfeatures2.has_amx_int8());
 }
 
 #[test]

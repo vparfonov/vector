@@ -6,7 +6,7 @@ use std::future::Future;
 use std::io;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll};
 
 pub(crate) fn read_buf<'a, R, B>(reader: &'a mut R, buf: &'a mut B) -> ReadBuf<'a, R, B>
 where

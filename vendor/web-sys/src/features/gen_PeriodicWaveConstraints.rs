@@ -10,16 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `PeriodicWaveConstraints`*"]
     pub type PeriodicWaveConstraints;
-    #[doc = "Get the `disableNormalization` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PeriodicWaveConstraints`*"]
-    #[wasm_bindgen(method, getter = "disableNormalization")]
-    pub fn get_disable_normalization(this: &PeriodicWaveConstraints) -> Option<bool>;
-    #[doc = "Change the `disableNormalization` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PeriodicWaveConstraints`*"]
-    #[wasm_bindgen(method, setter = "disableNormalization")]
-    pub fn set_disable_normalization(this: &PeriodicWaveConstraints, val: bool);
 }
 impl PeriodicWaveConstraints {
     #[doc = "Construct a new `PeriodicWaveConstraints`."]
@@ -30,9 +20,21 @@ impl PeriodicWaveConstraints {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_disable_normalization()` instead."]
+    #[doc = "Change the `disableNormalization` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PeriodicWaveConstraints`*"]
     pub fn disable_normalization(&mut self, val: bool) -> &mut Self {
-        self.set_disable_normalization(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("disableNormalization"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

@@ -135,14 +135,15 @@ fn socketpair() -> (FileDescriptor, FileDescriptor) {
     fds
 }
 
-fn drain(mut fd: &FileDescriptor, mut amt: usize) {
+fn drain(mut fd: &FileDescriptor) {
     let mut buf = [0u8; 512];
-    while amt > 0 {
+    #[allow(clippy::unused_io_amount)]
+    loop {
         match fd.read(&mut buf[..]) {
-            Err(e) if e.kind() == ErrorKind::WouldBlock => {}
+            Err(e) if e.kind() == ErrorKind::WouldBlock => break,
             Ok(0) => panic!("unexpected EOF"),
             Err(e) => panic!("unexpected error: {:?}", e),
-            Ok(x) => amt -= x,
+            Ok(_) => continue,
         }
     }
 }
@@ -218,10 +219,10 @@ async fn reset_writable() {
     let mut guard = afd_a.writable().await.unwrap();
 
     // Write until we get a WouldBlock. This also clears the ready state.
-    let mut bytes = 0;
-    while let Ok(Ok(amt)) = guard.try_io(|_| afd_a.get_ref().write(&[0; 512][..])) {
-        bytes += amt;
-    }
+    while guard
+        .try_io(|_| afd_a.get_ref().write(&[0; 512][..]))
+        .is_ok()
+    {}
 
     // Writable state should be cleared now.
     let writable = afd_a.writable();
@@ -233,7 +234,7 @@ async fn reset_writable() {
     }
 
     // Read from the other side; we should become writable now.
-    drain(&b, bytes);
+    drain(&b);
 
     let _ = writable.await.unwrap();
 }
@@ -371,7 +372,7 @@ async fn multiple_waiters() {
             panic!("Tasks exited unexpectedly")
         },
         _ = barrier.wait() => {}
-    }
+    };
 
     b.write_all(b"0").unwrap();
 
@@ -385,10 +386,7 @@ async fn poll_fns() {
     let afd_b = Arc::new(AsyncFd::new(b).unwrap());
 
     // Fill up the write side of A
-    let mut bytes = 0;
-    while let Ok(amt) = afd_a.get_ref().write(&[0; 512]) {
-        bytes += amt;
-    }
+    while afd_a.get_ref().write(&[0; 512]).is_ok() {}
 
     let waker = TestWaker::new();
 
@@ -448,7 +446,7 @@ async fn poll_fns() {
     }
 
     // Make it writable now
-    drain(afd_b.get_ref(), bytes);
+    drain(afd_b.get_ref());
 
     // now we should be writable (ie - the waker for poll_write should still be registered after we wake the read side)
     let _ = write_fut.await;

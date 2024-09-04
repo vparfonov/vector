@@ -41,8 +41,8 @@ impl LifecycleRuleAndOperator {
 }
 
 /// A builder for [`LifecycleRuleAndOperator`](crate::types::LifecycleRuleAndOperator).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct LifecycleRuleAndOperatorBuilder {
     pub(crate) prefix: ::std::option::Option<::std::string::String>,
     pub(crate) tags: ::std::option::Option<::std::vec::Vec<crate::types::Tag>>,

@@ -47,7 +47,5 @@ pub mod interceptors;
 /// Stalled stream protection for clients
 pub mod stalled_stream_protection;
 
-#[doc(hidden)]
-pub mod sdk_feature;
 /// Smithy support-code for code generated waiters.
 pub mod waiters;

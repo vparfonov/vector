@@ -2,12 +2,12 @@ use snafu::prelude::*;
 
 #[derive(Debug, Snafu)]
 enum AlphaError {
-    _AlphaDummy,
+    AlphaDummy,
 }
 
 #[derive(Debug, Snafu)]
 enum BetaError {
-    _BetaDummy,
+    BetaDummy,
 }
 
 #[derive(Debug, Snafu)]
@@ -67,7 +67,7 @@ mod with_bounds {
 
     #[derive(Debug, Snafu)]
     enum GenericError<T, U = i32> {
-        _Something { things: T, other: U },
+        Something { things: T, other: U },
     }
 
     #[derive(Debug, Snafu)]

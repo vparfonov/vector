@@ -117,9 +117,6 @@ macro_rules! check {
                 && $crate::aarch64::sysctlbyname(b"hw.optional.armv8_2_sha3\0")
         }
     };
-    ("sm4") => {
-        false
-    };
 }
 
 /// Apple helper function for calling `sysctlbyname`.

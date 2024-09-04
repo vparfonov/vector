@@ -13,15 +13,9 @@
 @if not defined INCLUDE goto :FAIL
 
 @setlocal
-@rem Add more debug flags here, e.g. DEBUGCFLAGS=/DLUA_USE_ASSERT
+@rem Add more debug flags here, e.g. DEBUGCFLAGS=/DLUA_USE_APICHECK
 @set DEBUGCFLAGS=
 @set LJCOMPILE=cl /nologo /c /O2 /W3 /D_CRT_SECURE_NO_DEPRECATE /D_CRT_STDIO_INLINE=__declspec(dllexport)__inline
-@set LJDYNBUILD=/DLUA_BUILD_AS_DLL /MD
-@set LJDYNBUILD_DEBUG=/DLUA_BUILD_AS_DLL /MDd 
-@set LJCOMPILETARGET=/Zi
-@set LJLINKTYPE=/DEBUG /RELEASE
-@set LJLINKTYPE_DEBUG=/DEBUG
-@set LJLINKTARGET=/OPT:REF /OPT:ICF /INCREMENTAL:NO
 @set LJLINK=link /nologo
 @set LJMT=mt /nologo
 @set LJLIB=lib /nologo /nodefaultlib
@@ -30,6 +24,7 @@
 @set DASC=vm_x64.dasc
 @set LJDLLNAME=lua51.dll
 @set LJLIBNAME=lua51.lib
+@set BUILDTYPE=release
 @set ALL_LIB=lib_base.c lib_math.c lib_bit.c lib_string.c lib_table.c lib_io.c lib_os.c lib_package.c lib_debug.c lib_jit.c lib_ffi.c lib_buffer.c
 
 @setlocal
@@ -96,15 +91,14 @@ buildvm -m folddef -o lj_folddef.h lj_opt_fold.c
 
 @if "%1" neq "debug" goto :NODEBUG
 @shift
-@set LJCOMPILE=%LJCOMPILE% %DEBUGCFLAGS%
-@set LJDYNBUILD=%LJDYNBUILD_DEBUG%
-@set LJLINKTYPE=%LJLINKTYPE_DEBUG%
+@set BUILDTYPE=debug
+@set LJCOMPILE=%LJCOMPILE% /Zi %DEBUGCFLAGS%
+@set LJLINK=%LJLINK% /opt:ref /opt:icf /incremental:no
 :NODEBUG
-@set LJCOMPILE=%LJCOMPILE% %LJCOMPILETARGET%
-@set LJLINK=%LJLINK% %LJLINKTYPE% %LJLINKTARGET%
+@set LJLINK=%LJLINK% /%BUILDTYPE%
 @if "%1"=="amalg" goto :AMALGDLL
 @if "%1"=="static" goto :STATIC
-%LJCOMPILE% %LJDYNBUILD% lj_*.c lib_*.c
+%LJCOMPILE% /MD /DLUA_BUILD_AS_DLL lj_*.c lib_*.c
 @if errorlevel 1 goto :BAD
 %LJLINK% /DLL /out:%LJDLLNAME% lj_*.obj lib_*.obj
 @if errorlevel 1 goto :BAD
@@ -116,7 +110,7 @@ buildvm -m folddef -o lj_folddef.h lj_opt_fold.c
 @if errorlevel 1 goto :BAD
 @goto :MTDLL
 :AMALGDLL
-%LJCOMPILE% %LJDYNBUILD% ljamalg.c
+%LJCOMPILE% /MD /DLUA_BUILD_AS_DLL ljamalg.c
 @if errorlevel 1 goto :BAD
 %LJLINK% /DLL /out:%LJDLLNAME% ljamalg.obj lj_vm.obj
 @if errorlevel 1 goto :BAD

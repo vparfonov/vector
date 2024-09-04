@@ -21,8 +21,8 @@ impl StorageClassAnalysis {
 }
 
 /// A builder for [`StorageClassAnalysis`](crate::types::StorageClassAnalysis).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct StorageClassAnalysisBuilder {
     pub(crate) data_export: ::std::option::Option<crate::types::StorageClassAnalysisDataExport>,
 }

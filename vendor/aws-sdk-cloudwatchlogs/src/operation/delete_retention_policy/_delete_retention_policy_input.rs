@@ -20,8 +20,8 @@ impl DeleteRetentionPolicyInput {
 }
 
 /// A builder for [`DeleteRetentionPolicyInput`](crate::operation::delete_retention_policy::DeleteRetentionPolicyInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DeleteRetentionPolicyInputBuilder {
     pub(crate) log_group_name: ::std::option::Option<::std::string::String>,
 }

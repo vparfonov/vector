@@ -18,8 +18,8 @@ impl PutInsightRuleOutput {
 }
 
 /// A builder for [`PutInsightRuleOutput`](crate::operation::put_insight_rule::PutInsightRuleOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct PutInsightRuleOutputBuilder {
     _request_id: Option<String>,
 }

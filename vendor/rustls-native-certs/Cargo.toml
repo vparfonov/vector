@@ -13,12 +13,7 @@
 edition = "2021"
 rust-version = "1.60"
 name = "rustls-native-certs"
-version = "0.7.3"
-build = false
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
+version = "0.7.0"
 description = "rustls-native-certs allows rustls to use the platform native certificate store"
 homepage = "https://github.com/rustls/rustls-native-certs"
 readme = "README.md"
@@ -29,26 +24,6 @@ categories = [
 license = "Apache-2.0 OR ISC OR MIT"
 repository = "https://github.com/rustls/rustls-native-certs"
 
-[lib]
-name = "rustls_native_certs"
-path = "src/lib.rs"
-
-[[example]]
-name = "google"
-path = "examples/google.rs"
-
-[[example]]
-name = "print-trust-anchors"
-path = "examples/print-trust-anchors.rs"
-
-[[test]]
-name = "compare_mozilla"
-path = "tests/compare_mozilla.rs"
-
-[[test]]
-name = "smoketests"
-path = "tests/smoketests.rs"
-
 [dependencies.pki-types]
 version = "1"
 package = "rustls-pki-types"
@@ -57,34 +32,31 @@ package = "rustls-pki-types"
 version = "2"
 
 [dev-dependencies.ring]
-version = "0.17"
+version = "0.16.5"
 
 [dev-dependencies.rustls]
-version = "0.23"
+version = "0.22"
 
 [dev-dependencies.rustls-webpki]
 version = "0.102"
 
 [dev-dependencies.serial_test]
-version = "3"
-
-[dev-dependencies.tempfile]
-version = "3.5"
+version = "2"
 
 [dev-dependencies.untrusted]
-version = "0.9"
+version = "0.7"
 
 [dev-dependencies.webpki-roots]
 version = "0.26"
 
 [dev-dependencies.x509-parser]
-version = "0.16"
+version = "0.15"
 
-[target.'cfg(all(unix, not(target_os = "macos")))'.dependencies.openssl-probe]
+[target."cfg(all(unix, not(target_os = \"macos\")))".dependencies.openssl-probe]
 version = "0.1.2"
 
-[target.'cfg(target_os = "macos")'.dependencies.security-framework]
+[target."cfg(target_os = \"macos\")".dependencies.security-framework]
 version = "2"
 
 [target."cfg(windows)".dependencies.schannel]
-version = "0.1"
+version = "0.1.15"

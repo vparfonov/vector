@@ -23,8 +23,8 @@ impl DeleteQueueInput {
 }
 
 /// A builder for [`DeleteQueueInput`](crate::operation::delete_queue::DeleteQueueInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DeleteQueueInputBuilder {
     pub(crate) queue_url: ::std::option::Option<::std::string::String>,
 }

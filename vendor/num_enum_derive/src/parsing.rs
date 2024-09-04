@@ -61,7 +61,6 @@ impl EnumInfo {
     pub(crate) fn variant_idents(&self) -> Vec<Ident> {
         self.variants
             .iter()
-            .filter(|variant| !variant.is_catch_all)
             .map(|variant| variant.ident.clone())
             .collect()
     }
@@ -82,7 +81,6 @@ impl EnumInfo {
     pub(crate) fn variant_expressions(&self) -> Vec<Vec<Expr>> {
         self.variants
             .iter()
-            .filter(|variant| !variant.is_catch_all)
             .map(|variant| variant.all_values().cloned().collect())
             .collect()
     }

@@ -8,7 +8,7 @@ cfg_not_wasi! {
 use std::fmt;
 use std::io;
 use std::net::{self, SocketAddr};
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll};
 
 cfg_net! {
     /// A TCP socket server, listening for connections.

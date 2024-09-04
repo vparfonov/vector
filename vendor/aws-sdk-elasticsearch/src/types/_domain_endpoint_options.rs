@@ -6,12 +6,10 @@
 pub struct DomainEndpointOptions {
     /// <p>Specify if only HTTPS endpoint should be enabled for the Elasticsearch domain.</p>
     pub enforce_https: ::std::option::Option<bool>,
-    /// <p>Specify the TLS security policy that needs to be applied to the HTTPS endpoint of Elasticsearch domain. <br><br>
-    /// It can be one of the following values:</p>
+    /// <p>Specify the TLS security policy that needs to be applied to the HTTPS endpoint of Elasticsearch domain. <br><br> It can be one of the following values: </p>
     /// <ul>
-    /// <li><b>Policy-Min-TLS-1-0-2019-07: </b> TLS security policy that supports TLS version 1.0 to TLS version 1.2</li>
-    /// <li><b>Policy-Min-TLS-1-2-2019-07: </b> TLS security policy that supports only TLS version 1.2</li>
-    /// <li><b>Policy-Min-TLS-1-2-PFS-2023-10: </b> TLS security policy that supports TLS version 1.2 to TLS version 1.3 with perfect forward secrecy cipher suites</li>
+    /// <li><b>Policy-Min-TLS-1-0-2019-07: </b> TLS security policy which supports TLSv1.0 and higher.</li>
+    /// <li><b>Policy-Min-TLS-1-2-2019-07: </b> TLS security policy which supports only TLSv1.2</li>
     /// </ul>
     /// <p></p>
     pub tls_security_policy: ::std::option::Option<crate::types::TlsSecurityPolicy>,
@@ -27,12 +25,10 @@ impl DomainEndpointOptions {
     pub fn enforce_https(&self) -> ::std::option::Option<bool> {
         self.enforce_https
     }
-    /// <p>Specify the TLS security policy that needs to be applied to the HTTPS endpoint of Elasticsearch domain. <br><br>
-    /// It can be one of the following values:</p>
+    /// <p>Specify the TLS security policy that needs to be applied to the HTTPS endpoint of Elasticsearch domain. <br><br> It can be one of the following values: </p>
     /// <ul>
-    /// <li><b>Policy-Min-TLS-1-0-2019-07: </b> TLS security policy that supports TLS version 1.0 to TLS version 1.2</li>
-    /// <li><b>Policy-Min-TLS-1-2-2019-07: </b> TLS security policy that supports only TLS version 1.2</li>
-    /// <li><b>Policy-Min-TLS-1-2-PFS-2023-10: </b> TLS security policy that supports TLS version 1.2 to TLS version 1.3 with perfect forward secrecy cipher suites</li>
+    /// <li><b>Policy-Min-TLS-1-0-2019-07: </b> TLS security policy which supports TLSv1.0 and higher.</li>
+    /// <li><b>Policy-Min-TLS-1-2-2019-07: </b> TLS security policy which supports only TLSv1.2</li>
     /// </ul>
     /// <p></p>
     pub fn tls_security_policy(&self) -> ::std::option::Option<&crate::types::TlsSecurityPolicy> {
@@ -59,8 +55,8 @@ impl DomainEndpointOptions {
 }
 
 /// A builder for [`DomainEndpointOptions`](crate::types::DomainEndpointOptions).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DomainEndpointOptionsBuilder {
     pub(crate) enforce_https: ::std::option::Option<bool>,
     pub(crate) tls_security_policy: ::std::option::Option<crate::types::TlsSecurityPolicy>,
@@ -83,36 +79,30 @@ impl DomainEndpointOptionsBuilder {
     pub fn get_enforce_https(&self) -> &::std::option::Option<bool> {
         &self.enforce_https
     }
-    /// <p>Specify the TLS security policy that needs to be applied to the HTTPS endpoint of Elasticsearch domain. <br><br>
-    /// It can be one of the following values:</p>
+    /// <p>Specify the TLS security policy that needs to be applied to the HTTPS endpoint of Elasticsearch domain. <br><br> It can be one of the following values: </p>
     /// <ul>
-    /// <li><b>Policy-Min-TLS-1-0-2019-07: </b> TLS security policy that supports TLS version 1.0 to TLS version 1.2</li>
-    /// <li><b>Policy-Min-TLS-1-2-2019-07: </b> TLS security policy that supports only TLS version 1.2</li>
-    /// <li><b>Policy-Min-TLS-1-2-PFS-2023-10: </b> TLS security policy that supports TLS version 1.2 to TLS version 1.3 with perfect forward secrecy cipher suites</li>
+    /// <li><b>Policy-Min-TLS-1-0-2019-07: </b> TLS security policy which supports TLSv1.0 and higher.</li>
+    /// <li><b>Policy-Min-TLS-1-2-2019-07: </b> TLS security policy which supports only TLSv1.2</li>
     /// </ul>
     /// <p></p>
     pub fn tls_security_policy(mut self, input: crate::types::TlsSecurityPolicy) -> Self {
         self.tls_security_policy = ::std::option::Option::Some(input);
         self
     }
-    /// <p>Specify the TLS security policy that needs to be applied to the HTTPS endpoint of Elasticsearch domain. <br><br>
-    /// It can be one of the following values:</p>
+    /// <p>Specify the TLS security policy that needs to be applied to the HTTPS endpoint of Elasticsearch domain. <br><br> It can be one of the following values: </p>
     /// <ul>
-    /// <li><b>Policy-Min-TLS-1-0-2019-07: </b> TLS security policy that supports TLS version 1.0 to TLS version 1.2</li>
-    /// <li><b>Policy-Min-TLS-1-2-2019-07: </b> TLS security policy that supports only TLS version 1.2</li>
-    /// <li><b>Policy-Min-TLS-1-2-PFS-2023-10: </b> TLS security policy that supports TLS version 1.2 to TLS version 1.3 with perfect forward secrecy cipher suites</li>
+    /// <li><b>Policy-Min-TLS-1-0-2019-07: </b> TLS security policy which supports TLSv1.0 and higher.</li>
+    /// <li><b>Policy-Min-TLS-1-2-2019-07: </b> TLS security policy which supports only TLSv1.2</li>
     /// </ul>
     /// <p></p>
     pub fn set_tls_security_policy(mut self, input: ::std::option::Option<crate::types::TlsSecurityPolicy>) -> Self {
         self.tls_security_policy = input;
         self
     }
-    /// <p>Specify the TLS security policy that needs to be applied to the HTTPS endpoint of Elasticsearch domain. <br><br>
-    /// It can be one of the following values:</p>
+    /// <p>Specify the TLS security policy that needs to be applied to the HTTPS endpoint of Elasticsearch domain. <br><br> It can be one of the following values: </p>
     /// <ul>
-    /// <li><b>Policy-Min-TLS-1-0-2019-07: </b> TLS security policy that supports TLS version 1.0 to TLS version 1.2</li>
-    /// <li><b>Policy-Min-TLS-1-2-2019-07: </b> TLS security policy that supports only TLS version 1.2</li>
-    /// <li><b>Policy-Min-TLS-1-2-PFS-2023-10: </b> TLS security policy that supports TLS version 1.2 to TLS version 1.3 with perfect forward secrecy cipher suites</li>
+    /// <li><b>Policy-Min-TLS-1-0-2019-07: </b> TLS security policy which supports TLSv1.0 and higher.</li>
+    /// <li><b>Policy-Min-TLS-1-2-2019-07: </b> TLS security policy which supports only TLSv1.2</li>
     /// </ul>
     /// <p></p>
     pub fn get_tls_security_policy(&self) -> &::std::option::Option<crate::types::TlsSecurityPolicy> {

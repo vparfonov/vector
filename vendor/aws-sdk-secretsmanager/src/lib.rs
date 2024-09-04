@@ -1,5 +1,4 @@
 #![allow(deprecated)]
-#![allow(unknown_lints)]
 #![allow(clippy::module_inception)]
 #![allow(clippy::upper_case_acronyms)]
 #![allow(clippy::large_enum_variant)]
@@ -11,12 +10,8 @@
 #![allow(clippy::needless_return)]
 #![allow(clippy::derive_partial_eq_without_eq)]
 #![allow(clippy::result_large_err)]
-#![allow(clippy::unnecessary_map_on_constructor)]
 #![allow(rustdoc::bare_urls)]
-#![allow(rustdoc::redundant_explicit_links)]
-#![forbid(unsafe_code)]
 #![warn(missing_docs)]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 //! Amazon Web Services Secrets Manager provides a service to enable you to store, manage, and retrieve, secrets.
 //!
 //! This guide provides descriptions of the Secrets Manager API. For more information about using this service, see the [Amazon Web Services Secrets Manager User Guide](https://docs.aws.amazon.com/secretsmanager/latest/userguide/introduction.html).
@@ -46,8 +41,8 @@
 //!
 //! ```toml
 //! [dependencies]
-//! aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
-//! aws-sdk-secretsmanager = "1.44.0"
+//! aws-config = { version = "1.0.1", features = ["behavior-version-latest"] }
+//! aws-sdk-secretsmanager = "1.3.0"
 //! tokio = { version = "1", features = ["full"] }
 //! ```
 //!
@@ -132,9 +127,9 @@ pub use config::Config;
 /// # }
 /// ```
 ///
-/// Occasionally, SDKs may have additional service-specific values that can be set on the [`Config`] that
+/// Occasionally, SDKs may have additional service-specific that can be set on the [`Config`] that
 /// is absent from [`SdkConfig`], or slightly different settings for a specific client may be desired.
-/// The [`Builder`] struct implements `From<&SdkConfig>`, so setting these specific settings can be
+/// The [`Config`] struct implements `From<&SdkConfig>`, so setting these specific settings can be
 /// done as follows:
 ///
 /// ```rust,no_run
@@ -164,14 +159,14 @@ pub use config::Config;
 /// # Using the `Client`
 ///
 /// A client has a function for every operation that can be performed by the service.
-/// For example, the [`BatchGetSecretValue`](crate::operation::batch_get_secret_value) operation has
-/// a [`Client::batch_get_secret_value`], function which returns a builder for that operation.
+/// For example, the [`CancelRotateSecret`](crate::operation::cancel_rotate_secret) operation has
+/// a [`Client::cancel_rotate_secret`], function which returns a builder for that operation.
 /// The fluent builder ultimately has a `send()` function that returns an async future that
 /// returns a result, as illustrated below:
 ///
 /// ```rust,ignore
-/// let result = client.batch_get_secret_value()
-///     .next_token("example")
+/// let result = client.cancel_rotate_secret()
+///     .secret_id("example")
 ///     .send()
 ///     .await;
 /// ```
@@ -211,11 +206,9 @@ pub(crate) mod protocol_serde;
 
 mod serialization_settings;
 
-mod endpoint_lib;
-
 mod lens;
 
-mod sdk_feature_tracker;
+mod endpoint_lib;
 
 mod json_errors;
 

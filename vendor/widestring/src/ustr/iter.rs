@@ -2,7 +2,6 @@ use crate::{
     error::{DecodeUtf16Error, DecodeUtf32Error},
     iter::{DecodeUtf16, DecodeUtf16Lossy, DecodeUtf32, DecodeUtf32Lossy},
 };
-#[allow(unused_imports)]
 use core::{
     iter::{Copied, DoubleEndedIterator, ExactSizeIterator, FusedIterator},
     slice::Iter,

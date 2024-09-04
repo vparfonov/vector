@@ -130,14 +130,14 @@ macro_rules! const_fn {
 macro_rules! impl_debug_and_serde {
     ($atomic_type:ident) => {
         impl fmt::Debug for $atomic_type {
-            #[inline] // fmt is not hot path, but #[inline] on fmt seems to still be useful: https://github.com/rust-lang/rust/pull/117727
+            #[allow(clippy::missing_inline_in_public_items)] // fmt is not hot path
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 // std atomic types use Relaxed in Debug::fmt: https://github.com/rust-lang/rust/blob/1.70.0/library/core/src/sync/atomic.rs#L2024
                 fmt::Debug::fmt(&self.load(Ordering::Relaxed), f)
             }
         }
         #[cfg(feature = "serde")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+        #[cfg_attr(portable_atomic_doc_cfg, doc(cfg(feature = "serde")))]
         impl serde::ser::Serialize for $atomic_type {
             #[allow(clippy::missing_inline_in_public_items)] // serde doesn't use inline on std atomic's Serialize/Deserialize impl
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -149,7 +149,7 @@ macro_rules! impl_debug_and_serde {
             }
         }
         #[cfg(feature = "serde")]
-        #[cfg_attr(docsrs, doc(cfg(feature = "serde")))]
+        #[cfg_attr(portable_atomic_doc_cfg, doc(cfg(feature = "serde")))]
         impl<'de> serde::de::Deserialize<'de> for $atomic_type {
             #[allow(clippy::missing_inline_in_public_items)] // serde doesn't use inline on std atomic's Serialize/Deserialize impl
             fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
@@ -163,7 +163,7 @@ macro_rules! impl_debug_and_serde {
 }
 
 // We do not provide `nand` because it cannot be optimized on neither x86 nor MSP430.
-// https://godbolt.org/z/ahWejchbT
+// https://godbolt.org/z/7TzjKqYvE
 macro_rules! impl_default_no_fetch_ops {
     ($atomic_type:ident, bool) => {
         impl $atomic_type {
@@ -246,23 +246,6 @@ macro_rules! items {
     };
 }
 
-#[allow(dead_code)]
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-// Stable version of https://doc.rust-lang.org/nightly/std/hint/fn.assert_unchecked.html.
-// TODO: use real core::hint::assert_unchecked on 1.81+ https://github.com/rust-lang/rust/pull/123588
-#[inline(always)]
-#[cfg_attr(all(debug_assertions, not(portable_atomic_no_track_caller)), track_caller)]
-pub(crate) unsafe fn assert_unchecked(cond: bool) {
-    if !cond {
-        if cfg!(debug_assertions) {
-            unreachable!()
-        } else {
-            // SAFETY: the caller promised `cond` is true.
-            unsafe { core::hint::unreachable_unchecked() }
-        }
-    }
-}
-
 // https://github.com/rust-lang/rust/blob/1.70.0/library/core/src/sync/atomic.rs#L3155
 #[inline]
 #[cfg_attr(all(debug_assertions, not(portable_atomic_no_track_caller)), track_caller)]
@@ -271,7 +254,7 @@ pub(crate) fn assert_load_ordering(order: Ordering) {
         Ordering::Acquire | Ordering::Relaxed | Ordering::SeqCst => {}
         Ordering::Release => panic!("there is no such thing as a release load"),
         Ordering::AcqRel => panic!("there is no such thing as an acquire-release load"),
-        _ => unreachable!(),
+        _ => unreachable!("{:?}", order),
     }
 }
 
@@ -283,7 +266,7 @@ pub(crate) fn assert_store_ordering(order: Ordering) {
         Ordering::Release | Ordering::Relaxed | Ordering::SeqCst => {}
         Ordering::Acquire => panic!("there is no such thing as an acquire store"),
         Ordering::AcqRel => panic!("there is no such thing as an acquire-release store"),
-        _ => unreachable!(),
+        _ => unreachable!("{:?}", order),
     }
 }
 
@@ -297,13 +280,13 @@ pub(crate) fn assert_compare_exchange_ordering(success: Ordering, failure: Order
         | Ordering::Relaxed
         | Ordering::Release
         | Ordering::SeqCst => {}
-        _ => unreachable!(),
+        _ => unreachable!("{:?}, {:?}", success, failure),
     }
     match failure {
         Ordering::Acquire | Ordering::Relaxed | Ordering::SeqCst => {}
         Ordering::Release => panic!("there is no such thing as a release failure ordering"),
         Ordering::AcqRel => panic!("there is no such thing as an acquire-release failure ordering"),
-        _ => unreachable!(),
+        _ => unreachable!("{:?}, {:?}", success, failure),
     }
 }
 
@@ -382,19 +365,21 @@ pub(crate) struct Pair<T: Copy> {
     pub(crate) lo: T,
 }
 
-#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
+#[allow(dead_code)]
 type MinWord = u32;
-#[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
-type RetInt = u32;
+#[cfg(target_arch = "riscv32")]
+type RegSize = u32;
+#[cfg(target_arch = "riscv64")]
+type RegSize = u64;
 // Adapted from https://github.com/taiki-e/atomic-maybe-uninit/blob/v0.3.0/src/utils.rs#L210.
 // Helper for implementing sub-word atomic operations using word-sized LL/SC loop or CAS loop.
 //
-// Refs: https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/lib/CodeGen/AtomicExpandPass.cpp#L691
+// Refs: https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/lib/CodeGen/AtomicExpandPass.cpp#L699
 // (aligned_ptr, shift, mask)
 #[cfg(any(target_arch = "riscv32", target_arch = "riscv64"))]
 #[allow(dead_code)]
 #[inline]
-pub(crate) fn create_sub_word_mask_values<T>(ptr: *mut T) -> (*mut MinWord, RetInt, RetInt) {
+pub(crate) fn create_sub_word_mask_values<T>(ptr: *mut T) -> (*mut MinWord, RegSize, RegSize) {
     use core::mem;
     const SHIFT_MASK: bool = !cfg!(any(
         target_arch = "riscv32",
@@ -415,11 +400,11 @@ pub(crate) fn create_sub_word_mask_values<T>(ptr: *mut T) -> (*mut MinWord, RetI
     } else {
         (ptr_lsb ^ (mem::size_of::<MinWord>() - mem::size_of::<T>())).wrapping_mul(8)
     };
-    let mut mask: RetInt = (1 << (mem::size_of::<T>() * 8)) - 1; // !(0 as T) as RetInt
+    let mut mask: RegSize = (1 << (mem::size_of::<T>() * 8)) - 1; // !(0 as T) as RegSize
     if SHIFT_MASK {
         mask <<= shift;
     }
-    (aligned_ptr, shift as RetInt, mask)
+    (aligned_ptr, shift as RegSize, mask)
 }
 
 /// Emulate strict provenance.

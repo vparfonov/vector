@@ -141,7 +141,7 @@
 //! // ...
 //! # fn parse_bin_digits<'s>(input: &mut &'s str) -> PResult<&'s str> {
 //! #     take_while(1.., (
-//! #         ('0'..='1'),
+//! #         ('0'..='7'),
 //! #     )).parse_next(input)
 //! # }
 //! #
@@ -180,7 +180,7 @@
 //!
 //! > **Warning:** the above example is for illustrative purposes and relying on `Result::Ok` or
 //! > `Result::Err` can lead to incorrect behavior. This will be clarified in later when covering
-//! > [error handling][`chapter_7`#error-cuts]
+//! > [error handling][`chapter_6`#errmode]
 //!
 //! [`opt`] is a parser that encapsulates this pattern of "retry on failure":
 //! ```rust
@@ -202,7 +202,7 @@
 //! #
 //! # fn parse_bin_digits<'s>(input: &mut &'s str) -> PResult<&'s str> {
 //! #     take_while(1.., (
-//! #         ('0'..='1'),
+//! #         ('0'..='7'),
 //! #     )).parse_next(input)
 //! # }
 //! #
@@ -256,7 +256,7 @@
 //! #
 //! # fn parse_bin_digits<'s>(input: &mut &'s str) -> PResult<&'s str> {
 //! #     take_while(1.., (
-//! #         ('0'..='1'),
+//! #         ('0'..='7'),
 //! #     )).parse_next(input)
 //! # }
 //! #
@@ -318,7 +318,7 @@
 //! #
 //! # fn parse_bin_digits<'s>(input: &mut &'s str) -> PResult<&'s str> {
 //! #     take_while(1.., (
-//! #         ('0'..='1'),
+//! #         ('0'..='7'),
 //! #     )).parse_next(input)
 //! # }
 //! #
@@ -359,7 +359,7 @@
 //! See [`combinator`] for more alternative parsers.
 
 #![allow(unused_imports)]
-use super::chapter_7;
+use super::chapter_6;
 use crate::combinator;
 use crate::combinator::alt;
 use crate::combinator::dispatch;

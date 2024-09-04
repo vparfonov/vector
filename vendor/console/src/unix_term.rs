@@ -5,6 +5,7 @@ use std::io;
 use std::io::{BufRead, BufReader};
 use std::mem;
 use std::os::unix::io::AsRawFd;
+use std::ptr;
 use std::str;
 
 use crate::kb::Key;
@@ -45,11 +46,11 @@ pub fn c_result<F: FnOnce() -> libc::c_int>(f: F) -> io::Result<()> {
 
 pub fn terminal_size(out: &Term) -> Option<(u16, u16)> {
     unsafe {
-        if libc::isatty(out.as_raw_fd()) != 1 {
+        if libc::isatty(libc::STDOUT_FILENO) != 1 {
             return None;
         }
 
-        let mut winsize: libc::winsize = mem::zeroed();
+        let mut winsize: libc::winsize = std::mem::zeroed();
 
         // FIXME: ".into()" used as a temporary fix for a libc bug
         // https://github.com/rust-lang/libc/pull/704
@@ -80,7 +81,7 @@ pub fn read_secure() -> io::Result<String> {
         }
     };
 
-    let mut termios = mem::MaybeUninit::uninit();
+    let mut termios = core::mem::MaybeUninit::uninit();
     c_result(|| unsafe { libc::tcgetattr(fd, termios.as_mut_ptr()) })?;
     let mut termios = unsafe { termios.assume_init() };
     let original = termios;
@@ -124,7 +125,7 @@ fn select_fd(fd: i32, timeout: i32) -> io::Result<bool> {
 
         let mut timeout_val;
         let timeout = if timeout < 0 {
-            std::ptr::null_mut()
+            ptr::null_mut()
         } else {
             timeout_val = libc::timeval {
                 tv_sec: (timeout / 1000) as _,
@@ -138,8 +139,8 @@ fn select_fd(fd: i32, timeout: i32) -> io::Result<bool> {
         let ret = libc::select(
             fd + 1,
             &mut read_fd_set,
-            std::ptr::null_mut(),
-            std::ptr::null_mut(),
+            ptr::null_mut(),
+            ptr::null_mut(),
             timeout,
         );
         if ret < 0 {
@@ -294,7 +295,7 @@ fn read_single_key_impl(fd: i32) -> Result<Key, io::Error> {
     }
 }
 
-pub fn read_single_key(ctrlc_key: bool) -> io::Result<Key> {
+pub fn read_single_key() -> io::Result<Key> {
     let tty_f;
     let fd = unsafe {
         if libc::isatty(libc::STDIN_FILENO) == 1 {
@@ -320,12 +321,8 @@ pub fn read_single_key(ctrlc_key: bool) -> io::Result<Key> {
     // if the user hit ^C we want to signal SIGINT to outselves.
     if let Err(ref err) = rv {
         if err.kind() == io::ErrorKind::Interrupted {
-            if !ctrlc_key {
-                unsafe {
-                    libc::raise(libc::SIGINT);
-                }
-            } else {
-                return Ok(Key::CtrlC);
+            unsafe {
+                libc::raise(libc::SIGINT);
             }
         }
     }

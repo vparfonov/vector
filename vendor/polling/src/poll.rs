@@ -6,12 +6,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Condvar, Mutex};
 use std::time::{Duration, Instant};
 
-#[cfg(not(target_os = "hermit"))]
+use rustix::event::{poll, PollFd, PollFlags};
 use rustix::fd::{AsFd, AsRawFd, BorrowedFd};
-#[cfg(target_os = "hermit")]
-use std::os::hermit::io::{AsFd, AsRawFd, BorrowedFd};
-
-use syscall::{poll, PollFd, PollFlags};
 
 // std::os::unix doesn't exist on Fuchsia
 type RawFd = std::os::raw::c_int;
@@ -430,16 +426,6 @@ impl EventExtra {
     pub fn is_pri(&self) -> bool {
         self.flags.contains(PollFlags::PRI)
     }
-
-    #[inline]
-    pub fn is_connect_failed(&self) -> Option<bool> {
-        Some(self.flags.contains(PollFlags::ERR) || self.flags.contains(PollFlags::HUP))
-    }
-
-    #[inline]
-    pub fn is_err(&self) -> Option<bool> {
-        Some(self.flags.contains(PollFlags::ERR))
-    }
 }
 
 fn cvt_mode_as_remove(mode: PollMode) -> io::Result<bool> {
@@ -452,182 +438,7 @@ fn cvt_mode_as_remove(mode: PollMode) -> io::Result<bool> {
     }
 }
 
-#[cfg(unix)]
-mod syscall {
-    pub(super) use rustix::event::{poll, PollFd, PollFlags};
-
-    #[cfg(target_os = "espidf")]
-    pub(super) use rustix::event::{eventfd, EventfdFlags};
-    #[cfg(target_os = "espidf")]
-    pub(super) use rustix::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
-    #[cfg(target_os = "espidf")]
-    pub(super) use rustix::io::{read, write};
-}
-
-#[cfg(target_os = "hermit")]
-mod syscall {
-    // TODO: Remove this shim once HermitOS is supported in Rustix.
-
-    use std::fmt;
-    use std::io;
-    use std::marker::PhantomData;
-    use std::ops::BitOr;
-
-    pub(super) use std::os::hermit::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, OwnedFd, RawFd};
-
-    /// Create an eventfd.
-    pub(super) fn eventfd(count: u64, _flags: EventfdFlags) -> io::Result<OwnedFd> {
-        let fd = unsafe { hermit_abi::eventfd(count, 0) };
-
-        if fd < 0 {
-            Err(io::Error::from_raw_os_error(unsafe {
-                hermit_abi::get_errno()
-            }))
-        } else {
-            Ok(unsafe { OwnedFd::from_raw_fd(fd) })
-        }
-    }
-
-    /// Read some bytes.
-    pub(super) fn read(fd: BorrowedFd<'_>, bytes: &mut [u8]) -> io::Result<usize> {
-        let count = unsafe { hermit_abi::read(fd.as_raw_fd(), bytes.as_mut_ptr(), bytes.len()) };
-
-        cvt(count)
-    }
-
-    /// Write some bytes.
-    pub(super) fn write(fd: BorrowedFd<'_>, bytes: &[u8]) -> io::Result<usize> {
-        let count = unsafe { hermit_abi::write(fd.as_raw_fd(), bytes.as_ptr(), bytes.len()) };
-
-        cvt(count)
-    }
-
-    /// Safe wrapper around the `poll` system call.
-    pub(super) fn poll(fds: &mut [PollFd<'_>], timeout: i32) -> io::Result<usize> {
-        let call = unsafe {
-            hermit_abi::poll(
-                fds.as_mut_ptr() as *mut hermit_abi::pollfd,
-                fds.len(),
-                timeout,
-            )
-        };
-
-        cvt(call as isize)
-    }
-
-    /// Safe wrapper around `pollfd`.
-    #[repr(transparent)]
-    pub(super) struct PollFd<'a> {
-        inner: hermit_abi::pollfd,
-        _lt: PhantomData<BorrowedFd<'a>>,
-    }
-
-    impl<'a> PollFd<'a> {
-        pub(super) fn from_borrowed_fd(fd: BorrowedFd<'a>, inflags: PollFlags) -> Self {
-            Self {
-                inner: hermit_abi::pollfd {
-                    fd: fd.as_raw_fd(),
-                    events: inflags.0,
-                    revents: 0,
-                },
-                _lt: PhantomData,
-            }
-        }
-
-        pub(super) fn revents(&self) -> PollFlags {
-            PollFlags(self.inner.revents)
-        }
-    }
-
-    impl AsFd for PollFd<'_> {
-        fn as_fd(&self) -> BorrowedFd<'_> {
-            unsafe { BorrowedFd::borrow_raw(self.inner.fd) }
-        }
-    }
-
-    impl fmt::Debug for PollFd<'_> {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            f.debug_struct("PollFd")
-                .field("fd", &format_args!("0x{:x}", self.inner.fd))
-                .field("events", &PollFlags(self.inner.events))
-                .field("revents", &PollFlags(self.inner.revents))
-                .finish()
-        }
-    }
-
-    /// Wrapper around polling flags.
-    #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-    pub(super) struct PollFlags(i16);
-
-    impl PollFlags {
-        /// Empty set of flags.
-        pub(super) const fn empty() -> Self {
-            Self(0)
-        }
-
-        pub(super) const IN: PollFlags = PollFlags(hermit_abi::POLLIN);
-        pub(super) const OUT: PollFlags = PollFlags(hermit_abi::POLLOUT);
-        pub(super) const WRBAND: PollFlags = PollFlags(hermit_abi::POLLWRBAND);
-        pub(super) const ERR: PollFlags = PollFlags(hermit_abi::POLLERR);
-        pub(super) const HUP: PollFlags = PollFlags(hermit_abi::POLLHUP);
-        pub(super) const PRI: PollFlags = PollFlags(hermit_abi::POLLPRI);
-
-        /// Tell if this contains some flags.
-        pub(super) fn contains(self, flags: PollFlags) -> bool {
-            self.0 & flags.0 != 0
-        }
-
-        /// Set a flag.
-        pub(super) fn set(&mut self, flags: PollFlags, set: bool) {
-            if set {
-                self.0 |= flags.0;
-            } else {
-                self.0 &= !(flags.0);
-            }
-        }
-
-        /// Tell if this is empty.
-        pub(super) fn is_empty(self) -> bool {
-            self.0 == 0
-        }
-
-        /// Tell if this intersects with some flags.
-        pub(super) fn intersects(self, flags: PollFlags) -> bool {
-            self.contains(flags)
-        }
-    }
-
-    impl BitOr for PollFlags {
-        type Output = PollFlags;
-
-        fn bitor(self, rhs: Self) -> Self::Output {
-            Self(self.0 | rhs.0)
-        }
-    }
-
-    #[derive(Debug, Copy, Clone)]
-    pub(super) struct EventfdFlags;
-
-    impl EventfdFlags {
-        pub(super) fn empty() -> Self {
-            Self
-        }
-    }
-
-    /// Convert a number to an actual result.
-    #[inline]
-    fn cvt(len: isize) -> io::Result<usize> {
-        if len < 0 {
-            Err(io::Error::from_raw_os_error(unsafe {
-                hermit_abi::get_errno()
-            }))
-        } else {
-            Ok(len as usize)
-        }
-    }
-}
-
-#[cfg(not(any(target_os = "espidf", target_os = "hermit")))]
+#[cfg(not(target_os = "espidf"))]
 mod notify {
     use std::io;
 
@@ -685,7 +496,7 @@ mod notify {
             self.read_pipe.as_fd()
         }
 
-        /// Provides the poll flags to be used when registering the read half of the notify pipe with the `Poller`.
+        /// Provides the poll flags to be used when registering the read half of the botify pipe with the `Poller`.
         pub(super) fn poll_flags(&self) -> PollFlags {
             PollFlags::RDNORM
         }
@@ -699,25 +510,7 @@ mod notify {
 
         /// Pops a notification (if any) from the pipe.
         pub(super) fn pop_notification(&self) -> Result<(), io::Error> {
-            // Pipes on Vita do not guarantee that after `write` call succeeds, the
-            // data becomes immediately available for reading on the other side of the pipe.
-            // To ensure that the notification is not lost, the read side of the pipe is temporarily
-            // switched to blocking for a single `read` call.
-            #[cfg(target_os = "vita")]
-            rustix::fs::fcntl_setfl(
-                &self.read_pipe,
-                rustix::fs::fcntl_getfl(&self.read_pipe)? & !rustix::fs::OFlags::NONBLOCK,
-            )?;
-
-            let result = read(&self.read_pipe, &mut [0; 1]);
-
-            #[cfg(target_os = "vita")]
-            rustix::fs::fcntl_setfl(
-                &self.read_pipe,
-                rustix::fs::fcntl_getfl(&self.read_pipe)? | rustix::fs::OFlags::NONBLOCK,
-            )?;
-
-            result?;
+            read(&self.read_pipe, &mut [0; 1])?;
 
             Ok(())
         }
@@ -736,18 +529,20 @@ mod notify {
     }
 }
 
-#[cfg(any(target_os = "espidf", target_os = "hermit"))]
+#[cfg(target_os = "espidf")]
 mod notify {
     use std::io;
     use std::mem;
 
-    use super::syscall::{
-        eventfd, read, write, AsFd, AsRawFd, BorrowedFd, EventfdFlags, OwnedFd, PollFlags, RawFd,
-    };
+    use rustix::event::PollFlags;
+    use rustix::event::{eventfd, EventfdFlags};
+
+    use rustix::fd::{AsFd, AsRawFd, BorrowedFd, OwnedFd, RawFd};
+    use rustix::io::{read, write};
 
     /// A notification pipe.
     ///
-    /// This implementation uses the `eventfd` syscall to send notifications.
+    /// This implementation uses ther `eventfd` syscall to send notifications.
     #[derive(Debug)]
     pub(super) struct Notify {
         /// The file descriptor of the eventfd object. This is also stored as the first
@@ -771,20 +566,13 @@ mod notify {
             // (1) is not a problem for us, as we want the eventfd() file descriptor to be in a non-blocking mode anyway
             // (2) is also not a problem, as long as we don't try to read the counter value in an endless loop when we detect being notified
 
+            #[cfg(not(target_os = "espidf"))]
+            let flags = EventfdFlags::NONBLOCK;
+
+            #[cfg(target_os = "espidf")]
             let flags = EventfdFlags::empty();
-            let event_fd = eventfd(0, flags).map_err(|err| {
-                match io::Error::from(err) {
-                    err if err.kind() == io::ErrorKind::PermissionDenied => {
-                        // EPERM can happen if the eventfd isn't initialized yet.
-                        // Tell the user to call esp_vfs_eventfd_register.
-                        io::Error::new(
-                            io::ErrorKind::PermissionDenied,
-                            "failed to initialize eventfd for polling, try calling `esp_vfs_eventfd_register`"
-                        )
-                    },
-                    err => err,
-                }
-            })?;
+
+            let event_fd = eventfd(0, flags)?;
 
             Ok(Self { event_fd })
         }
@@ -801,14 +589,14 @@ mod notify {
 
         /// Notifies the `Poller` instance via the eventfd file descriptor.
         pub(super) fn notify(&self) -> Result<(), io::Error> {
-            write(self.event_fd.as_fd(), &1u64.to_ne_bytes())?;
+            write(&self.event_fd, &1u64.to_ne_bytes())?;
 
             Ok(())
         }
 
         /// Pops a notification (if any) from the eventfd file descriptor.
         pub(super) fn pop_notification(&self) -> Result<(), io::Error> {
-            read(self.event_fd.as_fd(), &mut [0; mem::size_of::<u64>()])?;
+            read(&self.event_fd, &mut [0; mem::size_of::<u64>()])?;
 
             Ok(())
         }

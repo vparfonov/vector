@@ -1,3 +1,7 @@
+#[cfg(feature = "logging")]
+use crate::log::warn;
+use crate::KeyLog;
+
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter};
 use std::env::var_os;
@@ -6,10 +10,6 @@ use std::fs::{File, OpenOptions};
 use std::io;
 use std::io::Write;
 use std::sync::Mutex;
-
-#[cfg(feature = "logging")]
-use crate::log::warn;
-use crate::KeyLog;
 
 // Internal mutable state for KeyLogFile
 struct KeyLogFileInner {

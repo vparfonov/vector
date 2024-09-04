@@ -10,26 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `DomWindowResizeEventDetail`*"]
     pub type DomWindowResizeEventDetail;
-    #[doc = "Get the `height` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `DomWindowResizeEventDetail`*"]
-    #[wasm_bindgen(method, getter = "height")]
-    pub fn get_height(this: &DomWindowResizeEventDetail) -> Option<i32>;
-    #[doc = "Change the `height` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `DomWindowResizeEventDetail`*"]
-    #[wasm_bindgen(method, setter = "height")]
-    pub fn set_height(this: &DomWindowResizeEventDetail, val: i32);
-    #[doc = "Get the `width` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `DomWindowResizeEventDetail`*"]
-    #[wasm_bindgen(method, getter = "width")]
-    pub fn get_width(this: &DomWindowResizeEventDetail) -> Option<i32>;
-    #[doc = "Change the `width` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `DomWindowResizeEventDetail`*"]
-    #[wasm_bindgen(method, setter = "width")]
-    pub fn set_width(this: &DomWindowResizeEventDetail, val: i32);
 }
 impl DomWindowResizeEventDetail {
     #[doc = "Construct a new `DomWindowResizeEventDetail`."]
@@ -40,14 +20,31 @@ impl DomWindowResizeEventDetail {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_height()` instead."]
+    #[doc = "Change the `height` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `DomWindowResizeEventDetail`*"]
     pub fn height(&mut self, val: i32) -> &mut Self {
-        self.set_height(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("height"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_width()` instead."]
+    #[doc = "Change the `width` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `DomWindowResizeEventDetail`*"]
     pub fn width(&mut self, val: i32) -> &mut Self {
-        self.set_width(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("width"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

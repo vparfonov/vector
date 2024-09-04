@@ -1,9 +1,9 @@
-use alloc::vec::Vec;
+use crate::std_alloc::Vec;
 use core::mem;
 use core::ops::Shl;
-use num_traits::One;
+use num_traits::{One, Zero};
 
-use crate::big_digit::{self, BigDigit, DoubleBigDigit};
+use crate::big_digit::{self, BigDigit, DoubleBigDigit, SignedDoubleBigDigit};
 use crate::biguint::BigUint;
 
 struct MontyReducer {
@@ -15,8 +15,8 @@ struct MontyReducer {
 fn inv_mod_alt(b: BigDigit) -> BigDigit {
     assert_ne!(b & 1, 0);
 
-    let mut k0 = BigDigit::wrapping_sub(2, b);
-    let mut t = b - 1;
+    let mut k0 = 2 - b as SignedDoubleBigDigit;
+    let mut t = (b - 1) as SignedDoubleBigDigit;
     let mut i = 1;
     while i < big_digit::BITS {
         t = t.wrapping_mul(t);
@@ -24,8 +24,7 @@ fn inv_mod_alt(b: BigDigit) -> BigDigit {
 
         i <<= 1;
     }
-    debug_assert_eq!(k0.wrapping_mul(b), 1);
-    k0.wrapping_neg()
+    -k0 as BigDigit
 }
 
 impl MontyReducer {
@@ -57,7 +56,7 @@ fn montgomery(x: &BigUint, y: &BigUint, m: &BigUint, k: BigDigit, n: usize) -> B
         n
     );
 
-    let mut z = BigUint::ZERO;
+    let mut z = BigUint::zero();
     z.data.resize(n * 2, 0);
 
     let mut c: BigDigit = 0;
@@ -174,7 +173,7 @@ pub(super) fn monty_modpow(x: &BigUint, y: &BigUint, m: &BigUint) -> BigUint {
     // initialize z = 1 (Montgomery 1)
     let mut z = powers[0].clone();
     z.data.resize(num_words, 0);
-    let mut zz = BigUint::ZERO;
+    let mut zz = BigUint::zero();
     zz.data.resize(num_words, 0);
 
     // same windowed exponent, but with Montgomery multiplications

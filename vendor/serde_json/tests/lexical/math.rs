@@ -18,12 +18,12 @@ impl Math for Bigint {
     }
 }
 
-#[cfg(fast_arithmetic = "32")]
+#[cfg(limb_width_32)]
 pub(crate) fn from_u32(x: &[u32]) -> Vec<Limb> {
     x.iter().cloned().collect()
 }
 
-#[cfg(fast_arithmetic = "64")]
+#[cfg(limb_width_64)]
 pub(crate) fn from_u32(x: &[u32]) -> Vec<Limb> {
     let mut v = Vec::<Limb>::default();
     for xi in x.chunks(2) {

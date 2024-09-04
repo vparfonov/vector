@@ -5,7 +5,7 @@
 
 use crate::environment::parse_bool;
 use crate::provider_config::ProviderConfig;
-use aws_runtime::env_config::EnvConfigValue;
+use crate::standard_property::StandardProperty;
 use aws_smithy_types::error::display::DisplayErrorContext;
 
 mod env {
@@ -24,13 +24,11 @@ mod profile_key {
 ///
 /// If invalid values are found, the provider will return None and an error will be logged.
 pub async fn use_fips_provider(provider_config: &ProviderConfig) -> Option<bool> {
-    let env = provider_config.env();
-    let profiles = provider_config.profile().await;
-
-    EnvConfigValue::new()
+    StandardProperty::new()
         .env(env::USE_FIPS)
         .profile(profile_key::USE_FIPS)
-        .validate(&env, profiles, parse_bool)
+        .validate(provider_config, parse_bool)
+        .await
         .map_err(
             |err| tracing::warn!(err = %DisplayErrorContext(&err), "invalid value for FIPS setting"),
         )
@@ -40,7 +38,6 @@ pub async fn use_fips_provider(provider_config: &ProviderConfig) -> Option<bool>
 #[cfg(test)]
 mod test {
     use crate::default_provider::use_fips::use_fips_provider;
-    #[allow(deprecated)]
     use crate::profile::profile_file::{ProfileFileKind, ProfileFiles};
     use crate::provider_config::ProviderConfig;
     use aws_types::os_shim_internal::{Env, Fs};
@@ -65,13 +62,8 @@ mod test {
             .with_env(Env::from_slice(&[("AWS_USE_FIPS_ENDPOINT", "TRUE")]))
             .with_profile_config(
                 Some(
-                    #[allow(deprecated)]
                     ProfileFiles::builder()
-                        .with_file(
-                            #[allow(deprecated)]
-                            ProfileFileKind::Config,
-                            "conf",
-                        )
+                        .with_file(ProfileFileKind::Config, "conf")
                         .build(),
                 ),
                 None,

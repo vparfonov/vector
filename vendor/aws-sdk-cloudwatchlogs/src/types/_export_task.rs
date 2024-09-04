@@ -69,8 +69,8 @@ impl ExportTask {
 }
 
 /// A builder for [`ExportTask`](crate::types::ExportTask).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct ExportTaskBuilder {
     pub(crate) task_id: ::std::option::Option<::std::string::String>,
     pub(crate) task_name: ::std::option::Option<::std::string::String>,

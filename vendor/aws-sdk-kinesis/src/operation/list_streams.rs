@@ -90,7 +90,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for ListStr
             ::aws_smithy_runtime_api::client::auth::static_resolver::StaticAuthSchemeOptionResolverParams::new(),
         ));
 
-        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new("ListStreams", "kinesis"));
+        cfg.store_put(::aws_smithy_http::operation::Metadata::new("ListStreams", "kinesis"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = true;
         signing_options.content_sha256_header = false;
@@ -111,7 +111,11 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for ListStr
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("ListStreams")
-            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
+            .with_interceptor(
+                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
+                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
+                ),
+            )
             .with_interceptor(ListStreamsEndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::list_streams::ListStreamsError,
@@ -237,9 +241,6 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for ListStreamsEn
     }
 }
 
-// The get_* functions below are generated from JMESPath expressions in the
-// operationContextParams trait. They target the operation's input shape.
-
 /// Error type for the `ListStreamsError` operation.
 #[non_exhaustive]
 #[derive(::std::fmt::Debug)]
@@ -248,7 +249,7 @@ pub enum ListStreamsError {
     ExpiredNextTokenException(crate::types::error::ExpiredNextTokenException),
     /// <p>A specified parameter exceeds its restrictions, is not supported, or can't be used. For more information, see the returned message.</p>
     InvalidArgumentException(crate::types::error::InvalidArgumentException),
-    /// <p>The requested resource exceeds the maximum number allowed, or the number of concurrent stream requests exceeds the maximum number allowed.</p>
+    /// <p>The requested resource exceeds the maximum number allowed, or the number of concurrent stream requests exceeds the maximum number allowed. </p>
     LimitExceededException(crate::types::error::LimitExceededException),
     /// An unexpected error occurred (e.g., invalid JSON returned by the service or an unknown error code).
     #[deprecated(note = "Matching `Unhandled` directly is not forwards compatible. Instead, match using a \

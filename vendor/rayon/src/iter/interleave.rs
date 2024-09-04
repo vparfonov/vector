@@ -1,5 +1,6 @@
 use super::plumbing::*;
 use super::*;
+use std::cmp;
 use std::iter::Fuse;
 
 /// `Interleave` is an iterator that interleaves elements of iterators
@@ -184,11 +185,11 @@ where
     }
 
     fn min_len(&self) -> usize {
-        Ord::max(self.i.min_len(), self.j.min_len())
+        cmp::max(self.i.min_len(), self.j.min_len())
     }
 
     fn max_len(&self) -> usize {
-        Ord::min(self.i.max_len(), self.j.max_len())
+        cmp::min(self.i.max_len(), self.j.max_len())
     }
 
     /// We know 0 < index <= self.i_len + self.j_len

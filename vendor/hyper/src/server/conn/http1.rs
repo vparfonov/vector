@@ -57,7 +57,7 @@ pin_project_lite::pin_project! {
 /// # fn main() {
 /// let mut http = Builder::new();
 /// // Set options one at a time
-/// http.half_close(false);
+/// http.header_read_timeout(Duration::from_millis(200));
 ///
 /// // Or, chain multiple options
 /// http.keep_alive(false).title_case_headers(true).max_buf_size(8192);
@@ -79,7 +79,6 @@ pub struct Builder {
     h1_writev: Option<bool>,
     max_buf_size: Option<usize>,
     pipeline_flush: bool,
-    date_header: bool,
 }
 
 /// Deconstructed parts of a `Connection`.
@@ -87,7 +86,6 @@ pub struct Builder {
 /// This allows taking apart a `Connection` at a later time, in order to
 /// reclaim the IO object, and additional related pieces.
 #[derive(Debug)]
-#[non_exhaustive]
 pub struct Parts<T, S> {
     /// The original IO object used in the handshake.
     pub io: T,
@@ -102,6 +100,7 @@ pub struct Parts<T, S> {
     pub read_buf: Bytes,
     /// The `Service` used to serve this connection.
     pub service: S,
+    _inner: (),
 }
 
 // ===== impl Connection =====
@@ -152,6 +151,7 @@ where
             io,
             read_buf,
             service: dispatch.into_service(),
+            _inner: (),
         }
     }
 
@@ -166,6 +166,7 @@ where
     where
         S: Unpin,
         S::Future: Unpin,
+        B: Unpin,
     {
         self.conn.poll_without_shutdown(cx)
     }
@@ -176,7 +177,12 @@ where
     /// # Error
     ///
     /// This errors if the underlying connection protocol is not HTTP/1.
-    pub fn without_shutdown(self) -> impl Future<Output = crate::Result<Parts<I, S>>> {
+    pub fn without_shutdown(self) -> impl Future<Output = crate::Result<Parts<I, S>>>
+    where
+        S: Unpin,
+        S::Future: Unpin,
+        B: Unpin,
+    {
         let mut zelf = Some(self);
         futures_util::future::poll_fn(move |cx| {
             ready!(zelf.as_mut().unwrap().conn.poll_without_shutdown(cx))?;
@@ -199,7 +205,7 @@ impl<I, B, S> Future for Connection<I, S>
 where
     S: HttpService<IncomingBody, ResBody = B>,
     S::Error: Into<Box<dyn StdError + Send + Sync>>,
-    I: Read + Write + Unpin,
+    I: Read + Write + Unpin + 'static,
     B: Body + 'static,
     B::Error: Into<Box<dyn StdError + Send + Sync>>,
 {
@@ -241,7 +247,6 @@ impl Builder {
             h1_writev: None,
             max_buf_size: None,
             pipeline_flush: false,
-            date_header: true,
         }
     }
     /// Set whether HTTP/1 connections should support half-closures.
@@ -311,9 +316,6 @@ impl Builder {
     /// Set a timeout for reading client request headers. If a client does not
     /// transmit the entire header within this time, the connection is closed.
     ///
-    /// Requires a [`Timer`] set by [`Builder::timer`] to take effect. Panics if `header_read_timeout` is configured
-    /// without a [`Timer`].
-    ///
     /// Pass `None` to disable.
     ///
     /// Default is 30 seconds.
@@ -352,16 +354,6 @@ impl Builder {
             "the max_buf_size cannot be smaller than the minimum that h1 specifies."
         );
         self.max_buf_size = Some(max);
-        self
-    }
-
-    /// Set whether the `date` header should be included in HTTP responses.
-    ///
-    /// Note that including the `date` header is recommended by RFC 7231.
-    ///
-    /// Default is true.
-    pub fn auto_date_header(&mut self, enabled: bool) -> &mut Self {
-        self.date_header = enabled;
         self
     }
 
@@ -488,11 +480,7 @@ where
     /// This `Connection` should continue to be polled until shutdown
     /// can finish.
     pub fn graceful_shutdown(mut self: Pin<&mut Self>) {
-        // Connection (`inner`) is `None` if it was upgraded (and `poll` is `Ready`).
-        // In that case, we don't need to call `graceful_shutdown`.
-        if let Some(conn) = self.inner.as_mut() {
-            Pin::new(conn).graceful_shutdown()
-        }
+        Pin::new(self.inner.as_mut().unwrap()).graceful_shutdown()
     }
 }
 
@@ -507,19 +495,14 @@ where
     type Output = crate::Result<()>;
 
     fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        if let Some(conn) = self.inner.as_mut() {
-            match ready!(Pin::new(&mut conn.conn).poll(cx)) {
-                Ok(proto::Dispatched::Shutdown) => Poll::Ready(Ok(())),
-                Ok(proto::Dispatched::Upgrade(pending)) => {
-                    let (io, buf, _) = self.inner.take().unwrap().conn.into_inner();
-                    pending.fulfill(Upgraded::new(io, buf));
-                    Poll::Ready(Ok(()))
-                }
-                Err(e) => Poll::Ready(Err(e)),
+        match ready!(Pin::new(&mut self.inner.as_mut().unwrap().conn).poll(cx)) {
+            Ok(proto::Dispatched::Shutdown) => Poll::Ready(Ok(())),
+            Ok(proto::Dispatched::Upgrade(pending)) => {
+                let (io, buf, _) = self.inner.take().unwrap().conn.into_inner();
+                pending.fulfill(Upgraded::new(io, buf));
+                Poll::Ready(Ok(()))
             }
-        } else {
-            // inner is `None`, meaning the connection was upgraded, thus it's `Poll::Ready(Ok(()))`
-            Poll::Ready(Ok(()))
+            Err(e) => Poll::Ready(Err(e)),
         }
     }
 }

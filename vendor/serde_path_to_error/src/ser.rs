@@ -99,7 +99,6 @@ pub struct Serializer<'a, 'b, S> {
 }
 
 impl<'a, 'b, S> Serializer<'a, 'b, S> {
-    #[allow(clippy::needless_pass_by_ref_mut)]
     pub fn new(ser: S, track: &'b mut Track) -> Self {
         Serializer {
             ser,

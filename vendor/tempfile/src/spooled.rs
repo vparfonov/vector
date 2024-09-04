@@ -36,8 +36,14 @@ pub struct SpooledTempFile {
 ///
 /// ```
 /// use tempfile::spooled_tempfile;
-/// use std::io::Write;
+/// use std::io::{self, Write};
 ///
+/// # fn main() {
+/// #     if let Err(_) = run() {
+/// #         ::std::process::exit(1);
+/// #     }
+/// # }
+/// # fn run() -> Result<(), io::Error> {
 /// let mut file = spooled_tempfile(15);
 ///
 /// writeln!(file, "short line")?;
@@ -48,7 +54,9 @@ pub struct SpooledTempFile {
 /// // and the in-memory buffer will be dropped
 /// writeln!(file, "marvin gardens")?;
 /// assert!(file.is_rolled());
-/// # Ok::<(), std::io::Error>(())
+///
+/// # Ok(())
+/// # }
 /// ```
 #[inline]
 pub fn spooled_tempfile(max_size: usize) -> SpooledTempFile {

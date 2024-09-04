@@ -1,19 +1,17 @@
 use crate::iter::Bytes;
 
-#[target_feature(enable = "sse4.2")]
-pub unsafe fn match_uri_vectored(bytes: &mut Bytes) {
+pub unsafe fn parse_uri_batch_16(bytes: &mut Bytes) {
     while bytes.as_ref().len() >= 16 {
         let advance = match_url_char_16_sse(bytes.as_ref());
         bytes.advance(advance);
 
         if advance != 16 {
-            return;
+            break;
         }
     }
-    super::swar::match_uri_vectored(bytes);
 }
 
-#[inline(always)]
+#[target_feature(enable = "sse4.2")]
 #[allow(non_snake_case, overflowing_literals)]
 unsafe fn match_url_char_16_sse(buf: &[u8]) -> usize {
     debug_assert!(buf.len() >= 16);
@@ -56,25 +54,23 @@ unsafe fn match_url_char_16_sse(buf: &[u8]) -> usize {
     let bits = _mm_and_si128(_mm_shuffle_epi8(ARF, cols), rbms);
 
     let v = _mm_cmpeq_epi8(bits, _mm_setzero_si128());
-    let r = _mm_movemask_epi8(v) as u16;
+    let r = 0xffff_0000 | _mm_movemask_epi8(v) as u32;
 
-    r.trailing_zeros() as usize
+    _tzcnt_u32(r) as usize
 }
 
-#[target_feature(enable = "sse4.2")]
-pub unsafe fn match_header_value_vectored(bytes: &mut Bytes) {
+pub unsafe fn match_header_value_batch_16(bytes: &mut Bytes) {
     while bytes.as_ref().len() >= 16 {
         let advance = match_header_value_char_16_sse(bytes.as_ref());
         bytes.advance(advance);
 
        if advance != 16 {
-            return;
+            break;
        }
     }
-    super::swar::match_header_value_vectored(bytes);
 }
 
-#[inline(always)]
+#[target_feature(enable = "sse4.2")]
 #[allow(non_snake_case)]
 unsafe fn match_header_value_char_16_sse(buf: &[u8]) -> usize {
     debug_assert!(buf.len() >= 16);
@@ -97,25 +93,25 @@ unsafe fn match_header_value_char_16_sse(buf: &[u8]) -> usize {
     let tab = _mm_cmpeq_epi8(dat, TAB);
     let del = _mm_cmpeq_epi8(dat, DEL);
     let bit = _mm_andnot_si128(del, _mm_or_si128(low, tab));
-    let res = _mm_movemask_epi8(bit) as u16;
+    let rev = _mm_cmpeq_epi8(bit, _mm_setzero_si128());
+    let res = 0xffff_0000 | _mm_movemask_epi8(rev) as u32;
 
-    // TODO: use .trailing_ones() once MSRV >= 1.46
-    (!res).trailing_zeros() as usize
+    _tzcnt_u32(res) as usize
 }
 
 #[test]
 fn sse_code_matches_uri_chars_table() {
-    if !is_x86_feature_detected!("sse4.2") {
-        return;
+    match super::detect() {
+        super::SSE_42 | super::AVX_2_AND_SSE_42 => {},
+        _ => return,
     }
 
-    #[allow(clippy::undocumented_unsafe_blocks)]
     unsafe {
-        assert!(byte_is_allowed(b'_', match_uri_vectored));
+        assert!(byte_is_allowed(b'_', parse_uri_batch_16));
 
         for (b, allowed) in crate::URI_MAP.iter().cloned().enumerate() {
             assert_eq!(
-                byte_is_allowed(b as u8, match_uri_vectored), allowed,
+                byte_is_allowed(b as u8, parse_uri_batch_16), allowed,
                 "byte_is_allowed({:?}) should be {:?}", b, allowed,
             );
         }
@@ -124,24 +120,23 @@ fn sse_code_matches_uri_chars_table() {
 
 #[test]
 fn sse_code_matches_header_value_chars_table() {
-    if !is_x86_feature_detected!("sse4.2") {
-        return;
+    match super::detect() {
+        super::SSE_42 | super::AVX_2_AND_SSE_42 => {},
+        _ => return,
     }
 
-    #[allow(clippy::undocumented_unsafe_blocks)]
     unsafe {
-        assert!(byte_is_allowed(b'_', match_header_value_vectored));
+        assert!(byte_is_allowed(b'_', match_header_value_batch_16));
 
         for (b, allowed) in crate::HEADER_VALUE_MAP.iter().cloned().enumerate() {
             assert_eq!(
-                byte_is_allowed(b as u8, match_header_value_vectored), allowed,
+                byte_is_allowed(b as u8, match_header_value_batch_16), allowed,
                 "byte_is_allowed({:?}) should be {:?}", b, allowed,
             );
         }
     }
 }
 
-#[allow(clippy::missing_safety_doc)]
 #[cfg(test)]
 unsafe fn byte_is_allowed(byte: u8, f: unsafe fn(bytes: &mut Bytes<'_>)) -> bool {
     let slice = [

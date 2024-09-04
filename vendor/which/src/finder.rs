@@ -76,27 +76,12 @@ impl Finder {
     {
         let path = PathBuf::from(&binary_name);
 
-        #[cfg(feature = "tracing")]
-        tracing::debug!(
-            "query binary_name = {:?}, paths = {:?}, cwd = {:?}",
-            binary_name.as_ref().to_string_lossy(),
-            paths.as_ref().map(|p| p.as_ref().to_string_lossy()),
-            cwd.as_ref().map(|p| p.as_ref().display())
-        );
-
         let binary_path_candidates = match cwd {
             Some(cwd) if path.has_separator() => {
-                #[cfg(feature = "tracing")]
-                tracing::trace!(
-                    "{} has a path seperator, so only CWD will be searched.",
-                    path.display()
-                );
                 // Search binary in cwd if the path have a path separator.
                 Either::Left(Self::cwd_search_candidates(path, cwd).into_iter())
             }
             _ => {
-                #[cfg(feature = "tracing")]
-                tracing::trace!("{} has no path seperators, so only paths in PATH environment variable will be searched.", path.display());
                 // Search binary in PATHs(defined in environment variable).
                 let paths =
                     env::split_paths(&paths.ok_or(Error::CannotGetCurrentDirAndPathListEmpty)?)
@@ -108,15 +93,10 @@ impl Finder {
                 Either::Right(Self::path_search_candidates(path, paths).into_iter())
             }
         };
-        let ret = binary_path_candidates
+
+        Ok(binary_path_candidates
             .filter(move |p| binary_checker.is_valid(p))
-            .map(correct_casing);
-        #[cfg(feature = "tracing")]
-        let ret = ret.map(|p| {
-            tracing::debug!("found path {}", p.display());
-            p
-        });
-        Ok(ret)
+            .map(correct_casing))
     }
 
     #[cfg(feature = "regex")]
@@ -189,50 +169,39 @@ impl Finder {
     where
         P: IntoIterator<Item = PathBuf>,
     {
-        use std::sync::OnceLock;
+        use once_cell::sync::Lazy;
 
         // Sample %PATHEXT%: .COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC
         // PATH_EXTENSIONS is then [".COM", ".EXE", ".BAT", …].
         // (In one use of PATH_EXTENSIONS we skip the dot, but in the other we need it;
         // hence its retention.)
-        static PATH_EXTENSIONS: OnceLock<Vec<String>> = OnceLock::new();
+        static PATH_EXTENSIONS: Lazy<Vec<String>> = Lazy::new(|| {
+            env::var("PATHEXT")
+                .map(|pathext| {
+                    pathext
+                        .split(';')
+                        .filter_map(|s| {
+                            if s.as_bytes().first() == Some(&b'.') {
+                                Some(s.to_owned())
+                            } else {
+                                // Invalid segment; just ignore it.
+                                None
+                            }
+                        })
+                        .collect()
+                })
+                // PATHEXT not being set or not being a proper Unicode string is exceedingly
+                // improbable and would probably break Windows badly. Still, don't crash:
+                .unwrap_or_default()
+        });
 
         paths
             .into_iter()
             .flat_map(move |p| -> Box<dyn Iterator<Item = _>> {
-                let path_extensions = PATH_EXTENSIONS.get_or_init(|| {
-                    env::var("PATHEXT")
-                        .map(|pathext| {
-                            pathext
-                                .split(';')
-                                .filter_map(|s| {
-                                    if s.as_bytes().first() == Some(&b'.') {
-                                        Some(s.to_owned())
-                                    } else {
-                                        // Invalid segment; just ignore it.
-                                        None
-                                    }
-                                })
-                                .collect()
-                        })
-                        // PATHEXT not being set or not being a proper Unicode string is exceedingly
-                        // improbable and would probably break Windows badly. Still, don't crash:
-                        .unwrap_or_default()
-                });
                 // Check if path already have executable extension
-                if has_executable_extension(&p, path_extensions) {
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!(
-                        "{} already has an executable extension, not modifying it further",
-                        p.display()
-                    );
+                if has_executable_extension(&p, &PATH_EXTENSIONS) {
                     Box::new(iter::once(p))
                 } else {
-                    #[cfg(feature = "tracing")]
-                    tracing::trace!(
-                        "{} has no extension, using PATHEXT environment variable to infer one",
-                        p.display()
-                    );
                     // Appended paths with windows executable extensions.
                     // e.g. path `c:/windows/bin[.ext]` will expand to:
                     // [c:/windows/bin.ext]
@@ -241,14 +210,12 @@ impl Finder {
                     // c:/windows/bin[.ext].CMD
                     // ...
                     Box::new(
-                        iter::once(p.clone()).chain(path_extensions.iter().map(move |e| {
+                        iter::once(p.clone()).chain(PATH_EXTENSIONS.iter().map(move |e| {
                             // Append the extension.
                             let mut p = p.clone().into_os_string();
                             p.push(e);
-                            let ret = PathBuf::from(p);
-                            #[cfg(feature = "tracing")]
-                            tracing::trace!("possible extension: {}", ret.display());
-                            ret
+
+                            PathBuf::from(p)
                         })),
                     )
                 }
@@ -262,11 +229,6 @@ fn tilde_expansion(p: &PathBuf) -> Cow<'_, PathBuf> {
         if o == "~" {
             let mut new_path = home_dir().unwrap_or_default();
             new_path.extend(component_iter);
-            #[cfg(feature = "tracing")]
-            tracing::trace!(
-                "found tilde, substituting in user's home directory to get {}",
-                new_path.display()
-            );
             Cow::Owned(new_path)
         } else {
             Cow::Borrowed(p)

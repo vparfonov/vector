@@ -1,6 +1,7 @@
 mod biguint {
     use num_bigint::BigUint;
     use num_traits::{One, Zero};
+    use std::{i32, u32};
 
     fn check<T: Into<BigUint>>(x: T, n: u32) {
         let x: BigUint = x.into();

@@ -2,7 +2,7 @@ use super::color::{Color, RGBAColor};
 use plotters_backend::{BackendColor, BackendStyle};
 
 /// Style for any shape
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone)]
 pub struct ShapeStyle {
     /// Specification of the color.
     pub color: RGBAColor,

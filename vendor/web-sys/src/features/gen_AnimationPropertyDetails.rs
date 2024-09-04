@@ -10,46 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
     pub type AnimationPropertyDetails;
-    #[doc = "Get the `property` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
-    #[wasm_bindgen(method, getter = "property")]
-    pub fn get_property(this: &AnimationPropertyDetails) -> String;
-    #[doc = "Change the `property` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
-    #[wasm_bindgen(method, setter = "property")]
-    pub fn set_property(this: &AnimationPropertyDetails, val: &str);
-    #[doc = "Get the `runningOnCompositor` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
-    #[wasm_bindgen(method, getter = "runningOnCompositor")]
-    pub fn get_running_on_compositor(this: &AnimationPropertyDetails) -> bool;
-    #[doc = "Change the `runningOnCompositor` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
-    #[wasm_bindgen(method, setter = "runningOnCompositor")]
-    pub fn set_running_on_compositor(this: &AnimationPropertyDetails, val: bool);
-    #[doc = "Get the `values` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
-    #[wasm_bindgen(method, getter = "values")]
-    pub fn get_values(this: &AnimationPropertyDetails) -> ::js_sys::Array;
-    #[doc = "Change the `values` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
-    #[wasm_bindgen(method, setter = "values")]
-    pub fn set_values(this: &AnimationPropertyDetails, val: &::wasm_bindgen::JsValue);
-    #[doc = "Get the `warning` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
-    #[wasm_bindgen(method, getter = "warning")]
-    pub fn get_warning(this: &AnimationPropertyDetails) -> Option<String>;
-    #[doc = "Change the `warning` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
-    #[wasm_bindgen(method, setter = "warning")]
-    pub fn set_warning(this: &AnimationPropertyDetails, val: &str);
 }
 impl AnimationPropertyDetails {
     #[doc = "Construct a new `AnimationPropertyDetails`."]
@@ -67,24 +27,69 @@ impl AnimationPropertyDetails {
         ret.values(values);
         ret
     }
-    #[deprecated = "Use `set_property()` instead."]
+    #[doc = "Change the `property` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
     pub fn property(&mut self, val: &str) -> &mut Self {
-        self.set_property(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("property"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_running_on_compositor()` instead."]
+    #[doc = "Change the `runningOnCompositor` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
     pub fn running_on_compositor(&mut self, val: bool) -> &mut Self {
-        self.set_running_on_compositor(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("runningOnCompositor"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_values()` instead."]
+    #[doc = "Change the `values` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
     pub fn values(&mut self, val: &::wasm_bindgen::JsValue) -> &mut Self {
-        self.set_values(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("values"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_warning()` instead."]
+    #[doc = "Change the `warning` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AnimationPropertyDetails`*"]
     pub fn warning(&mut self, val: &str) -> &mut Self {
-        self.set_warning(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("warning"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

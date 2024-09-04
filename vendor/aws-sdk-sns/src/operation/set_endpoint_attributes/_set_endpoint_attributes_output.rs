@@ -18,8 +18,8 @@ impl SetEndpointAttributesOutput {
 }
 
 /// A builder for [`SetEndpointAttributesOutput`](crate::operation::set_endpoint_attributes::SetEndpointAttributesOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct SetEndpointAttributesOutputBuilder {
     _request_id: Option<String>,
 }

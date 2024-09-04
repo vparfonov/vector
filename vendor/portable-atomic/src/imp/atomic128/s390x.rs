@@ -2,12 +2,11 @@
 
 // Atomic{I,U}128 implementation on s390x.
 //
-// s390x has 128-bit atomic load/store/CAS instructions and other operations are emulated by CAS loop.
+// s390x supports 128-bit atomic load/store/cmpxchg:
 // https://github.com/llvm/llvm-project/commit/a11f63a952664f700f076fd754476a2b9eb158cc
-// https://github.com/llvm/llvm-project/commit/c568927f3e2e7d9804ea74ecbf11c16c014ddcbc
 //
 // LLVM's minimal supported architecture level is z10:
-// https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/lib/Target/SystemZ/SystemZProcessors.td)
+// https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/lib/Target/SystemZ/SystemZProcessors.td)
 // This does not appear to have changed since the current s390x backend was added in LLVM 3.3:
 // https://github.com/llvm/llvm-project/commit/5f613dfd1f7edb0ae95d521b7107b582d9df5103#diff-cbaef692b3958312e80fd5507a7e2aff071f1acb086f10e8a96bc06a7bb289db
 //
@@ -20,9 +19,9 @@
 // - atomic-maybe-uninit https://github.com/taiki-e/atomic-maybe-uninit
 //
 // Generated asm:
-// - s390x https://godbolt.org/z/sbvhjKrMT
-// - s390x (z196) https://godbolt.org/z/Erbqazhv7
-// - s390x (z15) https://godbolt.org/z/GEaePbbsT
+// - s390x https://godbolt.org/z/b11znnEh4
+// - s390x (z196) https://godbolt.org/z/s5n9PGcv6
+// - s390x (z15) https://godbolt.org/z/Wf49h7bPf
 
 include!("macros.rs");
 
@@ -126,7 +125,7 @@ unsafe fn atomic_store(dst: *mut u128, val: u128, order: Ordering) {
                 portable_atomic_target_feature = "fast-serialization",
             )))]
             Ordering::SeqCst => atomic_store!("bcr 15, 0"),
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", order),
         }
     }
 }
@@ -416,7 +415,7 @@ atomic_rmw_cas_3! {
 // We use atomic_update for atomic min/max on pre-z196 because
 // z10 doesn't seem to have a good way to implement 128-bit min/max.
 // loc{,g}r requires z196 or later.
-// https://godbolt.org/z/EqoMEP8b3
+// https://godbolt.org/z/j8KG9q5oq
 #[cfg(not(any(
     target_feature = "load-store-on-cond",
     portable_atomic_target_feature = "load-store-on-cond",

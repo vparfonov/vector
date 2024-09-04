@@ -631,7 +631,7 @@ impl Command {
     /// [`env::args_os`]: std::env::args_os()
     /// [`Command::get_matches`]: Command::get_matches()
     pub fn get_matches_mut(&mut self) -> ArgMatches {
-        self.try_get_matches_from_mut(env::args_os())
+        self.try_get_matches_from_mut(&mut env::args_os())
             .unwrap_or_else(|e| e.exit())
     }
 
@@ -1157,8 +1157,6 @@ impl Command {
 
     /// Sets when to color output.
     ///
-    /// To customize how the output is styled, see [`Command::styles`].
-    ///
     /// **NOTE:** This choice is propagated to all child subcommands.
     ///
     /// **NOTE:** Default behaviour is [`ColorChoice::Auto`].
@@ -1199,13 +1197,13 @@ impl Command {
     /// ```no_run
     /// # use clap_builder as clap;
     /// # use clap::{Command, ColorChoice, builder::styling};
-    /// const STYLES: styling::Styles = styling::Styles::styled()
-    ///     .header(styling::AnsiColor::Green.on_default().bold())
-    ///     .usage(styling::AnsiColor::Green.on_default().bold())
-    ///     .literal(styling::AnsiColor::Blue.on_default().bold())
+    /// let styles = styling::Styles::styled()
+    ///     .header(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
+    ///     .usage(styling::AnsiColor::Green.on_default() | styling::Effects::BOLD)
+    ///     .literal(styling::AnsiColor::Blue.on_default() | styling::Effects::BOLD)
     ///     .placeholder(styling::AnsiColor::Cyan.on_default());
     /// Command::new("myprog")
-    ///     .styles(STYLES)
+    ///     .styles(styles)
     ///     .get_matches();
     /// ```
     #[cfg(feature = "color")]

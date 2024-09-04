@@ -54,14 +54,14 @@
 // - atomic-maybe-uninit https://github.com/taiki-e/atomic-maybe-uninit
 //
 // Generated asm:
-// - aarch64 https://godbolt.org/z/9Kq15oGs4
-// - aarch64 msvc https://godbolt.org/z/hsWo8eYh4
-// - aarch64 (+lse) https://godbolt.org/z/81TanrTGn
-// - aarch64 msvc (+lse) https://godbolt.org/z/KsannGvTY
-// - aarch64 (+lse,+lse2) https://godbolt.org/z/EzvodM6ca
-// - aarch64 (+lse,+lse2,+rcpc3) https://godbolt.org/z/3rEEs6KE6
-// - aarch64 (+lse2,+lse128) https://godbolt.org/z/PWhsPjGa7
-// - aarch64 (+lse2,+lse128,+rcpc3) https://godbolt.org/z/K8MMhfPT1
+// - aarch64 https://godbolt.org/z/5Mz1E33vz
+// - aarch64 msvc https://godbolt.org/z/P53d1MsGY
+// - aarch64 (+lse) https://godbolt.org/z/qvaE8n79K
+// - aarch64 msvc (+lse) https://godbolt.org/z/dj4aYerfr
+// - aarch64 (+lse,+lse2) https://godbolt.org/z/1E15jjxah
+// - aarch64 (+lse,+lse2,+rcpc3) https://godbolt.org/z/YreM4n84o
+// - aarch64 (+lse2,+lse128) https://godbolt.org/z/Kfeqs54ox
+// - aarch64 (+lse2,+lse128,+rcpc3) https://godbolt.org/z/n6zhjE77s
 
 include!("macros.rs");
 
@@ -211,7 +211,7 @@ macro_rules! debug_assert_lse2 {
     };
 }
 
-// Refs: https://developer.arm.com/documentation/100067/0611/armclang-Integrated-Assembler/AArch32-Target-selection-directives?lang=en
+// Refs: https://developer.arm.com/documentation/100067/0612/armclang-Integrated-Assembler/AArch32-Target-selection-directives?lang=en
 //
 // This is similar to #[target_feature(enable = "lse")], except that there are
 // no compiler guarantees regarding (un)inlining, and the scope is within an asm
@@ -220,7 +220,7 @@ macro_rules! debug_assert_lse2 {
 //
 // The .arch_extension directive is effective until the end of the assembly block and
 // is not propagated to subsequent code, so the end_lse macro is unneeded.
-// https://godbolt.org/z/o6EPndP94
+// https://godbolt.org/z/4oMEW8vWc
 // https://github.com/torvalds/linux/commit/e0d5896bd356cd577f9710a02d7a474cdf58426b
 // https://github.com/torvalds/linux/commit/dd1f6308b28edf0452dd5dc7877992903ec61e69
 // (It seems GCC effectively ignores this directive and always allow FEAT_LSE instructions: https://godbolt.org/z/W9W6rensG)
@@ -279,7 +279,7 @@ macro_rules! atomic_rmw {
             Ordering::SeqCst if $write == Ordering::SeqCst => $op!("a", "l", "dmb ish"),
             // AcqRel and SeqCst RMWs are equivalent in non-MSVC environments.
             Ordering::SeqCst => $op!("a", "l", ""),
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", $order),
         }
     };
 }
@@ -404,7 +404,7 @@ unsafe fn atomic_load(src: *mut u128, order: Ordering) -> u128 {
                         }
                     })
                 }
-                _ => unreachable!(),
+                _ => unreachable!("{:?}", order),
             }
         }
     }
@@ -471,7 +471,7 @@ unsafe fn _atomic_load_ldp(src: *mut u128, order: Ordering) -> u128 {
                     options(nostack, preserves_flags),
                 );
             }
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", order),
         }
         U128 { pair: Pair { lo: out_lo, hi: out_hi } }.whole
     }
@@ -505,7 +505,7 @@ unsafe fn _atomic_load_casp(src: *mut u128, order: Ordering) -> u128 {
             Ordering::Relaxed => atomic_load!("", ""),
             Ordering::Acquire => atomic_load!("a", ""),
             Ordering::SeqCst => atomic_load!("a", "l"),
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", order),
         }
         U128 { pair: Pair { lo: out_lo, hi: out_hi } }.whole
     }
@@ -544,7 +544,7 @@ unsafe fn _atomic_load_ldxp_stxp(src: *mut u128, order: Ordering) -> u128 {
             Ordering::Relaxed => atomic_load!("", ""),
             Ordering::Acquire => atomic_load!("a", ""),
             Ordering::SeqCst => atomic_load!("a", "l"),
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", order),
         }
         U128 { pair: Pair { lo: out_lo, hi: out_hi } }.whole
     }
@@ -678,7 +678,7 @@ unsafe fn atomic_store(dst: *mut u128, val: u128, order: Ordering) {
                         }
                     });
                 }
-                _ => unreachable!(),
+                _ => unreachable!("{:?}", order),
             }
         }
     }
@@ -752,7 +752,7 @@ unsafe fn _atomic_store_stp(dst: *mut u128, val: u128, order: Ordering) {
             }
             #[cfg(not(any(target_feature = "lse128", portable_atomic_target_feature = "lse128")))]
             Ordering::SeqCst => atomic_store!("dmb ish", "dmb ish"),
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", order),
         }
     }
 }
@@ -950,7 +950,7 @@ unsafe fn atomic_compare_exchange(
                         }
                     })
                 }
-                _ => unreachable!(),
+                _ => unreachable!("{:?}", success),
             }
         }
     };

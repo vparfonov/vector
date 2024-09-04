@@ -132,7 +132,7 @@ where
     type Item = N;
 
     fn next(&mut self) -> Option<Self::Item> {
-        for next in self.iter.by_ref() {
+        while let Some(next) = self.iter.next() {
             if next.1 == &self.node {
                 return Some(*next.0);
             }
@@ -157,7 +157,7 @@ const UNDEFINED: usize = ::std::usize::MAX;
 /// Cooper et al found it to be faster in practice on control flow graphs of up
 /// to ~30,000 vertices.
 ///
-/// [0]: http://www.hipersoft.rice.edu/grads/publications/dom14.pdf
+/// [0]: http://www.cs.rice.edu/~keith/EMBED/dom.pdf
 pub fn simple_fast<G>(graph: G, root: G::NodeId) -> Dominators<G::NodeId>
 where
     G: IntoNeighbors + Visitable,
@@ -267,7 +267,7 @@ where
                         .map(|p| *node_to_post_order_idx.get(&p).unwrap())
                         .collect()
                 })
-                .unwrap_or_default()
+                .unwrap_or_else(Vec::new)
         })
         .collect()
 }

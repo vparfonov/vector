@@ -3,7 +3,7 @@ pub use crate::operation::put_bucket_metrics_configuration::_put_bucket_metrics_
 
 pub use crate::operation::put_bucket_metrics_configuration::_put_bucket_metrics_configuration_input::PutBucketMetricsConfigurationInputBuilder;
 
-impl crate::operation::put_bucket_metrics_configuration::builders::PutBucketMetricsConfigurationInputBuilder {
+impl PutBucketMetricsConfigurationInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -30,23 +30,17 @@ impl crate::operation::put_bucket_metrics_configuration::builders::PutBucketMetr
 /// <p>For information about CloudWatch request metrics for Amazon S3, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/dev/cloudwatch-monitoring.html">Monitoring Metrics with Amazon CloudWatch</a>.</p>
 /// <p>The following operations are related to <code>PutBucketMetricsConfiguration</code>:</p>
 /// <ul>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketMetricsConfiguration.html">DeleteBucketMetricsConfiguration</a></p></li>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketMetricsConfiguration.html">GetBucketMetricsConfiguration</a></p></li>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBucketMetricsConfigurations.html">ListBucketMetricsConfigurations</a></p></li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketMetricsConfiguration.html">DeleteBucketMetricsConfiguration</a> </p> </li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_GetBucketMetricsConfiguration.html">GetBucketMetricsConfiguration</a> </p> </li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBucketMetricsConfigurations.html">ListBucketMetricsConfigurations</a> </p> </li>
 /// </ul>
-/// <p><code>PutBucketMetricsConfiguration</code> has the following special error:</p>
+/// <p> <code>PutBucketMetricsConfiguration</code> has the following special error:</p>
 /// <ul>
-/// <li>
-/// <p>Error code: <code>TooManyConfigurations</code></p>
+/// <li> <p>Error code: <code>TooManyConfigurations</code> </p>
 /// <ul>
-/// <li>
-/// <p>Description: You are attempting to create a new configuration but have already reached the 1,000-configuration limit.</p></li>
-/// <li>
-/// <p>HTTP Status Code: HTTP 400 Bad Request</p></li>
-/// </ul></li>
+/// <li> <p>Description: You are attempting to create a new configuration but have already reached the 1,000-configuration limit.</p> </li>
+/// <li> <p>HTTP Status Code: HTTP 400 Bad Request</p> </li>
+/// </ul> </li>
 /// </ul>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
 pub struct PutBucketMetricsConfigurationFluentBuilder {
@@ -73,7 +67,7 @@ impl
     }
 }
 impl PutBucketMetricsConfigurationFluentBuilder {
-    /// Creates a new `PutBucketMetricsConfigurationFluentBuilder`.
+    /// Creates a new `PutBucketMetricsConfiguration`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -124,12 +118,12 @@ impl PutBucketMetricsConfigurationFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }

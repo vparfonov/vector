@@ -1,8 +1,6 @@
 use crate::internally::DEFAULT_KEY;
-use crate::is_serialize_str::expect_str;
 use alloc::borrow::ToOwned;
 use alloc::boxed::Box;
-use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 use core::marker::PhantomData;
@@ -236,7 +234,7 @@ where
     ) -> Result<Self::SerializeStruct, Self::Error> {
         let mut state = self.delegate.serialize_map(Some(len + 1))?;
         state.serialize_entry(self.tag, self.variant)?;
-        Ok(SerializeStructAsMap::new(state, self.tag, self.variant))
+        Ok(SerializeStructAsMap::new(state))
     }
 
     fn serialize_struct_variant(
@@ -389,13 +387,11 @@ where
 
 pub struct SerializeStructAsMap<M> {
     map: M,
-    tag: &'static str,
-    variant: &'static str,
 }
 
 impl<M> SerializeStructAsMap<M> {
-    fn new(map: M, tag: &'static str, variant: &'static str) -> Self {
-        SerializeStructAsMap { map, tag, variant }
+    fn new(map: M) -> Self {
+        SerializeStructAsMap { map }
     }
 }
 
@@ -410,17 +406,7 @@ where
     where
         T: ?Sized + Serialize,
     {
-        if key == self.tag {
-            match expect_str(value, self.variant) {
-                Ok(()) => Ok(()),
-                Err(unexpected) => Err(ser::Error::custom(format!(
-                    "mismatched value for tag {:?}: {:?} vs {:?}",
-                    self.tag, self.variant, unexpected,
-                ))),
-            }
-        } else {
-            self.map.serialize_entry(key, value)
-        }
+        self.map.serialize_entry(key, value)
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {

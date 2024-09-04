@@ -34,9 +34,6 @@ pub use msg::*;
 
 /// `recv(fd, buf, flags)`—Reads data from a socket.
 ///
-/// This takes a `&mut [u8]` which Rust requires to contain initialized memory.
-/// To use an uninitialized buffer, use [`recv_uninit`].
-///
 /// # References
 ///  - [Beej's Guide to Network Programming]
 ///  - [POSIX]
@@ -78,7 +75,7 @@ pub fn recv_uninit<Fd: AsFd>(
     flags: RecvFlags,
 ) -> io::Result<(&mut [u8], &mut [MaybeUninit<u8>])> {
     let length = unsafe {
-        backend::net::syscalls::recv(fd.as_fd(), buf.as_mut_ptr().cast::<u8>(), buf.len(), flags)
+        backend::net::syscalls::recv(fd.as_fd(), buf.as_mut_ptr() as *mut u8, buf.len(), flags)
     };
 
     Ok(unsafe { split_init(buf, length?) })
@@ -117,9 +114,6 @@ pub fn send<Fd: AsFd>(fd: Fd, buf: &[u8], flags: SendFlags) -> io::Result<usize>
 
 /// `recvfrom(fd, buf, flags, addr, len)`—Reads data from a socket and
 /// returns the sender address.
-///
-/// This takes a `&mut [u8]` which Rust requires to contain initialized memory.
-/// To use an uninitialized buffer, use [`recvfrom_uninit`].
 ///
 /// # References
 ///  - [Beej's Guide to Network Programming]
@@ -168,12 +162,7 @@ pub fn recvfrom_uninit<Fd: AsFd>(
     flags: RecvFlags,
 ) -> io::Result<(&mut [u8], &mut [MaybeUninit<u8>], Option<SocketAddrAny>)> {
     let (length, addr) = unsafe {
-        backend::net::syscalls::recvfrom(
-            fd.as_fd(),
-            buf.as_mut_ptr().cast::<u8>(),
-            buf.len(),
-            flags,
-        )?
+        backend::net::syscalls::recvfrom(fd.as_fd(), buf.as_mut_ptr() as *mut u8, buf.len(), flags)?
     };
     let (init, uninit) = unsafe { split_init(buf, length) };
     Ok((init, uninit, addr))

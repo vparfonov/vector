@@ -10,110 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
     pub type InputEventInit;
-    #[doc = "Get the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, getter = "bubbles")]
-    pub fn get_bubbles(this: &InputEventInit) -> Option<bool>;
-    #[doc = "Change the `bubbles` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, setter = "bubbles")]
-    pub fn set_bubbles(this: &InputEventInit, val: bool);
-    #[doc = "Get the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, getter = "cancelable")]
-    pub fn get_cancelable(this: &InputEventInit) -> Option<bool>;
-    #[doc = "Change the `cancelable` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, setter = "cancelable")]
-    pub fn set_cancelable(this: &InputEventInit, val: bool);
-    #[doc = "Get the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, getter = "composed")]
-    pub fn get_composed(this: &InputEventInit) -> Option<bool>;
-    #[doc = "Change the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, setter = "composed")]
-    pub fn set_composed(this: &InputEventInit, val: bool);
-    #[doc = "Get the `detail` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, getter = "detail")]
-    pub fn get_detail(this: &InputEventInit) -> Option<i32>;
-    #[doc = "Change the `detail` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, setter = "detail")]
-    pub fn set_detail(this: &InputEventInit, val: i32);
-    #[cfg(feature = "Window")]
-    #[doc = "Get the `view` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`, `Window`*"]
-    #[wasm_bindgen(method, getter = "view")]
-    pub fn get_view(this: &InputEventInit) -> Option<Window>;
-    #[cfg(feature = "Window")]
-    #[doc = "Change the `view` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`, `Window`*"]
-    #[wasm_bindgen(method, setter = "view")]
-    pub fn set_view(this: &InputEventInit, val: Option<&Window>);
-    #[doc = "Get the `data` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, getter = "data")]
-    pub fn get_data(this: &InputEventInit) -> Option<String>;
-    #[doc = "Change the `data` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, setter = "data")]
-    pub fn set_data(this: &InputEventInit, val: Option<&str>);
-    #[cfg(feature = "DataTransfer")]
-    #[doc = "Get the `dataTransfer` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `DataTransfer`, `InputEventInit`*"]
-    #[wasm_bindgen(method, getter = "dataTransfer")]
-    pub fn get_data_transfer(this: &InputEventInit) -> Option<DataTransfer>;
-    #[cfg(feature = "DataTransfer")]
-    #[doc = "Change the `dataTransfer` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `DataTransfer`, `InputEventInit`*"]
-    #[wasm_bindgen(method, setter = "dataTransfer")]
-    pub fn set_data_transfer(this: &InputEventInit, val: Option<&DataTransfer>);
-    #[doc = "Get the `inputType` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, getter = "inputType")]
-    pub fn get_input_type(this: &InputEventInit) -> Option<String>;
-    #[doc = "Change the `inputType` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, setter = "inputType")]
-    pub fn set_input_type(this: &InputEventInit, val: &str);
-    #[doc = "Get the `isComposing` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, getter = "isComposing")]
-    pub fn get_is_composing(this: &InputEventInit) -> Option<bool>;
-    #[doc = "Change the `isComposing` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, setter = "isComposing")]
-    pub fn set_is_composing(this: &InputEventInit, val: bool);
-    #[doc = "Get the `targetRanges` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, getter = "targetRanges")]
-    pub fn get_target_ranges(this: &InputEventInit) -> Option<::js_sys::Array>;
-    #[doc = "Change the `targetRanges` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
-    #[wasm_bindgen(method, setter = "targetRanges")]
-    pub fn set_target_ranges(this: &InputEventInit, val: &::wasm_bindgen::JsValue);
 }
 impl InputEventInit {
     #[doc = "Construct a new `InputEventInit`."]
@@ -124,56 +20,165 @@ impl InputEventInit {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_bubbles()` instead."]
+    #[doc = "Change the `bubbles` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
     pub fn bubbles(&mut self, val: bool) -> &mut Self {
-        self.set_bubbles(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("bubbles"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_cancelable()` instead."]
+    #[doc = "Change the `cancelable` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
     pub fn cancelable(&mut self, val: bool) -> &mut Self {
-        self.set_cancelable(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("cancelable"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_composed()` instead."]
+    #[doc = "Change the `composed` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
     pub fn composed(&mut self, val: bool) -> &mut Self {
-        self.set_composed(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("composed"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_detail()` instead."]
+    #[doc = "Change the `detail` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
     pub fn detail(&mut self, val: i32) -> &mut Self {
-        self.set_detail(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("detail"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "Window")]
-    #[deprecated = "Use `set_view()` instead."]
+    #[doc = "Change the `view` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`, `Window`*"]
     pub fn view(&mut self, val: Option<&Window>) -> &mut Self {
-        self.set_view(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("view"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_data()` instead."]
+    #[doc = "Change the `data` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
     pub fn data(&mut self, val: Option<&str>) -> &mut Self {
-        self.set_data(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("data"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "DataTransfer")]
-    #[deprecated = "Use `set_data_transfer()` instead."]
+    #[doc = "Change the `dataTransfer` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `DataTransfer`, `InputEventInit`*"]
     pub fn data_transfer(&mut self, val: Option<&DataTransfer>) -> &mut Self {
-        self.set_data_transfer(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("dataTransfer"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_input_type()` instead."]
+    #[doc = "Change the `inputType` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
     pub fn input_type(&mut self, val: &str) -> &mut Self {
-        self.set_input_type(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("inputType"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_is_composing()` instead."]
+    #[doc = "Change the `isComposing` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
     pub fn is_composing(&mut self, val: bool) -> &mut Self {
-        self.set_is_composing(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("isComposing"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_target_ranges()` instead."]
+    #[doc = "Change the `targetRanges` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `InputEventInit`*"]
     pub fn target_ranges(&mut self, val: &::wasm_bindgen::JsValue) -> &mut Self {
-        self.set_target_ranges(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("targetRanges"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

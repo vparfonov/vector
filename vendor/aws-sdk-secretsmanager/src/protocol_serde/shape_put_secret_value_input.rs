@@ -24,8 +24,5 @@ pub fn ser_put_secret_value_input_input(
         }
         array_6.finish();
     }
-    if let Some(var_8) = &input.rotation_token {
-        object.key("RotationToken").string(var_8.as_str());
-    }
     Ok(())
 }

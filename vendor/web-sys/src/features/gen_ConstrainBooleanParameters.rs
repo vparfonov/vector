@@ -10,26 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `ConstrainBooleanParameters`*"]
     pub type ConstrainBooleanParameters;
-    #[doc = "Get the `exact` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConstrainBooleanParameters`*"]
-    #[wasm_bindgen(method, getter = "exact")]
-    pub fn get_exact(this: &ConstrainBooleanParameters) -> Option<bool>;
-    #[doc = "Change the `exact` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConstrainBooleanParameters`*"]
-    #[wasm_bindgen(method, setter = "exact")]
-    pub fn set_exact(this: &ConstrainBooleanParameters, val: bool);
-    #[doc = "Get the `ideal` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConstrainBooleanParameters`*"]
-    #[wasm_bindgen(method, getter = "ideal")]
-    pub fn get_ideal(this: &ConstrainBooleanParameters) -> Option<bool>;
-    #[doc = "Change the `ideal` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConstrainBooleanParameters`*"]
-    #[wasm_bindgen(method, setter = "ideal")]
-    pub fn set_ideal(this: &ConstrainBooleanParameters, val: bool);
 }
 impl ConstrainBooleanParameters {
     #[doc = "Construct a new `ConstrainBooleanParameters`."]
@@ -40,14 +20,30 @@ impl ConstrainBooleanParameters {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_exact()` instead."]
+    #[doc = "Change the `exact` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ConstrainBooleanParameters`*"]
     pub fn exact(&mut self, val: bool) -> &mut Self {
-        self.set_exact(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("exact"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_ideal()` instead."]
+    #[doc = "Change the `ideal` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ConstrainBooleanParameters`*"]
     pub fn ideal(&mut self, val: bool) -> &mut Self {
-        self.set_ideal(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("ideal"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

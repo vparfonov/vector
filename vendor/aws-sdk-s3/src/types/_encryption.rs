@@ -42,8 +42,8 @@ impl Encryption {
 }
 
 /// A builder for [`Encryption`](crate::types::Encryption).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default)]
 pub struct EncryptionBuilder {
     pub(crate) encryption_type: ::std::option::Option<crate::types::ServerSideEncryption>,
     pub(crate) kms_key_id: ::std::option::Option<::std::string::String>,

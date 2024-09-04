@@ -10,16 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `EventListener`*"]
     pub type EventListener;
-    #[doc = "Get the `handleEvent` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `EventListener`*"]
-    #[wasm_bindgen(method, getter = "handleEvent")]
-    pub fn get_handle_event(this: &EventListener) -> Option<::js_sys::Function>;
-    #[doc = "Change the `handleEvent` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `EventListener`*"]
-    #[wasm_bindgen(method, setter = "handleEvent")]
-    pub fn set_handle_event(this: &EventListener, val: &::js_sys::Function);
 }
 impl EventListener {
     #[doc = "Construct a new `EventListener`."]
@@ -30,9 +20,21 @@ impl EventListener {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_handle_event()` instead."]
+    #[doc = "Change the `handleEvent` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `EventListener`*"]
     pub fn handle_event(&mut self, val: &::js_sys::Function) -> &mut Self {
-        self.set_handle_event(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("handleEvent"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

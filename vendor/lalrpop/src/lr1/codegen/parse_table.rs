@@ -11,6 +11,7 @@ use itertools::Itertools;
 use std::fmt;
 use std::io::{self, Write};
 use std::rc::Rc;
+use string_cache::DefaultAtom as Atom;
 
 use super::base::CodeGenerator;
 
@@ -172,7 +173,7 @@ impl<'ascent, 'grammar, W: Write> CodeGenerator<'ascent, 'grammar, W, TableDrive
 
         rust!(
             self.out,
-            "struct {p}StateMachine<{mtp}>",
+            "pub(crate) struct {p}StateMachine<{mtp}>",
             p = self.prefix,
             mtp = machine_type_parameters,
         );
@@ -257,14 +258,9 @@ impl<'ascent, 'grammar, W: Write> CodeGenerator<'ascent, 'grammar, W, TableDrive
         );
         rust!(
             self.out,
-            "{p}action(state, {})",
-            // Avoid needless 1 subtract by 1
-            if self.grammar.terminals.all.len() == 1 {
-                "0".to_string()
-            } else {
-                format!("{} - 1", self.grammar.terminals.all.len())
-            },
+            "{p}action(state, {num_term} - 1)",
             p = self.prefix,
+            num_term = self.grammar.terminals.all.len(),
         );
         rust!(self.out, "}}");
 
@@ -519,14 +515,9 @@ impl<'ascent, 'grammar, W: Write> CodeGenerator<'ascent, 'grammar, W, TableDrive
 
         rust!(
             self.out,
-            "{p}ACTION[(state as usize) {} + integer]",
-            // Leads to multliplication by 1
-            if self.grammar.terminals.all.len() == 1 {
-                "".to_string()
-            } else {
-                format!("* {}", self.grammar.terminals.all.len())
-            },
+            "{p}ACTION[(state as usize) * {num_term} + integer]",
             p = self.prefix,
+            num_term = self.grammar.terminals.all.len(),
         );
 
         rust!(self.out, "}}");
@@ -805,11 +796,7 @@ impl<'ascent, 'grammar, W: Write> CodeGenerator<'ascent, 'grammar, W, TableDrive
             .emit()?;
         rust!(self.out, "{{");
 
-        rust!(
-            self.out,
-            "#[allow(clippy::manual_range_patterns)]match {p}token_index {{",
-            p = self.prefix,
-        );
+        rust!(self.out, "match {p}token_index {{", p = self.prefix,);
 
         let mut token_to_symbol_mapping = Vec::new();
 
@@ -856,11 +843,7 @@ impl<'ascent, 'grammar, W: Write> CodeGenerator<'ascent, 'grammar, W, TableDrive
                 rust!(
                     self.out,
                     "{} => match {}token {{",
-                    indices
-                        .iter()
-                        .map(|(index, _)| index)
-                        .format(" | ")
-                        .to_string(),
+                    indices.iter().map(|(index, _)| index).format(" | "),
                     self.prefix
                 );
                 rust!(
@@ -879,11 +862,7 @@ impl<'ascent, 'grammar, W: Write> CodeGenerator<'ascent, 'grammar, W, TableDrive
                 rust!(
                     self.out,
                     "{indices} => {p}Symbol::{variant_name}({p}token),",
-                    indices = indices
-                        .iter()
-                        .map(|(index, _)| index)
-                        .format(" | ")
-                        .to_string(),
+                    indices = indices.iter().map(|(index, _)| index).format(" | "),
                     p = self.prefix,
                     variant_name = variant_name,
                 )
@@ -918,7 +897,10 @@ impl<'ascent, 'grammar, W: Write> CodeGenerator<'ascent, 'grammar, W, TableDrive
         ];
 
         self.out
-            .fn_header(&Visibility::Priv, format!("{}reduce", self.prefix))
+            .fn_header(
+                &Visibility::Pub(Some(Path::from_id(Atom::from("crate")))),
+                format!("{}reduce", self.prefix),
+            )
             .with_grammar(self.grammar)
             .with_parameters(parameters)
             .with_return_type(format!(
@@ -1043,7 +1025,10 @@ impl<'ascent, 'grammar, W: Write> CodeGenerator<'ascent, 'grammar, W, TableDrive
         ];
 
         self.out
-            .fn_header(&Visibility::Priv, format!("{}reduce{}", self.prefix, index))
+            .fn_header(
+                &Visibility::Pub(Some(Path::from_id(Atom::from("crate")))),
+                format!("{}reduce{}", self.prefix, index),
+            )
             .with_grammar(self.grammar)
             .with_parameters(parameters)
             .with_return_type("(usize, usize)")
@@ -1097,10 +1082,10 @@ impl<'ascent, 'grammar, W: Write> CodeGenerator<'ascent, 'grammar, W, TableDrive
             // stack will be empty)
             rust!(
                 self.out,
-                "let {p}start = {p}lookahead_start.cloned().or_else(|| {p}symbols.last().map(|s| s.2)).unwrap_or_default();",
+                "let {p}start = {p}lookahead_start.cloned().or_else(|| {p}symbols.last().map(|s| s.2.clone())).unwrap_or_default();",
                 p = self.prefix,
             );
-            rust!(self.out, "let {p}end = {p}start;", p = self.prefix,);
+            rust!(self.out, "let {p}end = {p}start.clone();", p = self.prefix,);
         }
 
         let transferred_syms = transfer_syms.len();

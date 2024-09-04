@@ -1188,7 +1188,7 @@ fn ee_no_dp_crl_idp_owned() {
 }
 
 #[test]
-fn ee_not_revoked_crl_no_idp() {
+fn ee_crl_no_idp_unknown_status() {
     let ee = include_bytes!("client_auth_revocation/dp_chain.ee.der");
     let intermediates = &[
         include_bytes!("client_auth_revocation/dp_chain.int.a.ca.der").as_slice(),
@@ -1198,52 +1198,8 @@ fn ee_not_revoked_crl_no_idp() {
 
     let crls = &[&webpki::CertRevocationList::Borrowed(
         webpki::BorrowedCertRevocationList::from_der(
-            include_bytes!("client_auth_revocation/ee_not_revoked_crl_no_idp.crl.der").as_slice(),
-        )
-        .unwrap(),
-    )];
-    let builder = RevocationOptionsBuilder::new(crls).unwrap();
-
-    let builder = builder.with_depth(RevocationCheckDepth::EndEntity);
-    let revocation = Some(builder.build());
-    assert_eq!(check_cert(ee, intermediates, ca, revocation), Ok(()));
-}
-
-#[cfg(feature = "alloc")]
-#[test]
-fn ee_not_revoked_crl_no_idp_owned() {
-    let ee = include_bytes!("client_auth_revocation/dp_chain.ee.der");
-    let intermediates = &[
-        include_bytes!("client_auth_revocation/dp_chain.int.a.ca.der").as_slice(),
-        include_bytes!("client_auth_revocation/dp_chain.int.b.ca.der").as_slice(),
-    ];
-    let ca = include_bytes!("client_auth_revocation/dp_chain.root.ca.der");
-
-    let crls = &[&webpki::CertRevocationList::Owned(
-        webpki::OwnedCertRevocationList::from_der(
-            include_bytes!("client_auth_revocation/ee_not_revoked_crl_no_idp.crl.der").as_slice(),
-        )
-        .unwrap(),
-    )];
-    let builder = RevocationOptionsBuilder::new(crls).unwrap();
-
-    let builder = builder.with_depth(RevocationCheckDepth::EndEntity);
-    let revocation = Some(builder.build());
-    assert_eq!(check_cert(ee, intermediates, ca, revocation), Ok(()));
-}
-
-#[test]
-fn ee_revoked_crl_no_idp() {
-    let ee = include_bytes!("client_auth_revocation/dp_chain.ee.der");
-    let intermediates = &[
-        include_bytes!("client_auth_revocation/dp_chain.int.a.ca.der").as_slice(),
-        include_bytes!("client_auth_revocation/dp_chain.int.b.ca.der").as_slice(),
-    ];
-    let ca = include_bytes!("client_auth_revocation/dp_chain.root.ca.der");
-
-    let crls = &[&webpki::CertRevocationList::Borrowed(
-        webpki::BorrowedCertRevocationList::from_der(
-            include_bytes!("client_auth_revocation/ee_revoked_crl_no_idp.crl.der").as_slice(),
+            include_bytes!("client_auth_revocation/ee_crl_no_idp_unknown_status.crl.der")
+                .as_slice(),
         )
         .unwrap(),
     )];
@@ -1253,13 +1209,13 @@ fn ee_revoked_crl_no_idp() {
     let revocation = Some(builder.build());
     assert_eq!(
         check_cert(ee, intermediates, ca, revocation),
-        Err(webpki::Error::CertRevoked)
+        Err(webpki::Error::UnknownRevocationStatus)
     );
 }
 
 #[cfg(feature = "alloc")]
 #[test]
-fn ee_revoked_crl_no_idp_owned() {
+fn ee_crl_no_idp_unknown_status_owned() {
     let ee = include_bytes!("client_auth_revocation/dp_chain.ee.der");
     let intermediates = &[
         include_bytes!("client_auth_revocation/dp_chain.int.a.ca.der").as_slice(),
@@ -1269,7 +1225,8 @@ fn ee_revoked_crl_no_idp_owned() {
 
     let crls = &[&webpki::CertRevocationList::Owned(
         webpki::OwnedCertRevocationList::from_der(
-            include_bytes!("client_auth_revocation/ee_revoked_crl_no_idp.crl.der").as_slice(),
+            include_bytes!("client_auth_revocation/ee_crl_no_idp_unknown_status.crl.der")
+                .as_slice(),
         )
         .unwrap(),
     )];
@@ -1279,7 +1236,7 @@ fn ee_revoked_crl_no_idp_owned() {
     let revocation = Some(builder.build());
     assert_eq!(
         check_cert(ee, intermediates, ca, revocation),
-        Err(webpki::Error::CertRevoked)
+        Err(webpki::Error::UnknownRevocationStatus)
     );
 }
 
@@ -1588,109 +1545,5 @@ fn ee_dp_invalid_owned() {
     assert_eq!(
         check_cert(ee, intermediates, ca, revocation),
         Err(webpki::Error::UnknownRevocationStatus)
-    );
-}
-
-#[test]
-fn expired_crl_ignore_expiration() {
-    let ee = include_bytes!("client_auth_revocation/no_ku_chain.ee.der");
-    let intermediates = &[
-        include_bytes!("client_auth_revocation/no_ku_chain.int.a.ca.der").as_slice(),
-        include_bytes!("client_auth_revocation/no_ku_chain.int.b.ca.der").as_slice(),
-    ];
-    let ca = include_bytes!("client_auth_revocation/no_ku_chain.root.ca.der");
-
-    let crls = &[&webpki::CertRevocationList::Borrowed(
-        webpki::BorrowedCertRevocationList::from_der(
-            include_bytes!("client_auth_revocation/expired_crl_ignore_expiration.crl.der")
-                .as_slice(),
-        )
-        .unwrap(),
-    )];
-    let builder = RevocationOptionsBuilder::new(crls).unwrap();
-
-    let builder = builder.with_status_policy(UnknownStatusPolicy::Allow);
-    let revocation = Some(builder.build());
-    assert_eq!(check_cert(ee, intermediates, ca, revocation), Ok(()));
-}
-
-#[cfg(feature = "alloc")]
-#[test]
-fn expired_crl_ignore_expiration_owned() {
-    let ee = include_bytes!("client_auth_revocation/no_ku_chain.ee.der");
-    let intermediates = &[
-        include_bytes!("client_auth_revocation/no_ku_chain.int.a.ca.der").as_slice(),
-        include_bytes!("client_auth_revocation/no_ku_chain.int.b.ca.der").as_slice(),
-    ];
-    let ca = include_bytes!("client_auth_revocation/no_ku_chain.root.ca.der");
-
-    let crls = &[&webpki::CertRevocationList::Owned(
-        webpki::OwnedCertRevocationList::from_der(
-            include_bytes!("client_auth_revocation/expired_crl_ignore_expiration.crl.der")
-                .as_slice(),
-        )
-        .unwrap(),
-    )];
-    let builder = RevocationOptionsBuilder::new(crls).unwrap();
-
-    let builder = builder.with_status_policy(UnknownStatusPolicy::Allow);
-    let revocation = Some(builder.build());
-    assert_eq!(check_cert(ee, intermediates, ca, revocation), Ok(()));
-}
-
-#[test]
-fn expired_crl_enforce_expiration() {
-    let ee = include_bytes!("client_auth_revocation/no_ku_chain.ee.der");
-    let intermediates = &[
-        include_bytes!("client_auth_revocation/no_ku_chain.int.a.ca.der").as_slice(),
-        include_bytes!("client_auth_revocation/no_ku_chain.int.b.ca.der").as_slice(),
-    ];
-    let ca = include_bytes!("client_auth_revocation/no_ku_chain.root.ca.der");
-
-    let crls = &[&webpki::CertRevocationList::Borrowed(
-        webpki::BorrowedCertRevocationList::from_der(
-            include_bytes!("client_auth_revocation/expired_crl_enforce_expiration.crl.der")
-                .as_slice(),
-        )
-        .unwrap(),
-    )];
-    let builder = RevocationOptionsBuilder::new(crls).unwrap();
-
-    let builder = builder.with_status_policy(UnknownStatusPolicy::Allow);
-
-    let builder = builder.with_expiration_policy(webpki::ExpirationPolicy::Enforce);
-    let revocation = Some(builder.build());
-    assert_eq!(
-        check_cert(ee, intermediates, ca, revocation),
-        Err(webpki::Error::CrlExpired)
-    );
-}
-
-#[cfg(feature = "alloc")]
-#[test]
-fn expired_crl_enforce_expiration_owned() {
-    let ee = include_bytes!("client_auth_revocation/no_ku_chain.ee.der");
-    let intermediates = &[
-        include_bytes!("client_auth_revocation/no_ku_chain.int.a.ca.der").as_slice(),
-        include_bytes!("client_auth_revocation/no_ku_chain.int.b.ca.der").as_slice(),
-    ];
-    let ca = include_bytes!("client_auth_revocation/no_ku_chain.root.ca.der");
-
-    let crls = &[&webpki::CertRevocationList::Owned(
-        webpki::OwnedCertRevocationList::from_der(
-            include_bytes!("client_auth_revocation/expired_crl_enforce_expiration.crl.der")
-                .as_slice(),
-        )
-        .unwrap(),
-    )];
-    let builder = RevocationOptionsBuilder::new(crls).unwrap();
-
-    let builder = builder.with_status_policy(UnknownStatusPolicy::Allow);
-
-    let builder = builder.with_expiration_policy(webpki::ExpirationPolicy::Enforce);
-    let revocation = Some(builder.build());
-    assert_eq!(
-        check_cert(ee, intermediates, ca, revocation),
-        Err(webpki::Error::CrlExpired)
     );
 }

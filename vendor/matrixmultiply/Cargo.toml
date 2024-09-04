@@ -12,23 +12,18 @@
 [package]
 edition = "2018"
 name = "matrixmultiply"
-version = "0.3.9"
+version = "0.3.8"
 authors = [
     "bluss",
     "R. Janis Goldschmidt",
 ]
 build = "build.rs"
 exclude = ["docs/*"]
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 description = """
 General matrix multiplication for f32 and f64 matrices. Operates on matrices with general layout (they can use arbitrary row and column stride). Detects and uses AVX or SSE2 on x86 platforms transparently for higher performance. Uses a microkernel strategy, so that the implementation is easy to parallelize and optimize.
 
 Supports multithreading."""
 documentation = "https://docs.rs/matrixmultiply/"
-readme = false
 keywords = [
     "matrix",
     "sgemm",
@@ -56,25 +51,10 @@ debug = 2
 debug = 2
 
 [lib]
-name = "matrixmultiply"
-path = "src/lib.rs"
 bench = false
-
-[[example]]
-name = "benchmark"
-path = "examples/benchmark.rs"
-
-[[example]]
-name = "usegemm"
-path = "examples/usegemm.rs"
-
-[[test]]
-name = "sgemm"
-path = "tests/sgemm.rs"
 
 [[bench]]
 name = "benchmarks"
-path = "benches/benchmarks.rs"
 harness = false
 
 [dependencies.num_cpus]

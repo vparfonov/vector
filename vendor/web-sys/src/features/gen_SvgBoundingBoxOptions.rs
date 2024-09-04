@@ -10,46 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
     pub type SvgBoundingBoxOptions;
-    #[doc = "Get the `clipped` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
-    #[wasm_bindgen(method, getter = "clipped")]
-    pub fn get_clipped(this: &SvgBoundingBoxOptions) -> Option<bool>;
-    #[doc = "Change the `clipped` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
-    #[wasm_bindgen(method, setter = "clipped")]
-    pub fn set_clipped(this: &SvgBoundingBoxOptions, val: bool);
-    #[doc = "Get the `fill` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
-    #[wasm_bindgen(method, getter = "fill")]
-    pub fn get_fill(this: &SvgBoundingBoxOptions) -> Option<bool>;
-    #[doc = "Change the `fill` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
-    #[wasm_bindgen(method, setter = "fill")]
-    pub fn set_fill(this: &SvgBoundingBoxOptions, val: bool);
-    #[doc = "Get the `markers` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
-    #[wasm_bindgen(method, getter = "markers")]
-    pub fn get_markers(this: &SvgBoundingBoxOptions) -> Option<bool>;
-    #[doc = "Change the `markers` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
-    #[wasm_bindgen(method, setter = "markers")]
-    pub fn set_markers(this: &SvgBoundingBoxOptions, val: bool);
-    #[doc = "Get the `stroke` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
-    #[wasm_bindgen(method, getter = "stroke")]
-    pub fn get_stroke(this: &SvgBoundingBoxOptions) -> Option<bool>;
-    #[doc = "Change the `stroke` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
-    #[wasm_bindgen(method, setter = "stroke")]
-    pub fn set_stroke(this: &SvgBoundingBoxOptions, val: bool);
 }
 impl SvgBoundingBoxOptions {
     #[doc = "Construct a new `SvgBoundingBoxOptions`."]
@@ -60,24 +20,65 @@ impl SvgBoundingBoxOptions {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_clipped()` instead."]
+    #[doc = "Change the `clipped` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
     pub fn clipped(&mut self, val: bool) -> &mut Self {
-        self.set_clipped(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("clipped"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_fill()` instead."]
+    #[doc = "Change the `fill` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
     pub fn fill(&mut self, val: bool) -> &mut Self {
-        self.set_fill(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("fill"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_markers()` instead."]
+    #[doc = "Change the `markers` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
     pub fn markers(&mut self, val: bool) -> &mut Self {
-        self.set_markers(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("markers"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_stroke()` instead."]
+    #[doc = "Change the `stroke` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `SvgBoundingBoxOptions`*"]
     pub fn stroke(&mut self, val: bool) -> &mut Self {
-        self.set_stroke(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("stroke"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

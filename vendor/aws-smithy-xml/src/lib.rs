@@ -3,9 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-/* Automatically managed default lints */
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
-/* End of automatically managed default lints */
 #![allow(clippy::derive_partial_eq_without_eq)]
 #![warn(
     // missing_docs,
@@ -15,7 +12,7 @@
 )]
 
 //! Abstractions for Smithy
-//! [XML Binding Traits](https://smithy.io/2.0/spec/protocol-traits.html#xml-bindings)
+//! [XML Binding Traits](https://awslabs.github.io/smithy/1.0/spec/core/xml-traits.html)
 
 pub mod decode;
 pub mod encode;

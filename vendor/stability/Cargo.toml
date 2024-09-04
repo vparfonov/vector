@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.60"
 name = "stability"
-version = "0.2.1"
+version = "0.2.0"
 authors = ["Stephen M. Coakley <me@stephencoakley.com>"]
 description = "Rust API stability attributes for the rest of us."
 documentation = "https://docs.rs/stability/"

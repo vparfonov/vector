@@ -28,8 +28,8 @@ impl GetLogGroupFieldsOutput {
 }
 
 /// A builder for [`GetLogGroupFieldsOutput`](crate::operation::get_log_group_fields::GetLogGroupFieldsOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct GetLogGroupFieldsOutputBuilder {
     pub(crate) log_group_fields: ::std::option::Option<::std::vec::Vec<crate::types::LogGroupField>>,
     _request_id: Option<String>,

@@ -21,8 +21,8 @@ impl ListTagsLogGroupInput {
 }
 
 /// A builder for [`ListTagsLogGroupInput`](crate::operation::list_tags_log_group::ListTagsLogGroupInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct ListTagsLogGroupInputBuilder {
     pub(crate) log_group_name: ::std::option::Option<::std::string::String>,
 }

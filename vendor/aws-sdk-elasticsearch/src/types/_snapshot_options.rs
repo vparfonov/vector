@@ -21,8 +21,8 @@ impl SnapshotOptions {
 }
 
 /// A builder for [`SnapshotOptions`](crate::types::SnapshotOptions).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct SnapshotOptionsBuilder {
     pub(crate) automated_snapshot_start_hour: ::std::option::Option<i32>,
 }

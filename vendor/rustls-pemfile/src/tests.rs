@@ -1,8 +1,5 @@
 #[cfg(test)]
 mod unit {
-    use alloc::{format, vec};
-    use std::prelude::v1::*;
-
     use crate::{Error, Item};
 
     #[test]

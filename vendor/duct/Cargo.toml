@@ -10,9 +10,9 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
+edition = "2018"
 name = "duct"
-version = "0.13.7"
+version = "0.13.6"
 authors = ["oconnor663@gmail.com"]
 description = "a library for running child processes"
 documentation = "https://docs.rs/duct"

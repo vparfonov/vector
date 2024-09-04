@@ -10,26 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `DisplayNameOptions`*"]
     pub type DisplayNameOptions;
-    #[doc = "Get the `keys` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `DisplayNameOptions`*"]
-    #[wasm_bindgen(method, getter = "keys")]
-    pub fn get_keys(this: &DisplayNameOptions) -> Option<::js_sys::Array>;
-    #[doc = "Change the `keys` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `DisplayNameOptions`*"]
-    #[wasm_bindgen(method, setter = "keys")]
-    pub fn set_keys(this: &DisplayNameOptions, val: &::wasm_bindgen::JsValue);
-    #[doc = "Get the `style` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `DisplayNameOptions`*"]
-    #[wasm_bindgen(method, getter = "style")]
-    pub fn get_style(this: &DisplayNameOptions) -> Option<String>;
-    #[doc = "Change the `style` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `DisplayNameOptions`*"]
-    #[wasm_bindgen(method, setter = "style")]
-    pub fn set_style(this: &DisplayNameOptions, val: &str);
 }
 impl DisplayNameOptions {
     #[doc = "Construct a new `DisplayNameOptions`."]
@@ -40,14 +20,30 @@ impl DisplayNameOptions {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_keys()` instead."]
+    #[doc = "Change the `keys` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `DisplayNameOptions`*"]
     pub fn keys(&mut self, val: &::wasm_bindgen::JsValue) -> &mut Self {
-        self.set_keys(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("keys"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_style()` instead."]
+    #[doc = "Change the `style` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `DisplayNameOptions`*"]
     pub fn style(&mut self, val: &str) -> &mut Self {
-        self.set_style(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("style"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

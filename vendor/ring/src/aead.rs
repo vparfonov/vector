@@ -21,10 +21,7 @@
 //! [AEAD]: https://eprint.iacr.org/2000/025.pdf
 //! [`crypto.cipher.AEAD`]: https://golang.org/pkg/crypto/cipher/#AEAD
 
-use crate::{
-    cpu, error, hkdf,
-    polyfill::{u64_from_usize, usize_from_u64_saturated},
-};
+use crate::{cpu, error, hkdf, polyfill};
 use core::ops::RangeFrom;
 
 pub use self::{
@@ -137,32 +134,28 @@ impl hkdf::KeyType for &'static Algorithm {
 pub struct Algorithm {
     init: fn(key: &[u8], cpu_features: cpu::Features) -> Result<KeyInner, error::Unspecified>,
 
-    seal: fn(
-        key: &KeyInner,
-        nonce: Nonce,
-        aad: Aad<&[u8]>,
-        in_out: &mut [u8],
-        cpu_features: cpu::Features,
-    ) -> Result<Tag, error::Unspecified>,
+    seal: fn(key: &KeyInner, nonce: Nonce, aad: Aad<&[u8]>, in_out: &mut [u8]) -> Tag,
     open: fn(
         key: &KeyInner,
         nonce: Nonce,
         aad: Aad<&[u8]>,
         in_out: &mut [u8],
         src: RangeFrom<usize>,
-        cpu_features: cpu::Features,
-    ) -> Result<Tag, error::Unspecified>,
+    ) -> Tag,
 
     key_len: usize,
     id: AlgorithmID,
+
+    /// Use `max_input_len!()` to initialize this.
+    // TODO: Make this `usize`.
+    max_input_len: u64,
 }
 
-const fn max_input_len(block_len: usize, overhead_blocks_per_nonce: usize) -> usize {
+const fn max_input_len(block_len: usize, overhead_blocks_per_nonce: usize) -> u64 {
     // Each of our AEADs use a 32-bit block counter so the maximum is the
     // largest input that will not overflow the counter.
-    usize_from_u64_saturated(
-        ((1u64 << 32) - u64_from_usize(overhead_blocks_per_nonce)) * u64_from_usize(block_len),
-    )
+    ((1u64 << 32) - polyfill::u64_from_usize(overhead_blocks_per_nonce))
+        * polyfill::u64_from_usize(block_len)
 }
 
 impl Algorithm {

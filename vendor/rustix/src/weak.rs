@@ -167,7 +167,6 @@ macro_rules! syscall {
             // (not paths).
             use libc::*;
 
-            #[allow(dead_code)]
             trait AsSyscallArg {
                 type SyscallArgType;
                 fn into_syscall_arg(self) -> Self::SyscallArgType;

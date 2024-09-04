@@ -12,12 +12,12 @@
 // OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 // CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-use super::Modulus;
+use super::{Modulus, Width};
 use crate::{
     error,
     limb::{self, Limb, LimbMask, LIMB_BYTES},
 };
-use alloc::{boxed::Box, vec};
+use alloc::{borrow::ToOwned, boxed::Box, vec};
 use core::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
@@ -76,17 +76,28 @@ impl<M> BoxedLimbs<M> {
             return Err(error::KeyRejected::invalid_encoding());
         }
         let num_limbs = (input.len() + LIMB_BYTES - 1) / LIMB_BYTES;
-        let mut r = Self::zero(num_limbs);
+        let mut r = Self::zero(Width {
+            num_limbs,
+            m: PhantomData,
+        });
         limb::parse_big_endian_and_pad_consttime(input, &mut r)
             .map_err(|error::Unspecified| error::KeyRejected::unexpected_error())?;
         Ok(r)
+    }
+
+    pub(super) fn minimal_width_from_unpadded(limbs: &[Limb]) -> Self {
+        debug_assert_ne!(limbs.last(), Some(&0));
+        Self {
+            limbs: limbs.to_owned().into_boxed_slice(),
+            m: PhantomData,
+        }
     }
 
     pub(super) fn from_be_bytes_padded_less_than(
         input: untrusted::Input,
         m: &Modulus<M>,
     ) -> Result<Self, error::Unspecified> {
-        let mut r = Self::zero(m.limbs().len());
+        let mut r = Self::zero(m.width());
         limb::parse_big_endian_and_pad_consttime(input, &mut r)?;
         if limb::limbs_less_than_limbs_consttime(&r, m.limbs()) != LimbMask::True {
             return Err(error::Unspecified);
@@ -99,9 +110,16 @@ impl<M> BoxedLimbs<M> {
         limb::limbs_are_zero_constant_time(&self.limbs) == LimbMask::True
     }
 
-    pub(super) fn zero(len: usize) -> Self {
+    pub(super) fn zero(width: Width<M>) -> Self {
         Self {
-            limbs: vec![0; len].into_boxed_slice(),
+            limbs: vec![0; width.num_limbs].into_boxed_slice(),
+            m: PhantomData,
+        }
+    }
+
+    pub(super) fn width(&self) -> Width<M> {
+        Width {
+            num_limbs: self.limbs.len(),
             m: PhantomData,
         }
     }

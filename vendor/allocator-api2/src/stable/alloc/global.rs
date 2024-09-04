@@ -1,6 +1,7 @@
 use core::ptr::NonNull;
 
-use alloc_crate::alloc::{alloc, alloc_zeroed, dealloc, realloc};
+#[doc(inline)]
+pub use alloc_crate::alloc::{alloc, alloc_zeroed, dealloc, handle_alloc_error, realloc};
 
 use crate::stable::{assume, invalid_mut};
 

@@ -75,8 +75,8 @@ fn _detect(info: &mut CpuInfo) {
             info.set(CpuInfo::HAS_RCPC3);
         }
     }
-    // OpenBSD has an API to get AA64MMFR2, but currently always returns 0.
-    // https://github.com/openbsd/src/blob/1847475460684e4251d673e6b1bceb1b38e699c3/sys/arch/arm64/arm64/machdep.c#L367
+    // OpenBSD has an API to get this, but currently always returns 0.
+    // https://github.com/openbsd/src/blob/6a233889798dc3ecb18acc52dce1e57862af2957/sys/arch/arm64/arm64/machdep.c#L371-L377
     #[cfg_attr(target_os = "openbsd", cfg(test))]
     {
         // ID_AA64MMFR2_EL1, AArch64 Memory Model Feature Register 2
@@ -109,7 +109,7 @@ mod imp {
             asm!(
                 "mrs {0}, ID_AA64ISAR0_EL1",
                 out(reg) aa64isar0,
-                options(pure, nomem, nostack, preserves_flags),
+                options(pure, nomem, nostack, preserves_flags)
             );
             #[cfg(test)]
             let aa64isar1: u64;
@@ -118,14 +118,14 @@ mod imp {
                 asm!(
                     "mrs {0}, ID_AA64ISAR1_EL1",
                     out(reg) aa64isar1,
-                    options(pure, nomem, nostack, preserves_flags),
+                    options(pure, nomem, nostack, preserves_flags)
                 );
             }
             let aa64mmfr2: u64;
             asm!(
                 "mrs {0}, ID_AA64MMFR2_EL1",
                 out(reg) aa64mmfr2,
-                options(pure, nomem, nostack, preserves_flags),
+                options(pure, nomem, nostack, preserves_flags)
             );
             AA64Reg {
                 aa64isar0,
@@ -320,7 +320,6 @@ mod imp {
         let mut out = 0_u64;
         let mut out_len = OUT_LEN;
         #[allow(clippy::cast_possible_truncation)]
-        let mib_len = mib.len() as ffi::c_uint;
         // SAFETY:
         // - `mib.len()` does not exceed the size of `mib`.
         // - `out_len` does not exceed the size of `out`.
@@ -328,7 +327,7 @@ mod imp {
         let res = unsafe {
             ffi::sysctl(
                 mib.as_ptr(),
-                mib_len,
+                mib.len() as ffi::c_uint,
                 (&mut out as *mut u64).cast::<ffi::c_void>(),
                 &mut out_len,
                 ptr::null_mut(),
@@ -405,8 +404,8 @@ mod tests {
     #[test]
     fn test_netbsd() {
         use c_types::*;
+        use core::{arch::asm, mem, ptr};
         use imp::ffi;
-        use std::{arch::asm, mem, ptr, vec, vec::Vec};
         use test_helper::sys;
 
         // Call syscall using asm instead of libc.
@@ -425,6 +424,7 @@ mod tests {
                 new_p: *const c_void,
                 new_len: c_size_t,
             ) -> Result<c_int, c_int> {
+                #[allow(clippy::cast_possible_truncation)]
                 // SAFETY: the caller must uphold the safety contract.
                 unsafe {
                     let mut n = sys::SYS___sysctl as u64;
@@ -444,7 +444,6 @@ mod tests {
                         in("x5") new_len as u64,
                         options(nostack),
                     );
-                    #[allow(clippy::cast_possible_truncation)]
                     if r as c_int == -1 {
                         Err(n as c_int)
                     } else {
@@ -454,6 +453,7 @@ mod tests {
             }
 
             // https://github.com/golang/sys/blob/4badad8d477ffd7a6b762c35bc69aed82faface7/cpu/cpu_netbsd_arm64.go.
+            use std::{vec, vec::Vec};
             fn sysctl_nodes(mib: &mut Vec<i32>) -> Result<Vec<sys::sysctlnode>, i32> {
                 mib.push(sys::CTL_QUERY);
                 let mut q_node = sys::sysctlnode {
@@ -464,15 +464,15 @@ mod tests {
                 let sz = mem::size_of::<sys::sysctlnode>();
                 let mut olen = 0;
                 #[allow(clippy::cast_possible_truncation)]
-                let mib_len = mib.len() as c_uint;
                 unsafe {
-                    sysctl(mib.as_ptr(), mib_len, ptr::null_mut(), &mut olen, qp, sz)?;
+                    sysctl(mib.as_ptr(), mib.len() as c_uint, ptr::null_mut(), &mut olen, qp, sz)?;
                 }
 
                 let mut nodes = Vec::<sys::sysctlnode>::with_capacity(olen / sz);
                 let np = nodes.as_mut_ptr().cast::<ffi::c_void>();
+                #[allow(clippy::cast_possible_truncation)]
                 unsafe {
-                    sysctl(mib.as_ptr(), mib_len, np, &mut olen, qp, sz)?;
+                    sysctl(mib.as_ptr(), mib.len() as c_uint, np, &mut olen, qp, sz)?;
                     nodes.set_len(olen / sz);
                 }
 
@@ -511,11 +511,10 @@ mod tests {
             let mut buf: ffi::aarch64_sysctl_cpu_id = unsafe { core::mem::zeroed() };
             let mut out_len = OUT_LEN;
             #[allow(clippy::cast_possible_truncation)]
-            let mib_len = mib.len() as c_uint;
             unsafe {
                 sysctl(
                     mib.as_ptr(),
-                    mib_len,
+                    mib.len() as c_uint,
                     (&mut buf as *mut ffi::aarch64_sysctl_cpu_id).cast::<ffi::c_void>(),
                     &mut out_len,
                     ptr::null_mut(),
@@ -556,8 +555,8 @@ mod tests {
         clippy::used_underscore_binding
     )]
     const _: fn() = || {
+        use core::mem::size_of;
         use imp::ffi;
-        use std::mem;
         use test_helper::{libc, sys};
         let mut _sysctlbyname: unsafe extern "C" fn(
             *const ffi::c_char,
@@ -570,14 +569,12 @@ mod tests {
         _sysctlbyname = sys::sysctlbyname;
         // libc doesn't have this
         // static_assert!(
-        //     mem::size_of::<ffi::aarch64_sysctl_cpu_id>()
-        //         == mem::size_of::<libc::aarch64_sysctl_cpu_id>()
+        //     size_of::<ffi::aarch64_sysctl_cpu_id>() == size_of::<libc::aarch64_sysctl_cpu_id>()
         // );
         static_assert!(
-            mem::size_of::<ffi::aarch64_sysctl_cpu_id>()
-                == mem::size_of::<sys::aarch64_sysctl_cpu_id>()
+            size_of::<ffi::aarch64_sysctl_cpu_id>() == size_of::<sys::aarch64_sysctl_cpu_id>()
         );
-        let ffi: ffi::aarch64_sysctl_cpu_id = unsafe { mem::zeroed() };
+        let ffi: ffi::aarch64_sysctl_cpu_id = unsafe { core::mem::zeroed() };
         let _ = sys::aarch64_sysctl_cpu_id {
             ac_midr: ffi.midr,
             ac_revidr: ffi.revidr,

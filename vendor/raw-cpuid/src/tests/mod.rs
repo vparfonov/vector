@@ -9,7 +9,7 @@ use crate::*;
 
 #[test]
 fn cpuid_impls_debug() {
-    fn debug_required<T: Debug>(_t: T) {}
+    fn debug_required<T: Debug>(t: T) {}
 
     debug_required(CpuId::new());
 }

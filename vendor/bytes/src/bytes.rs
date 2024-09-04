@@ -1,7 +1,6 @@
 use core::iter::FromIterator;
-use core::mem::{self, ManuallyDrop};
 use core::ops::{Deref, RangeBounds};
-use core::{cmp, fmt, hash, ptr, slice, usize};
+use core::{cmp, fmt, hash, mem, ptr, slice, usize};
 
 use alloc::{
     alloc::{dealloc, Layout},
@@ -15,7 +14,7 @@ use crate::buf::IntoIter;
 #[allow(unused)]
 use crate::loom::sync::atomic::AtomicMut;
 use crate::loom::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
-use crate::{offset_from, Buf, BytesMut};
+use crate::Buf;
 
 /// A cheaply cloneable and sliceable chunk of contiguous memory.
 ///
@@ -113,7 +112,6 @@ pub(crate) struct Vtable {
     ///
     /// takes `Bytes` to value
     pub to_vec: unsafe fn(&AtomicPtr<()>, *const u8, usize) -> Vec<u8>,
-    pub to_mut: unsafe fn(&AtomicPtr<()>, *const u8, usize) -> BytesMut,
     /// fn(data)
     pub is_unique: unsafe fn(&AtomicPtr<()>) -> bool,
     /// fn(data, ptr, len)
@@ -386,6 +384,13 @@ impl Bytes {
     /// Panics if `at > len`.
     #[must_use = "consider Bytes::truncate if you don't need the other half"]
     pub fn split_off(&mut self, at: usize) -> Self {
+        assert!(
+            at <= self.len(),
+            "split_off out of bounds: {:?} <= {:?}",
+            at,
+            self.len(),
+        );
+
         if at == self.len() {
             return Bytes::new();
         }
@@ -393,13 +398,6 @@ impl Bytes {
         if at == 0 {
             return mem::replace(self, Bytes::new());
         }
-
-        assert!(
-            at <= self.len(),
-            "split_off out of bounds: {:?} <= {:?}",
-            at,
-            self.len(),
-        );
 
         let mut ret = self.clone();
 
@@ -435,6 +433,13 @@ impl Bytes {
     /// Panics if `at > len`.
     #[must_use = "consider Bytes::advance if you don't need the other half"]
     pub fn split_to(&mut self, at: usize) -> Self {
+        assert!(
+            at <= self.len(),
+            "split_to out of bounds: {:?} <= {:?}",
+            at,
+            self.len(),
+        );
+
         if at == self.len() {
             return mem::replace(self, Bytes::new());
         }
@@ -442,13 +447,6 @@ impl Bytes {
         if at == 0 {
             return Bytes::new();
         }
-
-        assert!(
-            at <= self.len(),
-            "split_to out of bounds: {:?} <= {:?}",
-            at,
-            self.len(),
-        );
 
         let mut ret = self.clone();
 
@@ -506,29 +504,6 @@ impl Bytes {
     #[inline]
     pub fn clear(&mut self) {
         self.truncate(0);
-    }
-
-    /// Try to convert self into `BytesMut`.
-    ///
-    /// If `self` is unique for the entire original buffer, this will succeed
-    /// and return a `BytesMut` with the contents of `self` without copying.
-    /// If `self` is not unique for the entire original buffer, this will fail
-    /// and return self.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use bytes::{Bytes, BytesMut};
-    ///
-    /// let bytes = Bytes::from(b"hello".to_vec());
-    /// assert_eq!(bytes.try_into_mut(), Ok(BytesMut::from(&b"hello"[..])));
-    /// ```
-    pub fn try_into_mut(self) -> Result<BytesMut, Bytes> {
-        if self.is_unique() {
-            Ok(self.into())
-        } else {
-            Err(self)
-        }
     }
 
     #[inline]
@@ -606,7 +581,13 @@ impl Buf for Bytes {
     }
 
     fn copy_to_bytes(&mut self, len: usize) -> Self {
-        self.split_to(len)
+        if len == self.remaining() {
+            core::mem::replace(self, Bytes::new())
+        } else {
+            let ret = self.slice(..len);
+            self.advance(len);
+            ret
+        }
     }
 }
 
@@ -847,15 +828,13 @@ impl From<&'static str> for Bytes {
 }
 
 impl From<Vec<u8>> for Bytes {
-    fn from(vec: Vec<u8>) -> Bytes {
-        let mut vec = ManuallyDrop::new(vec);
+    fn from(mut vec: Vec<u8>) -> Bytes {
         let ptr = vec.as_mut_ptr();
         let len = vec.len();
         let cap = vec.capacity();
 
         // Avoid an extra allocation if possible.
         if len == cap {
-            let vec = ManuallyDrop::into_inner(vec);
             return Bytes::from(vec.into_boxed_slice());
         }
 
@@ -864,6 +843,7 @@ impl From<Vec<u8>> for Bytes {
             cap,
             ref_cnt: AtomicUsize::new(1),
         });
+        mem::forget(vec);
 
         let shared = Box::into_raw(shared);
         // The pointer should be aligned, so this assert should
@@ -912,28 +892,6 @@ impl From<Box<[u8]>> for Bytes {
     }
 }
 
-impl From<Bytes> for BytesMut {
-    /// Convert self into `BytesMut`.
-    ///
-    /// If `bytes` is unique for the entire original buffer, this will return a
-    /// `BytesMut` with the contents of `bytes` without copying.
-    /// If `bytes` is not unique for the entire original buffer, this will make
-    /// a copy of `bytes` subset of the original buffer in a new `BytesMut`.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use bytes::{Bytes, BytesMut};
-    ///
-    /// let bytes = Bytes::from(b"hello".to_vec());
-    /// assert_eq!(BytesMut::from(bytes), BytesMut::from(&b"hello"[..]));
-    /// ```
-    fn from(bytes: Bytes) -> Self {
-        let bytes = ManuallyDrop::new(bytes);
-        unsafe { (bytes.vtable.to_mut)(&bytes.data, bytes.ptr, bytes.len) }
-    }
-}
-
 impl From<String> for Bytes {
     fn from(s: String) -> Bytes {
         Bytes::from(s.into_bytes())
@@ -942,7 +900,7 @@ impl From<String> for Bytes {
 
 impl From<Bytes> for Vec<u8> {
     fn from(bytes: Bytes) -> Vec<u8> {
-        let bytes = ManuallyDrop::new(bytes);
+        let bytes = mem::ManuallyDrop::new(bytes);
         unsafe { (bytes.vtable.to_vec)(&bytes.data, bytes.ptr, bytes.len) }
     }
 }
@@ -963,7 +921,6 @@ impl fmt::Debug for Vtable {
 const STATIC_VTABLE: Vtable = Vtable {
     clone: static_clone,
     to_vec: static_to_vec,
-    to_mut: static_to_mut,
     is_unique: static_is_unique,
     drop: static_drop,
 };
@@ -976,11 +933,6 @@ unsafe fn static_clone(_: &AtomicPtr<()>, ptr: *const u8, len: usize) -> Bytes {
 unsafe fn static_to_vec(_: &AtomicPtr<()>, ptr: *const u8, len: usize) -> Vec<u8> {
     let slice = slice::from_raw_parts(ptr, len);
     slice.to_vec()
-}
-
-unsafe fn static_to_mut(_: &AtomicPtr<()>, ptr: *const u8, len: usize) -> BytesMut {
-    let slice = slice::from_raw_parts(ptr, len);
-    BytesMut::from(slice)
 }
 
 fn static_is_unique(_: &AtomicPtr<()>) -> bool {
@@ -996,7 +948,6 @@ unsafe fn static_drop(_: &mut AtomicPtr<()>, _: *const u8, _: usize) {
 static PROMOTABLE_EVEN_VTABLE: Vtable = Vtable {
     clone: promotable_even_clone,
     to_vec: promotable_even_to_vec,
-    to_mut: promotable_even_to_mut,
     is_unique: promotable_is_unique,
     drop: promotable_even_drop,
 };
@@ -1004,7 +955,6 @@ static PROMOTABLE_EVEN_VTABLE: Vtable = Vtable {
 static PROMOTABLE_ODD_VTABLE: Vtable = Vtable {
     clone: promotable_odd_clone,
     to_vec: promotable_odd_to_vec,
-    to_mut: promotable_odd_to_mut,
     is_unique: promotable_is_unique,
     drop: promotable_odd_drop,
 };
@@ -1039,7 +989,7 @@ unsafe fn promotable_to_vec(
 
         let buf = f(shared);
 
-        let cap = offset_from(ptr, buf) + len;
+        let cap = (ptr as usize - buf as usize) + len;
 
         // Copy back buffer
         ptr::copy(ptr, buf, len);
@@ -1048,43 +998,8 @@ unsafe fn promotable_to_vec(
     }
 }
 
-unsafe fn promotable_to_mut(
-    data: &AtomicPtr<()>,
-    ptr: *const u8,
-    len: usize,
-    f: fn(*mut ()) -> *mut u8,
-) -> BytesMut {
-    let shared = data.load(Ordering::Acquire);
-    let kind = shared as usize & KIND_MASK;
-
-    if kind == KIND_ARC {
-        shared_to_mut_impl(shared.cast(), ptr, len)
-    } else {
-        // KIND_VEC is a view of an underlying buffer at a certain offset.
-        // The ptr + len always represents the end of that buffer.
-        // Before truncating it, it is first promoted to KIND_ARC.
-        // Thus, we can safely reconstruct a Vec from it without leaking memory.
-        debug_assert_eq!(kind, KIND_VEC);
-
-        let buf = f(shared);
-        let off = offset_from(ptr, buf);
-        let cap = off + len;
-        let v = Vec::from_raw_parts(buf, cap, cap);
-
-        let mut b = BytesMut::from_vec(v);
-        b.advance_unchecked(off);
-        b
-    }
-}
-
 unsafe fn promotable_even_to_vec(data: &AtomicPtr<()>, ptr: *const u8, len: usize) -> Vec<u8> {
     promotable_to_vec(data, ptr, len, |shared| {
-        ptr_map(shared.cast(), |addr| addr & !KIND_MASK)
-    })
-}
-
-unsafe fn promotable_even_to_mut(data: &AtomicPtr<()>, ptr: *const u8, len: usize) -> BytesMut {
-    promotable_to_mut(data, ptr, len, |shared| {
         ptr_map(shared.cast(), |addr| addr & !KIND_MASK)
     })
 }
@@ -1120,10 +1035,6 @@ unsafe fn promotable_odd_to_vec(data: &AtomicPtr<()>, ptr: *const u8, len: usize
     promotable_to_vec(data, ptr, len, |shared| shared.cast())
 }
 
-unsafe fn promotable_odd_to_mut(data: &AtomicPtr<()>, ptr: *const u8, len: usize) -> BytesMut {
-    promotable_to_mut(data, ptr, len, |shared| shared.cast())
-}
-
 unsafe fn promotable_odd_drop(data: &mut AtomicPtr<()>, ptr: *const u8, len: usize) {
     data.with_mut(|shared| {
         let shared = *shared;
@@ -1152,7 +1063,7 @@ unsafe fn promotable_is_unique(data: &AtomicPtr<()>) -> bool {
 }
 
 unsafe fn free_boxed_slice(buf: *mut u8, offset: *const u8, len: usize) {
-    let cap = offset_from(offset, buf) + len;
+    let cap = (offset as usize - buf as usize) + len;
     dealloc(buf, Layout::from_size_align(cap, 1).unwrap())
 }
 
@@ -1180,7 +1091,6 @@ const _: [(); 0 - mem::align_of::<Shared>() % 2] = []; // Assert that the alignm
 static SHARED_VTABLE: Vtable = Vtable {
     clone: shared_clone,
     to_vec: shared_to_vec,
-    to_mut: shared_to_mut,
     is_unique: shared_is_unique,
     drop: shared_drop,
 };
@@ -1206,11 +1116,11 @@ unsafe fn shared_to_vec_impl(shared: *mut Shared, ptr: *const u8, len: usize) ->
         .compare_exchange(1, 0, Ordering::AcqRel, Ordering::Relaxed)
         .is_ok()
     {
-        // Deallocate the `Shared` instance without running its destructor.
-        let shared = *Box::from_raw(shared);
-        let shared = ManuallyDrop::new(shared);
-        let buf = shared.buf;
-        let cap = shared.cap;
+        let buf = (*shared).buf;
+        let cap = (*shared).cap;
+
+        // Deallocate Shared
+        drop(Box::from_raw(shared as *mut mem::ManuallyDrop<Shared>));
 
         // Copy back buffer
         ptr::copy(ptr, buf, len);
@@ -1225,45 +1135,6 @@ unsafe fn shared_to_vec_impl(shared: *mut Shared, ptr: *const u8, len: usize) ->
 
 unsafe fn shared_to_vec(data: &AtomicPtr<()>, ptr: *const u8, len: usize) -> Vec<u8> {
     shared_to_vec_impl(data.load(Ordering::Relaxed).cast(), ptr, len)
-}
-
-unsafe fn shared_to_mut_impl(shared: *mut Shared, ptr: *const u8, len: usize) -> BytesMut {
-    // The goal is to check if the current handle is the only handle
-    // that currently has access to the buffer. This is done by
-    // checking if the `ref_cnt` is currently 1.
-    //
-    // The `Acquire` ordering synchronizes with the `Release` as
-    // part of the `fetch_sub` in `release_shared`. The `fetch_sub`
-    // operation guarantees that any mutations done in other threads
-    // are ordered before the `ref_cnt` is decremented. As such,
-    // this `Acquire` will guarantee that those mutations are
-    // visible to the current thread.
-    //
-    // Otherwise, we take the other branch, copy the data and call `release_shared`.
-    if (*shared).ref_cnt.load(Ordering::Acquire) == 1 {
-        // Deallocate the `Shared` instance without running its destructor.
-        let shared = *Box::from_raw(shared);
-        let shared = ManuallyDrop::new(shared);
-        let buf = shared.buf;
-        let cap = shared.cap;
-
-        // Rebuild Vec
-        let off = offset_from(ptr, buf);
-        let v = Vec::from_raw_parts(buf, len + off, cap);
-
-        let mut b = BytesMut::from_vec(v);
-        b.advance_unchecked(off);
-        b
-    } else {
-        // Copy the data from Shared in a new Vec, then release it
-        let v = slice::from_raw_parts(ptr, len).to_vec();
-        release_shared(shared);
-        BytesMut::from_vec(v)
-    }
-}
-
-unsafe fn shared_to_mut(data: &AtomicPtr<()>, ptr: *const u8, len: usize) -> BytesMut {
-    shared_to_mut_impl(data.load(Ordering::Relaxed).cast(), ptr, len)
 }
 
 pub(crate) unsafe fn shared_is_unique(data: &AtomicPtr<()>) -> bool {
@@ -1314,7 +1185,7 @@ unsafe fn shallow_clone_vec(
     // vector.
     let shared = Box::new(Shared {
         buf,
-        cap: offset_from(offset, buf) + len,
+        cap: (offset as usize - buf as usize) + len,
         // Initialize refcount to 2. One for this reference, and one
         // for the new clone that will be returned from
         // `shallow_clone`.

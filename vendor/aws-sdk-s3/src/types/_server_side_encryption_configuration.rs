@@ -22,8 +22,8 @@ impl ServerSideEncryptionConfiguration {
 }
 
 /// A builder for [`ServerSideEncryptionConfiguration`](crate::types::ServerSideEncryptionConfiguration).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct ServerSideEncryptionConfigurationBuilder {
     pub(crate) rules: ::std::option::Option<::std::vec::Vec<crate::types::ServerSideEncryptionRule>>,
 }

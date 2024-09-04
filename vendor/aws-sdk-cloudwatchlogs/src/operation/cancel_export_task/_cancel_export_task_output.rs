@@ -18,8 +18,8 @@ impl CancelExportTaskOutput {
 }
 
 /// A builder for [`CancelExportTaskOutput`](crate::operation::cancel_export_task::CancelExportTaskOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct CancelExportTaskOutputBuilder {
     _request_id: Option<String>,
 }

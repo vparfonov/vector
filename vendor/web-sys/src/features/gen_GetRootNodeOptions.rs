@@ -10,16 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `GetRootNodeOptions`*"]
     pub type GetRootNodeOptions;
-    #[doc = "Get the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GetRootNodeOptions`*"]
-    #[wasm_bindgen(method, getter = "composed")]
-    pub fn get_composed(this: &GetRootNodeOptions) -> Option<bool>;
-    #[doc = "Change the `composed` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `GetRootNodeOptions`*"]
-    #[wasm_bindgen(method, setter = "composed")]
-    pub fn set_composed(this: &GetRootNodeOptions, val: bool);
 }
 impl GetRootNodeOptions {
     #[doc = "Construct a new `GetRootNodeOptions`."]
@@ -30,9 +20,21 @@ impl GetRootNodeOptions {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_composed()` instead."]
+    #[doc = "Change the `composed` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `GetRootNodeOptions`*"]
     pub fn composed(&mut self, val: bool) -> &mut Self {
-        self.set_composed(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("composed"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

@@ -55,7 +55,7 @@
 #[macro_export]
 macro_rules! vec {
     (in $alloc:expr $(;)?) => (
-        $crate::vec::Vec::new_in($alloc)
+        $crate::vec::Vec::new()
     );
     (in $alloc:expr; $elem:expr; $n:expr) => (
         $crate::vec::from_elem_in($elem, $n, $alloc)

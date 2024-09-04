@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.70.0"
+rust-version = "1.56.0"
 name = "num_enum"
-version = "0.7.3"
+version = "0.7.2"
 authors = [
     "Daniel Wagner-Hall <dawagner@gmail.com>",
     "Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>",
@@ -36,7 +36,7 @@ repository = "https://github.com/illicitonion/num_enum"
 features = ["external_doc"]
 
 [dependencies.num_enum_derive]
-version = "=0.7.3"
+version = "=0.7.2"
 default-features = false
 
 [dev-dependencies.anyhow]
@@ -49,7 +49,7 @@ version = "1"
 version = "1.0.4"
 
 [dev-dependencies.trybuild]
-version = "1.0.98"
+version = "1.0.49"
 
 [dev-dependencies.walkdir]
 version = "2"
@@ -62,3 +62,7 @@ std = ["num_enum_derive/std"]
 
 [badges.maintenance]
 status = "passively-maintained"
+
+[badges.travis-ci]
+branch = "master"
+repository = "illicitonion/num_enum"

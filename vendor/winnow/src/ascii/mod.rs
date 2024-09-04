@@ -942,7 +942,7 @@ where
     trace("space0", take_while(0.., AsChar::is_space)).parse_next(input)
 }
 
-/// Recognizes one or more spaces and tabs.
+/// Recognizes zero or more spaces and tabs.
 ///
 /// *Complete version*: Will return the whole input if no terminating token is found (a non space
 /// character).
@@ -1132,7 +1132,7 @@ where
 {
     trace("dec_uint", move |input: &mut Input| {
         alt(((one_of('1'..='9'), digit0).void(), one_of('0').void()))
-            .take()
+            .recognize()
             .verify_map(|s: <Input as Stream>::Slice| {
                 let s = s.as_bstr();
                 // SAFETY: Only 7-bit ASCII characters are parsed
@@ -1222,7 +1222,7 @@ where
             _ => fail,
         });
         alt(((sign, one_of('1'..='9'), digit0).void(), one_of('0').void()))
-            .take()
+            .recognize()
             .verify_map(|s: <Input as Stream>::Slice| {
                 let s = s.as_bstr();
                 // SAFETY: Only 7-bit ASCII characters are parsed
@@ -1491,7 +1491,7 @@ where
     Error: ParserError<Input>,
 {
     trace("float", move |input: &mut Input| {
-        let s = take_float_or_exceptions(input)?;
+        let s = recognize_float_or_exceptions(input)?;
         s.parse_slice()
             .ok_or_else(|| ErrMode::from_error_kind(input, ErrorKind::Verify))
     })
@@ -1499,7 +1499,9 @@ where
 }
 
 #[allow(clippy::trait_duplication_in_bounds)] // HACK: clippy 1.64.0 bug
-fn take_float_or_exceptions<I, E: ParserError<I>>(input: &mut I) -> PResult<<I as Stream>::Slice, E>
+fn recognize_float_or_exceptions<I, E: ParserError<I>>(
+    input: &mut I,
+) -> PResult<<I as Stream>::Slice, E>
 where
     I: StreamIsPartial,
     I: Stream,
@@ -1510,24 +1512,24 @@ where
     I: AsBStr,
 {
     alt((
-        take_float,
+        recognize_float,
         crate::token::literal(Caseless("nan")),
         (
             opt(one_of(['+', '-'])),
             crate::token::literal(Caseless("infinity")),
         )
-            .take(),
+            .recognize(),
         (
             opt(one_of(['+', '-'])),
             crate::token::literal(Caseless("inf")),
         )
-            .take(),
+            .recognize(),
     ))
     .parse_next(input)
 }
 
 #[allow(clippy::trait_duplication_in_bounds)] // HACK: clippy 1.64.0 bug
-fn take_float<I, E: ParserError<I>>(input: &mut I) -> PResult<<I as Stream>::Slice, E>
+fn recognize_float<I, E: ParserError<I>>(input: &mut I) -> PResult<<I as Stream>::Slice, E>
 where
     I: StreamIsPartial,
     I: Stream,
@@ -1544,22 +1546,11 @@ where
         )),
         opt((one_of(['e', 'E']), opt(one_of(['+', '-'])), cut_err(digit1))),
     )
-        .take()
+        .recognize()
         .parse_next(input)
 }
 
 /// Recognize the input slice with escaped characters.
-///
-/// Arguments:
-/// - `normal`: unescapeable characters
-///   - Must not include `control`
-/// - `control_char`: e.g. `\` for strings in most languages
-/// - `escape`: parse and transform the escaped character
-///
-/// Parsing ends when:
-/// - `alt(normal, control._char)` [`Backtrack`s][crate::error::ErrMode::Backtrack]
-/// - `normal` doesn't advance the input stream
-/// - *(complete)* input stream is exhausted
 ///
 /// See also [`escaped_transform`]
 ///
@@ -1598,13 +1589,13 @@ where
 /// assert_eq!(esc(Partial::new("12\\\"34;")), Ok((Partial::new(";"), "12\\\"34")));
 /// ```
 #[inline(always)]
-pub fn take_escaped<'i, Input, Error, Normal, Escapable, NormalOutput, EscapableOutput>(
+pub fn take_escaped<'i, Input: 'i, Error, Normal, Escapable, NormalOutput, EscapableOutput>(
     mut normal: Normal,
     control_char: char,
     mut escapable: Escapable,
 ) -> impl Parser<Input, <Input as Stream>::Slice, Error>
 where
-    Input: StreamIsPartial + Stream + Compare<char> + 'i,
+    Input: StreamIsPartial + Stream + Compare<char>,
     Normal: Parser<Input, NormalOutput, Error>,
     Escapable: Parser<Input, EscapableOutput, Error>,
     Error: ParserError<Input>,
@@ -1621,13 +1612,13 @@ where
 /// Deprecated, replaced with [`take_escaped`]
 #[deprecated(since = "0.6.4", note = "Replaced with `take_escaped`")]
 #[inline(always)]
-pub fn escaped<'i, Input, Error, Normal, Escapable, NormalOutput, EscapableOutput>(
+pub fn escaped<'i, Input: 'i, Error, Normal, Escapable, NormalOutput, EscapableOutput>(
     normal: Normal,
     control_char: char,
     escapable: Escapable,
 ) -> impl Parser<Input, <Input as Stream>::Slice, Error>
 where
-    Input: StreamIsPartial + Stream + Compare<char> + 'i,
+    Input: StreamIsPartial + Stream + Compare<char>,
     Normal: Parser<Input, NormalOutput, Error>,
     Escapable: Parser<Input, EscapableOutput, Error>,
     Error: ParserError<Input>,
@@ -1677,7 +1668,7 @@ where
     Err(ErrMode::Incomplete(Needed::Unknown))
 }
 
-fn complete_escaped_internal<'a, I, Error, F, G, O1, O2>(
+fn complete_escaped_internal<'a, I: 'a, Error, F, G, O1, O2>(
     input: &mut I,
     normal: &mut F,
     control_char: char,
@@ -1687,7 +1678,6 @@ where
     I: StreamIsPartial,
     I: Stream,
     I: Compare<char>,
-    I: 'a,
     F: Parser<I, O1, Error>,
     G: Parser<I, O2, Error>,
     Error: ParserError<I>,
@@ -1723,21 +1713,11 @@ where
 
 /// Parse escaped characters, unescaping them
 ///
-/// Arguments:
-/// - `normal`: unescapeable characters
-///   - Must not include `control`
-/// - `control_char`: e.g. `\` for strings in most languages
-/// - `escape`: parse and transform the escaped character
-///
-/// Parsing ends when:
-/// - `alt(normal, control._char)` [`Backtrack`s][crate::error::ErrMode::Backtrack]
-/// - `normal` doesn't advance the input stream
-/// - *(complete)* input stream is exhausted
+/// As an example, the chain `abc\tdef` could be `abc    def` (it also consumes the control character)
 ///
 /// # Example
 ///
 /// ```rust
-/// # #[cfg(feature = "std")] {
 /// # use winnow::prelude::*;
 /// # use winnow::{error::ErrMode, error::ErrorKind, error::InputError, error::Needed};
 /// # use std::str::from_utf8;
@@ -1760,11 +1740,9 @@ where
 ///
 /// assert_eq!(parser.parse_peek("ab\\\"cd"), Ok(("", String::from("ab\"cd"))));
 /// assert_eq!(parser.parse_peek("ab\\ncd"), Ok(("", String::from("ab\ncd"))));
-/// # }
 /// ```
 ///
 /// ```
-/// # #[cfg(feature = "std")] {
 /// # use winnow::prelude::*;
 /// # use winnow::{error::ErrMode, error::ErrorKind, error::InputError, error::Needed};
 /// # use std::str::from_utf8;
@@ -1787,7 +1765,6 @@ where
 /// }
 ///
 /// assert_eq!(parser.parse_peek(Partial::new("ab\\\"cd\"")), Ok((Partial::new("\""), String::from("ab\"cd"))));
-/// # }
 /// ```
 #[inline(always)]
 pub fn escaped_transform<Input, Error, Normal, Escape, Output>(

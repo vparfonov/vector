@@ -15,7 +15,7 @@
 
 use super::c;
 use super::fd::{AsRawFd, BorrowedFd, FromRawFd, RawFd};
-#[cfg(any(feature = "event", feature = "runtime", feature = "system"))]
+#[cfg(any(feature = "event", feature = "runtime"))]
 use super::io::errno::try_decode_error;
 #[cfg(target_pointer_width = "64")]
 use super::io::errno::try_decode_u64;
@@ -107,14 +107,14 @@ pub(super) fn pass_usize<'a, Num: ArgNumber>(t: usize) -> ArgReg<'a, Num> {
 
 impl<'a, Num: ArgNumber, T> From<*mut T> for ArgReg<'a, Num> {
     #[inline]
-    fn from(c: *mut T) -> Self {
+    fn from(c: *mut T) -> ArgReg<'a, Num> {
         raw_arg(c.cast())
     }
 }
 
 impl<'a, Num: ArgNumber, T> From<*const T> for ArgReg<'a, Num> {
     #[inline]
-    fn from(c: *const T) -> Self {
+    fn from(c: *const T) -> ArgReg<'a, Num> {
         let mut_ptr = c as *mut T;
         raw_arg(mut_ptr.cast())
     }
@@ -790,19 +790,11 @@ impl<'a, Num: ArgNumber> From<(crate::net::SocketType, crate::net::SocketFlags)>
 }
 
 #[cfg(feature = "thread")]
-impl<'a, Num: ArgNumber>
-    From<(
-        crate::backend::thread::futex::Operation,
-        crate::thread::futex::Flags,
-    )> for ArgReg<'a, Num>
+impl<'a, Num: ArgNumber> From<(crate::thread::FutexOperation, crate::thread::FutexFlags)>
+    for ArgReg<'a, Num>
 {
     #[inline]
-    fn from(
-        pair: (
-            crate::backend::thread::futex::Operation,
-            crate::thread::futex::Flags,
-        ),
-    ) -> Self {
+    fn from(pair: (crate::thread::FutexOperation, crate::thread::FutexFlags)) -> Self {
         c_uint(pair.0 as u32 | pair.1.bits())
     }
 }
@@ -882,7 +874,7 @@ pub(super) unsafe fn ret(raw: RetReg<R0>) -> io::Result<()> {
 ///
 /// The caller must ensure that this is the return value of a syscall which
 /// doesn't return on success.
-#[cfg(any(feature = "event", feature = "runtime", feature = "system"))]
+#[cfg(any(feature = "event", feature = "runtime"))]
 #[inline]
 pub(super) unsafe fn ret_error(raw: RetReg<R0>) -> io::Errno {
     try_decode_error(raw)

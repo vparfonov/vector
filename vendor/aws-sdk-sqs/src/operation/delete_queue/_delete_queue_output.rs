@@ -18,8 +18,8 @@ impl DeleteQueueOutput {
 }
 
 /// A builder for [`DeleteQueueOutput`](crate::operation::delete_queue::DeleteQueueOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DeleteQueueOutputBuilder {
     _request_id: Option<String>,
 }

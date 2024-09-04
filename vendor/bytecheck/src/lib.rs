@@ -24,11 +24,10 @@
 //! use bytecheck::CheckBytes;
 //!
 //! #[derive(CheckBytes, Debug)]
-//! #[repr(C)]
 //! struct Test {
 //!     a: u32,
-//!     b: char,
-//!     c: bool,
+//!     b: bool,
+//!     c: char,
 //! }
 //! #[repr(C, align(16))]
 //! struct Aligned<const N: usize>([u8; N]);
@@ -507,7 +506,7 @@ impl<T: fmt::Display> fmt::Display for SliceCheckError<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             SliceCheckError::CheckBytes { index, error } => {
-                write!(f, "check failed for slice index {}: {}", index, error)
+                write!(f, "check failed for slice index {index}: {error}")
             }
         }
     }
@@ -551,7 +550,7 @@ impl fmt::Display for StrCheckError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StrCheckError::Utf8Error(e) => write!(f, "utf8 error: {}", e),
+            StrCheckError::Utf8Error(e) => write!(f, "utf8 error: {e}"),
         }
     }
 }
@@ -599,7 +598,7 @@ impl fmt::Display for CStrCheckError {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CStrCheckError::Utf8Error(e) => write!(f, "utf8 error: {}", e),
+            CStrCheckError::Utf8Error(e) => write!(f, "utf8 error: {e}"),
             CStrCheckError::MissingNullTerminator => write!(f, "missing null terminator"),
         }
     }
@@ -715,18 +714,16 @@ impl<T: fmt::Display> fmt::Display for EnumCheckError<T> {
                 inner,
             } => write!(
                 f,
-                "check failed for enum struct variant {}: {}",
-                variant_name, inner
+                "check failed for enum struct variant {variant_name}: {inner}"
             ),
             EnumCheckError::InvalidTuple {
                 variant_name,
                 inner,
             } => write!(
                 f,
-                "check failed for enum tuple variant {}: {}",
-                variant_name, inner
+                "check failed for enum tuple variant {variant_name}: {inner}"
             ),
-            EnumCheckError::InvalidTag(tag) => write!(f, "invalid tag for enum: {}", tag),
+            EnumCheckError::InvalidTag(tag) => write!(f, "invalid tag for enum: {tag}"),
         }
     }
 }

@@ -39,8 +39,8 @@ impl VpcEndpointSummary {
 }
 
 /// A builder for [`VpcEndpointSummary`](crate::types::VpcEndpointSummary).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct VpcEndpointSummaryBuilder {
     pub(crate) vpc_endpoint_id: ::std::option::Option<::std::string::String>,
     pub(crate) vpc_endpoint_owner: ::std::option::Option<::std::string::String>,

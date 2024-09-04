@@ -18,8 +18,8 @@ impl DeleteResourcePolicyOutput {
 }
 
 /// A builder for [`DeleteResourcePolicyOutput`](crate::operation::delete_resource_policy::DeleteResourcePolicyOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DeleteResourcePolicyOutputBuilder {
     _request_id: Option<String>,
 }

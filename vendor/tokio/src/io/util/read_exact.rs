@@ -6,7 +6,7 @@ use std::io;
 use std::marker::PhantomPinned;
 use std::marker::Unpin;
 use std::pin::Pin;
-use std::task::{ready, Context, Poll};
+use std::task::{Context, Poll};
 
 /// A future which can be used to easily read exactly enough bytes to fill
 /// a buffer.

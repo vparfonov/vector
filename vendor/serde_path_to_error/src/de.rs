@@ -72,7 +72,6 @@ pub struct Deserializer<'a, 'b, D> {
 }
 
 impl<'a, 'b, D> Deserializer<'a, 'b, D> {
-    #[allow(clippy::needless_pass_by_ref_mut)]
     pub fn new(de: D, track: &'b mut Track) -> Self {
         Deserializer {
             de,

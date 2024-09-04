@@ -8,7 +8,11 @@ use std::io::{self, BufRead, Read};
 ))]
 use std::pin::Pin;
 
-#[cfg(any(feature = "futures-03", feature = "tokio-02", feature = "tokio-03"))]
+#[cfg(any(
+    feature = "futures-03",
+    feature = "tokio-02",
+    feature = "tokio-03"
+))]
 use std::mem::MaybeUninit;
 
 #[cfg(feature = "futures-core-03")]
@@ -357,17 +361,14 @@ fn extend_buf_sync<R>(buf: &mut BytesMut, read: &mut R) -> io::Result<usize>
 where
     R: Read,
 {
-    let size = 8 * 1024;
     if !buf.has_remaining_mut() {
-        buf.reserve(size);
+        buf.reserve(8 * 1024);
     }
 
     // Copy of tokio's poll_read_buf method (but it has to force initialize the buffer)
     let n = {
         let bs = buf.chunk_mut();
 
-        let initial_size = bs.len().min(size);
-        let bs = &mut bs[..initial_size];
         for i in 0..bs.len() {
             bs.write_byte(i, 0);
         }

@@ -203,7 +203,9 @@ impl Context<gimli::EndianRcSlice<gimli::RunTimeEndian>> {
     /// Performance sensitive applications may want to use `Context::from_dwarf`
     /// with a more specialised `gimli::Reader` implementation.
     #[inline]
-    pub fn new<'data, O: object::Object<'data>>(file: &O) -> Result<Self, Error> {
+    pub fn new<'data: 'file, 'file, O: object::Object<'data, 'file>>(
+        file: &'file O,
+    ) -> Result<Self, Error> {
         Self::new_with_sup(file, None)
     }
 
@@ -217,9 +219,9 @@ impl Context<gimli::EndianRcSlice<gimli::RunTimeEndian>> {
     ///
     /// Performance sensitive applications may want to use `Context::from_dwarf`
     /// with a more specialised `gimli::Reader` implementation.
-    pub fn new_with_sup<'data, O: object::Object<'data>>(
-        file: &O,
-        sup_file: Option<&O>,
+    pub fn new_with_sup<'data: 'file, 'file, O: object::Object<'data, 'file>>(
+        file: &'file O,
+        sup_file: Option<&'file O>,
     ) -> Result<Self, Error> {
         let endian = if file.is_little_endian() {
             gimli::RunTimeEndian::Little
@@ -227,13 +229,13 @@ impl Context<gimli::EndianRcSlice<gimli::RunTimeEndian>> {
             gimli::RunTimeEndian::Big
         };
 
-        fn load_section<'data, O, Endian>(
+        fn load_section<'data: 'file, 'file, O, Endian>(
             id: gimli::SectionId,
-            file: &O,
+            file: &'file O,
             endian: Endian,
         ) -> Result<gimli::EndianRcSlice<Endian>, Error>
         where
-            O: object::Object<'data>,
+            O: object::Object<'data, 'file>,
             Endian: gimli::Endianity,
         {
             use object::ObjectSection;

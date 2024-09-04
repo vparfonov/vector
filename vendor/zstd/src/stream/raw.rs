@@ -132,7 +132,7 @@ pub struct Status {
 
 /// An in-memory decoder for streams of data.
 pub struct Decoder<'a> {
-    context: MaybeOwnedDCtx<'a>,
+    context: zstd_safe::DCtx<'a>,
 }
 
 impl Decoder<'static> {
@@ -148,20 +148,11 @@ impl Decoder<'static> {
         context
             .load_dictionary(dictionary)
             .map_err(map_error_code)?;
-        Ok(Decoder {
-            context: MaybeOwnedDCtx::Owned(context),
-        })
+        Ok(Decoder { context })
     }
 }
 
 impl<'a> Decoder<'a> {
-    /// Creates a new decoder which employs the provided context for deserialization.
-    pub fn with_context(context: &'a mut zstd_safe::DCtx<'static>) -> Self {
-        Self {
-            context: MaybeOwnedDCtx::Borrowed(context),
-        }
-    }
-
     /// Creates a new decoder, using an existing `DecoderDictionary`.
     pub fn with_prepared_dictionary<'b>(
         dictionary: &DecoderDictionary<'b>,
@@ -173,30 +164,14 @@ impl<'a> Decoder<'a> {
         context
             .ref_ddict(dictionary.as_ddict())
             .map_err(map_error_code)?;
-        Ok(Decoder {
-            context: MaybeOwnedDCtx::Owned(context),
-        })
-    }
-
-    /// Creates a new decoder, using a ref prefix
-    pub fn with_ref_prefix<'b>(ref_prefix: &'b [u8]) -> io::Result<Self>
-    where
-        'b: 'a,
-    {
-        let mut context = zstd_safe::DCtx::create();
-        context.ref_prefix(ref_prefix).map_err(map_error_code)?;
-        Ok(Decoder {
-            context: MaybeOwnedDCtx::Owned(context),
-        })
+        Ok(Decoder { context })
     }
 
     /// Sets a decompression parameter for this decoder.
     pub fn set_parameter(&mut self, parameter: DParameter) -> io::Result<()> {
-        match &mut self.context {
-            MaybeOwnedDCtx::Owned(x) => x.set_parameter(parameter),
-            MaybeOwnedDCtx::Borrowed(x) => x.set_parameter(parameter),
-        }
-        .map_err(map_error_code)?;
+        self.context
+            .set_parameter(parameter)
+            .map_err(map_error_code)?;
         Ok(())
     }
 }
@@ -207,11 +182,9 @@ impl Operation for Decoder<'_> {
         input: &mut InBuffer<'_>,
         output: &mut OutBuffer<'_, C>,
     ) -> io::Result<usize> {
-        match &mut self.context {
-            MaybeOwnedDCtx::Owned(x) => x.decompress_stream(output, input),
-            MaybeOwnedDCtx::Borrowed(x) => x.decompress_stream(output, input),
-        }
-        .map_err(map_error_code)
+        self.context
+            .decompress_stream(output, input)
+            .map_err(map_error_code)
     }
 
     fn flush<C: WriteBuf + ?Sized>(
@@ -232,15 +205,9 @@ impl Operation for Decoder<'_> {
     }
 
     fn reinit(&mut self) -> io::Result<()> {
-        match &mut self.context {
-            MaybeOwnedDCtx::Owned(x) => {
-                x.reset(zstd_safe::ResetDirective::SessionOnly)
-            }
-            MaybeOwnedDCtx::Borrowed(x) => {
-                x.reset(zstd_safe::ResetDirective::SessionOnly)
-            }
-        }
-        .map_err(map_error_code)?;
+        self.context
+            .reset(zstd_safe::ResetDirective::SessionOnly)
+            .map_err(map_error_code)?;
         Ok(())
     }
 
@@ -262,7 +229,7 @@ impl Operation for Decoder<'_> {
 
 /// An in-memory encoder for streams of data.
 pub struct Encoder<'a> {
-    context: MaybeOwnedCCtx<'a>,
+    context: zstd_safe::CCtx<'a>,
 }
 
 impl Encoder<'static> {
@@ -283,20 +250,11 @@ impl Encoder<'static> {
             .load_dictionary(dictionary)
             .map_err(map_error_code)?;
 
-        Ok(Encoder {
-            context: MaybeOwnedCCtx::Owned(context),
-        })
+        Ok(Encoder { context })
     }
 }
 
 impl<'a> Encoder<'a> {
-    /// Creates a new encoder that uses the provided context for serialization.
-    pub fn with_context(context: &'a mut zstd_safe::CCtx<'static>) -> Self {
-        Self {
-            context: MaybeOwnedCCtx::Borrowed(context),
-        }
-    }
-
     /// Creates a new encoder using an existing `EncoderDictionary`.
     pub fn with_prepared_dictionary<'b>(
         dictionary: &EncoderDictionary<'b>,
@@ -308,39 +266,14 @@ impl<'a> Encoder<'a> {
         context
             .ref_cdict(dictionary.as_cdict())
             .map_err(map_error_code)?;
-        Ok(Encoder {
-            context: MaybeOwnedCCtx::Owned(context),
-        })
-    }
-
-    /// Creates a new encoder initialized with the given ref prefix.
-    pub fn with_ref_prefix<'b>(
-        level: i32,
-        ref_prefix: &'b [u8],
-    ) -> io::Result<Self>
-    where
-        'b: 'a,
-    {
-        let mut context = zstd_safe::CCtx::create();
-
-        context
-            .set_parameter(CParameter::CompressionLevel(level))
-            .map_err(map_error_code)?;
-
-        context.ref_prefix(ref_prefix).map_err(map_error_code)?;
-
-        Ok(Encoder {
-            context: MaybeOwnedCCtx::Owned(context),
-        })
+        Ok(Encoder { context })
     }
 
     /// Sets a compression parameter for this encoder.
     pub fn set_parameter(&mut self, parameter: CParameter) -> io::Result<()> {
-        match &mut self.context {
-            MaybeOwnedCCtx::Owned(x) => x.set_parameter(parameter),
-            MaybeOwnedCCtx::Borrowed(x) => x.set_parameter(parameter),
-        }
-        .map_err(map_error_code)?;
+        self.context
+            .set_parameter(parameter)
+            .map_err(map_error_code)?;
         Ok(())
     }
 
@@ -356,15 +289,9 @@ impl<'a> Encoder<'a> {
         &mut self,
         pledged_src_size: Option<u64>,
     ) -> io::Result<()> {
-        match &mut self.context {
-            MaybeOwnedCCtx::Owned(x) => {
-                x.set_pledged_src_size(pledged_src_size)
-            }
-            MaybeOwnedCCtx::Borrowed(x) => {
-                x.set_pledged_src_size(pledged_src_size)
-            }
-        }
-        .map_err(map_error_code)?;
+        self.context
+            .set_pledged_src_size(pledged_src_size)
+            .map_err(map_error_code)?;
         Ok(())
     }
 }
@@ -375,22 +302,16 @@ impl<'a> Operation for Encoder<'a> {
         input: &mut InBuffer<'_>,
         output: &mut OutBuffer<'_, C>,
     ) -> io::Result<usize> {
-        match &mut self.context {
-            MaybeOwnedCCtx::Owned(x) => x.compress_stream(output, input),
-            MaybeOwnedCCtx::Borrowed(x) => x.compress_stream(output, input),
-        }
-        .map_err(map_error_code)
+        self.context
+            .compress_stream(output, input)
+            .map_err(map_error_code)
     }
 
     fn flush<C: WriteBuf + ?Sized>(
         &mut self,
         output: &mut OutBuffer<'_, C>,
     ) -> io::Result<usize> {
-        match &mut self.context {
-            MaybeOwnedCCtx::Owned(x) => x.flush_stream(output),
-            MaybeOwnedCCtx::Borrowed(x) => x.flush_stream(output),
-        }
-        .map_err(map_error_code)
+        self.context.flush_stream(output).map_err(map_error_code)
     }
 
     fn finish<C: WriteBuf + ?Sized>(
@@ -398,35 +319,15 @@ impl<'a> Operation for Encoder<'a> {
         output: &mut OutBuffer<'_, C>,
         _finished_frame: bool,
     ) -> io::Result<usize> {
-        match &mut self.context {
-            MaybeOwnedCCtx::Owned(x) => x.end_stream(output),
-            MaybeOwnedCCtx::Borrowed(x) => x.end_stream(output),
-        }
-        .map_err(map_error_code)
+        self.context.end_stream(output).map_err(map_error_code)
     }
 
     fn reinit(&mut self) -> io::Result<()> {
-        match &mut self.context {
-            MaybeOwnedCCtx::Owned(x) => {
-                x.reset(zstd_safe::ResetDirective::SessionOnly)
-            }
-            MaybeOwnedCCtx::Borrowed(x) => {
-                x.reset(zstd_safe::ResetDirective::SessionOnly)
-            }
-        }
-        .map_err(map_error_code)?;
+        self.context
+            .reset(zstd_safe::ResetDirective::SessionOnly)
+            .map_err(map_error_code)?;
         Ok(())
     }
-}
-
-enum MaybeOwnedCCtx<'a> {
-    Owned(zstd_safe::CCtx<'a>),
-    Borrowed(&'a mut zstd_safe::CCtx<'static>),
-}
-
-enum MaybeOwnedDCtx<'a> {
-    Owned(zstd_safe::DCtx<'a>),
-    Borrowed(&'a mut zstd_safe::DCtx<'static>),
 }
 
 #[cfg(test)]

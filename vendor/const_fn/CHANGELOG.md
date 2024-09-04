@@ -10,13 +10,9 @@ Note: In this file, do not use the hard wrap in the middle of a sentence for com
 
 ## [Unreleased]
 
-## [0.4.10] - 2024-04-21
-
-- Respect `RUSTC_WRAPPER` in rustc version detection.
-
 ## [0.4.9] - 2022-01-03
 
-- [Fix detection of `-Z assume-incomplete-release` in recent nightly compilers.](https://github.com/taiki-e/const_fn/pull/39)
+- Fix detection of `-Z assume-incomplete-release` in recent nightly compilers.
 
 ## [0.4.8] - 2021-05-19
 
@@ -128,7 +124,7 @@ Note: In this file, do not use the hard wrap in the middle of a sentence for com
 
 ## [0.1.4] - 2019-02-15
 
-**Note:** This release has been yanked.
+**NOTE:** This release has been yanked.
 
 - Reduce compilation time
 
@@ -148,8 +144,7 @@ Note: In this file, do not use the hard wrap in the middle of a sentence for com
 
 Initial release
 
-[Unreleased]: https://github.com/taiki-e/const_fn/compare/v0.4.10...HEAD
-[0.4.10]: https://github.com/taiki-e/const_fn/compare/v0.4.9...v0.4.10
+[Unreleased]: https://github.com/taiki-e/const_fn/compare/v0.4.9...HEAD
 [0.4.9]: https://github.com/taiki-e/const_fn/compare/v0.4.8...v0.4.9
 [0.4.8]: https://github.com/taiki-e/const_fn/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/taiki-e/const_fn/compare/v0.4.6...v0.4.7

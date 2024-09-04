@@ -82,7 +82,7 @@ impl<'a> ExtractAttribute for FromFieldImpl<'a> {
         self.attr_names
     }
 
-    fn forward_attrs(&self) -> &super::ForwardAttrs<'_> {
+    fn forward_attrs(&self) -> &super::ForwardAttrs {
         &self.forward_attrs
     }
 

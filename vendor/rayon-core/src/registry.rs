@@ -1,7 +1,6 @@
 use crate::job::{JobFifo, JobRef, StackJob};
 use crate::latch::{AsCoreLatch, CoreLatch, Latch, LatchRef, LockLatch, OnceLatch, SpinLatch};
 use crate::sleep::Sleep;
-use crate::sync::Mutex;
 use crate::unwind;
 use crate::{
     ErrorKind, ExitHandler, PanicHandler, StartHandler, ThreadPoolBuildError, ThreadPoolBuilder,
@@ -16,7 +15,7 @@ use std::io;
 use std::mem;
 use std::ptr;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Once};
+use std::sync::{Arc, Mutex, Once};
 use std::thread;
 use std::usize;
 

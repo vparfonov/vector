@@ -268,10 +268,6 @@ impl ser::Serializer for Serializer<()> {
             tag: None,
         }))
     }
-
-    fn is_human_readable(&self) -> bool {
-        false
-    }
 }
 
 impl ser::SerializeSeq for Serializer<Vec<Value>> {

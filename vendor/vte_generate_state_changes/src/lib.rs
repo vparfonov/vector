@@ -1,5 +1,3 @@
-#![deny(clippy::all, clippy::if_not_else, clippy::enum_glob_use)]
-
 extern crate proc_macro;
 
 use std::iter::Peekable;
@@ -55,7 +53,7 @@ fn states_stream(iter: &mut impl Iterator<Item = TokenTree>) -> TokenStream {
 /// Generate the array assignment statements for one origin state.
 fn state_entry_stream(iter: &mut Peekable<token_stream::IntoIter>) -> TokenStream {
     // Origin state name
-    let state = iter.next().unwrap();
+    let state = iter.next().unwrap().into();
 
     // Token stream with all the byte->target mappings
     let mut changes_stream = next_group(iter).into_iter().peekable();
@@ -153,10 +151,10 @@ fn next_usize(iter: &mut impl Iterator<Item = TokenTree>) -> usize {
     match iter.next() {
         Some(Literal(literal)) => {
             let literal = literal.to_string();
-            if let Some(prefix) = literal.strip_prefix("0x") {
-                usize::from_str_radix(prefix, 16).unwrap()
+            if literal.starts_with("0x") {
+                usize::from_str_radix(&literal[2..], 16).unwrap()
             } else {
-                literal.parse::<usize>().unwrap()
+                usize::from_str_radix(&literal, 10).unwrap()
             }
         },
         token => panic!("Expected literal, but got {:?}", token),

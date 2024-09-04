@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "quoted_printable"
-version = "0.5.1"
+version = "0.5.0"
 authors = ["Kartikaya Gupta <kats@seldon.staktrace.com>"]
 exclude = [
     ".gitignore",

@@ -91,11 +91,3 @@ impl NoEncryptionConfig {
         }
     }
 }
-impl ::std::fmt::Display for NoEncryptionConfig {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            NoEncryptionConfig::NoEncryption => write!(f, "NoEncryption"),
-            NoEncryptionConfig::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

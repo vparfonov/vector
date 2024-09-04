@@ -20,8 +20,8 @@ impl GetDashboardInput {
 }
 
 /// A builder for [`GetDashboardInput`](crate::operation::get_dashboard::GetDashboardInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct GetDashboardInputBuilder {
     pub(crate) dashboard_name: ::std::option::Option<::std::string::String>,
 }

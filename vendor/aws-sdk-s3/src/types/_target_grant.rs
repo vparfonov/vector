@@ -28,8 +28,8 @@ impl TargetGrant {
 }
 
 /// A builder for [`TargetGrant`](crate::types::TargetGrant).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct TargetGrantBuilder {
     pub(crate) grantee: ::std::option::Option<crate::types::Grantee>,
     pub(crate) permission: ::std::option::Option<crate::types::BucketLogsPermission>,

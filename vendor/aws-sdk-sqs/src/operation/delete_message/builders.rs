@@ -3,7 +3,7 @@ pub use crate::operation::delete_message::_delete_message_output::DeleteMessageO
 
 pub use crate::operation::delete_message::_delete_message_input::DeleteMessageInputBuilder;
 
-impl crate::operation::delete_message::builders::DeleteMessageInputBuilder {
+impl DeleteMessageInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -22,7 +22,7 @@ impl crate::operation::delete_message::builders::DeleteMessageInputBuilder {
 }
 /// Fluent builder constructing a request to `DeleteMessage`.
 ///
-/// <p>Deletes the specified message from the specified queue. To select the message to delete, use the <code>ReceiptHandle</code> of the message (<i>not</i> the <code>MessageId</code> which you receive when you send the message). Amazon SQS can delete a message from a queue even if a visibility timeout setting causes the message to be locked by another consumer. Amazon SQS automatically deletes messages left in a queue longer than the retention period configured for the queue.</p><note>
+/// <p>Deletes the specified message from the specified queue. To select the message to delete, use the <code>ReceiptHandle</code> of the message (<i>not</i> the <code>MessageId</code> which you receive when you send the message). Amazon SQS can delete a message from a queue even if a visibility timeout setting causes the message to be locked by another consumer. Amazon SQS automatically deletes messages left in a queue longer than the retention period configured for the queue. </p> <note>
 /// <p>The <code>ReceiptHandle</code> is associated with a <i>specific instance</i> of receiving a message. If you receive a message more than once, the <code>ReceiptHandle</code> is different each time you receive a message. When you use the <code>DeleteMessage</code> action, you must provide the most recently received <code>ReceiptHandle</code> for the message (otherwise, the request succeeds, but the message will not be deleted).</p>
 /// <p>For standard queues, it is possible to receive a message even after you delete it. This might happen on rare occasions if one of the servers which stores a copy of the message is unavailable when you send the request to delete the message. The copy remains on the server and might be returned to you during a subsequent receive request. You should ensure that your application is idempotent, so that receiving a message more than once does not cause issues.</p>
 /// </note>
@@ -51,7 +51,7 @@ impl
     }
 }
 impl DeleteMessageFluentBuilder {
-    /// Creates a new `DeleteMessageFluentBuilder`.
+    /// Creates a new `DeleteMessage`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -102,12 +102,12 @@ impl DeleteMessageFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }

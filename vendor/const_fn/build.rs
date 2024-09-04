@@ -1,18 +1,20 @@
-// SPDX-License-Identifier: Apache-2.0 OR MIT
+#![warn(rust_2018_idioms, single_use_lifetimes)]
 
-// The rustc-cfg emitted by the build script are *not* public API.
+use std::{
+    env, fs,
+    path::{Path, PathBuf},
+    process::Command,
+    str,
+};
 
-use std::{env, fs, iter, path::PathBuf, process::Command, str};
-
+// The rustc-cfg strings below are *not* public API. Please let us know by
+// opening a GitHub issue if your build environment requires some way to enable
+// these cfgs other than by executing our build script.
 fn main() {
-    println!("cargo:rerun-if-changed=build.rs");
-
-    let version = match rustc_version() {
+    let rustc: PathBuf = env::var_os("RUSTC").unwrap_or_else(|| "rustc".into()).into();
+    let version = match Version::from_rustc(&rustc) {
         Ok(version) => version.print(),
         Err(e) => {
-            if env::var_os("CONST_FN_DENY_WARNINGS").unwrap_or_default() == "1" {
-                panic!("unable to determine rustc version")
-            }
             println!(
                 "cargo:warning={}: unable to determine rustc version: {}",
                 env!("CARGO_PKG_NAME"),
@@ -35,53 +37,64 @@ fn main() {
     println!("cargo:rustc-cfg=const_fn_has_build_script");
 }
 
-fn rustc_version() -> Result<Version, String> {
-    let rustc = env::var_os("RUSTC").ok_or("RUSTC not set")?;
-    let rustc_wrapper = if env::var_os("CARGO_ENCODED_RUSTFLAGS").is_some() {
-        env::var_os("RUSTC_WRAPPER").filter(|v| !v.is_empty())
-    } else {
-        // Cargo sets environment variables for wrappers correctly only since https://github.com/rust-lang/cargo/pull/9601.
-        None
-    };
-    // Do not apply RUSTC_WORKSPACE_WRAPPER: https://github.com/cuviper/autocfg/issues/58#issuecomment-2067625980
-    let mut rustc = rustc_wrapper.into_iter().chain(iter::once(rustc));
-    let mut cmd = Command::new(rustc.next().unwrap());
-    cmd.args(rustc);
-    // Use verbose version output because the packagers add extra strings to the normal version output.
-    // Do not use long flags (--version --verbose) because clippy-deriver doesn't handle them properly.
-    // -vV is also matched with that cargo internally uses: https://github.com/rust-lang/cargo/blob/14b46ecc62aa671d7477beba237ad9c6a209cf5d/src/cargo/util/rustc.rs#L65
-    let output =
-        cmd.arg("-vV").output().map_err(|e| format!("could not execute {:?}: {}", cmd, e))?;
-    let verbose_version = str::from_utf8(&output.stdout)
-        .map_err(|e| format!("failed to parse output of {:?}: {}", cmd, e))?;
-    Version::parse(verbose_version)
-        .ok_or_else(|| format!("unexpected output from {:?}: {}", cmd, verbose_version))
-}
-
 struct Version {
     minor: u32,
     nightly: bool,
 }
 
 impl Version {
-    fn parse(verbose_version: &str) -> Option<Self> {
-        let mut release = verbose_version
+    // The version detection logic is based on https://github.com/cuviper/autocfg/blob/1.0.1/src/version.rs#L25-L59,
+    // but detects channel and provides a better error message.
+    fn from_rustc(rustc: &Path) -> Result<Self, String> {
+        let output =
+            Command::new(rustc).args(&["--version", "--verbose"]).output().map_err(|e| {
+                format!("could not execute `{} --version --verbose`: {}", rustc.display(), e)
+            })?;
+        if !output.status.success() {
+            return Err(format!(
+                "process didn't exit successfully: `{} --version --verbose`",
+                rustc.display()
+            ));
+        }
+        let output = str::from_utf8(&output.stdout).map_err(|e| {
+            format!("failed to parse output of `{} --version --verbose`: {}", rustc.display(), e)
+        })?;
+
+        // Find the release line in the verbose version output.
+        let release = output
             .lines()
             .find(|line| line.starts_with("release: "))
-            .map(|line| &line["release: ".len()..])?
-            .splitn(2, '-');
-        let version = release.next().unwrap();
-        let channel = release.next().unwrap_or_default();
-        let mut digits = version.splitn(3, '.');
-        let major = digits.next()?;
-        if major != "1" {
-            return None;
-        }
-        let minor = digits.next()?.parse::<u32>().ok()?;
-        let _patch = digits.next().unwrap_or("0").parse::<u32>().ok()?;
-        let nightly = channel == "nightly" || channel == "dev";
+            .map(|line| &line["release: ".len()..])
+            .ok_or_else(|| {
+                format!(
+                    "could not find rustc release from output of `{} --version --verbose`: {}",
+                    rustc.display(),
+                    output
+                )
+            })?;
 
-        Some(Self { minor, nightly })
+        // Split the version and channel info.
+        let mut version_channel = release.split('-');
+        let version = version_channel.next().unwrap();
+        let channel = version_channel.next();
+
+        let minor = (|| {
+            // Split the version into semver components.
+            let mut digits = version.splitn(3, '.');
+            let major = digits.next()?;
+            if major != "1" {
+                return None;
+            }
+            let minor = digits.next()?.parse().ok()?;
+            let _patch = digits.next()?;
+            Some(minor)
+        })()
+        .ok_or_else(|| {
+            format!("unexpected output from `{} --version --verbose`: {}", rustc.display(), output)
+        })?;
+
+        let nightly = channel.map_or(false, |c| c == "dev" || c == "nightly");
+        Ok(Self { minor, nightly })
     }
 
     fn print(&self) -> String {
@@ -92,7 +105,11 @@ impl Version {
 // https://github.com/taiki-e/const_fn/issues/27
 // https://github.com/rust-lang/rust/pull/81468
 fn assume_incomplete_release() -> bool {
-    // Recognized formats: -Z( )?assume-incomplete-release
+    // Recognized formats:
+    //
+    //     -Z assume-incomplete-release
+    //
+    //     -Zassume-incomplete-release
 
     // https://github.com/rust-lang/cargo/issues/10111
     if let Some(rustflags) = env::var_os("CARGO_ENCODED_RUSTFLAGS") {

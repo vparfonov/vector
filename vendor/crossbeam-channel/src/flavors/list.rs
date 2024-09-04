@@ -1,6 +1,5 @@
 //! Unbounded channel implemented as a linked list.
 
-use std::boxed::Box;
 use std::cell::UnsafeCell;
 use std::marker::PhantomData;
 use std::mem::MaybeUninit;
@@ -583,10 +582,7 @@ impl<T> Channel<T> {
         }
 
         let mut head = self.head.index.load(Ordering::Acquire);
-        // The channel may be uninitialized, so we have to swap to avoid overwriting any sender's attempts
-        // to initialize the first block before noticing that the receivers disconnected. Late allocations
-        // will be deallocated by the sender in Drop
-        let mut block = self.head.block.swap(ptr::null_mut(), Ordering::AcqRel);
+        let mut block = self.head.block.load(Ordering::Acquire);
 
         // If we're going to be dropping messages we need to synchronize with initialization
         if head >> SHIFT != tail >> SHIFT {
@@ -599,7 +595,6 @@ impl<T> Channel<T> {
                 block = self.head.block.load(Ordering::Acquire);
             }
         }
-
         unsafe {
             // Drop all messages between head and tail and deallocate the heap-allocated blocks.
             while head >> SHIFT != tail >> SHIFT {
@@ -609,7 +604,8 @@ impl<T> Channel<T> {
                     // Drop the message in the slot.
                     let slot = (*block).slots.get_unchecked(offset);
                     slot.wait_write();
-                    (*slot.msg.get()).assume_init_drop();
+                    let p = &mut *slot.msg.get();
+                    p.as_mut_ptr().drop_in_place();
                 } else {
                     (*block).wait_next();
                     // Deallocate the block and move to the next one.
@@ -627,6 +623,7 @@ impl<T> Channel<T> {
             }
         }
         head &= !MARK_BIT;
+        self.head.block.store(ptr::null_mut(), Ordering::Release);
         self.head.index.store(head, Ordering::Release);
     }
 
@@ -666,7 +663,8 @@ impl<T> Drop for Channel<T> {
                 if offset < BLOCK_CAP {
                     // Drop the message in the slot.
                     let slot = (*block).slots.get_unchecked(offset);
-                    (*slot.msg.get()).assume_init_drop();
+                    let p = &mut *slot.msg.get();
+                    p.as_mut_ptr().drop_in_place();
                 } else {
                     // Deallocate the block and move to the next one.
                     let next = *(*block).next.get_mut();

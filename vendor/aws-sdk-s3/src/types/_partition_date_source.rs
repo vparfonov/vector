@@ -96,12 +96,3 @@ impl PartitionDateSource {
         }
     }
 }
-impl ::std::fmt::Display for PartitionDateSource {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            PartitionDateSource::DeliveryTime => write!(f, "DeliveryTime"),
-            PartitionDateSource::EventTime => write!(f, "EventTime"),
-            PartitionDateSource::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

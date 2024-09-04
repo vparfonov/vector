@@ -19,16 +19,12 @@ pub const SYS_CLOSE: usize =      SYS_CLASS_FILE | 6;
 pub const SYS_DUP: usize =        SYS_CLASS_FILE | SYS_RET_FILE | 41;
 pub const SYS_DUP2: usize =       SYS_CLASS_FILE | SYS_RET_FILE | 63;
 pub const SYS_READ: usize =       SYS_CLASS_FILE | SYS_ARG_MSLICE | 3;
-pub const SYS_READ2: usize =      SYS_CLASS_FILE | SYS_ARG_MSLICE | 35;
 pub const SYS_WRITE: usize =      SYS_CLASS_FILE | SYS_ARG_SLICE | 4;
-pub const SYS_WRITE2: usize =     SYS_CLASS_FILE | SYS_ARG_SLICE | 45;
 pub const SYS_LSEEK: usize =      SYS_CLASS_FILE | 19;
 pub const SYS_FCHMOD: usize =     SYS_CLASS_FILE | 94;
 pub const SYS_FCHOWN: usize =     SYS_CLASS_FILE | 207;
 pub const SYS_FCNTL: usize =      SYS_CLASS_FILE | 55;
 pub const SYS_FEVENT: usize =     SYS_CLASS_FILE | 927;
-
-pub const SYS_SENDFD: usize =     SYS_CLASS_FILE | 34;
 
 // TODO: Rename FMAP/FUNMAP to MMAP/MUNMAP
 pub const SYS_FMAP_OLD: usize =   SYS_CLASS_FILE | SYS_ARG_SLICE | 90;
@@ -59,9 +55,6 @@ pub const KSMSG_MUNMAP: usize = SYS_CLASS_FILE | 74;
 // b = file, c = flags, d = page_count, uid:gid = offset
 pub const KSMSG_MMAP_PREP: usize = SYS_CLASS_FILE | 75;
 
-// b = target_packetid_lo32, c = target_packetid_hi32
-pub const KSMSG_CANCEL: usize = SYS_CLASS_FILE | 76;
-
 pub const SYS_CLOCK_GETTIME: usize = 265;
 pub const SYS_EXIT: usize =     1;
 pub const SYS_FUTEX: usize =    240;
@@ -79,11 +72,18 @@ pub const SYS_KILL: usize =     37;
 pub const SYS_MPROTECT: usize = 125;
 pub const SYS_MKNS: usize =     984;
 pub const SYS_NANOSLEEP: usize =162;
+pub const SYS_PHYSALLOC: usize =945;
+pub const SYS_PHYSALLOC3: usize=9453;
+pub const SYS_PHYSFREE: usize = 946;
+pub const SYS_PHYSMAP: usize =  947;
 pub const SYS_VIRTTOPHYS: usize=949;
 pub const SYS_SETPGID: usize =  57;
 pub const SYS_SETREGID: usize = 204;
 pub const SYS_SETRENS: usize =  952;
 pub const SYS_SETREUID: usize = 203;
+pub const SYS_SIGACTION: usize =67;
+pub const SYS_SIGPROCMASK:usize=126;
+pub const SYS_SIGRETURN: usize =119;
 pub const SYS_UMASK: usize =    60;
 pub const SYS_WAITPID: usize =  7;
 pub const SYS_YIELD: usize =    158;

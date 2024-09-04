@@ -530,6 +530,7 @@ impl<A: Array> TinyVec<A> {
 
 impl<A: Array> TinyVec<A> {
   /// Move all values from `other` into this vec.
+  #[cfg(feature = "rustc_1_40")]
   #[inline]
   pub fn append(&mut self, other: &mut Self) {
     self.reserve(other.len());
@@ -539,6 +540,16 @@ impl<A: Array> TinyVec<A> {
       (TinyVec::Heap(sh), TinyVec::Heap(oh)) => sh.append(oh),
       (TinyVec::Inline(a), TinyVec::Heap(h)) => a.extend(h.drain(..)),
       (ref mut this, TinyVec::Inline(arr)) => this.extend(arr.drain(..)),
+    }
+  }
+
+  /// Move all values from `other` into this vec.
+  #[cfg(not(feature = "rustc_1_40"))]
+  #[inline]
+  pub fn append(&mut self, other: &mut Self) {
+    match other {
+      TinyVec::Inline(a) => self.extend(a.drain(..)),
+      TinyVec::Heap(h) => self.extend(h.drain(..)),
     }
   }
 
@@ -647,27 +658,6 @@ impl<A: Array> TinyVec<A> {
     }
   }
 
-  /// Walk the vec and keep only the elements that pass the predicate given,
-  /// having the opportunity to modify the elements at the same time.
-  ///
-  /// ## Example
-  ///
-  /// ```rust
-  /// use tinyvec::*;
-  ///
-  /// let mut tv = tiny_vec!([i32; 10] => 1, 2, 3, 4);
-  /// tv.retain_mut(|x| if *x % 2 == 0 { *x *= 2; true } else { false });
-  /// assert_eq!(tv.as_slice(), &[4, 8][..]);
-  /// ```
-  #[inline]
-  #[cfg(feature = "rustc_1_61")]
-  pub fn retain_mut<F: FnMut(&mut A::Item) -> bool>(&mut self, acceptable: F) {
-    match self {
-      TinyVec::Inline(i) => i.retain_mut(acceptable),
-      TinyVec::Heap(h) => h.retain_mut(acceptable),
-    }
-  }
-
   /// Helper for getting the mut slice.
   #[inline(always)]
   #[must_use]
@@ -729,7 +719,7 @@ impl<A: Array> TinyVec<A> {
   /// **Note: This method has significant performance issues compared to
   /// matching on the TinyVec and then calling drain on the Inline or Heap value
   /// inside. The draining iterator has to branch on every single access. It is
-  /// provided for simplicity and compatibility only.**
+  /// provided for simplicity and compatability only.**
   ///
   /// ## Panics
   /// * If the start is greater than the end
@@ -862,6 +852,14 @@ impl<A: Array> TinyVec<A> {
   }
 
   /// Place an element onto the end of the vec.
+  /// ## Panics
+  /// * If the length of the vec would overflow the capacity.
+  /// ```rust
+  /// use tinyvec::*;
+  /// let mut tv = tiny_vec!([i32; 10] => 1, 2, 3);
+  /// tv.push(4);
+  /// assert_eq!(tv.as_slice(), &[1, 2, 3, 4]);
+  /// ```
   #[inline]
   pub fn push(&mut self, val: A::Item) {
     // The code path for moving the inline contents to the heap produces a lot
@@ -1103,6 +1101,7 @@ impl<'p, A: Array> DoubleEndedIterator for TinyVecDrain<'p, A> {
     #[inline]
     fn next_back(self: &mut Self) -> Option<Self::Item>;
 
+    #[cfg(feature = "rustc_1_40")]
     #[inline]
     fn nth_back(self: &mut Self, n: usize) -> Option<Self::Item>;
   }
@@ -1381,16 +1380,9 @@ impl<A: Array> DoubleEndedIterator for TinyVecIterator<A> {
     #[inline]
     fn next_back(self: &mut Self) -> Option<Self::Item>;
 
+    #[cfg(feature = "rustc_1_40")]
     #[inline]
     fn nth_back(self: &mut Self, n: usize) -> Option<Self::Item>;
-  }
-}
-
-impl<A: Array> ExactSizeIterator for TinyVecIterator<A> {
-  impl_mirrored! {
-    type Mirror = TinyVecIterator;
-    #[inline]
-    fn len(self: &Self) -> usize;
   }
 }
 
@@ -1536,7 +1528,7 @@ where
   #[allow(clippy::missing_inline_in_public_items)]
   fn fmt(&self, f: &mut Formatter) -> core::fmt::Result {
     write!(f, "[")?;
-    if f.alternate() && !self.is_empty() {
+    if f.alternate() {
       write!(f, "\n    ")?;
     }
     for (i, elem) in self.iter().enumerate() {
@@ -1545,7 +1537,7 @@ where
       }
       Debug::fmt(elem, f)?;
     }
-    if f.alternate() && !self.is_empty() {
+    if f.alternate() {
       write!(f, ",\n")?;
     }
     write!(f, "]")

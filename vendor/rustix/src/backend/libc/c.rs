@@ -86,20 +86,10 @@ pub(crate) const XCASE: tcflag_t = linux_raw_sys::general::XCASE as _;
 #[cfg(target_os = "aix")]
 pub(crate) const MSG_DONTWAIT: c_int = libc::MSG_NONBLOCK;
 
-// `O_LARGEFILE` can be automatically set by the kernel on Linux:
-// <https://github.com/torvalds/linux/blob/v6.7/fs/open.c#L1458-L1459>
-// so libc implementations may leave it undefined or defined to zero.
-#[cfg(linux_kernel)]
-pub(crate) const O_LARGEFILE: c_int = linux_raw_sys::general::O_LARGEFILE as _;
-
-// Gated under `_LARGEFILE_SOURCE` but automatically set by the kernel.
-// <https://github.com/illumos/illumos-gate/blob/fb2cb638e5604b214d8ea8d4f01ad2e77b437c17/usr/src/ucbhead/sys/fcntl.h#L64>
-#[cfg(target_os = "illumos")]
-pub(crate) const O_LARGEFILE: c_int = 0x2000;
-
-// TODO: This is new in Linux 6.11; remove when linux-raw-sys is updated.
-#[cfg(linux_kernel)]
-pub(crate) const MAP_DROPPABLE: u32 = 0x8;
+// TODO: Remove once https://github.com/rust-lang/libc/pull/3377 is merged and released.
+#[cfg(target_os = "netbsd")]
+#[cfg(feature = "net")]
+pub(crate) const SO_NOSIGPIPE: c_int = 0x0800;
 
 // On PowerPC, the regular `termios` has the `termios2` fields and there is no
 // `termios2`. linux-raw-sys has aliases `termios2` to `termios` to cover this

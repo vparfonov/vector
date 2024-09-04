@@ -91,11 +91,3 @@ impl Scope {
         }
     }
 }
-impl ::std::fmt::Display for Scope {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            Scope::All => write!(f, "ALL"),
-            Scope::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

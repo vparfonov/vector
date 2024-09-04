@@ -14,98 +14,6 @@ extern "C" {
     #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
     #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub type XrRenderStateInit;
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "XrWebGlLayer")]
-    #[doc = "Get the `baseLayer` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`, `XrWebGlLayer`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "baseLayer")]
-    pub fn get_base_layer(this: &XrRenderStateInit) -> Option<XrWebGlLayer>;
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "XrWebGlLayer")]
-    #[doc = "Change the `baseLayer` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`, `XrWebGlLayer`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "baseLayer")]
-    pub fn set_base_layer(this: &XrRenderStateInit, val: Option<&XrWebGlLayer>);
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `depthFar` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "depthFar")]
-    pub fn get_depth_far(this: &XrRenderStateInit) -> Option<f64>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `depthFar` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "depthFar")]
-    pub fn set_depth_far(this: &XrRenderStateInit, val: f64);
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `depthNear` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "depthNear")]
-    pub fn get_depth_near(this: &XrRenderStateInit) -> Option<f64>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `depthNear` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "depthNear")]
-    pub fn set_depth_near(this: &XrRenderStateInit, val: f64);
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `inlineVerticalFieldOfView` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "inlineVerticalFieldOfView")]
-    pub fn get_inline_vertical_field_of_view(this: &XrRenderStateInit) -> Option<f64>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `inlineVerticalFieldOfView` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "inlineVerticalFieldOfView")]
-    pub fn set_inline_vertical_field_of_view(this: &XrRenderStateInit, val: f64);
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `layers` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "layers")]
-    pub fn get_layers(this: &XrRenderStateInit) -> Option<::js_sys::Array>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `layers` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "layers")]
-    pub fn set_layers(this: &XrRenderStateInit, val: &::wasm_bindgen::JsValue);
 }
 #[cfg(web_sys_unstable_apis)]
 impl XrRenderStateInit {
@@ -122,33 +30,105 @@ impl XrRenderStateInit {
     }
     #[cfg(web_sys_unstable_apis)]
     #[cfg(feature = "XrWebGlLayer")]
-    #[deprecated = "Use `set_base_layer()` instead."]
+    #[doc = "Change the `baseLayer` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`, `XrWebGlLayer`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn base_layer(&mut self, val: Option<&XrWebGlLayer>) -> &mut Self {
-        self.set_base_layer(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("baseLayer"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_depth_far()` instead."]
+    #[doc = "Change the `depthFar` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn depth_far(&mut self, val: f64) -> &mut Self {
-        self.set_depth_far(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("depthFar"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_depth_near()` instead."]
+    #[doc = "Change the `depthNear` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn depth_near(&mut self, val: f64) -> &mut Self {
-        self.set_depth_near(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("depthNear"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_inline_vertical_field_of_view()` instead."]
+    #[doc = "Change the `inlineVerticalFieldOfView` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn inline_vertical_field_of_view(&mut self, val: f64) -> &mut Self {
-        self.set_inline_vertical_field_of_view(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("inlineVerticalFieldOfView"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_layers()` instead."]
+    #[doc = "Change the `layers` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `XrRenderStateInit`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn layers(&mut self, val: Option<&::wasm_bindgen::JsValue>) -> &mut Self {
-        self.set_layers(val.unwrap_or(&::wasm_bindgen::JsValue::NULL));
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("layers"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

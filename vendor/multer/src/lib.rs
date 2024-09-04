@@ -5,8 +5,6 @@
 //! `AsyncRead` reader as a source, so that it can be plugged into any async
 //! Rust environment e.g. any async server.
 //!
-//! To enable trace logging via the `log` crate, enable the `log` feature.
-//!
 //! # Examples
 //!
 //! ```no_run
@@ -127,16 +125,6 @@ pub use field::Field;
 pub use multipart::Multipart;
 pub use size_limit::SizeLimit;
 
-#[cfg(feature = "log")]
-macro_rules! trace {
-    ($($t:tt)*) => (::log::trace!($($t)*););
-}
-
-#[cfg(not(feature = "log"))]
-macro_rules! trace {
-    ($($t:tt)*) => {};
-}
-
 mod buffer;
 mod constants;
 mod constraints;
@@ -169,15 +157,15 @@ pub fn parse_boundary<T: AsRef<str>>(content_type: T) -> Result<String> {
     let m = content_type
         .as_ref()
         .parse::<mime::Mime>()
-        .map_err(Error::DecodeContentType)?;
+        .map_err(crate::Error::DecodeContentType)?;
 
     if !(m.type_() == mime::MULTIPART && m.subtype() == mime::FORM_DATA) {
-        return Err(Error::NoMultipart);
+        return Err(crate::Error::NoMultipart);
     }
 
     m.get_param(mime::BOUNDARY)
         .map(|name| name.as_str().to_owned())
-        .ok_or(Error::NoBoundary)
+        .ok_or(crate::Error::NoBoundary)
 }
 
 #[cfg(test)]

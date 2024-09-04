@@ -10,11 +10,8 @@
 //!
 //! This library is suitable for use in applications that can always be recompiled and instantly deployed.
 //! For applications that are deployed to end-users and cannot be recompiled, or which need certification
-//! before deployment, consider a library that uses the platform native certificate verifier such as
-//! [rustls-platform-verifier]. This has the additional benefit of supporting OS provided CA constraints
-//! and revocation data.
-//!
-//! [rustls-platform-verifier]: https://docs.rs/rustls-platform-verifier
+//! before deployment, consider a library that loads certificates at runtime, like
+//! [rustls-native-certs](https://docs.rs/rustls-native-certs).
 //
 // This library is automatically generated from the Mozilla
 // IncludedCACertificateReportPEMCSV report via ccadb.org. Don't edit it.
@@ -336,7 +333,7 @@ pub const TLS_SERVER_ROOTS: &[TrustAnchor] = &[
   /*
    * Issuer: O=Starfield Technologies, Inc. OU=Starfield Class 2 Certification Authority
    * Subject: O=Starfield Technologies, Inc. OU=Starfield Class 2 Certification Authority
-   * Label: "Starfield Class 2 Certification Authority"
+   * Label: "Starfield Class 2 CA"
    * Serial: 0
    * SHA256 Fingerprint: 14:65:fa:20:53:97:b8:76:fa:a6:f0:a9:95:8e:55:90:e4:0f:cc:7f:aa:4f:b7:c2:c8:67:75:21:fb:5f:b6:58
    * -----BEGIN CERTIFICATE-----
@@ -2293,7 +2290,7 @@ pub const TLS_SERVER_ROOTS: &[TrustAnchor] = &[
   /*
    * Issuer: O=CERTSIGN SA OU=certSIGN ROOT CA G2
    * Subject: O=CERTSIGN SA OU=certSIGN ROOT CA G2
-   * Label: "certSIGN ROOT CA G2"
+   * Label: "certSIGN Root CA G2"
    * Serial: 313609486401300475190
    * SHA256 Fingerprint: 65:7c:fe:2f:a7:3f:aa:38:46:25:71:f3:32:a2:36:3a:46:fc:e7:02:09:51:71:07:02:cd:fb:b6:ee:da:33:05
    * -----BEGIN CERTIFICATE-----
@@ -3508,6 +3505,51 @@ pub const TLS_SERVER_ROOTS: &[TrustAnchor] = &[
   },
 
   /*
+   * Issuer: CN=GLOBALTRUST 2020 O=e-commerce monitoring GmbH
+   * Subject: CN=GLOBALTRUST 2020 O=e-commerce monitoring GmbH
+   * Label: "GLOBALTRUST 2020"
+   * Serial: 109160994242082918454945253
+   * SHA256 Fingerprint: 9a:29:6a:51:82:d1:d4:51:a2:e3:7f:43:9b:74:da:af:a2:67:52:33:29:f9:0f:9a:0d:20:07:c3:34:e2:3c:9a
+   * -----BEGIN CERTIFICATE-----
+   * MIIFgjCCA2qgAwIBAgILWku9WvtPilv6ZeUwDQYJKoZIhvcNAQELBQAwTTELMAkG
+   * A1UEBhMCQVQxIzAhBgNVBAoTGmUtY29tbWVyY2UgbW9uaXRvcmluZyBHbWJIMRkw
+   * FwYDVQQDExBHTE9CQUxUUlVTVCAyMDIwMB4XDTIwMDIxMDAwMDAwMFoXDTQwMDYx
+   * MDAwMDAwMFowTTELMAkGA1UEBhMCQVQxIzAhBgNVBAoTGmUtY29tbWVyY2UgbW9u
+   * aXRvcmluZyBHbWJIMRkwFwYDVQQDExBHTE9CQUxUUlVTVCAyMDIwMIICIjANBgkq
+   * hkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAri5WrRsc7/aVj6B3GyvTY4+ETUWiD59b
+   * RatZe1E0+eyLinjF3WuvvcTfk0Uev5E4C64OFudBc/jbu9G4UeDLgztzOG53ig9Z
+   * YybNpyrOVPu44sB8R85gfD+yc/LAGbaKkoc1DZAoouQVBGM+uq/ufF7MpotQsjj3
+   * QWPKzv9pj2gOlTblzLmMCcpL3TGQlsjMH/1WljTbjhzqLL6FLmPdqqmV0/0plRPw
+   * yJiT2S0WR5ARg6I6IqIoV6Lr/sCMKKCmfecqQjuCgGOlYx8ZzHyyZqjC0203b+J+
+   * BlHZRYQfEs4kUmSFC0iAToexIiIwquuuvuAC4EDosEKAA1GqtH6qRNdDYfOiaxaJ
+   * SaSjpCuKAsR49GiKweR6NrFvG5Ybd0mN1MkGco/PU+PcF4UgStyYJ9ORJitHHmkH
+   * r96i5OTUawuzXnzUJIBHKWk7buis/UDr2O1xcSvy6Fgd60GXIsUf1DnQJ4+H4xj0
+   * 4KlGDfV0OoIu0G4skaMxXDtG6nsEEFZegB31pWXogvziB4xiRfUg3kZwhqG8k9Me
+   * dKZssCz3AwyIDMvUclOGvGBG85hqwvG/Q/lwIHfKN0F5VVJjjVsSn8VoxIidrPIw
+   * q7ejMZdnrY8XD2zHc+0klGvIg5rQmjdJBKuxFshsSUktq6HQjJLyQUp5ISXbY9e2
+   * nKd+Qmn7OmMCAwEAAaNjMGEwDwYDVR0TAQH/BAUwAwEB/zAOBgNVHQ8BAf8EBAMC
+   * AQYwHQYDVR0OBBYEFNwuH9FhN3nkq9XVsxJxaD1qaJwiMB8GA1UdIwQYMBaAFNwu
+   * H9FhN3nkq9XVsxJxaD1qaJwiMA0GCSqGSIb3DQEBCwUAA4ICAQCR8EICaEDuw2jA
+   * VC/f7GLDw56KoDEoqoOOpFaWEhCGVrqXctJUMHytGdUdaG/7FELYjQ7ztdGl4wJC
+   * XtzoRlgHNQIw4Lx0SsFDKv/bGtCwr2zD/cuz9X9tAy5ZVp0tLTWMstZDFyySCstd
+   * 6IwPS3BD0IL/qMy/pJTAvoe9iuOTe8aPmxadJ2W8esVCgmxcB9CpwYhgROmYhRZf
+   * +I/KARDOJcP5YBugxZfD0yyIMaK9MOzQ0MAS8cE54+X1+NZK3TTN+2/BT+MAi1bi
+   * kvcoskJ3ciNnxz8RFbLEAwW+uxF7Cr+obuf/WEPPm2eggAe2HcqtbepBEX4tdJP7
+   * wry+UUTF72glJ4DjyKDUEuzZpTcdN3y0kcra1LGWge9oXHYQSa9+pTeAsRxSvTOB
+   * TI/53WXZFM2KJVj04sWDpQmQ1GwUY7VA3+vA/MRYfg0UFodUJ25W5HCEuGwyEn6C
+   * MUO+1918oa2u1qsgEu8KwxCMSZY13At1XrFP1U80DhEgB3VDRemjEdqso5nCtnkn
+   * 4rnvyOL2NSl6dPrFf4IFYqYK6miyeUcGbvJXqBUzxvd4Sj1Ce2t+/vdG6tHrju+I
+   * aFvowdlxfv1k7/9nR4hYJS8+hge9+6jlgqispdNpQ80xiEmEU5LAsTkbOYMBMMTy
+   * qfrQA71yN2BWHzZ8vTmR9W0Nv3vXkg==
+   * -----END CERTIFICATE-----
+   */
+  TrustAnchor {
+    subject: Der::from_slice(b"1\x0b0\t\x06\x03U\x04\x06\x13\x02AT1#0!\x06\x03U\x04\n\x13\x1ae-commerce monitoring GmbH1\x190\x17\x06\x03U\x04\x03\x13\x10GLOBALTRUST 2020"),
+    subject_public_key_info: Der::from_slice(b"0\r\x06\t*\x86H\x86\xf7\r\x01\x01\x01\x05\x00\x03\x82\x02\x0f\x000\x82\x02\n\x02\x82\x02\x01\x00\xae.V\xad\x1b\x1c\xef\xf6\x95\x8f\xa0w\x1b+\xd3c\x8f\x84ME\xa2\x0f\x9f[E\xabY{Q4\xf9\xec\x8b\x8ax\xc5\xddk\xaf\xbd\xc4\xdf\x93E\x1e\xbf\x918\x0b\xae\x0e\x16\xe7As\xf8\xdb\xbb\xd1\xb8Q\xe0\xcb\x83;s8nw\x8a\x0fYc&\xcd\xa7*\xceT\xfb\xb8\xe2\xc0|G\xce`|?\xb2s\xf2\xc0\x19\xb6\x8a\x92\x875\r\x90(\xa2\xe4\x15\x04c>\xba\xaf\xee|^\xcc\xa6\x8bP\xb28\xf7Ac\xca\xce\xffi\x8fh\x0e\x956\xe5\xcc\xb9\x8c\t\xcaK\xdd1\x90\x96\xc8\xcc\x1f\xfdV\x964\xdb\x8e\x1c\xea,\xbe\x85.c\xdd\xaa\xa9\x95\xd3\xfd)\x95\x13\xf0\xc8\x98\x93\xd9-\x16G\x90\x11\x83\xa2:\"\xa2(W\xa2\xeb\xfe\xc0\x8c(\xa0\xa6}\xe7*B;\x82\x80c\xa5c\x1f\x19\xcc|\xb2f\xa8\xc2\xd3m7o\xe2~\x06Q\xd9E\x84\x1f\x12\xce$Rd\x85\x0bH\x80N\x87\xb1\"\"0\xaa\xeb\xae\xbe\xe0\x02\xe0@\xe8\xb0B\x80\x03Q\xaa\xb4~\xaaD\xd7Ca\xf3\xa2k\x16\x89I\xa4\xa3\xa4+\x8a\x02\xc4x\xf4h\x8a\xc1\xe4z6\xb1o\x1b\x96\x1bwI\x8d\xd4\xc9\x06r\x8f\xcfS\xe3\xdc\x17\x85 J\xdc\x98\'\xd3\x91&+G\x1ei\x07\xaf\xde\xa2\xe4\xe4\xd4k\x0b\xb3^|\xd4$\x80G)i;n\xe8\xac\xfd@\xeb\xd8\xedqq+\xf2\xe8X\x1d\xebA\x97\"\xc5\x1f\xd49\xd0\'\x8f\x87\xe3\x18\xf4\xe0\xa9F\r\xf5t:\x82.\xd0n,\x91\xa31\\;F\xea{\x04\x10V^\x80\x1d\xf5\xa5e\xe8\x82\xfc\xe2\x07\x8cbE\xf5 \xdeFp\x86\xa1\xbc\x93\xd3\x1et\xa6l\xb0,\xf7\x03\x0c\x88\x0c\xcb\xd4rS\x86\xbc`F\xf3\x98j\xc2\xf1\xbfC\xf9p w\xca7AyURc\x8d[\x12\x9f\xc5h\xc4\x88\x9d\xac\xf20\xab\xb7\xa31\x97g\xad\x8f\x17\x0fl\xc7s\xed$\x94k\xc8\x83\x9a\xd0\x9a7I\x04\xab\xb1\x16\xc8lII-\xab\xa1\xd0\x8c\x92\xf2AJy!%\xdbc\xd7\xb6\x9c\xa7~Bi\xfb:c\x02\x03\x01\x00\x01"),
+    name_constraints: None
+  },
+
+  /*
    * Issuer: CN=ACCVRAIZ1 O=ACCV OU=PKIACCV
    * Subject: CN=ACCVRAIZ1 O=ACCV OU=PKIACCV
    * Label: "ACCVRAIZ1"
@@ -3971,35 +4013,6 @@ pub const TLS_SERVER_ROOTS: &[TrustAnchor] = &[
   },
 
   /*
-   * Issuer: CN=FIRMAPROFESIONAL CA ROOT-A WEB O=Firmaprofesional SA
-   * Subject: CN=FIRMAPROFESIONAL CA ROOT-A WEB O=Firmaprofesional SA
-   * Label: "FIRMAPROFESIONAL CA ROOT-A WEB"
-   * Serial: 65916896770016886708751106294915943533
-   * SHA256 Fingerprint: be:f2:56:da:f2:6e:9c:69:bd:ec:16:02:35:97:98:f3:ca:f7:18:21:a0:3e:01:82:57:c5:3c:65:61:7f:3d:4a
-   * -----BEGIN CERTIFICATE-----
-   * MIICejCCAgCgAwIBAgIQMZch7a+JQn81QYehZ1ZMbTAKBggqhkjOPQQDAzBuMQsw
-   * CQYDVQQGEwJFUzEcMBoGA1UECgwTRmlybWFwcm9mZXNpb25hbCBTQTEYMBYGA1UE
-   * YQwPVkFURVMtQTYyNjM0MDY4MScwJQYDVQQDDB5GSVJNQVBST0ZFU0lPTkFMIENB
-   * IFJPT1QtQSBXRUIwHhcNMjIwNDA2MDkwMTM2WhcNNDcwMzMxMDkwMTM2WjBuMQsw
-   * CQYDVQQGEwJFUzEcMBoGA1UECgwTRmlybWFwcm9mZXNpb25hbCBTQTEYMBYGA1UE
-   * YQwPVkFURVMtQTYyNjM0MDY4MScwJQYDVQQDDB5GSVJNQVBST0ZFU0lPTkFMIENB
-   * IFJPT1QtQSBXRUIwdjAQBgcqhkjOPQIBBgUrgQQAIgNiAARHU+osEaR3xyrq89Zf
-   * e9MEkVz6iMYiuYMQYneEMy3pA4jU4DP37XcsSmDq5G+tbbT4TIqk5B/K6k84Si6C
-   * cyvHZpsKjECcfIr28jlgst7L7Ljkb+qbXbdTkBgyVcUgt5SjYzBhMA8GA1UdEwEB
-   * /wQFMAMBAf8wHwYDVR0jBBgwFoAUk+FDY1w8ndYn81LsF7Kpryz3dvgwHQYDVR0O
-   * BBYEFJPhQ2NcPJ3WJ/NS7Beyqa8s93b4MA4GA1UdDwEB/wQEAwIBBjAKBggqhkjO
-   * PQQDAwNoADBlAjAdfKR7w4l1M+E7qUW/Runpod3JIha3RxEL2Jq68cgLcFBTApFw
-   * hVmpHqTm6iMxoAACMQD94vizrxa5HnPEluPBMBnYfubDl94cT7iJLzPrSA8Z94dG
-   * XSaQpYXFuXqUPoeovQA=
-   * -----END CERTIFICATE-----
-   */
-  TrustAnchor {
-    subject: Der::from_slice(b"1\x0b0\t\x06\x03U\x04\x06\x13\x02ES1\x1c0\x1a\x06\x03U\x04\n\x0c\x13Firmaprofesional SA1\x180\x16\x06\x03U\x04a\x0c\x0fVATES-A626340681\'0%\x06\x03U\x04\x03\x0c\x1eFIRMAPROFESIONAL CA ROOT-A WEB"),
-    subject_public_key_info: Der::from_slice(b"0\x10\x06\x07*\x86H\xce=\x02\x01\x06\x05+\x81\x04\x00\"\x03b\x00\x04GS\xea,\x11\xa4w\xc7*\xea\xf3\xd6_{\xd3\x04\x91\\\xfa\x88\xc6\"\xb9\x83\x10bw\x843-\xe9\x03\x88\xd4\xe03\xf7\xedw,J`\xea\xe4o\xadm\xb4\xf8L\x8a\xa4\xe4\x1f\xca\xeaO8J.\x82s+\xc7f\x9b\n\x8c@\x9c|\x8a\xf6\xf29`\xb2\xde\xcb\xec\xb8\xe4o\xea\x9b]\xb7S\x90\x182U\xc5 \xb7\x94"),
-    name_constraints: None
-  },
-
-  /*
    * Issuer: CN=SecureSign RootCA11 O=Japan Certification Services, Inc.
    * Subject: CN=SecureSign RootCA11 O=Japan Certification Services, Inc.
    * Label: "SecureSign RootCA11"
@@ -4115,7 +4128,7 @@ pub const TLS_SERVER_ROOTS: &[TrustAnchor] = &[
   /*
    * Issuer: O=Chunghwa Telecom Co., Ltd. OU=ePKI Root Certification Authority
    * Subject: O=Chunghwa Telecom Co., Ltd. OU=ePKI Root Certification Authority
-   * Label: "ePKI Root Certification Authority"
+   * Label: "Chunghwa Telecom Co., Ltd. - ePKI Root Certification Authority"
    * Serial: 28956088682735189655030529057352760477
    * SHA256 Fingerprint: c0:a6:f4:dc:63:a2:4b:fd:cf:54:ef:2a:6a:08:2a:0a:72:de:35:80:3e:2f:f5:ff:52:7a:e5:d8:72:06:df:d5
    * -----BEGIN CERTIFICATE-----
@@ -4188,7 +4201,7 @@ pub const TLS_SERVER_ROOTS: &[TrustAnchor] = &[
   /*
    * Issuer: O=The Go Daddy Group, Inc. OU=Go Daddy Class 2 Certification Authority
    * Subject: O=The Go Daddy Group, Inc. OU=Go Daddy Class 2 Certification Authority
-   * Label: "Go Daddy Class 2 Certification Authority"
+   * Label: "Go Daddy Class 2 CA"
    * Serial: 0
    * SHA256 Fingerprint: c3:84:6b:f2:4b:9e:93:ca:64:27:4c:0e:c6:7c:1e:cc:5e:02:4f:fc:ac:d2:d7:40:19:35:0e:81:fe:54:6a:e4
    * -----BEGIN CERTIFICATE-----
@@ -5033,7 +5046,7 @@ pub const TLS_SERVER_ROOTS: &[TrustAnchor] = &[
   /*
    * Issuer: O=FNMT-RCM OU=AC RAIZ FNMT-RCM
    * Subject: O=FNMT-RCM OU=AC RAIZ FNMT-RCM
-   * Label: "AC RAIZ FNMT-RCM"
+   * Label: "FNMT-RCM - SHA256"
    * Serial: 485876308206448804701554682760554759
    * SHA256 Fingerprint: eb:c5:57:0c:29:01:8c:4d:67:b1:aa:12:7b:af:12:f7:03:b4:61:1e:bc:17:b7:da:b5:57:38:94:17:9b:93:fa
    * -----BEGIN CERTIFICATE-----

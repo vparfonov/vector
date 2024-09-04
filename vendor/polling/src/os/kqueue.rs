@@ -4,7 +4,6 @@ use crate::sys::{mode_to_flags, SourceId};
 use crate::{PollMode, Poller};
 
 use std::io;
-use std::marker::PhantomData;
 use std::process::Child;
 use std::time::Duration;
 
@@ -172,14 +171,11 @@ impl Filter for Signal {}
 /// Monitor a child process.
 #[derive(Debug)]
 pub struct Process<'a> {
-    /// The process ID to monitor.
-    pid: rustix::process::Pid,
+    /// The child process to monitor.
+    child: &'a Child,
 
     /// The operation to monitor.
     ops: ProcessOps,
-
-    /// Lifetime of the underlying process.
-    _lt: PhantomData<&'a Child>,
 }
 
 /// The operations that a monitored process can perform.
@@ -204,24 +200,7 @@ impl<'a> Process<'a> {
     /// Once registered into the `Poller`, the `Child` object must outlive this filter's
     /// registration into the poller.
     pub unsafe fn new(child: &'a Child, ops: ProcessOps) -> Self {
-        Self {
-            pid: rustix::process::Pid::from_child(child),
-            ops,
-            _lt: PhantomData,
-        }
-    }
-
-    /// Create a `Process` from a PID.
-    ///
-    /// # Safety
-    ///
-    /// The PID must be tied to an actual child process.
-    pub unsafe fn from_pid(pid: std::num::NonZeroI32, ops: ProcessOps) -> Self {
-        Self {
-            pid: unsafe { rustix::process::Pid::from_raw_unchecked(pid.get()) },
-            ops,
-            _lt: PhantomData,
-        }
+        Self { child, ops }
     }
 }
 
@@ -236,8 +215,7 @@ unsafe impl FilterSealed for Process<'_> {
 
         kqueue::Event::new(
             kqueue::EventFilter::Proc {
-                // SAFETY: We know that the PID is nonzero.
-                pid: self.pid,
+                pid: rustix::process::Pid::from_child(self.child),
                 flags: events,
             },
             flags | kqueue::EventFlags::RECEIPT,
@@ -247,8 +225,7 @@ unsafe impl FilterSealed for Process<'_> {
 
     #[inline(always)]
     fn source_id(&self) -> SourceId {
-        // SAFETY: We know that the PID is nonzero
-        SourceId::Pid(self.pid)
+        SourceId::Pid(rustix::process::Pid::from_child(self.child))
     }
 }
 

@@ -49,7 +49,7 @@
         target_family = "wasm",
         target_feature = "atomics"
     ),
-    feature(stdarch_wasm_atomic_wait)
+    feature(stdsimd)
 )]
 
 mod parking_lot;

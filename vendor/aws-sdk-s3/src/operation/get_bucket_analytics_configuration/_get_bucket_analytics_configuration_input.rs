@@ -32,8 +32,8 @@ impl GetBucketAnalyticsConfigurationInput {
 }
 
 /// A builder for [`GetBucketAnalyticsConfigurationInput`](crate::operation::get_bucket_analytics_configuration::GetBucketAnalyticsConfigurationInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct GetBucketAnalyticsConfigurationInputBuilder {
     pub(crate) bucket: ::std::option::Option<::std::string::String>,
     pub(crate) id: ::std::option::Option<::std::string::String>,

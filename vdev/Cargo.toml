@@ -6,7 +6,6 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 license = "MPL-2.0"
 readme = "README.md"
 publish = false
-rust-version = "1.71.1"
 
 [dependencies]
 anyhow = "1.0.86"

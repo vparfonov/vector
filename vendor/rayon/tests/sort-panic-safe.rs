@@ -2,14 +2,12 @@ use rand::distributions::Uniform;
 use rand::{thread_rng, Rng};
 use rayon::prelude::*;
 use std::cell::Cell;
-use std::cmp::Ordering;
+use std::cmp::{self, Ordering};
 use std::panic;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering::Relaxed;
 use std::thread;
 
-// const is needed for array initializer
-#[allow(clippy::declare_interior_mutable_const)]
 const ZERO: AtomicUsize = AtomicUsize::new(0);
 const LEN: usize = 20_000;
 
@@ -30,7 +28,6 @@ impl PartialEq for DropCounter {
     }
 }
 
-#[allow(clippy::non_canonical_partial_ord_impl)]
 impl PartialOrd for DropCounter {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         self.version.set(self.version.get() + 1);
@@ -69,7 +66,7 @@ macro_rules! test {
         let step = if len <= 100 {
             1
         } else {
-            Ord::max(1, panic_countdown / 10)
+            cmp::max(1, panic_countdown / 10)
         };
 
         // ... and then panic after each `step` comparisons.
@@ -118,7 +115,7 @@ macro_rules! test {
     };
 }
 
-thread_local!(static SILENCE_PANIC: Cell<bool> = const { Cell::new(false) });
+thread_local!(static SILENCE_PANIC: Cell<bool> = Cell::new(false));
 
 #[test]
 #[cfg_attr(any(target_os = "emscripten", target_family = "wasm"), ignore)]
@@ -149,8 +146,8 @@ fn sort_panic_safe() {
                     }
 
                     for _ in 0..5 {
-                        let a = rng.sample(len_dist);
-                        let b = rng.sample(len_dist);
+                        let a = rng.sample(&len_dist);
+                        let b = rng.sample(&len_dist);
                         if a < b {
                             input[a..b].reverse();
                         } else {

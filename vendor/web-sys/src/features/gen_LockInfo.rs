@@ -14,62 +14,6 @@ extern "C" {
     #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
     #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub type LockInfo;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `clientId` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `LockInfo`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "clientId")]
-    pub fn get_client_id(this: &LockInfo) -> Option<String>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `clientId` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `LockInfo`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "clientId")]
-    pub fn set_client_id(this: &LockInfo, val: &str);
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "LockMode")]
-    #[doc = "Get the `mode` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `LockInfo`, `LockMode`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "mode")]
-    pub fn get_mode(this: &LockInfo) -> Option<LockMode>;
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "LockMode")]
-    #[doc = "Change the `mode` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `LockInfo`, `LockMode`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "mode")]
-    pub fn set_mode(this: &LockInfo, val: LockMode);
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Get the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `LockInfo`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "name")]
-    pub fn get_name(this: &LockInfo) -> Option<String>;
-    #[cfg(web_sys_unstable_apis)]
-    #[doc = "Change the `name` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `LockInfo`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "name")]
-    pub fn set_name(this: &LockInfo, val: &str);
 }
 #[cfg(web_sys_unstable_apis)]
 impl LockInfo {
@@ -85,22 +29,59 @@ impl LockInfo {
         ret
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_client_id()` instead."]
+    #[doc = "Change the `clientId` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `LockInfo`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn client_id(&mut self, val: &str) -> &mut Self {
-        self.set_client_id(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("clientId"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
     #[cfg(feature = "LockMode")]
-    #[deprecated = "Use `set_mode()` instead."]
+    #[doc = "Change the `mode` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `LockInfo`, `LockMode`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn mode(&mut self, val: LockMode) -> &mut Self {
-        self.set_mode(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("mode"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(web_sys_unstable_apis)]
-    #[deprecated = "Use `set_name()` instead."]
+    #[doc = "Change the `name` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `LockInfo`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn name(&mut self, val: &str) -> &mut Self {
-        self.set_name(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("name"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

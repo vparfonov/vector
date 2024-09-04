@@ -10,9 +10,7 @@
 // - atomic-maybe-uninit https://github.com/taiki-e/atomic-maybe-uninit
 //
 // Generated asm:
-// - x86_64 (+cmpxchg16b) https://godbolt.org/z/r5x9M8PdK
-
-// TODO: use core::arch::x86_64::cmpxchg16b where available and efficient than asm
+// - x86_64 (+cmpxchg16b) https://godbolt.org/z/55n54WeKr
 
 include!("macros.rs");
 
@@ -22,7 +20,6 @@ mod fallback;
 
 #[cfg(not(portable_atomic_no_outline_atomics))]
 #[cfg(not(target_env = "sgx"))]
-#[cfg_attr(not(target_feature = "sse"), cfg(not(target_feature = "cmpxchg16b")))]
 #[path = "detect/x86_64.rs"]
 mod detect;
 
@@ -53,16 +50,14 @@ macro_rules! debug_assert_vmovdqa_atomic {
     }};
 }
 
-#[cfg(not(any(portable_atomic_no_outline_atomics, target_env = "sgx")))]
-#[cfg(target_feature = "sse")]
+#[allow(unused_macros)]
 #[cfg(target_pointer_width = "32")]
 macro_rules! ptr_modifier {
     () => {
         ":e"
     };
 }
-#[cfg(not(any(portable_atomic_no_outline_atomics, target_env = "sgx")))]
-#[cfg(target_feature = "sse")]
+#[allow(unused_macros)]
 #[cfg(target_pointer_width = "64")]
 macro_rules! ptr_modifier {
     () => {
@@ -70,15 +65,8 @@ macro_rules! ptr_modifier {
     };
 }
 
-// Unlike AArch64 and RISC-V, x86's assembler doesn't check instruction
-// requirements for the currently enabled target features. In the first place,
-// there is no option in the x86 assembly for such case, like ARM .arch_extension,
-// RISC-V .option arch, PowerPC .machine, etc.
-// However, we set target_feature(enable) when available (Rust 1.69+) in case a
-// new codegen backend is added that checks for it in the future, or an option
-// is added to the assembler to check for it.
 #[cfg_attr(
-    not(portable_atomic_no_cmpxchg16b_target_feature),
+    not(any(target_feature = "cmpxchg16b", portable_atomic_target_feature = "cmpxchg16b")),
     target_feature(enable = "cmpxchg16b")
 )]
 #[inline]
@@ -107,16 +95,17 @@ unsafe fn cmpxchg16b(dst: *mut u128, old: u128, new: u128) -> (u128, bool) {
         macro_rules! cmpxchg16b {
             ($rdi:tt) => {
                 asm!(
-                    "xchg {rbx_tmp}, rbx", // save rbx which is reserved by LLVM
+                    // rbx is reserved by LLVM
+                    "xchg {rbx_tmp}, rbx",
                     concat!("lock cmpxchg16b xmmword ptr [", $rdi, "]"),
-                    "sete cl",
+                    "sete r8b",
                     "mov rbx, {rbx_tmp}", // restore rbx
                     rbx_tmp = inout(reg) new.pair.lo => _,
                     in("rcx") new.pair.hi,
                     inout("rax") old.pair.lo => prev_lo,
                     inout("rdx") old.pair.hi => prev_hi,
                     in($rdi) dst,
-                    lateout("cl") r,
+                    out("r8b") r,
                     // Do not use `preserves_flags` because CMPXCHG16B modifies the ZF flag.
                     options(nostack),
                 )
@@ -126,21 +115,17 @@ unsafe fn cmpxchg16b(dst: *mut u128, old: u128, new: u128) -> (u128, bool) {
         cmpxchg16b!("edi");
         #[cfg(target_pointer_width = "64")]
         cmpxchg16b!("rdi");
-        crate::utils::assert_unchecked(r == 0 || r == 1); // needed to remove extra test
         (U128 { pair: Pair { lo: prev_lo, hi: prev_hi } }.whole, r != 0)
     }
 }
 
-// VMOVDQA is atomic on Intel, AMD, and Zhaoxin CPUs with AVX.
+// VMOVDQA is atomic on Intel and AMD CPUs with AVX.
 // See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=104688 for details.
 //
 // Refs: https://www.felixcloutier.com/x86/movdqa:vmovdqa32:vmovdqa64
 //
-// Use cfg(target_feature = "sse") here -- SSE is included in the x86_64
-// baseline and is always available, but the SSE target feature is disabled for
-// use cases such as kernels and firmware that should not use vector registers.
-// So, do not use vector registers unless SSE target feature is enabled.
-// See also https://github.com/rust-lang/rust/blob/1.77.0/src/doc/rustc/src/platform-support/x86_64-unknown-none.md.
+// Do not use vector registers on targets such as x86_64-unknown-none unless SSE is explicitly enabled.
+// https://doc.rust-lang.org/nightly/rustc/platform-support/x86_64-unknown-none.html
 #[cfg(not(any(portable_atomic_no_outline_atomics, target_env = "sgx")))]
 #[cfg(target_feature = "sse")]
 #[target_feature(enable = "avx")]
@@ -153,7 +138,7 @@ unsafe fn atomic_load_vmovdqa(src: *mut u128) -> u128 {
     //
     // atomic load by vmovdqa is always SeqCst.
     unsafe {
-        let out: core::arch::x86_64::__m128i;
+        let out: core::arch::x86_64::__m128;
         asm!(
             concat!("vmovdqa {out}, xmmword ptr [{src", ptr_modifier!(), "}]"),
             src = in(reg) src,
@@ -173,7 +158,7 @@ unsafe fn atomic_store_vmovdqa(dst: *mut u128, val: u128, order: Ordering) {
 
     // SAFETY: the caller must uphold the safety contract.
     unsafe {
-        let val: core::arch::x86_64::__m128i = core::mem::transmute(val);
+        let val: core::arch::x86_64::__m128 = core::mem::transmute(val);
         match order {
             // Relaxed and Release stores are equivalent.
             Ordering::Relaxed | Ordering::Release => {
@@ -185,24 +170,15 @@ unsafe fn atomic_store_vmovdqa(dst: *mut u128, val: u128, order: Ordering) {
                 );
             }
             Ordering::SeqCst => {
-                let p = core::cell::UnsafeCell::new(core::mem::MaybeUninit::<u64>::uninit());
                 asm!(
                     concat!("vmovdqa xmmword ptr [{dst", ptr_modifier!(), "}], {val}"),
-                    // Equivalent to mfence, but is up to 3.1x faster on Coffee Lake and up to 2.4x faster on Raptor Lake-H at least in simple cases.
-                    // - https://github.com/taiki-e/portable-atomic/pull/156
-                    // - LLVM uses lock or for x86_32 64-bit atomic SeqCst store using SSE https://godbolt.org/z/9sKEr8YWc
-                    // - Windows uses xchg for x86_32 for MemoryBarrier https://learn.microsoft.com/en-us/windows/win32/api/winnt/nf-winnt-memorybarrier
-                    // - MSVC STL uses lock inc https://github.com/microsoft/STL/pull/740
-                    // - boost uses lock or https://github.com/boostorg/atomic/commit/559eba81af71386cedd99f170dc6101c6ad7bf22
-                    concat!("xchg qword ptr [{p", ptr_modifier!(), "}], {tmp}"),
+                    "mfence",
                     dst = in(reg) dst,
                     val = in(xmm_reg) val,
-                    p = inout(reg) p.get() => _,
-                    tmp = lateout(reg) _,
                     options(nostack, preserves_flags),
                 );
             }
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", order),
         }
     }
 }
@@ -225,7 +201,7 @@ macro_rules! load_store_detect {
         {
             // Check CMPXCHG16B first to prevent mixing atomic and non-atomic access.
             if cpuid.has_cmpxchg16b() {
-                // We only use VMOVDQA when SSE is enabled. See atomic_load_vmovdqa() for more.
+                // We do not use vector registers on targets such as x86_64-unknown-none unless SSE is explicitly enabled.
                 #[cfg(target_feature = "sse")]
                 {
                     if cpuid.has_vmovdqa_atomic() {
@@ -255,7 +231,8 @@ macro_rules! load_store_detect {
 
 #[inline]
 unsafe fn atomic_load(src: *mut u128, _order: Ordering) -> u128 {
-    // We only use VMOVDQA when SSE is enabled. See atomic_load_vmovdqa() for more.
+    // Do not use vector registers on targets such as x86_64-unknown-none unless SSE is explicitly enabled.
+    // https://doc.rust-lang.org/nightly/rustc/platform-support/x86_64-unknown-none.html
     // SGX doesn't support CPUID.
     #[cfg(all(
         any(target_feature = "cmpxchg16b", portable_atomic_target_feature = "cmpxchg16b"),
@@ -283,9 +260,8 @@ unsafe fn atomic_load(src: *mut u128, _order: Ordering) -> u128 {
         })
     }
 }
-// See cmpxchg16b() for target_feature(enable).
 #[cfg_attr(
-    not(portable_atomic_no_cmpxchg16b_target_feature),
+    not(any(target_feature = "cmpxchg16b", portable_atomic_target_feature = "cmpxchg16b")),
     target_feature(enable = "cmpxchg16b")
 )]
 #[inline]
@@ -307,7 +283,8 @@ unsafe fn atomic_load_cmpxchg16b(src: *mut u128) -> u128 {
         macro_rules! cmpxchg16b {
             ($rdi:tt) => {
                 asm!(
-                    "mov {rbx_tmp}, rbx", // save rbx which is reserved by LLVM
+                    // rbx is reserved by LLVM
+                    "mov {rbx_tmp}, rbx",
                     "xor rbx, rbx", // zeroed rbx
                     concat!("lock cmpxchg16b xmmword ptr [", $rdi, "]"),
                     "mov rbx, {rbx_tmp}", // restore rbx
@@ -332,7 +309,8 @@ unsafe fn atomic_load_cmpxchg16b(src: *mut u128) -> u128 {
 
 #[inline]
 unsafe fn atomic_store(dst: *mut u128, val: u128, order: Ordering) {
-    // We only use VMOVDQA when SSE is enabled. See atomic_load_vmovdqa() for more.
+    // Do not use vector registers on targets such as x86_64-unknown-none unless SSE is explicitly enabled.
+    // https://doc.rust-lang.org/nightly/rustc/platform-support/x86_64-unknown-none.html
     // SGX doesn't support CPUID.
     #[cfg(all(
         any(target_feature = "cmpxchg16b", portable_atomic_target_feature = "cmpxchg16b"),
@@ -381,16 +359,14 @@ unsafe fn atomic_store(dst: *mut u128, val: u128, order: Ordering) {
                     }
                 });
             }
-            _ => unreachable!(),
+            _ => unreachable!("{:?}", order),
         }
     }
 }
-// See cmpxchg16b() for target_feature(enable).
 #[cfg_attr(
-    not(portable_atomic_no_cmpxchg16b_target_feature),
+    not(any(target_feature = "cmpxchg16b", portable_atomic_target_feature = "cmpxchg16b")),
     target_feature(enable = "cmpxchg16b")
 )]
-#[inline]
 unsafe fn atomic_store_cmpxchg16b(dst: *mut u128, val: u128) {
     // SAFETY: the caller must uphold the safety contract.
     unsafe {
@@ -437,9 +413,8 @@ use atomic_compare_exchange as atomic_compare_exchange_weak;
 
 #[cfg(any(target_feature = "cmpxchg16b", portable_atomic_target_feature = "cmpxchg16b"))]
 use atomic_swap_cmpxchg16b as atomic_swap;
-// See cmpxchg16b() for target_feature(enable).
 #[cfg_attr(
-    not(portable_atomic_no_cmpxchg16b_target_feature),
+    not(any(target_feature = "cmpxchg16b", portable_atomic_target_feature = "cmpxchg16b")),
     target_feature(enable = "cmpxchg16b")
 )]
 #[inline]
@@ -464,7 +439,8 @@ unsafe fn atomic_swap_cmpxchg16b(dst: *mut u128, val: u128, _order: Ordering) ->
         macro_rules! cmpxchg16b {
             ($rdi:tt) => {
                 asm!(
-                    "xchg {rbx_tmp}, rbx", // save rbx which is reserved by LLVM
+                    // rbx is reserved by LLVM
+                    "xchg {rbx_tmp}, rbx",
                     // This is not single-copy atomic reads, but this is ok because subsequent
                     // CAS will check for consistency.
                     //
@@ -511,9 +487,8 @@ macro_rules! atomic_rmw_cas_3 {
     ($name:ident as $reexport_name:ident, $($op:tt)*) => {
         #[cfg(any(target_feature = "cmpxchg16b", portable_atomic_target_feature = "cmpxchg16b"))]
         use $name as $reexport_name;
-        // See cmpxchg16b() for target_feature(enable).
         #[cfg_attr(
-            not(portable_atomic_no_cmpxchg16b_target_feature),
+            not(any(target_feature = "cmpxchg16b", portable_atomic_target_feature = "cmpxchg16b")),
             target_feature(enable = "cmpxchg16b")
         )]
         #[inline]
@@ -532,7 +507,8 @@ macro_rules! atomic_rmw_cas_3 {
                 macro_rules! cmpxchg16b {
                     ($rdi:tt) => {
                         asm!(
-                            "mov {rbx_tmp}, rbx", // save rbx which is reserved by LLVM
+                            // rbx is reserved by LLVM
+                            "mov {rbx_tmp}, rbx",
                             // This is not single-copy atomic reads, but this is ok because subsequent
                             // CAS will check for consistency.
                             //
@@ -582,9 +558,8 @@ macro_rules! atomic_rmw_cas_2 {
     ($name:ident as $reexport_name:ident, $($op:tt)*) => {
         #[cfg(any(target_feature = "cmpxchg16b", portable_atomic_target_feature = "cmpxchg16b"))]
         use $name as $reexport_name;
-        // See cmpxchg16b() for target_feature(enable).
         #[cfg_attr(
-            not(portable_atomic_no_cmpxchg16b_target_feature),
+            not(any(target_feature = "cmpxchg16b", portable_atomic_target_feature = "cmpxchg16b")),
             target_feature(enable = "cmpxchg16b")
         )]
         #[inline]
@@ -602,7 +577,8 @@ macro_rules! atomic_rmw_cas_2 {
                 macro_rules! cmpxchg16b {
                     ($rdi:tt) => {
                         asm!(
-                            "mov {rbx_tmp}, rbx", // save rbx which is reserved by LLVM
+                            // rbx is reserved by LLVM
+                            "mov {rbx_tmp}, rbx",
                             // This is not single-copy atomic reads, but this is ok because subsequent
                             // CAS will check for consistency.
                             //
@@ -753,9 +729,11 @@ macro_rules! atomic_rmw_with_ifunc {
         #[inline]
         unsafe fn $name($($arg)*, _order: Ordering) $(-> $ret_ty)? {
             fn_alias! {
-                // See cmpxchg16b() for target_feature(enable).
                 #[cfg_attr(
-                    not(portable_atomic_no_cmpxchg16b_target_feature),
+                    not(any(
+                        target_feature = "cmpxchg16b",
+                        portable_atomic_target_feature = "cmpxchg16b",
+                    )),
                     target_feature(enable = "cmpxchg16b")
                 )]
                 unsafe fn($($arg)*) $(-> $ret_ty)?;

@@ -197,8 +197,6 @@ pub(crate) mod parsing {
 #[cfg(feature = "printing")]
 mod printing {
     use crate::mac::{Macro, MacroDelimiter};
-    use crate::path;
-    use crate::path::printing::PathStyle;
     use crate::token;
     use proc_macro2::{Delimiter, TokenStream};
     use quote::ToTokens;
@@ -217,7 +215,7 @@ mod printing {
     #[cfg_attr(docsrs, doc(cfg(feature = "printing")))]
     impl ToTokens for Macro {
         fn to_tokens(&self, tokens: &mut TokenStream) {
-            path::printing::print_path(tokens, &self.path, PathStyle::Mod);
+            self.path.to_tokens(tokens);
             self.bang_token.to_tokens(tokens);
             self.delimiter.surround(tokens, self.tokens.clone());
         }

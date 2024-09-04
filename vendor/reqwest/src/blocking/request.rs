@@ -167,14 +167,6 @@ impl RequestBuilder {
         }
     }
 
-    /// Assemble a builder starting from an existing `Client` and a `Request`.
-    pub fn from_parts(client: Client, request: Request) -> RequestBuilder {
-        RequestBuilder {
-            client,
-            request: crate::Result::Ok(request),
-        }
-    }
-
     /// Add a `Header` to this Request.
     ///
     /// ```rust
@@ -211,12 +203,7 @@ impl RequestBuilder {
             match <HeaderName as TryFrom<K>>::try_from(key) {
                 Ok(key) => match <HeaderValue as TryFrom<V>>::try_from(value) {
                     Ok(mut value) => {
-                        // We want to potentially make an unsensitive header
-                        // to be sensitive, not the reverse. So, don't turn off
-                        // a previously sensitive header.
-                        if sensitive {
-                            value.set_sensitive(true);
-                        }
+                        value.set_sensitive(sensitive);
                         req.headers_mut().append(key, value);
                     }
                     Err(e) => error = Some(crate::error::builder(e.into())),
@@ -561,15 +548,6 @@ impl RequestBuilder {
     /// `Client::execute()`.
     pub fn build(self) -> crate::Result<Request> {
         self.request
-    }
-
-    /// Build a `Request`, which can be inspected, modified and executed with
-    /// `Client::execute()`.
-    ///
-    /// This is similar to [`RequestBuilder::build()`], but also returns the
-    /// embedded `Client`.
-    pub fn build_split(self) -> (Client, crate::Result<Request>) {
-        (self.client, self.request)
     }
 
     /// Constructs the Request and sends it the target URL, returning a Response.

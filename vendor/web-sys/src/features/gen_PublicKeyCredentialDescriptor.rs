@@ -10,38 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialDescriptor`*"]
     pub type PublicKeyCredentialDescriptor;
-    #[doc = "Get the `id` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialDescriptor`*"]
-    #[wasm_bindgen(method, getter = "id")]
-    pub fn get_id(this: &PublicKeyCredentialDescriptor) -> ::js_sys::Object;
-    #[doc = "Change the `id` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialDescriptor`*"]
-    #[wasm_bindgen(method, setter = "id")]
-    pub fn set_id(this: &PublicKeyCredentialDescriptor, val: &::js_sys::Object);
-    #[doc = "Get the `transports` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialDescriptor`*"]
-    #[wasm_bindgen(method, getter = "transports")]
-    pub fn get_transports(this: &PublicKeyCredentialDescriptor) -> Option<::js_sys::Array>;
-    #[doc = "Change the `transports` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialDescriptor`*"]
-    #[wasm_bindgen(method, setter = "transports")]
-    pub fn set_transports(this: &PublicKeyCredentialDescriptor, val: &::wasm_bindgen::JsValue);
-    #[cfg(feature = "PublicKeyCredentialType")]
-    #[doc = "Get the `type` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialDescriptor`, `PublicKeyCredentialType`*"]
-    #[wasm_bindgen(method, getter = "type")]
-    pub fn get_type(this: &PublicKeyCredentialDescriptor) -> PublicKeyCredentialType;
-    #[cfg(feature = "PublicKeyCredentialType")]
-    #[doc = "Change the `type` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialDescriptor`, `PublicKeyCredentialType`*"]
-    #[wasm_bindgen(method, setter = "type")]
-    pub fn set_type(this: &PublicKeyCredentialDescriptor, val: PublicKeyCredentialType);
 }
 impl PublicKeyCredentialDescriptor {
     #[cfg(feature = "PublicKeyCredentialType")]
@@ -55,20 +23,48 @@ impl PublicKeyCredentialDescriptor {
         ret.type_(type_);
         ret
     }
-    #[deprecated = "Use `set_id()` instead."]
+    #[doc = "Change the `id` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialDescriptor`*"]
     pub fn id(&mut self, val: &::js_sys::Object) -> &mut Self {
-        self.set_id(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("id"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_transports()` instead."]
+    #[doc = "Change the `transports` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialDescriptor`*"]
     pub fn transports(&mut self, val: &::wasm_bindgen::JsValue) -> &mut Self {
-        self.set_transports(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("transports"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "PublicKeyCredentialType")]
-    #[deprecated = "Use `set_type()` instead."]
+    #[doc = "Change the `type` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `PublicKeyCredentialDescriptor`, `PublicKeyCredentialType`*"]
     pub fn type_(&mut self, val: PublicKeyCredentialType) -> &mut Self {
-        self.set_type(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("type"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

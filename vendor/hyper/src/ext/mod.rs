@@ -1,6 +1,5 @@
 //! HTTP extensions.
 
-#[cfg(all(any(feature = "client", feature = "server"), feature = "http1"))]
 use bytes::Bytes;
 #[cfg(any(
     all(any(feature = "client", feature = "server"), feature = "http1"),
@@ -8,7 +7,8 @@ use bytes::Bytes;
 ))]
 use http::header::HeaderName;
 #[cfg(all(any(feature = "client", feature = "server"), feature = "http1"))]
-use http::header::{HeaderMap, IntoHeaderName, ValueIter};
+use http::header::{IntoHeaderName, ValueIter};
+use http::HeaderMap;
 #[cfg(feature = "ffi")]
 use std::collections::HashMap;
 #[cfg(feature = "http2")]
@@ -98,7 +98,6 @@ impl fmt::Debug for Protocol {
 /// ```
 ///
 /// [`preserve_header_case`]: /client/struct.Client.html#method.preserve_header_case
-#[cfg(all(any(feature = "client", feature = "server"), feature = "http1"))]
 #[derive(Clone, Debug)]
 pub(crate) struct HeaderCaseMap(HeaderMap<Bytes>);
 

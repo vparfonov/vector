@@ -1,3 +1,4 @@
+#![allow(clippy::upper_case_acronyms)]
 #![allow(missing_docs)]
 
 #[macro_use]
@@ -17,14 +18,13 @@ pub(crate) mod persist;
 #[cfg(test)]
 mod handshake_test;
 
-pub mod ffdhe_groups;
 #[cfg(test)]
 mod message_test;
 
 #[cfg(test)]
 mod tests {
     use super::codec::Reader;
-    use super::message::{Message, OutboundOpaqueMessage};
+    use super::message::{Message, OpaqueMessage};
 
     #[test]
     fn smoketest() {
@@ -32,7 +32,7 @@ mod tests {
         let mut r = Reader::init(bytes);
 
         while r.any_left() {
-            let m = OutboundOpaqueMessage::read(&mut r).unwrap();
+            let m = OpaqueMessage::read(&mut r).unwrap();
 
             let out = m.clone().encode();
             assert!(!out.is_empty());

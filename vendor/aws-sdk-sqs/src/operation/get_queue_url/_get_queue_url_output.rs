@@ -27,8 +27,8 @@ impl GetQueueUrlOutput {
 }
 
 /// A builder for [`GetQueueUrlOutput`](crate::operation::get_queue_url::GetQueueUrlOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct GetQueueUrlOutputBuilder {
     pub(crate) queue_url: ::std::option::Option<::std::string::String>,
     _request_id: Option<String>,

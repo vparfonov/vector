@@ -17,8 +17,6 @@ mod membarrier;
 mod pidfd;
 #[cfg(target_os = "linux")]
 mod pidfd_getfd;
-#[cfg(target_os = "linux")]
-mod pivot_root;
 #[cfg(linux_kernel)]
 mod prctl;
 #[cfg(not(any(target_os = "fuchsia", target_os = "vita", target_os = "wasi")))]
@@ -59,8 +57,6 @@ pub use membarrier::*;
 pub use pidfd::*;
 #[cfg(target_os = "linux")]
 pub use pidfd_getfd::*;
-#[cfg(target_os = "linux")]
-pub use pivot_root::*;
 #[cfg(linux_kernel)]
 pub use prctl::*;
 #[cfg(not(any(target_os = "fuchsia", target_os = "vita", target_os = "wasi")))]

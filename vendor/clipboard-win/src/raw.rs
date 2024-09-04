@@ -13,7 +13,6 @@
 use crate::types::*;
 use crate::sys::*;
 use crate::utils::Buffer;
-use crate::options::{self, EmptyFn, Clearing};
 
 const CBM_INIT: DWORD = 0x04;
 const BI_RGB: DWORD = 0;
@@ -23,51 +22,20 @@ const CP_UTF8: DWORD = 65001;
 
 use error_code::ErrorCode;
 
-use core::{slice, mem, ptr, cmp, str, hint};
+use core::{slice, mem, ptr, cmp};
 use core::num::{NonZeroUsize, NonZeroU32};
 
 use alloc::string::String;
 use alloc::borrow::ToOwned;
 use alloc::format;
 
-use crate::{SysResult, html, formats};
+use crate::{SysResult, formats};
 use crate::utils::{unlikely_empty_size_result, RawMem};
-
-#[cold]
-#[inline(never)]
-fn invalid_data() -> ErrorCode {
-    ErrorCode::new_system(13)
-}
 
 #[inline(always)]
 fn free_dc(data: HDC) {
     unsafe {
         ReleaseDC(ptr::null_mut(), data);
-    }
-}
-
-/// A scope guard for impersonating anonymous token on Windows
-struct AnonymousTokenImpersonator {
-    must_revert: bool,
-}
-
-impl AnonymousTokenImpersonator {
-    #[inline]
-    pub fn new() -> Self {
-        Self {
-            must_revert: unsafe { ImpersonateAnonymousToken(GetCurrentThread()) != 0 },
-        }
-    }
-}
-
-impl Drop for AnonymousTokenImpersonator {
-    #[inline]
-    fn drop(&mut self) {
-        if self.must_revert {
-            unsafe {
-                RevertToSelf();
-            }
-        }
     }
 }
 
@@ -119,12 +87,6 @@ pub fn open_for(owner: HWND) -> SysResult<()> {
 ///
 ///* [open()](fn.open.html) has been called.
 pub fn close() -> SysResult<()> {
-    // See https://crbug.com/441834:
-    //  Impersonate anonymous token while calling CloseClipboard.
-    //  This prevents the Windows kernel from capturing the broker's
-    //  access token which could lead to potential escalation of privilege.
-    let _guard = AnonymousTokenImpersonator::new();
-
     match unsafe { CloseClipboard() } {
         0 => Err(ErrorCode::last_system()),
         _ => Ok(()),
@@ -239,22 +201,6 @@ pub fn is_format_avail(format: c_uint) -> bool {
     unsafe { IsClipboardFormatAvailable(format) != 0 }
 }
 
-#[inline(always)]
-///Returns the first available format in the specified list.
-///
-///Returns `None` if no format is available or clipboard is empty
-pub fn which_format_avail(formats: &[c_uint]) -> Option<NonZeroU32> {
-    let result = unsafe {
-        GetPriorityClipboardFormat(formats.as_ptr(), formats.len() as _)
-    };
-    if result < 0 {
-        None
-    } else {
-        NonZeroU32::new(result as _)
-    }
-}
-
-
 #[inline]
 ///Retrieves number of currently available formats on clipboard.
 ///
@@ -318,172 +264,18 @@ pub fn get_vec(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
     Ok(result)
 }
 
-///Retrieves HTML using format code created by `register_raw_format` or `register_format` with argument `HTML Format`
-pub fn get_html(format: u32, out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
-    let ptr = RawMem::from_borrowed(get_clipboard_data(format)?);
-
-    let result = unsafe {
-        let (data_ptr, _lock) = ptr.lock()?;
-        let data_size = GlobalSize(ptr.get()) as usize;
-
-        let data = match str::from_utf8(slice::from_raw_parts(data_ptr.as_ptr() as *const u8, data_size)) {
-            Ok(data) => data,
-            Err(_) => return Err(invalid_data()),
-        };
-
-        let mut start_idx = 0usize;
-        let mut end_idx = data.len();
-        for line in data.lines() {
-            let mut split = line.split(html::SEP);
-            let key = match split.next() {
-                Some(key) => key,
-                None => hint::unreachable_unchecked(),
-            };
-            let value = match split.next() {
-                Some(value) => value,
-                //Reached HTML
-                None => break
-            };
-            match key {
-                html::START_FRAGMENT => match value.trim_start_matches('0').parse() {
-                    Ok(value) => {
-                        start_idx = value;
-                        continue;
-                    }
-                    //Should not really happen
-                    Err(_) => break,
-                },
-                html::END_FRAGMENT => match value.trim_start_matches('0').parse() {
-                    Ok(value) => {
-                        end_idx = value;
-                        continue;
-                    }
-                    //Should not really happen
-                    Err(_) => break,
-                },
-                _ => continue,
-            }
-        }
-
-        //Make sure HTML writer didn't screw up offsets of fragment
-        let size = match end_idx.checked_sub(start_idx) {
-            Some(size) => size,
-            None => return Err(invalid_data()),
-        };
-        if size > data_size {
-            return Err(invalid_data())
-        }
-
-        out.reserve(size);
-        let out_cursor = out.len();
-        ptr::copy_nonoverlapping(data.as_ptr().add(start_idx), out.spare_capacity_mut().as_mut_ptr().add(out_cursor) as _, size);
-        out.set_len(out_cursor + size);
-        size
-    };
-
-    Ok(result)
-}
-
-///Sets HTML using format code created by `register_raw_format` or `register_format` with argument `HTML Format`
+/// Copies raw bytes onto clipboard with specified `format`, returning whether it was successful.
 ///
-///Allows to customize clipboard setting behavior
+/// This function empties the clipboard before setting the data.
+pub fn set(format: u32, data: &[u8]) -> SysResult<()> {
+    let _ = empty();
+    set_without_clear(format, data)
+}
+
+/// Copies raw bytes onto the clipboard with the specified `format`, returning whether it was successful.
 ///
-///- `C` - Specifies clearing behavior
-pub fn set_html_with<C: Clearing>(format: u32, html: &str, _is_clear: C) -> SysResult<()> {
-    set_html_inner(format, html, C::EMPTY_FN)
-}
-
-///Sets HTML using format code created by `register_raw_format` or `register_format` with argument `HTML Format`
-pub fn set_html(format: u32, html: &str) -> SysResult<()> {
-    set_html_inner(format, html, options::NoClear::EMPTY_FN)
-}
-
-fn set_html_inner(format: u32, html: &str, empty: EmptyFn) -> SysResult<()> {
-    const VERSION_VALUE: &str = ":0.9";
-    const HEADER_SIZE: usize = html::VERSION.len() + VERSION_VALUE.len() + html::NEWLINE.len()
-                               + html::START_HTML.len() + html::LEN_SIZE + 1 + html::NEWLINE.len()
-                               + html::END_HTML.len() + html::LEN_SIZE + 1 + html::NEWLINE.len()
-                               + html::START_FRAGMENT.len() + html::LEN_SIZE + 1 + html::NEWLINE.len()
-                               + html::END_FRAGMENT.len() + html::LEN_SIZE + 1 + html::NEWLINE.len();
-    const FRAGMENT_OFFSET: usize = HEADER_SIZE + html::BODY_HEADER.len();
-
-    let total_size = FRAGMENT_OFFSET + html::BODY_FOOTER.len() + html.len();
-
-    let mut len_buffer = html::LengthBuffer::new();
-    let mem = RawMem::new_global_mem(total_size)?;
-
-    unsafe {
-        use core::fmt::Write;
-        let (ptr, _lock) = mem.lock()?;
-        let out = slice::from_raw_parts_mut(ptr.as_ptr() as *mut mem::MaybeUninit<u8>, total_size);
-
-        let mut cursor = 0;
-        macro_rules! write_out {
-            ($input:expr) => {
-                let input = $input;
-                ptr::copy_nonoverlapping(input.as_ptr() as *const u8, out.as_mut_ptr().add(cursor) as _, input.len());
-                cursor += input.len();
-            };
-        }
-
-        write_out!(html::VERSION);
-        write_out!(VERSION_VALUE);
-        write_out!(html::NEWLINE);
-
-        let _ = write!(&mut len_buffer, "{:0>10}", HEADER_SIZE);
-        write_out!(html::START_HTML);
-        write_out!([html::SEP as u8]);
-        write_out!(&len_buffer);
-        write_out!(html::NEWLINE);
-
-        let _ = write!(&mut len_buffer, "{:0>10}", total_size);
-        write_out!(html::END_HTML);
-        write_out!([html::SEP as u8]);
-        write_out!(&len_buffer);
-        write_out!(html::NEWLINE);
-
-        let _ = write!(&mut len_buffer, "{:0>10}", FRAGMENT_OFFSET);
-        write_out!(html::START_FRAGMENT);
-        write_out!([html::SEP as u8]);
-        write_out!(&len_buffer);
-        write_out!(html::NEWLINE);
-
-        let _ = write!(&mut len_buffer, "{:0>10}", total_size - html::BODY_FOOTER.len());
-        write_out!(html::END_FRAGMENT);
-        write_out!([html::SEP as u8]);
-        write_out!(&len_buffer);
-        write_out!(html::NEWLINE);
-
-        //Verify StartHTML is correct
-        debug_assert_eq!(HEADER_SIZE, cursor);
-
-        write_out!(html::BODY_HEADER);
-
-        //Verify StartFragment is correct
-        debug_assert_eq!(FRAGMENT_OFFSET, cursor);
-
-        write_out!(html);
-
-        //Verify EndFragment is correct
-        debug_assert_eq!(total_size - html::BODY_FOOTER.len(), cursor);
-
-        write_out!(html::BODY_FOOTER);
-
-        //Verify EndHTML is correct
-        debug_assert_eq!(cursor, total_size);
-    }
-
-    let _ = (empty)();
-    if unsafe { !SetClipboardData(format, mem.get()).is_null() } {
-        //SetClipboardData takes ownership
-        mem.release();
-        Ok(())
-    } else {
-        Err(ErrorCode::last_system())
-    }
-}
-
-fn set_inner(format: u32, data: &[u8], clear: EmptyFn) -> SysResult<()> {
+/// This function does not empty the clipboard before setting the data.
+pub fn set_without_clear(format: u32, data: &[u8]) -> SysResult<()> {
     let size = data.len();
     if size == 0 {
         #[allow(clippy::unit_arg)]
@@ -497,7 +289,6 @@ fn set_inner(format: u32, data: &[u8], clear: EmptyFn) -> SysResult<()> {
         unsafe { ptr::copy_nonoverlapping(data.as_ptr(), ptr.as_ptr() as _, size) };
     }
 
-    let _ = (clear)();
     if unsafe { !SetClipboardData(format, mem.get()).is_null() } {
         //SetClipboardData takes ownership
         mem.release();
@@ -505,19 +296,6 @@ fn set_inner(format: u32, data: &[u8], clear: EmptyFn) -> SysResult<()> {
     }
 
     Err(ErrorCode::last_system())
-}
-/// Copies raw bytes onto clipboard with specified `format`, returning whether it was successful.
-///
-/// This function empties the clipboard before setting the data.
-pub fn set(format: u32, data: &[u8]) -> SysResult<()> {
-    set_inner(format, data, options::DoClear::EMPTY_FN)
-}
-
-/// Copies raw bytes onto the clipboard with the specified `format`, returning whether it was successful.
-///
-/// This function does not empty the clipboard before setting the data.
-pub fn set_without_clear(format: u32, data: &[u8]) -> SysResult<()> {
-    set_inner(format, data, options::NoClear::EMPTY_FN)
 }
 
 ///Copies raw bytes from clipboard with specified `format`, appending to `out` buffer.
@@ -553,7 +331,9 @@ pub fn get_string(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
     Ok(result)
 }
 
-fn set_string_inner(data: &str, clear: EmptyFn) -> SysResult<()> {
+///Copies unicode string onto clipboard, performing necessary conversions, returning true on
+///success.
+pub fn set_string(data: &str) -> SysResult<()> {
     let size = unsafe {
         MultiByteToWideChar(CP_UTF8, 0, data.as_ptr() as *const _, data.len() as _, ptr::null_mut(), 0)
     };
@@ -570,7 +350,8 @@ fn set_string_inner(data: &str, clear: EmptyFn) -> SysResult<()> {
             }
         }
 
-        let _ = (clear)();
+        let _ = empty();
+
         if unsafe { !SetClipboardData(formats::CF_UNICODETEXT, mem.get()).is_null() } {
             //SetClipboardData takes ownership
             mem.release();
@@ -579,24 +360,6 @@ fn set_string_inner(data: &str, clear: EmptyFn) -> SysResult<()> {
     }
 
     Err(ErrorCode::last_system())
-}
-
-#[inline(always)]
-///Copies unicode string onto clipboard, performing necessary conversions, returning true on
-///success.
-pub fn set_string(data: &str) -> SysResult<()> {
-    set_string_inner(data, options::DoClear::EMPTY_FN)
-}
-
-#[inline(always)]
-///Copies unicode string onto clipboard, performing necessary conversions, returning true on
-///success.
-///
-///Allows to customize clipboard setting behavior
-///
-///- `C` - Specifies clearing behavior
-pub fn set_string_with<C: Clearing>(data: &str, _is_clear: C) -> SysResult<()> {
-    set_string_inner(data, C::EMPTY_FN)
 }
 
 #[cfg(feature = "std")]
@@ -739,7 +502,8 @@ pub fn get_bitmap(out: &mut alloc::vec::Vec<u8>) -> SysResult<usize> {
     let out_before = out.len();
 
     let dc = crate::utils::Scope(unsafe { GetDC(ptr::null_mut()) }, free_dc);
-    let mut buffer = alloc::vec![0; img_size];
+    let mut buffer = alloc::vec::Vec::new();
+    buffer.resize(img_size, 0u8);
 
     if unsafe { GetDIBits(dc.0, clipboard_data.as_ptr() as _, 0, bitmap.bmHeight as _, buffer.as_mut_ptr() as _, header_storage.get() as _, DIB_RGB_COLORS) } == 0 {
         return Err(ErrorCode::last_system());
@@ -785,24 +549,6 @@ pub fn set_bitamp(data: &[u8]) -> SysResult<()> {
 ///
 ///Returns `ERROR_INCORRECT_SIZE` if size of data is not valid
 pub fn set_bitmap(data: &[u8]) -> SysResult<()> {
-    //Bitmap format cannot really overlap with much so there is no risk of having non-empty clipboard
-    //Also it is backward compatible beahvior.
-    //To be changed in 6.x
-    set_bitmap_inner(data, options::NoClear::EMPTY_FN)
-}
-
-///Sets bitmap (header + RGB) onto clipboard, from raw bytes.
-///
-///Returns `ERROR_INCORRECT_SIZE` if size of data is not valid
-///
-///Allows to customize clipboard setting behavior
-///
-///- `C` - Specifies clearing behavior
-pub fn set_bitmap_with<C: Clearing>(data: &[u8], _is_clear: C) -> SysResult<()> {
-    set_bitmap_inner(data, C::EMPTY_FN)
-}
-
-fn set_bitmap_inner(data: &[u8], clear: EmptyFn) -> SysResult<()> {
     const FILE_HEADER_LEN: usize = mem::size_of::<BITMAPFILEHEADER>();
     const INFO_HEADER_LEN: usize = mem::size_of::<BITMAPINFOHEADER>();
 
@@ -839,7 +585,7 @@ fn set_bitmap_inner(data: &[u8], clear: EmptyFn) -> SysResult<()> {
         return Err(ErrorCode::last_system());
     }
 
-    let _ = (clear)();
+    let _ = empty();
     if unsafe { SetClipboardData(formats::CF_BITMAP, handle as _).is_null() } {
         return Err(ErrorCode::last_system());
     }
@@ -848,20 +594,8 @@ fn set_bitmap_inner(data: &[u8], clear: EmptyFn) -> SysResult<()> {
 }
 
 
-#[inline(always)]
 ///Set list of file paths to clipboard.
 pub fn set_file_list(paths: &[impl AsRef<str>]) -> SysResult<()> {
-    //See set_bitmap for reasoning of NoClear
-    set_file_list_inner(paths, options::NoClear::EMPTY_FN)
-}
-
-#[inline(always)]
-///Set list of file paths to clipboard.
-pub fn set_file_list_with<C: Clearing>(paths: &[impl AsRef<str>], _is_clear: C) -> SysResult<()> {
-    set_file_list_inner(paths, C::EMPTY_FN)
-}
-
-fn set_file_list_inner(paths: &[impl AsRef<str>], empty: EmptyFn) -> SysResult<()> {
     #[repr(C, packed(1))]
     pub struct DROPFILES {
         pub p_files: u32,
@@ -915,15 +649,16 @@ fn set_file_list_inner(paths: &[impl AsRef<str>], empty: EmptyFn) -> SysResult<(
         }
     }
 
-    let _ = (empty)();
+    let _ = empty();
+
     if unsafe { !SetClipboardData(formats::CF_HDROP, mem.get()).is_null() } {
         //SetClipboardData now has ownership of `mem`.
         mem.release();
-        Ok(())
-    } else {
-        Err(ErrorCode::last_system())
+        return Ok(());
     }
+    return Err(ErrorCode::last_system());
 }
+
 
 ///Enumerator over available clipboard formats.
 ///
@@ -1152,7 +887,7 @@ pub fn register_format(name: &str) -> Option<NonZeroU32> {
             register_raw_format(&buffer)
         }
     } else {
-        let mut buffer = mem::MaybeUninit::<[u16; 52]>::zeroed();
+        let mut buffer = mem::MaybeUninit::<[u16; 52]>::uninit();
         let size = unsafe {
             MultiByteToWideChar(CP_UTF8, 0, name.as_ptr() as *const _, name.len() as c_int, buffer.as_mut_ptr() as *mut u16, 51)
         };

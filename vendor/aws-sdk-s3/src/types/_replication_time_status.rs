@@ -96,12 +96,3 @@ impl ReplicationTimeStatus {
         }
     }
 }
-impl ::std::fmt::Display for ReplicationTimeStatus {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            ReplicationTimeStatus::Disabled => write!(f, "Disabled"),
-            ReplicationTimeStatus::Enabled => write!(f, "Enabled"),
-            ReplicationTimeStatus::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

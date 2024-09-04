@@ -12,13 +12,8 @@
 [package]
 edition = "2021"
 name = "rkyv"
-version = "0.7.45"
+version = "0.7.44"
 authors = ["David Koloski <djkoloski@gmail.com>"]
-build = "build.rs"
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 description = "Zero-copy deserialization framework for Rust"
 readme = "crates-io.md"
 keywords = [
@@ -37,10 +32,6 @@ repository = "https://github.com/rkyv/rkyv"
 
 [package.metadata.docs.rs]
 features = ["validation"]
-
-[lib]
-name = "rkyv"
-path = "src/lib.rs"
 
 [dependencies.arrayvec]
 version = "0.7"
@@ -81,7 +72,7 @@ optional = true
 default-features = false
 
 [dependencies.rkyv_derive]
-version = "=0.7.45"
+version = "=0.7.44"
 
 [dependencies.seahash]
 version = "4.0"

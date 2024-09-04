@@ -74,7 +74,7 @@ mod with_bounds {
 
     #[derive(Debug, Snafu)]
     enum GenericError<T, U = i32> {
-        _Something { things: T, other: U },
+        Something { things: T, other: U },
     }
 
     #[derive(Debug, Snafu)]

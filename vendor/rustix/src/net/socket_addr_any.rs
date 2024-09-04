@@ -109,14 +109,14 @@ impl SocketAddrAny {
 
 #[cfg(feature = "std")]
 impl fmt::Debug for SocketAddrAny {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::V4(v4) => v4.fmt(f),
-            Self::V6(v6) => v6.fmt(f),
+            Self::V4(v4) => v4.fmt(fmt),
+            Self::V6(v6) => v6.fmt(fmt),
             #[cfg(unix)]
-            Self::Unix(unix) => unix.fmt(f),
+            Self::Unix(unix) => unix.fmt(fmt),
             #[cfg(target_os = "linux")]
-            Self::Xdp(xdp) => xdp.fmt(f),
+            Self::Xdp(xdp) => xdp.fmt(fmt),
         }
     }
 }

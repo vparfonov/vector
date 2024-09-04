@@ -12,10 +12,9 @@
 [package]
 edition = "2018"
 name = "castaway"
-version = "0.2.3"
+version = "0.2.2"
 authors = ["Stephen M. Coakley <me@stephencoakley.com>"]
 description = "Safe, zero-cost downcasting for limited compile-time specialization."
-readme = "README.md"
 keywords = [
     "specialization",
     "specialize",
@@ -38,6 +37,5 @@ version = "1"
 version = "1"
 
 [features]
-alloc = []
 default = ["std"]
-std = ["alloc"]
+std = []

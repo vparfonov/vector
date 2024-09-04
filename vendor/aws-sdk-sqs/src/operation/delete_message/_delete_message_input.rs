@@ -29,8 +29,8 @@ impl DeleteMessageInput {
 }
 
 /// A builder for [`DeleteMessageInput`](crate::operation::delete_message::DeleteMessageInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DeleteMessageInputBuilder {
     pub(crate) queue_url: ::std::option::Option<::std::string::String>,
     pub(crate) receipt_handle: ::std::option::Option<::std::string::String>,

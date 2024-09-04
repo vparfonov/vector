@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.63"
 name = "which"
-version = "6.0.3"
+version = "5.0.0"
 authors = ["Harry Fei <tiziyuanfang@gmail.com>"]
 description = "A Rust equivalent of Unix command \"which\". Locate installed executable in cross platforms."
 documentation = "https://docs.rs/which/"
@@ -35,35 +35,32 @@ repository = "https://github.com/harryfei/which-rs.git"
 all-features = true
 
 [dependencies.either]
-version = "1.9.0"
+version = "1.6.1"
 
 [dependencies.regex]
-version = "1.10.2"
+version = "= 1.9.6"
 optional = true
 
-[dependencies.tracing]
-version = "0.1.40"
-optional = true
-default-features = false
-
-[dev-dependencies.tempfile]
-version = "3.9.0"
-
-[features]
-regex = ["dep:regex"]
-tracing = ["dep:tracing"]
-
-[target."cfg(any(unix, target_os = \"wasi\", target_os = \"redox\"))".dependencies.rustix]
-version = "0.38.30"
+[dependencies.rustix]
+version = "0.38.10"
 features = [
     "fs",
     "std",
 ]
 default-features = false
 
-[target."cfg(any(windows, unix, target_os = \"redox\"))".dependencies.home]
-version = "0.5.9"
+[dev-dependencies.tempfile]
+version = "3.3.0"
 
-[target."cfg(windows)".dependencies.winsafe]
-version = "0.0.19"
-features = ["kernel"]
+[target."cfg(any(windows, unix, target_os = \"redox\"))".dependencies.home]
+version = "0.5.5"
+
+[target."cfg(windows)".dependencies.once_cell]
+version = "1"
+
+[target."cfg(windows)".dependencies.windows-sys]
+version = "0.48"
+features = [
+    "Win32_Storage_FileSystem",
+    "Win32_Foundation",
+]

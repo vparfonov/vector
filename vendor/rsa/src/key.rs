@@ -11,11 +11,6 @@ use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::algorithms::generate::generate_multi_prime_key_with_exp;
-use crate::algorithms::rsa::{
-    compute_modulus, compute_private_exponent_carmicheal, compute_private_exponent_euler_totient,
-    recover_primes,
-};
-
 use crate::dummy_rng::DummyRng;
 use crate::errors::{Error, Result};
 use crate::traits::{PaddingScheme, PrivateKeyParts, PublicKeyParts, SignatureScheme};
@@ -232,36 +227,17 @@ impl RsaPrivateKey {
         RsaPrivateKey::from_components(components.n, components.e, components.d, components.primes)
     }
 
-    /// Constructs an RSA key pair from individual components:
-    ///
-    /// - `n`: RSA modulus
-    /// - `e`: public exponent (i.e. encrypting exponent)
-    /// - `d`: private exponent (i.e. decrypting exponent)
-    /// - `primes`: prime factors of `n`: typically two primes `p` and `q`. More than two primes can
-    ///   be provided for multiprime RSA, however this is generally not recommended. If no `primes`
-    ///   are provided, a prime factor recovery algorithm will be employed to attempt to recover the
-    ///   factors (as described in [NIST SP 800-56B Revision 2] Appendix C.2). This algorithm only
-    ///   works if there are just two prime factors `p` and `q` (as opposed to multiprime), and `e`
-    ///   is between 2^16 and 2^256.
-    ///
-    ///  [NIST SP 800-56B Revision 2]: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf
+    /// Constructs an RSA key pair from the individual components.
     pub fn from_components(
         n: BigUint,
         e: BigUint,
         d: BigUint,
-        mut primes: Vec<BigUint>,
+        primes: Vec<BigUint>,
     ) -> Result<RsaPrivateKey> {
-        let mut should_validate = false;
+        // TODO(tarcieri): support recovering `p` and `q` from `d` if `primes` is empty
+        // See method in Appendix C: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br1.pdf
         if primes.len() < 2 {
-            if !primes.is_empty() {
-                return Err(Error::NprimesTooSmall);
-            }
-            // Recover `p` and `q` from `d`.
-            // See method in Appendix C.2: https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf
-            let (p, q) = recover_primes(&n, &e, &d)?;
-            primes.push(p);
-            primes.push(q);
-            should_validate = true;
+            return Err(Error::NprimesTooSmall);
         }
 
         let mut k = RsaPrivateKey {
@@ -271,55 +247,10 @@ impl RsaPrivateKey {
             precomputed: None,
         };
 
-        // Validate the key if we had to recover the primes.
-        if should_validate {
-            k.validate()?;
-        }
-
         // precompute when possible, ignore error otherwise.
         let _ = k.precompute();
 
         Ok(k)
-    }
-
-    /// Constructs an RSA key pair from its two primes p and q.
-    ///
-    /// This will rebuild the private exponent and the modulus.
-    ///
-    /// Private exponent will be rebuilt using the method defined in
-    /// [NIST 800-56B Section 6.2.1](https://nvlpubs.nist.gov/nistpubs/SpecialPublications/NIST.SP.800-56Br2.pdf#page=47).
-    pub fn from_p_q(p: BigUint, q: BigUint, public_exponent: BigUint) -> Result<RsaPrivateKey> {
-        if p == q {
-            return Err(Error::InvalidPrime);
-        }
-
-        let n = compute_modulus(&[p.clone(), q.clone()]);
-        let d = compute_private_exponent_carmicheal(&p, &q, &public_exponent)?;
-
-        Self::from_components(n, public_exponent, d, vec![p, q])
-    }
-
-    /// Constructs an RSA key pair from its primes.
-    ///
-    /// This will rebuild the private exponent and the modulus.
-    pub fn from_primes(primes: Vec<BigUint>, public_exponent: BigUint) -> Result<RsaPrivateKey> {
-        if primes.len() < 2 {
-            return Err(Error::NprimesTooSmall);
-        }
-
-        // Makes sure that primes is pairwise unequal.
-        for (i, prime1) in primes.iter().enumerate() {
-            for prime2 in primes.iter().take(i) {
-                if prime1 == prime2 {
-                    return Err(Error::InvalidPrime);
-                }
-            }
-        }
-
-        let n = compute_modulus(&primes);
-        let d = compute_private_exponent_euler_totient(&primes, &public_exponent)?;
-
-        Self::from_components(n, public_exponent, d, primes)
     }
 
     /// Get the public key from the private key, cloning `n` and `e`.
@@ -538,7 +469,6 @@ mod tests {
 
     use hex_literal::hex;
     use num_traits::{FromPrimitive, ToPrimitive};
-    use pkcs8::DecodePrivateKey;
     use rand_chacha::{rand_core::SeedableRng, ChaCha8Rng};
 
     #[test]
@@ -796,48 +726,5 @@ mod tests {
             RsaPublicKey::new(n, e).err().unwrap(),
             Error::ModulusTooLarge
         );
-    }
-
-    #[test]
-    fn build_key_from_primes() {
-        const RSA_2048_PRIV_DER: &[u8] = include_bytes!("../tests/examples/pkcs8/rsa2048-priv.der");
-        let ref_key = RsaPrivateKey::from_pkcs8_der(RSA_2048_PRIV_DER).unwrap();
-        assert_eq!(ref_key.validate(), Ok(()));
-
-        let primes = ref_key.primes().to_vec();
-
-        let exp = ref_key.e().clone();
-        let key =
-            RsaPrivateKey::from_primes(primes, exp).expect("failed to import key from primes");
-        assert_eq!(key.validate(), Ok(()));
-
-        assert_eq!(key.n(), ref_key.n());
-
-        assert_eq!(key.dp(), ref_key.dp());
-        assert_eq!(key.dq(), ref_key.dq());
-
-        assert_eq!(key.d(), ref_key.d());
-    }
-
-    #[test]
-    fn build_key_from_p_q() {
-        const RSA_2048_SP800_PRIV_DER: &[u8] =
-            include_bytes!("../tests/examples/pkcs8/rsa2048-sp800-56b-priv.der");
-        let ref_key = RsaPrivateKey::from_pkcs8_der(RSA_2048_SP800_PRIV_DER).unwrap();
-        assert_eq!(ref_key.validate(), Ok(()));
-
-        let primes = ref_key.primes().to_vec();
-        let exp = ref_key.e().clone();
-
-        let key = RsaPrivateKey::from_p_q(primes[0].clone(), primes[1].clone(), exp)
-            .expect("failed to import key from primes");
-        assert_eq!(key.validate(), Ok(()));
-
-        assert_eq!(key.n(), ref_key.n());
-
-        assert_eq!(key.dp(), ref_key.dp());
-        assert_eq!(key.dq(), ref_key.dq());
-
-        assert_eq!(key.d(), ref_key.d());
     }
 }

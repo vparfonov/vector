@@ -115,14 +115,6 @@ impl RequestBuilder {
         RequestBuilder { client, request }
     }
 
-    /// Assemble a builder starting from an existing `Client` and a `Request`.
-    pub fn from_parts(client: crate::Client, request: crate::Request) -> crate::RequestBuilder {
-        crate::RequestBuilder {
-            client,
-            request: crate::Result::Ok(request),
-        }
-    }
-
     /// Modify the query string of the URL.
     ///
     /// Modifies the URL of this request, adding the parameters provided.
@@ -355,15 +347,6 @@ impl RequestBuilder {
     /// `Client::execute()`.
     pub fn build(self) -> crate::Result<Request> {
         self.request
-    }
-
-    /// Build a `Request`, which can be inspected, modified and executed with
-    /// `Client::execute()`.
-    ///
-    /// This is similar to [`RequestBuilder::build()`], but also returns the
-    /// embedded `Client`.
-    pub fn build_split(self) -> (Client, crate::Result<Request>) {
-        (self.client, self.request)
     }
 
     /// Constructs the Request and sends it to the target URL, returning a

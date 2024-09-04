@@ -18,8 +18,8 @@ impl ChangeMessageVisibilityOutput {
 }
 
 /// A builder for [`ChangeMessageVisibilityOutput`](crate::operation::change_message_visibility::ChangeMessageVisibilityOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct ChangeMessageVisibilityOutputBuilder {
     _request_id: Option<String>,
 }

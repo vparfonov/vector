@@ -96,12 +96,3 @@ impl Payer {
         }
     }
 }
-impl ::std::fmt::Display for Payer {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            Payer::BucketOwner => write!(f, "BucketOwner"),
-            Payer::Requester => write!(f, "Requester"),
-            Payer::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

@@ -23,7 +23,7 @@ use super::liblz4::*;
 use std::io::{Error, ErrorKind, Result};
 
 /// Represents the compression mode do be used.
-#[derive(Clone, Copy, Debug)]
+#[derive(Debug)]
 pub enum CompressionMode {
     /// High compression with compression parameter
     HIGHCOMPRESSION(i32),
@@ -31,12 +31,6 @@ pub enum CompressionMode {
     FAST(i32),
     /// Default compression
     DEFAULT,
-}
-
-impl Default for CompressionMode {
-    fn default() -> Self {
-        CompressionMode::DEFAULT
-    }
 }
 
 /// Returns the size of the buffer that is guaranteed to hold the result of
@@ -95,8 +89,7 @@ pub fn compress(src: &[u8], mode: Option<CompressionMode>, prepend_size: bool) -
 ///
 /// # Errors
 /// Returns std::io::Error with ErrorKind::InvalidInput if the src buffer is too long.
-/// The buffer cannot be larger than `i32::MAX`.
-/// Returns std::io::Error with ErrorKind::Other if the compression data does not fit in `buffer`.
+/// Returns std::io::Error with ErrorKind::Other if the compression data does not find in `buffer`.
 pub fn compress_to_buffer(
     src: &[u8],
     mode: Option<CompressionMode>,

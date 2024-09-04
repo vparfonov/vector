@@ -3,7 +3,7 @@ pub use crate::operation::get_bucket_inventory_configuration::_get_bucket_invent
 
 pub use crate::operation::get_bucket_inventory_configuration::_get_bucket_inventory_configuration_input::GetBucketInventoryConfigurationInputBuilder;
 
-impl crate::operation::get_bucket_inventory_configuration::builders::GetBucketInventoryConfigurationInputBuilder {
+impl GetBucketInventoryConfigurationInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -30,12 +30,9 @@ impl crate::operation::get_bucket_inventory_configuration::builders::GetBucketIn
 /// <p>For information about the Amazon S3 inventory feature, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/dev/storage-inventory.html">Amazon S3 Inventory</a>.</p>
 /// <p>The following operations are related to <code>GetBucketInventoryConfiguration</code>:</p>
 /// <ul>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketInventoryConfiguration.html">DeleteBucketInventoryConfiguration</a></p></li>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBucketInventoryConfigurations.html">ListBucketInventoryConfigurations</a></p></li>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketInventoryConfiguration.html">PutBucketInventoryConfiguration</a></p></li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteBucketInventoryConfiguration.html">DeleteBucketInventoryConfiguration</a> </p> </li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListBucketInventoryConfigurations.html">ListBucketInventoryConfigurations</a> </p> </li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_PutBucketInventoryConfiguration.html">PutBucketInventoryConfiguration</a> </p> </li>
 /// </ul>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
 pub struct GetBucketInventoryConfigurationFluentBuilder {
@@ -62,7 +59,7 @@ impl
     }
 }
 impl GetBucketInventoryConfigurationFluentBuilder {
-    /// Creates a new `GetBucketInventoryConfigurationFluentBuilder`.
+    /// Creates a new `GetBucketInventoryConfiguration`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -113,12 +110,12 @@ impl GetBucketInventoryConfigurationFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }

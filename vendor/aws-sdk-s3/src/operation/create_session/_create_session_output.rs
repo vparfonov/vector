@@ -3,13 +3,13 @@
 #[non_exhaustive]
 #[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::fmt::Debug)]
 pub struct CreateSessionOutput {
-    /// <p>The established temporary security credentials for the created session.</p>
+    /// <p>The established temporary security credentials for the created session..</p>
     pub credentials: ::std::option::Option<crate::types::SessionCredentials>,
     _extended_request_id: Option<String>,
     _request_id: Option<String>,
 }
 impl CreateSessionOutput {
-    /// <p>The established temporary security credentials for the created session.</p>
+    /// <p>The established temporary security credentials for the created session..</p>
     pub fn credentials(&self) -> ::std::option::Option<&crate::types::SessionCredentials> {
         self.credentials.as_ref()
     }
@@ -32,26 +32,26 @@ impl CreateSessionOutput {
 }
 
 /// A builder for [`CreateSessionOutput`](crate::operation::create_session::CreateSessionOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct CreateSessionOutputBuilder {
     pub(crate) credentials: ::std::option::Option<crate::types::SessionCredentials>,
     _extended_request_id: Option<String>,
     _request_id: Option<String>,
 }
 impl CreateSessionOutputBuilder {
-    /// <p>The established temporary security credentials for the created session.</p>
+    /// <p>The established temporary security credentials for the created session..</p>
     /// This field is required.
     pub fn credentials(mut self, input: crate::types::SessionCredentials) -> Self {
         self.credentials = ::std::option::Option::Some(input);
         self
     }
-    /// <p>The established temporary security credentials for the created session.</p>
+    /// <p>The established temporary security credentials for the created session..</p>
     pub fn set_credentials(mut self, input: ::std::option::Option<crate::types::SessionCredentials>) -> Self {
         self.credentials = input;
         self
     }
-    /// <p>The established temporary security credentials for the created session.</p>
+    /// <p>The established temporary security credentials for the created session..</p>
     pub fn get_credentials(&self) -> &::std::option::Option<crate::types::SessionCredentials> {
         &self.credentials
     }

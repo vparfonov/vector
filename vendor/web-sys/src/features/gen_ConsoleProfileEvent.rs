@@ -10,26 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `ConsoleProfileEvent`*"]
     pub type ConsoleProfileEvent;
-    #[doc = "Get the `action` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleProfileEvent`*"]
-    #[wasm_bindgen(method, getter = "action")]
-    pub fn get_action(this: &ConsoleProfileEvent) -> Option<String>;
-    #[doc = "Change the `action` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleProfileEvent`*"]
-    #[wasm_bindgen(method, setter = "action")]
-    pub fn set_action(this: &ConsoleProfileEvent, val: &str);
-    #[doc = "Get the `arguments` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleProfileEvent`*"]
-    #[wasm_bindgen(method, getter = "arguments")]
-    pub fn get_arguments(this: &ConsoleProfileEvent) -> Option<::js_sys::Array>;
-    #[doc = "Change the `arguments` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleProfileEvent`*"]
-    #[wasm_bindgen(method, setter = "arguments")]
-    pub fn set_arguments(this: &ConsoleProfileEvent, val: &::wasm_bindgen::JsValue);
 }
 impl ConsoleProfileEvent {
     #[doc = "Construct a new `ConsoleProfileEvent`."]
@@ -40,14 +20,35 @@ impl ConsoleProfileEvent {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_action()` instead."]
+    #[doc = "Change the `action` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ConsoleProfileEvent`*"]
     pub fn action(&mut self, val: &str) -> &mut Self {
-        self.set_action(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("action"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_arguments()` instead."]
+    #[doc = "Change the `arguments` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ConsoleProfileEvent`*"]
     pub fn arguments(&mut self, val: &::wasm_bindgen::JsValue) -> &mut Self {
-        self.set_arguments(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("arguments"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

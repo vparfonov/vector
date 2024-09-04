@@ -44,6 +44,10 @@ impl<T> AtomicPtr<T> {
         self.inner.get_mut()
     }
     #[inline]
+    pub(crate) fn into_inner(self) -> *mut T {
+        self.inner.into_inner()
+    }
+    #[inline]
     #[cfg_attr(
         any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
         track_caller
@@ -168,6 +172,10 @@ macro_rules! atomic_int {
             #[inline]
             pub(crate) fn get_mut(&mut self) -> &mut $int_type {
                 self.inner.get_mut()
+            }
+            #[inline]
+            pub(crate) fn into_inner(self) -> $int_type {
+                self.inner.into_inner()
             }
             #[inline]
             #[cfg_attr(
@@ -377,7 +385,6 @@ macro_rules! atomic_int {
             pub(crate) fn not(&self, order: Ordering) {
                 self.fetch_not(order);
             }
-            // TODO: provide asm-based implementation on AArch64, ARMv7, RISC-V, etc.
             #[inline]
             #[cfg_attr(miri, track_caller)] // even without panics, this helps for Miri backtraces
             pub(crate) fn fetch_neg(&self, order: Ordering) -> $int_type {

@@ -29,6 +29,7 @@ use crate::OutOfRange;
 /// Can be Serialized/Deserialized with serde
 // Actual implementation is zero-indexed, API intended as 1-indexed for more intuitive behavior.
 #[derive(PartialEq, Eq, Copy, Clone, Debug, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "rustc-serialize", derive(RustcEncodable, RustcDecodable))]
 #[cfg_attr(
     any(feature = "rkyv", feature = "rkyv-16", feature = "rkyv-32", feature = "rkyv-64"),
     derive(Archive, Deserialize, Serialize),

@@ -18,8 +18,8 @@ impl PutMetricFilterOutput {
 }
 
 /// A builder for [`PutMetricFilterOutput`](crate::operation::put_metric_filter::PutMetricFilterOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct PutMetricFilterOutputBuilder {
     _request_id: Option<String>,
 }

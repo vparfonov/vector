@@ -26,8 +26,8 @@ impl DescribeStreamSummaryOutput {
 }
 
 /// A builder for [`DescribeStreamSummaryOutput`](crate::operation::describe_stream_summary::DescribeStreamSummaryOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DescribeStreamSummaryOutputBuilder {
     pub(crate) stream_description_summary: ::std::option::Option<crate::types::StreamDescriptionSummary>,
     _request_id: Option<String>,

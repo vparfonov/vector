@@ -96,12 +96,3 @@ impl DeleteMarkerReplicationStatus {
         }
     }
 }
-impl ::std::fmt::Display for DeleteMarkerReplicationStatus {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            DeleteMarkerReplicationStatus::Disabled => write!(f, "Disabled"),
-            DeleteMarkerReplicationStatus::Enabled => write!(f, "Enabled"),
-            DeleteMarkerReplicationStatus::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

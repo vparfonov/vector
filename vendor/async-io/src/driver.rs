@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use async_lock::OnceCell;
 use futures_lite::pin;
 use parking::Parker;
+use waker_fn::waker_fn;
 
 use crate::reactor::Reactor;
 
@@ -130,7 +131,17 @@ pub fn block_on<T>(future: impl Future<Output = T>) -> T {
         let io_blocked = Arc::new(AtomicBool::new(false));
 
         // Prepare the waker.
-        let waker = BlockOnWaker::create(io_blocked.clone(), u);
+        let waker = waker_fn({
+            let io_blocked = io_blocked.clone();
+            move || {
+                if u.unpark() {
+                    // Check if waking from another thread and if currently blocked on I/O.
+                    if !IO_POLLING.with(Cell::get) && io_blocked.load(Ordering::SeqCst) {
+                        Reactor::get().notify();
+                    }
+                }
+            }
+        });
 
         (p, waker, io_blocked)
     }
@@ -140,36 +151,7 @@ pub fn block_on<T>(future: impl Future<Output = T>) -> T {
         static CACHE: RefCell<(Parker, Waker, Arc<AtomicBool>)> = RefCell::new(parker_and_waker());
 
         // Indicates that the current thread is polling I/O, but not necessarily blocked on it.
-        static IO_POLLING: Cell<bool> = const { Cell::new(false) };
-    }
-
-    struct BlockOnWaker {
-        io_blocked: Arc<AtomicBool>,
-        unparker: parking::Unparker,
-    }
-
-    impl BlockOnWaker {
-        fn create(io_blocked: Arc<AtomicBool>, unparker: parking::Unparker) -> Waker {
-            Waker::from(Arc::new(BlockOnWaker {
-                io_blocked,
-                unparker,
-            }))
-        }
-    }
-
-    impl std::task::Wake for BlockOnWaker {
-        fn wake_by_ref(self: &Arc<Self>) {
-            if self.unparker.unpark() {
-                // Check if waking from another thread and if currently blocked on I/O.
-                if !IO_POLLING.with(Cell::get) && self.io_blocked.load(Ordering::SeqCst) {
-                    Reactor::get().notify();
-                }
-            }
-        }
-
-        fn wake(self: Arc<Self>) {
-            self.wake_by_ref()
-        }
+        static IO_POLLING: Cell<bool> = Cell::new(false);
     }
 
     CACHE.with(|cache| {

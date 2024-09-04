@@ -52,7 +52,7 @@ use crate::Backoff;
 ///         .await?)
 /// }
 ///
-/// #[tokio::main(flavor = "current_thread")]
+/// #[tokio::main]
 /// async fn main() -> Result<()> {
 ///     let content = fetch.retry(&ExponentialBuilder::default()).await?;
 ///     println!("fetch succeeded: {}", content);
@@ -147,7 +147,7 @@ where
     ///         .await?)
     /// }
     ///
-    /// #[tokio::main(flavor = "current_thread")]
+    /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     let content = fetch
     ///         .retry(&ExponentialBuilder::default())
@@ -191,7 +191,7 @@ where
     ///         .await?)
     /// }
     ///
-    /// #[tokio::main(flavor = "current_thread")]
+    /// #[tokio::main]
     /// async fn main() -> Result<()> {
     ///     let content = fetch
     ///         .retry(&ExponentialBuilder::default())

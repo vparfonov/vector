@@ -63,9 +63,6 @@ pub enum Error {
 
     /// Invalid padding length.
     InvalidPadLen,
-
-    /// Invalid arguments.
-    InvalidArguments,
 }
 
 #[cfg(feature = "std")]
@@ -94,7 +91,6 @@ impl core::fmt::Display for Error {
             Error::Internal => write!(f, "internal error"),
             Error::LabelTooLong => write!(f, "label too long"),
             Error::InvalidPadLen => write!(f, "invalid padding length"),
-            Error::InvalidArguments => write!(f, "invalid arguments"),
         }
     }
 }

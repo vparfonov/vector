@@ -65,7 +65,6 @@ impl DeleteObjects {
             {
                 ::aws_runtime::auth::sigv4a::SCHEME_ID
             },
-            crate::s3_express::auth::SCHEME_ID,
             ::aws_smithy_runtime::client::auth::no_auth::NO_AUTH_SCHEME_ID,
         ]));
         if let ::std::option::Option::Some(config_override) = config_override {
@@ -96,7 +95,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for DeleteO
             ::aws_smithy_runtime_api::client::auth::static_resolver::StaticAuthSchemeOptionResolverParams::new(),
         ));
 
-        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new("DeleteObjects", "s3"));
+        cfg.store_put(::aws_smithy_http::operation::Metadata::new("DeleteObjects", "s3"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = false;
         signing_options.content_sha256_header = true;
@@ -107,7 +106,6 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for DeleteO
             signing_options,
             ..::std::default::Default::default()
         });
-        cfg.store_put(crate::s3_express::checksum::provide_default_checksum_algorithm());
 
         ::std::option::Option::Some(cfg.freeze())
     }
@@ -118,7 +116,11 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for DeleteO
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("DeleteObjects")
-            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
+            .with_interceptor(
+                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
+                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
+                ),
+            )
             .with_interceptor(DeleteObjectsEndpointParamsInterceptor)
             .with_interceptor(crate::http_request_checksum::RequestChecksumInterceptor::new(
                 |input: &::aws_smithy_runtime_api::client::interceptors::context::Input| {
@@ -141,15 +143,9 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for DeleteO
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::ModeledAsRetryableClassifier::<
                 crate::operation::delete_objects::DeleteObjectsError,
             >::new())
-            .with_retry_classifier(
-                ::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<crate::operation::delete_objects::DeleteObjectsError>::builder()
-                    .transient_errors({
-                        let mut transient_errors: Vec<&'static str> = ::aws_runtime::retries::classifiers::TRANSIENT_ERRORS.into();
-                        transient_errors.push("InternalError");
-                        ::std::borrow::Cow::Owned(transient_errors)
-                    })
-                    .build(),
-            );
+            .with_retry_classifier(::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<
+                crate::operation::delete_objects::DeleteObjectsError,
+            >::new());
 
         ::std::borrow::Cow::Owned(rcb)
     }
@@ -211,6 +207,7 @@ impl ::aws_smithy_runtime_api::client::ser_de::SerializeRequest for DeleteObject
             ) -> ::std::result::Result<(), ::aws_smithy_types::error::operation::BuildError> {
                 let mut query = ::aws_smithy_http::query::Writer::new(output);
                 query.push_v("delete");
+                query.push_kv("x-id", "DeleteObjects");
                 ::std::result::Result::Ok(())
             }
             #[allow(clippy::unnecessary_wraps)]
@@ -286,9 +283,6 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for DeleteObjects
         ::std::result::Result::Ok(())
     }
 }
-
-// The get_* functions below are generated from JMESPath expressions in the
-// operationContextParams trait. They target the operation's input shape.
 
 /// Error type for the `DeleteObjectsError` operation.
 #[non_exhaustive]

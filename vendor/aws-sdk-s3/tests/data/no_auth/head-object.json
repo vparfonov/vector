@@ -52,6 +52,9 @@
                 "server": [
                   "AmazonS3"
                 ],
+                "content-length": [
+                  "386910"
+                ],
                 "accept-ranges": [
                   "bytes"
                 ],

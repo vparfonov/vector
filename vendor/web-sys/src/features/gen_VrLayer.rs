@@ -10,38 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `VrLayer`*"]
     pub type VrLayer;
-    #[doc = "Get the `leftBounds` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `VrLayer`*"]
-    #[wasm_bindgen(method, getter = "leftBounds")]
-    pub fn get_left_bounds(this: &VrLayer) -> Option<::js_sys::Array>;
-    #[doc = "Change the `leftBounds` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `VrLayer`*"]
-    #[wasm_bindgen(method, setter = "leftBounds")]
-    pub fn set_left_bounds(this: &VrLayer, val: &::wasm_bindgen::JsValue);
-    #[doc = "Get the `rightBounds` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `VrLayer`*"]
-    #[wasm_bindgen(method, getter = "rightBounds")]
-    pub fn get_right_bounds(this: &VrLayer) -> Option<::js_sys::Array>;
-    #[doc = "Change the `rightBounds` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `VrLayer`*"]
-    #[wasm_bindgen(method, setter = "rightBounds")]
-    pub fn set_right_bounds(this: &VrLayer, val: &::wasm_bindgen::JsValue);
-    #[cfg(feature = "HtmlCanvasElement")]
-    #[doc = "Get the `source` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HtmlCanvasElement`, `VrLayer`*"]
-    #[wasm_bindgen(method, getter = "source")]
-    pub fn get_source(this: &VrLayer) -> Option<HtmlCanvasElement>;
-    #[cfg(feature = "HtmlCanvasElement")]
-    #[doc = "Change the `source` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `HtmlCanvasElement`, `VrLayer`*"]
-    #[wasm_bindgen(method, setter = "source")]
-    pub fn set_source(this: &VrLayer, val: Option<&HtmlCanvasElement>);
 }
 impl VrLayer {
     #[doc = "Construct a new `VrLayer`."]
@@ -52,20 +20,53 @@ impl VrLayer {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_left_bounds()` instead."]
+    #[doc = "Change the `leftBounds` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `VrLayer`*"]
     pub fn left_bounds(&mut self, val: &::wasm_bindgen::JsValue) -> &mut Self {
-        self.set_left_bounds(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("leftBounds"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_right_bounds()` instead."]
+    #[doc = "Change the `rightBounds` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `VrLayer`*"]
     pub fn right_bounds(&mut self, val: &::wasm_bindgen::JsValue) -> &mut Self {
-        self.set_right_bounds(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("rightBounds"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "HtmlCanvasElement")]
-    #[deprecated = "Use `set_source()` instead."]
+    #[doc = "Change the `source` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `HtmlCanvasElement`, `VrLayer`*"]
     pub fn source(&mut self, val: Option<&HtmlCanvasElement>) -> &mut Self {
-        self.set_source(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("source"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

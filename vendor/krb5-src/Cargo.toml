@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "krb5-src"
-version = "0.3.3+1.19.2"
+version = "0.3.2+1.19.2"
 authors = ["Materialize, Inc."]
 links = "krb5-src"
 description = "Build system integration for libkrb5, MIT's Kerberos implementation."
@@ -21,11 +21,9 @@ readme = "README.md"
 categories = ["external-ffi-bindings"]
 license = "Apache-2.0"
 repository = "https://github.com/MaterializeInc/rust-krb5-src"
-
 [dependencies.openssl-sys]
 version = "0.9.55"
 optional = true
-
 [build-dependencies.duct]
 version = "0.13.3"
 

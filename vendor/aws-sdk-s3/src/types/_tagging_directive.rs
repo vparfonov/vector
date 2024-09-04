@@ -96,12 +96,3 @@ impl TaggingDirective {
         }
     }
 }
-impl ::std::fmt::Display for TaggingDirective {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            TaggingDirective::Copy => write!(f, "COPY"),
-            TaggingDirective::Replace => write!(f, "REPLACE"),
-            TaggingDirective::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

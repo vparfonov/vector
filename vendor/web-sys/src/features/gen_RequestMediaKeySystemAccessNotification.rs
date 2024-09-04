@@ -10,28 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `RequestMediaKeySystemAccessNotification`*"]
     pub type RequestMediaKeySystemAccessNotification;
-    #[doc = "Get the `keySystem` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RequestMediaKeySystemAccessNotification`*"]
-    #[wasm_bindgen(method, getter = "keySystem")]
-    pub fn get_key_system(this: &RequestMediaKeySystemAccessNotification) -> String;
-    #[doc = "Change the `keySystem` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RequestMediaKeySystemAccessNotification`*"]
-    #[wasm_bindgen(method, setter = "keySystem")]
-    pub fn set_key_system(this: &RequestMediaKeySystemAccessNotification, val: &str);
-    #[cfg(feature = "MediaKeySystemStatus")]
-    #[doc = "Get the `status` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `MediaKeySystemStatus`, `RequestMediaKeySystemAccessNotification`*"]
-    #[wasm_bindgen(method, getter = "status")]
-    pub fn get_status(this: &RequestMediaKeySystemAccessNotification) -> MediaKeySystemStatus;
-    #[cfg(feature = "MediaKeySystemStatus")]
-    #[doc = "Change the `status` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `MediaKeySystemStatus`, `RequestMediaKeySystemAccessNotification`*"]
-    #[wasm_bindgen(method, setter = "status")]
-    pub fn set_status(this: &RequestMediaKeySystemAccessNotification, val: MediaKeySystemStatus);
 }
 impl RequestMediaKeySystemAccessNotification {
     #[cfg(feature = "MediaKeySystemStatus")]
@@ -45,15 +23,36 @@ impl RequestMediaKeySystemAccessNotification {
         ret.status(status);
         ret
     }
-    #[deprecated = "Use `set_key_system()` instead."]
+    #[doc = "Change the `keySystem` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RequestMediaKeySystemAccessNotification`*"]
     pub fn key_system(&mut self, val: &str) -> &mut Self {
-        self.set_key_system(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("keySystem"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "MediaKeySystemStatus")]
-    #[deprecated = "Use `set_status()` instead."]
+    #[doc = "Change the `status` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `MediaKeySystemStatus`, `RequestMediaKeySystemAccessNotification`*"]
     pub fn status(&mut self, val: MediaKeySystemStatus) -> &mut Self {
-        self.set_status(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("status"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

@@ -299,9 +299,6 @@ endif
 ifneq (,$(LMULTILIB))
   TARGET_XCFLAGS+= -DLUA_LMULTILIB=\"$(LMULTILIB)\"
 endif
-ifneq (,$(INSTALL_LJLIBD))
-  TARGET_XCFLAGS+= -DLUA_LJDIR=\"$(INSTALL_LJLIBD)\"
-endif
 
 ##############################################################################
 # Target system detection.

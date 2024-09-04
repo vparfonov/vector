@@ -8,14 +8,8 @@ use crate::net::unix::SocketAddr;
 use std::fmt;
 use std::io::{self, Read, Write};
 use std::net::Shutdown;
-#[cfg(target_os = "android")]
-use std::os::android::net::SocketAddrExt;
-#[cfg(target_os = "linux")]
-use std::os::linux::net::SocketAddrExt;
-#[cfg(any(target_os = "linux", target_os = "android"))]
-use std::os::unix::ffi::OsStrExt;
 use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, FromRawFd, IntoRawFd, RawFd};
-use std::os::unix::net::{self, SocketAddr as StdSocketAddr};
+use std::os::unix::net;
 use std::path::Path;
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -72,20 +66,7 @@ impl UnixStream {
     where
         P: AsRef<Path>,
     {
-        // On linux, abstract socket paths need to be considered.
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        let addr = {
-            let os_str_bytes = path.as_ref().as_os_str().as_bytes();
-            if os_str_bytes.starts_with(b"\0") {
-                StdSocketAddr::from_abstract_name(os_str_bytes)?
-            } else {
-                StdSocketAddr::from_pathname(path)?
-            }
-        };
-        #[cfg(not(any(target_os = "linux", target_os = "android")))]
-        let addr = StdSocketAddr::from_pathname(path)?;
-
-        let stream = mio::net::UnixStream::connect_addr(&addr)?;
+        let stream = mio::net::UnixStream::connect(path)?;
         let stream = UnixStream::new(stream)?;
 
         poll_fn(|cx| stream.io.registration().poll_write_ready(cx)).await?;

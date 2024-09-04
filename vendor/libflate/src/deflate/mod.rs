@@ -42,7 +42,6 @@ enum BlockType {
 mod tests {
     use super::*;
     use crate::lz77;
-    use alloc::vec::Vec;
     use core2::io::{Read, Write};
 
     #[test]

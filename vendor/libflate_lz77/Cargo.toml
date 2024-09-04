@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "libflate_lz77"
-version = "2.1.0"
+version = "2.0.0"
 authors = ["Takeru Ohta <phjgt308@gmail.com>"]
 description = "LZ77 encoder for libflate crate"
 homepage = "https://github.com/sile/libflate"
@@ -28,21 +28,16 @@ features = ["alloc"]
 default-features = false
 
 [dependencies.hashbrown]
-version = "0.14"
+version = "0.13"
 
 [dependencies.rle-decode-fast]
 version = "1.0.0"
 
-[dev-dependencies.libflate]
-version = "2.0"
-default-features = false
+[dev-dependencies]
 
 [features]
 default = ["std"]
-std = [
-    "core2/std",
-    "libflate/std",
-]
+std = ["core2/std"]
 
 [badges.coveralls]
 repository = "sile/libflate"

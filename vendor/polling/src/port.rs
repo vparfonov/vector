@@ -250,14 +250,4 @@ impl EventExtra {
     pub fn is_pri(&self) -> bool {
         self.flags.contains(PollFlags::PRI)
     }
-
-    #[inline]
-    pub fn is_connect_failed(&self) -> Option<bool> {
-        Some(self.flags.contains(PollFlags::ERR) && self.flags.contains(PollFlags::HUP))
-    }
-
-    #[inline]
-    pub fn is_err(&self) -> Option<bool> {
-        Some(self.flags.contains(PollFlags::ERR))
-    }
 }

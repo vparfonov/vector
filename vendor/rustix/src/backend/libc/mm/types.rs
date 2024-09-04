@@ -85,7 +85,6 @@ bitflags! {
             target_os = "emscripten",
             target_os = "fuchsia",
             target_os = "haiku",
-            target_os = "hurd",
             target_os = "nto",
             target_os = "redox",
         )))]
@@ -98,7 +97,6 @@ bitflags! {
             solarish,
             target_os = "aix",
             target_os = "haiku",
-            target_os = "hurd",
             target_os = "nto",
             target_os = "redox",
         )))]
@@ -114,7 +112,6 @@ bitflags! {
             target_os = "emscripten",
             target_os = "fuchsia",
             target_os = "haiku",
-            target_os = "hurd",
             target_os = "nto",
             target_os = "redox",
         )))]
@@ -125,7 +122,6 @@ bitflags! {
             solarish,
             target_os = "aix",
             target_os = "haiku",
-            target_os = "hurd",
             target_os = "nto",
             target_os = "redox",
         )))]
@@ -136,7 +132,6 @@ bitflags! {
             solarish,
             target_os = "aix",
             target_os = "haiku",
-            target_os = "hurd",
             target_os = "nto",
             target_os = "redox",
         )))]
@@ -150,7 +145,6 @@ bitflags! {
             target_os = "emscripten",
             target_os = "fuchsia",
             target_os = "haiku",
-            target_os = "hurd",
             target_os = "nto",
             target_os = "redox",
         )))]
@@ -164,7 +158,6 @@ bitflags! {
             target_os = "emscripten",
             target_os = "fuchsia",
             target_os = "haiku",
-            target_os = "hurd",
             target_os = "nto",
             target_os = "redox",
         )))]
@@ -175,7 +168,6 @@ bitflags! {
             solarish,
             target_os = "aix",
             target_os = "haiku",
-            target_os = "hurd",
             target_os = "nto",
             target_os = "redox",
         )))]
@@ -187,7 +179,6 @@ bitflags! {
         #[cfg(not(any(
             freebsdlike,
             target_os = "aix",
-            target_os = "hurd",
             target_os = "nto",
             target_os = "redox",
         )))]
@@ -201,7 +192,6 @@ bitflags! {
             solarish,
             target_os = "aix",
             target_os = "haiku",
-            target_os = "hurd",
             target_os = "nto",
             target_os = "redox",
         )))]
@@ -211,8 +201,9 @@ bitflags! {
             apple,
             solarish,
             target_os = "aix",
+            target_os = "dragonfly",
             target_os = "haiku",
-            target_os = "hurd",
+            target_os = "netbsd",
             target_os = "redox",
         )))]
         const STACK = bitcast!(c::MAP_STACK);
@@ -228,7 +219,6 @@ bitflags! {
             target_os = "emscripten",
             target_os = "fuchsia",
             target_os = "haiku",
-            target_os = "hurd",
             target_os = "nto",
             target_os = "redox",
             all(
@@ -240,9 +230,6 @@ bitflags! {
         /// `MAP_UNINITIALIZED`
         #[cfg(any())]
         const UNINITIALIZED = bitcast!(c::MAP_UNINITIALIZED);
-        /// `MAP_DROPPABLE`
-        #[cfg(linux_kernel)]
-        const DROPPABLE = bitcast!(c::MAP_DROPPABLE);
 
         /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
@@ -347,12 +334,7 @@ pub enum Advice {
     WillNeed = bitcast!(c::MADV_WILLNEED),
 
     /// `POSIX_MADV_DONTNEED`
-    #[cfg(not(any(
-        target_os = "android",
-        target_os = "emscripten",
-        target_os = "haiku",
-        target_os = "hurd",
-    )))]
+    #[cfg(not(any(target_os = "android", target_os = "emscripten", target_os = "haiku")))]
     DontNeed = bitcast!(c::POSIX_MADV_DONTNEED),
 
     /// `POSIX_MADV_DONTNEED`

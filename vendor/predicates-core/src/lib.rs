@@ -19,7 +19,6 @@
 //! configuration. See the examples for how this can work.
 
 #![warn(missing_docs, missing_debug_implementations)]
-#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 mod core;
 pub use crate::core::*;

@@ -9,7 +9,6 @@ use std::mem::MaybeUninit;
 use std::ops::Deref;
 use std::os::windows::io::{AsRawHandle, RawHandle};
 use std::pin::Pin;
-use std::ptr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -134,7 +133,7 @@ impl<T> fmt::Debug for IoCompletionPort<T> {
 
         impl fmt::Debug for WriteAsHex {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "{:010x}", self.0 as usize)
+                write!(f, "{:010x}", self.0)
             }
         }
 
@@ -150,13 +149,13 @@ impl<T: CompletionHandle> IoCompletionPort<T> {
         let handle = unsafe {
             CreateIoCompletionPort(
                 INVALID_HANDLE_VALUE,
-                ptr::null_mut(),
+                0,
                 0,
                 threads.try_into().expect("too many threads"),
             )
         };
 
-        if handle.is_null() {
+        if handle == 0 {
             Err(io::Error::last_os_error())
         } else {
             Ok(Self {
@@ -177,7 +176,7 @@ impl<T: CompletionHandle> IoCompletionPort<T> {
         let result =
             unsafe { CreateIoCompletionPort(handle as _, self.handle, handle as usize, 0) };
 
-        if result.is_null() {
+        if result == 0 {
             return Err(io::Error::last_os_error());
         }
 
@@ -295,5 +294,13 @@ impl<T: CompletionHandle> OverlappedEntry<T> {
 impl<T: CompletionHandle> Drop for OverlappedEntry<T> {
     fn drop(&mut self) {
         drop(unsafe { self.packet() });
+    }
+}
+
+struct CallOnDrop<F: FnMut()>(F);
+
+impl<F: FnMut()> Drop for CallOnDrop<F> {
+    fn drop(&mut self) {
+        (self.0)();
     }
 }

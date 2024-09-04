@@ -28,8 +28,8 @@
 //
 // See also README.md of this directory.
 //
-// [^avr1]: https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/lib/Target/AVR/AVRExpandPseudoInsts.cpp#L1074
-// [^avr2]: https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/test/CodeGen/AVR/atomics/load16.ll#L5
+// [^avr1]: https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/lib/Target/AVR/AVRExpandPseudoInsts.cpp#L1074
+// [^avr2]: https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/test/CodeGen/AVR/atomics/load16.ll#L5
 
 // On some platforms, atomic load/store can be implemented in a more efficient
 // way than disabling interrupts. On MSP430, some RMWs that do not return the
@@ -137,6 +137,11 @@ impl<T> AtomicPtr<T> {
         // SAFETY: the mutable reference guarantees unique ownership.
         // (UnsafeCell::get_mut requires Rust 1.50)
         unsafe { &mut *self.p.get() }
+    }
+
+    #[inline]
+    pub(crate) fn into_inner(self) -> *mut T {
+        self.p.into_inner()
     }
 
     #[inline]
@@ -269,6 +274,11 @@ macro_rules! atomic_int {
                 // SAFETY: the mutable reference guarantees unique ownership.
                 // (UnsafeCell::get_mut requires Rust 1.50)
                 unsafe { &mut *self.v.get() }
+            }
+
+            #[inline]
+            pub(crate) fn into_inner(self) -> $int_type {
+                self.v.into_inner()
             }
 
             #[inline]

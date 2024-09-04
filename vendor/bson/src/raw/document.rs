@@ -15,14 +15,12 @@ use crate::{
 use super::{
     error::{ValueAccessError, ValueAccessErrorKind, ValueAccessResult},
     i32_from_slice,
-    iter::Iter,
-    try_to_str,
     Error,
+    Iter,
     RawArray,
     RawBinaryRef,
     RawBsonRef,
     RawDocumentBuf,
-    RawIter,
     RawRegexRef,
     Result,
 };
@@ -172,33 +170,13 @@ impl RawDocument {
     /// # Ok::<(), Error>(())
     /// ```
     pub fn get(&self, key: impl AsRef<str>) -> Result<Option<RawBsonRef<'_>>> {
-        for elem in RawIter::new(self) {
-            let elem = elem?;
-            if key.as_ref() == elem.key() {
-                return Ok(Some(elem.try_into()?));
+        for result in self.into_iter() {
+            let (k, v) = result?;
+            if key.as_ref() == k {
+                return Ok(Some(v));
             }
         }
         Ok(None)
-    }
-
-    /// Gets an iterator over the elements in the [`RawDocument`] that yields
-    /// `Result<(&str, RawBson<'_>)>`.
-    pub fn iter(&self) -> Iter<'_> {
-        Iter::new(self)
-    }
-
-    /// Gets an iterator over the elements in the [`RawDocument`],
-    /// which yields `Result<RawElement<'_>>` values. These hold a
-    /// reference to the underlying document but do not explicitly
-    /// resolve the values.
-    ///
-    /// This iterator, which underpins the implementation of the
-    /// default iterator, produces `RawElement` objects that hold a
-    /// view onto the document but do not parse out or construct
-    /// values until the `.value()` or `.try_into()` methods are
-    /// called.
-    pub fn iter_elements(&self) -> RawIter<'_> {
-        RawIter::new(self)
     }
 
     fn get_with<'a, T>(
@@ -514,22 +492,6 @@ impl RawDocument {
     pub fn is_empty(&self) -> bool {
         self.as_bytes().len() == MIN_BSON_DOCUMENT_SIZE as usize
     }
-
-    pub(crate) fn read_cstring_at(&self, start_at: usize) -> Result<&str> {
-        let buf = &self.as_bytes()[start_at..];
-
-        let mut splits = buf.splitn(2, |x| *x == 0);
-        let value = splits
-            .next()
-            .ok_or_else(|| Error::new_without_key(ErrorKind::new_malformed("no value")))?;
-        if splits.next().is_some() {
-            Ok(try_to_str(value)?)
-        } else {
-            Err(Error::new_without_key(ErrorKind::new_malformed(
-                "expected null terminator",
-            )))
-        }
-    }
 }
 
 impl<'de: 'a, 'a> Deserialize<'de> for &'a RawDocument {
@@ -619,6 +581,6 @@ impl<'a> IntoIterator for &'a RawDocument {
     type Item = Result<(&'a str, RawBsonRef<'a>)>;
 
     fn into_iter(self) -> Iter<'a> {
-        self.iter()
+        Iter::new(self)
     }
 }

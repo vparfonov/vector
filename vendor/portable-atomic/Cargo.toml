@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.34"
 name = "portable-atomic"
-version = "1.7.0"
+version = "1.6.0"
 exclude = [
     "/.*",
     "/tools",
@@ -45,6 +45,10 @@ features = [
     "serde",
     "critical-section",
 ]
+rustdoc-args = [
+    "--cfg",
+    "portable_atomic_doc_cfg",
+]
 targets = ["x86_64-unknown-linux-gnu"]
 
 [lib]
@@ -63,7 +67,7 @@ default-features = false
 version = "0.1"
 
 [dev-dependencies.crossbeam-utils]
-version = "=0.8.16"
+version = "0.8"
 
 [dev-dependencies.fastrand]
 version = "2"
@@ -91,7 +95,6 @@ unsafe-assume-single-core = []
 [lints.clippy]
 all = "warn"
 as_ptr_cast_mut = "warn"
-as_underscore = "warn"
 default_union_representation = "warn"
 inline_asm_x86_att_syntax = "warn"
 pedantic = "warn"
@@ -99,15 +102,7 @@ trailing_empty_array = "warn"
 transmute_undefined_repr = "warn"
 undocumented_unsafe_blocks = "warn"
 
-[lints.clippy.bool_assert_comparison]
-level = "allow"
-priority = 1
-
 [lints.clippy.borrow_as_ptr]
-level = "allow"
-priority = 1
-
-[lints.clippy.declare_interior_mutable_const]
 level = "allow"
 priority = 1
 
@@ -116,14 +111,6 @@ level = "allow"
 priority = 1
 
 [lints.clippy.float_cmp]
-level = "allow"
-priority = 1
-
-[lints.clippy.incompatible_msrv]
-level = "allow"
-priority = 1
-
-[lints.clippy.lint_groups_priority]
 level = "allow"
 priority = 1
 
@@ -143,10 +130,6 @@ priority = 1
 level = "allow"
 priority = 1
 
-[lints.clippy.nonminimal_bool]
-level = "allow"
-priority = 1
-
 [lints.clippy.similar_names]
 level = "allow"
 priority = 1
@@ -160,10 +143,6 @@ level = "allow"
 priority = 1
 
 [lints.clippy.struct_excessive_bools]
-level = "allow"
-priority = 1
-
-[lints.clippy.struct_field_names]
 level = "allow"
 priority = 1
 
@@ -186,7 +165,3 @@ non_ascii_idents = "warn"
 rust_2018_idioms = "warn"
 single_use_lifetimes = "warn"
 unreachable_pub = "warn"
-
-[lints.rust.unexpected_cfgs]
-level = "warn"
-priority = 0

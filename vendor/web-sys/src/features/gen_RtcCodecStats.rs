@@ -10,88 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
     pub type RtcCodecStats;
-    #[doc = "Get the `id` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, getter = "id")]
-    pub fn get_id(this: &RtcCodecStats) -> Option<String>;
-    #[doc = "Change the `id` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, setter = "id")]
-    pub fn set_id(this: &RtcCodecStats, val: &str);
-    #[doc = "Get the `timestamp` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, getter = "timestamp")]
-    pub fn get_timestamp(this: &RtcCodecStats) -> Option<f64>;
-    #[doc = "Change the `timestamp` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, setter = "timestamp")]
-    pub fn set_timestamp(this: &RtcCodecStats, val: f64);
-    #[cfg(feature = "RtcStatsType")]
-    #[doc = "Get the `type` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`, `RtcStatsType`*"]
-    #[wasm_bindgen(method, getter = "type")]
-    pub fn get_type(this: &RtcCodecStats) -> Option<RtcStatsType>;
-    #[cfg(feature = "RtcStatsType")]
-    #[doc = "Change the `type` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`, `RtcStatsType`*"]
-    #[wasm_bindgen(method, setter = "type")]
-    pub fn set_type(this: &RtcCodecStats, val: RtcStatsType);
-    #[doc = "Get the `channels` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, getter = "channels")]
-    pub fn get_channels(this: &RtcCodecStats) -> Option<u32>;
-    #[doc = "Change the `channels` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, setter = "channels")]
-    pub fn set_channels(this: &RtcCodecStats, val: u32);
-    #[doc = "Get the `clockRate` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, getter = "clockRate")]
-    pub fn get_clock_rate(this: &RtcCodecStats) -> Option<u32>;
-    #[doc = "Change the `clockRate` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, setter = "clockRate")]
-    pub fn set_clock_rate(this: &RtcCodecStats, val: u32);
-    #[doc = "Get the `codec` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, getter = "codec")]
-    pub fn get_codec(this: &RtcCodecStats) -> Option<String>;
-    #[doc = "Change the `codec` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, setter = "codec")]
-    pub fn set_codec(this: &RtcCodecStats, val: &str);
-    #[doc = "Get the `parameters` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, getter = "parameters")]
-    pub fn get_parameters(this: &RtcCodecStats) -> Option<String>;
-    #[doc = "Change the `parameters` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, setter = "parameters")]
-    pub fn set_parameters(this: &RtcCodecStats, val: &str);
-    #[doc = "Get the `payloadType` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, getter = "payloadType")]
-    pub fn get_payload_type(this: &RtcCodecStats) -> Option<u32>;
-    #[doc = "Change the `payloadType` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
-    #[wasm_bindgen(method, setter = "payloadType")]
-    pub fn set_payload_type(this: &RtcCodecStats, val: u32);
 }
 impl RtcCodecStats {
     #[doc = "Construct a new `RtcCodecStats`."]
@@ -102,45 +20,129 @@ impl RtcCodecStats {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_id()` instead."]
+    #[doc = "Change the `id` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
     pub fn id(&mut self, val: &str) -> &mut Self {
-        self.set_id(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("id"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_timestamp()` instead."]
+    #[doc = "Change the `timestamp` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
     pub fn timestamp(&mut self, val: f64) -> &mut Self {
-        self.set_timestamp(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("timestamp"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
     #[cfg(feature = "RtcStatsType")]
-    #[deprecated = "Use `set_type()` instead."]
+    #[doc = "Change the `type` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`, `RtcStatsType`*"]
     pub fn type_(&mut self, val: RtcStatsType) -> &mut Self {
-        self.set_type(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("type"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_channels()` instead."]
+    #[doc = "Change the `channels` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
     pub fn channels(&mut self, val: u32) -> &mut Self {
-        self.set_channels(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("channels"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_clock_rate()` instead."]
+    #[doc = "Change the `clockRate` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
     pub fn clock_rate(&mut self, val: u32) -> &mut Self {
-        self.set_clock_rate(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("clockRate"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_codec()` instead."]
+    #[doc = "Change the `codec` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
     pub fn codec(&mut self, val: &str) -> &mut Self {
-        self.set_codec(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("codec"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_parameters()` instead."]
+    #[doc = "Change the `parameters` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
     pub fn parameters(&mut self, val: &str) -> &mut Self {
-        self.set_parameters(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("parameters"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_payload_type()` instead."]
+    #[doc = "Change the `payloadType` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcCodecStats`*"]
     pub fn payload_type(&mut self, val: u32) -> &mut Self {
-        self.set_payload_type(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("payloadType"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

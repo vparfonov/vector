@@ -28,8 +28,8 @@ impl RemoveRegionsFromReplicationInput {
 }
 
 /// A builder for [`RemoveRegionsFromReplicationInput`](crate::operation::remove_regions_from_replication::RemoveRegionsFromReplicationInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct RemoveRegionsFromReplicationInputBuilder {
     pub(crate) secret_id: ::std::option::Option<::std::string::String>,
     pub(crate) remove_replica_regions: ::std::option::Option<::std::vec::Vec<::std::string::String>>,

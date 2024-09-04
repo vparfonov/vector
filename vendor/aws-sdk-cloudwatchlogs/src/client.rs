@@ -27,9 +27,9 @@ pub(crate) struct Handle {
 /// # }
 /// ```
 ///
-/// Occasionally, SDKs may have additional service-specific values that can be set on the [`Config`] that
+/// Occasionally, SDKs may have additional service-specific that can be set on the [`Config`] that
 /// is absent from [`SdkConfig`], or slightly different settings for a specific client may be desired.
-/// The [`Builder`] struct implements `From<&SdkConfig>`, so setting these specific settings can be
+/// The [`Config`] struct implements `From<&SdkConfig>`, so setting these specific settings can be
 /// done as follows:
 ///
 /// ```rust,no_run
@@ -144,8 +144,6 @@ mod create_delivery;
 
 mod create_export_task;
 
-mod create_log_anomaly_detector;
-
 mod create_log_group;
 
 mod create_log_stream;
@@ -190,8 +188,6 @@ mod delete_delivery_destination_policy;
 mod delete_delivery_source;
 
 mod delete_destination;
-
-mod delete_log_anomaly_detector;
 
 mod delete_log_group;
 
@@ -247,8 +243,6 @@ mod get_delivery_destination_policy;
 
 mod get_delivery_source;
 
-mod get_log_anomaly_detector;
-
 mod get_log_events;
 
 mod get_log_group_fields;
@@ -256,10 +250,6 @@ mod get_log_group_fields;
 mod get_log_record;
 
 mod get_query_results;
-
-mod list_anomalies;
-
-mod list_log_anomaly_detectors;
 
 mod list_tags_for_resource;
 
@@ -304,7 +294,3 @@ mod test_metric_filter;
 mod untag_log_group;
 
 mod untag_resource;
-
-mod update_anomaly;
-
-mod update_log_anomaly_detector;

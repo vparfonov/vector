@@ -91,10 +91,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for Registe
             ::aws_smithy_runtime_api::client::auth::static_resolver::StaticAuthSchemeOptionResolverParams::new(),
         ));
 
-        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new(
-            "RegisterStreamConsumer",
-            "kinesis",
-        ));
+        cfg.store_put(::aws_smithy_http::operation::Metadata::new("RegisterStreamConsumer", "kinesis"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = true;
         signing_options.content_sha256_header = false;
@@ -115,7 +112,11 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for Registe
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("RegisterStreamConsumer")
-            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
+            .with_interceptor(
+                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
+                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
+                ),
+            )
             .with_interceptor(RegisterStreamConsumerEndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::register_stream_consumer::RegisterStreamConsumerError,
@@ -251,9 +252,6 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for RegisterStrea
     }
 }
 
-// The get_* functions below are generated from JMESPath expressions in the
-// operationContextParams trait. They target the operation's input shape.
-
 /// Error type for the `RegisterStreamConsumerError` operation.
 #[non_exhaustive]
 #[derive(::std::fmt::Debug)]
@@ -262,7 +260,7 @@ pub enum RegisterStreamConsumerError {
     InvalidArgumentException(crate::types::error::InvalidArgumentException),
     /// <p>The resource is not available for this operation. For successful operation, the resource must be in the <code>ACTIVE</code> state.</p>
     ResourceInUseException(crate::types::error::ResourceInUseException),
-    /// <p>The requested resource exceeds the maximum number allowed, or the number of concurrent stream requests exceeds the maximum number allowed.</p>
+    /// <p>The requested resource exceeds the maximum number allowed, or the number of concurrent stream requests exceeds the maximum number allowed. </p>
     LimitExceededException(crate::types::error::LimitExceededException),
     /// <p>The requested resource could not be found. The stream might not be specified correctly.</p>
     ResourceNotFoundException(crate::types::error::ResourceNotFoundException),

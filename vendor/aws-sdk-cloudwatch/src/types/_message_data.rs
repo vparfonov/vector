@@ -28,8 +28,8 @@ impl MessageData {
 }
 
 /// A builder for [`MessageData`](crate::types::MessageData).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct MessageDataBuilder {
     pub(crate) code: ::std::option::Option<::std::string::String>,
     pub(crate) value: ::std::option::Option<::std::string::String>,

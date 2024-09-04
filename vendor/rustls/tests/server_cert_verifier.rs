@@ -1,18 +1,16 @@
 //! Tests for configuring and using a [`ServerCertVerifier`] for a client.
 
-#![allow(clippy::duplicate_mod)]
-
-use super::*;
+#![cfg(any(feature = "ring", feature = "aws_lc_rs"))]
 
 mod common;
-use std::sync::Arc;
-
-use common::{
+use crate::common::{
     do_handshake, do_handshake_until_both_error, make_client_config_with_versions,
     make_pair_for_arc_configs, make_server_config, ErrorFromPeer, MockServerVerifier,
     ALL_KEY_TYPES,
 };
 use rustls::{AlertDescription, Error, InvalidMessage};
+
+use std::sync::Arc;
 
 #[test]
 fn client_can_override_certificate_verification() {

@@ -1,9 +1,9 @@
 use std::{
-    future::Future,
     pin::Pin,
     task::{Context, Poll},
 };
 
+use futures_util::Future;
 use http_body::Body;
 use pin_project_lite::pin_project;
 

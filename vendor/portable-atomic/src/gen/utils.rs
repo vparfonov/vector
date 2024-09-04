@@ -4,14 +4,14 @@
 
 #![allow(unused_macros)]
 
-// On AArch64, the base register of memory-related instructions must be 64-bit.
+// On AArch64, the base register of load/store/atomic instructions must be 64-bit.
 // Passing a 32-bit value to `in(reg)` on AArch64 results in the upper bits
 // having an undefined value, but to work correctly with ILP32 ABI, the upper
 // bits must be zero, which is handled here by casting to u64. Another way to
 // handle this is to pass it as a pointer and clear the upper bits inside asm,
 // but it is easier to overlook than cast, which can catch overlooks by
 // asm_sub_register lint.
-// See also https://github.com/ARM-software/abi-aa/blob/2023Q3/aapcs64/aapcs64.rst#pointers
+// See also https://github.com/ARM-software/abi-aa/blob/2023Q1/aapcs64/aapcs64.rst#57pointers
 //
 // Except for x86_64, which can use 32-bit registers in the destination operand
 // (on x86_64, we use the ptr_modifier macro to handle this), we need to do the
@@ -30,7 +30,6 @@
     target_pointer_width = "32",
     any(
         target_arch = "aarch64",
-        target_arch = "arm64ec",
         target_arch = "bpf",
         target_arch = "loongarch64",
         target_arch = "mips64",
@@ -67,7 +66,6 @@ macro_rules! ptr_reg {
     target_pointer_width = "32",
     any(
         target_arch = "aarch64",
-        target_arch = "arm64ec",
         target_arch = "bpf",
         target_arch = "loongarch64",
         target_arch = "mips64",
@@ -97,7 +95,6 @@ macro_rules! ptr_reg {
 #[cfg(any(
     not(any(target_pointer_width = "16", target_pointer_width = "32")), // i.e., 64-bit or greater
     target_arch = "aarch64",
-    target_arch = "arm64ec",
     target_arch = "bpf",
     target_arch = "loongarch64",
     target_arch = "mips64",
@@ -125,7 +122,6 @@ mod fast_atomic_64_macros {
 #[cfg(not(any(
     not(any(target_pointer_width = "16", target_pointer_width = "32")), // i.e., 64-bit or greater
     target_arch = "aarch64",
-    target_arch = "arm64ec",
     target_arch = "bpf",
     target_arch = "loongarch64",
     target_arch = "mips64",

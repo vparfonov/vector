@@ -636,8 +636,11 @@ impl<'d> Deserialize<'d> for VerifyingKey {
                 write!(formatter, concat!("An ed25519 verifying (public) key"))
             }
 
-            fn visit_bytes<E: serde::de::Error>(self, bytes: &[u8]) -> Result<Self::Value, E> {
-                VerifyingKey::try_from(bytes).map_err(E::custom)
+            fn visit_borrowed_bytes<E: serde::de::Error>(
+                self,
+                bytes: &'de [u8],
+            ) -> Result<Self::Value, E> {
+                VerifyingKey::try_from(bytes.as_ref()).map_err(E::custom)
             }
 
             fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -646,7 +649,6 @@ impl<'d> Deserialize<'d> for VerifyingKey {
             {
                 let mut bytes = [0u8; 32];
 
-                #[allow(clippy::needless_range_loop)]
                 for i in 0..32 {
                     bytes[i] = seq
                         .next_element()?

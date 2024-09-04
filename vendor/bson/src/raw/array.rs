@@ -6,10 +6,10 @@ use super::{
     error::{ValueAccessError, ValueAccessErrorKind, ValueAccessResult},
     serde::OwnedOrBorrowedRawArray,
     Error,
+    Iter,
     RawBinaryRef,
     RawBsonRef,
     RawDocument,
-    RawIter,
     RawRegexRef,
     Result,
 };
@@ -260,14 +260,14 @@ impl<'a> IntoIterator for &'a RawArray {
 
     fn into_iter(self) -> RawArrayIter<'a> {
         RawArrayIter {
-            inner: RawIter::new(&self.doc),
+            inner: self.doc.into_iter(),
         }
     }
 }
 
 /// An iterator over borrowed raw BSON array values.
 pub struct RawArrayIter<'a> {
-    inner: RawIter<'a>,
+    inner: Iter<'a>,
 }
 
 impl<'a> Iterator for RawArrayIter<'a> {
@@ -275,10 +275,7 @@ impl<'a> Iterator for RawArrayIter<'a> {
 
     fn next(&mut self) -> Option<Result<RawBsonRef<'a>>> {
         match self.inner.next() {
-            Some(Ok(elem)) => match elem.value() {
-                Ok(value) => Some(Ok(value)),
-                Err(e) => Some(Err(e)),
-            },
+            Some(Ok((_, v))) => Some(Ok(v)),
             Some(Err(e)) => Some(Err(e)),
             None => None,
         }

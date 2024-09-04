@@ -104,7 +104,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbObjectStore`, `IdbRequest`*"]
     pub fn count_with_key(
         this: &IdbObjectStore,
-        query: &::wasm_bindgen::JsValue,
+        key: &::wasm_bindgen::JsValue,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbIndex")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = createIndex)]
@@ -141,7 +141,7 @@ extern "C" {
         this: &IdbObjectStore,
         name: &str,
         key_path: &str,
-        options: &IdbIndexParameters,
+        optional_parameters: &IdbIndexParameters,
     ) -> Result<IdbIndex, JsValue>;
     #[cfg(all(feature = "IdbIndex", feature = "IdbIndexParameters",))]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = createIndex)]
@@ -154,7 +154,7 @@ extern "C" {
         this: &IdbObjectStore,
         name: &str,
         key_path: &::wasm_bindgen::JsValue,
-        options: &IdbIndexParameters,
+        optional_parameters: &IdbIndexParameters,
     ) -> Result<IdbIndex, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = delete)]
@@ -165,7 +165,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbObjectStore`, `IdbRequest`*"]
     pub fn delete(
         this: &IdbObjectStore,
-        query: &::wasm_bindgen::JsValue,
+        key: &::wasm_bindgen::JsValue,
     ) -> Result<IdbRequest, JsValue>;
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = deleteIndex)]
     #[doc = "The `deleteIndex()` method."]
@@ -173,7 +173,7 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/deleteIndex)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `IdbObjectStore`*"]
-    pub fn delete_index(this: &IdbObjectStore, name: &str) -> Result<(), JsValue>;
+    pub fn delete_index(this: &IdbObjectStore, index_name: &str) -> Result<(), JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = get)]
     #[doc = "The `get()` method."]
@@ -181,10 +181,8 @@ extern "C" {
     #[doc = "[MDN Documentation](https://developer.mozilla.org/en-US/docs/Web/API/IDBObjectStore/get)"]
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `IdbObjectStore`, `IdbRequest`*"]
-    pub fn get(
-        this: &IdbObjectStore,
-        query: &::wasm_bindgen::JsValue,
-    ) -> Result<IdbRequest, JsValue>;
+    pub fn get(this: &IdbObjectStore, key: &::wasm_bindgen::JsValue)
+        -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = getAll)]
     #[doc = "The `getAll()` method."]
@@ -202,7 +200,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbObjectStore`, `IdbRequest`*"]
     pub fn get_all_with_key(
         this: &IdbObjectStore,
-        query: &::wasm_bindgen::JsValue,
+        key: &::wasm_bindgen::JsValue,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = getAll)]
@@ -213,8 +211,8 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbObjectStore`, `IdbRequest`*"]
     pub fn get_all_with_key_and_limit(
         this: &IdbObjectStore,
-        query: &::wasm_bindgen::JsValue,
-        count: u32,
+        key: &::wasm_bindgen::JsValue,
+        limit: u32,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = getAllKeys)]
@@ -233,7 +231,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbObjectStore`, `IdbRequest`*"]
     pub fn get_all_keys_with_key(
         this: &IdbObjectStore,
-        query: &::wasm_bindgen::JsValue,
+        key: &::wasm_bindgen::JsValue,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = getAllKeys)]
@@ -244,8 +242,8 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbObjectStore`, `IdbRequest`*"]
     pub fn get_all_keys_with_key_and_limit(
         this: &IdbObjectStore,
-        query: &::wasm_bindgen::JsValue,
-        count: u32,
+        key: &::wasm_bindgen::JsValue,
+        limit: u32,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = getKey)]
@@ -256,7 +254,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbObjectStore`, `IdbRequest`*"]
     pub fn get_key(
         this: &IdbObjectStore,
-        query: &::wasm_bindgen::JsValue,
+        key: &::wasm_bindgen::JsValue,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbIndex")]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = index)]
@@ -283,7 +281,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbObjectStore`, `IdbRequest`*"]
     pub fn open_cursor_with_range(
         this: &IdbObjectStore,
-        query: &::wasm_bindgen::JsValue,
+        range: &::wasm_bindgen::JsValue,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(all(feature = "IdbCursorDirection", feature = "IdbRequest",))]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = openCursor)]
@@ -294,7 +292,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbCursorDirection`, `IdbObjectStore`, `IdbRequest`*"]
     pub fn open_cursor_with_range_and_direction(
         this: &IdbObjectStore,
-        query: &::wasm_bindgen::JsValue,
+        range: &::wasm_bindgen::JsValue,
         direction: IdbCursorDirection,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]
@@ -314,7 +312,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbObjectStore`, `IdbRequest`*"]
     pub fn open_key_cursor_with_range(
         this: &IdbObjectStore,
-        query: &::wasm_bindgen::JsValue,
+        range: &::wasm_bindgen::JsValue,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(all(feature = "IdbCursorDirection", feature = "IdbRequest",))]
     # [wasm_bindgen (catch , method , structural , js_class = "IDBObjectStore" , js_name = openKeyCursor)]
@@ -325,7 +323,7 @@ extern "C" {
     #[doc = "*This API requires the following crate features to be activated: `IdbCursorDirection`, `IdbObjectStore`, `IdbRequest`*"]
     pub fn open_key_cursor_with_range_and_direction(
         this: &IdbObjectStore,
-        query: &::wasm_bindgen::JsValue,
+        range: &::wasm_bindgen::JsValue,
         direction: IdbCursorDirection,
     ) -> Result<IdbRequest, JsValue>;
     #[cfg(feature = "IdbRequest")]

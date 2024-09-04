@@ -1,14 +1,14 @@
-use alloc::boxed::Box;
-use alloc::string::ToString;
-
 use crate::common_state::{CommonState, Side};
 use crate::crypto::cipher::{AeadKey, Iv, MessageDecrypter};
 use crate::crypto::tls13::{expand, Hkdf, HkdfExpander, OkmBlock, OutputLengthError};
-use crate::crypto::{hash, hmac, SharedSecret};
+use crate::crypto::{hash, hmac, ActiveKeyExchange};
 use crate::error::Error;
-use crate::msgs::message::Message;
+use crate::quic;
 use crate::suites::PartiallyExtractedSecrets;
-use crate::{quic, KeyLog, Tls13CipherSuite};
+use crate::{KeyLog, Tls13CipherSuite};
+
+use alloc::boxed::Box;
+use alloc::string::ToString;
 
 /// Key schedule maintenance for TLS1.3
 
@@ -24,8 +24,6 @@ enum SecretKind {
     ExporterMasterSecret,
     ResumptionMasterSecret,
     DerivedSecret,
-    ServerEchConfirmationSecret,
-    ServerEchHrrConfirmationSecret,
 }
 
 impl SecretKind {
@@ -41,10 +39,6 @@ impl SecretKind {
             ExporterMasterSecret => b"exp master",
             ResumptionMasterSecret => b"res master",
             DerivedSecret => b"derived",
-            // https://datatracker.ietf.org/doc/html/draft-ietf-tls-esni-18#section-7.2
-            ServerEchConfirmationSecret => b"ech accept confirmation",
-            // https://datatracker.ietf.org/doc/html/draft-ietf-tls-esni-18#section-7.2.1
-            ServerEchHrrConfirmationSecret => b"hrr ech accept confirmation",
         }
     }
 
@@ -149,11 +143,12 @@ impl KeySchedulePreHandshake {
 
     pub(crate) fn into_handshake(
         mut self,
-        shared_secret: SharedSecret,
-    ) -> KeyScheduleHandshakeStart {
+        kx: Box<dyn ActiveKeyExchange>,
+        peer_public_key: &[u8],
+    ) -> Result<KeyScheduleHandshakeStart, Error> {
         self.ks
-            .input_secret(shared_secret.secret_bytes());
-        KeyScheduleHandshakeStart { ks: self.ks }
+            .input_from_key_exchange(kx, peer_public_key)?;
+        Ok(KeyScheduleHandshakeStart { ks: self.ks })
     }
 }
 
@@ -212,30 +207,6 @@ impl KeyScheduleHandshakeStart {
         new.ks
             .set_encrypter(&new.server_handshake_traffic_secret, common);
         new
-    }
-
-    pub(crate) fn server_ech_confirmation_secret(
-        &mut self,
-        client_hello_inner_random: &[u8],
-        hs_hash: hash::Output,
-    ) -> [u8; 8] {
-        /*
-        Per ietf-tls-esni-17 section 7.2:
-        <https://datatracker.ietf.org/doc/html/draft-ietf-tls-esni-17#section-7.2>
-        accept_confirmation = HKDF-Expand-Label(
-          HKDF-Extract(0, ClientHelloInner.random),
-          "ech accept confirmation",
-          transcript_ech_conf,8)
-         */
-        hkdf_expand_label(
-            self.ks
-                .suite
-                .hkdf_provider
-                .extract_from_secret(None, client_hello_inner_random)
-                .as_ref(),
-            SecretKind::ServerEchConfirmationSecret.to_bytes(),
-            hs_hash.as_ref(),
-        )
     }
 
     fn into_handshake(
@@ -497,17 +468,6 @@ impl KeyScheduleTraffic {
         self.ks.set_encrypter(&secret, common);
     }
 
-    pub(crate) fn request_key_update_and_update_encrypter(
-        &mut self,
-        common: &mut CommonState,
-    ) -> Result<(), Error> {
-        common.check_aligned_handshake()?;
-        common.send_msg_encrypt(Message::build_key_update_request().into());
-        let secret = self.next_application_traffic_secret(common.side);
-        self.ks.set_encrypter(&secret, common);
-        Ok(())
-    }
-
     pub(crate) fn update_decrypter(&mut self, common: &mut CommonState) {
         let secret = self.next_application_traffic_secret(common.side.peer());
         self.ks.set_decrypter(&secret, common);
@@ -609,10 +569,7 @@ impl KeySchedule {
 
         common
             .record_layer
-            .set_message_encrypter(
-                self.suite.aead_alg.encrypter(key, iv),
-                self.suite.common.confidentiality_limit,
-            );
+            .set_message_encrypter(self.suite.aead_alg.encrypter(key, iv));
     }
 
     fn set_decrypter(&self, secret: &OkmBlock, common: &mut CommonState) {
@@ -650,12 +607,27 @@ impl KeySchedule {
     }
 
     /// Input the given secret.
+    #[cfg(all(test, any(feature = "ring", feature = "aws_lc_rs")))]
     fn input_secret(&mut self, secret: &[u8]) {
         let salt = self.derive_for_empty_hash(SecretKind::DerivedSecret);
         self.current = self
             .suite
             .hkdf_provider
             .extract_from_secret(Some(salt.as_ref()), secret);
+    }
+
+    /// Input the shared secret resulting from completing the given key exchange.
+    fn input_from_key_exchange(
+        &mut self,
+        kx: Box<dyn ActiveKeyExchange>,
+        peer_public_key: &[u8],
+    ) -> Result<(), Error> {
+        let salt = self.derive_for_empty_hash(SecretKind::DerivedSecret);
+        self.current = self
+            .suite
+            .hkdf_provider
+            .extract_from_kx_shared_secret(Some(salt.as_ref()), kx, peer_public_key)?;
+        Ok(())
     }
 
     /// Derive a secret of given `kind`, using current handshake hash `hs_hash`.
@@ -820,29 +792,6 @@ fn hkdf_expand_label_slice(
     })
 }
 
-pub(crate) fn server_ech_hrr_confirmation_secret(
-    hkdf_provider: &'static dyn Hkdf,
-    client_hello_inner_random: &[u8],
-    hs_hash: hash::Output,
-) -> [u8; 8] {
-    /*
-    Per ietf-tls-esni-17 section 7.2.1:
-    <https://datatracker.ietf.org/doc/html/draft-ietf-tls-esni-17#section-7.2.1>
-    hrr_accept_confirmation = HKDF-Expand-Label(
-      HKDF-Extract(0, ClientHelloInner1.random),
-      "hrr ech accept confirmation",
-      transcript_hrr_ech_conf,
-      8)
-     */
-    hkdf_expand_label(
-        hkdf_provider
-            .extract_from_secret(None, client_hello_inner_random)
-            .as_ref(),
-        SecretKind::ServerEchHrrConfirmationSecret.to_bytes(),
-        hs_hash.as_ref(),
-    )
-}
-
 pub(crate) fn derive_traffic_key(expander: &dyn HkdfExpander, aead_key_len: usize) -> AeadKey {
     hkdf_expand_label_aead_key(expander, aead_key_len, b"key", &[])
 }
@@ -879,14 +828,15 @@ where
     f(expander, info)
 }
 
-test_for_each_provider! {
+#[cfg(all(test, any(feature = "ring", feature = "aws_lc_rs")))]
+mod tests {
     use core::fmt::Debug;
-    use std::vec;
     use std::prelude::v1::*;
+    use std::vec;
 
     use super::{derive_traffic_iv, derive_traffic_key, KeySchedule, SecretKind};
-    use provider::ring_like::aead;
-    use provider::tls13::{
+    use crate::test_provider::ring_like::aead;
+    use crate::test_provider::tls13::{
         TLS13_AES_128_GCM_SHA256_INTERNAL, TLS13_CHACHA20_POLY1305_SHA256_INTERNAL,
     };
     use crate::KeyLog;
@@ -1062,13 +1012,15 @@ test_for_each_provider! {
     }
 }
 
-bench_for_each_provider! {
+#[cfg(bench)]
+mod benchmarks {
+    #[cfg(any(feature = "ring", feature = "aws_lc_rs"))]
     #[bench]
     fn bench_sha256(b: &mut test::Bencher) {
         use core::fmt::Debug;
 
         use super::{derive_traffic_iv, derive_traffic_key, KeySchedule, SecretKind};
-        use provider::tls13::TLS13_CHACHA20_POLY1305_SHA256_INTERNAL;
+        use crate::test_provider::tls13::TLS13_CHACHA20_POLY1305_SHA256_INTERNAL;
         use crate::KeyLog;
 
         fn extract_traffic_secret(ks: &KeySchedule, kind: SecretKind) {

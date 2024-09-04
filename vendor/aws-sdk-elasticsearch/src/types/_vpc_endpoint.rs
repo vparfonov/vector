@@ -51,8 +51,8 @@ impl VpcEndpoint {
 }
 
 /// A builder for [`VpcEndpoint`](crate::types::VpcEndpoint).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct VpcEndpointBuilder {
     pub(crate) vpc_endpoint_id: ::std::option::Option<::std::string::String>,
     pub(crate) vpc_endpoint_owner: ::std::option::Option<::std::string::String>,

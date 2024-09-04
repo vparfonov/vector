@@ -1,5 +1,3 @@
-// SPDX-License-Identifier: Apache-2.0 OR MIT
-
 use std::iter::FromIterator;
 
 use proc_macro::{Delimiter, Group, Ident, Literal, Punct, Spacing, Span, TokenStream, TokenTree};

@@ -4,14 +4,14 @@
 #[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::fmt::Debug)]
 pub struct PutMetricDataInput {
     /// <p>The namespace for the metric data. You can use ASCII characters for the namespace, except for control characters which are not supported.</p>
-    /// <p>To avoid conflicts with Amazon Web Services service namespaces, you should not specify a namespace that begins with <code>AWS/</code></p>
+    /// <p>To avoid conflicts with Amazon Web Services service namespaces, you should not specify a namespace that begins with <code>AWS/</code> </p>
     pub namespace: ::std::option::Option<::std::string::String>,
     /// <p>The data for the metric. The array can include no more than 1000 metrics per call.</p>
     pub metric_data: ::std::option::Option<::std::vec::Vec<crate::types::MetricDatum>>,
 }
 impl PutMetricDataInput {
     /// <p>The namespace for the metric data. You can use ASCII characters for the namespace, except for control characters which are not supported.</p>
-    /// <p>To avoid conflicts with Amazon Web Services service namespaces, you should not specify a namespace that begins with <code>AWS/</code></p>
+    /// <p>To avoid conflicts with Amazon Web Services service namespaces, you should not specify a namespace that begins with <code>AWS/</code> </p>
     pub fn namespace(&self) -> ::std::option::Option<&str> {
         self.namespace.as_deref()
     }
@@ -30,28 +30,28 @@ impl PutMetricDataInput {
 }
 
 /// A builder for [`PutMetricDataInput`](crate::operation::put_metric_data::PutMetricDataInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct PutMetricDataInputBuilder {
     pub(crate) namespace: ::std::option::Option<::std::string::String>,
     pub(crate) metric_data: ::std::option::Option<::std::vec::Vec<crate::types::MetricDatum>>,
 }
 impl PutMetricDataInputBuilder {
     /// <p>The namespace for the metric data. You can use ASCII characters for the namespace, except for control characters which are not supported.</p>
-    /// <p>To avoid conflicts with Amazon Web Services service namespaces, you should not specify a namespace that begins with <code>AWS/</code></p>
+    /// <p>To avoid conflicts with Amazon Web Services service namespaces, you should not specify a namespace that begins with <code>AWS/</code> </p>
     /// This field is required.
     pub fn namespace(mut self, input: impl ::std::convert::Into<::std::string::String>) -> Self {
         self.namespace = ::std::option::Option::Some(input.into());
         self
     }
     /// <p>The namespace for the metric data. You can use ASCII characters for the namespace, except for control characters which are not supported.</p>
-    /// <p>To avoid conflicts with Amazon Web Services service namespaces, you should not specify a namespace that begins with <code>AWS/</code></p>
+    /// <p>To avoid conflicts with Amazon Web Services service namespaces, you should not specify a namespace that begins with <code>AWS/</code> </p>
     pub fn set_namespace(mut self, input: ::std::option::Option<::std::string::String>) -> Self {
         self.namespace = input;
         self
     }
     /// <p>The namespace for the metric data. You can use ASCII characters for the namespace, except for control characters which are not supported.</p>
-    /// <p>To avoid conflicts with Amazon Web Services service namespaces, you should not specify a namespace that begins with <code>AWS/</code></p>
+    /// <p>To avoid conflicts with Amazon Web Services service namespaces, you should not specify a namespace that begins with <code>AWS/</code> </p>
     pub fn get_namespace(&self) -> &::std::option::Option<::std::string::String> {
         &self.namespace
     }

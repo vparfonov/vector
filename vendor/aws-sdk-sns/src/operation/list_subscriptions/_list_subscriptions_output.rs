@@ -35,8 +35,8 @@ impl ListSubscriptionsOutput {
 }
 
 /// A builder for [`ListSubscriptionsOutput`](crate::operation::list_subscriptions::ListSubscriptionsOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct ListSubscriptionsOutputBuilder {
     pub(crate) subscriptions: ::std::option::Option<::std::vec::Vec<crate::types::Subscription>>,
     pub(crate) next_token: ::std::option::Option<::std::string::String>,

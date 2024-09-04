@@ -15,7 +15,6 @@ use syn::{
 impl Printer {
     pub fn item(&mut self, item: &Item) {
         match item {
-            #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
             Item::Const(item) => self.item_const(item),
             Item::Enum(item) => self.item_enum(item),
             Item::ExternCrate(item) => self.item_extern_crate(item),
@@ -32,6 +31,7 @@ impl Printer {
             Item::Union(item) => self.item_union(item),
             Item::Use(item) => self.item_use(item),
             Item::Verbatim(item) => self.item_verbatim(item),
+            #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
             _ => unimplemented!("unknown Item"),
         }
     }
@@ -743,12 +743,7 @@ impl Printer {
     fn use_group(&mut self, use_group: &UseGroup) {
         if use_group.items.is_empty() {
             self.word("{}");
-        } else if use_group.items.len() == 1
-            && match &use_group.items[0] {
-                UseTree::Rename(use_rename) => use_rename.ident != "self",
-                _ => true,
-            }
-        {
+        } else if use_group.items.len() == 1 {
             self.use_tree(&use_group.items[0]);
         } else {
             self.cbox(INDENT);
@@ -780,12 +775,12 @@ impl Printer {
 
     fn foreign_item(&mut self, foreign_item: &ForeignItem) {
         match foreign_item {
-            #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
             ForeignItem::Fn(item) => self.foreign_item_fn(item),
             ForeignItem::Static(item) => self.foreign_item_static(item),
             ForeignItem::Type(item) => self.foreign_item_type(item),
             ForeignItem::Macro(item) => self.foreign_item_macro(item),
             ForeignItem::Verbatim(item) => self.foreign_item_verbatim(item),
+            #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
             _ => unimplemented!("unknown ForeignItem"),
         }
     }
@@ -922,12 +917,12 @@ impl Printer {
 
     fn trait_item(&mut self, trait_item: &TraitItem) {
         match trait_item {
-            #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
             TraitItem::Const(item) => self.trait_item_const(item),
             TraitItem::Fn(item) => self.trait_item_fn(item),
             TraitItem::Type(item) => self.trait_item_type(item),
             TraitItem::Macro(item) => self.trait_item_macro(item),
             TraitItem::Verbatim(item) => self.trait_item_verbatim(item),
+            #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
             _ => unimplemented!("unknown TraitItem"),
         }
     }
@@ -1112,12 +1107,12 @@ impl Printer {
 
     fn impl_item(&mut self, impl_item: &ImplItem) {
         match impl_item {
-            #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
             ImplItem::Const(item) => self.impl_item_const(item),
             ImplItem::Fn(item) => self.impl_item_fn(item),
             ImplItem::Type(item) => self.impl_item_type(item),
             ImplItem::Macro(item) => self.impl_item_macro(item),
             ImplItem::Verbatim(item) => self.impl_item_verbatim(item),
+            #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
             _ => unimplemented!("unknown ImplItem"),
         }
     }
@@ -1367,9 +1362,9 @@ impl Printer {
 
     fn static_mutability(&mut self, mutability: &StaticMutability) {
         match mutability {
-            #![cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
             StaticMutability::Mut(_) => self.word("mut "),
             StaticMutability::None => {}
+            #[cfg_attr(all(test, exhaustive), deny(non_exhaustive_omitted_patterns))]
             _ => unimplemented!("unknown StaticMutability"),
         }
     }

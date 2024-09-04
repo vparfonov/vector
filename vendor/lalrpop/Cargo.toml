@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.70"
+rust-version = "1.64"
 name = "lalrpop"
-version = "0.20.2"
+version = "0.20.0"
 authors = ["Niko Matsakis <niko@alum.mit.edu>"]
 exclude = ["build.rs"]
 description = "convenient LR(1) parser generator"
@@ -47,18 +47,24 @@ default_features = false
 version = "0.5.2"
 default_features = false
 
+[dependencies.diff]
+version = "0.1.12"
+default_features = false
+
 [dependencies.ena]
 version = "0.14"
 default_features = false
 
+[dependencies.is-terminal]
+version = "0.4.2"
+
 [dependencies.itertools]
-version = "0.11"
+version = "0.10"
 features = ["use_std"]
 default_features = false
 
 [dependencies.lalrpop-util]
 version = "0.20.0"
-default_features = false
 
 [dependencies.petgraph]
 version = "0.6"
@@ -75,7 +81,7 @@ features = ["std"]
 default_features = false
 
 [dependencies.regex-syntax]
-version = "0.8"
+version = "0.7"
 default_features = false
 
 [dependencies.string_cache]
@@ -94,13 +100,6 @@ features = ["sha3"]
 version = "0.2"
 default_features = false
 
-[dependencies.walkdir]
-version = "2.4.0"
-
-[dev-dependencies.diff]
-version = "0.1.12"
-default_features = false
-
 [dev-dependencies.rand]
 version = "0.8"
 
@@ -114,5 +113,4 @@ lexer = ["lalrpop-util/lexer"]
 unicode = [
     "regex/unicode",
     "regex-syntax/unicode",
-    "lalrpop-util/unicode",
 ]

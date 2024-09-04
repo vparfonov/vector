@@ -9,34 +9,30 @@
 
 //! Core Foundation property lists
 
+use std::ptr;
 use std::mem;
 use std::os::raw::c_void;
-use std::ptr;
 
-use crate::base::{CFType, TCFType, TCFTypeRef};
-use crate::data::CFData;
-use crate::error::CFError;
+use error::CFError;
+use data::CFData;
+use base::{CFType, TCFType, TCFTypeRef};
 
-use core_foundation_sys::base::{
-    kCFAllocatorDefault, CFGetRetainCount, CFGetTypeID, CFIndex, CFRetain, CFShow, CFTypeID,
-};
-use core_foundation_sys::error::CFErrorRef;
 pub use core_foundation_sys::propertylist::*;
+use core_foundation_sys::error::CFErrorRef;
+use core_foundation_sys::base::{CFGetRetainCount, CFGetTypeID, CFIndex, CFRetain,
+                                CFShow, CFTypeID, kCFAllocatorDefault};
 
-pub fn create_with_data(
-    data: CFData,
-    options: CFPropertyListMutabilityOptions,
-) -> Result<(*const c_void, CFPropertyListFormat), CFError> {
+pub fn create_with_data(data: CFData,
+                        options: CFPropertyListMutabilityOptions)
+                        -> Result<(*const c_void, CFPropertyListFormat), CFError> {
     unsafe {
         let mut error: CFErrorRef = ptr::null_mut();
         let mut format: CFPropertyListFormat = 0;
-        let property_list = CFPropertyListCreateWithData(
-            kCFAllocatorDefault,
-            data.as_concrete_TypeRef(),
-            options,
-            &mut format,
-            &mut error,
-        );
+        let property_list = CFPropertyListCreateWithData(kCFAllocatorDefault,
+                                                         data.as_concrete_TypeRef(),
+                                                         options,
+                                                         &mut format,
+                                                         &mut error);
         if property_list.is_null() {
             Err(TCFType::wrap_under_create_rule(error))
         } else {
@@ -45,14 +41,14 @@ pub fn create_with_data(
     }
 }
 
-pub fn create_data(
-    property_list: *const c_void,
-    format: CFPropertyListFormat,
-) -> Result<CFData, CFError> {
+pub fn create_data(property_list: *const c_void, format: CFPropertyListFormat) -> Result<CFData, CFError> {
     unsafe {
         let mut error: CFErrorRef = ptr::null_mut();
-        let data_ref =
-            CFPropertyListCreateData(kCFAllocatorDefault, property_list, format, 0, &mut error);
+        let data_ref = CFPropertyListCreateData(kCFAllocatorDefault,
+                                                property_list,
+                                                format,
+                                                0,
+                                                &mut error);
         if data_ref.is_null() {
             Err(TCFType::wrap_under_create_rule(error))
         } else {
@@ -60,6 +56,7 @@ pub fn create_data(
         }
     }
 }
+
 
 /// Trait for all subclasses of [`CFPropertyList`].
 ///
@@ -87,15 +84,16 @@ pub trait CFPropertyListSubClass: TCFType {
     }
 }
 
-impl CFPropertyListSubClass for crate::data::CFData {}
-impl CFPropertyListSubClass for crate::string::CFString {}
-impl CFPropertyListSubClass for crate::array::CFArray {}
-impl CFPropertyListSubClass for crate::dictionary::CFDictionary {}
-impl CFPropertyListSubClass for crate::date::CFDate {}
-impl CFPropertyListSubClass for crate::boolean::CFBoolean {}
-impl CFPropertyListSubClass for crate::number::CFNumber {}
+impl CFPropertyListSubClass for ::data::CFData {}
+impl CFPropertyListSubClass for ::string::CFString {}
+impl CFPropertyListSubClass for ::array::CFArray {}
+impl CFPropertyListSubClass for ::dictionary::CFDictionary {}
+impl CFPropertyListSubClass for ::date::CFDate {}
+impl CFPropertyListSubClass for ::boolean::CFBoolean {}
+impl CFPropertyListSubClass for ::number::CFNumber {}
 
-declare_TCFType! {
+
+declare_TCFType!{
     /// A CFPropertyList struct. This is superclass to [`CFData`], [`CFString`], [`CFArray`],
     /// [`CFDictionary`], [`CFDate`], [`CFBoolean`], and [`CFNumber`].
     ///
@@ -163,8 +161,8 @@ impl CFPropertyList {
         unsafe { CFGetRetainCount(self.as_CFTypeRef()) }
     }
 
-    /// Returns the type ID of this object. Will be one of `CFData`, `CFString`, `CFArray`,
-    /// `CFDictionary`, `CFDate`, `CFBoolean`, or `CFNumber`.
+    /// Returns the type ID of this object. Will be one of CFData, CFString, CFArray, CFDictionary,
+    /// CFDate, CFBoolean, or CFNumber.
     #[inline]
     pub fn type_of(&self) -> CFTypeID {
         unsafe { CFGetTypeID(self.as_CFTypeRef()) }
@@ -175,7 +173,7 @@ impl CFPropertyList {
         unsafe { CFShow(self.as_CFTypeRef()) }
     }
 
-    /// Returns `true` if this value is an instance of another type.
+    /// Returns true if this value is an instance of another type.
     #[inline]
     pub fn instance_of<OtherCFType: TCFType>(&self) -> bool {
         self.type_of() == OtherCFType::type_id()
@@ -246,33 +244,33 @@ impl CFPropertyList {
     }
 }
 
+
+
 #[cfg(test)]
 pub mod test {
     use super::*;
-    use crate::boolean::CFBoolean;
-    use crate::string::CFString;
+    use string::CFString;
+    use boolean::CFBoolean;
 
     #[test]
     fn test_property_list_serialization() {
+        use base::{TCFType, CFEqual};
+        use boolean::CFBoolean;
+        use number::CFNumber;
+        use dictionary::CFDictionary;
+        use string::CFString;
         use super::*;
-        use crate::base::{CFEqual, TCFType};
-        use crate::boolean::CFBoolean;
-        use crate::dictionary::CFDictionary;
-        use crate::number::CFNumber;
-        use crate::string::CFString;
 
         let bar = CFString::from_static_string("Bar");
         let baz = CFString::from_static_string("Baz");
         let boo = CFString::from_static_string("Boo");
         let foo = CFString::from_static_string("Foo");
         let tru = CFBoolean::true_value();
-        let n42 = CFNumber::from(1i64 << 33);
+        let n42 = CFNumber::from(1i64<<33);
 
-        let dict1 = CFDictionary::from_CFType_pairs(&[
-            (bar.as_CFType(), boo.as_CFType()),
-            (baz.as_CFType(), tru.as_CFType()),
-            (foo.as_CFType(), n42.as_CFType()),
-        ]);
+        let dict1 = CFDictionary::from_CFType_pairs(&[(bar.as_CFType(), boo.as_CFType()),
+                                                      (baz.as_CFType(), tru.as_CFType()),
+                                                      (foo.as_CFType(), n42.as_CFType())]);
 
         let data = create_data(dict1.as_CFTypeRef(), kCFPropertyListXMLFormat_v1_0).unwrap();
         let (dict2, _) = create_with_data(data, kCFPropertyListImmutable).unwrap();
@@ -283,7 +281,7 @@ pub mod test {
 
     #[test]
     fn to_propertylist_retain_count() {
-        let string = CFString::from_static_string("alongerstring");
+        let string = CFString::from_static_string("Bar");
         assert_eq!(string.retain_count(), 1);
 
         let propertylist = string.to_CFPropertyList();
@@ -297,10 +295,7 @@ pub mod test {
     #[test]
     fn downcast_string() {
         let propertylist = CFString::from_static_string("Bar").to_CFPropertyList();
-        assert_eq!(
-            propertylist.downcast::<CFString>().unwrap().to_string(),
-            "Bar"
-        );
+        assert_eq!(propertylist.downcast::<CFString>().unwrap().to_string(), "Bar");
         assert!(propertylist.downcast::<CFBoolean>().is_none());
     }
 
@@ -313,7 +308,7 @@ pub mod test {
 
     #[test]
     fn downcast_into_fail() {
-        let string = CFString::from_static_string("alongerstring");
+        let string = CFString::from_static_string("Bar");
         let propertylist = string.to_CFPropertyList();
         assert_eq!(string.retain_count(), 2);
 
@@ -323,12 +318,12 @@ pub mod test {
 
     #[test]
     fn downcast_into() {
-        let string = CFString::from_static_string("alongerstring");
+        let string = CFString::from_static_string("Bar");
         let propertylist = string.to_CFPropertyList();
         assert_eq!(string.retain_count(), 2);
 
         let string2 = propertylist.downcast_into::<CFString>().unwrap();
-        assert_eq!(string2.to_string(), "alongerstring");
+        assert_eq!(string2.to_string(), "Bar");
         assert_eq!(string2.retain_count(), 2);
     }
 }

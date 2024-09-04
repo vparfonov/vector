@@ -35,8 +35,8 @@ impl DescribeVpcEndpointsOutput {
 }
 
 /// A builder for [`DescribeVpcEndpointsOutput`](crate::operation::describe_vpc_endpoints::DescribeVpcEndpointsOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DescribeVpcEndpointsOutputBuilder {
     pub(crate) vpc_endpoints: ::std::option::Option<::std::vec::Vec<crate::types::VpcEndpoint>>,
     pub(crate) vpc_endpoint_errors: ::std::option::Option<::std::vec::Vec<crate::types::VpcEndpointError>>,

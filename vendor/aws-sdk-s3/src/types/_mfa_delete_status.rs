@@ -96,12 +96,3 @@ impl MfaDeleteStatus {
         }
     }
 }
-impl ::std::fmt::Display for MfaDeleteStatus {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            MfaDeleteStatus::Disabled => write!(f, "Disabled"),
-            MfaDeleteStatus::Enabled => write!(f, "Enabled"),
-            MfaDeleteStatus::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

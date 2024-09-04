@@ -181,7 +181,6 @@ impl<Params, Key> PemLabel for SubjectPublicKeyInfo<Params, Key> {
 #[cfg(feature = "alloc")]
 mod allocating {
     use super::*;
-    use crate::EncodePublicKey;
     use der::referenced::*;
 
     impl<'a> RefToOwned<'a> for SubjectPublicKeyInfoRef<'a> {
@@ -201,17 +200,6 @@ mod allocating {
                 algorithm: self.algorithm.owned_to_ref(),
                 subject_public_key: self.subject_public_key.owned_to_ref(),
             }
-        }
-    }
-
-    impl SubjectPublicKeyInfoOwned {
-        /// Create a [`SubjectPublicKeyInfoOwned`] from any object that implements
-        /// [`EncodePublicKey`].
-        pub fn from_key<T>(source: T) -> Result<Self>
-        where
-            T: EncodePublicKey,
-        {
-            Ok(source.to_public_key_der()?.decode_msg::<Self>()?)
         }
     }
 }

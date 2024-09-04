@@ -12,15 +12,23 @@
 //!
 //! ## Compatibility
 //!
-//! The `num-iter` crate is tested for rustc 1.31 and greater.
+//! The `num-iter` crate is tested for rustc 1.8 and greater.
 
 #![doc(html_root_url = "https://docs.rs/num-iter/0.1")]
 #![no_std]
+#[cfg(feature = "std")]
+extern crate std;
 
-use core::ops::{Add, Bound, RangeBounds, Sub};
+extern crate num_integer as integer;
+extern crate num_traits as traits;
+
+use core::ops::{Add, Sub};
 use core::usize;
-use num_integer::Integer;
-use num_traits::{CheckedAdd, One, ToPrimitive, Zero};
+use integer::Integer;
+use traits::{CheckedAdd, One, ToPrimitive, Zero};
+
+#[cfg(rustc_1_28)]
+use core::ops::{Bound, RangeBounds};
 
 /// An iterator over the range [start, stop)
 #[derive(Clone)]
@@ -50,19 +58,36 @@ where
 {
     Range {
         state: start,
-        stop,
+        stop: stop,
         one: One::one(),
     }
 }
 
 #[inline]
+#[cfg(has_i128)]
 fn unsigned<T: ToPrimitive>(x: &T) -> Option<u128> {
     match x.to_u128() {
+        None => match x.to_i128() {
+            Some(i) => Some(i as u128),
+            None => None,
+        },
         Some(u) => Some(u),
-        None => Some(x.to_i128()? as u128),
     }
 }
 
+#[inline]
+#[cfg(not(has_i128))]
+fn unsigned<T: ToPrimitive>(x: &T) -> Option<u64> {
+    match x.to_u64() {
+        None => match x.to_i64() {
+            Some(i) => Some(i as u64),
+            None => None,
+        },
+        Some(u) => Some(u),
+    }
+}
+
+#[cfg(rustc_1_28)]
 impl<A> RangeBounds<A> for Range<A> {
     fn start_bound(&self) -> Bound<&A> {
         Bound::Included(&self.state)
@@ -125,7 +150,7 @@ where
     #[inline]
     fn next_back(&mut self) -> Option<A> {
         if self.stop > self.state {
-            self.stop.dec();
+            self.stop = self.stop.clone() - self.one.clone();
             Some(self.stop.clone())
         } else {
             None
@@ -152,6 +177,7 @@ where
     }
 }
 
+#[cfg(rustc_1_28)]
 impl<A> RangeBounds<A> for RangeInclusive<A> {
     fn start_bound(&self) -> Bound<&A> {
         Bound::Included(&self.range.state)
@@ -207,7 +233,7 @@ where
     fn next_back(&mut self) -> Option<A> {
         if self.range.stop > self.range.state {
             let result = self.range.stop.clone();
-            self.range.stop.dec();
+            self.range.stop = self.range.stop.clone() - self.range.one.clone();
             Some(result)
         } else if !self.done && self.range.state == self.range.stop {
             self.done = true;
@@ -236,9 +262,9 @@ where
     let rev = step < Zero::zero();
     RangeStep {
         state: start,
-        stop,
-        step,
-        rev,
+        stop: stop,
+        step: step,
+        rev: rev,
     }
 }
 
@@ -282,9 +308,9 @@ where
     let rev = step < Zero::zero();
     RangeStepInclusive {
         state: start,
-        stop,
-        step,
-        rev,
+        stop: stop,
+        step: step,
+        rev: rev,
         done: false,
     }
 }
@@ -336,6 +362,7 @@ where
     }
 }
 
+#[cfg(rustc_1_28)]
 impl<A> RangeBounds<A> for RangeFrom<A> {
     fn start_bound(&self) -> Bound<&A> {
         Bound::Included(&self.state)
@@ -383,7 +410,10 @@ pub fn range_step_from<A>(start: A, step: A) -> RangeStepFrom<A>
 where
     A: Add<A, Output = A> + Clone,
 {
-    RangeStepFrom { state: start, step }
+    RangeStepFrom {
+        state: start,
+        step: step,
+    }
 }
 
 impl<A> Iterator for RangeStepFrom<A>
@@ -411,7 +441,7 @@ mod tests {
     use core::iter;
     use core::ops::{Add, Mul};
     use core::{isize, usize};
-    use num_traits::{One, ToPrimitive};
+    use traits::{One, ToPrimitive};
 
     #[test]
     fn test_range() {
@@ -489,6 +519,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(has_i128)]
     fn test_range_128() {
         use core::{i128, u128};
 
@@ -547,6 +578,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(has_i128)]
     fn test_range_inclusive_128() {
         use core::i128;
 
@@ -589,6 +621,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(has_i128)]
     fn test_range_step_128() {
         use core::u128::MAX as UMAX;
 
@@ -611,6 +644,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(has_i128)]
     fn test_range_step_inclusive_128() {
         use core::u128::MAX as UMAX;
 

@@ -45,7 +45,7 @@ fn supports_shorthand_formatting() {
 
 #[test]
 fn supports_positional_and_shorthand_formatting() {
-    let error = PositionalAndShorthandArgumentsSnafu {
+    let error = OnlyShorthandArgumentsSnafu {
         id: 42,
         name: "Anna",
     }

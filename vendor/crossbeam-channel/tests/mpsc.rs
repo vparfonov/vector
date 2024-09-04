@@ -20,7 +20,11 @@
 //!   - https://github.com/rust-lang/rust/blob/master/COPYRIGHT
 //!   - https://www.rust-lang.org/en-US/legal.html
 
-#![allow(clippy::match_single_binding, clippy::redundant_clone)]
+#![allow(
+    clippy::drop_copy,
+    clippy::match_single_binding,
+    clippy::redundant_clone
+)]
 
 use std::sync::mpsc::{RecvError, RecvTimeoutError, TryRecvError};
 use std::sync::mpsc::{SendError, TrySendError};
@@ -176,8 +180,6 @@ macro_rules! select {
     (
         $($name:pat = $rx:ident.$meth:ident() => $code:expr),+
     ) => ({
-        const _IS_BIASED: bool = false;
-
         cc::crossbeam_channel_internal! {
             $(
                 $meth(($rx).inner) -> res => {
@@ -195,7 +197,7 @@ mod channel_tests {
 
     use std::env;
     use std::thread;
-    use std::time::Instant;
+    use std::time::{Duration, Instant};
 
     pub fn stress_factor() -> usize {
         match env::var("RUST_TEST_STRESS") {
@@ -971,6 +973,7 @@ mod sync_channel_tests {
 
     use std::env;
     use std::thread;
+    use std::time::Duration;
 
     pub fn stress_factor() -> usize {
         match env::var("RUST_TEST_STRESS") {

@@ -7,17 +7,15 @@ pub struct CreateDeliveryStreamInput {
     pub delivery_stream_name: ::std::option::Option<::std::string::String>,
     /// <p>The delivery stream type. This parameter can be one of the following values:</p>
     /// <ul>
-    /// <li>
-    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
-    /// <li>
-    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
+    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
+    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
     /// </ul>
     pub delivery_stream_type: ::std::option::Option<crate::types::DeliveryStreamType>,
     /// <p>When a Kinesis data stream is used as the source for the delivery stream, a <code>KinesisStreamSourceConfiguration</code> containing the Kinesis data stream Amazon Resource Name (ARN) and the role ARN for the source stream.</p>
     pub kinesis_stream_source_configuration: ::std::option::Option<crate::types::KinesisStreamSourceConfiguration>,
     /// <p>Used to specify the type and Amazon Resource Name (ARN) of the KMS key needed for Server-Side Encryption (SSE).</p>
     pub delivery_stream_encryption_configuration_input: ::std::option::Option<crate::types::DeliveryStreamEncryptionConfigurationInput>,
-    /// <p>\[Deprecated\] The destination in Amazon S3. You can specify only one destination.</p>
+    /// <p>[Deprecated] The destination in Amazon S3. You can specify only one destination.</p>
     #[deprecated]
     pub s3_destination_configuration: ::std::option::Option<crate::types::S3DestinationConfiguration>,
     /// <p>The destination in Amazon S3. You can specify only one destination.</p>
@@ -34,21 +32,12 @@ pub struct CreateDeliveryStreamInput {
     pub http_endpoint_destination_configuration: ::std::option::Option<crate::types::HttpEndpointDestinationConfiguration>,
     /// <p>A set of tags to assign to the delivery stream. A tag is a key-value pair that you can define and assign to Amazon Web Services resources. Tags are metadata. For example, you can add friendly names and descriptions or other types of information that can help you distinguish the delivery stream. For more information about tags, see <a href="https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html">Using Cost Allocation Tags</a> in the Amazon Web Services Billing and Cost Management User Guide.</p>
     /// <p>You can specify up to 50 tags when creating a delivery stream.</p>
-    /// <p>If you specify tags in the <code>CreateDeliveryStream</code> action, Amazon Data Firehose performs an additional authorization on the <code>firehose:TagDeliveryStream</code> action to verify if users have permissions to create tags. If you do not provide this permission, requests to create new Firehose delivery streams with IAM resource tags will fail with an <code>AccessDeniedException</code> such as following.</p>
-    /// <p><b>AccessDeniedException</b></p>
-    /// <p>User: arn:aws:sts::x:assumed-role/x/x is not authorized to perform: firehose:TagDeliveryStream on resource: arn:aws:firehose:us-east-1:x:deliverystream/x with an explicit deny in an identity-based policy.</p>
-    /// <p>For an example IAM policy, see <a href="https://docs.aws.amazon.com/firehose/latest/APIReference/API_CreateDeliveryStream.html#API_CreateDeliveryStream_Examples">Tag example.</a></p>
     pub tags: ::std::option::Option<::std::vec::Vec<crate::types::Tag>>,
     /// <p>The destination in the Serverless offering for Amazon OpenSearch Service. You can specify only one destination.</p>
     pub amazon_open_search_serverless_destination_configuration:
         ::std::option::Option<crate::types::AmazonOpenSearchServerlessDestinationConfiguration>,
     /// <p>The configuration for the Amazon MSK cluster to be used as the source for a delivery stream.</p>
     pub msk_source_configuration: ::std::option::Option<crate::types::MskSourceConfiguration>,
-    /// <p>Configure Snowflake destination</p>
-    pub snowflake_destination_configuration: ::std::option::Option<crate::types::SnowflakeDestinationConfiguration>,
-    /// <p>Configure Apache Iceberg Tables destination.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub iceberg_destination_configuration: ::std::option::Option<crate::types::IcebergDestinationConfiguration>,
 }
 impl CreateDeliveryStreamInput {
     /// <p>The name of the delivery stream. This name must be unique per Amazon Web Services account in the same Amazon Web Services Region. If the delivery streams are in different accounts or different Regions, you can have multiple delivery streams with the same name.</p>
@@ -57,10 +46,8 @@ impl CreateDeliveryStreamInput {
     }
     /// <p>The delivery stream type. This parameter can be one of the following values:</p>
     /// <ul>
-    /// <li>
-    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
-    /// <li>
-    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
+    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
+    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
     /// </ul>
     pub fn delivery_stream_type(&self) -> ::std::option::Option<&crate::types::DeliveryStreamType> {
         self.delivery_stream_type.as_ref()
@@ -73,7 +60,7 @@ impl CreateDeliveryStreamInput {
     pub fn delivery_stream_encryption_configuration_input(&self) -> ::std::option::Option<&crate::types::DeliveryStreamEncryptionConfigurationInput> {
         self.delivery_stream_encryption_configuration_input.as_ref()
     }
-    /// <p>\[Deprecated\] The destination in Amazon S3. You can specify only one destination.</p>
+    /// <p>[Deprecated] The destination in Amazon S3. You can specify only one destination.</p>
     #[deprecated]
     pub fn s3_destination_configuration(&self) -> ::std::option::Option<&crate::types::S3DestinationConfiguration> {
         self.s3_destination_configuration.as_ref()
@@ -106,10 +93,6 @@ impl CreateDeliveryStreamInput {
     }
     /// <p>A set of tags to assign to the delivery stream. A tag is a key-value pair that you can define and assign to Amazon Web Services resources. Tags are metadata. For example, you can add friendly names and descriptions or other types of information that can help you distinguish the delivery stream. For more information about tags, see <a href="https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html">Using Cost Allocation Tags</a> in the Amazon Web Services Billing and Cost Management User Guide.</p>
     /// <p>You can specify up to 50 tags when creating a delivery stream.</p>
-    /// <p>If you specify tags in the <code>CreateDeliveryStream</code> action, Amazon Data Firehose performs an additional authorization on the <code>firehose:TagDeliveryStream</code> action to verify if users have permissions to create tags. If you do not provide this permission, requests to create new Firehose delivery streams with IAM resource tags will fail with an <code>AccessDeniedException</code> such as following.</p>
-    /// <p><b>AccessDeniedException</b></p>
-    /// <p>User: arn:aws:sts::x:assumed-role/x/x is not authorized to perform: firehose:TagDeliveryStream on resource: arn:aws:firehose:us-east-1:x:deliverystream/x with an explicit deny in an identity-based policy.</p>
-    /// <p>For an example IAM policy, see <a href="https://docs.aws.amazon.com/firehose/latest/APIReference/API_CreateDeliveryStream.html#API_CreateDeliveryStream_Examples">Tag example.</a></p>
     ///
     /// If no value was sent for this field, a default will be set. If you want to determine if no value was sent, use `.tags.is_none()`.
     pub fn tags(&self) -> &[crate::types::Tag] {
@@ -125,15 +108,6 @@ impl CreateDeliveryStreamInput {
     pub fn msk_source_configuration(&self) -> ::std::option::Option<&crate::types::MskSourceConfiguration> {
         self.msk_source_configuration.as_ref()
     }
-    /// <p>Configure Snowflake destination</p>
-    pub fn snowflake_destination_configuration(&self) -> ::std::option::Option<&crate::types::SnowflakeDestinationConfiguration> {
-        self.snowflake_destination_configuration.as_ref()
-    }
-    /// <p>Configure Apache Iceberg Tables destination.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub fn iceberg_destination_configuration(&self) -> ::std::option::Option<&crate::types::IcebergDestinationConfiguration> {
-        self.iceberg_destination_configuration.as_ref()
-    }
 }
 impl CreateDeliveryStreamInput {
     /// Creates a new builder-style object to manufacture [`CreateDeliveryStreamInput`](crate::operation::create_delivery_stream::CreateDeliveryStreamInput).
@@ -143,8 +117,8 @@ impl CreateDeliveryStreamInput {
 }
 
 /// A builder for [`CreateDeliveryStreamInput`](crate::operation::create_delivery_stream::CreateDeliveryStreamInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct CreateDeliveryStreamInputBuilder {
     pub(crate) delivery_stream_name: ::std::option::Option<::std::string::String>,
     pub(crate) delivery_stream_type: ::std::option::Option<crate::types::DeliveryStreamType>,
@@ -162,8 +136,6 @@ pub struct CreateDeliveryStreamInputBuilder {
     pub(crate) amazon_open_search_serverless_destination_configuration:
         ::std::option::Option<crate::types::AmazonOpenSearchServerlessDestinationConfiguration>,
     pub(crate) msk_source_configuration: ::std::option::Option<crate::types::MskSourceConfiguration>,
-    pub(crate) snowflake_destination_configuration: ::std::option::Option<crate::types::SnowflakeDestinationConfiguration>,
-    pub(crate) iceberg_destination_configuration: ::std::option::Option<crate::types::IcebergDestinationConfiguration>,
 }
 impl CreateDeliveryStreamInputBuilder {
     /// <p>The name of the delivery stream. This name must be unique per Amazon Web Services account in the same Amazon Web Services Region. If the delivery streams are in different accounts or different Regions, you can have multiple delivery streams with the same name.</p>
@@ -183,10 +155,8 @@ impl CreateDeliveryStreamInputBuilder {
     }
     /// <p>The delivery stream type. This parameter can be one of the following values:</p>
     /// <ul>
-    /// <li>
-    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
-    /// <li>
-    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
+    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
+    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
     /// </ul>
     pub fn delivery_stream_type(mut self, input: crate::types::DeliveryStreamType) -> Self {
         self.delivery_stream_type = ::std::option::Option::Some(input);
@@ -194,10 +164,8 @@ impl CreateDeliveryStreamInputBuilder {
     }
     /// <p>The delivery stream type. This parameter can be one of the following values:</p>
     /// <ul>
-    /// <li>
-    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
-    /// <li>
-    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
+    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
+    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
     /// </ul>
     pub fn set_delivery_stream_type(mut self, input: ::std::option::Option<crate::types::DeliveryStreamType>) -> Self {
         self.delivery_stream_type = input;
@@ -205,10 +173,8 @@ impl CreateDeliveryStreamInputBuilder {
     }
     /// <p>The delivery stream type. This parameter can be one of the following values:</p>
     /// <ul>
-    /// <li>
-    /// <p><code>DirectPut</code>: Provider applications access the delivery stream directly.</p></li>
-    /// <li>
-    /// <p><code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p></li>
+    /// <li> <p> <code>DirectPut</code>: Provider applications access the delivery stream directly.</p> </li>
+    /// <li> <p> <code>KinesisStreamAsSource</code>: The delivery stream uses a Kinesis data stream as a source.</p> </li>
     /// </ul>
     pub fn get_delivery_stream_type(&self) -> &::std::option::Option<crate::types::DeliveryStreamType> {
         &self.delivery_stream_type
@@ -246,19 +212,19 @@ impl CreateDeliveryStreamInputBuilder {
     ) -> &::std::option::Option<crate::types::DeliveryStreamEncryptionConfigurationInput> {
         &self.delivery_stream_encryption_configuration_input
     }
-    /// <p>\[Deprecated\] The destination in Amazon S3. You can specify only one destination.</p>
+    /// <p>[Deprecated] The destination in Amazon S3. You can specify only one destination.</p>
     #[deprecated]
     pub fn s3_destination_configuration(mut self, input: crate::types::S3DestinationConfiguration) -> Self {
         self.s3_destination_configuration = ::std::option::Option::Some(input);
         self
     }
-    /// <p>\[Deprecated\] The destination in Amazon S3. You can specify only one destination.</p>
+    /// <p>[Deprecated] The destination in Amazon S3. You can specify only one destination.</p>
     #[deprecated]
     pub fn set_s3_destination_configuration(mut self, input: ::std::option::Option<crate::types::S3DestinationConfiguration>) -> Self {
         self.s3_destination_configuration = input;
         self
     }
-    /// <p>\[Deprecated\] The destination in Amazon S3. You can specify only one destination.</p>
+    /// <p>[Deprecated] The destination in Amazon S3. You can specify only one destination.</p>
     #[deprecated]
     pub fn get_s3_destination_configuration(&self) -> &::std::option::Option<crate::types::S3DestinationConfiguration> {
         &self.s3_destination_configuration
@@ -367,10 +333,6 @@ impl CreateDeliveryStreamInputBuilder {
     ///
     /// <p>A set of tags to assign to the delivery stream. A tag is a key-value pair that you can define and assign to Amazon Web Services resources. Tags are metadata. For example, you can add friendly names and descriptions or other types of information that can help you distinguish the delivery stream. For more information about tags, see <a href="https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html">Using Cost Allocation Tags</a> in the Amazon Web Services Billing and Cost Management User Guide.</p>
     /// <p>You can specify up to 50 tags when creating a delivery stream.</p>
-    /// <p>If you specify tags in the <code>CreateDeliveryStream</code> action, Amazon Data Firehose performs an additional authorization on the <code>firehose:TagDeliveryStream</code> action to verify if users have permissions to create tags. If you do not provide this permission, requests to create new Firehose delivery streams with IAM resource tags will fail with an <code>AccessDeniedException</code> such as following.</p>
-    /// <p><b>AccessDeniedException</b></p>
-    /// <p>User: arn:aws:sts::x:assumed-role/x/x is not authorized to perform: firehose:TagDeliveryStream on resource: arn:aws:firehose:us-east-1:x:deliverystream/x with an explicit deny in an identity-based policy.</p>
-    /// <p>For an example IAM policy, see <a href="https://docs.aws.amazon.com/firehose/latest/APIReference/API_CreateDeliveryStream.html#API_CreateDeliveryStream_Examples">Tag example.</a></p>
     pub fn tags(mut self, input: crate::types::Tag) -> Self {
         let mut v = self.tags.unwrap_or_default();
         v.push(input);
@@ -379,20 +341,12 @@ impl CreateDeliveryStreamInputBuilder {
     }
     /// <p>A set of tags to assign to the delivery stream. A tag is a key-value pair that you can define and assign to Amazon Web Services resources. Tags are metadata. For example, you can add friendly names and descriptions or other types of information that can help you distinguish the delivery stream. For more information about tags, see <a href="https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html">Using Cost Allocation Tags</a> in the Amazon Web Services Billing and Cost Management User Guide.</p>
     /// <p>You can specify up to 50 tags when creating a delivery stream.</p>
-    /// <p>If you specify tags in the <code>CreateDeliveryStream</code> action, Amazon Data Firehose performs an additional authorization on the <code>firehose:TagDeliveryStream</code> action to verify if users have permissions to create tags. If you do not provide this permission, requests to create new Firehose delivery streams with IAM resource tags will fail with an <code>AccessDeniedException</code> such as following.</p>
-    /// <p><b>AccessDeniedException</b></p>
-    /// <p>User: arn:aws:sts::x:assumed-role/x/x is not authorized to perform: firehose:TagDeliveryStream on resource: arn:aws:firehose:us-east-1:x:deliverystream/x with an explicit deny in an identity-based policy.</p>
-    /// <p>For an example IAM policy, see <a href="https://docs.aws.amazon.com/firehose/latest/APIReference/API_CreateDeliveryStream.html#API_CreateDeliveryStream_Examples">Tag example.</a></p>
     pub fn set_tags(mut self, input: ::std::option::Option<::std::vec::Vec<crate::types::Tag>>) -> Self {
         self.tags = input;
         self
     }
     /// <p>A set of tags to assign to the delivery stream. A tag is a key-value pair that you can define and assign to Amazon Web Services resources. Tags are metadata. For example, you can add friendly names and descriptions or other types of information that can help you distinguish the delivery stream. For more information about tags, see <a href="https://docs.aws.amazon.com/awsaccountbilling/latest/aboutv2/cost-alloc-tags.html">Using Cost Allocation Tags</a> in the Amazon Web Services Billing and Cost Management User Guide.</p>
     /// <p>You can specify up to 50 tags when creating a delivery stream.</p>
-    /// <p>If you specify tags in the <code>CreateDeliveryStream</code> action, Amazon Data Firehose performs an additional authorization on the <code>firehose:TagDeliveryStream</code> action to verify if users have permissions to create tags. If you do not provide this permission, requests to create new Firehose delivery streams with IAM resource tags will fail with an <code>AccessDeniedException</code> such as following.</p>
-    /// <p><b>AccessDeniedException</b></p>
-    /// <p>User: arn:aws:sts::x:assumed-role/x/x is not authorized to perform: firehose:TagDeliveryStream on resource: arn:aws:firehose:us-east-1:x:deliverystream/x with an explicit deny in an identity-based policy.</p>
-    /// <p>For an example IAM policy, see <a href="https://docs.aws.amazon.com/firehose/latest/APIReference/API_CreateDeliveryStream.html#API_CreateDeliveryStream_Examples">Tag example.</a></p>
     pub fn get_tags(&self) -> &::std::option::Option<::std::vec::Vec<crate::types::Tag>> {
         &self.tags
     }
@@ -432,37 +386,6 @@ impl CreateDeliveryStreamInputBuilder {
     pub fn get_msk_source_configuration(&self) -> &::std::option::Option<crate::types::MskSourceConfiguration> {
         &self.msk_source_configuration
     }
-    /// <p>Configure Snowflake destination</p>
-    pub fn snowflake_destination_configuration(mut self, input: crate::types::SnowflakeDestinationConfiguration) -> Self {
-        self.snowflake_destination_configuration = ::std::option::Option::Some(input);
-        self
-    }
-    /// <p>Configure Snowflake destination</p>
-    pub fn set_snowflake_destination_configuration(mut self, input: ::std::option::Option<crate::types::SnowflakeDestinationConfiguration>) -> Self {
-        self.snowflake_destination_configuration = input;
-        self
-    }
-    /// <p>Configure Snowflake destination</p>
-    pub fn get_snowflake_destination_configuration(&self) -> &::std::option::Option<crate::types::SnowflakeDestinationConfiguration> {
-        &self.snowflake_destination_configuration
-    }
-    /// <p>Configure Apache Iceberg Tables destination.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub fn iceberg_destination_configuration(mut self, input: crate::types::IcebergDestinationConfiguration) -> Self {
-        self.iceberg_destination_configuration = ::std::option::Option::Some(input);
-        self
-    }
-    /// <p>Configure Apache Iceberg Tables destination.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub fn set_iceberg_destination_configuration(mut self, input: ::std::option::Option<crate::types::IcebergDestinationConfiguration>) -> Self {
-        self.iceberg_destination_configuration = input;
-        self
-    }
-    /// <p>Configure Apache Iceberg Tables destination.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub fn get_iceberg_destination_configuration(&self) -> &::std::option::Option<crate::types::IcebergDestinationConfiguration> {
-        &self.iceberg_destination_configuration
-    }
     /// Consumes the builder and constructs a [`CreateDeliveryStreamInput`](crate::operation::create_delivery_stream::CreateDeliveryStreamInput).
     pub fn build(
         self,
@@ -483,8 +406,6 @@ impl CreateDeliveryStreamInputBuilder {
             tags: self.tags,
             amazon_open_search_serverless_destination_configuration: self.amazon_open_search_serverless_destination_configuration,
             msk_source_configuration: self.msk_source_configuration,
-            snowflake_destination_configuration: self.snowflake_destination_configuration,
-            iceberg_destination_configuration: self.iceberg_destination_configuration,
         })
     }
 }

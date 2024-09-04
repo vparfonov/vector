@@ -65,7 +65,6 @@ impl ListObjectsV2 {
             {
                 ::aws_runtime::auth::sigv4a::SCHEME_ID
             },
-            crate::s3_express::auth::SCHEME_ID,
             ::aws_smithy_runtime::client::auth::no_auth::NO_AUTH_SCHEME_ID,
         ]));
         if let ::std::option::Option::Some(config_override) = config_override {
@@ -96,7 +95,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for ListObj
             ::aws_smithy_runtime_api::client::auth::static_resolver::StaticAuthSchemeOptionResolverParams::new(),
         ));
 
-        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new("ListObjectsV2", "s3"));
+        cfg.store_put(::aws_smithy_http::operation::Metadata::new("ListObjectsV2", "s3"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = false;
         signing_options.content_sha256_header = true;
@@ -117,7 +116,11 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for ListObj
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
         let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("ListObjectsV2")
-            .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
+            .with_interceptor(
+                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
+                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
+                ),
+            )
             .with_interceptor(ListObjectsV2EndpointParamsInterceptor)
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
                 crate::operation::list_objects_v2::ListObjectsV2Error,
@@ -125,15 +128,9 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for ListObj
             .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::ModeledAsRetryableClassifier::<
                 crate::operation::list_objects_v2::ListObjectsV2Error,
             >::new())
-            .with_retry_classifier(
-                ::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<crate::operation::list_objects_v2::ListObjectsV2Error>::builder()
-                    .transient_errors({
-                        let mut transient_errors: Vec<&'static str> = ::aws_runtime::retries::classifiers::TRANSIENT_ERRORS.into();
-                        transient_errors.push("InternalError");
-                        ::std::borrow::Cow::Owned(transient_errors)
-                    })
-                    .build(),
-            );
+            .with_retry_classifier(::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<
+                crate::operation::list_objects_v2::ListObjectsV2Error,
+            >::new());
 
         ::std::borrow::Cow::Owned(rcb)
     }
@@ -197,37 +194,37 @@ impl ::aws_smithy_runtime_api::client::ser_de::SerializeRequest for ListObjectsV
                 query.push_kv("list-type", "2");
                 if let ::std::option::Option::Some(inner_1) = &_input.delimiter {
                     {
-                        query.push_kv("delimiter", &::aws_smithy_http::query::fmt_string(inner_1));
+                        query.push_kv("delimiter", &::aws_smithy_http::query::fmt_string(&inner_1));
                     }
                 }
                 if let ::std::option::Option::Some(inner_2) = &_input.encoding_type {
                     {
-                        query.push_kv("encoding-type", &::aws_smithy_http::query::fmt_string(inner_2));
+                        query.push_kv("encoding-type", &::aws_smithy_http::query::fmt_string(&inner_2));
                     }
                 }
                 if let ::std::option::Option::Some(inner_3) = &_input.max_keys {
-                    {
+                    if *inner_3 != 0 {
                         query.push_kv("max-keys", ::aws_smithy_types::primitive::Encoder::from(*inner_3).encode());
                     }
                 }
                 if let ::std::option::Option::Some(inner_4) = &_input.prefix {
                     {
-                        query.push_kv("prefix", &::aws_smithy_http::query::fmt_string(inner_4));
+                        query.push_kv("prefix", &::aws_smithy_http::query::fmt_string(&inner_4));
                     }
                 }
                 if let ::std::option::Option::Some(inner_5) = &_input.continuation_token {
                     {
-                        query.push_kv("continuation-token", &::aws_smithy_http::query::fmt_string(inner_5));
+                        query.push_kv("continuation-token", &::aws_smithy_http::query::fmt_string(&inner_5));
                     }
                 }
                 if let ::std::option::Option::Some(inner_6) = &_input.fetch_owner {
-                    {
+                    if *inner_6 {
                         query.push_kv("fetch-owner", ::aws_smithy_types::primitive::Encoder::from(*inner_6).encode());
                     }
                 }
                 if let ::std::option::Option::Some(inner_7) = &_input.start_after {
                     {
-                        query.push_kv("start-after", &::aws_smithy_http::query::fmt_string(inner_7));
+                        query.push_kv("start-after", &::aws_smithy_http::query::fmt_string(&inner_7));
                     }
                 }
                 ::std::result::Result::Ok(())
@@ -301,9 +298,6 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for ListObjectsV2
         ::std::result::Result::Ok(())
     }
 }
-
-// The get_* functions below are generated from JMESPath expressions in the
-// operationContextParams trait. They target the operation's input shape.
 
 /// Error type for the `ListObjectsV2Error` operation.
 #[non_exhaustive]

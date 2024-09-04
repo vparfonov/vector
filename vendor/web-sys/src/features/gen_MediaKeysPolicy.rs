@@ -10,16 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `MediaKeysPolicy`*"]
     pub type MediaKeysPolicy;
-    #[doc = "Get the `minHdcpVersion` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `MediaKeysPolicy`*"]
-    #[wasm_bindgen(method, getter = "minHdcpVersion")]
-    pub fn get_min_hdcp_version(this: &MediaKeysPolicy) -> Option<String>;
-    #[doc = "Change the `minHdcpVersion` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `MediaKeysPolicy`*"]
-    #[wasm_bindgen(method, setter = "minHdcpVersion")]
-    pub fn set_min_hdcp_version(this: &MediaKeysPolicy, val: &str);
 }
 impl MediaKeysPolicy {
     #[doc = "Construct a new `MediaKeysPolicy`."]
@@ -30,9 +20,21 @@ impl MediaKeysPolicy {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_min_hdcp_version()` instead."]
+    #[doc = "Change the `minHdcpVersion` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `MediaKeysPolicy`*"]
     pub fn min_hdcp_version(&mut self, val: &str) -> &mut Self {
-        self.set_min_hdcp_version(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("minHdcpVersion"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

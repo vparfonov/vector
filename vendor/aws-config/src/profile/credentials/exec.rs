@@ -130,24 +130,19 @@ impl ProviderChain {
                 sso_region,
                 sso_role_name,
                 sso_start_url,
-                sso_session_name,
             } => {
                 #[cfg(feature = "sso")]
                 {
                     use crate::sso::{credentials::SsoProviderConfig, SsoCredentialsProvider};
                     use aws_types::region::Region;
 
-                    let (Some(sso_account_id), Some(sso_role_name)) =
-                        (sso_account_id, sso_role_name)
-                    else {
-                        return Err(ProfileFileError::TokenProviderConfig {});
-                    };
                     let sso_config = SsoProviderConfig {
                         account_id: sso_account_id.to_string(),
                         role_name: sso_role_name.to_string(),
                         start_url: sso_start_url.to_string(),
                         region: Region::new(sso_region.to_string()),
-                        session_name: sso_session_name.map(|s| s.to_string()),
+                        // TODO(https://github.com/awslabs/aws-sdk-rust/issues/703): Implement sso_session_name profile property
+                        session_name: None,
                     };
                     Arc::new(SsoCredentialsProvider::new(provider_config, sso_config))
                 }
@@ -160,12 +155,12 @@ impl ProviderChain {
                 }
             }
         };
-        tracing::debug!(base = ?repr.base(), "first credentials will be loaded from {:?}", repr.base());
+        tracing::info!(base = ?repr.base(), "first credentials will be loaded from {:?}", repr.base());
         let chain = repr
             .chain()
             .iter()
             .map(|role_arn| {
-                tracing::debug!(role_arn = ?role_arn, "which will be used to assume a role");
+                tracing::info!(role_arn = ?role_arn, "which will be used to assume a role");
                 AssumeRoleProvider {
                     role_arn: role_arn.role_arn.into(),
                     external_id: role_arn.external_id.map(Into::into),

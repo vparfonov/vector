@@ -21,8 +21,8 @@ impl UnsubscribeInput {
 }
 
 /// A builder for [`UnsubscribeInput`](crate::operation::unsubscribe::UnsubscribeInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct UnsubscribeInputBuilder {
     pub(crate) subscription_arn: ::std::option::Option<::std::string::String>,
 }

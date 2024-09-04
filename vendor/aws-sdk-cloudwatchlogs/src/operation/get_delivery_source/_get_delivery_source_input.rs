@@ -20,8 +20,8 @@ impl GetDeliverySourceInput {
 }
 
 /// A builder for [`GetDeliverySourceInput`](crate::operation::get_delivery_source::GetDeliverySourceInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct GetDeliverySourceInputBuilder {
     pub(crate) name: ::std::option::Option<::std::string::String>,
 }

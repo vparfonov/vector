@@ -65,19 +65,16 @@ There will be three phases before `1.0` 🚢 can be released.
     - [ ] Fuzz testing
     - [ ] Security Audits
 
-## ⚠️Security Warning
+## Security Notes
 
 This crate has received one [security audit by Include Security][audit], with
 only one minor finding which has since been addressed.
 
 See the [open security issues] on our issue tracker for other known problems.
 
-~~Notably the implementation of [modular exponentiation is not constant time],
-but timing variability is masked using [random blinding], a commonly used
-technique.~~ This crate is vulnerable to the [Marvin Attack] which could enable
-private key recovery by a network attacker (see [RUSTSEC-2023-0071]).
-
-You can follow our work on mitigating this issue in [#390].
+Notably the implementation of [modular exponentiation is not constant time],
+but timing variability is masked using random blinding, a commonly used
+technique.
 
 ## Minimum Supported Rust Version (MSRV)
 
@@ -120,7 +117,3 @@ dual licensed as above, without any additional terms or conditions.
 [audit]: https://www.opentech.fund/results/security-safety-audits/deltachat/
 [open security issues]: https://github.com/RustCrypto/RSA/issues?q=is%3Aissue+is%3Aopen+label%3Asecurity
 [modular exponentiation is not constant time]: https://github.com/RustCrypto/RSA/issues/19
-[random blinding]: https://en.wikipedia.org/wiki/Blinding_(cryptography)
-[Marvin Attack]: https://people.redhat.com/~hkario/marvin/
-[RUSTSEC-2023-0071]: https://rustsec.org/advisories/RUSTSEC-2023-0071.html
-[#390]: https://github.com/RustCrypto/RSA/issues/390

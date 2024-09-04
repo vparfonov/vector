@@ -4,7 +4,6 @@
 <!-- tidy:crate-doc:start -->
 Portable atomic types including support for 128-bit atomics, atomic float, etc.
 
-<!-- TODO: move atomic_bool_fetch_not to "features that require newer compilers" group once 1.81 became stable: https://github.com/rust-lang/rust/pull/127204 -->
 - Provide all atomic integer types (`Atomic{I,U}{8,16,32,64}`) for all targets that can use atomic CAS. (i.e., all targets that can use `std`, and most no-std targets)
 - Provide `AtomicI128` and `AtomicU128`.
 - Provide `AtomicF32` and `AtomicF64`. ([optional, requires the `float` feature](#optional-features-float))
@@ -16,10 +15,8 @@ Portable atomic types including support for 128-bit atomics, atomic float, etc.
 
 <!-- TODO:
 - mention Atomic{I,U}*::fetch_neg, Atomic{I*,U*,Ptr}::bit_*, etc.
-- mention optimizations not available in the standard library's equivalents
+- mention portable-atomic-util crate
 -->
-
-portable-atomic version of `std::sync::Arc` is provided by the [portable-atomic-util](https://github.com/taiki-e/portable-atomic/tree/HEAD/portable-atomic-util) crate.
 
 ## Usage
 
@@ -38,18 +35,20 @@ If you don't need them, disabling the default features may reduce code size and 
 portable-atomic = { version = "1", default-features = false }
 ```
 
-If your crate supports no-std environment and requires atomic CAS, enabling the `require-cas` feature will allow the `portable-atomic` to display a [helpful error message](https://github.com/taiki-e/portable-atomic/pull/100) to users on targets requiring additional action on the user side to provide atomic CAS.
+If your crate supports no-std environment and requires atomic CAS, enabling the `require-cas` feature will allow the `portable-atomic` to display helpful error messages to users on targets requiring additional action on the user side to provide atomic CAS.
 
 ```toml
 [dependencies]
 portable-atomic = { version = "1.3", default-features = false, features = ["require-cas"] }
 ```
 
+*Compiler support: requires rustc 1.34+*
+
 ## 128-bit atomics support
 
 Native 128-bit atomic operations are available on x86_64 (Rust 1.59+), aarch64 (Rust 1.59+), powerpc64 (nightly only), and s390x (nightly only), otherwise the fallback implementation is used.
 
-On x86_64, even if `cmpxchg16b` is not available at compile-time (note: `cmpxchg16b` target feature is enabled by default only on Apple and Windows (except Windows 7) targets), run-time detection checks whether `cmpxchg16b` is available. If `cmpxchg16b` is not available at either compile-time or run-time detection, the fallback implementation is used. See also [`portable_atomic_no_outline_atomics`](#optional-cfg-no-outline-atomics) cfg.
+On x86_64, even if `cmpxchg16b` is not available at compile-time (note: `cmpxchg16b` target feature is enabled by default only on Apple targets), run-time detection checks whether `cmpxchg16b` is available. If `cmpxchg16b` is not available at either compile-time or run-time detection, the fallback implementation is used. See also [`portable_atomic_no_outline_atomics`](#optional-cfg-no-outline-atomics) cfg.
 
 They are usually implemented using inline assembly, and when using Miri or ThreadSanitizer that do not support inline assembly, core intrinsics are used instead of inline assembly if possible.
 
@@ -162,10 +161,10 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
 - <a name="optional-cfg-no-outline-atomics"></a>**`--cfg portable_atomic_no_outline_atomics`**<br>
   Disable dynamic dispatching by run-time CPU feature detection.
 
-  If dynamic dispatching by run-time CPU feature detection is enabled, it allows maintaining support for older CPUs while using features that are not supported on older CPUs, such as CMPXCHG16B (x86_64) and FEAT_LSE/FEAT_LSE2 (aarch64).
+  If dynamic dispatching by run-time CPU feature detection is enabled, it allows maintaining support for older CPUs while using features that are not supported on older CPUs, such as CMPXCHG16B (x86_64) and FEAT_LSE (aarch64).
 
   Note:
-  - Dynamic detection is currently only enabled in Rust 1.59+ for aarch64 and x86_64, nightly only for powerpc64 (disabled by default), otherwise it works the same as when this cfg is set.
+  - Dynamic detection is currently only enabled in Rust 1.59+ for aarch64, in Rust 1.59+ (AVX) or 1.69+ (CMPXCHG16B) for x86_64, nightly only for powerpc64 (disabled by default), otherwise it works the same as when this cfg is set.
   - If the required target features are enabled at compile-time, the atomic operations are inlined.
   - This is compatible with no-std (as with all features except `std`).
   - On some targets, run-time detection is disabled by default mainly for compatibility with older versions of operating systems or incomplete build environments, and can be enabled by `--cfg portable_atomic_outline_atomics`. (When both cfg are enabled, `*_no_*` cfg is preferred.)
@@ -238,10 +237,21 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
 // These features are already stabilized or have already been removed from compilers,
 // and can safely be enabled for old nightly as long as version detection works.
 // - cfg(target_has_atomic)
+// - #[target_feature(enable = "cmpxchg16b")] on x86_64
 // - asm! on ARM, AArch64, RISC-V, x86_64
 // - llvm_asm! on AVR (tier 3) and MSP430 (tier 3)
 // - #[instruction_set] on non-Linux/Android pre-v6 ARM (tier 3)
 #![cfg_attr(portable_atomic_unstable_cfg_target_has_atomic, feature(cfg_target_has_atomic))]
+#![cfg_attr(
+    all(
+        target_arch = "x86_64",
+        portable_atomic_unstable_cmpxchg16b_target_feature,
+        not(portable_atomic_no_outline_atomics),
+        not(any(target_env = "sgx", miri)),
+        feature = "fallback",
+    ),
+    feature(cmpxchg16b_target_feature)
+)]
 #![cfg_attr(
     all(
         portable_atomic_unstable_asm,
@@ -272,15 +282,6 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
 // Miri and/or ThreadSanitizer only
 // They do not support inline assembly, so we need to use unstable features instead.
 // Since they require nightly compilers anyway, we can use the unstable features.
-// This is not an ideal situation, but it is still better than always using lock-based
-// fallback and causing memory ordering problems to be missed by these checkers.
-#![cfg_attr(
-    all(
-        any(target_arch = "aarch64", target_arch = "powerpc64", target_arch = "s390x"),
-        any(miri, portable_atomic_sanitize_thread),
-    ),
-    allow(internal_features)
-)]
 #![cfg_attr(
     all(
         any(target_arch = "aarch64", target_arch = "powerpc64", target_arch = "s390x"),
@@ -288,8 +289,17 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
     ),
     feature(core_intrinsics)
 )]
-// docs.rs only (cfg is enabled by docs.rs, not build script)
-#![cfg_attr(docsrs, feature(doc_cfg))]
+// This feature is only enabled for old nightly because cmpxchg16b_intrinsic has been stabilized.
+#![cfg_attr(
+    all(
+        target_arch = "x86_64",
+        portable_atomic_unstable_cmpxchg16b_intrinsic,
+        any(miri, portable_atomic_sanitize_thread),
+    ),
+    feature(stdsimd)
+)]
+// docs.rs only
+#![cfg_attr(portable_atomic_doc_cfg, feature(doc_cfg))]
 #![cfg_attr(
     all(
         portable_atomic_no_atomic_load_store,
@@ -305,10 +315,10 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
     allow(unused_imports, unused_macros)
 )]
 
-// There are currently no 128-bit or higher builtin targets.
+// There are currently no 8-bit, 128-bit, or higher builtin targets.
 // (Although some of our generic code is written with the future
 // addition of 128-bit targets in mind.)
-// Note that Rust (and C99) pointers must be at least 16-bit (i.e., 8-bit targets are impossible): https://github.com/rust-lang/rust/pull/49305
+// Note that Rust (and C99) pointers must be at least 16-bits: https://github.com/rust-lang/rust/pull/49305
 #[cfg(not(any(
     target_pointer_width = "16",
     target_pointer_width = "32",
@@ -513,7 +523,7 @@ cfg_has_atomic_8! {
 cfg_has_atomic_cas! {
 // See https://github.com/rust-lang/rust/pull/114034 for details.
 // https://github.com/rust-lang/rust/blob/9339f446a5302cd5041d3f3b5e59761f36699167/library/core/src/sync/atomic.rs#L134
-// https://godbolt.org/z/Enh87Ph9b
+// https://godbolt.org/z/5W85abT58
 #[cfg(portable_atomic_no_cfg_target_has_atomic)]
 const EMULATE_ATOMIC_BOOL: bool = cfg!(all(
     not(portable_atomic_no_atomic_cas),
@@ -587,7 +597,6 @@ impl AtomicBool {
         Self { v: core::cell::UnsafeCell::new(v as u8) }
     }
 
-    // TODO: update docs based on https://github.com/rust-lang/rust/pull/116762
     /// Creates a new `AtomicBool` from a pointer.
     ///
     /// # Safety
@@ -686,30 +695,22 @@ impl AtomicBool {
     // TODO: Add from_mut/get_mut_slice/from_mut_slice once it is stable on std atomic types.
     // https://github.com/rust-lang/rust/issues/76314
 
-    const_fn! {
-        const_if: #[cfg(not(portable_atomic_no_const_transmute))];
-        /// Consumes the atomic and returns the contained value.
-        ///
-        /// This is safe because passing `self` by value guarantees that no other threads are
-        /// concurrently accessing the atomic data.
-        ///
-        /// This is `const fn` on Rust 1.56+.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use portable_atomic::AtomicBool;
-        ///
-        /// let some_bool = AtomicBool::new(true);
-        /// assert_eq!(some_bool.into_inner(), true);
-        /// ```
-        #[inline]
-        pub const fn into_inner(self) -> bool {
-            // SAFETY: AtomicBool and u8 have the same size and in-memory representations,
-            // so they can be safely transmuted.
-            // (const UnsafeCell::into_inner is unstable)
-            unsafe { core::mem::transmute::<AtomicBool, u8>(self) != 0 }
-        }
+    /// Consumes the atomic and returns the contained value.
+    ///
+    /// This is safe because passing `self` by value guarantees that no other threads are
+    /// concurrently accessing the atomic data.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use portable_atomic::AtomicBool;
+    ///
+    /// let some_bool = AtomicBool::new(true);
+    /// assert_eq!(some_bool.into_inner(), true);
+    /// ```
+    #[inline]
+    pub fn into_inner(self) -> bool {
+        self.v.into_inner() != 0
     }
 
     /// Loads a value from the bool.
@@ -832,7 +833,7 @@ impl AtomicBool {
     /// assert_eq!(some_bool.load(Ordering::Relaxed), false);
     /// ```
     #[inline]
-    #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+    #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
     #[cfg_attr(
         any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
         track_caller
@@ -900,7 +901,7 @@ impl AtomicBool {
     /// }
     /// ```
     #[inline]
-    #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+    #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
     #[cfg_attr(
         any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
         track_caller
@@ -1311,7 +1312,7 @@ impl AtomicBool {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// use portable_atomic::{AtomicBool, Ordering};
     ///
     /// let x = AtomicBool::new(false);
@@ -1414,7 +1415,7 @@ impl<T> From<*mut T> for AtomicPtr<T> {
 }
 
 impl<T> fmt::Debug for AtomicPtr<T> {
-    #[inline] // fmt is not hot path, but #[inline] on fmt seems to still be useful: https://github.com/rust-lang/rust/pull/117727
+    #[allow(clippy::missing_inline_in_public_items)] // fmt is not hot path
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // std atomic types use Relaxed in Debug::fmt: https://github.com/rust-lang/rust/blob/1.70.0/library/core/src/sync/atomic.rs#L2024
         fmt::Debug::fmt(&self.load(Ordering::Relaxed), f)
@@ -1422,7 +1423,7 @@ impl<T> fmt::Debug for AtomicPtr<T> {
 }
 
 impl<T> fmt::Pointer for AtomicPtr<T> {
-    #[inline] // fmt is not hot path, but #[inline] on fmt seems to still be useful: https://github.com/rust-lang/rust/pull/117727
+    #[allow(clippy::missing_inline_in_public_items)] // fmt is not hot path
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         // std atomic types use Relaxed in Debug::fmt: https://github.com/rust-lang/rust/blob/1.70.0/library/core/src/sync/atomic.rs#L2024
         fmt::Pointer::fmt(&self.load(Ordering::Relaxed), f)
@@ -1453,7 +1454,6 @@ impl<T> AtomicPtr<T> {
         Self { inner: imp::AtomicPtr::new(p) }
     }
 
-    // TODO: update docs based on https://github.com/rust-lang/rust/pull/116762
     /// Creates a new `AtomicPtr` from a pointer.
     ///
     /// # Safety
@@ -1552,31 +1552,23 @@ impl<T> AtomicPtr<T> {
     // TODO: Add from_mut/get_mut_slice/from_mut_slice once it is stable on std atomic types.
     // https://github.com/rust-lang/rust/issues/76314
 
-    const_fn! {
-        const_if: #[cfg(not(portable_atomic_no_const_transmute))];
-        /// Consumes the atomic and returns the contained value.
-        ///
-        /// This is safe because passing `self` by value guarantees that no other threads are
-        /// concurrently accessing the atomic data.
-        ///
-        /// This is `const fn` on Rust 1.56+.
-        ///
-        /// # Examples
-        ///
-        /// ```
-        /// use portable_atomic::AtomicPtr;
-        ///
-        /// let mut data = 5;
-        /// let atomic_ptr = AtomicPtr::new(&mut data);
-        /// assert_eq!(unsafe { *atomic_ptr.into_inner() }, 5);
-        /// ```
-        #[inline]
-        pub const fn into_inner(self) -> *mut T {
-            // SAFETY: AtomicPtr<T> and *mut T have the same size and in-memory representations,
-            // so they can be safely transmuted.
-            // (const UnsafeCell::into_inner is unstable)
-            unsafe { core::mem::transmute(self) }
-        }
+    /// Consumes the atomic and returns the contained value.
+    ///
+    /// This is safe because passing `self` by value guarantees that no other threads are
+    /// concurrently accessing the atomic data.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use portable_atomic::AtomicPtr;
+    ///
+    /// let mut data = 5;
+    /// let atomic_ptr = AtomicPtr::new(&mut data);
+    /// assert_eq!(unsafe { *atomic_ptr.into_inner() }, 5);
+    /// ```
+    #[inline]
+    pub fn into_inner(self) -> *mut T {
+        self.inner.into_inner()
     }
 
     /// Loads a value from the pointer.
@@ -1693,7 +1685,7 @@ impl<T> AtomicPtr<T> {
     /// let value = some_ptr.compare_exchange(ptr, other_ptr, Ordering::SeqCst, Ordering::Relaxed);
     /// ```
     #[inline]
-    #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+    #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
     #[cfg_attr(
         any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
         track_caller
@@ -1744,7 +1736,7 @@ impl<T> AtomicPtr<T> {
     /// }
     /// ```
     #[inline]
-    #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+    #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
     #[cfg_attr(
         any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
         track_caller
@@ -1794,7 +1786,7 @@ impl<T> AtomicPtr<T> {
     ///
     /// # Examples
     ///
-    /// ```
+    /// ```rust
     /// use portable_atomic::{AtomicPtr, Ordering};
     ///
     /// let ptr: *mut _ = &mut 5;
@@ -1919,7 +1911,7 @@ impl<T> AtomicPtr<T> {
     /// let array = [1i32, 2i32];
     /// let atom = AtomicPtr::new(array.as_ptr().wrapping_add(1) as *mut _);
     ///
-    /// assert!(core::ptr::eq(atom.fetch_ptr_sub(1, Ordering::Relaxed), &array[1]));
+    /// assert!(core::ptr::eq(atom.fetch_ptr_sub(1, Ordering::Relaxed), &array[1],));
     /// assert!(core::ptr::eq(atom.load(Ordering::Relaxed), &array[0]));
     /// ```
     #[inline]
@@ -2449,7 +2441,6 @@ let atomic_forty_two = ", stringify!($atomic_type), "::new(42);
                 }
             }
 
-            // TODO: update docs based on https://github.com/rust-lang/rust/pull/116762
             doc_comment! {
                 concat!("Creates a new reference to an atomic integer from a pointer.
 
@@ -2555,39 +2546,11 @@ assert_eq!(some_var.load(Ordering::SeqCst), 5);
             // TODO: Add from_mut/get_mut_slice/from_mut_slice once it is stable on std atomic types.
             // https://github.com/rust-lang/rust/issues/76314
 
-            #[cfg(not(portable_atomic_no_const_transmute))]
             doc_comment! {
                 concat!("Consumes the atomic and returns the contained value.
 
 This is safe because passing `self` by value guarantees that no other threads are
 concurrently accessing the atomic data.
-
-This is `const fn` on Rust 1.56+.
-
-# Examples
-
-```
-use portable_atomic::", stringify!($atomic_type), ";
-
-let some_var = ", stringify!($atomic_type), "::new(5);
-assert_eq!(some_var.into_inner(), 5);
-```"),
-                #[inline]
-                pub const fn into_inner(self) -> $int_type {
-                    // SAFETY: $atomic_type and $int_type have the same size and in-memory representations,
-                    // so they can be safely transmuted.
-                    // (const UnsafeCell::into_inner is unstable)
-                    unsafe { core::mem::transmute(self) }
-                }
-            }
-            #[cfg(portable_atomic_no_const_transmute)]
-            doc_comment! {
-                concat!("Consumes the atomic and returns the contained value.
-
-This is safe because passing `self` by value guarantees that no other threads are
-concurrently accessing the atomic data.
-
-This is `const fn` on Rust 1.56+.
 
 # Examples
 
@@ -2599,10 +2562,7 @@ assert_eq!(some_var.into_inner(), 5);
 ```"),
                 #[inline]
                 pub fn into_inner(self) -> $int_type {
-                    // SAFETY: $atomic_type and $int_type have the same size and in-memory representations,
-                    // so they can be safely transmuted.
-                    // (const UnsafeCell::into_inner is unstable)
-                    unsafe { core::mem::transmute(self) }
+                    self.inner.into_inner()
                 }
             }
 
@@ -2730,7 +2690,7 @@ assert_eq!(
 assert_eq!(some_var.load(Ordering::Relaxed), 10);
 ```"),
                 #[inline]
-                #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+                #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
                 #[cfg_attr(
                     any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
                     track_caller
@@ -2784,7 +2744,7 @@ loop {
 }
 ```"),
                 #[inline]
-                #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+                #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
                 #[cfg_attr(
                     any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
                     track_caller
@@ -3179,7 +3139,7 @@ In particular, this method will not circumvent the [ABA Problem].
 
 # Examples
 
-```
+```rust
 use portable_atomic::{", stringify!($atomic_type), ", Ordering};
 
 let x = ", stringify!($atomic_type), "::new(7);
@@ -3540,7 +3500,7 @@ This type has the same in-memory representation as the underlying floating point
 [`", stringify!($float_type), "`].
 "
             ),
-            #[cfg_attr(docsrs, doc(cfg(feature = "float")))]
+            #[cfg_attr(portable_atomic_doc_cfg, doc(cfg(feature = "float")))]
             // We can use #[repr(transparent)] here, but #[repr(C, align(N))]
             // will show clearer docs.
             #[repr(C, align($align))]
@@ -3580,7 +3540,6 @@ This type has the same in-memory representation as the underlying floating point
                 Self { inner: imp::float::$atomic_type::new(v) }
             }
 
-            // TODO: update docs based on https://github.com/rust-lang/rust/pull/116762
             doc_comment! {
                 concat!("Creates a new reference to an atomic float from a pointer.
 
@@ -3654,21 +3613,13 @@ This type has the same in-memory representation as the underlying floating point
             // TODO: Add from_mut/get_mut_slice/from_mut_slice once it is stable on std atomic types.
             // https://github.com/rust-lang/rust/issues/76314
 
-            const_fn! {
-                const_if: #[cfg(not(portable_atomic_no_const_transmute))];
-                /// Consumes the atomic and returns the contained value.
-                ///
-                /// This is safe because passing `self` by value guarantees that no other threads are
-                /// concurrently accessing the atomic data.
-                ///
-                /// This is `const fn` on Rust 1.56+.
-                #[inline]
-                pub const fn into_inner(self) -> $float_type {
-                    // SAFETY: $atomic_type and $float_type have the same size and in-memory representations,
-                    // so they can be safely transmuted.
-                    // (const UnsafeCell::into_inner is unstable)
-                    unsafe { core::mem::transmute(self) }
-                }
+            /// Consumes the atomic and returns the contained value.
+            ///
+            /// This is safe because passing `self` by value guarantees that no other threads are
+            /// concurrently accessing the atomic data.
+            #[inline]
+            pub fn into_inner(self) -> $float_type {
+                self.inner.into_inner()
             }
 
             /// Loads a value from the atomic float.
@@ -3737,7 +3688,7 @@ This type has the same in-memory representation as the underlying floating point
             ///
             /// Panics if `failure` is [`Release`], [`AcqRel`].
             #[inline]
-            #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+            #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
             #[cfg_attr(
                 any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
                 track_caller
@@ -3772,7 +3723,7 @@ This type has the same in-memory representation as the underlying floating point
             ///
             /// Panics if `failure` is [`Release`], [`AcqRel`].
             #[inline]
-            #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+            #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
             #[cfg_attr(
                 any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
                 track_caller

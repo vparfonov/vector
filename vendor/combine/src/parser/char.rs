@@ -1,6 +1,7 @@
 //! Module containing parsers specialized on character streams.
 
 use crate::{
+    error::ParseError,
     parser::{
         combinator::no_partial,
         repeat::skip_many,
@@ -21,6 +22,7 @@ use crate::{
 pub fn char<Input>(c: char) -> Token<Input>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     token(c)
 }
@@ -61,6 +63,7 @@ parser! {
 pub fn space<Input>() -> impl Parser<Input, Output = char, PartialState = ()>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     let f: fn(char) -> bool = char::is_whitespace;
     satisfy(f).expected("whitespace")
@@ -81,6 +84,7 @@ where
 pub fn spaces<Input>() -> impl Parser<Input, Output = ()>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     skip_many(space()).expected("whitespaces")
 }
@@ -96,6 +100,7 @@ where
 pub fn newline<Input>() -> impl Parser<Input, Output = char, PartialState = ()>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     satisfy(|ch: char| ch == '\n').expected("lf newline")
 }
@@ -112,6 +117,7 @@ where
 pub fn crlf<Input>() -> impl Parser<Input, Output = char, PartialState = ()>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     no_partial(satisfy(|ch: char| ch == '\r').with(newline())).expected("crlf newline")
 }
@@ -127,6 +133,7 @@ where
 pub fn tab<Input>() -> impl Parser<Input, Output = char, PartialState = ()>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     satisfy(|ch: char| ch == '\t').expected("tab")
 }
@@ -144,6 +151,7 @@ where
 pub fn upper<Input>() -> impl Parser<Input, Output = char, PartialState = ()>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     satisfy(|ch: char| ch.is_uppercase()).expected("uppercase letter")
 }
@@ -161,6 +169,7 @@ where
 pub fn lower<Input>() -> impl Parser<Input, Output = char, PartialState = ()>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     satisfy(|ch: char| ch.is_lowercase()).expected("lowercase letter")
 }
@@ -179,6 +188,7 @@ where
 pub fn alpha_num<Input>() -> impl Parser<Input, Output = char, PartialState = ()>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     satisfy(|ch: char| ch.is_alphanumeric()).expected("letter or digit")
 }
@@ -197,6 +207,7 @@ where
 pub fn letter<Input>() -> impl Parser<Input, Output = char, PartialState = ()>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     satisfy(|ch: char| ch.is_alphabetic()).expected("letter")
 }
@@ -212,6 +223,7 @@ where
 pub fn oct_digit<Input>() -> impl Parser<Input, Output = char, PartialState = ()>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     satisfy(|ch: char| ch.is_digit(8)).expected("octal digit")
 }
@@ -227,6 +239,7 @@ where
 pub fn hex_digit<Input>() -> impl Parser<Input, Output = char, PartialState = ()>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     satisfy(|ch: char| ch.is_digit(0x10)).expected("hexadecimal digit")
 }
@@ -247,6 +260,7 @@ where
 pub fn string<'a, Input>(s: &'static str) -> impl Parser<Input, Output = &'a str>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     string_cmp(s, |l, r| l == r)
 }
@@ -268,6 +282,7 @@ pub fn string_cmp<'a, C, Input>(s: &'static str, cmp: C) -> impl Parser<Input, O
 where
     C: FnMut(char, char) -> bool,
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     tokens_cmp(s.chars(), cmp).map(move |_| s).expected(s)
 }

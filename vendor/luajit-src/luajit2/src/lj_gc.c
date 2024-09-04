@@ -187,7 +187,8 @@ static int gc_traverse_tab(global_State *g, GCtab *t)
     }
     if (weak) {  /* Weak tables are cleared in the atomic phase. */
 #if LJ_HASFFI
-      if (gcref(g->gcroot[GCROOT_FFI_FIN]) == obj2gco(t)) {
+      CTState *cts = ctype_ctsG(g);
+      if (cts && cts->finalizer == t) {
 	weak = (int)(~0u & ~LJ_GC_WEAKVAL);
       } else
 #endif
@@ -552,8 +553,9 @@ static void gc_finalize(lua_State *L)
     o->gch.marked &= (uint8_t)~LJ_GC_CDATA_FIN;
     /* Resolve finalizer. */
     setcdataV(L, &tmp, gco2cd(o));
-    tv = lj_tab_set(L, tabref(g->gcroot[GCROOT_FFI_FIN]), &tmp);
+    tv = lj_tab_set(L, ctype_ctsG(g)->finalizer, &tmp);
     if (!tvisnil(tv)) {
+      g->gc.nocdatafin = 0;
       copyTV(L, &tmp, tv);
       setnilV(tv);  /* Clear entry in finalizer table. */
       gc_call_finalizer(g, L, &tmp, o);
@@ -583,31 +585,35 @@ void lj_gc_finalize_udata(lua_State *L)
 void lj_gc_finalize_cdata(lua_State *L)
 {
   global_State *g = G(L);
-  GCtab *t = tabref(g->gcroot[GCROOT_FFI_FIN]);
-  Node *node = noderef(t->node);
-  ptrdiff_t i;
-  setgcrefnull(t->metatable);  /* Mark finalizer table as disabled. */
-  for (i = (ptrdiff_t)t->hmask; i >= 0; i--)
-    if (!tvisnil(&node[i].val) && tviscdata(&node[i].key)) {
-      GCobj *o = gcV(&node[i].key);
-      TValue tmp;
-      makewhite(g, o);
-      o->gch.marked &= (uint8_t)~LJ_GC_CDATA_FIN;
-      copyTV(L, &tmp, &node[i].val);
-      setnilV(&node[i].val);
-      gc_call_finalizer(g, L, &tmp, o);
-    }
+  CTState *cts = ctype_ctsG(g);
+  if (cts) {
+    GCtab *t = cts->finalizer;
+    Node *node = noderef(t->node);
+    ptrdiff_t i;
+    setgcrefnull(t->metatable);  /* Mark finalizer table as disabled. */
+    for (i = (ptrdiff_t)t->hmask; i >= 0; i--)
+      if (!tvisnil(&node[i].val) && tviscdata(&node[i].key)) {
+	GCobj *o = gcV(&node[i].key);
+	TValue tmp;
+	makewhite(g, o);
+	o->gch.marked &= (uint8_t)~LJ_GC_CDATA_FIN;
+	copyTV(L, &tmp, &node[i].val);
+	setnilV(&node[i].val);
+	gc_call_finalizer(g, L, &tmp, o);
+      }
+  }
 }
 #endif
 
 /* Free all remaining GC objects. */
 void lj_gc_freeall(global_State *g)
 {
-  MSize i;
+  MSize i, strmask;
   /* Free everything, except super-fixed objects (the main thread). */
   g->gc.currentwhite = LJ_GC_WHITES | LJ_GC_SFIXED;
   gc_fullsweep(g, &g->gc.root);
-  for (i = g->str.mask; i != ~(MSize)0; i--)  /* Free all string hash chains. */
+  strmask = g->str.mask;
+  for (i = 0; i <= strmask; i++)  /* Free all string hash chains. */
     gc_sweepstr(g, &g->str.tab[i]);
 }
 
@@ -688,6 +694,9 @@ static size_t gc_onestep(lua_State *L)
 	lj_str_resize(L, g->str.mask >> 1);  /* Shrink string table. */
       if (gcref(g->gc.mmudata)) {  /* Need any finalizations? */
 	g->gc.state = GCSfinalize;
+#if LJ_HASFFI
+	g->gc.nocdatafin = 1;
+#endif
       } else {  /* Otherwise skip this phase to help the JIT. */
 	g->gc.state = GCSpause;  /* End of GC cycle. */
 	g->gc.debt = 0;
@@ -707,6 +716,9 @@ static size_t gc_onestep(lua_State *L)
 	g->gc.estimate -= GCFINALIZECOST;
       return GCFINALIZECOST;
     }
+#if LJ_HASFFI
+    if (!g->gc.nocdatafin) lj_tab_rehash(L, ctype_ctsG(g)->finalizer);
+#endif
     g->gc.state = GCSpause;  /* End of GC cycle. */
     g->gc.debt = 0;
     return 0;

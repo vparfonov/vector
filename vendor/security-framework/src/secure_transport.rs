@@ -843,10 +843,14 @@ impl SslContext {
         /// If enabled, TLS false start will be performed if an appropriate
         /// cipher suite is negotiated.
         ///
+        /// Requires the `OSX_10_9` (or greater) feature.
+        #[cfg(feature = "OSX_10_9")]
         const kSSLSessionOptionFalseStart: false_start & set_false_start,
         /// If enabled, 1/n-1 record splitting will be enabled for TLS 1.0
         /// connections using block ciphers to mitigate the BEAST attack.
         ///
+        /// Requires the `OSX_10_9` (or greater) feature.
+        #[cfg(feature = "OSX_10_9")]
         const kSSLSessionOptionSendOneByteRecord: send_one_byte_record & set_send_one_byte_record,
     }
 
@@ -1681,7 +1685,7 @@ mod test {
     }
 
     #[test]
-    #[cfg_attr(any(target_os = "ios", target_os = "tvos", target_os = "watchos", target_os = "visionos"), ignore)] // FIXME what's going on with ios?
+    #[cfg_attr(any(target_os = "ios", target_os = "tvos", target_os = "watchos"), ignore)] // FIXME what's going on with ios?
     fn cipher_configuration() {
         let mut ctx = p!(SslContext::new(
             SslProtocolSide::SERVER,
@@ -1717,7 +1721,7 @@ mod test {
     }
 
     #[test]
-    #[cfg_attr(any(target_os = "ios", target_os = "tvos", target_os = "watchos", target_os = "visionos"), ignore)] // FIXME same issue as cipher_configuration
+    #[cfg_attr(any(target_os = "ios", target_os = "tvos", target_os = "watchos"), ignore)] // FIXME same issue as cipher_configuration
     fn test_builder_blacklist_ciphers() {
         let stream = p!(TcpStream::connect("google.com:443"));
 

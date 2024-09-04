@@ -13,7 +13,7 @@ pub fn compile<W: Write>(
 ) -> io::Result<()> {
     let prefix = &grammar.prefix;
 
-    rust!(out, "#[rustfmt::skip]");
+    rust!(out, "#[cfg_attr(rustfmt, rustfmt_skip)]");
     rust!(out, "mod {}intern_token {{", prefix);
     rust!(out, "#![allow(unused_imports)]");
     out.write_uses("super::", grammar)?;
@@ -40,7 +40,10 @@ pub fn compile<W: Write>(
                 },
             )
         })
-        .map(|(regex, skip)| (format!("{}", regex), skip))
+        .map(|(regex, skip)| {
+            // make sure all regex are anchored at the beginning of the input
+            (format!("^({})", regex), skip)
+        })
         .map(|(regex_str, skip)| {
             // create a rust string with text of the regex; the Debug impl
             // will add quotes and escape
@@ -56,10 +59,7 @@ pub fn compile<W: Write>(
     }
 
     if !contains_skip {
-        #[cfg(feature = "unicode")]
-        rust!(out, r#"(r"\s+", true),"#);
-        #[cfg(not(feature = "unicode"))]
-        rust!(out, r#"(r"(?-u:\s)+", true),"#);
+        rust!(out, r#"(r"^(\s*)", true),"#);
     }
 
     rust!(out, "];");

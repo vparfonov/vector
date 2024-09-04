@@ -65,7 +65,6 @@ impl CreateMultipartUpload {
             {
                 ::aws_runtime::auth::sigv4a::SCHEME_ID
             },
-            crate::s3_express::auth::SCHEME_ID,
             ::aws_smithy_runtime::client::auth::no_auth::NO_AUTH_SCHEME_ID,
         ]));
         if let ::std::option::Option::Some(config_override) = config_override {
@@ -97,10 +96,7 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for CreateM
         ));
 
         cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::SensitiveOutput);
-        cfg.store_put(::aws_smithy_runtime_api::client::orchestrator::Metadata::new(
-            "CreateMultipartUpload",
-            "s3",
-        ));
+        cfg.store_put(::aws_smithy_http::operation::Metadata::new("CreateMultipartUpload", "s3"));
         let mut signing_options = ::aws_runtime::auth::SigningOptions::default();
         signing_options.double_uri_encode = false;
         signing_options.content_sha256_header = true;
@@ -120,27 +116,22 @@ impl ::aws_smithy_runtime_api::client::runtime_plugin::RuntimePlugin for CreateM
         _: &::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder,
     ) -> ::std::borrow::Cow<'_, ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder> {
         #[allow(unused_mut)]
-        let mut rcb =
-            ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("CreateMultipartUpload")
-                .with_interceptor(::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::default())
-                .with_interceptor(CreateMultipartUploadEndpointParamsInterceptor)
-                .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
-                    crate::operation::create_multipart_upload::CreateMultipartUploadError,
-                >::new())
-                .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::ModeledAsRetryableClassifier::<
-                    crate::operation::create_multipart_upload::CreateMultipartUploadError,
-                >::new())
-                .with_retry_classifier(
-                    ::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<
-                        crate::operation::create_multipart_upload::CreateMultipartUploadError,
-                    >::builder()
-                    .transient_errors({
-                        let mut transient_errors: Vec<&'static str> = ::aws_runtime::retries::classifiers::TRANSIENT_ERRORS.into();
-                        transient_errors.push("InternalError");
-                        ::std::borrow::Cow::Owned(transient_errors)
-                    })
-                    .build(),
-                );
+        let mut rcb = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("CreateMultipartUpload")
+            .with_interceptor(
+                ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptor::new(
+                    ::aws_smithy_runtime::client::stalled_stream_protection::StalledStreamProtectionInterceptorKind::ResponseBody,
+                ),
+            )
+            .with_interceptor(CreateMultipartUploadEndpointParamsInterceptor)
+            .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::TransientErrorClassifier::<
+                crate::operation::create_multipart_upload::CreateMultipartUploadError,
+            >::new())
+            .with_retry_classifier(::aws_smithy_runtime::client::retries::classifiers::ModeledAsRetryableClassifier::<
+                crate::operation::create_multipart_upload::CreateMultipartUploadError,
+            >::new())
+            .with_retry_classifier(::aws_runtime::retries::classifiers::AwsErrorCodeClassifier::<
+                crate::operation::create_multipart_upload::CreateMultipartUploadError,
+            >::new());
 
         ::std::borrow::Cow::Owned(rcb)
     }
@@ -213,6 +204,7 @@ impl ::aws_smithy_runtime_api::client::ser_de::SerializeRequest for CreateMultip
             ) -> ::std::result::Result<(), ::aws_smithy_types::error::operation::BuildError> {
                 let mut query = ::aws_smithy_http::query::Writer::new(output);
                 query.push_v("uploads");
+                query.push_kv("x-id", "CreateMultipartUpload");
                 ::std::result::Result::Ok(())
             }
             #[allow(clippy::unnecessary_wraps)]
@@ -290,18 +282,13 @@ impl ::aws_smithy_runtime_api::client::interceptors::Intercept for CreateMultipa
         ::std::result::Result::Ok(())
     }
 }
-
-// The get_* functions below are generated from JMESPath expressions in the
-// operationContextParams trait. They target the operation's input shape.
-
 #[allow(unreachable_code, unused_variables)]
 #[cfg(test)]
-mod create_multipart_upload_test {
-
+mod create_multipart_upload_request_test {
     /// This test validates that the URI for CreateMultipartUpload is created correctly
     /// Test ID: CreateMultipartUploadUriConstruction
     #[::tokio::test]
-    #[::tracing_test::traced_test]
+    #[allow(unused_mut)]
     async fn create_multipart_upload_uri_construction_request() {
         let (http_client, request_receiver) = ::aws_smithy_runtime::client::http::test_util::capture_request(None);
         let config_builder = crate::config::Config::builder().with_test_defaults().endpoint_url("https://example.com");
@@ -319,7 +306,7 @@ mod create_multipart_upload_test {
             .await;
         let _ = dbg!(result);
         let http_request = request_receiver.expect_request();
-        let expected_query_params = &["uploads"];
+        let expected_query_params = &["uploads", "x-id=CreateMultipartUpload"];
         ::aws_smithy_protocol_test::assert_ok(::aws_smithy_protocol_test::validate_query_string(&http_request, expected_query_params));
         let uri: ::http::Uri = http_request.uri().parse().expect("invalid URI sent");
         ::pretty_assertions::assert_eq!(http_request.method(), "POST", "method was incorrect");

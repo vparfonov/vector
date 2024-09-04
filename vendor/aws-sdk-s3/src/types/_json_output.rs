@@ -21,8 +21,8 @@ impl JsonOutput {
 }
 
 /// A builder for [`JsonOutput`](crate::types::JsonOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct JsonOutputBuilder {
     pub(crate) record_delimiter: ::std::option::Option<::std::string::String>,
 }

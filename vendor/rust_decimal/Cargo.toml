@@ -13,17 +13,13 @@
 edition = "2021"
 rust-version = "1.60"
 name = "rust_decimal"
-version = "1.36.0"
+version = "1.33.1"
 authors = ["Paul Mason <paul@form1.co.nz>"]
 build = "build.rs"
 exclude = ["tests/generated/*"]
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 description = "Decimal number implementation written in pure Rust suitable for financial and fixed-precision calculations."
 documentation = "https://docs.rs/rust_decimal/"
-readme = "README.md"
+readme = "./README.md"
 keywords = [
     "decimal",
     "financial",
@@ -41,35 +37,11 @@ repository = "https://github.com/paupino/rust-decimal"
 
 [package.metadata.docs.rs]
 all-features = true
-rustdoc-args = [
-    "--cfg",
-    "docsrs",
-]
-
-[lib]
-name = "rust_decimal"
-path = "src/lib.rs"
-
-[[test]]
-name = "decimal_tests"
-path = "tests/decimal_tests.rs"
-
-[[test]]
-name = "macros"
-path = "tests/macros.rs"
-
-[[test]]
-name = "version-numbers"
-path = "tests/version-numbers.rs"
 
 [[bench]]
 name = "comparison"
 path = "benches/comparison.rs"
 harness = false
-
-[[bench]]
-name = "lib_benches"
-path = "benches/lib_benches.rs"
 
 [dependencies.arbitrary]
 version = "1.0"
@@ -94,10 +66,17 @@ version = "1.0"
 optional = true
 default-features = false
 
-[dependencies.diesel]
-version = "2.2"
+[dependencies.diesel1]
+version = "1.0"
 optional = true
 default-features = false
+package = "diesel"
+
+[dependencies.diesel2]
+version = "2.1"
+optional = true
+default-features = false
+package = "diesel"
 
 [dependencies.ndarray]
 version = "0.15.6"
@@ -109,8 +88,8 @@ version = "0.2"
 features = ["i128"]
 default-features = false
 
-[dependencies.postgres-types]
-version = "0.2"
+[dependencies.postgres]
+version = "0.19"
 optional = true
 default-features = false
 
@@ -173,17 +152,9 @@ version = "1"
 version = "0.3"
 default-features = false
 
-[dev-dependencies.postgres]
-version = "0.19"
-default-features = false
-
 [dev-dependencies.rand]
 version = "0.8"
 features = ["getrandom"]
-default-features = false
-
-[dev-dependencies.rust_decimal_macros]
-version = "1.33"
 default-features = false
 
 [dev-dependencies.serde]
@@ -203,10 +174,6 @@ features = [
 ]
 default-features = false
 
-[dev-dependencies.tokio-postgres]
-version = "0.7"
-default-features = false
-
 [dev-dependencies.version-sync]
 version = "0.9"
 features = [
@@ -221,25 +188,34 @@ borsh = [
     "std",
 ]
 c-repr = []
-db-diesel-mysql = [
-    "diesel/mysql",
+db-diesel-mysql = ["db-diesel1-mysql"]
+db-diesel-postgres = ["db-diesel1-postgres"]
+db-diesel1-mysql = [
+    "diesel1/mysql",
     "std",
 ]
-db-diesel-postgres = [
-    "diesel/postgres",
+db-diesel1-postgres = [
+    "diesel1/postgres",
     "std",
 ]
-db-diesel2-mysql = ["db-diesel-mysql"]
-db-diesel2-postgres = ["db-diesel-postgres"]
+db-diesel2-mysql = [
+    "diesel2/mysql",
+    "std",
+]
+db-diesel2-postgres = [
+    "diesel2/postgres",
+    "std",
+]
 db-postgres = [
     "dep:bytes",
-    "dep:postgres-types",
+    "dep:postgres",
     "std",
 ]
 db-tokio-postgres = [
     "dep:bytes",
-    "dep:postgres-types",
+    "dep:postgres",
     "std",
+    "dep:tokio-postgres",
 ]
 default = [
     "serde",

@@ -5,7 +5,7 @@ use core::{
     mem::size_of,
 };
 
-#[cfg(feature = "bytes")]
+#[cfg(any(test, feature = "bytes"))]
 use bytes::{BufMut, BytesMut};
 
 use crate::__private::maybestd::{
@@ -19,6 +19,8 @@ use crate::__private::maybestd::{
 };
 use crate::io::{Error, ErrorKind, Read, Result};
 
+#[cfg(feature = "rc")]
+use crate::__private::maybestd::{rc::Rc, sync::Arc};
 use crate::error::check_zst;
 
 mod hint;
@@ -421,7 +423,7 @@ where
     }
 }
 
-#[cfg(feature = "bytes")]
+#[cfg(any(test, feature = "bytes"))]
 impl BorshDeserialize for bytes::Bytes {
     #[inline]
     fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self> {
@@ -430,7 +432,7 @@ impl BorshDeserialize for bytes::Bytes {
     }
 }
 
-#[cfg(feature = "bytes")]
+#[cfg(any(test, feature = "bytes"))]
 impl BorshDeserialize for bytes::BytesMut {
     #[inline]
     fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self> {
@@ -443,7 +445,7 @@ impl BorshDeserialize for bytes::BytesMut {
     }
 }
 
-#[cfg(feature = "bson")]
+#[cfg(any(test, feature = "bson"))]
 impl BorshDeserialize for bson::oid::ObjectId {
     #[inline]
     fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self> {
@@ -487,11 +489,11 @@ where
 }
 
 /// Module is available if borsh is built with `features = ["std"]` or `features = ["hashbrown"]`.
-///
-/// Module defines [BorshDeserialize] implementation for
-/// [HashMap](std::collections::HashMap)/[HashSet](std::collections::HashSet).
 #[cfg(hash_collections)]
 pub mod hashes {
+    //!
+    //! Module defines [BorshDeserialize] implementation for
+    //! [HashMap](std::collections::HashMap)/[HashSet](std::collections::HashSet).
     use core::hash::{BuildHasher, Hash};
 
     use crate::BorshDeserialize;
@@ -779,7 +781,6 @@ fn array_deserialization_doesnt_leak() {
     static DESERIALIZE_COUNT: AtomicUsize = AtomicUsize::new(0);
     static DROP_COUNT: AtomicUsize = AtomicUsize::new(0);
 
-    #[allow(unused)]
     struct MyType(u8);
     impl BorshDeserialize for MyType {
         fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self> {
@@ -882,42 +883,23 @@ impl_range!(RangeFrom, start.., start);
 impl_range!(RangeTo, ..end, end);
 impl_range!(RangeToInclusive, ..=end, end);
 
-/// Module is available if borsh is built with `features = ["rc"]`.
 #[cfg(feature = "rc")]
-pub mod rc {
-    //!
-    //! Module defines [BorshDeserialize] implementation for
-    //! [alloc::rc::Rc](std::rc::Rc) and [alloc::sync::Arc](std::sync::Arc).
-    use crate::__private::maybestd::{boxed::Box, rc::Rc, sync::Arc};
-    use crate::io::{Read, Result};
-    use crate::BorshDeserialize;
-
-    /// This impl requires the [`"rc"`] Cargo feature of borsh.
-    ///
-    /// Deserializing a data structure containing `Rc` will not attempt to
-    /// deduplicate `Rc` references to the same data. Every deserialized `Rc`
-    /// will end up with a strong count of 1.
-    impl<T: ?Sized> BorshDeserialize for Rc<T>
-    where
-        Box<T>: BorshDeserialize,
-    {
-        fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self> {
-            Ok(Box::<T>::deserialize_reader(reader)?.into())
-        }
+impl<T: ?Sized> BorshDeserialize for Rc<T>
+where
+    Box<T>: BorshDeserialize,
+{
+    fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self> {
+        Ok(Box::<T>::deserialize_reader(reader)?.into())
     }
+}
 
-    /// This impl requires the [`"rc"`] Cargo feature of borsh.
-    ///
-    /// Deserializing a data structure containing `Arc` will not attempt to
-    /// deduplicate `Arc` references to the same data. Every deserialized `Arc`
-    /// will end up with a strong count of 1.
-    impl<T: ?Sized> BorshDeserialize for Arc<T>
-    where
-        Box<T>: BorshDeserialize,
-    {
-        fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self> {
-            Ok(Box::<T>::deserialize_reader(reader)?.into())
-        }
+#[cfg(feature = "rc")]
+impl<T: ?Sized> BorshDeserialize for Arc<T>
+where
+    Box<T>: BorshDeserialize,
+{
+    fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self> {
+        Ok(Box::<T>::deserialize_reader(reader)?.into())
     }
 }
 
@@ -926,25 +908,6 @@ impl<T: ?Sized> BorshDeserialize for PhantomData<T> {
         Ok(PhantomData)
     }
 }
-
-impl<T> BorshDeserialize for core::cell::Cell<T>
-where
-    T: BorshDeserialize + Copy,
-{
-    fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self> {
-        <T as BorshDeserialize>::deserialize_reader(reader).map(core::cell::Cell::new)
-    }
-}
-
-impl<T> BorshDeserialize for core::cell::RefCell<T>
-where
-    T: BorshDeserialize,
-{
-    fn deserialize_reader<R: Read>(reader: &mut R) -> Result<Self> {
-        <T as BorshDeserialize>::deserialize_reader(reader).map(core::cell::RefCell::new)
-    }
-}
-
 /// Deserializes an object from a slice of bytes.
 /// # Example
 /// ```

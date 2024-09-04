@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "combine"
-version = "4.6.7"
+version = "4.6.6"
 authors = ["Markus Westerlind <marwes91@gmail.com>"]
 description = "Fast parser combinators on arbitrary streams with zero-copy support."
 documentation = "https://docs.rs/combine"
@@ -29,6 +29,7 @@ categories = [
 ]
 license = "MIT"
 repository = "https://github.com/Marwes/combine"
+resolver = "1"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -85,11 +86,6 @@ required-features = ["std"]
 name = "mp4"
 harness = false
 required-features = ["mp4"]
-
-[[bench]]
-name = "buffers"
-harness = false
-required-features = ["std"]
 
 [dependencies.bytes]
 version = "1"

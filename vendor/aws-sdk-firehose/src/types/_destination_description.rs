@@ -6,7 +6,7 @@
 pub struct DestinationDescription {
     /// <p>The ID of the destination.</p>
     pub destination_id: ::std::string::String,
-    /// <p>\[Deprecated\] The destination in Amazon S3.</p>
+    /// <p>[Deprecated] The destination in Amazon S3.</p>
     pub s3_destination_description: ::std::option::Option<crate::types::S3DestinationDescription>,
     /// <p>The destination in Amazon S3.</p>
     pub extended_s3_destination_description: ::std::option::Option<crate::types::ExtendedS3DestinationDescription>,
@@ -20,13 +20,8 @@ pub struct DestinationDescription {
     pub splunk_destination_description: ::std::option::Option<crate::types::SplunkDestinationDescription>,
     /// <p>Describes the specified HTTP endpoint destination.</p>
     pub http_endpoint_destination_description: ::std::option::Option<crate::types::HttpEndpointDestinationDescription>,
-    /// <p>Optional description for the destination</p>
-    pub snowflake_destination_description: ::std::option::Option<crate::types::SnowflakeDestinationDescription>,
     /// <p>The destination in the Serverless offering for Amazon OpenSearch Service.</p>
     pub amazon_open_search_serverless_destination_description: ::std::option::Option<crate::types::AmazonOpenSearchServerlessDestinationDescription>,
-    /// <p>Describes a destination in Apache Iceberg Tables.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub iceberg_destination_description: ::std::option::Option<crate::types::IcebergDestinationDescription>,
 }
 impl DestinationDescription {
     /// <p>The ID of the destination.</p>
@@ -34,7 +29,7 @@ impl DestinationDescription {
         use std::ops::Deref;
         self.destination_id.deref()
     }
-    /// <p>\[Deprecated\] The destination in Amazon S3.</p>
+    /// <p>[Deprecated] The destination in Amazon S3.</p>
     pub fn s3_destination_description(&self) -> ::std::option::Option<&crate::types::S3DestinationDescription> {
         self.s3_destination_description.as_ref()
     }
@@ -64,20 +59,11 @@ impl DestinationDescription {
     pub fn http_endpoint_destination_description(&self) -> ::std::option::Option<&crate::types::HttpEndpointDestinationDescription> {
         self.http_endpoint_destination_description.as_ref()
     }
-    /// <p>Optional description for the destination</p>
-    pub fn snowflake_destination_description(&self) -> ::std::option::Option<&crate::types::SnowflakeDestinationDescription> {
-        self.snowflake_destination_description.as_ref()
-    }
     /// <p>The destination in the Serverless offering for Amazon OpenSearch Service.</p>
     pub fn amazon_open_search_serverless_destination_description(
         &self,
     ) -> ::std::option::Option<&crate::types::AmazonOpenSearchServerlessDestinationDescription> {
         self.amazon_open_search_serverless_destination_description.as_ref()
-    }
-    /// <p>Describes a destination in Apache Iceberg Tables.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub fn iceberg_destination_description(&self) -> ::std::option::Option<&crate::types::IcebergDestinationDescription> {
-        self.iceberg_destination_description.as_ref()
     }
 }
 impl DestinationDescription {
@@ -88,8 +74,8 @@ impl DestinationDescription {
 }
 
 /// A builder for [`DestinationDescription`](crate::types::DestinationDescription).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct DestinationDescriptionBuilder {
     pub(crate) destination_id: ::std::option::Option<::std::string::String>,
     pub(crate) s3_destination_description: ::std::option::Option<crate::types::S3DestinationDescription>,
@@ -99,10 +85,8 @@ pub struct DestinationDescriptionBuilder {
     pub(crate) amazonopensearchservice_destination_description: ::std::option::Option<crate::types::AmazonopensearchserviceDestinationDescription>,
     pub(crate) splunk_destination_description: ::std::option::Option<crate::types::SplunkDestinationDescription>,
     pub(crate) http_endpoint_destination_description: ::std::option::Option<crate::types::HttpEndpointDestinationDescription>,
-    pub(crate) snowflake_destination_description: ::std::option::Option<crate::types::SnowflakeDestinationDescription>,
     pub(crate) amazon_open_search_serverless_destination_description:
         ::std::option::Option<crate::types::AmazonOpenSearchServerlessDestinationDescription>,
-    pub(crate) iceberg_destination_description: ::std::option::Option<crate::types::IcebergDestinationDescription>,
 }
 impl DestinationDescriptionBuilder {
     /// <p>The ID of the destination.</p>
@@ -120,17 +104,17 @@ impl DestinationDescriptionBuilder {
     pub fn get_destination_id(&self) -> &::std::option::Option<::std::string::String> {
         &self.destination_id
     }
-    /// <p>\[Deprecated\] The destination in Amazon S3.</p>
+    /// <p>[Deprecated] The destination in Amazon S3.</p>
     pub fn s3_destination_description(mut self, input: crate::types::S3DestinationDescription) -> Self {
         self.s3_destination_description = ::std::option::Option::Some(input);
         self
     }
-    /// <p>\[Deprecated\] The destination in Amazon S3.</p>
+    /// <p>[Deprecated] The destination in Amazon S3.</p>
     pub fn set_s3_destination_description(mut self, input: ::std::option::Option<crate::types::S3DestinationDescription>) -> Self {
         self.s3_destination_description = input;
         self
     }
-    /// <p>\[Deprecated\] The destination in Amazon S3.</p>
+    /// <p>[Deprecated] The destination in Amazon S3.</p>
     pub fn get_s3_destination_description(&self) -> &::std::option::Option<crate::types::S3DestinationDescription> {
         &self.s3_destination_description
     }
@@ -229,20 +213,6 @@ impl DestinationDescriptionBuilder {
     pub fn get_http_endpoint_destination_description(&self) -> &::std::option::Option<crate::types::HttpEndpointDestinationDescription> {
         &self.http_endpoint_destination_description
     }
-    /// <p>Optional description for the destination</p>
-    pub fn snowflake_destination_description(mut self, input: crate::types::SnowflakeDestinationDescription) -> Self {
-        self.snowflake_destination_description = ::std::option::Option::Some(input);
-        self
-    }
-    /// <p>Optional description for the destination</p>
-    pub fn set_snowflake_destination_description(mut self, input: ::std::option::Option<crate::types::SnowflakeDestinationDescription>) -> Self {
-        self.snowflake_destination_description = input;
-        self
-    }
-    /// <p>Optional description for the destination</p>
-    pub fn get_snowflake_destination_description(&self) -> &::std::option::Option<crate::types::SnowflakeDestinationDescription> {
-        &self.snowflake_destination_description
-    }
     /// <p>The destination in the Serverless offering for Amazon OpenSearch Service.</p>
     pub fn amazon_open_search_serverless_destination_description(
         mut self,
@@ -265,23 +235,6 @@ impl DestinationDescriptionBuilder {
     ) -> &::std::option::Option<crate::types::AmazonOpenSearchServerlessDestinationDescription> {
         &self.amazon_open_search_serverless_destination_description
     }
-    /// <p>Describes a destination in Apache Iceberg Tables.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub fn iceberg_destination_description(mut self, input: crate::types::IcebergDestinationDescription) -> Self {
-        self.iceberg_destination_description = ::std::option::Option::Some(input);
-        self
-    }
-    /// <p>Describes a destination in Apache Iceberg Tables.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub fn set_iceberg_destination_description(mut self, input: ::std::option::Option<crate::types::IcebergDestinationDescription>) -> Self {
-        self.iceberg_destination_description = input;
-        self
-    }
-    /// <p>Describes a destination in Apache Iceberg Tables.</p>
-    /// <p>Amazon Data Firehose is in preview release and is subject to change.</p>
-    pub fn get_iceberg_destination_description(&self) -> &::std::option::Option<crate::types::IcebergDestinationDescription> {
-        &self.iceberg_destination_description
-    }
     /// Consumes the builder and constructs a [`DestinationDescription`](crate::types::DestinationDescription).
     /// This method will fail if any of the following fields are not set:
     /// - [`destination_id`](crate::types::builders::DestinationDescriptionBuilder::destination_id)
@@ -300,9 +253,7 @@ impl DestinationDescriptionBuilder {
             amazonopensearchservice_destination_description: self.amazonopensearchservice_destination_description,
             splunk_destination_description: self.splunk_destination_description,
             http_endpoint_destination_description: self.http_endpoint_destination_description,
-            snowflake_destination_description: self.snowflake_destination_description,
             amazon_open_search_serverless_destination_description: self.amazon_open_search_serverless_destination_description,
-            iceberg_destination_description: self.iceberg_destination_description,
         })
     }
 }

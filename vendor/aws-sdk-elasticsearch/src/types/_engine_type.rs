@@ -96,12 +96,3 @@ impl EngineType {
         }
     }
 }
-impl ::std::fmt::Display for EngineType {
-    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        match self {
-            EngineType::Elasticsearch => write!(f, "Elasticsearch"),
-            EngineType::OpenSearch => write!(f, "OpenSearch"),
-            EngineType::Unknown(value) => write!(f, "{}", value),
-        }
-    }
-}

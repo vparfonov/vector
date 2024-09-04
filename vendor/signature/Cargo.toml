@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.60"
+rust-version = "1.56"
 name = "signature"
-version = "2.2.0"
+version = "2.0.0"
 authors = ["RustCrypto Developers"]
 description = "Traits for cryptographic signature algorithms (e.g. ECDSA, Ed25519)"
 documentation = "https://docs.rs/signature"
@@ -55,7 +55,7 @@ optional = true
 default-features = false
 
 [dev-dependencies.hex-literal]
-version = "0.4"
+version = "0.3"
 
 [dev-dependencies.sha2]
 version = "0.10"
@@ -63,7 +63,4 @@ default-features = false
 
 [features]
 alloc = []
-std = [
-    "alloc",
-    "rand_core?/std",
-]
+std = ["alloc"]

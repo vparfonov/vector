@@ -18,8 +18,8 @@ impl UntagQueueOutput {
 }
 
 /// A builder for [`UntagQueueOutput`](crate::operation::untag_queue::UntagQueueOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct UntagQueueOutputBuilder {
     _request_id: Option<String>,
 }

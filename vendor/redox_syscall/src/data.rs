@@ -1,29 +1,29 @@
-use core::{
-    mem,
-    ops::{Deref, DerefMut},
-    slice,
-};
-
-use crate::flag::{EventFlags, MapFlags, PtraceFlags};
+use core::ops::{Deref, DerefMut};
+use core::{mem, slice};
+use crate::flag::{EventFlags, MapFlags, PtraceFlags, SigActionFlags};
 
 #[derive(Copy, Clone, Debug, Default)]
 #[repr(C)]
 pub struct Event {
     pub id: usize,
     pub flags: EventFlags,
-    pub data: usize,
+    pub data: usize
 }
 
 impl Deref for Event {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self as *const Event as *const u8, mem::size_of::<Event>()) }
+        unsafe {
+            slice::from_raw_parts(self as *const Event as *const u8, mem::size_of::<Event>())
+        }
     }
 }
 
 impl DerefMut for Event {
     fn deref_mut(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self as *mut Event as *mut u8, mem::size_of::<Event>()) }
+        unsafe {
+            slice::from_raw_parts_mut(self as *mut Event as *mut u8, mem::size_of::<Event>())
+        }
     }
 }
 
@@ -38,10 +38,8 @@ impl Deref for ITimerSpec {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
         unsafe {
-            slice::from_raw_parts(
-                self as *const ITimerSpec as *const u8,
-                mem::size_of::<ITimerSpec>(),
-            )
+            slice::from_raw_parts(self as *const ITimerSpec as *const u8,
+                                  mem::size_of::<ITimerSpec>())
         }
     }
 }
@@ -49,10 +47,8 @@ impl Deref for ITimerSpec {
 impl DerefMut for ITimerSpec {
     fn deref_mut(&mut self) -> &mut [u8] {
         unsafe {
-            slice::from_raw_parts_mut(
-                self as *mut ITimerSpec as *mut u8,
-                mem::size_of::<ITimerSpec>(),
-            )
+            slice::from_raw_parts_mut(self as *mut ITimerSpec as *mut u8,
+                                      mem::size_of::<ITimerSpec>())
         }
     }
 }
@@ -102,13 +98,17 @@ pub struct Map {
 impl Deref for Map {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self as *const Map as *const u8, mem::size_of::<Map>()) }
+        unsafe {
+            slice::from_raw_parts(self as *const Map as *const u8, mem::size_of::<Map>())
+        }
     }
 }
 
 impl DerefMut for Map {
     fn deref_mut(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self as *mut Map as *mut u8, mem::size_of::<Map>()) }
+        unsafe {
+            slice::from_raw_parts_mut(self as *mut Map as *mut u8, mem::size_of::<Map>())
+        }
     }
 }
 
@@ -122,7 +122,7 @@ pub struct Packet {
     pub a: usize,
     pub b: usize,
     pub c: usize,
-    pub d: usize,
+    pub d: usize
 }
 
 impl Deref for Packet {
@@ -140,6 +140,41 @@ impl DerefMut for Packet {
             slice::from_raw_parts_mut(self as *mut Packet as *mut u8, mem::size_of::<Packet>())
         }
     }
+}
+
+#[derive(Copy, Clone, Debug, Default, PartialEq)]
+#[repr(C)]
+pub struct SigAction {
+    pub sa_handler: Option<extern "C" fn(usize)>,
+    pub sa_mask: [u64; 2],
+    pub sa_flags: SigActionFlags,
+}
+impl Deref for SigAction {
+    type Target = [u8];
+    fn deref(&self) -> &[u8] {
+        unsafe {
+            slice::from_raw_parts(self as *const SigAction as *const u8,
+                                  mem::size_of::<SigAction>())
+        }
+    }
+}
+
+impl DerefMut for SigAction {
+    fn deref_mut(&mut self) -> &mut [u8] {
+        unsafe {
+            slice::from_raw_parts_mut(self as *mut SigAction as *mut u8,
+                                      mem::size_of::<SigAction>())
+        }
+    }
+}
+
+#[allow(dead_code)]
+unsafe fn _assert_size_of_function_is_sane() {
+    // Transmuting will complain *at compile time* if sizes differ.
+    // Rust forbids a fn-pointer from being 0 so to allow SIG_DFL to
+    // exist, we use Option<extern "C" fn(usize)> which will mean 0
+    // becomes None
+    let _ = mem::transmute::<Option<extern "C" fn(usize)>, usize>(None);
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq)]
@@ -165,13 +200,19 @@ pub struct Stat {
 impl Deref for Stat {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self as *const Stat as *const u8, mem::size_of::<Stat>()) }
+        unsafe {
+            slice::from_raw_parts(self as *const Stat as *const u8,
+                                  mem::size_of::<Stat>())
+        }
     }
 }
 
 impl DerefMut for Stat {
     fn deref_mut(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self as *mut Stat as *mut u8, mem::size_of::<Stat>()) }
+        unsafe {
+            slice::from_raw_parts_mut(self as *mut Stat as *mut u8,
+                                      mem::size_of::<Stat>())
+        }
     }
 }
 
@@ -188,10 +229,8 @@ impl Deref for StatVfs {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
         unsafe {
-            slice::from_raw_parts(
-                self as *const StatVfs as *const u8,
-                mem::size_of::<StatVfs>(),
-            )
+            slice::from_raw_parts(self as *const StatVfs as *const u8,
+                                  mem::size_of::<StatVfs>())
         }
     }
 }
@@ -199,7 +238,8 @@ impl Deref for StatVfs {
 impl DerefMut for StatVfs {
     fn deref_mut(&mut self) -> &mut [u8] {
         unsafe {
-            slice::from_raw_parts_mut(self as *mut StatVfs as *mut u8, mem::size_of::<StatVfs>())
+            slice::from_raw_parts_mut(self as *mut StatVfs as *mut u8,
+                                      mem::size_of::<StatVfs>())
         }
     }
 }
@@ -215,10 +255,8 @@ impl Deref for TimeSpec {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
         unsafe {
-            slice::from_raw_parts(
-                self as *const TimeSpec as *const u8,
-                mem::size_of::<TimeSpec>(),
-            )
+            slice::from_raw_parts(self as *const TimeSpec as *const u8,
+                                  mem::size_of::<TimeSpec>())
         }
     }
 }
@@ -226,7 +264,8 @@ impl Deref for TimeSpec {
 impl DerefMut for TimeSpec {
     fn deref_mut(&mut self) -> &mut [u8] {
         unsafe {
-            slice::from_raw_parts_mut(self as *mut TimeSpec as *mut u8, mem::size_of::<TimeSpec>())
+            slice::from_raw_parts_mut(self as *mut TimeSpec as *mut u8,
+                                      mem::size_of::<TimeSpec>())
         }
     }
 }
@@ -240,17 +279,14 @@ pub struct PtraceEvent {
     pub c: usize,
     pub d: usize,
     pub e: usize,
-    pub f: usize,
+    pub f: usize
 }
 
 impl Deref for PtraceEvent {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
         unsafe {
-            slice::from_raw_parts(
-                self as *const PtraceEvent as *const u8,
-                mem::size_of::<PtraceEvent>(),
-            )
+            slice::from_raw_parts(self as *const PtraceEvent as *const u8, mem::size_of::<PtraceEvent>())
         }
     }
 }
@@ -258,10 +294,7 @@ impl Deref for PtraceEvent {
 impl DerefMut for PtraceEvent {
     fn deref_mut(&mut self) -> &mut [u8] {
         unsafe {
-            slice::from_raw_parts_mut(
-                self as *mut PtraceEvent as *mut u8,
-                mem::size_of::<PtraceEvent>(),
-            )
+            slice::from_raw_parts_mut(self as *mut PtraceEvent as *mut u8, mem::size_of::<PtraceEvent>())
         }
     }
 }
@@ -282,7 +315,7 @@ macro_rules! ptrace_event {
 }
 
 bitflags::bitflags! {
-    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Default)]
+    #[derive(Default)]
     pub struct GrantFlags: usize {
         const GRANT_READ = 0x0000_0001;
         const GRANT_WRITE = 0x0000_0002;
@@ -293,14 +326,6 @@ bitflags::bitflags! {
         const GRANT_SCHEME = 0x0000_0020;
         const GRANT_PHYS = 0x0000_0040;
         const GRANT_PINNED = 0x0000_0080;
-        const GRANT_PHYS_CONTIGUOUS = 0x0000_0100;
-    }
-}
-
-impl GrantFlags {
-    #[deprecated = "use the safe `from_bits_retain` method instead"]
-    pub unsafe fn from_bits_unchecked(bits: usize) -> Self {
-        Self::from_bits_retain(bits)
     }
 }
 
@@ -317,10 +342,7 @@ impl Deref for GrantDesc {
     type Target = [u8];
     fn deref(&self) -> &[u8] {
         unsafe {
-            slice::from_raw_parts(
-                self as *const GrantDesc as *const u8,
-                mem::size_of::<GrantDesc>(),
-            )
+            slice::from_raw_parts(self as *const GrantDesc as *const u8, mem::size_of::<GrantDesc>())
         }
     }
 }
@@ -328,33 +350,7 @@ impl Deref for GrantDesc {
 impl DerefMut for GrantDesc {
     fn deref_mut(&mut self) -> &mut [u8] {
         unsafe {
-            slice::from_raw_parts_mut(
-                self as *mut GrantDesc as *mut u8,
-                mem::size_of::<GrantDesc>(),
-            )
+            slice::from_raw_parts_mut(self as *mut GrantDesc as *mut u8, mem::size_of::<GrantDesc>())
         }
     }
 }
-
-#[derive(Clone, Copy, Debug, Default)]
-#[repr(C)]
-pub struct SetSighandlerData {
-    pub user_handler: usize,
-    pub excp_handler: usize,
-    pub thread_control_addr: usize,
-    pub proc_control_addr: usize,
-}
-
-impl Deref for SetSighandlerData {
-    type Target = [u8];
-    fn deref(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self as *const Self as *const u8, mem::size_of::<Self>()) }
-    }
-}
-
-impl DerefMut for SetSighandlerData {
-    fn deref_mut(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self as *mut Self as *mut u8, mem::size_of::<Self>()) }
-    }
-}
-pub use crate::sigabi::*;

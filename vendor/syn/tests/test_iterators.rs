@@ -1,7 +1,7 @@
-#![allow(clippy::map_unwrap_or, clippy::uninlined_format_args)]
+#![allow(clippy::uninlined_format_args)]
 
 use syn::punctuated::{Pair, Punctuated};
-use syn::{parse_quote, GenericParam, Generics, Lifetime, LifetimeParam, Token};
+use syn::Token;
 
 #[macro_use]
 mod macros;
@@ -67,23 +67,4 @@ fn may_dangle() {
             break;
         }
     }
-}
-
-// Regression test for https://github.com/dtolnay/syn/issues/1718
-#[test]
-fn no_opaque_drop() {
-    let mut generics = Generics::default();
-
-    let _ = generics
-        .lifetimes()
-        .next()
-        .map(|param| param.lifetime.clone())
-        .unwrap_or_else(|| {
-            let lifetime: Lifetime = parse_quote!('a);
-            generics.params.insert(
-                0,
-                GenericParam::Lifetime(LifetimeParam::new(lifetime.clone())),
-            );
-            lifetime
-        });
 }

@@ -55,7 +55,7 @@ impl<'grammar> LaneTable<'grammar> {
     pub fn add_lookahead(&mut self, state: StateIndex, conflict: ConflictIndex, tokens: &TokenSet) {
         self.lookaheads
             .entry((state, conflict))
-            .or_default()
+            .or_insert_with(TokenSet::new)
             .union_with(tokens);
     }
 
@@ -121,11 +121,11 @@ impl<'grammar> LaneTable<'grammar> {
                 "rows: inserting state_index={:?} conflict_index={:?} token_set={:?}",
                 state_index, conflict_index, token_set
             );
-            match map
-                .entry(state_index)
-                .or_insert_with(|| ContextSet::new(self.conflicts))
-                .insert(conflict_index, token_set)
-            {
+            match {
+                map.entry(state_index)
+                    .or_insert_with(|| ContextSet::new(self.conflicts))
+                    .insert(conflict_index, token_set)
+            } {
                 Ok(_changed) => {}
                 Err(OverlappingLookahead) => {
                     debug!("rows: intra-row conflict inserting state_index={:?} conflict_index={:?} token_set={:?}",
@@ -167,13 +167,13 @@ impl<'grammar> Debug for LaneTable<'grammar> {
                     self.lookaheads
                         .get(&(index, ConflictIndex::new(i)))
                         .map(|token_set| format!("{:?}", token_set))
-                        .unwrap_or_default()
+                        .unwrap_or_else(String::new)
                 }))
                 .chain(Some(
                     self.successors
                         .get(&index)
                         .map(|c| format!("{:?}", c))
-                        .unwrap_or_default(),
+                        .unwrap_or_else(String::new),
                 ))
                 .collect()
         });

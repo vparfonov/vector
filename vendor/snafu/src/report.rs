@@ -188,7 +188,7 @@ where
         match self.0 {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) => {
-                eprintln!("Error: {}", ReportFormatter(&e));
+                eprintln!("{}", ReportFormatter(&e));
 
                 #[cfg(feature = "unstable-provider-api")]
                 {

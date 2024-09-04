@@ -13,13 +13,8 @@
 edition = "2021"
 rust-version = "1.61.0"
 name = "chrono"
-version = "0.4.38"
-include = [
-    "src/*",
-    "tests/*.rs",
-    "LICENSE.txt",
-    "CITATION.cff",
-]
+version = "0.4.37"
+exclude = ["/ci/*"]
 description = "Date and time library for Rust"
 homepage = "https://github.com/chronotope/chrono"
 documentation = "https://docs.rs/chrono/"
@@ -68,6 +63,10 @@ optional = true
 version = "0.7.43"
 optional = true
 default-features = false
+
+[dependencies.rustc-serialize]
+version = "0.3.20"
+optional = true
 
 [dependencies.serde]
 version = "1.0.99"
@@ -152,4 +151,4 @@ version = "0.52"
 optional = true
 
 [target."cfg(windows)".dev-dependencies.windows-bindgen]
-version = "0.56"
+version = "0.55"

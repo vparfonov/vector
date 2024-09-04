@@ -18,8 +18,8 @@ impl SetQueueAttributesOutput {
 }
 
 /// A builder for [`SetQueueAttributesOutput`](crate::operation::set_queue_attributes::SetQueueAttributesOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct SetQueueAttributesOutputBuilder {
     _request_id: Option<String>,
 }

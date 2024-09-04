@@ -1,9 +1,4 @@
 #![doc(html_root_url = "https://docs.rs/wasm-bindgen-macro/0.2")]
-#![cfg_attr(
-    wasm_bindgen_unstable_test_coverage,
-    feature(allow_internal_unstable),
-    allow(internal_features)
-)]
 
 extern crate proc_macro;
 
@@ -11,10 +6,6 @@ use proc_macro::TokenStream;
 use quote::quote;
 
 #[proc_macro_attribute]
-#[cfg_attr(
-    wasm_bindgen_unstable_test_coverage,
-    allow_internal_unstable(coverage_attribute)
-)]
 pub fn wasm_bindgen(attr: TokenStream, input: TokenStream) -> TokenStream {
     match wasm_bindgen_macro_support::expand(attr.into(), input.into()) {
         Ok(tokens) => {
@@ -33,7 +24,7 @@ pub fn wasm_bindgen(attr: TokenStream, input: TokenStream) -> TokenStream {
 /// The module can be specified in a few ways:
 /// - You can use `inline_js = "..."` to create an inline JS file.
 /// - You can use `module = "/foo/bar"` to reference a file relative to the
-///   root of the crate the macro is invoked in.
+/// root of the crate the macro is invoked in.
 ///
 /// The returned URL can be used for things like creating workers/worklets:
 /// ```no_run
@@ -41,10 +32,6 @@ pub fn wasm_bindgen(attr: TokenStream, input: TokenStream) -> TokenStream {
 /// let worker = Worker::new(&wasm_bindgen::link_to!(module = "/src/worker.js"));
 /// ```
 #[proc_macro]
-#[cfg_attr(
-    wasm_bindgen_unstable_test_coverage,
-    allow_internal_unstable(coverage_attribute)
-)]
 pub fn link_to(input: TokenStream) -> TokenStream {
     match wasm_bindgen_macro_support::expand_link_to(input.into()) {
         Ok(tokens) => {
@@ -61,10 +48,6 @@ pub fn link_to(input: TokenStream) -> TokenStream {
 }
 
 #[proc_macro_attribute]
-#[cfg_attr(
-    wasm_bindgen_unstable_test_coverage,
-    allow_internal_unstable(coverage_attribute)
-)]
 pub fn __wasm_bindgen_class_marker(attr: TokenStream, input: TokenStream) -> TokenStream {
     match wasm_bindgen_macro_support::expand_class_marker(attr.into(), input.into()) {
         Ok(tokens) => {

@@ -18,8 +18,8 @@ impl AddTagsOutput {
 }
 
 /// A builder for [`AddTagsOutput`](crate::operation::add_tags::AddTagsOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct AddTagsOutputBuilder {
     _request_id: Option<String>,
 }

@@ -95,11 +95,10 @@
 //! }
 //! ```
 
-#![doc(html_root_url = "https://docs.rs/erased-serde/0.4.5")]
-#![no_std]
+#![doc(html_root_url = "https://docs.rs/erased-serde/0.4.0")]
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unsafe_op_in_unsafe_fn)]
 #![allow(
-    clippy::box_collection,
     clippy::derive_partial_eq_without_eq,
     clippy::extra_unused_type_parameters,
     clippy::items_after_statements,
@@ -116,9 +115,6 @@
 )]
 
 extern crate alloc;
-
-#[cfg(feature = "std")]
-extern crate std;
 
 #[macro_use]
 mod macros;

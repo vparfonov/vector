@@ -104,17 +104,14 @@ mod tests {
     use bytes::Buf;
     use bytes_utils::SegmentedBuf;
     use http_body::Body;
-    use std::fmt::Write;
     use std::io::Read;
 
     fn header_value_as_checksum_string(header_value: &http::HeaderValue) -> String {
         let decoded_checksum = base64::decode(header_value.to_str().unwrap()).unwrap();
         let decoded_checksum = decoded_checksum
             .into_iter()
-            .fold(String::new(), |mut acc, byte| {
-                write!(acc, "{byte:02X?}").expect("string will always be writeable");
-                acc
-            });
+            .map(|byte| format!("{:02X?}", byte))
+            .collect::<String>();
 
         format!("0x{}", decoded_checksum)
     }

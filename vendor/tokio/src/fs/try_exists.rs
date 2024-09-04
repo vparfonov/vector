@@ -24,5 +24,11 @@ use std::path::Path;
 /// ```
 pub async fn try_exists(path: impl AsRef<Path>) -> io::Result<bool> {
     let path = path.as_ref().to_owned();
-    asyncify(move || path.try_exists()).await
+    // std's Path::try_exists is not available for current Rust min supported version.
+    // Current implementation is based on its internal implementation instead.
+    match asyncify(move || std::fs::metadata(path)).await {
+        Ok(_) => Ok(true),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(error) => Err(error),
+    }
 }

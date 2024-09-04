@@ -2,83 +2,26 @@ use super::noop::NoopConsumer;
 use super::plumbing::{Consumer, Folder, Reducer, UnindexedConsumer};
 use super::{IntoParallelIterator, ParallelExtend, ParallelIterator};
 
-use either::Either;
 use std::borrow::Cow;
 use std::collections::LinkedList;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::collections::{BinaryHeap, VecDeque};
-use std::ffi::{OsStr, OsString};
 use std::hash::{BuildHasher, Hash};
 
 /// Performs a generic `par_extend` by collecting to a `LinkedList<Vec<_>>` in
 /// parallel, then extending the collection sequentially.
 macro_rules! extend {
-    ($self:ident, $par_iter:ident) => {
-        extend!($self <- fast_collect($par_iter))
-    };
-    ($self:ident <- $vecs:expr) => {
-        match $vecs {
-            Either::Left(vec) => $self.extend(vec),
-            Either::Right(list) => {
-                for vec in list {
-                    $self.extend(vec);
-                }
-            }
-        }
-    };
-}
-macro_rules! extend_reserved {
-    ($self:ident, $par_iter:ident, $len:ident) => {
-        let vecs = fast_collect($par_iter);
-        $self.reserve($len(&vecs));
-        extend!($self <- vecs)
-    };
-    ($self:ident, $par_iter:ident) => {
-        extend_reserved!($self, $par_iter, len)
+    ($self:ident, $par_iter:ident, $extend:ident) => {
+        $extend(
+            $self,
+            $par_iter.into_par_iter().drive_unindexed(ListVecConsumer),
+        );
     };
 }
 
-/// Computes the total length of a `fast_collect` result.
-fn len<T>(vecs: &Either<Vec<T>, LinkedList<Vec<T>>>) -> usize {
-    match vecs {
-        Either::Left(vec) => vec.len(),
-        Either::Right(list) => list.iter().map(Vec::len).sum(),
-    }
-}
-
-/// Computes the total string length of a `fast_collect` result.
-fn string_len<T: AsRef<str>>(vecs: &Either<Vec<T>, LinkedList<Vec<T>>>) -> usize {
-    let strs = match vecs {
-        Either::Left(vec) => Either::Left(vec.iter()),
-        Either::Right(list) => Either::Right(list.iter().flatten()),
-    };
-    strs.map(AsRef::as_ref).map(str::len).sum()
-}
-
-/// Computes the total OS-string length of a `fast_collect` result.
-fn osstring_len<T: AsRef<OsStr>>(vecs: &Either<Vec<T>, LinkedList<Vec<T>>>) -> usize {
-    let osstrs = match vecs {
-        Either::Left(vec) => Either::Left(vec.iter()),
-        Either::Right(list) => Either::Right(list.iter().flatten()),
-    };
-    osstrs.map(AsRef::as_ref).map(OsStr::len).sum()
-}
-
-pub(super) fn fast_collect<I, T>(pi: I) -> Either<Vec<T>, LinkedList<Vec<T>>>
-where
-    I: IntoParallelIterator<Item = T>,
-    T: Send,
-{
-    let par_iter = pi.into_par_iter();
-    match par_iter.opt_len() {
-        Some(len) => {
-            // Pseudo-specialization. See impl of ParallelExtend for Vec for more details.
-            let mut vec = Vec::new();
-            super::collect::special_extend(par_iter, len, &mut vec);
-            Either::Left(vec)
-        }
-        None => Either::Right(par_iter.drive_unindexed(ListVecConsumer)),
-    }
+/// Computes the total length of a `LinkedList<Vec<_>>`.
+fn len<T>(list: &LinkedList<Vec<T>>) -> usize {
+    list.iter().map(Vec::len).sum()
 }
 
 struct ListVecConsumer;
@@ -144,6 +87,16 @@ impl<T> Folder<T> for ListVecFolder<T> {
     }
 }
 
+fn heap_extend<T, Item>(heap: &mut BinaryHeap<T>, list: LinkedList<Vec<Item>>)
+where
+    BinaryHeap<T>: Extend<Item>,
+{
+    heap.reserve(len(&list));
+    for vec in list {
+        heap.extend(vec);
+    }
+}
+
 /// Extends a binary heap with items from a parallel iterator.
 impl<T> ParallelExtend<T> for BinaryHeap<T>
 where
@@ -153,7 +106,7 @@ where
     where
         I: IntoParallelIterator<Item = T>,
     {
-        extend_reserved!(self, par_iter);
+        extend!(self, par_iter, heap_extend);
     }
 }
 
@@ -166,7 +119,16 @@ where
     where
         I: IntoParallelIterator<Item = &'a T>,
     {
-        extend_reserved!(self, par_iter);
+        extend!(self, par_iter, heap_extend);
+    }
+}
+
+fn btree_map_extend<K, V, Item>(map: &mut BTreeMap<K, V>, list: LinkedList<Vec<Item>>)
+where
+    BTreeMap<K, V>: Extend<Item>,
+{
+    for vec in list {
+        map.extend(vec);
     }
 }
 
@@ -180,7 +142,7 @@ where
     where
         I: IntoParallelIterator<Item = (K, V)>,
     {
-        extend!(self, par_iter);
+        extend!(self, par_iter, btree_map_extend);
     }
 }
 
@@ -194,7 +156,16 @@ where
     where
         I: IntoParallelIterator<Item = (&'a K, &'a V)>,
     {
-        extend!(self, par_iter);
+        extend!(self, par_iter, btree_map_extend);
+    }
+}
+
+fn btree_set_extend<T, Item>(set: &mut BTreeSet<T>, list: LinkedList<Vec<Item>>)
+where
+    BTreeSet<T>: Extend<Item>,
+{
+    for vec in list {
+        set.extend(vec);
     }
 }
 
@@ -207,7 +178,7 @@ where
     where
         I: IntoParallelIterator<Item = T>,
     {
-        extend!(self, par_iter);
+        extend!(self, par_iter, btree_set_extend);
     }
 }
 
@@ -220,7 +191,19 @@ where
     where
         I: IntoParallelIterator<Item = &'a T>,
     {
-        extend!(self, par_iter);
+        extend!(self, par_iter, btree_set_extend);
+    }
+}
+
+fn hash_map_extend<K, V, S, Item>(map: &mut HashMap<K, V, S>, list: LinkedList<Vec<Item>>)
+where
+    HashMap<K, V, S>: Extend<Item>,
+    K: Eq + Hash,
+    S: BuildHasher,
+{
+    map.reserve(len(&list));
+    for vec in list {
+        map.extend(vec);
     }
 }
 
@@ -236,7 +219,7 @@ where
         I: IntoParallelIterator<Item = (K, V)>,
     {
         // See the map_collect benchmarks in rayon-demo for different strategies.
-        extend_reserved!(self, par_iter);
+        extend!(self, par_iter, hash_map_extend);
     }
 }
 
@@ -251,7 +234,19 @@ where
     where
         I: IntoParallelIterator<Item = (&'a K, &'a V)>,
     {
-        extend_reserved!(self, par_iter);
+        extend!(self, par_iter, hash_map_extend);
+    }
+}
+
+fn hash_set_extend<T, S, Item>(set: &mut HashSet<T, S>, list: LinkedList<Vec<Item>>)
+where
+    HashSet<T, S>: Extend<Item>,
+    T: Eq + Hash,
+    S: BuildHasher,
+{
+    set.reserve(len(&list));
+    for vec in list {
+        set.extend(vec);
     }
 }
 
@@ -265,7 +260,7 @@ where
     where
         I: IntoParallelIterator<Item = T>,
     {
-        extend_reserved!(self, par_iter);
+        extend!(self, par_iter, hash_set_extend);
     }
 }
 
@@ -279,7 +274,7 @@ where
     where
         I: IntoParallelIterator<Item = &'a T>,
     {
-        extend_reserved!(self, par_iter);
+        extend!(self, par_iter, hash_set_extend);
     }
 }
 
@@ -380,34 +375,9 @@ impl<T> Reducer<LinkedList<T>> for ListReducer {
     }
 }
 
-/// Extends an OS-string with string slices from a parallel iterator.
-impl<'a> ParallelExtend<&'a OsStr> for OsString {
-    fn par_extend<I>(&mut self, par_iter: I)
-    where
-        I: IntoParallelIterator<Item = &'a OsStr>,
-    {
-        extend_reserved!(self, par_iter, osstring_len);
-    }
-}
-
-/// Extends an OS-string with strings from a parallel iterator.
-impl ParallelExtend<OsString> for OsString {
-    fn par_extend<I>(&mut self, par_iter: I)
-    where
-        I: IntoParallelIterator<Item = OsString>,
-    {
-        extend_reserved!(self, par_iter, osstring_len);
-    }
-}
-
-/// Extends an OS-string with string slices from a parallel iterator.
-impl<'a> ParallelExtend<Cow<'a, OsStr>> for OsString {
-    fn par_extend<I>(&mut self, par_iter: I)
-    where
-        I: IntoParallelIterator<Item = Cow<'a, OsStr>>,
-    {
-        extend_reserved!(self, par_iter, osstring_len);
-    }
+fn flat_string_extend(string: &mut String, list: LinkedList<String>) {
+    string.reserve(list.iter().map(String::len).sum());
+    string.extend(list);
 }
 
 /// Extends a string with characters from a parallel iterator.
@@ -419,8 +389,7 @@ impl ParallelExtend<char> for String {
         // This is like `extend`, but `Vec<char>` is less efficient to deal
         // with than `String`, so instead collect to `LinkedList<String>`.
         let list = par_iter.into_par_iter().drive_unindexed(ListStringConsumer);
-        self.reserve(list.iter().map(String::len).sum());
-        self.extend(list);
+        flat_string_extend(self, list);
     }
 }
 
@@ -499,13 +468,25 @@ impl Folder<char> for ListStringFolder {
     }
 }
 
+fn string_extend<Item>(string: &mut String, list: LinkedList<Vec<Item>>)
+where
+    String: Extend<Item>,
+    Item: AsRef<str>,
+{
+    let len = list.iter().flatten().map(Item::as_ref).map(str::len).sum();
+    string.reserve(len);
+    for vec in list {
+        string.extend(vec);
+    }
+}
+
 /// Extends a string with string slices from a parallel iterator.
 impl<'a> ParallelExtend<&'a str> for String {
     fn par_extend<I>(&mut self, par_iter: I)
     where
         I: IntoParallelIterator<Item = &'a str>,
     {
-        extend_reserved!(self, par_iter, string_len);
+        extend!(self, par_iter, string_extend);
     }
 }
 
@@ -515,7 +496,7 @@ impl ParallelExtend<String> for String {
     where
         I: IntoParallelIterator<Item = String>,
     {
-        extend_reserved!(self, par_iter, string_len);
+        extend!(self, par_iter, string_extend);
     }
 }
 
@@ -525,7 +506,7 @@ impl ParallelExtend<Box<str>> for String {
     where
         I: IntoParallelIterator<Item = Box<str>>,
     {
-        extend_reserved!(self, par_iter, string_len);
+        extend!(self, par_iter, string_extend);
     }
 }
 
@@ -535,7 +516,17 @@ impl<'a> ParallelExtend<Cow<'a, str>> for String {
     where
         I: IntoParallelIterator<Item = Cow<'a, str>>,
     {
-        extend_reserved!(self, par_iter, string_len);
+        extend!(self, par_iter, string_extend);
+    }
+}
+
+fn deque_extend<T, Item>(deque: &mut VecDeque<T>, list: LinkedList<Vec<Item>>)
+where
+    VecDeque<T>: Extend<Item>,
+{
+    deque.reserve(len(&list));
+    for vec in list {
+        deque.extend(vec);
     }
 }
 
@@ -548,7 +539,7 @@ where
     where
         I: IntoParallelIterator<Item = T>,
     {
-        extend_reserved!(self, par_iter);
+        extend!(self, par_iter, deque_extend);
     }
 }
 
@@ -561,7 +552,14 @@ where
     where
         I: IntoParallelIterator<Item = &'a T>,
     {
-        extend_reserved!(self, par_iter);
+        extend!(self, par_iter, deque_extend);
+    }
+}
+
+fn vec_append<T>(vec: &mut Vec<T>, list: LinkedList<Vec<T>>) {
+    vec.reserve(len(&list));
+    for mut other in list {
+        vec.append(&mut other);
     }
 }
 
@@ -586,10 +584,7 @@ where
             None => {
                 // This works like `extend`, but `Vec::append` is more efficient.
                 let list = par_iter.drive_unindexed(ListVecConsumer);
-                self.reserve(list.iter().map(Vec::len).sum());
-                for mut other in list {
-                    self.append(&mut other);
-                }
+                vec_append(self, list);
             }
         }
     }

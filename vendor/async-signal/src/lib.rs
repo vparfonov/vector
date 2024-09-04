@@ -402,7 +402,7 @@ impl Stream for Signals {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         // This stream is expected to never end.
-        (usize::MAX, None)
+        (std::usize::MAX, None)
     }
 }
 
@@ -417,6 +417,6 @@ impl Stream for &Signals {
     #[inline]
     fn size_hint(&self) -> (usize, Option<usize>) {
         // This stream is expected to never end.
-        (usize::MAX, None)
+        (std::usize::MAX, None)
     }
 }

@@ -34,9 +34,9 @@ dependencies = [
 
 [[package]]
 name = "anstyle"
-version = "1.0.8"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bec1de6f59aedf83baf9ff929c98f2ad654b97c9510f4e70cf6f661d49fd5b1"
+checksum = "038dfcf04a5feb68e9c60b21c9625a54c2c0616e79b72b0fd87075a056ae1d1b"
 
 [[package]]
 name = "anstyle-parse"
@@ -130,9 +130,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "clap"
-version = "4.5.16"
+version = "4.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed6719fffa43d0d87e5fd8caeab59be1554fb028cd30edc88fc4369b17971019"
+checksum = "8f6b81fb3c84f5563d509c59b5a48d935f689e993afa90fe39047f05adef9142"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -140,9 +140,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.15"
+version = "4.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "216aec2b177652e3846684cbfe25c9964d18ec45234f0f5da5157b207ed1aab6"
+checksum = "5ca6706fd5224857d9ac5eb9355f6683563cc0541c7cd9d014043b57cbec78ac"
 dependencies = [
  "anstyle",
  "backtrace",
@@ -151,7 +151,7 @@ dependencies = [
 
 [[package]]
 name = "clap_complete"
-version = "4.5.24"
+version = "4.5.9"
 dependencies = [
  "automod",
  "clap",
@@ -159,6 +159,7 @@ dependencies = [
  "completest",
  "completest-pty",
  "is_executable",
+ "pathdiff",
  "shlex",
  "snapbox",
  "trycmd",
@@ -167,9 +168,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.5.13"
+version = "4.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "501d359d5f3dcaf6ecdeee48833ae73ec6e42723a1e52419c79abf9507eec0a0"
+checksum = "2bac35c6dafb060fd4d275d9a4ffae97917c13a6327903a8be2153cd964f7085"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -191,15 +192,15 @@ checksum = "0b6a852b24ab71dffc585bcb46eaf7959d175cb865a7152e35b348d1b2960422"
 
 [[package]]
 name = "completest"
-version = "0.4.2"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "410de1ffe61368aa040f599747584e9e3d19235cf4045be6159edb167ef45ddb"
+checksum = "e6cda99a94266124c2cce3d239973ef8ce3160c83a3f426a314285d9bf6422d1"
 
 [[package]]
 name = "completest-pty"
-version = "0.5.3"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3635aa91b48c47ea30fe12fe7c04efbbf17dade642d4dbaa1e9cfbf3593eed4a"
+checksum = "ee700748da7d34de4bbe0296d3153e8ef5217233d814d23fb68106c110dd9bc5"
 dependencies = [
  "completest",
  "ptyprocess",
@@ -456,6 +457,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "pathdiff"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8835116a5c179084a830efb3adc117ab007512b535bc1a21c991d3b32a6b44dd"
+
+[[package]]
 name = "pin-utils"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -605,9 +612,9 @@ checksum = "fa42c91313f1d05da9b26f267f931cf178d4aba455b4c4622dd7355eb80c6640"
 
 [[package]]
 name = "snapbox"
-version = "0.6.16"
+version = "0.6.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "027c936207f85d10d015e21faf5c676c7e08c453ed371adf55c0874c443ca77a"
+checksum = "699c824ef8c2061c39efb3af4f334310b3acbfb2a50c6d1f867e4d95dcff94be"
 dependencies = [
  "anstream",
  "anstyle",
@@ -628,9 +635,9 @@ dependencies = [
 
 [[package]]
 name = "snapbox-macros"
-version = "0.3.10"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16569f53ca23a41bb6f62e0a5084aa1661f4814a67fa33696a79073e03a664af"
+checksum = "b1f4c14672714436c09254801c934b203196a51182a5107fb76591c7cc56424d"
 dependencies = [
  "anstream",
 ]
@@ -682,9 +689,9 @@ dependencies = [
 
 [[package]]
 name = "trycmd"
-version = "0.15.6"
+version = "0.15.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e8673f1dc45acdff8e25a06cc62f8e529563e8acd84237ce83d5a28e2befa12"
+checksum = "59709bd8eccada6a3fded26d22a7f2dcee406c18d3bd7ad2605ca3eeb8f6f6ec"
 dependencies = [
  "automod",
  "glob",

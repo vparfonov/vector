@@ -54,7 +54,7 @@ pub fn dup<Fd: AsFd>(fd: Fd) -> io::Result<OwnedFd> {
 ///
 /// This function does not set the `O_CLOEXEC` flag. To do a `dup2` that does
 /// set `O_CLOEXEC`, use [`dup3`] with [`DupFlags::CLOEXEC`] on platforms which
-/// support it, or [`fcntl_dupfd_cloexec`].
+/// support it, or [`fcntl_dupfd_cloexec`]
 ///
 /// For `dup2` to stdin, stdout, and stderr, see [`stdio::dup2_stdin`],
 /// [`stdio::dup2_stdout`], and [`stdio::dup2_stderr`].
@@ -114,7 +114,6 @@ pub fn dup2<Fd: AsFd>(fd: Fd, new: &mut OwnedFd) -> io::Result<()> {
 #[cfg(not(any(
     target_os = "aix",
     target_os = "espidf",
-    target_os = "horizon",
     target_os = "nto",
     target_os = "vita",
     target_os = "wasi"

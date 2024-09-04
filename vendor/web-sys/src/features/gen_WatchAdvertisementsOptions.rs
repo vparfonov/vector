@@ -14,26 +14,6 @@ extern "C" {
     #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
     #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub type WatchAdvertisementsOptions;
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "AbortSignal")]
-    #[doc = "Get the `signal` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AbortSignal`, `WatchAdvertisementsOptions`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, getter = "signal")]
-    pub fn get_signal(this: &WatchAdvertisementsOptions) -> Option<AbortSignal>;
-    #[cfg(web_sys_unstable_apis)]
-    #[cfg(feature = "AbortSignal")]
-    #[doc = "Change the `signal` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `AbortSignal`, `WatchAdvertisementsOptions`*"]
-    #[doc = ""]
-    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
-    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
-    #[wasm_bindgen(method, setter = "signal")]
-    pub fn set_signal(this: &WatchAdvertisementsOptions, val: &AbortSignal);
 }
 #[cfg(web_sys_unstable_apis)]
 impl WatchAdvertisementsOptions {
@@ -50,9 +30,21 @@ impl WatchAdvertisementsOptions {
     }
     #[cfg(web_sys_unstable_apis)]
     #[cfg(feature = "AbortSignal")]
-    #[deprecated = "Use `set_signal()` instead."]
+    #[doc = "Change the `signal` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `AbortSignal`, `WatchAdvertisementsOptions`*"]
+    #[doc = ""]
+    #[doc = "*This API is unstable and requires `--cfg=web_sys_unstable_apis` to be activated, as"]
+    #[doc = "[described in the `wasm-bindgen` guide](https://rustwasm.github.io/docs/wasm-bindgen/web-sys/unstable-apis.html)*"]
     pub fn signal(&mut self, val: &AbortSignal) -> &mut Self {
-        self.set_signal(val);
+        use wasm_bindgen::JsValue;
+        let r =
+            ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("signal"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

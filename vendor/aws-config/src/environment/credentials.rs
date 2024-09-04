@@ -39,7 +39,7 @@ impl EnvironmentVariableCredentialsProvider {
                 .get("AWS_SESSION_TOKEN")
                 .ok()
                 .and_then(|token| match token.trim() {
-                    "" => None,
+                    s if s.is_empty() => None,
                     s => Some(s.to_string()),
                 });
         Ok(Credentials::new(

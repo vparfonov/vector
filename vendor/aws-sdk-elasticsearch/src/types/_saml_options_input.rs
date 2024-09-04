@@ -70,8 +70,8 @@ impl SamlOptionsInput {
 }
 
 /// A builder for [`SamlOptionsInput`](crate::types::SamlOptionsInput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default)]
 pub struct SamlOptionsInputBuilder {
     pub(crate) enabled: ::std::option::Option<bool>,
     pub(crate) idp: ::std::option::Option<crate::types::SamlIdp>,

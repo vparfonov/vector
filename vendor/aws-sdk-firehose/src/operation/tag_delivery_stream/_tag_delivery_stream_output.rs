@@ -18,8 +18,8 @@ impl TagDeliveryStreamOutput {
 }
 
 /// A builder for [`TagDeliveryStreamOutput`](crate::operation::tag_delivery_stream::TagDeliveryStreamOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct TagDeliveryStreamOutputBuilder {
     _request_id: Option<String>,
 }

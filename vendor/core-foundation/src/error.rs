@@ -14,10 +14,11 @@ pub use core_foundation_sys::error::*;
 use std::error::Error;
 use std::fmt;
 
-use crate::base::{CFIndex, TCFType};
-use crate::string::CFString;
+use base::{CFIndex, TCFType};
+use string::CFString;
 
-declare_TCFType! {
+
+declare_TCFType!{
     /// An error value.
     CFError, CFErrorRef
 }
@@ -26,10 +27,10 @@ impl_TCFType!(CFError, CFErrorRef, CFErrorGetTypeID);
 impl fmt::Debug for CFError {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         fmt.debug_struct("CFError")
-            .field("domain", &self.domain())
-            .field("code", &self.code())
-            .field("description", &self.description())
-            .finish()
+           .field("domain", &self.domain())
+           .field("code", &self.code())
+           .field("description", &self.description())
+           .finish()
     }
 }
 

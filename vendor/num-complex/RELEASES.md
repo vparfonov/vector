@@ -1,23 +1,3 @@
-# Release 0.4.6 (2024-05-07)
-
-- [Upgrade to 2021 edition, **MSRV 1.60**][121]
-- [Add `const ZERO`/`ONE`/`I` and implement `ConstZero` and `ConstOne`][125]
-- [Add `c32` and `c64` functions to help construct `Complex` values][126]
-
-**Contributors**: @cuviper
-
-[121]: https://github.com/rust-num/num-complex/pull/121
-[125]: https://github.com/rust-num/num-complex/pull/125
-[126]: https://github.com/rust-num/num-complex/pull/126
-
-# Release 0.4.5 (2024-02-06)
-
-- [Relaxed `T` bounds on `serde::Deserialize` for `Complex<T>`.][119]
-
-**Contributors**: @cuviper, @WalterSmuts
-
-[119]: https://github.com/rust-num/num-complex/pull/119
-
 # Release 0.4.4 (2023-08-13)
 
 - [Fixes NaN value for `powc` of zero][116]

@@ -1,9 +1,9 @@
-#[cfg(feature = "std")]
 use alloc::sync::Arc;
 use alloc::vec::Vec;
 use core::fmt;
 
 use pki_types::CertificateRevocationListDer;
+use std::error::Error as StdError;
 use webpki::{CertRevocationList, OwnedCertRevocationList};
 
 use crate::error::{CertRevocationListError, CertificateError, Error, OtherError};
@@ -14,14 +14,17 @@ mod server_verifier;
 mod verify;
 
 pub use anchors::RootCertStore;
+
 pub use client_verifier::{ClientCertVerifierBuilder, WebPkiClientVerifier};
 pub use server_verifier::{ServerCertVerifierBuilder, WebPkiServerVerifier};
+
+pub use verify::{verify_tls12_signature, verify_tls13_signature, WebPkiSupportedAlgorithms};
+
 // Conditionally exported from crate.
 #[allow(unreachable_pub)]
 pub use verify::{
     verify_server_cert_signed_by_trust_anchor, verify_server_name, ParsedCertificate,
 };
-pub use verify::{verify_tls12_signature, verify_tls13_signature, WebPkiSupportedAlgorithms};
 
 /// An error that can occur when building a certificate verifier.
 #[derive(Debug, Clone)]
@@ -48,8 +51,7 @@ impl fmt::Display for VerifierBuilderError {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for VerifierBuilderError {}
+impl StdError for VerifierBuilderError {}
 
 fn pki_error(error: webpki::Error) -> Error {
     use webpki::Error::*;
@@ -61,7 +63,6 @@ fn pki_error(error: webpki::Error) -> Error {
         CertNotValidForName => CertificateError::NotValidForName.into(),
         CertRevoked => CertificateError::Revoked.into(),
         UnknownRevocationStatus => CertificateError::UnknownRevocationStatus.into(),
-        CrlExpired => CertificateError::ExpiredRevocationList.into(),
         IssuerNotCrlSigner => CertRevocationListError::IssuerInvalidForCrl.into(),
 
         InvalidSignatureForPublicKey
@@ -74,11 +75,7 @@ fn pki_error(error: webpki::Error) -> Error {
             CertRevocationListError::BadSignature.into()
         }
 
-        _ => CertificateError::Other(OtherError(
-            #[cfg(feature = "std")]
-            Arc::new(error),
-        ))
-        .into(),
+        _ => CertificateError::Other(OtherError(Arc::new(error))).into(),
     }
 }
 
@@ -98,10 +95,7 @@ fn crl_error(e: webpki::Error) -> CertRevocationListError {
         UnsupportedIndirectCrl => CertRevocationListError::UnsupportedIndirectCrl,
         UnsupportedRevocationReason => CertRevocationListError::UnsupportedRevocationReason,
 
-        _ => CertRevocationListError::Other(OtherError(
-            #[cfg(feature = "std")]
-            Arc::new(e),
-        )),
+        _ => CertRevocationListError::Other(OtherError(Arc::new(e))),
     }
 }
 
@@ -148,8 +142,7 @@ mod tests {
 
     #[test]
     fn crl_error_from_webpki() {
-        use super::crl_error;
-        use super::CertRevocationListError::*;
+        use super::{crl_error, CertRevocationListError::*};
 
         let testcases = &[
             (webpki::Error::InvalidCrlSignatureForPublicKey, BadSignature),
@@ -191,7 +184,7 @@ mod tests {
 
         assert!(matches!(
             crl_error(webpki::Error::NameConstraintViolation),
-            Other(..)
+            Other(_)
         ));
     }
 }

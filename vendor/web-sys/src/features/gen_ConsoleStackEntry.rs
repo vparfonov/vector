@@ -10,56 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
     pub type ConsoleStackEntry;
-    #[doc = "Get the `asyncCause` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
-    #[wasm_bindgen(method, getter = "asyncCause")]
-    pub fn get_async_cause(this: &ConsoleStackEntry) -> Option<String>;
-    #[doc = "Change the `asyncCause` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
-    #[wasm_bindgen(method, setter = "asyncCause")]
-    pub fn set_async_cause(this: &ConsoleStackEntry, val: Option<&str>);
-    #[doc = "Get the `columnNumber` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
-    #[wasm_bindgen(method, getter = "columnNumber")]
-    pub fn get_column_number(this: &ConsoleStackEntry) -> Option<u32>;
-    #[doc = "Change the `columnNumber` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
-    #[wasm_bindgen(method, setter = "columnNumber")]
-    pub fn set_column_number(this: &ConsoleStackEntry, val: u32);
-    #[doc = "Get the `filename` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
-    #[wasm_bindgen(method, getter = "filename")]
-    pub fn get_filename(this: &ConsoleStackEntry) -> Option<String>;
-    #[doc = "Change the `filename` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
-    #[wasm_bindgen(method, setter = "filename")]
-    pub fn set_filename(this: &ConsoleStackEntry, val: &str);
-    #[doc = "Get the `functionName` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
-    #[wasm_bindgen(method, getter = "functionName")]
-    pub fn get_function_name(this: &ConsoleStackEntry) -> Option<String>;
-    #[doc = "Change the `functionName` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
-    #[wasm_bindgen(method, setter = "functionName")]
-    pub fn set_function_name(this: &ConsoleStackEntry, val: &str);
-    #[doc = "Get the `lineNumber` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
-    #[wasm_bindgen(method, getter = "lineNumber")]
-    pub fn get_line_number(this: &ConsoleStackEntry) -> Option<u32>;
-    #[doc = "Change the `lineNumber` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
-    #[wasm_bindgen(method, setter = "lineNumber")]
-    pub fn set_line_number(this: &ConsoleStackEntry, val: u32);
 }
 impl ConsoleStackEntry {
     #[doc = "Construct a new `ConsoleStackEntry`."]
@@ -70,29 +20,89 @@ impl ConsoleStackEntry {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_async_cause()` instead."]
+    #[doc = "Change the `asyncCause` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
     pub fn async_cause(&mut self, val: Option<&str>) -> &mut Self {
-        self.set_async_cause(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("asyncCause"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_column_number()` instead."]
+    #[doc = "Change the `columnNumber` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
     pub fn column_number(&mut self, val: u32) -> &mut Self {
-        self.set_column_number(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("columnNumber"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_filename()` instead."]
+    #[doc = "Change the `filename` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
     pub fn filename(&mut self, val: &str) -> &mut Self {
-        self.set_filename(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("filename"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_function_name()` instead."]
+    #[doc = "Change the `functionName` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
     pub fn function_name(&mut self, val: &str) -> &mut Self {
-        self.set_function_name(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("functionName"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_line_number()` instead."]
+    #[doc = "Change the `lineNumber` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `ConsoleStackEntry`*"]
     pub fn line_number(&mut self, val: u32) -> &mut Self {
-        self.set_line_number(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("lineNumber"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

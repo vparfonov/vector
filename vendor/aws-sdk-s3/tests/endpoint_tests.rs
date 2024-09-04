@@ -2,7 +2,6 @@
 #![cfg(feature = "test-util")]
 #[::tokio::test]
 async fn operation_input_test_get_object_1() {
-    /* documentation: Invalid access point ARN: Not S3 */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -37,7 +36,6 @@ async fn operation_input_test_get_object_1() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_2() {
-    /* documentation: Invalid access point ARN: invalid resource */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -71,7 +69,6 @@ async fn operation_input_test_get_object_2() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_3() {
-    /* documentation: Invalid access point ARN: invalid no ap name */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -95,14 +92,13 @@ async fn operation_input_test_get_object_3() {
     rcvr.expect_no_request();
     let error = _result.expect_err("expected error: Invalid ARN: Expected a resource of the format `accesspoint:<accesspoint name>` but no name was provided [Invalid access point ARN: invalid no ap name]");
     assert!(
-                                            format!("{:?}", error).contains("Invalid ARN: Expected a resource of the format `accesspoint:<accesspoint name>` but no name was provided"),
-                                            "expected error to contain `Invalid ARN: Expected a resource of the format `accesspoint:<accesspoint name>` but no name was provided` but it was {:?}", error
-                                        );
+                                    format!("{:?}", error).contains("Invalid ARN: Expected a resource of the format `accesspoint:<accesspoint name>` but no name was provided"),
+                                    "expected error to contain `Invalid ARN: Expected a resource of the format `accesspoint:<accesspoint name>` but no name was provided` but it was {:?}", error
+                                );
 }
 
 #[::tokio::test]
 async fn operation_input_test_get_object_4() {
-    /* documentation: Invalid access point ARN: AccountId is invalid */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -136,7 +132,6 @@ async fn operation_input_test_get_object_4() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_5() {
-    /* documentation: Invalid access point ARN: access point name is invalid */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -170,7 +165,6 @@ async fn operation_input_test_get_object_5() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_6() {
-    /* documentation: Access points (disable access points explicitly false) */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -204,7 +198,6 @@ async fn operation_input_test_get_object_6() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_7() {
-    /* documentation: Access points: partition does not support FIPS */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "AWS::UseFIPS": true
@@ -240,7 +233,6 @@ async fn operation_input_test_get_object_7() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_8() {
-    /* documentation: Bucket region is invalid */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -274,7 +266,6 @@ async fn operation_input_test_get_object_8() {
 
 #[::tokio::test]
 async fn operation_input_test_create_bucket_9() {
-    /* documentation: Access points when Access points explicitly disabled (used for CreateBucket) */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -307,7 +298,6 @@ async fn operation_input_test_create_bucket_9() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_10() {
-    /* documentation: missing arn type */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -339,7 +329,6 @@ async fn operation_input_test_get_object_10() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_11() {
-    /* documentation: SDK::Host + access point + Dualstack is an error */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "AWS::UseDualStack": true,
@@ -379,7 +368,6 @@ async fn operation_input_test_get_object_11() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_12() {
-    /* documentation: Access point ARN with FIPS & Dualstack */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::UseFIPS": true,
@@ -417,7 +405,6 @@ async fn operation_input_test_get_object_12() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_13() {
-    /* documentation: Access point ARN with Dualstack */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::UseDualStack": true
@@ -453,7 +440,6 @@ async fn operation_input_test_get_object_13() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_14() {
-    /* documentation: vanilla MRAP */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -487,7 +473,6 @@ async fn operation_input_test_get_object_14() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_15() {
-    /* documentation: MRAP does not support FIPS */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::UseFIPS": true
@@ -523,7 +508,6 @@ async fn operation_input_test_get_object_15() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_16() {
-    /* documentation: MRAP does not support DualStack */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::UseDualStack": true
@@ -559,7 +543,6 @@ async fn operation_input_test_get_object_16() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_17() {
-    /* documentation: MRAP does not support S3 Accelerate */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::S3::Accelerate": true
@@ -595,7 +578,6 @@ async fn operation_input_test_get_object_17() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_18() {
-    /* documentation: MRAP explicitly disabled */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::S3::DisableMultiRegionAccessPoints": true
@@ -631,7 +613,6 @@ async fn operation_input_test_get_object_18() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_19() {
-    /* documentation: Dual-stack endpoint with path-style forced */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseDualStack": true,
@@ -667,7 +648,6 @@ async fn operation_input_test_get_object_19() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_20() {
-    /* documentation: Dual-stack endpoint + SDK::Host is error */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseDualStack": true,
@@ -706,7 +686,6 @@ async fn operation_input_test_get_object_20() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_21() {
-    /* documentation: path style + ARN bucket */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::ForcePathStyle": true
@@ -742,7 +721,6 @@ async fn operation_input_test_get_object_21() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_22() {
-    /* documentation: implicit path style bucket + dualstack */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseDualStack": true
@@ -776,7 +754,6 @@ async fn operation_input_test_get_object_22() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_23() {
-    /* documentation: implicit path style bucket + dualstack */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseDualStack": true,
@@ -813,7 +790,6 @@ async fn operation_input_test_get_object_23() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_24() {
-    /* documentation: don't allow URL injections in the bucket */
     /* builtIns: {
         "AWS::Region": "us-west-2"
     } */
@@ -845,7 +821,6 @@ async fn operation_input_test_get_object_24() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_25() {
-    /* documentation: URI encode bucket names in the path */
     /* builtIns: {
         "AWS::Region": "us-west-2"
     } */
@@ -877,7 +852,6 @@ async fn operation_input_test_get_object_25() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_26() {
-    /* documentation: path style + implicit private link */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "SDK::Endpoint": "https://control.vpce-1a2b3c4d-5e6f.s3.us-west-2.vpce.amazonaws.com"
@@ -911,7 +885,6 @@ async fn operation_input_test_get_object_26() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_27() {
-    /* documentation: using an IPv4 address forces path style */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "SDK::Endpoint": "https://123.123.0.1"
@@ -945,7 +918,6 @@ async fn operation_input_test_get_object_27() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_28() {
-    /* documentation: vanilla access point arn with region mismatch and UseArnRegion=false */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::UseArnRegion": false
@@ -973,14 +945,13 @@ async fn operation_input_test_get_object_28() {
     rcvr.expect_no_request();
     let error = _result.expect_err("expected error: Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false` [vanilla access point arn with region mismatch and UseArnRegion=false]");
     assert!(
-                                            format!("{:?}", error).contains("Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`"),
-                                            "expected error to contain `Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`` but it was {:?}", error
-                                        );
+                                    format!("{:?}", error).contains("Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`"),
+                                    "expected error to contain `Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`` but it was {:?}", error
+                                );
 }
 
 #[::tokio::test]
 async fn operation_input_test_get_object_29() {
-    /* documentation: vanilla access point arn with region mismatch and UseArnRegion unset */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -1014,7 +985,6 @@ async fn operation_input_test_get_object_29() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_30() {
-    /* documentation: vanilla access point arn with region mismatch and UseArnRegion=true */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::S3::UseArnRegion": true
@@ -1050,7 +1020,6 @@ async fn operation_input_test_get_object_30() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_31() {
-    /* documentation: subdomains are not allowed in virtual buckets */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -1082,7 +1051,6 @@ async fn operation_input_test_get_object_31() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_32() {
-    /* documentation: bucket names with 3 characters are allowed in virtual buckets */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -1114,7 +1082,6 @@ async fn operation_input_test_get_object_32() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_33() {
-    /* documentation: bucket names with fewer than 3 characters are not allowed in virtual host */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -1146,7 +1113,6 @@ async fn operation_input_test_get_object_33() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_34() {
-    /* documentation: bucket names with uppercase characters are not allowed in virtual host */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -1178,7 +1144,6 @@ async fn operation_input_test_get_object_34() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_35() {
-    /* documentation: subdomains are allowed in virtual buckets on http endpoints */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "SDK::Endpoint": "http://example.com"
@@ -1212,7 +1177,6 @@ async fn operation_input_test_get_object_35() {
 
 #[::tokio::test]
 async fn operation_input_test_list_buckets_36() {
-    /* documentation: aws-global region uses the global endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global"
     } */
@@ -1237,7 +1201,6 @@ async fn operation_input_test_list_buckets_36() {
 
 #[::tokio::test]
 async fn operation_input_test_list_buckets_37() {
-    /* documentation: aws-global region with fips uses the regional endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::UseFIPS": true
@@ -1264,7 +1227,6 @@ async fn operation_input_test_list_buckets_37() {
 
 #[::tokio::test]
 async fn operation_input_test_list_buckets_38() {
-    /* documentation: aws-global region with dualstack uses the regional endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::UseDualStack": true
@@ -1291,7 +1253,6 @@ async fn operation_input_test_list_buckets_38() {
 
 #[::tokio::test]
 async fn operation_input_test_list_buckets_39() {
-    /* documentation: aws-global region with fips and dualstack uses the regional endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::UseFIPS": true,
@@ -1320,7 +1281,6 @@ async fn operation_input_test_list_buckets_39() {
 
 #[::tokio::test]
 async fn operation_input_test_list_buckets_40() {
-    /* documentation: aws-global region with accelerate on non-bucket case, uses global endpoint and ignores accelerate */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::S3::Accelerate": true
@@ -1347,7 +1307,6 @@ async fn operation_input_test_list_buckets_40() {
 
 #[::tokio::test]
 async fn operation_input_test_list_buckets_41() {
-    /* documentation: aws-global region with custom endpoint, uses custom */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "SDK::Endpoint": "https://example.com"
@@ -1374,7 +1333,6 @@ async fn operation_input_test_list_buckets_41() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_42() {
-    /* documentation: virtual addressing, aws-global region uses the global endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global"
     } */
@@ -1406,7 +1364,6 @@ async fn operation_input_test_get_object_42() {
 
 #[::tokio::test]
 async fn operation_input_test_list_objects_43() {
-    /* documentation: virtual addressing, aws-global region with Prefix, and Key uses the global endpoint. Prefix and Key parameters should not be used in endpoint evaluation. */
     /* builtIns: {
         "AWS::Region": "aws-global"
     } */
@@ -1438,7 +1395,6 @@ async fn operation_input_test_list_objects_43() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_44() {
-    /* documentation: virtual addressing, aws-global region with fips uses the regional fips endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::UseFIPS": true
@@ -1472,7 +1428,6 @@ async fn operation_input_test_get_object_44() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_45() {
-    /* documentation: virtual addressing, aws-global region with dualstack uses the regional dualstack endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::UseDualStack": true
@@ -1506,7 +1461,6 @@ async fn operation_input_test_get_object_45() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_46() {
-    /* documentation: virtual addressing, aws-global region with fips/dualstack uses the regional fips/dualstack endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::UseFIPS": true,
@@ -1542,7 +1496,6 @@ async fn operation_input_test_get_object_46() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_47() {
-    /* documentation: virtual addressing, aws-global region with accelerate uses the global accelerate endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::S3::Accelerate": true
@@ -1576,7 +1529,6 @@ async fn operation_input_test_get_object_47() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_48() {
-    /* documentation: virtual addressing, aws-global region with custom endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "SDK::Endpoint": "https://example.com"
@@ -1610,7 +1562,6 @@ async fn operation_input_test_get_object_48() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_49() {
-    /* documentation: ForcePathStyle, aws-global region uses the global endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::S3::ForcePathStyle": true
@@ -1644,7 +1595,6 @@ async fn operation_input_test_get_object_49() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_50() {
-    /* documentation: ForcePathStyle, aws-global region with dualstack uses regional dualstack endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::UseDualStack": true,
@@ -1680,7 +1630,6 @@ async fn operation_input_test_get_object_50() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_51() {
-    /* documentation: ForcePathStyle, aws-global region custom endpoint uses the custom endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "SDK::Endpoint": "https://example.com",
@@ -1716,7 +1665,6 @@ async fn operation_input_test_get_object_51() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_52() {
-    /* documentation: ARN with aws-global region and  UseArnRegion uses the regional endpoint */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::S3::UseArnRegion": true
@@ -1752,7 +1700,6 @@ async fn operation_input_test_get_object_52() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_53() {
-    /* documentation: cross partition MRAP ARN is an error */
     /* builtIns: {
         "AWS::Region": "us-west-1"
     } */
@@ -1788,7 +1735,6 @@ async fn operation_input_test_get_object_53() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_54() {
-    /* documentation: Endpoint override, accesspoint with HTTP, port */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "SDK::Endpoint": "http://beta.example.com:1234"
@@ -1824,7 +1770,6 @@ async fn operation_input_test_get_object_54() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_55() {
-    /* documentation: vanilla virtual addressing@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2"
     } */
@@ -1856,7 +1801,6 @@ async fn operation_input_test_get_object_55() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_56() {
-    /* documentation: virtual addressing + dualstack@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseDualStack": true
@@ -1890,7 +1834,6 @@ async fn operation_input_test_get_object_56() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_57() {
-    /* documentation: accelerate + dualstack@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseDualStack": true,
@@ -1926,7 +1869,6 @@ async fn operation_input_test_get_object_57() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_58() {
-    /* documentation: accelerate (dualstack=false)@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::Accelerate": true
@@ -1960,7 +1902,6 @@ async fn operation_input_test_get_object_58() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_59() {
-    /* documentation: virtual addressing + fips@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseFIPS": true
@@ -1994,7 +1935,6 @@ async fn operation_input_test_get_object_59() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_60() {
-    /* documentation: virtual addressing + dualstack + fips@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseFIPS": true,
@@ -2030,7 +1970,6 @@ async fn operation_input_test_get_object_60() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_61() {
-    /* documentation: accelerate + fips = error@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseFIPS": true,
@@ -2066,7 +2005,6 @@ async fn operation_input_test_get_object_61() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_62() {
-    /* documentation: vanilla virtual addressing@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1"
     } */
@@ -2098,7 +2036,6 @@ async fn operation_input_test_get_object_62() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_63() {
-    /* documentation: virtual addressing + dualstack@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "AWS::UseDualStack": true
@@ -2132,7 +2069,6 @@ async fn operation_input_test_get_object_63() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_64() {
-    /* documentation: vanilla virtual addressing@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1"
     } */
@@ -2164,7 +2100,6 @@ async fn operation_input_test_get_object_64() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_65() {
-    /* documentation: virtual addressing + dualstack@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::UseDualStack": true
@@ -2198,7 +2133,6 @@ async fn operation_input_test_get_object_65() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_66() {
-    /* documentation: accelerate + dualstack@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::UseDualStack": true,
@@ -2234,7 +2168,6 @@ async fn operation_input_test_get_object_66() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_67() {
-    /* documentation: accelerate (dualstack=false)@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::S3::Accelerate": true
@@ -2268,7 +2201,6 @@ async fn operation_input_test_get_object_67() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_68() {
-    /* documentation: virtual addressing + fips@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::UseFIPS": true
@@ -2302,7 +2234,6 @@ async fn operation_input_test_get_object_68() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_69() {
-    /* documentation: virtual addressing + dualstack + fips@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::UseFIPS": true,
@@ -2338,7 +2269,6 @@ async fn operation_input_test_get_object_69() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_70() {
-    /* documentation: accelerate + fips = error@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::UseFIPS": true,
@@ -2374,7 +2304,6 @@ async fn operation_input_test_get_object_70() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_71() {
-    /* documentation: vanilla path style@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::ForcePathStyle": true
@@ -2408,7 +2337,6 @@ async fn operation_input_test_get_object_71() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_72() {
-    /* documentation: fips@us-gov-west-2, bucket is not S3-dns-compatible (subdomains) */
     /* builtIns: {
         "AWS::Region": "us-gov-west-1",
         "AWS::UseFIPS": true,
@@ -2444,7 +2372,6 @@ async fn operation_input_test_get_object_72() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_73() {
-    /* documentation: path style + accelerate = error@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::ForcePathStyle": true,
@@ -2481,7 +2408,6 @@ async fn operation_input_test_get_object_73() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_74() {
-    /* documentation: path style + dualstack@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseDualStack": true,
@@ -2517,7 +2443,6 @@ async fn operation_input_test_get_object_74() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_75() {
-    /* documentation: path style + arn is error@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::ForcePathStyle": true
@@ -2553,7 +2478,6 @@ async fn operation_input_test_get_object_75() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_76() {
-    /* documentation: path style + invalid DNS name@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::ForcePathStyle": true
@@ -2587,7 +2511,6 @@ async fn operation_input_test_get_object_76() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_77() {
-    /* documentation: no path style + invalid DNS name@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2"
     } */
@@ -2619,7 +2542,6 @@ async fn operation_input_test_get_object_77() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_78() {
-    /* documentation: vanilla path style@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "AWS::S3::ForcePathStyle": true
@@ -2653,7 +2575,6 @@ async fn operation_input_test_get_object_78() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_79() {
-    /* documentation: path style + fips@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "AWS::UseFIPS": true,
@@ -2689,7 +2610,6 @@ async fn operation_input_test_get_object_79() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_80() {
-    /* documentation: path style + accelerate = error@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "AWS::S3::ForcePathStyle": true,
@@ -2726,7 +2646,6 @@ async fn operation_input_test_get_object_80() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_81() {
-    /* documentation: path style + dualstack@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "AWS::UseDualStack": true,
@@ -2762,7 +2681,6 @@ async fn operation_input_test_get_object_81() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_82() {
-    /* documentation: path style + arn is error@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "AWS::S3::ForcePathStyle": true
@@ -2798,7 +2716,6 @@ async fn operation_input_test_get_object_82() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_83() {
-    /* documentation: path style + invalid DNS name@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "AWS::S3::ForcePathStyle": true
@@ -2832,7 +2749,6 @@ async fn operation_input_test_get_object_83() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_84() {
-    /* documentation: no path style + invalid DNS name@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1"
     } */
@@ -2864,7 +2780,6 @@ async fn operation_input_test_get_object_84() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_85() {
-    /* documentation: vanilla path style@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::S3::ForcePathStyle": true
@@ -2898,7 +2813,6 @@ async fn operation_input_test_get_object_85() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_86() {
-    /* documentation: path style + fips@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::UseFIPS": true,
@@ -2934,7 +2848,6 @@ async fn operation_input_test_get_object_86() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_87() {
-    /* documentation: path style + accelerate = error@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::S3::ForcePathStyle": true,
@@ -2971,7 +2884,6 @@ async fn operation_input_test_get_object_87() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_88() {
-    /* documentation: path style + dualstack@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::UseDualStack": true,
@@ -3007,7 +2919,6 @@ async fn operation_input_test_get_object_88() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_89() {
-    /* documentation: path style + arn is error@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::S3::ForcePathStyle": true
@@ -3043,7 +2954,6 @@ async fn operation_input_test_get_object_89() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_90() {
-    /* documentation: path style + invalid DNS name@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::S3::ForcePathStyle": true
@@ -3077,7 +2987,6 @@ async fn operation_input_test_get_object_90() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_91() {
-    /* documentation: no path style + invalid DNS name@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1"
     } */
@@ -3109,7 +3018,6 @@ async fn operation_input_test_get_object_91() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_92() {
-    /* documentation: virtual addressing + private link@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "SDK::Endpoint": "http://control.vpce-1a2b3c4d-5e6f.s3.us-west-2.vpce.amazonaws.com"
@@ -3143,7 +3051,6 @@ async fn operation_input_test_get_object_92() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_93() {
-    /* documentation: path style + private link@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "SDK::Endpoint": "https://control.vpce-1a2b3c4d-5e6f.s3.us-west-2.vpce.amazonaws.com",
@@ -3179,7 +3086,6 @@ async fn operation_input_test_get_object_93() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_94() {
-    /* documentation: SDK::Host + FIPS@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseFIPS": true,
@@ -3215,7 +3121,6 @@ async fn operation_input_test_get_object_94() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_95() {
-    /* documentation: SDK::Host + DualStack@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseDualStack": true,
@@ -3251,7 +3156,6 @@ async fn operation_input_test_get_object_95() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_96() {
-    /* documentation: SDK::HOST + accelerate@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "SDK::Endpoint": "http://control.vpce-1a2b3c4d-5e6f.s3.us-west-2.vpce.amazonaws.com",
@@ -3287,7 +3191,6 @@ async fn operation_input_test_get_object_96() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_97() {
-    /* documentation: SDK::Host + access point ARN@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "SDK::Endpoint": "https://beta.example.com"
@@ -3323,7 +3226,6 @@ async fn operation_input_test_get_object_97() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_98() {
-    /* documentation: virtual addressing + private link@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "SDK::Endpoint": "https://control.vpce-1a2b3c4d-5e6f.s3.us-west-2.vpce.amazonaws.com"
@@ -3357,7 +3259,6 @@ async fn operation_input_test_get_object_98() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_99() {
-    /* documentation: path style + private link@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "SDK::Endpoint": "https://control.vpce-1a2b3c4d-5e6f.s3.us-west-2.vpce.amazonaws.com",
@@ -3393,7 +3294,6 @@ async fn operation_input_test_get_object_99() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_100() {
-    /* documentation: SDK::Host + DualStack@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "AWS::UseDualStack": true,
@@ -3429,7 +3329,6 @@ async fn operation_input_test_get_object_100() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_101() {
-    /* documentation: SDK::Host + access point ARN@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "SDK::Endpoint": "https://beta.example.com"
@@ -3465,7 +3364,6 @@ async fn operation_input_test_get_object_101() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_102() {
-    /* documentation: virtual addressing + private link@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "SDK::Endpoint": "https://control.vpce-1a2b3c4d-5e6f.s3.us-west-2.vpce.amazonaws.com"
@@ -3499,7 +3397,6 @@ async fn operation_input_test_get_object_102() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_103() {
-    /* documentation: path style + private link@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "SDK::Endpoint": "https://control.vpce-1a2b3c4d-5e6f.s3.us-west-2.vpce.amazonaws.com",
@@ -3535,7 +3432,6 @@ async fn operation_input_test_get_object_103() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_104() {
-    /* documentation: SDK::Host + FIPS@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::UseFIPS": true,
@@ -3571,7 +3467,6 @@ async fn operation_input_test_get_object_104() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_105() {
-    /* documentation: SDK::Host + DualStack@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::UseDualStack": true,
@@ -3607,7 +3502,6 @@ async fn operation_input_test_get_object_105() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_106() {
-    /* documentation: SDK::HOST + accelerate@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "SDK::Endpoint": "https://control.vpce-1a2b3c4d-5e6f.s3.us-west-2.vpce.amazonaws.com",
@@ -3643,7 +3537,6 @@ async fn operation_input_test_get_object_106() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_107() {
-    /* documentation: SDK::Host + access point ARN@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "SDK::Endpoint": "https://beta.example.com"
@@ -3679,7 +3572,6 @@ async fn operation_input_test_get_object_107() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_108() {
-    /* documentation: vanilla access point arn@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2"
     } */
@@ -3713,7 +3605,6 @@ async fn operation_input_test_get_object_108() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_109() {
-    /* documentation: access point arn + FIPS@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseFIPS": true
@@ -3749,7 +3640,6 @@ async fn operation_input_test_get_object_109() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_110() {
-    /* documentation: access point arn + accelerate = error@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::Accelerate": true
@@ -3785,7 +3675,6 @@ async fn operation_input_test_get_object_110() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_111() {
-    /* documentation: access point arn + FIPS + DualStack@us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseFIPS": true,
@@ -3823,7 +3712,6 @@ async fn operation_input_test_get_object_111() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_112() {
-    /* documentation: vanilla access point arn@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1"
     } */
@@ -3857,7 +3745,6 @@ async fn operation_input_test_get_object_112() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_113() {
-    /* documentation: access point arn + accelerate = error@cn-north-1 */
     /* builtIns: {
         "AWS::Region": "cn-north-1",
         "AWS::S3::Accelerate": true
@@ -3893,7 +3780,6 @@ async fn operation_input_test_get_object_113() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_114() {
-    /* documentation: vanilla access point arn@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1"
     } */
@@ -3927,7 +3813,6 @@ async fn operation_input_test_get_object_114() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_115() {
-    /* documentation: access point arn + FIPS@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::UseFIPS": true
@@ -3963,7 +3848,6 @@ async fn operation_input_test_get_object_115() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_116() {
-    /* documentation: access point arn + accelerate = error@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::S3::Accelerate": true
@@ -3999,7 +3883,6 @@ async fn operation_input_test_get_object_116() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_117() {
-    /* documentation: access point arn + FIPS + DualStack@af-south-1 */
     /* builtIns: {
         "AWS::Region": "af-south-1",
         "AWS::UseFIPS": true,
@@ -4037,7 +3920,6 @@ async fn operation_input_test_get_object_117() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_118() {
-    /* documentation: S3 outposts vanilla test */
     /* builtIns: {
         "AWS::Region": "us-west-2"
     } */
@@ -4071,7 +3953,6 @@ async fn operation_input_test_get_object_118() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_119() {
-    /* documentation: S3 outposts custom endpoint */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "SDK::Endpoint": "https://example.amazonaws.com"
@@ -4107,7 +3988,6 @@ async fn operation_input_test_get_object_119() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_120() {
-    /* documentation: outposts arn with region mismatch and UseArnRegion=false */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::UseArnRegion": false
@@ -4135,14 +4015,13 @@ async fn operation_input_test_get_object_120() {
     rcvr.expect_no_request();
     let error = _result.expect_err("expected error: Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false` [outposts arn with region mismatch and UseArnRegion=false]");
     assert!(
-                                            format!("{:?}", error).contains("Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`"),
-                                            "expected error to contain `Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`` but it was {:?}", error
-                                        );
+                                    format!("{:?}", error).contains("Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`"),
+                                    "expected error to contain `Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`` but it was {:?}", error
+                                );
 }
 
 #[::tokio::test]
 async fn operation_input_test_get_object_121() {
-    /* documentation: outposts arn with region mismatch, custom region and UseArnRegion=false */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "SDK::Endpoint": "https://example.com",
@@ -4172,14 +4051,13 @@ async fn operation_input_test_get_object_121() {
     rcvr.expect_no_request();
     let error = _result.expect_err("expected error: Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false` [outposts arn with region mismatch, custom region and UseArnRegion=false]");
     assert!(
-                                            format!("{:?}", error).contains("Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`"),
-                                            "expected error to contain `Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`` but it was {:?}", error
-                                        );
+                                    format!("{:?}", error).contains("Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`"),
+                                    "expected error to contain `Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`` but it was {:?}", error
+                                );
 }
 
 #[::tokio::test]
 async fn operation_input_test_get_object_122() {
-    /* documentation: outposts arn with region mismatch and UseArnRegion=true */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::UseArnRegion": true
@@ -4215,7 +4093,6 @@ async fn operation_input_test_get_object_122() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_123() {
-    /* documentation: outposts arn with region mismatch and UseArnRegion unset */
     /* builtIns: {
         "AWS::Region": "us-west-2"
     } */
@@ -4249,7 +4126,6 @@ async fn operation_input_test_get_object_123() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_124() {
-    /* documentation: outposts arn with partition mismatch and UseArnRegion=true */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::UseArnRegion": true
@@ -4277,14 +4153,13 @@ async fn operation_input_test_get_object_124() {
     rcvr.expect_no_request();
     let error = _result.expect_err("expected error: Client was configured for partition `aws` but ARN (`arn:aws:s3-outposts:cn-north-1:123456789012:outpost:op-01234567890123456:accesspoint:myaccesspoint`) has `aws-cn` [outposts arn with partition mismatch and UseArnRegion=true]");
     assert!(
-                                            format!("{:?}", error).contains("Client was configured for partition `aws` but ARN (`arn:aws:s3-outposts:cn-north-1:123456789012:outpost:op-01234567890123456:accesspoint:myaccesspoint`) has `aws-cn`"),
-                                            "expected error to contain `Client was configured for partition `aws` but ARN (`arn:aws:s3-outposts:cn-north-1:123456789012:outpost:op-01234567890123456:accesspoint:myaccesspoint`) has `aws-cn`` but it was {:?}", error
-                                        );
+                                    format!("{:?}", error).contains("Client was configured for partition `aws` but ARN (`arn:aws:s3-outposts:cn-north-1:123456789012:outpost:op-01234567890123456:accesspoint:myaccesspoint`) has `aws-cn`"),
+                                    "expected error to contain `Client was configured for partition `aws` but ARN (`arn:aws:s3-outposts:cn-north-1:123456789012:outpost:op-01234567890123456:accesspoint:myaccesspoint`) has `aws-cn`` but it was {:?}", error
+                                );
 }
 
 #[::tokio::test]
 async fn operation_input_test_get_object_125() {
-    /* documentation: object lambda @us-east-1 */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::S3::UseArnRegion": false
@@ -4320,7 +4195,6 @@ async fn operation_input_test_get_object_125() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_126() {
-    /* documentation: object lambda @us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::UseArnRegion": false
@@ -4356,7 +4230,6 @@ async fn operation_input_test_get_object_126() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_127() {
-    /* documentation: object lambda, colon resource deliminator @us-west-2 */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::UseArnRegion": false
@@ -4392,7 +4265,6 @@ async fn operation_input_test_get_object_127() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_128() {
-    /* documentation: object lambda @us-east-1, client region us-west-2, useArnRegion=true */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::UseArnRegion": true
@@ -4428,7 +4300,6 @@ async fn operation_input_test_get_object_128() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_129() {
-    /* documentation: object lambda @us-east-1, client region s3-external-1, useArnRegion=true */
     /* builtIns: {
         "AWS::Region": "s3-external-1",
         "AWS::S3::UseArnRegion": true
@@ -4464,7 +4335,6 @@ async fn operation_input_test_get_object_129() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_130() {
-    /* documentation: object lambda @us-east-1, client region s3-external-1, useArnRegion=false */
     /* builtIns: {
         "AWS::Region": "s3-external-1",
         "AWS::S3::UseArnRegion": false
@@ -4492,14 +4362,13 @@ async fn operation_input_test_get_object_130() {
     rcvr.expect_no_request();
     let error = _result.expect_err("expected error: Invalid configuration: region from ARN `us-east-1` does not match client region `s3-external-1` and UseArnRegion is `false` [object lambda @us-east-1, client region s3-external-1, useArnRegion=false]");
     assert!(
-                                            format!("{:?}", error).contains("Invalid configuration: region from ARN `us-east-1` does not match client region `s3-external-1` and UseArnRegion is `false`"),
-                                            "expected error to contain `Invalid configuration: region from ARN `us-east-1` does not match client region `s3-external-1` and UseArnRegion is `false`` but it was {:?}", error
-                                        );
+                                    format!("{:?}", error).contains("Invalid configuration: region from ARN `us-east-1` does not match client region `s3-external-1` and UseArnRegion is `false`"),
+                                    "expected error to contain `Invalid configuration: region from ARN `us-east-1` does not match client region `s3-external-1` and UseArnRegion is `false`` but it was {:?}", error
+                                );
 }
 
 #[::tokio::test]
 async fn operation_input_test_get_object_131() {
-    /* documentation: object lambda @us-east-1, client region aws-global, useArnRegion=true */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::S3::UseArnRegion": true
@@ -4535,7 +4404,6 @@ async fn operation_input_test_get_object_131() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_132() {
-    /* documentation: object lambda @us-east-1, client region aws-global, useArnRegion=false */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::S3::UseArnRegion": false
@@ -4563,14 +4431,13 @@ async fn operation_input_test_get_object_132() {
     rcvr.expect_no_request();
     let error = _result.expect_err("expected error: Invalid configuration: region from ARN `us-east-1` does not match client region `aws-global` and UseArnRegion is `false` [object lambda @us-east-1, client region aws-global, useArnRegion=false]");
     assert!(
-                                            format!("{:?}", error).contains("Invalid configuration: region from ARN `us-east-1` does not match client region `aws-global` and UseArnRegion is `false`"),
-                                            "expected error to contain `Invalid configuration: region from ARN `us-east-1` does not match client region `aws-global` and UseArnRegion is `false`` but it was {:?}", error
-                                        );
+                                    format!("{:?}", error).contains("Invalid configuration: region from ARN `us-east-1` does not match client region `aws-global` and UseArnRegion is `false`"),
+                                    "expected error to contain `Invalid configuration: region from ARN `us-east-1` does not match client region `aws-global` and UseArnRegion is `false`` but it was {:?}", error
+                                );
 }
 
 #[::tokio::test]
 async fn operation_input_test_get_object_133() {
-    /* documentation: object lambda @cn-north-1, client region us-west-2 (cross partition), useArnRegion=true */
     /* builtIns: {
         "AWS::Region": "aws-global",
         "AWS::S3::UseArnRegion": true
@@ -4598,14 +4465,13 @@ async fn operation_input_test_get_object_133() {
     rcvr.expect_no_request();
     let error = _result.expect_err("expected error: Client was configured for partition `aws` but ARN (`arn:aws-cn:s3-object-lambda:cn-north-1:123456789012:accesspoint/mybanner`) has `aws-cn` [object lambda @cn-north-1, client region us-west-2 (cross partition), useArnRegion=true]");
     assert!(
-                                            format!("{:?}", error).contains("Client was configured for partition `aws` but ARN (`arn:aws-cn:s3-object-lambda:cn-north-1:123456789012:accesspoint/mybanner`) has `aws-cn`"),
-                                            "expected error to contain `Client was configured for partition `aws` but ARN (`arn:aws-cn:s3-object-lambda:cn-north-1:123456789012:accesspoint/mybanner`) has `aws-cn`` but it was {:?}", error
-                                        );
+                                    format!("{:?}", error).contains("Client was configured for partition `aws` but ARN (`arn:aws-cn:s3-object-lambda:cn-north-1:123456789012:accesspoint/mybanner`) has `aws-cn`"),
+                                    "expected error to contain `Client was configured for partition `aws` but ARN (`arn:aws-cn:s3-object-lambda:cn-north-1:123456789012:accesspoint/mybanner`) has `aws-cn`` but it was {:?}", error
+                                );
 }
 
 #[::tokio::test]
 async fn operation_input_test_get_object_134() {
-    /* documentation: object lambda with dualstack */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::UseDualStack": true,
@@ -4643,7 +4509,6 @@ async fn operation_input_test_get_object_134() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_135() {
-    /* documentation: object lambda with accelerate */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::Accelerate": true,
@@ -4681,7 +4546,6 @@ async fn operation_input_test_get_object_135() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_136() {
-    /* documentation: object lambda with invalid arn - bad service and someresource */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::UseArnRegion": false
@@ -4707,14 +4571,13 @@ async fn operation_input_test_get_object_136() {
     rcvr.expect_no_request();
     let error = _result.expect_err("expected error: Invalid ARN: Unrecognized format: arn:aws:sqs:us-west-2:123456789012:someresource (type: someresource) [object lambda with invalid arn - bad service and someresource]");
     assert!(
-                                            format!("{:?}", error).contains("Invalid ARN: Unrecognized format: arn:aws:sqs:us-west-2:123456789012:someresource (type: someresource)"),
-                                            "expected error to contain `Invalid ARN: Unrecognized format: arn:aws:sqs:us-west-2:123456789012:someresource (type: someresource)` but it was {:?}", error
-                                        );
+                                    format!("{:?}", error).contains("Invalid ARN: Unrecognized format: arn:aws:sqs:us-west-2:123456789012:someresource (type: someresource)"),
+                                    "expected error to contain `Invalid ARN: Unrecognized format: arn:aws:sqs:us-west-2:123456789012:someresource (type: someresource)` but it was {:?}", error
+                                );
 }
 
 #[::tokio::test]
 async fn operation_input_test_get_object_137() {
-    /* documentation: object lambda with invalid arn - account id contains invalid characters */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::UseArnRegion": true
@@ -4750,7 +4613,6 @@ async fn operation_input_test_get_object_137() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_138() {
-    /* documentation: object lambda with custom endpoint */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "SDK::Endpoint": "https://my-endpoint.com",
@@ -4788,7 +4650,6 @@ async fn operation_input_test_get_object_138() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_139() {
-    /* documentation: object lambda arn with region mismatch and UseArnRegion=false */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "AWS::S3::UseArnRegion": false
@@ -4816,14 +4677,13 @@ async fn operation_input_test_get_object_139() {
     rcvr.expect_no_request();
     let error = _result.expect_err("expected error: Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false` [object lambda arn with region mismatch and UseArnRegion=false]");
     assert!(
-                                            format!("{:?}", error).contains("Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`"),
-                                            "expected error to contain `Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`` but it was {:?}", error
-                                        );
+                                    format!("{:?}", error).contains("Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`"),
+                                    "expected error to contain `Invalid configuration: region from ARN `us-east-1` does not match client region `us-west-2` and UseArnRegion is `false`` but it was {:?}", error
+                                );
 }
 
 #[::tokio::test]
 async fn operation_input_test_get_object_140() {
-    /* documentation: Data Plane with short AZ */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -4855,7 +4715,6 @@ async fn operation_input_test_get_object_140() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_141() {
-    /* documentation: Data Plane with short AZ fips */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::UseFIPS": true
@@ -4889,7 +4748,6 @@ async fn operation_input_test_get_object_141() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_142() {
-    /* documentation: Data Plane with long AZ */
     /* builtIns: {
         "AWS::Region": "ap-northeast-1"
     } */
@@ -4921,7 +4779,6 @@ async fn operation_input_test_get_object_142() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_143() {
-    /* documentation: Data Plane with long AZ fips */
     /* builtIns: {
         "AWS::Region": "ap-northeast-1",
         "AWS::UseFIPS": true
@@ -4955,7 +4812,6 @@ async fn operation_input_test_get_object_143() {
 
 #[::tokio::test]
 async fn operation_input_test_create_bucket_144() {
-    /* documentation: Control plane with short AZ bucket */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -4986,7 +4842,6 @@ async fn operation_input_test_create_bucket_144() {
 
 #[::tokio::test]
 async fn operation_input_test_create_bucket_145() {
-    /* documentation: Control plane with short AZ bucket and fips */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::UseFIPS": true
@@ -5019,7 +4874,6 @@ async fn operation_input_test_create_bucket_145() {
 
 #[::tokio::test]
 async fn operation_input_test_list_directory_buckets_146() {
-    /* documentation: Control plane without bucket */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -5044,7 +4898,6 @@ async fn operation_input_test_list_directory_buckets_146() {
 
 #[::tokio::test]
 async fn operation_input_test_list_directory_buckets_147() {
-    /* documentation: Control plane without bucket and fips */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::UseFIPS": true
@@ -5071,7 +4924,6 @@ async fn operation_input_test_list_directory_buckets_147() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_148() {
-    /* documentation: Data plane host override non virtual session auth */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "SDK::Endpoint": "https://10.0.0.1"
@@ -5105,7 +4957,6 @@ async fn operation_input_test_get_object_148() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_149() {
-    /* documentation: Data plane host override */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "SDK::Endpoint": "https://custom.com"
@@ -5139,7 +4990,6 @@ async fn operation_input_test_get_object_149() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_150() {
-    /* documentation: bad format error */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -5171,7 +5021,6 @@ async fn operation_input_test_get_object_150() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_151() {
-    /* documentation: bad format error no session auth */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -5203,7 +5052,6 @@ async fn operation_input_test_get_object_151() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_152() {
-    /* documentation: dual-stack error */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::UseDualStack": true
@@ -5237,7 +5085,6 @@ async fn operation_input_test_get_object_152() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_153() {
-    /* documentation: accelerate error */
     /* builtIns: {
         "AWS::Region": "us-east-1",
         "AWS::S3::Accelerate": true
@@ -5271,7 +5118,6 @@ async fn operation_input_test_get_object_153() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_154() {
-    /* documentation: Data plane bucket format error */
     /* builtIns: {
         "AWS::Region": "us-east-1"
     } */
@@ -5303,7 +5149,6 @@ async fn operation_input_test_get_object_154() {
 
 #[::tokio::test]
 async fn operation_input_test_get_object_155() {
-    /* documentation: host override data plane bucket error session auth */
     /* builtIns: {
         "AWS::Region": "us-west-2",
         "SDK::Endpoint": "https://custom.com"

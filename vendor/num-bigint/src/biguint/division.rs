@@ -1,4 +1,6 @@
 use super::addition::__add2;
+#[cfg(not(u64_digit))]
+use super::u32_to_u128;
 use super::{cmp_slice, BigUint};
 
 use crate::big_digit::{self, BigDigit, DoubleBigDigit};
@@ -10,15 +12,12 @@ use core::ops::{Div, DivAssign, Rem, RemAssign};
 use num_integer::Integer;
 use num_traits::{CheckedDiv, CheckedEuclid, Euclid, One, ToPrimitive, Zero};
 
-pub(super) const FAST_DIV_WIDE: bool = cfg!(any(target_arch = "x86", target_arch = "x86_64"));
-
 /// Divide a two digit numerator by a one digit divisor, returns quotient and remainder:
 ///
 /// Note: the caller must ensure that both the quotient and remainder will fit into a single digit.
 /// This is _not_ true for an arbitrary numerator/denominator.
 ///
 /// (This function also matches what the x86 divide instruction does).
-#[cfg(any(miri, not(any(target_arch = "x86", target_arch = "x86_64"))))]
 #[inline]
 fn div_wide(hi: BigDigit, lo: BigDigit, divisor: BigDigit) -> (BigDigit, BigDigit) {
     debug_assert!(hi < divisor);
@@ -26,47 +25,6 @@ fn div_wide(hi: BigDigit, lo: BigDigit, divisor: BigDigit) -> (BigDigit, BigDigi
     let lhs = big_digit::to_doublebigdigit(hi, lo);
     let rhs = DoubleBigDigit::from(divisor);
     ((lhs / rhs) as BigDigit, (lhs % rhs) as BigDigit)
-}
-
-/// x86 and x86_64 can use a real `div` instruction.
-#[cfg(all(not(miri), any(target_arch = "x86", target_arch = "x86_64")))]
-#[inline]
-fn div_wide(hi: BigDigit, lo: BigDigit, divisor: BigDigit) -> (BigDigit, BigDigit) {
-    // This debug assertion covers the potential #DE for divisor==0 or a quotient too large for one
-    // register, otherwise in release mode it will become a target-specific fault like SIGFPE.
-    // This should never occur with the inputs from our few `div_wide` callers.
-    debug_assert!(hi < divisor);
-
-    // SAFETY: The `div` instruction only affects registers, reading the explicit operand as the
-    // divisor, and implicitly reading RDX:RAX or EDX:EAX as the dividend. The result is implicitly
-    // written back to RAX or EAX for the quotient and RDX or EDX for the remainder. No memory is
-    // used, and flags are not preserved.
-    unsafe {
-        let (div, rem);
-
-        cfg_digit!(
-            macro_rules! div {
-                () => {
-                    "div {0:e}"
-                };
-            }
-            macro_rules! div {
-                () => {
-                    "div {0:r}"
-                };
-            }
-        );
-
-        core::arch::asm!(
-            div!(),
-            in(reg) divisor,
-            inout("dx") hi => rem,
-            inout("ax") lo => div,
-            options(pure, nomem, nostack),
-        );
-
-        (div, rem)
-    }
 }
 
 /// For small divisors, we can divide without promoting to `DoubleBigDigit` by
@@ -89,7 +47,7 @@ pub(super) fn div_rem_digit(mut a: BigUint, b: BigDigit) -> (BigUint, BigDigit) 
 
     let mut rem = 0;
 
-    if !FAST_DIV_WIDE && b <= big_digit::HALF {
+    if b <= big_digit::HALF {
         for d in a.data.iter_mut().rev() {
             let (q, r) = div_half(rem, *d, b);
             *d = q;
@@ -114,7 +72,7 @@ fn rem_digit(a: &BigUint, b: BigDigit) -> BigDigit {
 
     let mut rem = 0;
 
-    if !FAST_DIV_WIDE && b <= big_digit::HALF {
+    if b <= big_digit::HALF {
         for &digit in a.data.iter().rev() {
             let (_, r) = div_half(rem, digit, b);
             rem = r;
@@ -163,12 +121,12 @@ fn div_rem(mut u: BigUint, mut d: BigUint) -> (BigUint, BigUint) {
         panic!("attempt to divide by zero")
     }
     if u.is_zero() {
-        return (BigUint::ZERO, BigUint::ZERO);
+        return (Zero::zero(), Zero::zero());
     }
 
     if d.data.len() == 1 {
         if d.data == [1] {
-            return (u, BigUint::ZERO);
+            return (u, Zero::zero());
         }
         let (div, rem) = div_rem_digit(u, d.data[0]);
         // reuse d
@@ -179,10 +137,10 @@ fn div_rem(mut u: BigUint, mut d: BigUint) -> (BigUint, BigUint) {
 
     // Required or the q_len calculation below can underflow:
     match u.cmp(&d) {
-        Less => return (BigUint::ZERO, u),
+        Less => return (Zero::zero(), u),
         Equal => {
             u.set_one();
-            return (u, BigUint::ZERO);
+            return (u, Zero::zero());
         }
         Greater => {} // Do nothing
     }
@@ -210,12 +168,12 @@ pub(super) fn div_rem_ref(u: &BigUint, d: &BigUint) -> (BigUint, BigUint) {
         panic!("attempt to divide by zero")
     }
     if u.is_zero() {
-        return (BigUint::ZERO, BigUint::ZERO);
+        return (Zero::zero(), Zero::zero());
     }
 
     if d.data.len() == 1 {
         if d.data == [1] {
-            return (u.clone(), BigUint::ZERO);
+            return (u.clone(), Zero::zero());
         }
 
         let (div, rem) = div_rem_digit(u.clone(), d.data[0]);
@@ -224,8 +182,8 @@ pub(super) fn div_rem_ref(u: &BigUint, d: &BigUint) -> (BigUint, BigUint) {
 
     // Required or the q_len calculation below can underflow:
     match u.cmp(d) {
-        Less => return (BigUint::ZERO, u.clone()),
-        Equal => return (One::one(), BigUint::ZERO),
+        Less => return (Zero::zero(), u.clone()),
+        Equal => return (One::one(), Zero::zero()),
         Greater => {} // Do nothing
     }
 
@@ -274,7 +232,7 @@ fn div_rem_core(mut a: BigUint, b: &[BigDigit]) -> (BigUint, BigUint) {
     let mut a0 = 0;
 
     // [b1, b0] are the two most significant digits of the divisor. They never change.
-    let b0 = b[b.len() - 1];
+    let b0 = *b.last().unwrap();
     let b1 = b[b.len() - 2];
 
     let q_len = a.data.len() - b.len() + 1;
@@ -402,7 +360,7 @@ impl Div<BigUint> for u32 {
         match other.data.len() {
             0 => panic!("attempt to divide by zero"),
             1 => From::from(self as BigDigit / other.data[0]),
-            _ => BigUint::ZERO,
+            _ => Zero::zero(),
         }
     }
 }
@@ -420,7 +378,7 @@ impl DivAssign<u64> for BigUint {
     #[inline]
     fn div_assign(&mut self, other: u64) {
         // a vec of size 0 does not allocate, so this is fairly cheap
-        let temp = mem::replace(self, Self::ZERO);
+        let temp = mem::replace(self, Zero::zero());
         *self = temp / other;
     }
 }
@@ -428,26 +386,26 @@ impl DivAssign<u64> for BigUint {
 impl Div<BigUint> for u64 {
     type Output = BigUint;
 
-    cfg_digit!(
-        #[inline]
-        fn div(self, other: BigUint) -> BigUint {
-            match other.data.len() {
-                0 => panic!("attempt to divide by zero"),
-                1 => From::from(self / u64::from(other.data[0])),
-                2 => From::from(self / big_digit::to_doublebigdigit(other.data[1], other.data[0])),
-                _ => BigUint::ZERO,
-            }
+    #[cfg(not(u64_digit))]
+    #[inline]
+    fn div(self, other: BigUint) -> BigUint {
+        match other.data.len() {
+            0 => panic!("attempt to divide by zero"),
+            1 => From::from(self / u64::from(other.data[0])),
+            2 => From::from(self / big_digit::to_doublebigdigit(other.data[1], other.data[0])),
+            _ => Zero::zero(),
         }
+    }
 
-        #[inline]
-        fn div(self, other: BigUint) -> BigUint {
-            match other.data.len() {
-                0 => panic!("attempt to divide by zero"),
-                1 => From::from(self / other.data[0]),
-                _ => BigUint::ZERO,
-            }
+    #[cfg(u64_digit)]
+    #[inline]
+    fn div(self, other: BigUint) -> BigUint {
+        match other.data.len() {
+            0 => panic!("attempt to divide by zero"),
+            1 => From::from(self / other.data[0]),
+            _ => Zero::zero(),
         }
-    );
+    }
 }
 
 impl Div<u128> for BigUint {
@@ -470,34 +428,33 @@ impl DivAssign<u128> for BigUint {
 impl Div<BigUint> for u128 {
     type Output = BigUint;
 
-    cfg_digit!(
-        #[inline]
-        fn div(self, other: BigUint) -> BigUint {
-            use super::u32_to_u128;
-            match other.data.len() {
-                0 => panic!("attempt to divide by zero"),
-                1 => From::from(self / u128::from(other.data[0])),
-                2 => From::from(
-                    self / u128::from(big_digit::to_doublebigdigit(other.data[1], other.data[0])),
-                ),
-                3 => From::from(self / u32_to_u128(0, other.data[2], other.data[1], other.data[0])),
-                4 => From::from(
-                    self / u32_to_u128(other.data[3], other.data[2], other.data[1], other.data[0]),
-                ),
-                _ => BigUint::ZERO,
-            }
+    #[cfg(not(u64_digit))]
+    #[inline]
+    fn div(self, other: BigUint) -> BigUint {
+        match other.data.len() {
+            0 => panic!("attempt to divide by zero"),
+            1 => From::from(self / u128::from(other.data[0])),
+            2 => From::from(
+                self / u128::from(big_digit::to_doublebigdigit(other.data[1], other.data[0])),
+            ),
+            3 => From::from(self / u32_to_u128(0, other.data[2], other.data[1], other.data[0])),
+            4 => From::from(
+                self / u32_to_u128(other.data[3], other.data[2], other.data[1], other.data[0]),
+            ),
+            _ => Zero::zero(),
         }
+    }
 
-        #[inline]
-        fn div(self, other: BigUint) -> BigUint {
-            match other.data.len() {
-                0 => panic!("attempt to divide by zero"),
-                1 => From::from(self / other.data[0] as u128),
-                2 => From::from(self / big_digit::to_doublebigdigit(other.data[1], other.data[0])),
-                _ => BigUint::ZERO,
-            }
+    #[cfg(u64_digit)]
+    #[inline]
+    fn div(self, other: BigUint) -> BigUint {
+        match other.data.len() {
+            0 => panic!("attempt to divide by zero"),
+            1 => From::from(self / other.data[0] as u128),
+            2 => From::from(self / big_digit::to_doublebigdigit(other.data[1], other.data[0])),
+            _ => Zero::zero(),
         }
-    );
+    }
 }
 
 forward_val_ref_binop!(impl Rem for BigUint, rem);
@@ -678,10 +635,6 @@ impl CheckedEuclid for BigUint {
         }
         Some(self.rem_euclid(v))
     }
-
-    fn checked_div_rem_euclid(&self, v: &Self) -> Option<(Self, Self)> {
-        Some(self.div_rem_euclid(v))
-    }
 }
 
 impl Euclid for BigUint {
@@ -695,10 +648,5 @@ impl Euclid for BigUint {
     fn rem_euclid(&self, v: &BigUint) -> BigUint {
         // trivially same as regular remainder
         self % v
-    }
-
-    fn div_rem_euclid(&self, v: &Self) -> (Self, Self) {
-        // trivially same as regular division and remainder
-        self.div_rem(v)
     }
 }

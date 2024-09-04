@@ -162,7 +162,7 @@ impl Mode {
     /// `Mode`.
     #[inline]
     pub const fn from_raw_mode(st_mode: RawMode) -> Self {
-        Self::from_bits_truncate(st_mode & !c::S_IFMT as RawMode)
+        Self::from_bits_truncate(st_mode)
     }
 
     /// Construct an `st_mode` value from a `Mode`.
@@ -327,14 +327,6 @@ bitflags! {
         /// `O_EMPTY_PATH`
         #[cfg(target_os = "freebsd")]
         const EMPTY_PATH = bitcast!(c::O_EMPTY_PATH);
-
-        /// `O_LARGEFILE`
-        ///
-        /// Note that rustix and/or libc will automatically set this flag when appropriate on
-        /// `open(2)` and friends, thus typical users do not need to care about it.
-        /// It will may be reported in return of `fcntl_getfl`, though.
-        #[cfg(any(linux_kernel, target_os = "illumos"))]
-        const LARGEFILE = bitcast!(c::O_LARGEFILE);
 
         /// <https://docs.rs/bitflags/*/bitflags/#externally-defined-flags>
         const _ = !0;
@@ -608,13 +600,6 @@ bitflags! {
         /// `MFD_HUGETLB` (since Linux 4.14)
         const HUGETLB = c::MFD_HUGETLB;
 
-        /// `MFD_NOEXEC_SEAL` (since Linux 6.3)
-        #[cfg(linux_kernel)]
-        const NOEXEC_SEAL = c::MFD_NOEXEC_SEAL;
-        /// `MFD_EXEC` (since Linux 6.3)
-        #[cfg(linux_kernel)]
-        const EXEC = c::MFD_EXEC;
-
         /// `MFD_HUGE_64KB`
         const HUGE_64KB = c::MFD_HUGE_64KB;
         /// `MFD_HUGE_512JB`
@@ -797,6 +782,7 @@ bitflags! {
 #[cfg(not(any(
     netbsdlike,
     solarish,
+    target_os = "aix",
     target_os = "espidf",
     target_os = "nto",
     target_os = "redox",

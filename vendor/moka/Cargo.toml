@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.65"
 name = "moka"
-version = "0.12.8"
+version = "0.12.7"
 build = "build.rs"
 exclude = [
     ".circleci",
@@ -152,7 +152,7 @@ version = "0.2"
 version = "1.0"
 
 [dependencies.triomphe]
-version = ">=0.1.3, <0.1.12"
+version = "0.1.3"
 default-features = false
 
 [dependencies.uuid]
@@ -209,6 +209,7 @@ future = [
     "event-listener",
     "futures-util",
 ]
+js = ["uuid/js"]
 logging = ["log"]
 sync = []
 unstable-debug-counters = ["future"]

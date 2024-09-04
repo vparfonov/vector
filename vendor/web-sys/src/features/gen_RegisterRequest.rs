@@ -10,26 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `RegisterRequest`*"]
     pub type RegisterRequest;
-    #[doc = "Get the `challenge` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RegisterRequest`*"]
-    #[wasm_bindgen(method, getter = "challenge")]
-    pub fn get_challenge(this: &RegisterRequest) -> Option<String>;
-    #[doc = "Change the `challenge` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RegisterRequest`*"]
-    #[wasm_bindgen(method, setter = "challenge")]
-    pub fn set_challenge(this: &RegisterRequest, val: &str);
-    #[doc = "Get the `version` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RegisterRequest`*"]
-    #[wasm_bindgen(method, getter = "version")]
-    pub fn get_version(this: &RegisterRequest) -> Option<String>;
-    #[doc = "Change the `version` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RegisterRequest`*"]
-    #[wasm_bindgen(method, setter = "version")]
-    pub fn set_version(this: &RegisterRequest, val: &str);
 }
 impl RegisterRequest {
     #[doc = "Construct a new `RegisterRequest`."]
@@ -40,14 +20,38 @@ impl RegisterRequest {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_challenge()` instead."]
+    #[doc = "Change the `challenge` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RegisterRequest`*"]
     pub fn challenge(&mut self, val: &str) -> &mut Self {
-        self.set_challenge(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("challenge"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_version()` instead."]
+    #[doc = "Change the `version` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RegisterRequest`*"]
     pub fn version(&mut self, val: &str) -> &mut Self {
-        self.set_version(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("version"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

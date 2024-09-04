@@ -7,8 +7,7 @@ mod constants;
 #[cfg(linux_kernel)]
 mod copy_file_range;
 #[cfg(not(any(target_os = "espidf", target_os = "redox")))]
-#[cfg(not(target_os = "haiku"))]
-// Haiku needs <https://git.haiku-os.org/haiku/commit/?id=b8caef69155fbe87def579305622b9718d7779dc>
+#[cfg(not(target_os = "haiku"))] // Haiku needs <https://github.com/rust-lang/rust/pull/112371>
 mod cwd;
 #[cfg(all(feature = "alloc", not(any(target_os = "espidf", target_os = "redox"))))]
 mod dir;
@@ -33,8 +32,6 @@ pub(crate) mod fd;
 mod getpath;
 #[cfg(not(target_os = "wasi"))] // WASI doesn't have get[gpu]id.
 mod id;
-#[cfg(linux_kernel)]
-pub mod inotify;
 #[cfg(linux_kernel)]
 mod ioctl;
 #[cfg(not(any(
@@ -66,9 +63,11 @@ mod statx;
     target_os = "wasi"
 )))]
 mod sync;
-#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
+#[cfg(any(apple, linux_kernel))]
 mod xattr;
 
+#[cfg(linux_kernel)]
+pub use crate::backend::fs::inotify;
 pub use abs::*;
 #[cfg(not(target_os = "redox"))]
 pub use at::*;
@@ -76,8 +75,7 @@ pub use constants::*;
 #[cfg(linux_kernel)]
 pub use copy_file_range::copy_file_range;
 #[cfg(not(any(target_os = "espidf", target_os = "redox")))]
-#[cfg(not(target_os = "haiku"))]
-// Haiku needs <https://git.haiku-os.org/haiku/commit/?id=b8caef69155fbe87def579305622b9718d7779dc>
+#[cfg(not(target_os = "haiku"))] // Haiku needs <https://github.com/rust-lang/rust/pull/112371>
 pub use cwd::*;
 #[cfg(all(feature = "alloc", not(any(target_os = "espidf", target_os = "redox"))))]
 pub use dir::{Dir, DirEntry};
@@ -133,7 +131,7 @@ pub use statx::statx;
     target_os = "wasi"
 )))]
 pub use sync::sync;
-#[cfg(any(apple, linux_kernel, target_os = "hurd"))]
+#[cfg(any(apple, linux_kernel))]
 pub use xattr::*;
 
 /// Re-export types common to POSIX-ish platforms.
@@ -152,7 +150,7 @@ pub use std::os::wasi::fs::{DirEntryExt, FileExt, FileTypeExt, MetadataExt, Open
 /// the Unix epoch. Until the next semver bump, these unsigned fields are
 /// deprecated, and this trait provides accessors which return their values
 /// as signed integers.
-#[cfg(unix)]
+#[cfg(all(unix, not(any(target_os = "aix", target_os = "nto"))))]
 pub trait StatExt {
     /// Return the value of the `st_atime` field, casted to the correct type.
     fn atime(&self) -> i64;
@@ -162,43 +160,19 @@ pub trait StatExt {
     fn ctime(&self) -> i64;
 }
 
-#[cfg(all(
-    unix,
-    not(any(target_os = "aix", target_os = "hurd", target_os = "nto"))
-))]
+#[cfg(all(unix, not(any(target_os = "aix", target_os = "nto"))))]
 #[allow(deprecated)]
 impl StatExt for Stat {
     #[inline]
     fn atime(&self) -> i64 {
         self.st_atime as i64
     }
-
     #[inline]
     fn mtime(&self) -> i64 {
         self.st_mtime as i64
     }
-
     #[inline]
     fn ctime(&self) -> i64 {
         self.st_ctime as i64
-    }
-}
-
-#[cfg(any(target_os = "aix", target_os = "hurd", target_os = "nto"))]
-#[allow(deprecated)]
-impl StatExt for Stat {
-    #[inline]
-    fn atime(&self) -> i64 {
-        self.st_atim.tv_sec as i64
-    }
-
-    #[inline]
-    fn mtime(&self) -> i64 {
-        self.st_mtim.tv_sec as i64
-    }
-
-    #[inline]
-    fn ctime(&self) -> i64 {
-        self.st_ctim.tv_sec as i64
     }
 }

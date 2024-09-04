@@ -10,16 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `TextDecoderOptions`*"]
     pub type TextDecoderOptions;
-    #[doc = "Get the `fatal` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `TextDecoderOptions`*"]
-    #[wasm_bindgen(method, getter = "fatal")]
-    pub fn get_fatal(this: &TextDecoderOptions) -> Option<bool>;
-    #[doc = "Change the `fatal` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `TextDecoderOptions`*"]
-    #[wasm_bindgen(method, setter = "fatal")]
-    pub fn set_fatal(this: &TextDecoderOptions, val: bool);
 }
 impl TextDecoderOptions {
     #[doc = "Construct a new `TextDecoderOptions`."]
@@ -30,9 +20,17 @@ impl TextDecoderOptions {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_fatal()` instead."]
+    #[doc = "Change the `fatal` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `TextDecoderOptions`*"]
     pub fn fatal(&mut self, val: bool) -> &mut Self {
-        self.set_fatal(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("fatal"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

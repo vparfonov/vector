@@ -18,8 +18,8 @@ impl UnsubscribeOutput {
 }
 
 /// A builder for [`UnsubscribeOutput`](crate::operation::unsubscribe::UnsubscribeOutput).
-#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 #[non_exhaustive]
+#[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::default::Default, ::std::fmt::Debug)]
 pub struct UnsubscribeOutputBuilder {
     _request_id: Option<String>,
 }

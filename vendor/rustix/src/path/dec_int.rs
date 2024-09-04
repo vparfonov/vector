@@ -87,8 +87,6 @@ impl DecInt {
     }
 }
 
-/// A wrapper around `DecInt` that implements `Write` without exposing this
-/// implementation to `DecInt`'s public API.
 struct DecIntWriter(DecInt);
 
 impl core::fmt::Write for DecIntWriter {
@@ -116,7 +114,7 @@ impl AsRef<Path> for DecInt {
 
 #[cfg(feature = "std")]
 impl fmt::Debug for DecInt {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.as_str().fmt(f)
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_str().fmt(fmt)
     }
 }

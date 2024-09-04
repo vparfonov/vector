@@ -1,3 +1,6 @@
+// `impl Trait` is not required for this parser but we use to to show that it can be used to
+// significantly simplify things
+
 #![cfg(feature = "std")]
 
 #[macro_use]
@@ -55,6 +58,7 @@ where
 fn integer<Input>() -> impl Parser<Input, Output = i64>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     lex(many1(digit()))
         .map(|s: String| {
@@ -70,6 +74,7 @@ where
 fn number<Input>() -> impl Parser<Input, Output = f64>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     let i = char('0').map(|_| 0.0).or(integer().map(|x| x as f64));
     let fractional = many(digit()).map(|digits: String| {
@@ -103,6 +108,7 @@ where
 fn json_char<Input>() -> impl Parser<Input, Output = char>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     parser(|input: &mut Input| {
         let (c, committed) = any().parse_lazy(input).into_result()?;
@@ -130,6 +136,7 @@ where
 fn json_string<Input>() -> impl Parser<Input, Output = String>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     between(char('"'), lex(char('"')), many(json_char())).expected("string")
 }
@@ -137,6 +144,7 @@ where
 fn object<Input>() -> impl Parser<Input, Output = Value>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     let field = (json_string(), lex(char(':')), json_value()).map(|t| (t.0, t.2));
     let fields = sep_by(field, lex(char(',')));
@@ -149,6 +157,7 @@ where
 fn json_value<Input>() -> impl Parser<Input, Output = Value>
 where
     Input: Stream<Token = char>,
+    Input::Error: ParseError<Input::Token, Input::Range, Input::Position>,
 {
     json_value_()
 }

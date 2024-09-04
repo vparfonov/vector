@@ -47,13 +47,13 @@ mod aarch64;
 // x86_64 128-bit atomics
 #[cfg(all(
     target_arch = "x86_64",
-    not(all(any(miri, portable_atomic_sanitize_thread), portable_atomic_no_cmpxchg16b_intrinsic)),
     any(not(portable_atomic_no_asm), portable_atomic_unstable_asm),
     any(
         target_feature = "cmpxchg16b",
         portable_atomic_target_feature = "cmpxchg16b",
         all(
             feature = "fallback",
+            not(portable_atomic_no_cmpxchg16b_target_feature),
             not(portable_atomic_no_outline_atomics),
             not(any(target_env = "sgx", miri)),
         ),
@@ -186,7 +186,7 @@ mod fallback;
 
 // On AVR, we always use critical section based fallback implementation.
 // AVR can be safely assumed to be single-core, so this is sound.
-// https://github.com/llvm/llvm-project/blob/llvmorg-18.1.2/llvm/lib/Target/AVR/AVRExpandPseudoInsts.cpp#L1074
+// https://github.com/llvm/llvm-project/blob/llvmorg-17.0.0-rc2/llvm/lib/Target/AVR/AVRExpandPseudoInsts.cpp#L1074
 // MSP430 as well.
 #[cfg(any(
     all(test, target_os = "none"),
@@ -329,16 +329,13 @@ items! {
         ),
         all(
             target_arch = "x86_64",
-            not(all(
-                any(miri, portable_atomic_sanitize_thread),
-                portable_atomic_no_cmpxchg16b_intrinsic,
-            )),
             any(not(portable_atomic_no_asm), portable_atomic_unstable_asm),
             any(
                 target_feature = "cmpxchg16b",
                 portable_atomic_target_feature = "cmpxchg16b",
                 all(
                     feature = "fallback",
+                    not(portable_atomic_no_cmpxchg16b_target_feature),
                     not(portable_atomic_no_outline_atomics),
                     not(any(target_env = "sgx", miri)),
                 ),
@@ -403,13 +400,13 @@ pub(crate) use self::aarch64::{AtomicI128, AtomicU128};
 // x86_64 & (cmpxchg16b | outline-atomics)
 #[cfg(all(
     target_arch = "x86_64",
-    not(all(any(miri, portable_atomic_sanitize_thread), portable_atomic_no_cmpxchg16b_intrinsic)),
     any(not(portable_atomic_no_asm), portable_atomic_unstable_asm),
     any(
         target_feature = "cmpxchg16b",
         portable_atomic_target_feature = "cmpxchg16b",
         all(
             feature = "fallback",
+            not(portable_atomic_no_cmpxchg16b_target_feature),
             not(portable_atomic_no_outline_atomics),
             not(any(target_env = "sgx", miri)),
         ),

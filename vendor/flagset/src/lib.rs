@@ -320,8 +320,7 @@ pub trait Flags:
     }
 }
 
-#[repr(C)]
-#[derive(Copy, Clone, Eq, Hash)]
+#[derive(Copy, Clone, Eq)]
 pub struct FlagSet<F: Flags>(F::Type);
 
 #[doc(hidden)]
@@ -773,35 +772,6 @@ impl<F: Flags, R: Into<FlagSet<F>>> RemAssign<R> for FlagSet<F> {
     }
 }
 
-impl<F: Flags, R: Into<FlagSet<F>>> Extend<R> for FlagSet<F> {
-    /// Add values by iterating over some collection.
-    ///
-    /// ```
-    /// use flagset::{FlagSet, flags};
-    ///
-    /// flags! {
-    ///     pub enum Flag: u8 {
-    ///         Foo = 1,
-    ///         Bar = 2,
-    ///         Baz = 4
-    ///     }
-    /// }
-    ///
-    /// let flag_vec = vec![Flag::Bar, Flag::Baz];
-    /// let mut some_extended_flags = FlagSet::from(Flag::Foo);
-    /// some_extended_flags.extend(flag_vec);
-    /// assert_eq!(some_extended_flags, Flag::Foo | Flag::Bar | Flag::Baz);
-    /// ```
-    fn extend<T>(&mut self, iter: T)
-    where
-        T: IntoIterator<Item = R>,
-    {
-        for item in iter {
-            *self |= item;
-        }
-    }
-}
-
 impl<F: Flags> FlagSet<F> {
     /// Creates a new set from bits; returning `Err(InvalidBits)` on invalid/unknown bits.
     ///
@@ -1250,7 +1220,7 @@ macro_rules! flags {
             const LIST: &'static [Self] = &[$($n::$k),*];
         }
 
-        impl ::core::convert::From<$n> for $crate::FlagSet<$n> {
+        impl core::convert::From<$n> for $crate::FlagSet<$n> {
             #[inline]
             fn from(value: $n) -> Self {
                 unsafe {
@@ -1261,7 +1231,7 @@ macro_rules! flags {
             }
         }
 
-        impl ::core::ops::Not for $n {
+        impl core::ops::Not for $n {
             type Output = $crate::FlagSet<$n>;
 
             #[inline]
@@ -1270,7 +1240,7 @@ macro_rules! flags {
             }
         }
 
-        impl<R: ::core::convert::Into<$crate::FlagSet<$n>>> ::core::ops::BitAnd<R> for $n {
+        impl<R: core::convert::Into<$crate::FlagSet<$n>>> core::ops::BitAnd<R> for $n {
             type Output = $crate::FlagSet<$n>;
 
             #[inline]
@@ -1279,7 +1249,7 @@ macro_rules! flags {
             }
         }
 
-        impl<R: ::core::convert::Into<$crate::FlagSet<$n>>> ::core::ops::BitOr<R> for $n {
+        impl<R: core::convert::Into<$crate::FlagSet<$n>>> core::ops::BitOr<R> for $n {
             type Output = $crate::FlagSet<$n>;
 
             #[inline]
@@ -1288,7 +1258,7 @@ macro_rules! flags {
             }
         }
 
-        impl<R: ::core::convert::Into<$crate::FlagSet<$n>>> ::core::ops::BitXor<R> for $n {
+        impl<R: core::convert::Into<$crate::FlagSet<$n>>> core::ops::BitXor<R> for $n {
             type Output = $crate::FlagSet<$n>;
 
             #[inline]
@@ -1297,7 +1267,7 @@ macro_rules! flags {
             }
         }
 
-        impl<R: ::core::convert::Into<$crate::FlagSet<$n>>> ::core::ops::Sub<R> for $n {
+        impl<R: core::convert::Into<$crate::FlagSet<$n>>> core::ops::Sub<R> for $n {
             type Output = $crate::FlagSet<$n>;
 
             #[inline]
@@ -1306,7 +1276,7 @@ macro_rules! flags {
             }
         }
 
-        impl<R: ::core::convert::Into<$crate::FlagSet<$n>>> ::core::ops::Rem<R> for $n {
+        impl<R: core::convert::Into<$crate::FlagSet<$n>>> core::ops::Rem<R> for $n {
             type Output = $crate::FlagSet<$n>;
 
             #[inline]

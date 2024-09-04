@@ -87,7 +87,7 @@ fn decode_step(state: &mut usize, cp: &mut u32, b: u8) {
     // Splits the space of all bytes into equivalence classes, such that
     // any byte in the same class can never discriminate between whether a
     // particular sequence is valid UTF-8 or not.
-    #[rustfmt::skip]
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     const CLASSES: [u8; 256] = [
        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
        0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,  0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -101,7 +101,7 @@ fn decode_step(state: &mut usize, cp: &mut u32, b: u8) {
 
     // A state machine taken from `bstr` which was in turn adapted from:
     // https://bjoern.hoehrmann.de/utf-8/decoder/dfa/
-    #[rustfmt::skip]
+    #[cfg_attr(rustfmt, rustfmt::skip)]
     const STATES_FORWARD: &'static [u8] = &[
       0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
       12, 0, 24, 36, 60, 96, 84, 0, 0, 0, 48, 72,

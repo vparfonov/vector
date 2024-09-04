@@ -1,7 +1,5 @@
 //! Event operations.
 
-#[cfg(any(linux_kernel, target_os = "redox"))]
-pub mod epoll;
 #[cfg(any(
     linux_kernel,
     target_os = "freebsd",
@@ -17,6 +15,8 @@ mod poll;
 #[cfg(solarish)]
 pub mod port;
 
+#[cfg(any(linux_kernel, target_os = "redox"))]
+pub use crate::backend::event::epoll;
 #[cfg(any(
     linux_kernel,
     target_os = "freebsd",

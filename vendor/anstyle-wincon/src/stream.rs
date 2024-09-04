@@ -101,7 +101,9 @@ impl WinconStream for std::io::Stderr {
 
 #[cfg(not(windows))]
 mod platform {
-    impl super::WinconStream for std::io::StdoutLock<'_> {
+    use super::*;
+
+    impl WinconStream for std::io::StdoutLock<'_> {
         fn write_colored(
             &mut self,
             fg: Option<anstyle::AnsiColor>,
@@ -112,7 +114,7 @@ mod platform {
         }
     }
 
-    impl super::WinconStream for std::io::StderrLock<'_> {
+    impl WinconStream for std::io::StderrLock<'_> {
         fn write_colored(
             &mut self,
             fg: Option<anstyle::AnsiColor>,
@@ -126,7 +128,9 @@ mod platform {
 
 #[cfg(windows)]
 mod platform {
-    impl super::WinconStream for std::io::StdoutLock<'_> {
+    use super::*;
+
+    impl WinconStream for std::io::StdoutLock<'_> {
         fn write_colored(
             &mut self,
             fg: Option<anstyle::AnsiColor>,
@@ -138,7 +142,7 @@ mod platform {
         }
     }
 
-    impl super::WinconStream for std::io::StderrLock<'_> {
+    impl WinconStream for std::io::StderrLock<'_> {
         fn write_colored(
             &mut self,
             fg: Option<anstyle::AnsiColor>,

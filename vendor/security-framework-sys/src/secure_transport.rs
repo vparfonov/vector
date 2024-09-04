@@ -30,13 +30,15 @@ pub type SSLSessionOption = c_int;
 pub const kSSLSessionOptionBreakOnServerAuth: SSLSessionOption = 0;
 pub const kSSLSessionOptionBreakOnCertRequested: SSLSessionOption = 1;
 pub const kSSLSessionOptionBreakOnClientAuth: SSLSessionOption = 2;
+#[cfg(any(feature = "OSX_10_9", target_os = "ios", target_os = "tvos", target_os = "watchos"))]
 pub const kSSLSessionOptionFalseStart: SSLSessionOption = 3;
+#[cfg(any(feature = "OSX_10_9", target_os = "ios", target_os = "tvos", target_os = "watchos"))]
 pub const kSSLSessionOptionSendOneByteRecord: SSLSessionOption = 4;
-#[cfg(all(feature = "OSX_10_11", not(any(target_os = "ios", target_os = "tvos", target_os = "watchos", target_os = "visionos"))))]
+#[cfg(all(feature = "OSX_10_11", not(any(target_os = "ios", target_os = "tvos", target_os = "watchos"))))]
 pub const kSSLSessionOptionAllowServerIdentityChange: SSLSessionOption = 5;
-#[cfg(all(feature = "OSX_10_10", not(any(target_os = "ios", target_os = "tvos", target_os = "watchos", target_os = "visionos"))))]
+#[cfg(all(feature = "OSX_10_10", not(any(target_os = "ios", target_os = "tvos", target_os = "watchos"))))]
 pub const kSSLSessionOptionFallback: SSLSessionOption = 6;
-#[cfg(all(feature = "OSX_10_11", not(any(target_os = "ios", target_os = "tvos", target_os = "watchos", target_os = "visionos"))))]
+#[cfg(all(feature = "OSX_10_11", not(any(target_os = "ios", target_os = "tvos", target_os = "watchos"))))]
 pub const kSSLSessionOptionBreakOnClientHello: SSLSessionOption = 7;
 
 pub type SSLSessionState = c_int;

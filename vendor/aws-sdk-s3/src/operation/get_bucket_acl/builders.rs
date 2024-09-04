@@ -3,7 +3,7 @@ pub use crate::operation::get_bucket_acl::_get_bucket_acl_output::GetBucketAclOu
 
 pub use crate::operation::get_bucket_acl::_get_bucket_acl_input::GetBucketAclInputBuilder;
 
-impl crate::operation::get_bucket_acl::builders::GetBucketAclInputBuilder {
+impl GetBucketAclInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -27,13 +27,12 @@ impl crate::operation::get_bucket_acl::builders::GetBucketAclInputBuilder {
 /// </note>
 /// <p>This implementation of the <code>GET</code> action uses the <code>acl</code> subresource to return the access control list (ACL) of a bucket. To use <code>GET</code> to return the ACL of the bucket, you must have the <code>READ_ACP</code> access to the bucket. If <code>READ_ACP</code> permission is granted to the anonymous user, you can return the ACL of the bucket without using an authorization header.</p>
 /// <p>When you use this API operation with an access point, provide the alias of the access point in place of the bucket name.</p>
-/// <p>When you use this API operation with an Object Lambda access point, provide the alias of the Object Lambda access point in place of the bucket name. If the Object Lambda access point alias in a request is not valid, the error code <code>InvalidAccessPointAliasError</code> is returned. For more information about <code>InvalidAccessPointAliasError</code>, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html#ErrorCodeList">List of Error Codes</a>.</p><note>
+/// <p>When you use this API operation with an Object Lambda access point, provide the alias of the Object Lambda access point in place of the bucket name. If the Object Lambda access point alias in a request is not valid, the error code <code>InvalidAccessPointAliasError</code> is returned. For more information about <code>InvalidAccessPointAliasError</code>, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html#ErrorCodeList">List of Error Codes</a>.</p> <note>
 /// <p>If your bucket uses the bucket owner enforced setting for S3 Object Ownership, requests to read ACLs are still supported and return the <code>bucket-owner-full-control</code> ACL with the owner being the account that created the bucket. For more information, see <a href="https://docs.aws.amazon.com/AmazonS3/latest/userguide/about-object-ownership.html"> Controlling object ownership and disabling ACLs</a> in the <i>Amazon S3 User Guide</i>.</p>
 /// </note>
 /// <p>The following operations are related to <code>GetBucketAcl</code>:</p>
 /// <ul>
-/// <li>
-/// <p><a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjects.html">ListObjects</a></p></li>
+/// <li> <p> <a href="https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjects.html">ListObjects</a> </p> </li>
 /// </ul>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
 pub struct GetBucketAclFluentBuilder {
@@ -60,7 +59,7 @@ impl
     }
 }
 impl GetBucketAclFluentBuilder {
-    /// Creates a new `GetBucketAclFluentBuilder`.
+    /// Creates a new `GetBucketAcl`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -111,12 +110,12 @@ impl GetBucketAclFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }

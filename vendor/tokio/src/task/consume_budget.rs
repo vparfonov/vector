@@ -1,4 +1,4 @@
-use std::task::{ready, Poll};
+use std::task::Poll;
 
 /// Consumes a unit of budget and returns the execution back to the Tokio
 /// runtime *if* the task's coop budget was exhausted.

@@ -185,9 +185,9 @@ concating
 concats
 condrestart
 conffiles
+configkey
 configmap
 confl
-confluentinc
 confy
 consigliere
 CONTEUDO
@@ -863,7 +863,6 @@ protoc
 protofbuf
 protosizer
 Prt
-psl
 psv
 publickey
 purgecss
@@ -1142,6 +1141,7 @@ trivy
 Troutwine
 trustarc
 truste
+TRUSTSTORE
 TSDB
 Tsvg
 turbofish
@@ -1232,7 +1232,6 @@ wktpointer
 wmem
 woooooow
 woothee
-wor
 wordlist
 workdir
 workstreams
@@ -1244,6 +1243,7 @@ wtcache
 wtime
 wtimeouts
 wtr
+wurstmeister
 xact
 xcatsy
 Xcg

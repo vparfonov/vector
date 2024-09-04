@@ -11,24 +11,17 @@ pub fn main() {
     }
 }
 
-// Used to detect the value of the `__ANDROID_API__`
-// builtin #define
-const MARKER: &str = "BACKTRACE_RS_ANDROID_APIVERSION";
-const ANDROID_API_C: &str = "
-BACKTRACE_RS_ANDROID_APIVERSION __ANDROID_API__
-";
-
 fn build_android() {
-    // Create `android-api.c` on demand.
+    // Resolve `src/android-api.c` relative to this file.
     // Required to support calling this from the `std` build script.
-    let out_dir = env::var_os("OUT_DIR").unwrap();
-    let android_api_c = Path::new(&out_dir).join("android-api.c");
-    std::fs::write(&android_api_c, ANDROID_API_C).unwrap();
-
-    let expansion = match cc::Build::new().file(&android_api_c).try_expand() {
+    let android_api_c = Path::new(file!())
+        .parent()
+        .unwrap()
+        .join("src/android-api.c");
+    let expansion = match cc::Build::new().file(android_api_c).try_expand() {
         Ok(result) => result,
         Err(e) => {
-            eprintln!("warning: android version detection failed while running C compiler: {e}");
+            println!("failed to run C compiler: {}", e);
             return;
         }
     };
@@ -36,12 +29,13 @@ fn build_android() {
         Ok(s) => s,
         Err(_) => return,
     };
-    eprintln!("expanded android version detection:\n{expansion}");
-    let i = match expansion.find(MARKER) {
+    println!("expanded android version detection:\n{}", expansion);
+    let marker = "APIVERSION";
+    let i = match expansion.find(marker) {
         Some(i) => i,
         None => return,
     };
-    let version = match expansion[i + MARKER.len() + 1..].split_whitespace().next() {
+    let version = match expansion[i + marker.len() + 1..].split_whitespace().next() {
         Some(s) => s,
         None => return,
     };

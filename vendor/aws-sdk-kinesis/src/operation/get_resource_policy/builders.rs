@@ -3,7 +3,7 @@ pub use crate::operation::get_resource_policy::_get_resource_policy_output::GetR
 
 pub use crate::operation::get_resource_policy::_get_resource_policy_input::GetResourcePolicyInputBuilder;
 
-impl crate::operation::get_resource_policy::builders::GetResourcePolicyInputBuilder {
+impl GetResourcePolicyInputBuilder {
     /// Sends a request with this input using the given client.
     pub async fn send_with(
         self,
@@ -24,10 +24,8 @@ impl crate::operation::get_resource_policy::builders::GetResourcePolicyInputBuil
 ///
 /// <p>Returns a policy attached to the specified data stream or consumer. Request patterns can be one of the following:</p>
 /// <ul>
-/// <li>
-/// <p>Data stream pattern: <code>arn:aws.*:kinesis:.*:\d{12}:.*stream/\S+</code></p></li>
-/// <li>
-/// <p>Consumer pattern: <code>^(arn):aws.*:kinesis:.*:\d{12}:.*stream\/\[a-zA-Z0-9_.-\]+\/consumer\/\[a-zA-Z0-9_.-\]+:\[0-9\]+</code></p></li>
+/// <li> <p>Data stream pattern: <code>arn:aws.*:kinesis:.*:\d{12}:.*stream/\S+</code> </p> </li>
+/// <li> <p> Consumer pattern: <code>^(arn):aws.*:kinesis:.*:\d{12}:.*stream\/[a-zA-Z0-9_.-]+\/consumer\/[a-zA-Z0-9_.-]+:[0-9]+</code> </p> </li>
 /// </ul>
 #[derive(::std::clone::Clone, ::std::fmt::Debug)]
 pub struct GetResourcePolicyFluentBuilder {
@@ -54,7 +52,7 @@ impl
     }
 }
 impl GetResourcePolicyFluentBuilder {
-    /// Creates a new `GetResourcePolicyFluentBuilder`.
+    /// Creates a new `GetResourcePolicy`.
     pub(crate) fn new(handle: ::std::sync::Arc<crate::client::Handle>) -> Self {
         Self {
             handle,
@@ -105,12 +103,12 @@ impl GetResourcePolicyFluentBuilder {
     > {
         crate::client::customize::CustomizableOperation::new(self)
     }
-    pub(crate) fn config_override(mut self, config_override: impl ::std::convert::Into<crate::config::Builder>) -> Self {
-        self.set_config_override(::std::option::Option::Some(config_override.into()));
+    pub(crate) fn config_override(mut self, config_override: impl Into<crate::config::Builder>) -> Self {
+        self.set_config_override(Some(config_override.into()));
         self
     }
 
-    pub(crate) fn set_config_override(&mut self, config_override: ::std::option::Option<crate::config::Builder>) -> &mut Self {
+    pub(crate) fn set_config_override(&mut self, config_override: Option<crate::config::Builder>) -> &mut Self {
         self.config_override = config_override;
         self
     }

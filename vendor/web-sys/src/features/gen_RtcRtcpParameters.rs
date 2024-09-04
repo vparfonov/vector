@@ -10,26 +10,6 @@ extern "C" {
     #[doc = ""]
     #[doc = "*This API requires the following crate features to be activated: `RtcRtcpParameters`*"]
     pub type RtcRtcpParameters;
-    #[doc = "Get the `cname` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcRtcpParameters`*"]
-    #[wasm_bindgen(method, getter = "cname")]
-    pub fn get_cname(this: &RtcRtcpParameters) -> Option<String>;
-    #[doc = "Change the `cname` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcRtcpParameters`*"]
-    #[wasm_bindgen(method, setter = "cname")]
-    pub fn set_cname(this: &RtcRtcpParameters, val: &str);
-    #[doc = "Get the `reducedSize` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcRtcpParameters`*"]
-    #[wasm_bindgen(method, getter = "reducedSize")]
-    pub fn get_reduced_size(this: &RtcRtcpParameters) -> Option<bool>;
-    #[doc = "Change the `reducedSize` field of this object."]
-    #[doc = ""]
-    #[doc = "*This API requires the following crate features to be activated: `RtcRtcpParameters`*"]
-    #[wasm_bindgen(method, setter = "reducedSize")]
-    pub fn set_reduced_size(this: &RtcRtcpParameters, val: bool);
 }
 impl RtcRtcpParameters {
     #[doc = "Construct a new `RtcRtcpParameters`."]
@@ -40,14 +20,34 @@ impl RtcRtcpParameters {
         let mut ret: Self = ::wasm_bindgen::JsCast::unchecked_into(::js_sys::Object::new());
         ret
     }
-    #[deprecated = "Use `set_cname()` instead."]
+    #[doc = "Change the `cname` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcRtcpParameters`*"]
     pub fn cname(&mut self, val: &str) -> &mut Self {
-        self.set_cname(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(self.as_ref(), &JsValue::from("cname"), &JsValue::from(val));
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
-    #[deprecated = "Use `set_reduced_size()` instead."]
+    #[doc = "Change the `reducedSize` field of this object."]
+    #[doc = ""]
+    #[doc = "*This API requires the following crate features to be activated: `RtcRtcpParameters`*"]
     pub fn reduced_size(&mut self, val: bool) -> &mut Self {
-        self.set_reduced_size(val);
+        use wasm_bindgen::JsValue;
+        let r = ::js_sys::Reflect::set(
+            self.as_ref(),
+            &JsValue::from("reducedSize"),
+            &JsValue::from(val),
+        );
+        debug_assert!(
+            r.is_ok(),
+            "setting properties should never fail on our dictionary objects"
+        );
+        let _ = r;
         self
     }
 }

@@ -2,7 +2,7 @@ use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder;
 use vector_core::{config::DataType, event::{Event, LogEvent}, schema};
 use chrono::{DateTime, SecondsFormat, Local};
-use vrl::value::Value;
+use vrl::{event_path, value::Value};
 use serde::{de, Deserialize};
 use vector_config::configurable_component;
 
@@ -296,21 +296,21 @@ fn add_log_source(log: &LogEvent, buf: &mut String) {
     buf.push_str("namespace_name=");
     buf.push_str(&String::from_utf8(
         log
-        .get("kubernetes.namespace_name")
+        .get(event_path!("kubernetes", "namespace_name"))
         .map(|h| h.coerce_to_bytes())
         .unwrap_or_default().to_vec()
     ).unwrap());
     buf.push_str(", container_name=");
     buf.push_str(&String::from_utf8(
         log
-        .get("kubernetes.container_name")
+        .get(event_path!("kubernetes", "container_name"))
         .map(|h| h.coerce_to_bytes())
         .unwrap_or_default().to_vec()
     ).unwrap());
     buf.push_str(", pod_name=");
     buf.push_str(&String::from_utf8(
         log
-        .get("kubernetes.pod_name")
+        .get(event_path!("kubernetes", "pod_name"))
         .map(|h| h.coerce_to_bytes())
         .unwrap_or_default().to_vec()
     ).unwrap());
@@ -321,7 +321,7 @@ fn get_num_facility(config_facility: &Facility, log: &LogEvent) -> u8 {
     match config_facility {
         Facility::Fixed(num) => return *num,
         Facility::Field(field_name) => {
-            if let Some(field_value) = log.get(field_name.as_str()) {
+            if let Some(field_value) = log.get(event_path!(field_name.as_str())) {
                 let field_value_string = String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
                 let num_value = field_value_string.parse::<u8>();
                 match num_value {
@@ -378,7 +378,7 @@ fn get_num_severity(config_severity: &Severity, log: &LogEvent) -> u8 {
     match config_severity {
         Severity::Fixed(num) => return *num,
         Severity::Field(field_name) => {
-            if let Some(field_value) = log.get(field_name.as_str()) {
+            if let Some(field_value) = log.get(event_path!(field_name.as_str())) {
                 let field_value_string = String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
                 let num_value = field_value_string.parse::<u8>();
                 match num_value {
@@ -424,7 +424,7 @@ fn get_field_or_config(config_name: &String, log: &LogEvent) -> String {
 }
 
 fn get_field(field_name: &str, log: &LogEvent) -> String {
-    if let Some(field_value) = log.get(field_name) {
+    if let Some(field_value) = log.get(event_path!(field_name)) {
         return String::from_utf8(field_value.coerce_to_bytes().to_vec()).unwrap_or_default();
     } else {
         return NILVALUE.to_string()
@@ -432,7 +432,7 @@ fn get_field(field_name: &str, log: &LogEvent) -> String {
 }
 
 fn get_timestamp(log: &LogEvent) -> DateTime::<Local> {
-    match log.get("@timestamp") {
+    match log.get(event_path!("@timestamp")) {
         Some(value) => {
             if let Value::Timestamp(timestamp) = value {
                 DateTime::<Local>::from(*timestamp)

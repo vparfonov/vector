@@ -105,11 +105,11 @@ impl Serialize for Tier {
     }
 }
 
-#[cfg(all(feature = "serde", feature = "std"))]
+#[cfg(feature = "serde")]
 impl<'de> Deserialize<'de> for Tier {
     fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         use de::Error;
-        std::string::String::deserialize(deserializer)?
+        <&str>::deserialize(deserializer)?
             .parse()
             .map_err(D::Error::custom)
     }

@@ -508,9 +508,10 @@ mod source {
                 file = %self.file.display(),
             );
             counter!(
-                "files_deleted_given_up_total", 1,
+                "files_deleted_given_up_total",
                 "file" => self.file.to_string_lossy().into_owned(),
-            );
+            )
+                .increment(1);
         }
     }
 

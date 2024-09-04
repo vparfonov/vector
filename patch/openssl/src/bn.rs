@@ -187,7 +187,7 @@ impl BigNumRef {
     pub fn div_word(&mut self, w: u32) -> Result<u64, ErrorStack> {
         unsafe {
             let r = ffi::BN_div_word(self.as_ptr(), w.into());
-            if r == ffi::BN_ULONG::max_value() {
+            if r == ffi::BN_ULONG::MAX {
                 Err(ErrorStack::get())
             } else {
                 Ok(r.into())
@@ -201,7 +201,7 @@ impl BigNumRef {
     pub fn mod_word(&self, w: u32) -> Result<u64, ErrorStack> {
         unsafe {
             let r = ffi::BN_mod_word(self.as_ptr(), w.into());
-            if r == ffi::BN_ULONG::max_value() {
+            if r == ffi::BN_ULONG::MAX {
                 Err(ErrorStack::get())
             } else {
                 Ok(r.into())
@@ -655,7 +655,6 @@ impl BigNumRef {
 
     /// Places into `self` the modular square root of `a` such that `self^2 = a (mod p)`
     #[corresponds(BN_mod_sqrt)]
-    #[cfg(ossl110)]
     pub fn mod_sqrt(
         &mut self,
         a: &BigNumRef,
@@ -1109,7 +1108,7 @@ impl BigNum {
     pub fn from_slice(n: &[u8]) -> Result<BigNum, ErrorStack> {
         unsafe {
             ffi::init();
-            assert!(n.len() <= LenType::max_value() as usize);
+            assert!(n.len() <= LenType::MAX as usize);
 
             cvt_p(ffi::BN_bin2bn(
                 n.as_ptr(),
@@ -1137,7 +1136,7 @@ impl BigNum {
     #[corresponds(BN_bin2bn)]
     pub fn copy_from_slice(&mut self, n: &[u8]) -> Result<(), ErrorStack> {
         unsafe {
-            assert!(n.len() <= LenType::max_value() as usize);
+            assert!(n.len() <= LenType::MAX as usize);
 
             cvt_p(ffi::BN_bin2bn(n.as_ptr(), n.len() as LenType, self.0))?;
             Ok(())
@@ -1229,7 +1228,7 @@ impl Ord for BigNumRef {
 
 impl PartialOrd for BigNum {
     fn partial_cmp(&self, oth: &BigNum) -> Option<Ordering> {
-        self.deref().partial_cmp(oth.deref())
+        Some(self.cmp(oth))
     }
 }
 
@@ -1490,17 +1489,23 @@ mod tests {
         assert!(b.is_const_time())
     }
 
-    #[cfg(ossl110)]
     #[test]
     fn test_mod_sqrt() {
         let mut ctx = BigNumContext::new().unwrap();
 
-        let s = BigNum::from_hex_str("47A8DD7626B9908C80ACD7E0D3344D69").unwrap();
-        let p = BigNum::from_hex_str("81EF47265B58BCE5").unwrap();
+        let s = BigNum::from_hex_str("2").unwrap();
+        let p = BigNum::from_hex_str("7DEB1").unwrap();
+        let mut sqrt = BigNum::new().unwrap();
         let mut out = BigNum::new().unwrap();
 
-        out.mod_sqrt(&s, &p, &mut ctx).unwrap();
-        assert_eq!(out, BigNum::from_hex_str("7C6D179E19B97BDD").unwrap());
+        // Square the root because OpenSSL randomly returns one of 2E42C or 4FA85
+        sqrt.mod_sqrt(&s, &p, &mut ctx).unwrap();
+        out.mod_sqr(&sqrt, &p, &mut ctx).unwrap();
+        assert!(out == s);
+
+        let s = BigNum::from_hex_str("3").unwrap();
+        let p = BigNum::from_hex_str("5").unwrap();
+        assert!(out.mod_sqrt(&s, &p, &mut ctx).is_err());
     }
 
     #[test]

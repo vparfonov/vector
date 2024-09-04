@@ -13,7 +13,7 @@
 //! done with a minor version bump.
 
 #![no_std]
-#![doc(html_logo_url = "https://raw.githubusercontent.com/RustSec/logos/main/rustsec-logo-lg.png")]
+#![doc(html_root_url = "https://docs.rs/platforms/1.1.0")]
 #![forbid(unsafe_code)]
 #![warn(missing_docs, unused_qualifications, rust_2018_idioms)]
 
@@ -27,7 +27,7 @@ pub mod target;
 pub use crate::{
     error::Error,
     platform::{Platform, Tier},
-    target::{Arch, Endian, Env, PointerWidth, OS},
+    target::{TARGET_ARCH, TARGET_ENV, TARGET_OS},
 };
 
 #[cfg(feature = "std")]

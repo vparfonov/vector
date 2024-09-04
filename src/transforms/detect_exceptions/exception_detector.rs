@@ -1,13 +1,12 @@
+use std::collections::HashMap;
+use std::usize;
+use chrono::{DateTime, Utc};
+use regex::Regex;
 use crate::{
     config::log_schema, event::LogEvent, event::Value,
     internal_events::detect_exceptions::DetectExceptionsStaleEventFlushed,
     transforms::detect_exceptions::*,
 };
-use chrono::{DateTime, Utc};
-use regex::Regex;
-
-use std::collections::HashMap;
-use std::usize;
 
 #[derive(Debug, Clone)]
 pub struct RuleTarget {
@@ -119,7 +118,7 @@ impl TraceAccumulator {
             _ => false,
         };
         if self.accumulated_messages.is_empty() && trigger_emit {
-            output.push(vector_core::event::Event::Log(le.to_owned()));
+            output.push(vector_lib::event::Event::Log(le.to_owned()));
             return;
         }
 
@@ -158,14 +157,14 @@ impl TraceAccumulator {
         match self.accumulated_messages.len() {
             0 => return,
             1 => {
-                output.push(vector_core::event::Event::Log(self.first_event.to_owned()));
+                output.push(Event::Log(self.first_event.to_owned()));
             }
             _ => {
                 self.first_event.insert(
                     log_schema().message_key_target_path().unwrap(),
                     self.accumulated_messages.join("\n"),
                 );
-                output.push(vector_core::event::Event::Log(self.first_event.clone()));
+                output.push(Event::Log(self.first_event.clone()));
             }
         }
         self.accumulated_messages = vec![];

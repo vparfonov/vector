@@ -32,7 +32,7 @@ impl EcdsaSig {
         T: HasPrivate,
     {
         unsafe {
-            assert!(data.len() <= c_int::max_value() as usize);
+            assert!(data.len() <= c_int::MAX as usize);
             let sig = cvt_p(ffi::ECDSA_do_sign(
                 data.as_ptr(),
                 data.len() as LenType,
@@ -77,7 +77,7 @@ impl EcdsaSigRef {
         T: HasPublic,
     {
         unsafe {
-            assert!(data.len() <= c_int::max_value() as usize);
+            assert!(data.len() <= c_int::MAX as usize);
             cvt_n(ffi::ECDSA_do_verify(
                 data.as_ptr(),
                 data.len() as LenType,
@@ -158,7 +158,7 @@ mod test {
     }
 
     #[test]
-    #[cfg_attr(osslconf = "OPENSSL_NO_EC2M", ignore)]
+    #[cfg_attr(osslconf = "OPENSSL_NO_EC", ignore)]
     fn sign_and_verify() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let private_key = EcKey::generate(&group).unwrap();
@@ -186,7 +186,7 @@ mod test {
     }
 
     #[test]
-    #[cfg_attr(osslconf = "OPENSSL_NO_EC2M", ignore)]
+    #[cfg_attr(osslconf = "OPENSSL_NO_EC", ignore)]
     fn check_private_components() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let private_key = EcKey::generate(&group).unwrap();
@@ -206,7 +206,7 @@ mod test {
     }
 
     #[test]
-    #[cfg_attr(osslconf = "OPENSSL_NO_EC2M", ignore)]
+    #[cfg_attr(osslconf = "OPENSSL_NO_EC", ignore)]
     fn serialize_deserialize() {
         let group = EcGroup::from_curve_name(Nid::X9_62_PRIME256V1).unwrap();
         let private_key = EcKey::generate(&group).unwrap();

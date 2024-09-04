@@ -38,7 +38,7 @@ pub fn bytes_to_key(
     count: i32,
 ) -> Result<KeyIvPair, ErrorStack> {
     unsafe {
-        assert!(data.len() <= c_int::max_value() as usize);
+        assert!(data.len() <= c_int::MAX as usize);
         let salt_ptr = match salt {
             Some(salt) => {
                 assert_eq!(salt.len(), ffi::PKCS5_SALT_LEN as usize);
@@ -115,7 +115,7 @@ pub fn pbkdf2_hmac(
 ///
 /// Requires OpenSSL 1.1.0 or newer.
 #[corresponds(EVP_PBE_scrypt)]
-#[cfg(any(ossl110, boringssl))]
+#[cfg(all(any(ossl110, boringssl), not(osslconf = "OPENSSL_NO_SCRYPT")))]
 #[allow(clippy::useless_conversion)]
 pub fn scrypt(
     pass: &[u8],

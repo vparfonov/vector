@@ -22,12 +22,12 @@ pub enum SecretBackends {
     /// Exec.
     Exec(exec::ExecBackend),
 
+    /// File.
+    File(file::FileBackend),
+
     /// AWS Secrets Manager.
     #[cfg(feature = "secrets-aws-secrets-manager")]
     AwsSecretsManager(aws_secrets_manager::AwsSecretsManagerBackend),
-
-    /// File.
-    File(file::FileBackend),
 
     /// Test.
     #[configurable(metadata(docs::hidden))]

@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.63"
 name = "tokio-rustls"
-version = "0.25.0"
+version = "0.26.0"
 exclude = [
     "/.github",
     "/examples",
@@ -36,7 +36,8 @@ version = "1"
 package = "rustls-pki-types"
 
 [dependencies.rustls]
-version = "0.22"
+version = "0.23"
+features = ["std"]
 default-features = false
 
 [dependencies.tokio]
@@ -58,24 +59,19 @@ version = "2"
 version = "1.0"
 features = ["full"]
 
-[dev-dependencies.webpki]
-version = "0.102"
-features = [
-    "alloc",
-    "std",
-]
-package = "rustls-webpki"
-
 [dev-dependencies.webpki-roots]
 version = "0.26"
 
 [features]
+aws-lc-rs = ["aws_lc_rs"]
+aws_lc_rs = ["rustls/aws_lc_rs"]
 default = [
     "logging",
     "tls12",
-    "ring",
+    "aws_lc_rs",
 ]
 early-data = []
+fips = ["rustls/fips"]
 logging = ["rustls/logging"]
 ring = ["rustls/ring"]
 tls12 = ["rustls/tls12"]

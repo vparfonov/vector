@@ -47,6 +47,7 @@ use std::sync::Arc;
 use std::task::{Context, Poll};
 
 pub use rustls;
+use rustls::server::AcceptedAlert;
 use rustls::{ClientConfig, ClientConnection, CommonState, ServerConfig, ServerConnection};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
@@ -195,6 +196,7 @@ impl TlsAcceptor {
 pub struct LazyConfigAcceptor<IO> {
     acceptor: rustls::server::Acceptor,
     io: Option<IO>,
+    alert: Option<(rustls::Error, AcceptedAlert)>,
 }
 
 impl<IO> LazyConfigAcceptor<IO>
@@ -206,6 +208,7 @@ where
         Self {
             acceptor,
             io: Some(io),
+            alert: None,
         }
     }
 
@@ -274,6 +277,22 @@ where
                 }
             };
 
+            if let Some((err, mut alert)) = this.alert.take() {
+                match alert.write(&mut common::SyncWriteAdapter { io, cx }) {
+                    Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                        this.alert = Some((err, alert));
+                        return Poll::Pending;
+                    }
+                    Ok(0) | Err(_) => {
+                        return Poll::Ready(Err(io::Error::new(io::ErrorKind::InvalidData, err)))
+                    }
+                    Ok(_) => {
+                        this.alert = Some((err, alert));
+                        continue;
+                    }
+                };
+            }
+
             let mut reader = common::SyncReadAdapter { io, cx };
             match this.acceptor.read_tls(&mut reader) {
                 Ok(0) => return Err(io::ErrorKind::UnexpectedEof.into()).into(),
@@ -287,9 +306,9 @@ where
                     let io = this.io.take().unwrap();
                     return Poll::Ready(Ok(StartHandshake { accepted, io }));
                 }
-                Ok(None) => continue,
-                Err(err) => {
-                    return Poll::Ready(Err(io::Error::new(io::ErrorKind::InvalidInput, err)))
+                Ok(None) => {}
+                Err((err, alert)) => {
+                    this.alert = Some((err, alert));
                 }
             }
         }
@@ -319,12 +338,13 @@ where
     {
         let mut conn = match self.accepted.into_connection(config) {
             Ok(conn) => conn,
-            Err(error) => {
-                return Accept(MidHandshake::Error {
+            Err((error, alert)) => {
+                return Accept(MidHandshake::SendAlert {
                     io: self.io,
+                    alert,
                     // TODO(eliza): should this really return an `io::Error`?
                     // Probably not...
-                    error: io::Error::new(io::ErrorKind::Other, error),
+                    error: io::Error::new(io::ErrorKind::InvalidData, error),
                 });
             }
         };
@@ -361,6 +381,7 @@ impl<IO> Connect<IO> {
     pub fn get_ref(&self) -> Option<&IO> {
         match &self.0 {
             MidHandshake::Handshaking(sess) => Some(sess.get_ref().0),
+            MidHandshake::SendAlert { io, .. } => Some(io),
             MidHandshake::Error { io, .. } => Some(io),
             MidHandshake::End => None,
         }
@@ -369,6 +390,7 @@ impl<IO> Connect<IO> {
     pub fn get_mut(&mut self) -> Option<&mut IO> {
         match &mut self.0 {
             MidHandshake::Handshaking(sess) => Some(sess.get_mut().0),
+            MidHandshake::SendAlert { io, .. } => Some(io),
             MidHandshake::Error { io, .. } => Some(io),
             MidHandshake::End => None,
         }
@@ -384,6 +406,7 @@ impl<IO> Accept<IO> {
     pub fn get_ref(&self) -> Option<&IO> {
         match &self.0 {
             MidHandshake::Handshaking(sess) => Some(sess.get_ref().0),
+            MidHandshake::SendAlert { io, .. } => Some(io),
             MidHandshake::Error { io, .. } => Some(io),
             MidHandshake::End => None,
         }
@@ -392,6 +415,7 @@ impl<IO> Accept<IO> {
     pub fn get_mut(&mut self) -> Option<&mut IO> {
         match &mut self.0 {
             MidHandshake::Handshaking(sess) => Some(sess.get_mut().0),
+            MidHandshake::SendAlert { io, .. } => Some(io),
             MidHandshake::Error { io, .. } => Some(io),
             MidHandshake::End => None,
         }
@@ -537,6 +561,26 @@ where
         match self.get_mut() {
             TlsStream::Client(x) => Pin::new(x).poll_write(cx, buf),
             TlsStream::Server(x) => Pin::new(x).poll_write(cx, buf),
+        }
+    }
+
+    #[inline]
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[io::IoSlice<'_>],
+    ) -> Poll<io::Result<usize>> {
+        match self.get_mut() {
+            TlsStream::Client(x) => Pin::new(x).poll_write_vectored(cx, bufs),
+            TlsStream::Server(x) => Pin::new(x).poll_write_vectored(cx, bufs),
+        }
+    }
+
+    #[inline]
+    fn is_write_vectored(&self) -> bool {
+        match self {
+            TlsStream::Client(x) => x.is_write_vectored(),
+            TlsStream::Server(x) => x.is_write_vectored(),
         }
     }
 

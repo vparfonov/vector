@@ -1,5 +1,7 @@
 //! A helper module that supports HTTP
 
+#[cfg(feature = "altair")]
+mod altair_source;
 #[cfg(feature = "graphiql")]
 mod graphiql_plugin;
 #[cfg(feature = "graphiql")]
@@ -14,6 +16,8 @@ mod websocket;
 
 use std::io::ErrorKind;
 
+#[cfg(feature = "altair")]
+pub use altair_source::*;
 use futures_util::io::{AsyncRead, AsyncReadExt};
 #[cfg(feature = "graphiql")]
 pub use graphiql_plugin::{graphiql_plugin_explorer, GraphiQLPlugin};
@@ -21,7 +25,6 @@ pub use graphiql_plugin::{graphiql_plugin_explorer, GraphiQLPlugin};
 pub use graphiql_source::graphiql_source;
 #[cfg(feature = "graphiql")]
 pub use graphiql_v2_source::{Credentials, GraphiQLSource};
-use mime;
 pub use multipart::MultipartOptions;
 pub use multipart_subscribe::{create_multipart_mixed_stream, is_accept_multipart_mixed};
 #[cfg(feature = "playground")]

@@ -1,9 +1,9 @@
+use alloc::vec::Vec;
+use core::fmt;
+
 use crate::crypto;
 use crate::crypto::hash;
 use crate::suites::{CipherSuiteCommon, SupportedCipherSuite};
-
-use alloc::vec::Vec;
-use core::fmt;
 
 pub(crate) mod key_schedule;
 
@@ -40,7 +40,29 @@ impl Tls13CipherSuite {
     /// Can a session using suite self resume from suite prev?
     pub fn can_resume_from(&self, prev: &'static Self) -> Option<&'static Self> {
         (prev.common.hash_provider.algorithm() == self.common.hash_provider.algorithm())
-            .then(|| prev)
+            .then_some(prev)
+    }
+
+    /// Return `true` if this is backed by a FIPS-approved implementation.
+    ///
+    /// This means all the constituent parts that do cryptography return `true` for `fips()`.
+    pub fn fips(&self) -> bool {
+        let Self {
+            common,
+            hkdf_provider,
+            aead_alg,
+            quic,
+        } = self;
+        common.fips()
+            && hkdf_provider.fips()
+            && aead_alg.fips()
+            && quic.map(|q| q.fips()).unwrap_or(true)
+    }
+
+    /// Returns a `quic::Suite` for the ciphersuite, if supported.
+    pub fn quic_suite(&'static self) -> Option<crate::quic::Suite> {
+        self.quic
+            .map(|quic| crate::quic::Suite { quic, suite: self })
     }
 }
 

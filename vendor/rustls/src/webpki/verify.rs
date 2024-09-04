@@ -1,13 +1,14 @@
 use alloc::vec::Vec;
 use core::fmt;
 
-use pki_types::{CertificateDer, ServerName, SignatureVerificationAlgorithm, UnixTime};
+use pki_types::{
+    CertificateDer, ServerName, SignatureVerificationAlgorithm, SubjectPublicKeyInfoDer, UnixTime,
+};
 
 use super::anchors::RootCertStore;
 use super::pki_error;
 use crate::enums::SignatureScheme;
 use crate::error::{Error, PeerMisbehaved};
-
 use crate::verify::{DigitallySignedStruct, HandshakeSignatureValid};
 
 /// Verify that the end-entity certificate `end_entity` is a valid server cert
@@ -23,7 +24,7 @@ use crate::verify::{DigitallySignedStruct, HandshakeSignatureValid};
 /// same order that the server sent them and may be empty.
 #[allow(dead_code)]
 pub fn verify_server_cert_signed_by_trust_anchor(
-    cert: &ParsedCertificate,
+    cert: &ParsedCertificate<'_>,
     roots: &RootCertStore,
     intermediates: &[CertificateDer<'_>],
     now: UnixTime,
@@ -39,11 +40,11 @@ pub fn verify_server_cert_signed_by_trust_anchor(
     )
 }
 
-/// Verify that the `end_entity` has a name or alternative name matching the `server_name`
-/// note: this only verifies the name and should be used in conjuction with more verification
+/// Verify that the `end_entity` has an alternative name matching the `server_name`
+/// note: this only verifies the name and should be used in conjunction with more verification
 /// like [verify_server_cert_signed_by_trust_anchor]
 pub fn verify_server_name(
-    cert: &ParsedCertificate,
+    cert: &ParsedCertificate<'_>,
     server_name: &ServerName<'_>,
 ) -> Result<(), Error> {
     cert.0
@@ -100,6 +101,15 @@ impl WebPkiSupportedAlgorithms {
             .next()
             .ok_or_else(|| PeerMisbehaved::SignedHandshakeWithUnadvertisedSigScheme.into())
     }
+
+    /// Return `true` if all cryptography is FIPS-approved.
+    pub fn fips(&self) -> bool {
+        self.all.iter().all(|alg| alg.fips())
+            && self
+                .mapping
+                .iter()
+                .all(|item| item.1.iter().all(|alg| alg.fips()))
+    }
 }
 
 impl fmt::Debug for WebPkiSupportedAlgorithms {
@@ -117,9 +127,16 @@ impl fmt::Debug for WebPkiSupportedAlgorithms {
 /// This is used in order to avoid parsing twice when specifying custom verification
 pub struct ParsedCertificate<'a>(pub(crate) webpki::EndEntityCert<'a>);
 
+impl<'a> ParsedCertificate<'a> {
+    /// Get the parsed certificate's SubjectPublicKeyInfo (SPKI)
+    pub fn subject_public_key_info(&self) -> SubjectPublicKeyInfoDer<'static> {
+        self.0.subject_public_key_info()
+    }
+}
+
 impl<'a> TryFrom<&'a CertificateDer<'a>> for ParsedCertificate<'a> {
     type Error = Error;
-    fn try_from(value: &'a CertificateDer<'a>) -> Result<ParsedCertificate<'a>, Self::Error> {
+    fn try_from(value: &'a CertificateDer<'a>) -> Result<Self, Self::Error> {
         webpki::EndEntityCert::try_from(value)
             .map_err(pki_error)
             .map(ParsedCertificate)
@@ -195,10 +212,10 @@ pub fn verify_tls13_signature(
 /// can't include this argument in `verify_server_cert_signed_by_trust_anchor` because
 /// it will leak the webpki types into Rustls' public API.
 pub(crate) fn verify_server_cert_signed_by_trust_anchor_impl(
-    cert: &ParsedCertificate,
+    cert: &ParsedCertificate<'_>,
     roots: &RootCertStore,
     intermediates: &[CertificateDer<'_>],
-    revocation: Option<webpki::RevocationOptions>,
+    revocation: Option<webpki::RevocationOptions<'_>>,
     now: UnixTime,
     supported_algs: &[&dyn SignatureVerificationAlgorithm],
 ) -> Result<(), Error> {
@@ -219,6 +236,8 @@ pub(crate) fn verify_server_cert_signed_by_trust_anchor_impl(
 
 #[cfg(test)]
 mod tests {
+    use std::format;
+
     use super::*;
 
     #[test]

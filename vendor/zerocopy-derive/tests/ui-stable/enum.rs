@@ -1,6 +1,10 @@
-// Copyright 2019 The Fuchsia Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// Copyright 2019 The Fuchsia Authors
+//
+// Licensed under a BSD-style license <LICENSE-BSD>, Apache License, Version 2.0
+// <LICENSE-APACHE or https://www.apache.org/licenses/LICENSE-2.0>, or the MIT
+// license <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your option.
+// This file may not be copied, modified, or distributed except according to
+// those terms.
 
 #[macro_use]
 extern crate zerocopy;
@@ -11,76 +15,97 @@ fn main() {}
 // Generic errors
 //
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 #[repr("foo")]
 enum Generic1 {
     A,
 }
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 #[repr(foo)]
 enum Generic2 {
     A,
 }
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 #[repr(transparent)]
 enum Generic3 {
     A,
 }
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 #[repr(u8, u16)]
 enum Generic4 {
     A,
 }
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 enum Generic5 {
     A,
+}
+
+//
+// FromZeroes errors
+//
+
+#[derive(FromZeroes)]
+enum FromZeroes1 {
+    A(u8),
+}
+
+#[derive(FromZeroes)]
+enum FromZeroes2 {
+    A,
+    B(u8),
+}
+
+#[derive(FromZeroes)]
+enum FromZeroes3 {
+    A = 1,
+    B,
 }
 
 //
 // FromBytes errors
 //
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 #[repr(C)]
 enum FromBytes1 {
     A,
 }
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 #[repr(usize)]
 enum FromBytes2 {
     A,
 }
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 #[repr(isize)]
 enum FromBytes3 {
     A,
 }
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 #[repr(u32)]
 enum FromBytes4 {
     A,
 }
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 #[repr(i32)]
 enum FromBytes5 {
     A,
 }
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 #[repr(u64)]
 enum FromBytes6 {
     A,
 }
 
-#[derive(FromBytes)]
+#[derive(FromZeroes, FromBytes)]
 #[repr(i64)]
 enum FromBytes7 {
     A,

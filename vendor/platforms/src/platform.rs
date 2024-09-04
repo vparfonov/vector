@@ -1,6 +1,8 @@
 //! Rust platforms
 
-mod platforms;
+pub mod tier1;
+pub mod tier2;
+pub mod tier3;
 
 #[cfg(feature = "std")]
 mod req;
@@ -11,16 +13,13 @@ pub use self::tier::Tier;
 #[cfg(feature = "std")]
 pub use self::req::PlatformReq;
 
-use self::platforms::ALL;
 use crate::target::*;
 use core::fmt;
 
 /// Rust platforms supported by mainline rustc
 ///
 /// Sourced from <https://doc.rust-lang.org/nightly/rustc/platform-support.html>
-/// as well as the latest nightly version of `rustc`
 #[derive(Clone, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
-#[non_exhaustive]
 pub struct Platform {
     /// "Target triple" string uniquely identifying the platform. See:
     /// <https://github.com/rust-lang/rfcs/blob/master/text/0131-target-specification.md>
@@ -38,15 +37,7 @@ pub struct Platform {
     /// Target environment `cfg` attribute (i.e. `cfg(target_env)`).
     /// Only used when needed for disambiguation, e.g. on many GNU platforms
     /// this value will be `None`.
-    pub target_env: Env,
-
-    /// Target pointer width `cfg` attribute, in bits (i.e. `cfg(target_pointer_width)`).
-    /// Typically 64 on modern platforms, 32 on older platforms, 16 on some microcontrollers.
-    pub target_pointer_width: PointerWidth,
-
-    /// Target [endianness](https://en.wikipedia.org/wiki/Endianness) `cfg` attribute (i.e. `cfg(target_endian)`).
-    /// Set to "little" on the vast majority of modern platforms.
-    pub target_endian: Endian,
+    pub target_env: Option<Env>,
 
     /// Tier of this platform:
     ///
@@ -57,16 +48,111 @@ pub struct Platform {
 }
 
 impl Platform {
-    /// All valid Rust platforms usable from the mainline compiler.
-    ///
-    /// Note that this list will evolve over time, and platforms will be both added and removed.
-    pub const ALL: &'static [Platform] = ALL;
-
     /// Find a Rust platform by its "target triple", e.g. `i686-apple-darwin`
     pub fn find(target_triple: &str) -> Option<&'static Platform> {
-        Self::ALL
+        Self::all()
             .iter()
             .find(|platform| platform.target_triple == target_triple)
+    }
+
+    /// Attempt to guess the current `Platform`. May give inaccurate results.
+    pub fn guess_current() -> Option<&'static Platform> {
+        Self::find(env!("TARGET")).or_else(|| {
+            Self::all().iter().find(|platform| {
+                platform.target_arch == TARGET_ARCH
+                    && platform.target_env == TARGET_ENV
+                    && platform.target_os == TARGET_OS
+            })
+        })
+    }
+
+    /// All valid Rust platforms usable from the mainline compiler
+    pub fn all() -> &'static [Platform] {
+        &[
+            // Tier 1
+            tier1::I686_APPLE_DARWIN,
+            tier1::I686_PC_WINDOWS_GNU,
+            tier1::I686_PC_WINDOWS_MSVC,
+            tier1::I686_UNKNOWN_LINUX_GNU,
+            tier1::X86_64_APPLE_DARWIN,
+            tier1::X86_64_PC_WINDOWS_GNU,
+            tier1::X86_64_PC_WINDOWS_MSVC,
+            tier1::X86_64_UNKNOWN_LINUX_GNU,
+            // Tier 2
+            tier2::AARCH64_APPLE_DARWIN,
+            tier2::AARCH64_APPLE_IOS,
+            tier2::AARCH64_PC_WINDOWS_MSVC,
+            tier2::AARCH64_LINUX_ANDROID,
+            tier2::AARCH64_FUCHSIA,
+            tier2::AARCH64_UNKNOWN_LINUX_GNU,
+            tier2::AARCH64_UNKNOWN_LINUX_MUSL,
+            tier2::ARM_LINUX_ANDROIDEABI,
+            tier2::ARM_UNKNOWN_LINUX_GNUEABI,
+            tier2::ARM_UNKNOWN_LINUX_GNUEABIHF,
+            tier2::ARM_UNKNOWN_LINUX_MUSLEABI,
+            tier2::ARM_UNKNOWN_LINUX_MUSLEABIHF,
+            tier2::ARMV5TE_UNKNOWN_LINUX_GNUEABI,
+            tier2::ARMV7_APPLE_IOS,
+            tier2::ARMV7_LINUX_ANDROIDEABI,
+            tier2::ARMV7_UNKNOWN_LINUX_GNUEABIHF,
+            tier2::ARMV7_UNKNOWN_LINUX_MUSLEABIHF,
+            tier2::ARMV7S_APPLE_IOS,
+            tier2::ASMJS_UNKNOWN_EMSCRIPTEN,
+            tier2::I386_APPLE_IOS,
+            tier2::I586_PC_WINDOWS_MSVC,
+            tier2::I586_UNKNOWN_LINUX_GNU,
+            tier2::I586_UNKNOWN_LINUX_MUSL,
+            tier2::I686_LINUX_ANDROID,
+            tier2::I686_UNKNOWN_FREEBSD,
+            tier2::I686_UNKNOWN_LINUX_MUSL,
+            tier2::MIPS_UNKNOWN_LINUX_GNU,
+            tier2::MIPS_UNKNOWN_LINUX_MUSL,
+            tier2::MIPS64_UNKNOWN_LINUX_GNUABI64,
+            tier2::MIPS64EL_UNKNOWN_LINUX_GNUABI64,
+            tier2::MIPSEL_UNKNOWN_LINUX_GNU,
+            tier2::MIPSEL_UNKNOWN_LINUX_MUSL,
+            tier2::POWERPC_UNKNOWN_LINUX_GNU,
+            tier2::POWERPC64_UNKNOWN_LINUX_GNU,
+            tier2::POWERPC64LE_UNKNOWN_LINUX_GNU,
+            tier2::S390X_UNKNOWN_LINUX_GNU,
+            tier2::SPARC64_UNKNOWN_LINUX_GNU,
+            tier2::SPARC64_SUN_SOLARIS,
+            tier2::WASM_UNKNOWN_UNKNOWN,
+            tier2::WASM_UNKNOWN_EMSCRIPTEN,
+            tier2::X86_64_APPLE_IOS,
+            tier2::X86_64_LINUX_ANDROID,
+            tier2::X86_64_RUMPRUN_NETBSD,
+            tier2::X86_64_SUN_SOLARIS,
+            tier2::X86_64_UNKNOWN_CLOUDABI,
+            tier2::X86_64_UNKNOWN_FREEBSD,
+            tier2::X86_64_FUCHSIA,
+            tier2::X86_64_UNKNOWN_LINUX_GNUX32,
+            tier2::X86_64_UNKNOWN_LINUX_MUSL,
+            tier2::X86_64_UNKNOWN_NETBSD,
+            tier2::X86_64_UNKNOWN_REDOX,
+            // Tier 2.5
+            tier2::AARCH64_UNKNOWN_CLOUDABI,
+            tier2::ARMV7_UNKNOWN_CLOUDABI_EABIHF,
+            tier2::I686_UNKNOWN_CLOUDABI,
+            tier2::POWERPC_UNKNOWN_LINUX_GNUSPE,
+            tier2::SPARC_UNKNOWN_LINUX_GNU,
+            // Tier 3
+            tier3::I686_UNKNOWN_HAIKU,
+            tier3::I686_UNKNOWN_NETBSD,
+            tier3::MIPS_UNKNOWN_LINUX_UCLIBC,
+            tier3::MIPSEL_UNKNOWN_LINUX_UCLIBC,
+            tier3::MSP430_NONE_ELF,
+            tier3::SPARC64_UNKNOWN_NETBSD,
+            tier3::THUMBV6M_NONE_EABI,
+            tier3::THUMBV7EM_NONE_EABI,
+            tier3::THUMBV7EM_NONE_EABIHF,
+            tier3::THUMBV7M_NONE_EABI,
+            tier3::X86_64_FORTANIX_UNKNOWN_SGX,
+            tier3::X86_64_UNKNOWN_BITRIG,
+            tier3::X86_64_UNKNOWN_DRAGONFLY,
+            tier3::X86_64_UNKNOWN_HAIKU,
+            tier3::X86_64_UNKNOWN_OPENBSD,
+        ]
     }
 }
 
@@ -86,7 +172,7 @@ mod tests {
     fn no_dupes_test() {
         let mut target_triples = HashSet::new();
 
-        for platform in Platform::ALL {
+        for platform in Platform::all() {
             assert!(
                 target_triples.insert(platform.target_triple),
                 "duplicate target triple: {}",
@@ -95,37 +181,8 @@ mod tests {
         }
     }
 
-    use std::collections::HashMap;
-
-    use super::*;
-
-    /// `platforms` v2.0 used to provide various constants passed as `cfg` values,
-    /// and attempted to detect the target triple based on that.
-    /// This test is meant to check whether such detection can be accurate.
-    ///
-    /// Turns out that as of v3.0 this is infeasible,
-    /// even though the list of supported cfg values was expanded.
-    ///
-    /// I have also verified that no possible expansion of the supported cfg fields
-    /// will lets uniquely identify the platform based on cfg values using a shell script:
-    /// `rustc --print=target-list | parallel 'rustc --print=cfg --target={} > ./{}'; fdupes`
     #[test]
-    #[ignore]
-    fn test_detection_feasibility() {
-        let mut all_platforms = HashMap::new();
-        for p in ALL {
-            if let Some(other_p) = all_platforms.insert(
-                (
-                    p.target_arch,
-                    p.target_os,
-                    p.target_env,
-                    p.target_endian,
-                    p.target_pointer_width,
-                ),
-                p.target_triple,
-            ) {
-                panic!("{} and {} have identical properties, and cannot be distinguished based on properties alone", p.target_triple, other_p);
-            }
-        }
+    fn guesses_current() {
+        assert!(Platform::guess_current().is_some());
     }
 }

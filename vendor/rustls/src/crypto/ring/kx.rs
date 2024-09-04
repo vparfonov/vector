@@ -1,15 +1,14 @@
 #![allow(clippy::duplicate_mod)]
 
+use alloc::boxed::Box;
+use core::fmt;
+
+use super::ring_like::agreement;
+use super::ring_like::rand::SystemRandom;
 use crate::crypto::{ActiveKeyExchange, SharedSecret, SupportedKxGroup};
 use crate::error::{Error, PeerMisbehaved};
 use crate::msgs::enums::NamedGroup;
 use crate::rand::GetRandomFailed;
-
-use super::ring_like::agreement;
-use super::ring_like::rand::SystemRandom;
-
-use alloc::boxed::Box;
-use core::fmt;
 
 /// A key-exchange group supported by *ring*.
 ///
@@ -21,6 +20,12 @@ struct KxGroup {
 
     /// The corresponding ring agreement::Algorithm
     agreement_algorithm: &'static agreement::Algorithm,
+
+    /// Whether the algorithm is allowed by FIPS
+    ///
+    /// `SupportedKxGroup::fips()` is true if and only if the algorithm is allowed,
+    /// _and_ the implementation is FIPS-validated.
+    fips_allowed: bool,
 }
 
 impl SupportedKxGroup for KxGroup {
@@ -44,6 +49,10 @@ impl SupportedKxGroup for KxGroup {
     fn name(&self) -> NamedGroup {
         self.name
     }
+
+    fn fips(&self) -> bool {
+        self.fips_allowed && super::fips()
+    }
 }
 
 impl fmt::Debug for KxGroup {
@@ -56,18 +65,27 @@ impl fmt::Debug for KxGroup {
 pub static X25519: &dyn SupportedKxGroup = &KxGroup {
     name: NamedGroup::X25519,
     agreement_algorithm: &agreement::X25519,
+
+    // "Curves that are included in SP 800-186 but not included in SP 800-56Arev3 are
+    //  not approved for key agreement. E.g., the ECDH X25519 and X448 key agreement
+    //  schemes (defined in RFC 7748) that use Curve25519 and Curve448, respectively,
+    //  are not compliant to SP 800-56Arev3."
+    // -- <https://csrc.nist.gov/csrc/media/Projects/cryptographic-module-validation-program/documents/fips%20140-3/FIPS%20140-3%20IG.pdf>
+    fips_allowed: false,
 };
 
 /// Ephemeral ECDH on secp256r1 (aka NIST-P256)
 pub static SECP256R1: &dyn SupportedKxGroup = &KxGroup {
     name: NamedGroup::secp256r1,
     agreement_algorithm: &agreement::ECDH_P256,
+    fips_allowed: true,
 };
 
 /// Ephemeral ECDH on secp384r1 (aka NIST-P384)
 pub static SECP384R1: &dyn SupportedKxGroup = &KxGroup {
     name: NamedGroup::secp384r1,
     agreement_algorithm: &agreement::ECDH_P384,
+    fips_allowed: true,
 };
 
 /// A list of all the key exchange groups supported by rustls.
@@ -103,6 +121,8 @@ impl ActiveKeyExchange for KeyExchange {
 
 #[cfg(test)]
 mod tests {
+    use std::format;
+
     #[test]
     fn kxgroup_fmt_yields_name() {
         assert_eq!("X25519", format!("{:?}", super::X25519));

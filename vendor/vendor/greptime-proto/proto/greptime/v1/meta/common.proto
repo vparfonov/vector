@@ -1,0 +1,75 @@
+// Copyright 2023 Greptime Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package greptime.v1.meta;
+
+option go_package = "github.com/GreptimeTeam/greptime-proto/go/greptime/v1/meta";
+
+message RequestHeader {
+  uint64 protocol_version = 1;
+  // cluster_id is the ID of the cluster which be sent to.
+  uint64 cluster_id = 2;
+  // member_id is the ID of the sender server.
+  uint64 member_id = 3;
+  Role role = 4;
+  // Encoded trace_id & span_id, follow the w3c Trace Context
+  // https://www.w3.org/TR/trace-context/#header-name
+  map<string, string> tracing_context = 5;
+}
+
+enum Role {
+  DATANODE = 0;
+  FRONTEND = 1;
+}
+
+message ResponseHeader {
+  uint64 protocol_version = 1;
+  // cluster_id is the ID of the cluster which sent the response.
+  uint64 cluster_id = 2;
+  Error error = 3;
+}
+
+message Error {
+  int32 code = 1;
+  string err_msg = 2;
+}
+
+message Peer {
+  uint64 id = 1;
+  string addr = 2;
+}
+
+message TableId { uint32 id = 1; }
+
+message TableName {
+  string catalog_name = 1;
+  string schema_name = 2;
+  string table_name = 3;
+}
+
+message TimeInterval {
+  // The unix timestamp in millis of the start of this period.
+  int64 start_timestamp_millis = 1;
+  // The unix timestamp in millis of the end of this period.
+  int64 end_timestamp_millis = 2;
+}
+
+message KeyValue {
+  // key is the key in bytes. An empty key is not allowed.
+  bytes key = 1;
+  // value is the value held by the key, in bytes.
+  bytes value = 2;
+}

@@ -46,7 +46,7 @@ macro_rules! _memoffset__let_base_ptr {
 }
 
 /// Macro to compute the distance between two pointers.
-#[cfg(any(feature = "unstable_const", stable_const))]
+#[cfg(feature = "unstable_const")]
 #[macro_export]
 #[doc(hidden)]
 macro_rules! _memoffset_offset_from_unsafe {
@@ -58,7 +58,7 @@ macro_rules! _memoffset_offset_from_unsafe {
         unsafe { (field as *const u8).offset_from(base as *const u8) as usize }
     }};
 }
-#[cfg(not(any(feature = "unstable_const", stable_const)))]
+#[cfg(not(feature = "unstable_const"))]
 #[macro_export]
 #[doc(hidden)]
 macro_rules! _memoffset_offset_from_unsafe {
@@ -66,28 +66,6 @@ macro_rules! _memoffset_offset_from_unsafe {
         // Compute offset.
         ($field as usize) - ($base as usize)
     };
-}
-#[cfg(not(feature = "unstable_offset_of"))]
-#[macro_export(local_inner_macros)]
-#[doc(hidden)]
-macro_rules! _memoffset__offset_of_impl {
-    ($parent:path, $field:tt) => {{
-        // Get a base pointer (non-dangling if rustc supports `MaybeUninit`).
-        _memoffset__let_base_ptr!(base_ptr, $parent);
-        // Get field pointer.
-        let field_ptr = raw_field!(base_ptr, $parent, $field);
-        // Compute offset.
-        _memoffset_offset_from_unsafe!(field_ptr, base_ptr)
-    }};
-}
-#[cfg(feature = "unstable_offset_of")]
-#[macro_export]
-#[doc(hidden)]
-#[allow_internal_unstable(offset_of)]
-macro_rules! _memoffset__offset_of_impl {
-    ($parent:path, $field:tt) => {{
-        $crate::__priv::mem::offset_of!($parent, $field)
-    }};
 }
 
 /// Calculates the offset of the specified field from the start of the named struct.
@@ -120,9 +98,14 @@ macro_rules! _memoffset__offset_of_impl {
 /// As a result, the value should not be retained and used between different compilations.
 #[macro_export(local_inner_macros)]
 macro_rules! offset_of {
-    ($parent:path, $field:tt) => {
-        _memoffset__offset_of_impl!($parent, $field)
-    };
+    ($parent:path, $field:tt) => {{
+        // Get a base pointer (non-dangling if rustc supports `MaybeUninit`).
+        _memoffset__let_base_ptr!(base_ptr, $parent);
+        // Get field pointer.
+        let field_ptr = raw_field!(base_ptr, $parent, $field);
+        // Compute offset.
+        _memoffset_offset_from_unsafe!(field_ptr, base_ptr)
+    }};
 }
 
 /// Calculates the offset of the specified field from the start of the tuple.
@@ -145,30 +128,6 @@ macro_rules! offset_of_tuple {
         let field_ptr = raw_field_tuple!(base_ptr, $parent, $field);
         // Compute offset.
         _memoffset_offset_from_unsafe!(field_ptr, base_ptr)
-    }};
-}
-
-#[cfg(not(feature = "unstable_offset_of"))]
-#[macro_export(local_inner_macros)]
-#[doc(hidden)]
-macro_rules! _memoffset__offset_of_union_impl {
-    ($parent:path, $field:tt) => {{
-        // Get a base pointer (non-dangling if rustc supports `MaybeUninit`).
-        _memoffset__let_base_ptr!(base_ptr, $parent);
-        // Get field pointer.
-        let field_ptr = raw_field_union!(base_ptr, $parent, $field);
-        // Compute offset.
-        _memoffset_offset_from_unsafe!(field_ptr, base_ptr)
-    }};
-}
-
-#[cfg(feature = "unstable_offset_of")]
-#[macro_export(local_inner_macros)]
-#[doc(hidden)]
-#[allow_internal_unstable(offset_of)]
-macro_rules! _memoffset__offset_of_union_impl {
-    ($parent:path, $field:tt) => {{
-        $crate::__priv::mem::offset_of!($parent, $field)
     }};
 }
 
@@ -196,7 +155,12 @@ macro_rules! _memoffset__offset_of_union_impl {
 #[macro_export(local_inner_macros)]
 macro_rules! offset_of_union {
     ($parent:path, $field:tt) => {{
-        _memoffset__offset_of_union_impl!($parent, $field)
+        // Get a base pointer (non-dangling if rustc supports `MaybeUninit`).
+        _memoffset__let_base_ptr!(base_ptr, $parent);
+        // Get field pointer.
+        let field_ptr = raw_field_union!(base_ptr, $parent, $field);
+        // Compute offset.
+        _memoffset_offset_from_unsafe!(field_ptr, base_ptr)
     }};
 }
 
@@ -348,11 +312,7 @@ mod tests {
         assert_eq!(f_ptr as usize + 0, raw_field_union!(f_ptr, Foo, c) as usize);
     }
 
-    #[cfg(any(
-        feature = "unstable_const",
-        feature = "unstable_offset_of",
-        stable_const
-    ))]
+    #[cfg(feature = "unstable_const")]
     #[test]
     fn const_offset() {
         #[repr(C)]
@@ -377,11 +337,7 @@ mod tests {
         assert_eq!([0; offset_of!(Foo, b)].len(), 4);
     }
 
-    #[cfg(any(
-        feature = "unstable_const",
-        feature = "unstable_offset_of",
-        stable_const
-    ))]
+    #[cfg(feature = "unstable_const")]
     #[test]
     fn const_fn_offset() {
         const fn test_fn() -> usize {

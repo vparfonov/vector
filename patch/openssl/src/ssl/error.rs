@@ -196,9 +196,9 @@ pub enum ErrorEx {
 impl PartialEq for ErrorEx {
     fn eq(&self, other: &ErrorEx) -> bool {
         match (self, other) {
-            (ErrorEx::OpenSslError{..}, ErrorEx::OpenSslError{..}) => true,
-            (ErrorEx::InvalidTlsVersion, ErrorEx::InvalidTlsVersion) => true,
-            (ErrorEx::InvalidCiphersuite, ErrorEx::InvalidCiphersuite) => true,
+            (ErrorEx::OpenSslError{..}, ErrorEx::OpenSslError{..})
+            | (ErrorEx::InvalidTlsVersion, ErrorEx::InvalidTlsVersion)
+            | (ErrorEx::InvalidCiphersuite, ErrorEx::InvalidCiphersuite) => true,
             _ => false,
         }
     }

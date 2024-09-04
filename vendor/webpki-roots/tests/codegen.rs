@@ -1,174 +1,94 @@
 use std::ascii::escape_default;
-use std::collections::HashMap;
 use std::fmt::Write;
 use std::fs;
-use std::io::Cursor;
 
+use pki_types::CertificateDer;
 use ring::digest;
+use webpki::anchor_from_trusted_cert;
+use webpki_ccadb::fetch_ccadb_roots;
+use x509_parser::prelude::AttributeTypeAndValue;
+use x509_parser::x509::X509Name;
 
 #[tokio::test]
-async fn generated_code_is_fresh() {
-    // Fetch the list of certificates as a PEM file from mkcert.org
-
-    let mut except = String::with_capacity(128);
-    for (i, ca) in EXCLUDED_CAS.iter().enumerate() {
-        if i > 0 {
-            except.push('+');
-        }
-
-        except
-            .write_fmt(format_args!(
-                "{}",
-                percent_encoding::percent_encode(ca.as_bytes(), percent_encoding::NON_ALPHANUMERIC,)
-            ))
-            .unwrap();
-    }
-
-    let url = format!("https://mkcert.org/generate/all/except/{except}");
-    eprintln!("fetching {url}...");
-    let body = reqwest::get(&url).await.unwrap().text().await.unwrap();
-    fs::write("fetched.pem", &body).unwrap();
-
-    // Split file contents into a Vec<Vec<&str>> where each inner Vec represents one certificate
-
-    let mut certs = Vec::with_capacity(64);
-    let mut current = Vec::with_capacity(16);
-    for ln in body.lines() {
-        if !ln.is_empty() {
-            current.push(ln);
-            continue;
-        } else if current.is_empty() {
-            continue;
-        }
-
-        certs.push(current);
-        current = Vec::with_capacity(16);
-    }
-
-    certs.push(current);
-
-    // Parse each certificate and check fingerprints
-
-    let mut hashed = HashMap::<Vec<u8>, (Vec<&str>, Vec<u8>)>::default();
-    for cert in certs {
-        let start = cert
-            .iter()
-            .position(|&ln| ln == "-----BEGIN CERTIFICATE-----")
-            .unwrap();
-
-        // Parse PEM to get the DER.
-        let pem = cert[start..].join("\n");
-        let mut reader = Cursor::new(pem.as_bytes());
-        let der = match rustls_pemfile::read_one(&mut reader).unwrap().unwrap() {
-            rustls_pemfile::Item::X509Certificate(der) => der,
-            _ => unreachable!(),
-        };
-
-        // Check if our hash matches the one in the file.
-        let their_fingerprint = cert
-            .iter()
-            .find_map(|&ln| ln.strip_prefix("# SHA256 Fingerprint: "))
-            .unwrap();
-        let hash = digest::digest(&digest::SHA256, &der);
-        assert!(
-            !hashed.contains_key(hash.as_ref()),
-            "duplicate hash: {:#?}",
-            &cert
-        );
-
-        let our_fingerprint = hash
-            .as_ref()
-            .iter()
-            .map(|b| format!("{:02x}", b))
-            .collect::<String>();
-        assert_eq!(
-            their_fingerprint.replace(':', ""),
-            our_fingerprint,
-            "{:#?}",
-            &cert
-        );
-
-        hashed.insert(hash.as_ref().to_vec(), (cert, der));
-    }
-
-    // For the given certificate subject name, store a name constraints encoding
-    // which will be applied to that certificate. This data is sourced from
-    // https://hg.mozilla.org/projects/nss/file/tip/lib/certdb/genname.c such that
-    // webpki-roots implements the same policy in this respect as the Mozilla root program.
-    let mut imposed_constraints = HashMap::<Vec<u8>, Vec<u8>>::default();
-    imposed_constraints.insert(
-        concat(TUBITAK1_SUBJECT_DN),
-        TUBITAK1_NAME_CONSTRAINTS.to_vec(),
-    );
-
-    // Generate the trust anchors, sorted by fingerprint
-
-    let mut hashes = hashed.into_iter().collect::<Vec<_>>();
-    hashes.sort_by(|a, b| a.0.cmp(&b.0));
-
-    let (mut subject, mut spki, mut name_constraints) =
-        (String::new(), String::new(), String::new());
+async fn new_generated_code_is_fresh() {
+    let tls_roots_map = fetch_ccadb_roots().await;
     let mut code = String::with_capacity(256 * 1_024);
     code.push_str(HEADER);
     code.push_str("pub const TLS_SERVER_ROOTS: &[TrustAnchor] = &[\n");
-    for (_, (lines, der)) in hashes {
-        let ta = webpki::TrustAnchor::try_from_cert_der(&der).unwrap();
+    let (mut subject, mut spki, mut name_constraints) =
+        (String::new(), String::new(), String::new());
+
+    for (_, root) in tls_roots_map {
+        // Verify the DER FP matches the metadata FP.
+        let der = root.der();
+        let calculated_fp = digest::digest(&digest::SHA256, &der);
+        let metadata_fp = hex::decode(&root.sha256_fingerprint).expect("malformed fingerprint");
+        assert_eq!(calculated_fp.as_ref(), metadata_fp.as_slice());
+
+        let ta_der = CertificateDer::from(der.as_ref());
+        let ta = anchor_from_trusted_cert(&ta_der).expect("malformed trust anchor der");
         subject.clear();
-        for &b in ta.subject {
+        for &b in ta.subject.as_ref() {
             write!(&mut subject, "{}", escape_default(b)).unwrap();
         }
 
         spki.clear();
-        for &b in ta.spki {
+        for &b in ta.subject_public_key_info.as_ref() {
             write!(&mut spki, "{}", escape_default(b)).unwrap();
         }
 
         name_constraints.clear();
-        let nc = imposed_constraints
-            .get(ta.subject)
-            .map(|nc| nc.as_slice())
-            .or(ta.name_constraints);
-        if let Some(nc) = nc {
-            for &b in nc {
+        if let Some(nc) = &root.mozilla_applied_constraints() {
+            for &b in nc.iter() {
                 write!(&mut name_constraints, "{}", escape_default(b)).unwrap();
             }
         }
 
-        // Write comment with source
+        let (_, parsed_cert) =
+            x509_parser::parse_x509_certificate(&der).expect("malformed x509 der");
+        let issuer = name_to_string(parsed_cert.issuer());
+        let subject_str = name_to_string(parsed_cert.subject());
+        let label = root.common_name_or_certificate_name.clone();
+        let serial = root.serial().to_string();
+        let sha256_fp = root.sha256_fp();
 
+        // Write comment
         code.push_str("  /*\n");
-        for &ln in lines.iter() {
+        code.push_str(&format!("   * Issuer: {}\n", issuer));
+        code.push_str(&format!("   * Subject: {}\n", subject_str));
+        code.push_str(&format!("   * Label: {:?}\n", label));
+        code.push_str(&format!("   * Serial: {}\n", serial));
+        code.push_str(&format!("   * SHA256 Fingerprint: {}\n", sha256_fp));
+        for ln in root.pem().lines() {
             code.push_str("   * ");
-            match ln.strip_prefix("# ") {
-                Some(ln) => code.push_str(ln),
-                None => code.push_str(ln),
-            }
+            code.push_str(ln.trim());
             code.push('\n');
         }
         code.push_str("   */\n");
 
         // Write the code
-
         code.push_str("  TrustAnchor {\n");
-        code.write_fmt(format_args!("    subject: b\"{subject}\",\n"))
-            .unwrap();
-        code.write_fmt(format_args!("    spki: b\"{spki}\",\n"))
-            .unwrap();
+        code.write_fmt(format_args!(
+            "    subject: Der::from_slice(b\"{subject}\"),\n"
+        ))
+        .unwrap();
+        code.write_fmt(format_args!(
+            "    subject_public_key_info: Der::from_slice(b\"{spki}\"),\n"
+        ))
+        .unwrap();
         match name_constraints.is_empty() {
             false => code
                 .write_fmt(format_args!(
-                    "    name_constraints: Some(b\"{name_constraints}\")\n"
+                    "    name_constraints: Some(Der::from_slice(b\"{name_constraints}\"))\n"
                 ))
                 .unwrap(),
             true => code.push_str("    name_constraints: None\n"),
         }
         code.push_str("  },\n\n");
     }
-
     code.push_str("];\n");
 
     // Check that the generated code matches the checked-in code
-
     let old = fs::read_to_string("src/lib.rs").unwrap();
     if old != code {
         fs::write("src/lib.rs", code).unwrap();
@@ -176,59 +96,70 @@ async fn generated_code_is_fresh() {
     }
 }
 
-fn concat(parts: &[&[u8]]) -> Vec<u8> {
-    let mut v = Vec::with_capacity(128);
-    for &b in parts {
-        v.extend(b);
+/// The built-in x509_parser::X509Name Display impl uses a different sort order than
+/// the one historically used by mkcert.org^[0]. We re-create that sort order here to
+/// avoid unnecessary churn in the generated code.
+///
+/// [0]: <https://github.com/Lukasa/mkcert/blob/6911a8f68681f4d6a795c1f6db7b063f75b03b5a/certs/convert_mozilla_certdata.go#L405-L428>
+fn name_to_string(name: &X509Name) -> String {
+    let mut ret = String::with_capacity(256);
+
+    if let Some(cn) = name
+        .iter_common_name()
+        .next()
+        .and_then(|cn| cn.as_str().ok())
+    {
+        write!(ret, "CN={}", cn).unwrap();
     }
-    v
+
+    let mut append_attrs = |attrs: Vec<&AttributeTypeAndValue>, label| {
+        let str_parts = attrs
+            .iter()
+            .filter_map(|attr| match attr.as_str() {
+                Ok(s) => Some(s),
+                Err(_) => None,
+            })
+            .collect::<Vec<_>>()
+            .join("/");
+        if !str_parts.is_empty() {
+            if !ret.is_empty() {
+                ret.push(' ');
+            }
+            write!(ret, "{}={}", label, str_parts).unwrap();
+        }
+    };
+
+    append_attrs(name.iter_organization().collect(), "O");
+    append_attrs(name.iter_organizational_unit().collect(), "OU");
+
+    ret
 }
 
-// TUBITAK Kamu SM SSL Kok Sertifikasi - Surum 1
-const TUBITAK1_SUBJECT_DN: &[&[u8]] = &[
-    b"\x31\x0b\x30\x09\x06\x03\x55\x04\x06\x13\x02",
-    b"TR",
-    b"\x31\x18\x30\x16\x06\x03\x55\x04\x07\x13\x0f",
-    b"Gebze - Kocaeli",
-    b"\x31\x42\x30\x40\x06\x03\x55\x04\x0a\x13\x39",
-    b"Turkiye Bilimsel ve Teknolojik Arastirma Kurumu - TUBITAK",
-    b"\x31\x2d\x30\x2b\x06\x03\x55\x04\x0b\x13\x24",
-    b"Kamu Sertifikasyon Merkezi - Kamu SM",
-    b"\x31\x36\x30\x34\x06\x03\x55\x04\x03\x13\x2d",
-    b"TUBITAK Kamu SM SSL Kok Sertifikasi - Surum 1",
-];
-
-const TUBITAK1_NAME_CONSTRAINTS: &[u8] =
-    &[0xA0, 0x07, 0x30, 0x05, 0x82, 0x03, 0x2E, 0x74, 0x72];
-
-const EXCLUDED_CAS: &[&str] = &[
-    // See https://bugzilla.mozilla.org/show_bug.cgi?id=1266574.
-    "Buypass Class 2 CA 1",
-    // https://blog.mozilla.org/security/2015/04/02/distrusting-new-cnnic-certificates/
-    // https://security.googleblog.com/2015/03/maintaining-digital-certificate-security.html
-    "China Internet Network Information Center",
-    "CNNIC",
-    // See https://bugzilla.mozilla.org/show_bug.cgi?id=1283326.
-    "RSA Security 2048 v3",
-    // https://bugzilla.mozilla.org/show_bug.cgi?id=1272158
-    "Root CA Generalitat Valenciana",
-    // See https://wiki.mozilla.org/CA:WoSign_Issues.
-    "StartCom",
-    "WoSign",
-    // See https://cabforum.org/pipermail/public/2016-September/008475.html.
-    // Both the ASCII and non-ASCII names are required.
-    "TÜRKTRUST",
-    "TURKTRUST",
-];
-
-const HEADER: &str = r#"//!
-//! This library is automatically generated from the Mozilla certificate
-//! store via mkcert.org.  Don't edit it.
+const HEADER: &str = r#"//! A compiled-in copy of the root certificates trusted by Mozilla.
 //!
-//! The generation is done deterministically so you can verify it
-//! yourself by inspecting and re-running the generation process.
+//! To use this library with rustls 0.22:
 //!
+//! ```rust
+//! let root_store = rustls::RootCertStore {
+//!   roots: webpki_roots::TLS_SERVER_ROOTS.iter().cloned().collect(),
+//! };
+//! ```
+//!
+//! This library is suitable for use in applications that can always be recompiled and instantly deployed.
+//! For applications that are deployed to end-users and cannot be recompiled, or which need certification
+//! before deployment, consider a library that uses the platform native certificate verifier such as
+//! [rustls-platform-verifier]. This has the additional benefit of supporting OS provided CA constraints
+//! and revocation data.
+//!
+//! [rustls-platform-verifier]: https://docs.rs/rustls-platform-verifier
+//
+// This library is automatically generated from the Mozilla
+// IncludedCACertificateReportPEMCSV report via ccadb.org. Don't edit it.
+//
+// The generation is done deterministically so you can verify it
+// yourself by inspecting and re-running the generation process.
 
+#![no_std]
 #![forbid(unsafe_code, unstable_features)]
 #![deny(
     trivial_casts,
@@ -238,11 +169,6 @@ const HEADER: &str = r#"//!
     unused_qualifications
 )]
 
-/// A trust anchor (sometimes called a root) for validating X.509 certificates
-pub struct TrustAnchor<'a> {
-    pub subject: &'a [u8],
-    pub spki: &'a [u8],
-    pub name_constraints: Option<&'a [u8]>,
-}
+use pki_types::{Der, TrustAnchor};
 
 "#;

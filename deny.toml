@@ -48,5 +48,5 @@ ignore = [
 [bans]
 multiple-versions = "allow"
 deny = [
-    { name = "ring", wrappers = ["rustls", "sct", "rustls-webpki"] },
+    { name = "ring", wrappers = ["rustls", "sct", "rustls-webpki", "async-nats"] },
 ]

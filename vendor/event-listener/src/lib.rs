@@ -19,7 +19,7 @@
 //! use std::thread;
 //! use std::time::Duration;
 //! use std::usize;
-//! use event_listener::Event;
+//! use event_listener::{Event, Listener};
 //!
 //! let flag = Arc::new(AtomicBool::new(false));
 //! let event = Arc::new(Event::new());
@@ -56,18 +56,22 @@
 //!     }
 //!
 //!     // Wait for a notification and continue the loop.
-//!     listener.as_mut().wait();
+//!     listener.wait();
 //! }
 //! ```
 //!
 //! # Features
+//!
+//! - The `std` feature (enabled by default) enables the use of the Rust standard library. Disable it for `no_std`
+//! support
 //!
 //! - The `portable-atomic` feature enables the use of the [`portable-atomic`] crate to provide
 //!   atomic operations on platforms that don't support them.
 //!
 //! [`portable-atomic`]: https://crates.io/crates/portable-atomic
 
-#![cfg_attr(all(not(feature = "std"), not(test)), no_std)]
+#![cfg_attr(not(feature = "std"), no_std)]
+#![allow(clippy::multiple_bound_locations)] // This is a WONTFIX issue with pin-project-lite
 #![warn(missing_docs, missing_debug_implementations, rust_2018_idioms)]
 #![doc(
     html_favicon_url = "https://raw.githubusercontent.com/smol-rs/smol/master/assets/images/logo_fullsize_transparent.png"
@@ -76,7 +80,10 @@
     html_logo_url = "https://raw.githubusercontent.com/smol-rs/smol/master/assets/images/logo_fullsize_transparent.png"
 )]
 
+#[cfg(not(feature = "std"))]
 extern crate alloc;
+#[cfg(feature = "std")]
+extern crate std as alloc;
 
 #[cfg_attr(feature = "std", path = "std.rs")]
 #[cfg_attr(not(feature = "std"), path = "no_std.rs")]
@@ -84,6 +91,7 @@ mod sys;
 
 mod notify;
 
+#[cfg(not(feature = "std"))]
 use alloc::boxed::Box;
 
 use core::borrow::Borrow;
@@ -101,15 +109,13 @@ use {
 };
 
 use sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
-use sync::{Arc, WithMut};
+use sync::Arc;
 
-use notify::{Internal, NotificationPrivate};
+#[cfg(not(loom))]
+use sync::WithMut;
+
+use notify::NotificationPrivate;
 pub use notify::{IntoNotification, Notification};
-
-/// Useful traits for notifications.
-pub mod prelude {
-    pub use crate::{IntoNotification, Notification};
-}
 
 /// Inner state of [`Event`].
 struct Inner<T> {
@@ -129,7 +135,7 @@ struct Inner<T> {
 impl<T> Inner<T> {
     fn new() -> Self {
         Self {
-            notified: AtomicUsize::new(core::usize::MAX),
+            notified: AtomicUsize::new(usize::MAX),
             list: sys::List::new(),
         }
     }
@@ -174,9 +180,9 @@ impl<T> fmt::Debug for Event<T> {
         match self.try_inner() {
             Some(inner) => {
                 let notified_count = inner.notified.load(Ordering::Relaxed);
-                let total_count = match inner.list.total_listeners() {
-                    Ok(total_count) => total_count,
-                    Err(_) => {
+                let total_count = match inner.list.try_total_listeners() {
+                    Some(total_count) => total_count,
+                    None => {
                         return f
                             .debug_tuple("Event")
                             .field(&format_args!("<locked>"))
@@ -217,9 +223,16 @@ impl<T> Event<T> {
     ///
     /// let event = Event::<usize>::with_tag();
     /// ```
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(loom)))]
     #[inline]
     pub const fn with_tag() -> Self {
+        Self {
+            inner: AtomicPtr::new(ptr::null_mut()),
+        }
+    }
+    #[cfg(all(feature = "std", loom))]
+    #[inline]
+    pub fn with_tag() -> Self {
         Self {
             inner: AtomicPtr::new(ptr::null_mut()),
         }
@@ -230,7 +243,7 @@ impl<T> Event<T> {
     /// # Examples
     ///
     /// ```
-    /// use event_listener::Event;
+    /// use event_listener::{Event, Listener};
     ///
     /// let event = Event::new();
     /// let listener = event.listen();
@@ -264,12 +277,12 @@ impl<T> Event<T> {
     ///
     /// The above example is equivalent to this code:
     ///
-    /// ```
+    /// ```no_compile
     /// use event_listener::{Event, EventListener};
     ///
     /// let event = Event::new();
-    /// let mut listener = Box::pin(EventListener::new(&event));
-    /// listener.as_mut().listen();
+    /// let mut listener = Box::pin(EventListener::new());
+    /// listener.listen(&event);
     /// ```
     ///
     /// It creates a new listener, pins it to the heap, and inserts it into the linked list
@@ -279,10 +292,18 @@ impl<T> Event<T> {
     /// allocated. However, users of this `new` method must be careful to ensure that the
     /// [`EventListener`] is `listen`ing before waiting on it; panics may occur otherwise.
     #[cold]
-    pub fn listen(&self) -> Pin<Box<EventListener<T>>> {
-        let mut listener = Box::pin(EventListener::new(self));
+    pub fn listen(&self) -> EventListener<T> {
+        let inner = ManuallyDrop::new(unsafe { Arc::from_raw(self.inner()) });
+
+        // Allocate the listener on the heap and insert it.
+        let mut listener = Box::pin(InnerListener {
+            event: Arc::clone(&inner),
+            listener: None,
+        });
         listener.as_mut().listen();
-        listener
+
+        // Return the listener.
+        EventListener { listener }
     }
 
     /// Notifies a number of active listeners.
@@ -338,7 +359,7 @@ impl<T> Event<T> {
     /// [`relaxed`]: IntoNotification::relaxed
     ///
     /// ```
-    /// use event_listener::{prelude::*, Event};
+    /// use event_listener::{IntoNotification, Event};
     /// use std::sync::atomic::{self, Ordering};
     ///
     /// let event = Event::new();
@@ -367,7 +388,7 @@ impl<T> Event<T> {
     /// [`additional`]: IntoNotification::additional
     ///
     /// ```
-    /// use event_listener::{prelude::*, Event};
+    /// use event_listener::{IntoNotification, Event};
     ///
     /// let event = Event::new();
     ///
@@ -390,7 +411,7 @@ impl<T> Event<T> {
     /// equivalent to calling [`Event::notify_additional_relaxed()`].
     ///
     /// ```
-    /// use event_listener::{prelude::*, Event};
+    /// use event_listener::{IntoNotification, Event};
     /// use std::sync::atomic::{self, Ordering};
     ///
     /// let event = Event::new();
@@ -419,21 +440,8 @@ impl<T> Event<T> {
         // Make sure the notification comes after whatever triggered it.
         notify.fence(notify::Internal::new());
 
-        if let Some(inner) = self.try_inner() {
-            let limit = if notify.is_additional(Internal::new()) {
-                core::usize::MAX
-            } else {
-                notify.count(Internal::new())
-            };
-
-            // Notify if there is at least one unnotified listener and the number of notified
-            // listeners is less than `limit`.
-            if inner.needs_notification(limit) {
-                return inner.notify(notify);
-            }
-        }
-
-        0
+        let inner = unsafe { &*self.inner() };
+        inner.notify(notify)
     }
 
     /// Return a reference to the inner state if it has been initialized.
@@ -479,6 +487,50 @@ impl<T> Event<T> {
 
         inner
     }
+
+    /// Get the number of listeners currently listening to this [`Event`].
+    ///
+    /// This call returns the number of [`EventListener`]s that are currently listening to
+    /// this event. It does this by acquiring the internal event lock and reading the listener
+    /// count. Therefore it is only available for `std`-enabled platforms.
+    ///
+    /// # Caveats
+    ///
+    /// This function returns just a snapshot of the number of listeners at this point in time.
+    /// Due to the nature of multi-threaded CPUs, it is possible that this number will be
+    /// inaccurate by the time that this function returns.
+    ///
+    /// It is possible for the actual number to change at any point. Therefore, the number should
+    /// only ever be used as a hint.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use event_listener::Event;
+    ///
+    /// let event = Event::new();
+    ///
+    /// assert_eq!(event.total_listeners(), 0);
+    ///
+    /// let listener1 = event.listen();
+    /// assert_eq!(event.total_listeners(), 1);
+    ///
+    /// let listener2 = event.listen();
+    /// assert_eq!(event.total_listeners(), 2);
+    ///
+    /// drop(listener1);
+    /// drop(listener2);
+    /// assert_eq!(event.total_listeners(), 0);
+    /// ```
+    #[cfg(feature = "std")]
+    #[inline]
+    pub fn total_listeners(&self) -> usize {
+        if let Some(inner) = self.try_inner() {
+            inner.list.total_listeners()
+        } else {
+            0
+        }
+    }
 }
 
 impl Event<()> {
@@ -492,7 +544,16 @@ impl Event<()> {
     /// let event = Event::new();
     /// ```
     #[inline]
+    #[cfg(not(loom))]
     pub const fn new() -> Self {
+        Self {
+            inner: AtomicPtr::new(ptr::null_mut()),
+        }
+    }
+
+    #[inline]
+    #[cfg(loom)]
+    pub fn new() -> Self {
         Self {
             inner: AtomicPtr::new(ptr::null_mut()),
         }
@@ -511,7 +572,7 @@ impl Event<()> {
     /// use [`Event::notify()`] like so:
     ///
     /// ```
-    /// use event_listener::{prelude::*, Event};
+    /// use event_listener::{IntoNotification, Event};
     /// let event = Event::new();
     ///
     /// // Old way:
@@ -524,7 +585,7 @@ impl Event<()> {
     /// # Examples
     ///
     /// ```
-    /// use event_listener::Event;
+    /// use event_listener::{Event, IntoNotification};
     /// use std::sync::atomic::{self, Ordering};
     ///
     /// let event = Event::new();
@@ -563,7 +624,7 @@ impl Event<()> {
     /// use [`Event::notify()`] like so:
     ///
     /// ```
-    /// use event_listener::{prelude::*, Event};
+    /// use event_listener::{IntoNotification, Event};
     /// let event = Event::new();
     ///
     /// // Old way:
@@ -613,7 +674,7 @@ impl Event<()> {
     /// use [`Event::notify()`] like so:
     ///
     /// ```
-    /// use event_listener::{prelude::*, Event};
+    /// use event_listener::{IntoNotification, Event};
     /// let event = Event::new();
     ///
     /// // Old way:
@@ -668,180 +729,17 @@ impl<T> Drop for Event<T> {
     }
 }
 
-pin_project_lite::pin_project! {
-    /// A guard waiting for a notification from an [`Event`].
-    ///
-    /// There are two ways for a listener to wait for a notification:
-    ///
-    /// 1. In an asynchronous manner using `.await`.
-    /// 2. In a blocking manner by calling [`EventListener::wait()`] on it.
-    ///
-    /// If a notified listener is dropped without receiving a notification, dropping will notify
-    /// another active listener. Whether one *additional* listener will be notified depends on what
-    /// kind of notification was delivered.
-    ///
-    /// The listener is not registered into the linked list inside of the [`Event`] by default if
-    /// it is created via the `new()` method. It needs to be pinned first before being inserted
-    /// using the `listen()` method. After the listener has begun `listen`ing, the user can
-    /// `await` it like a future or call `wait()` to block the current thread until it is notified.
-    ///
-    /// ## Examples
-    ///
-    /// ```
-    /// use event_listener::{Event, EventListener};
-    /// use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
-    /// use std::thread;
-    /// use std::time::Duration;
-    ///
-    /// // Some flag to wait on.
-    /// let flag = Arc::new(AtomicBool::new(false));
-    ///
-    /// // Create an event to wait on.
-    /// let event = Arc::new(Event::new());
-    ///
-    /// thread::spawn({
-    ///     let flag = flag.clone();
-    ///     let event = event.clone();
-    ///     move || {
-    ///         thread::sleep(Duration::from_secs(2));
-    ///         flag.store(true, Ordering::SeqCst);
-    ///
-    ///         // Wake up the listener.
-    ///         event.notify_additional(std::usize::MAX);
-    ///     }
-    /// });
-    ///
-    /// let listener = EventListener::new(&event);
-    ///
-    /// // Make sure that the event listener is pinned before doing anything else.
-    /// //
-    /// // We pin the listener to the stack here, as it lets us avoid a heap allocation.
-    /// futures_lite::pin!(listener);
-    ///
-    /// // Wait for the flag to become ready.
-    /// loop {
-    ///     if flag.load(Ordering::Acquire) {
-    ///         // We are done.
-    ///         break;
-    ///     }
-    ///
-    ///     if listener.is_listening() {
-    ///         // We are inserted into the linked list and we can now wait.
-    ///         listener.as_mut().wait();
-    ///     } else {
-    ///         // We need to insert ourselves into the list. Since this insertion is an atomic
-    ///         // operation, we should check the flag again before waiting.
-    ///         listener.as_mut().listen();
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// The above example is equivalent to the one provided in the crate level example. However,
-    /// it has some advantages. By directly creating the listener with `EventListener::new()`,
-    /// we have control over how the listener is handled in memory. We take advantage of this by
-    /// pinning the `listener` variable to the stack using the [`futures_lite::pin`] macro. In
-    /// contrast, `Event::listen` binds the listener to the heap.
-    ///
-    /// However, this additional power comes with additional responsibility. By default, the
-    /// event listener is created in an "uninserted" state. This property means that any
-    /// notifications delivered to the [`Event`] by default will not wake up this listener.
-    /// Before any notifications can be received, the `listen()` method must be called on
-    /// `EventListener` to insert it into the list of listeners. After a `.await` or a `wait()`
-    /// call has completed, `listen()` must be called again if the user is still interested in
-    /// any events.
-    ///
-    /// [`futures_lite::pin`]: https://docs.rs/futures-lite/latest/futures_lite/macro.pin.html
-    #[project(!Unpin)] // implied by Listener, but can generate better docs
-    pub struct EventListener<T = ()> {
-        #[pin]
-        listener: Listener<T, Arc<Inner<T>>>,
-    }
-}
-
-unsafe impl<T: Send> Send for EventListener<T> {}
-unsafe impl<T: Send> Sync for EventListener<T> {}
-
-impl<T> fmt::Debug for EventListener<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("EventListener")
-            .field("listening", &self.is_listening())
-            .finish()
-    }
-}
-
-impl<T> EventListener<T> {
-    /// Create a new `EventListener` that will wait for a notification from the given [`Event`].
-    ///
-    /// This function does not register the `EventListener` into the linked list of listeners
-    /// contained within the [`Event`]. Make sure to call `listen` before `await`ing on
-    /// this future or calling `wait()`.
-    ///
-    /// ## Examples
-    ///
-    /// ```
-    /// use event_listener::{Event, EventListener};
-    ///
-    /// let event = Event::new();
-    /// let listener = EventListener::new(&event);
-    ///
-    /// // Make sure that the listener is pinned and listening before doing anything else.
-    /// let mut listener = Box::pin(listener);
-    /// listener.as_mut().listen();
-    /// ```
-    pub fn new(event: &Event<T>) -> Self {
-        let inner = event.inner();
-
-        let listener = Listener {
-            event: unsafe { Arc::clone(&ManuallyDrop::new(Arc::from_raw(inner))) },
-            listener: None,
-        };
-
-        Self { listener }
-    }
-
-    /// Register this listener into the given [`Event`].
-    ///
-    /// This method can only be called after the listener has been pinned, and must be called before
-    /// the listener is polled.
-    pub fn listen(self: Pin<&mut Self>) {
-        self.listener().insert();
-
-        // Make sure the listener is registered before whatever happens next.
-        notify::full_fence();
-    }
-
-    /// Tell if this [`EventListener`] is currently listening for a notification.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use event_listener::{Event, EventListener};
-    ///
-    /// let event = Event::new();
-    /// let mut listener = Box::pin(EventListener::new(&event));
-    ///
-    /// // The listener starts off not listening.
-    /// assert!(!listener.is_listening());
-    ///
-    /// // After listen() is called, the listener is listening.
-    /// listener.as_mut().listen();
-    /// assert!(listener.is_listening());
-    ///
-    /// // Once the future is notified, the listener is no longer listening.
-    /// event.notify(1);
-    /// listener.as_mut().wait();
-    /// assert!(!listener.is_listening());
-    /// ```
-    pub fn is_listening(&self) -> bool {
-        self.listener.listener.is_some()
-    }
-
+/// A handle that is listening to an [`Event`].
+///
+/// This trait represents a type waiting for a notification from an [`Event`]. See the
+/// [`EventListener`] type for more documentation on this trait's usage.
+pub trait Listener<T = ()>: Future<Output = T> + __sealed::Sealed {
     /// Blocks until a notification is received.
     ///
     /// # Examples
     ///
     /// ```
-    /// use event_listener::Event;
+    /// use event_listener::{Event, Listener};
     ///
     /// let event = Event::new();
     /// let mut listener = event.listen();
@@ -850,12 +748,10 @@ impl<T> EventListener<T> {
     /// event.notify(1);
     ///
     /// // Receive the notification.
-    /// listener.as_mut().wait();
+    /// listener.wait();
     /// ```
     #[cfg(all(feature = "std", not(target_family = "wasm")))]
-    pub fn wait(self: Pin<&mut Self>) -> T {
-        self.listener().wait_internal(None).unwrap()
-    }
+    fn wait(self) -> T;
 
     /// Blocks until a notification is received or a timeout is reached.
     ///
@@ -865,19 +761,16 @@ impl<T> EventListener<T> {
     ///
     /// ```
     /// use std::time::Duration;
-    /// use event_listener::Event;
+    /// use event_listener::{Event, Listener};
     ///
     /// let event = Event::new();
     /// let mut listener = event.listen();
     ///
     /// // There are no notification so this times out.
-    /// assert!(listener.as_mut().wait_timeout(Duration::from_secs(1)).is_none());
+    /// assert!(listener.wait_timeout(Duration::from_secs(1)).is_none());
     /// ```
     #[cfg(all(feature = "std", not(target_family = "wasm")))]
-    pub fn wait_timeout(self: Pin<&mut Self>, timeout: Duration) -> Option<T> {
-        self.listener()
-            .wait_internal(Instant::now().checked_add(timeout))
-    }
+    fn wait_timeout(self, timeout: Duration) -> Option<T>;
 
     /// Blocks until a notification is received or a deadline is reached.
     ///
@@ -887,18 +780,16 @@ impl<T> EventListener<T> {
     ///
     /// ```
     /// use std::time::{Duration, Instant};
-    /// use event_listener::Event;
+    /// use event_listener::{Event, Listener};
     ///
     /// let event = Event::new();
     /// let mut listener = event.listen();
     ///
     /// // There are no notification so this times out.
-    /// assert!(listener.as_mut().wait_deadline(Instant::now() + Duration::from_secs(1)).is_none());
+    /// assert!(listener.wait_deadline(Instant::now() + Duration::from_secs(1)).is_none());
     /// ```
     #[cfg(all(feature = "std", not(target_family = "wasm")))]
-    pub fn wait_deadline(self: Pin<&mut Self>, deadline: Instant) -> Option<T> {
-        self.listener().wait_internal(Some(deadline))
-    }
+    fn wait_deadline(self, deadline: Instant) -> Option<T>;
 
     /// Drops this listener and discards its notification (if any) without notifying another
     /// active listener.
@@ -906,8 +797,9 @@ impl<T> EventListener<T> {
     /// Returns `true` if a notification was discarded.
     ///
     /// # Examples
+    ///
     /// ```
-    /// use event_listener::Event;
+    /// use event_listener::{Event, Listener};
     ///
     /// let event = Event::new();
     /// let mut listener1 = event.listen();
@@ -915,36 +807,31 @@ impl<T> EventListener<T> {
     ///
     /// event.notify(1);
     ///
-    /// assert!(listener1.as_mut().discard());
-    /// assert!(!listener2.as_mut().discard());
+    /// assert!(listener1.discard());
+    /// assert!(!listener2.discard());
     /// ```
-    pub fn discard(self: Pin<&mut Self>) -> bool {
-        self.listener().discard()
-    }
+    fn discard(self) -> bool;
 
     /// Returns `true` if this listener listens to the given `Event`.
     ///
     /// # Examples
     ///
     /// ```
-    /// use event_listener::Event;
+    /// use event_listener::{Event, Listener};
     ///
     /// let event = Event::new();
     /// let listener = event.listen();
     ///
     /// assert!(listener.listens_to(&event));
     /// ```
-    #[inline]
-    pub fn listens_to(&self, event: &Event<T>) -> bool {
-        ptr::eq::<Inner<T>>(&**self.inner(), event.inner.load(Ordering::Acquire))
-    }
+    fn listens_to(&self, event: &Event<T>) -> bool;
 
     /// Returns `true` if both listeners listen to the same `Event`.
     ///
     /// # Examples
     ///
     /// ```
-    /// use event_listener::Event;
+    /// use event_listener::{Event, Listener};
     ///
     /// let event = Event::new();
     /// let listener1 = event.listen();
@@ -952,30 +839,208 @@ impl<T> EventListener<T> {
     ///
     /// assert!(listener1.same_event(&listener2));
     /// ```
-    pub fn same_event(&self, other: &EventListener<T>) -> bool {
-        ptr::eq::<Inner<T>>(&**self.inner(), &**other.inner())
-    }
+    fn same_event(&self, other: &Self) -> bool;
+}
 
-    fn listener(self: Pin<&mut Self>) -> Pin<&mut Listener<T, Arc<Inner<T>>>> {
-        self.project().listener
-    }
+/// Implement the `Listener` trait using the underlying `InnerListener`.
+macro_rules! forward_impl_to_listener {
+    ($gen:ident => $ty:ty) => {
+        impl<$gen> crate::Listener<$gen> for $ty {
+            #[cfg(all(feature = "std", not(target_family = "wasm")))]
+            fn wait(mut self) -> $gen {
+                self.listener_mut().wait_internal(None).unwrap()
+            }
 
-    fn inner(&self) -> &Arc<Inner<T>> {
-        &self.listener.event
+            #[cfg(all(feature = "std", not(target_family = "wasm")))]
+            fn wait_timeout(mut self, timeout: std::time::Duration) -> Option<$gen> {
+                self.listener_mut()
+                    .wait_internal(std::time::Instant::now().checked_add(timeout))
+            }
+
+            #[cfg(all(feature = "std", not(target_family = "wasm")))]
+            fn wait_deadline(mut self, deadline: std::time::Instant) -> Option<$gen> {
+                self.listener_mut().wait_internal(Some(deadline))
+            }
+
+            fn discard(mut self) -> bool {
+                self.listener_mut().discard()
+            }
+
+            #[inline]
+            fn listens_to(&self, event: &Event<$gen>) -> bool {
+                core::ptr::eq::<Inner<$gen>>(
+                    &*self.listener().event,
+                    event.inner.load(core::sync::atomic::Ordering::Acquire),
+                )
+            }
+
+            #[inline]
+            fn same_event(&self, other: &$ty) -> bool {
+                core::ptr::eq::<Inner<$gen>>(&*self.listener().event, &*other.listener().event)
+            }
+        }
+
+        impl<$gen> Future for $ty {
+            type Output = $gen;
+
+            #[inline]
+            fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<$gen> {
+                self.listener_mut().poll_internal(cx)
+            }
+        }
+    };
+}
+
+/// A guard waiting for a notification from an [`Event`].
+///
+/// There are two ways for a listener to wait for a notification:
+///
+/// 1. In an asynchronous manner using `.await`.
+/// 2. In a blocking manner by calling [`EventListener::wait()`] on it.
+///
+/// If a notified listener is dropped without receiving a notification, dropping will notify
+/// another active listener. Whether one *additional* listener will be notified depends on what
+/// kind of notification was delivered.
+///
+/// See the [`Listener`] trait for the functionality exposed by this type.
+///
+/// This structure allocates the listener on the heap.
+pub struct EventListener<T = ()> {
+    listener: Pin<Box<InnerListener<T, Arc<Inner<T>>>>>,
+}
+
+unsafe impl<T: Send> Send for EventListener<T> {}
+unsafe impl<T: Send> Sync for EventListener<T> {}
+
+impl<T> core::panic::UnwindSafe for EventListener<T> {}
+impl<T> core::panic::RefUnwindSafe for EventListener<T> {}
+impl<T> Unpin for EventListener<T> {}
+
+impl<T> fmt::Debug for EventListener<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("EventListener").finish_non_exhaustive()
     }
 }
 
-impl<T> Future for EventListener<T> {
-    type Output = T;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        self.listener().poll_internal(cx)
+impl<T> EventListener<T> {
+    #[inline]
+    fn listener(&self) -> &InnerListener<T, Arc<Inner<T>>> {
+        &self.listener
     }
+
+    #[inline]
+    fn listener_mut(&mut self) -> Pin<&mut InnerListener<T, Arc<Inner<T>>>> {
+        self.listener.as_mut()
+    }
+}
+
+forward_impl_to_listener! { T => EventListener<T> }
+
+/// Create a stack-based event listener for an [`Event`].
+///
+/// [`EventListener`] allocates the listener on the heap. While this works for most use cases, in
+/// practice this heap allocation can be expensive for repeated uses. This method allows for
+/// allocating the listener on the stack instead.
+///
+/// There are limitations to using this macro instead of the [`EventListener`] type, however.
+/// Firstly, it is significantly less flexible. The listener is locked to the current stack
+/// frame, meaning that it can't be returned or put into a place where it would go out of
+/// scope. For instance, this will not work:
+///
+/// ```compile_fail
+/// use event_listener::{Event, Listener, listener};
+///
+/// fn get_listener(event: &Event) -> impl Listener {
+///     listener!(event => cant_return_this);
+///     cant_return_this
+/// }
+/// ```
+///
+/// In addition, the types involved in creating this listener are not able to be named. Therefore
+/// it cannot be used in hand-rolled futures or similar structures.
+///
+/// The type created by this macro implements [`Listener`], allowing it to be used in cases where
+/// [`EventListener`] would normally be used.
+///
+/// ## Example
+///
+/// To use this macro, replace cases where you would normally use this...
+///
+/// ```no_compile
+/// let listener = event.listen();
+/// ```
+///
+/// ...with this:
+///
+/// ```no_compile
+/// listener!(event => listener);
+/// ```
+///
+/// Here is the top level example from this crate's documentation, but using [`listener`] instead
+/// of [`EventListener`].
+///
+/// ```
+/// use std::sync::atomic::{AtomicBool, Ordering};
+/// use std::sync::Arc;
+/// use std::thread;
+/// use std::time::Duration;
+/// use std::usize;
+/// use event_listener::{Event, listener, IntoNotification, Listener};
+///
+/// let flag = Arc::new(AtomicBool::new(false));
+/// let event = Arc::new(Event::new());
+///
+/// // Spawn a thread that will set the flag after 1 second.
+/// thread::spawn({
+///     let flag = flag.clone();
+///     let event = event.clone();
+///     move || {
+///         // Wait for a second.
+///         thread::sleep(Duration::from_secs(1));
+///
+///         // Set the flag.
+///         flag.store(true, Ordering::SeqCst);
+///
+///         // Notify all listeners that the flag has been set.
+///         event.notify(usize::MAX);
+///     }
+/// });
+///
+/// // Wait until the flag is set.
+/// loop {
+///     // Check the flag.
+///     if flag.load(Ordering::SeqCst) {
+///         break;
+///     }
+///
+///     // Start listening for events.
+///     // NEW: Changed to a stack-based listener.
+///     listener!(event => listener);
+///
+///     // Check the flag again after creating the listener.
+///     if flag.load(Ordering::SeqCst) {
+///         break;
+///     }
+///
+///     // Wait for a notification and continue the loop.
+///     listener.wait();
+/// }
+/// ```
+#[macro_export]
+macro_rules! listener {
+    ($event:expr => $listener:ident) => {
+        let mut $listener = $crate::__private::StackSlot::new(&$event);
+        // SAFETY: We shadow $listener so it can't be moved after.
+        let mut $listener = unsafe { $crate::__private::Pin::new_unchecked(&mut $listener) };
+        #[allow(unused_mut)]
+        let mut $listener = $listener.listen();
+    };
 }
 
 pin_project_lite::pin_project! {
     #[project(!Unpin)]
-    struct Listener<T, B: Borrow<Inner<T>>>
+    #[project = ListenerProject]
+    struct InnerListener<T, B: Borrow<Inner<T>>>
     where
         B: Unpin,
     {
@@ -983,67 +1048,62 @@ pin_project_lite::pin_project! {
         event: B,
 
         // The inner state of the listener.
+        //
+        // This is only ever `None` during initialization. After `listen()` has completed, this
+        // should be `Some`.
         #[pin]
         listener: Option<sys::Listener<T>>,
     }
 
-    impl<T, B: Borrow<Inner<T>>> PinnedDrop for Listener<T, B>
+    impl<T, B: Borrow<Inner<T>>> PinnedDrop for InnerListener<T, B>
     where
         B: Unpin,
     {
         fn drop(mut this: Pin<&mut Self>) {
             // If we're being dropped, we need to remove ourself from the list.
             let this = this.project();
-            let inner = (*this.event).borrow();
-
-            inner.remove(this.listener, true);
+            (*this.event).borrow().remove(this.listener, true);
         }
     }
 }
 
-unsafe impl<T: Send, B: Borrow<Inner<T>> + Unpin + Send> Send for Listener<T, B> {}
-unsafe impl<T: Send, B: Borrow<Inner<T>> + Unpin + Sync> Sync for Listener<T, B> {}
+unsafe impl<T: Send, B: Borrow<Inner<T>> + Unpin + Send> Send for InnerListener<T, B> {}
+unsafe impl<T: Send, B: Borrow<Inner<T>> + Unpin + Sync> Sync for InnerListener<T, B> {}
 
-impl<T, B: Borrow<Inner<T>> + Unpin> Listener<T, B> {
-    /// Register this listener with the event.
-    fn insert(self: Pin<&mut Self>) {
+impl<T, B: Borrow<Inner<T>> + Unpin> InnerListener<T, B> {
+    /// Insert this listener into the linked list.
+    #[inline]
+    fn listen(self: Pin<&mut Self>) {
         let this = self.project();
-        let inner = (*this.event).borrow();
-
-        inner.insert(this.listener);
+        (*this.event).borrow().insert(this.listener);
     }
 
     /// Wait until the provided deadline.
     #[cfg(all(feature = "std", not(target_family = "wasm")))]
     fn wait_internal(mut self: Pin<&mut Self>, deadline: Option<Instant>) -> Option<T> {
-        use std::cell::RefCell;
+        fn parker_and_task() -> (Parker, Task) {
+            let parker = Parker::new();
+            let unparker = parker.unparker();
+            (parker, Task::Unparker(unparker))
+        }
 
-        std::thread_local! {
+        crate::sync::thread_local! {
             /// Cached thread-local parker/unparker pair.
-            static PARKER: RefCell<Option<(Parker, Task)>> = RefCell::new(None);
+            static PARKER: (Parker, Task) = parker_and_task();
         }
 
         // Try to borrow the thread-local parker/unparker pair.
         PARKER
             .try_with({
                 let this = self.as_mut();
-                |parker| {
-                    let mut pair = parker
-                        .try_borrow_mut()
-                        .expect("Shouldn't be able to borrow parker reentrantly");
-                    let (parker, unparker) = pair.get_or_insert_with(|| {
-                        let (parker, unparker) = parking::pair();
-                        (parker, Task::Unparker(unparker))
-                    });
-
-                    this.wait_with_parker(deadline, parker, unparker.as_task_ref())
-                }
+                |(parker, unparker)| this.wait_with_parker(deadline, parker, unparker.as_task_ref())
             })
             .unwrap_or_else(|_| {
                 // If the pair isn't accessible, we may be being called in a destructor.
                 // Just create a new pair.
                 let (parker, unparker) = parking::pair();
-                self.wait_with_parker(deadline, &parker, TaskRef::Unparker(&unparker))
+                self.as_mut()
+                    .wait_with_parker(deadline, &parker, TaskRef::Unparker(&unparker))
             })
     }
 
@@ -1069,16 +1129,23 @@ impl<T, B: Borrow<Inner<T>> + Unpin> Listener<T, B> {
             match deadline {
                 None => parker.park(),
 
+                #[cfg(loom)]
+                Some(_deadline) => {
+                    panic!("parking does not support timeouts under loom");
+                }
+
+                #[cfg(not(loom))]
                 Some(deadline) => {
                     // Make sure we're not timed out already.
                     let now = Instant::now();
                     if now >= deadline {
                         // Remove our entry and check if we were notified.
                         return inner
-                            .remove(this.listener, false)
+                            .remove(this.listener.as_mut(), false)
                             .expect("We never removed ourself from the list")
                             .notified();
                     }
+                    parker.park_deadline(deadline);
                 }
             }
 
@@ -1093,21 +1160,20 @@ impl<T, B: Borrow<Inner<T>> + Unpin> Listener<T, B> {
     /// active listener.
     fn discard(self: Pin<&mut Self>) -> bool {
         let this = self.project();
-        let inner = (*this.event).borrow();
-
-        inner
+        (*this.event)
+            .borrow()
             .remove(this.listener, false)
             .map_or(false, |state| state.is_notified())
     }
 
     /// Poll this listener for a notification.
     fn poll_internal(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<T> {
-        let mut this = self.project();
+        let this = self.project();
         let inner = (*this.event).borrow();
 
         // Try to register the listener.
         match inner
-            .register(this.listener.as_mut(), TaskRef::Waker(cx.waker()))
+            .register(this.listener, TaskRef::Waker(cx.waker()))
             .notified()
         {
             Some(tag) => {
@@ -1198,7 +1264,7 @@ impl<T> RegisterResult<T> {
         match self {
             Self::Notified(tag) => Some(tag),
             Self::Registered => None,
-            Self::NeverInserted => panic!("listener was never inserted into the list"),
+            Self::NeverInserted => panic!("{}", NEVER_INSERTED_PANIC),
         }
     }
 }
@@ -1276,10 +1342,13 @@ impl TaskRef<'_> {
     }
 }
 
+const NEVER_INSERTED_PANIC: &str = "\
+EventListener was not inserted into the linked list, make sure you're not polling \
+EventListener/listener! after it has finished";
+
+#[cfg(not(loom))]
 /// Synchronization primitive implementation.
 mod sync {
-    pub(super) use core::cell;
-
     #[cfg(not(feature = "portable-atomic"))]
     pub(super) use alloc::sync::Arc;
     #[cfg(not(feature = "portable-atomic"))]
@@ -1290,8 +1359,10 @@ mod sync {
     #[cfg(feature = "portable-atomic")]
     pub(super) use portable_atomic_util::Arc;
 
-    #[cfg(feature = "std")]
+    #[cfg(all(feature = "std", not(loom)))]
     pub(super) use std::sync::{Mutex, MutexGuard};
+    #[cfg(all(feature = "std", not(target_family = "wasm"), not(loom)))]
+    pub(super) use std::thread_local;
 
     pub(super) trait WithMut {
         type Output;
@@ -1312,14 +1383,162 @@ mod sync {
             f(self.get_mut())
         }
     }
+
+    pub(crate) mod cell {
+        pub(crate) use core::cell::Cell;
+
+        /// This newtype around *mut T exists for interoperability with loom::cell::ConstPtr,
+        /// which works as a guard and performs additional logic to track access scope.
+        pub(crate) struct ConstPtr<T>(*mut T);
+        impl<T> ConstPtr<T> {
+            pub(crate) unsafe fn deref(&self) -> &T {
+                &*self.0
+            }
+
+            #[allow(unused)] // std code does not need this
+            pub(crate) unsafe fn deref_mut(&mut self) -> &mut T {
+                &mut *self.0
+            }
+        }
+
+        /// This UnsafeCell wrapper exists for interoperability with loom::cell::UnsafeCell, and
+        /// only contains the interface that is needed for this crate.
+        #[derive(Debug, Default)]
+        pub(crate) struct UnsafeCell<T>(core::cell::UnsafeCell<T>);
+
+        impl<T> UnsafeCell<T> {
+            pub(crate) fn new(data: T) -> UnsafeCell<T> {
+                UnsafeCell(core::cell::UnsafeCell::new(data))
+            }
+
+            pub(crate) fn get(&self) -> ConstPtr<T> {
+                ConstPtr(self.0.get())
+            }
+
+            #[allow(dead_code)] // no_std does not need this
+            pub(crate) fn into_inner(self) -> T {
+                self.0.into_inner()
+            }
+        }
+    }
+}
+
+#[cfg(loom)]
+/// Synchronization primitive implementation.
+mod sync {
+    pub(super) use loom::sync::{atomic, Arc, Mutex, MutexGuard};
+    pub(super) use loom::{cell, thread_local};
 }
 
 fn __test_send_and_sync() {
     fn _assert_send<T: Send>() {}
     fn _assert_sync<T: Sync>() {}
 
+    _assert_send::<crate::__private::StackSlot<'_, ()>>();
+    _assert_sync::<crate::__private::StackSlot<'_, ()>>();
+    _assert_send::<crate::__private::StackListener<'_, '_, ()>>();
+    _assert_sync::<crate::__private::StackListener<'_, '_, ()>>();
     _assert_send::<Event<()>>();
     _assert_sync::<Event<()>>();
     _assert_send::<EventListener<()>>();
     _assert_sync::<EventListener<()>>();
+}
+
+#[doc(hidden)]
+mod __sealed {
+    use super::{EventListener, __private::StackListener};
+
+    pub trait Sealed {}
+    impl<T> Sealed for EventListener<T> {}
+    impl<T> Sealed for StackListener<'_, '_, T> {}
+}
+
+/// Semver exempt module.
+#[doc(hidden)]
+pub mod __private {
+    pub use core::pin::Pin;
+
+    use super::{Event, Inner, InnerListener};
+    use core::fmt;
+    use core::future::Future;
+    use core::task::{Context, Poll};
+
+    pin_project_lite::pin_project! {
+        /// Space on the stack where a stack-based listener can be allocated.
+        #[doc(hidden)]
+        #[project(!Unpin)]
+        pub struct StackSlot<'ev, T> {
+            #[pin]
+            listener: InnerListener<T, &'ev Inner<T>>
+        }
+    }
+
+    impl<T> fmt::Debug for StackSlot<'_, T> {
+        #[inline]
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("StackSlot").finish_non_exhaustive()
+        }
+    }
+
+    impl<T> core::panic::UnwindSafe for StackSlot<'_, T> {}
+    impl<T> core::panic::RefUnwindSafe for StackSlot<'_, T> {}
+    unsafe impl<T> Send for StackSlot<'_, T> {}
+    unsafe impl<T> Sync for StackSlot<'_, T> {}
+
+    impl<'ev, T> StackSlot<'ev, T> {
+        /// Create a new `StackSlot` on the stack.
+        #[inline]
+        #[doc(hidden)]
+        pub fn new(event: &'ev Event<T>) -> Self {
+            let inner = unsafe { &*event.inner() };
+            Self {
+                listener: InnerListener {
+                    event: inner,
+                    listener: None,
+                },
+            }
+        }
+
+        /// Start listening on this `StackSlot`.
+        #[inline]
+        #[doc(hidden)]
+        pub fn listen(mut self: Pin<&mut Self>) -> StackListener<'ev, '_, T> {
+            // Insert ourselves into the list.
+            self.as_mut().project().listener.listen();
+
+            // We are now listening.
+            StackListener { slot: self }
+        }
+    }
+
+    /// A stack-based `EventListener`.
+    #[doc(hidden)]
+    pub struct StackListener<'ev, 'stack, T> {
+        slot: Pin<&'stack mut StackSlot<'ev, T>>,
+    }
+
+    impl<T> core::panic::UnwindSafe for StackListener<'_, '_, T> {}
+    impl<T> core::panic::RefUnwindSafe for StackListener<'_, '_, T> {}
+    impl<T> Unpin for StackListener<'_, '_, T> {}
+
+    impl<T> fmt::Debug for StackListener<'_, '_, T> {
+        #[inline]
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("StackListener").finish_non_exhaustive()
+        }
+    }
+
+    impl<'ev, T> StackListener<'ev, '_, T> {
+        #[inline]
+        fn listener(&self) -> &InnerListener<T, &'ev Inner<T>> {
+            &self.slot.listener
+        }
+
+        #[inline]
+        fn listener_mut(&mut self) -> Pin<&mut InnerListener<T, &'ev Inner<T>>> {
+            self.slot.as_mut().project().listener
+        }
+    }
+
+    forward_impl_to_listener! { T => StackListener<'_, '_, T> }
 }

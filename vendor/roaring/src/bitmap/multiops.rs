@@ -5,11 +5,14 @@ use core::{
     ops::{BitOrAssign, BitXorAssign},
 };
 
-use alloc::{borrow::Cow, vec::Vec};
+use alloc::borrow::Cow;
 
 use crate::{MultiOps, RoaringBitmap};
 
 use super::{container::Container, store::Store};
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 /// When collecting bitmaps for optimizing the computation. If we don't know how many
 // elements are in the iterator we collect 10 elements.
@@ -229,7 +232,7 @@ fn try_multi_or_owned<E>(
     }
 
     containers.retain_mut(|container| {
-        if container.len() > 0 {
+        if !container.is_empty() {
             container.ensure_correct_store();
             true
         } else {
@@ -255,7 +258,7 @@ fn try_multi_xor_owned<E>(
     }
 
     containers.retain_mut(|container| {
-        if container.len() > 0 {
+        if !container.is_empty() {
             container.ensure_correct_store();
             true
         } else {

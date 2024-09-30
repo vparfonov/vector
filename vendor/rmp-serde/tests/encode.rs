@@ -2,10 +2,11 @@ extern crate rmp_serde as rmps;
 
 use std::io::Cursor;
 
+use rmps::config::BytesMode;
 use serde::Serialize;
 
-use crate::rmps::encode::{self, Error};
-use crate::rmps::{Raw, RawRef, Serializer};
+use rmp_serde::encode::{self, Error};
+use rmp_serde::{Raw, RawRef, Serializer};
 
 #[test]
 fn pass_null() {
@@ -25,7 +26,7 @@ fn fail_null() {
 
     match val.serialize(&mut Serializer::new(&mut &mut buf[..])) {
         Err(Error::InvalidValueWrite(..)) => (),
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 }
 
@@ -189,7 +190,6 @@ fn pass_char() {
     assert_eq!([0xa1, 0x21], buf);
 }
 
-
 #[test]
 fn pass_string() {
     let mut buf = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
@@ -208,6 +208,45 @@ fn pass_tuple() {
     val.serialize(&mut Serializer::new(&mut &mut buf[..])).ok().unwrap();
 
     assert_eq!([0x92, 0x2a, 0xce, 0x0, 0x1, 0x88, 0x94], buf);
+}
+
+#[test]
+fn pass_tuple_not_bytes() {
+    let mut buf = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+
+    let val = (42u32, 100500u32);
+    val.serialize(&mut Serializer::new(&mut &mut buf[..]).with_bytes(BytesMode::ForceAll)).ok().unwrap();
+
+    assert_eq!([0x92, 0x2a, 0xce, 0x0, 0x1, 0x88, 0x94], buf);
+}
+
+#[test]
+fn pass_tuple_bytes() {
+    let mut buf = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+
+    let val = (1u8, 100u8, 200u8, 254u8);
+    val.serialize(&mut Serializer::new(&mut &mut buf[..]).with_bytes(BytesMode::ForceAll)).ok().unwrap();
+
+    assert_eq!([196, 4, 1, 100, 200, 254], buf);
+}
+
+#[test]
+fn pass_hash_array_bytes() {
+    use std::collections::HashSet;
+    let mut buf = [0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00];
+
+    let val = [[255u8; 3], [1u8; 3]].into_iter().collect::<HashSet<[u8;3]>>();
+    val.serialize(&mut Serializer::new(&mut &mut buf[..]).with_bytes(BytesMode::ForceAll)).ok().unwrap();
+}
+
+#[test]
+fn pass_tuple_low_bytes() {
+    let mut buf = [0x00, 0x00, 0x00, 0x00, 0x00];
+
+    let val = (1u8, 2, 3, 127);
+    val.serialize(&mut Serializer::new(&mut &mut buf[..]).with_bytes(BytesMode::ForceAll)).ok().unwrap();
+
+    assert_eq!([148, 1, 2, 3, 127], buf);
 }
 
 #[test]

@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.63"
+rust-version = "1.70"
 name = "tokio"
-version = "1.36.0"
+version = "1.39.1"
 authors = ["Tokio Contributors <team@tokio.rs>"]
 description = """
 An event-driven, non-blocking I/O platform for writing asynchronous I/O
@@ -69,13 +69,9 @@ version = "1.0.0"
 optional = true
 
 [dependencies.mio]
-version = "0.8.9"
+version = "1.0.1"
 optional = true
 default-features = false
-
-[dependencies.num_cpus]
-version = "1.8.0"
-optional = true
 
 [dependencies.parking_lot]
 version = "0.12.0"
@@ -85,7 +81,7 @@ optional = true
 version = "0.2.11"
 
 [dependencies.tokio-macros]
-version = "~2.2.0"
+version = "~2.4.0"
 optional = true
 
 [dev-dependencies.async-stream]
@@ -148,10 +144,7 @@ process = [
     "windows-sys/Win32_System_WindowsProgramming",
 ]
 rt = []
-rt-multi-thread = [
-    "num_cpus",
-    "rt",
-]
+rt-multi-thread = ["rt"]
 signal = [
     "libc",
     "mio/os-poll",
@@ -194,7 +187,7 @@ version = "0.5.5"
 version = "3.1.0"
 
 [target."cfg(target_os = \"freebsd\")".dev-dependencies.mio-aio]
-version = "0.8.0"
+version = "0.9.0"
 features = ["tokio"]
 
 [target."cfg(tokio_taskdump)".dependencies.backtrace]
@@ -218,19 +211,20 @@ optional = true
 version = "0.2.149"
 
 [target."cfg(unix)".dev-dependencies.nix]
-version = "0.27.1"
+version = "0.29.0"
 features = [
+    "aio",
     "fs",
     "socket",
 ]
 default-features = false
 
 [target."cfg(windows)".dependencies.windows-sys]
-version = "0.48"
+version = "0.52"
 optional = true
 
 [target."cfg(windows)".dev-dependencies.windows-sys]
-version = "0.48"
+version = "0.52"
 features = [
     "Win32_Foundation",
     "Win32_Security_Authorization",

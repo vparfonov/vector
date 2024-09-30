@@ -2,15 +2,17 @@ mod scalar;
 mod vector;
 mod visitor;
 
-use alloc::boxed::Box;
-use alloc::vec::Vec;
-
 use crate::bitmap::store::array_store::visitor::{CardinalityCounter, VecWriter};
 use core::cmp::Ordering;
 use core::cmp::Ordering::*;
-use core::convert::TryFrom;
 use core::fmt::{Display, Formatter};
 use core::ops::{BitAnd, BitAndAssign, BitOr, BitXor, RangeInclusive, Sub, SubAssign};
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
+
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
 
 use super::bitmap_store::{bit, key, BitmapStore, BITMAP_LENGTH};
 
@@ -196,6 +198,10 @@ impl ArrayStore {
 
     pub fn len(&self) -> u64 {
         self.vec.len() as u64
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.vec.is_empty()
     }
 
     pub fn min(&self) -> Option<u16> {

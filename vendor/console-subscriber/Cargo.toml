@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.64.0"
+rust-version = "1.74.0"
 name = "console-subscriber"
-version = "0.2.0"
+version = "0.3.0"
 authors = [
     "Eliza Weisman <eliza@buoyant.io>",
     "Tokio Contributors <team@tokio.rs>",
@@ -45,8 +45,12 @@ rustdoc-args = [
     "docsrs",
 ]
 
+[[example]]
+name = "grpc_web"
+required-features = ["grpc-web"]
+
 [dependencies.console-api]
-version = "0.6.0"
+version = "0.7.0"
 features = ["transport"]
 
 [dependencies.crossbeam-channel]
@@ -71,6 +75,9 @@ version = "2.1.0"
 version = "0.12"
 optional = true
 package = "parking_lot"
+
+[dependencies.prost]
+version = "0.12"
 
 [dependencies.prost-types]
 version = "0.12.0"
@@ -99,8 +106,12 @@ version = "0.1"
 features = ["net"]
 
 [dependencies.tonic]
-version = "0.10"
+version = "0.11"
 features = ["transport"]
+
+[dependencies.tonic-web]
+version = "0.11"
+optional = true
 
 [dependencies.tracing]
 version = "0.1.26"
@@ -119,6 +130,9 @@ default-features = false
 [dev-dependencies.futures]
 version = "0.3"
 
+[dev-dependencies.http]
+version = "0.2"
+
 [dev-dependencies.tokio]
 version = "^1.21"
 features = [
@@ -130,9 +144,14 @@ features = [
 version = "0.4"
 default-features = false
 
+[dev-dependencies.tower-http]
+version = "0.4"
+features = ["cors"]
+
 [features]
 default = ["env-filter"]
 env-filter = ["tracing-subscriber/env-filter"]
+grpc-web = ["tonic-web"]
 parking_lot = [
     "parking_lot_crate",
     "tracing-subscriber/parking_lot",

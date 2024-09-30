@@ -14,7 +14,7 @@ pub(crate) mod table;
 pub(crate) mod trivia;
 pub(crate) mod value;
 
-pub use crate::error::TomlError;
+pub(crate) use crate::error::TomlError;
 
 pub(crate) fn parse_document<S: AsRef<str>>(raw: S) -> Result<crate::ImDocument<S>, TomlError> {
     use prelude::*;
@@ -99,7 +99,7 @@ pub(crate) mod prelude {
     }
 
     #[cfg(not(feature = "unbounded"))]
-    const LIMIT: usize = 100;
+    const LIMIT: usize = 80;
 
     #[cfg(not(feature = "unbounded"))]
     impl RecursionCheck {
@@ -152,6 +152,8 @@ pub(crate) mod prelude {
 #[cfg(feature = "display")]
 mod test {
     use super::*;
+    use snapbox::assert_data_eq;
+    use snapbox::prelude::*;
 
     #[test]
     fn documents() {
@@ -226,7 +228,7 @@ key = "value"
                 }
             };
 
-            snapbox::assert_eq(input, doc.to_string());
+            assert_data_eq!(doc.to_string(), input.raw());
         }
     }
 

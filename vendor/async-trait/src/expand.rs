@@ -169,8 +169,8 @@ fn transform_sig(
     sig.fn_token.span = sig.asyncness.take().unwrap().span;
 
     let (ret_arrow, ret) = match &sig.output {
-        ReturnType::Default => (Token![->](Span::call_site()), quote!(())),
-        ReturnType::Type(arrow, ret) => (*arrow, quote!(#ret)),
+        ReturnType::Default => (quote!(->), quote!(())),
+        ReturnType::Type(arrow, ret) => (quote!(#arrow), quote!(#ret)),
     };
 
     let mut lifetimes = CollectLifetimes::new();
@@ -335,7 +335,7 @@ fn transform_sig(
 //         ___ret
 //     })
 fn transform_block(context: Context, sig: &mut Signature, block: &mut Block) {
-    let mut self_span = None;
+    let mut replace_self = false;
     let decls = sig
         .inputs
         .iter()
@@ -346,8 +346,8 @@ fn transform_block(context: Context, sig: &mut Signature, block: &mut Block) {
                 mutability,
                 ..
             }) => {
+                replace_self = true;
                 let ident = Ident::new("__self", self_token.span);
-                self_span = Some(self_token.span);
                 quote!(let #mutability #ident = #self_token;)
             }
             FnArg::Typed(arg) => {
@@ -389,9 +389,8 @@ fn transform_block(context: Context, sig: &mut Signature, block: &mut Block) {
         })
         .collect::<Vec<_>>();
 
-    if let Some(span) = self_span {
-        let mut replace_self = ReplaceSelf(span);
-        replace_self.visit_block_mut(block);
+    if replace_self {
+        ReplaceSelf.visit_block_mut(block);
     }
 
     let stmts = &block.stmts;
@@ -410,6 +409,7 @@ fn transform_block(context: Context, sig: &mut Signature, block: &mut Block) {
             } else {
                 quote! {
                     if let ::core::option::Option::Some(__ret) = ::core::option::Option::None::<#ret> {
+                        #[allow(unreachable_code)]
                         return __ret;
                     }
                     #(#decls)*
@@ -427,9 +427,7 @@ fn transform_block(context: Context, sig: &mut Signature, block: &mut Block) {
 }
 
 fn positional_arg(i: usize, pat: &Pat) -> Ident {
-    let span: Span = syn::spanned::Spanned::span(pat);
-    #[cfg(not(no_span_mixed_site))]
-    let span = span.resolved_at(Span::mixed_site());
+    let span = syn::spanned::Spanned::span(pat).resolved_at(Span::mixed_site());
     format_ident!("__arg{}", i, span = span)
 }
 

@@ -13,8 +13,13 @@
 edition = "2018"
 rust-version = "1.53"
 name = "serde_bytes"
-version = "0.11.14"
+version = "0.11.15"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Optimized handling of `&[u8]` and `Vec<u8>` for Serde"
 documentation = "https://docs.rs/serde_bytes"
 readme = "README.md"
@@ -37,7 +42,21 @@ rustdoc-args = ["--generate-link-to-definition"]
 targets = ["x86_64-unknown-linux-gnu"]
 
 [lib]
+name = "serde_bytes"
+path = "src/lib.rs"
 doc-scrape-examples = false
+
+[[test]]
+name = "test_derive"
+path = "tests/test_derive.rs"
+
+[[test]]
+name = "test_partialeq"
+path = "tests/test_partialeq.rs"
+
+[[test]]
+name = "test_serde"
+path = "tests/test_serde.rs"
 
 [dependencies.serde]
 version = "1.0.166"

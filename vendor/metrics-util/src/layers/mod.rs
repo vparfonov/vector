@@ -7,8 +7,8 @@
 //!
 //! Here's an example of a layer that filters out all metrics that start with a specific string:
 //!
-//! ```rust
-//! # use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, SharedString, Unit};
+//! ```no_run
+//! # use metrics::{Counter, Gauge, Histogram, Key, KeyName, Metadata, Recorder, SharedString, Unit};
 //! # use metrics::NoopRecorder as BasicRecorder;
 //! # use metrics_util::layers::{Layer, Stack, PrefixLayer};
 //! // A simple layer that denies any metrics that have "stairway" or "heaven" in their name.
@@ -53,25 +53,25 @@
 //!         self.0.describe_histogram(key_name, unit, description)
 //!     }
 //!
-//!     fn register_counter(&self, key: &Key) -> Counter {
+//!     fn register_counter(&self, key: &Key, metadata: &Metadata<'_>) -> Counter {
 //!         if self.is_invalid_key(key.name()) {
 //!             return Counter::noop();
 //!         }
-//!         self.0.register_counter(key)
+//!         self.0.register_counter(key, metadata)
 //!     }
 //!
-//!     fn register_gauge(&self, key: &Key) -> Gauge {
+//!     fn register_gauge(&self, key: &Key, metadata: &Metadata<'_>) -> Gauge {
 //!         if self.is_invalid_key(key.name()) {
 //!             return Gauge::noop();
 //!         }
-//!         self.0.register_gauge(key)
+//!         self.0.register_gauge(key, metadata)
 //!     }
 //!
-//!     fn register_histogram(&self, key: &Key) -> Histogram {
+//!     fn register_histogram(&self, key: &Key, metadata: &Metadata<'_>) -> Histogram {
 //!         if self.is_invalid_key(key.name()) {
 //!             return Histogram::noop();
 //!         }
-//!         self.0.register_histogram(key)
+//!         self.0.register_histogram(key, metadata)
 //!     }
 //! }
 //!
@@ -92,15 +92,11 @@
 //! let recorder = BasicRecorder;
 //! let layer = StairwayDenyLayer::default();
 //! let layered = layer.layer(recorder);
-//! metrics::set_boxed_recorder(Box::new(layered)).expect("failed to install recorder");
-//!
-//! # unsafe { metrics::clear_recorder() };
+//! metrics::set_global_recorder(layered).expect("failed to install recorder");
 //!
 //! // Working with layers directly is a bit cumbersome, though, so let's use a `Stack`.
 //! let stack = Stack::new(BasicRecorder);
 //! stack.push(StairwayDenyLayer::default()).install().expect("failed to install stack");
-//!
-//! # unsafe { metrics::clear_recorder() };
 //!
 //! // `Stack` makes it easy to chain layers together, as well.
 //! let stack = Stack::new(BasicRecorder);
@@ -111,7 +107,7 @@
 //!     .expect("failed to install stack");
 //! # }
 //! ```
-use metrics::{Counter, Gauge, Histogram, Key, KeyName, Recorder, SharedString, Unit};
+use metrics::{Counter, Gauge, Histogram, Key, KeyName, Metadata, Recorder, SharedString, Unit};
 
 use metrics::SetRecorderError;
 
@@ -161,8 +157,8 @@ impl<R: Recorder + 'static> Stack<R> {
     /// Installs this stack as the global recorder.
     ///
     /// An error will be returned if there's an issue with installing the stack as the global recorder.
-    pub fn install(self) -> Result<(), SetRecorderError> {
-        metrics::set_boxed_recorder(Box::new(self))
+    pub fn install(self) -> Result<(), SetRecorderError<Self>> {
+        metrics::set_global_recorder(self)
     }
 }
 
@@ -179,15 +175,15 @@ impl<R: Recorder> Recorder for Stack<R> {
         self.inner.describe_histogram(key_name, unit, description);
     }
 
-    fn register_counter(&self, key: &Key) -> Counter {
-        self.inner.register_counter(key)
+    fn register_counter(&self, key: &Key, metadata: &Metadata<'_>) -> Counter {
+        self.inner.register_counter(key, metadata)
     }
 
-    fn register_gauge(&self, key: &Key) -> Gauge {
-        self.inner.register_gauge(key)
+    fn register_gauge(&self, key: &Key, metadata: &Metadata<'_>) -> Gauge {
+        self.inner.register_gauge(key, metadata)
     }
 
-    fn register_histogram(&self, key: &Key) -> Histogram {
-        self.inner.register_histogram(key)
+    fn register_histogram(&self, key: &Key, metadata: &Metadata<'_>) -> Histogram {
+        self.inner.register_histogram(key, metadata)
     }
 }

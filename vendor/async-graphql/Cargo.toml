@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "async-graphql"
-version = "7.0.3"
+version = "7.0.7"
 authors = [
     "sunli <scott_s829@163.com>",
     "Koxiaet",
@@ -45,33 +45,33 @@ name = "static_schema"
 harness = false
 
 [dependencies.async-graphql-derive]
-version = "7.0.3"
+version = "7.0.7"
 
 [dependencies.async-graphql-parser]
-version = "7.0.3"
+version = "7.0.7"
 
 [dependencies.async-graphql-value]
-version = "7.0.3"
+version = "7.0.7"
 
 [dependencies.async-stream]
-version = "0.3.0"
+version = "0.3.5"
 
 [dependencies.async-trait]
-version = "0.1.51"
+version = "0.1.79"
 
 [dependencies.base64]
-version = "0.21.0"
+version = "0.22.0"
 
 [dependencies.bigdecimal]
 version = ">=0.3.0, <0.5.0"
 optional = true
 
 [dependencies.blocking]
-version = "1.0.2"
+version = "1.5.1"
 optional = true
 
 [dependencies.bson]
-version = "2.4.0"
+version = "2.9.0"
 features = [
     "chrono-0_4",
     "uuid-1",
@@ -79,11 +79,11 @@ features = [
 optional = true
 
 [dependencies.bytes]
-version = "1.0.1"
+version = "1.6.0"
 features = ["serde"]
 
 [dependencies.chrono]
-version = "0.4.19"
+version = "0.4.37"
 features = [
     "clock",
     "std",
@@ -92,7 +92,7 @@ optional = true
 default-features = false
 
 [dependencies.chrono-tz]
-version = "0.6.1"
+version = "0.8.6"
 optional = true
 
 [dependencies.fast_chemail]
@@ -103,15 +103,15 @@ optional = true
 version = "1.0.7"
 
 [dependencies.futures-channel]
-version = "0.3.13"
+version = "0.3.30"
 optional = true
 
 [dependencies.futures-timer]
-version = "3.0.2"
+version = "3.0.3"
 optional = true
 
 [dependencies.futures-util]
-version = "0.3.0"
+version = "0.3.30"
 features = [
     "std",
     "io",
@@ -122,15 +122,15 @@ features = [
 default-features = false
 
 [dependencies.handlebars]
-version = "4.3.6"
+version = "5.1.2"
 optional = true
 
 [dependencies.hashbrown]
-version = "0.12.0"
+version = "0.14.3"
 optional = true
 
 [dependencies.http]
-version = "1.0.0"
+version = "1.1.0"
 package = "http"
 
 [dependencies.indexmap]
@@ -138,43 +138,47 @@ version = "2"
 features = ["serde"]
 
 [dependencies.iso8601]
-version = "0.6.0"
+version = "0.6.1"
 optional = true
 
 [dependencies.log]
-version = "0.4.16"
+version = "0.4.21"
 optional = true
 
 [dependencies.lru]
-version = "0.7.1"
+version = "0.12.3"
 optional = true
 
 [dependencies.mime]
-version = "0.3.15"
+version = "0.3.17"
 
 [dependencies.multer]
 version = "3.0.0"
 
 [dependencies.num-traits]
-version = "0.2.14"
+version = "0.2.18"
 
 [dependencies.once_cell]
-version = "1.7.2"
+version = "1.19.0"
 
 [dependencies.opentelemetry]
-version = "0.21.0"
+version = "0.23.0"
 features = ["trace"]
 optional = true
 default-features = false
 
 [dependencies.pin-project-lite]
-version = "0.2.6"
+version = "0.2.14"
 
 [dependencies.regex]
-version = "1.5.5"
+version = "1.10.4"
 
 [dependencies.rust_decimal]
-version = "1.14.3"
+version = "1.35.0"
+optional = true
+
+[dependencies.schemars]
+version = "0.8.21"
 optional = true
 
 [dependencies.secrecy]
@@ -182,39 +186,39 @@ version = "0.8.0"
 optional = true
 
 [dependencies.serde]
-version = "1.0.125"
+version = "1.0.197"
 features = ["derive"]
 
 [dependencies.serde_cbor]
-version = "0.11.1"
+version = "0.11.2"
 optional = true
 
 [dependencies.serde_json]
-version = "1.0.64"
+version = "1.0.115"
 
 [dependencies.serde_urlencoded]
-version = "0.7.0"
+version = "0.7.1"
 
 [dependencies.sha2]
-version = "0.10.2"
+version = "0.10.8"
 optional = true
 
 [dependencies.smol_str]
-version = "0.1.21"
+version = "0.2.1"
 optional = true
 
 [dependencies.static_assertions_next]
-version = "1.1.1"
+version = "1.1.2"
 
 [dependencies.tempfile]
-version = "3.2.0"
+version = "3.10.1"
 optional = true
 
 [dependencies.thiserror]
-version = "1.0.24"
+version = "1.0.58"
 
 [dependencies.time]
-version = "0.3.5"
+version = "0.3.34"
 features = [
     "parsing",
     "formatting",
@@ -223,7 +227,7 @@ features = [
 optional = true
 
 [dependencies.tokio]
-version = "1.17.0"
+version = "1.37.0"
 features = ["sync"]
 optional = true
 
@@ -236,16 +240,16 @@ features = [
 optional = true
 
 [dependencies.tracinglib]
-version = "0.1.35"
+version = "0.1.40"
 optional = true
 package = "tracing"
 
 [dependencies.url]
-version = "2.2.1"
+version = "2.5.0"
 optional = true
 
 [dependencies.uuid]
-version = "1.0.0"
+version = "1.8.0"
 features = [
     "v4",
     "serde",
@@ -253,24 +257,24 @@ features = [
 optional = true
 
 [dependencies.zxcvbn]
-version = "2.1.2"
+version = "2.2.2"
 optional = true
 
 [dev-dependencies.criterion]
-version = "0.3.6"
+version = "0.5.1"
 features = [
     "html_reports",
     "async_tokio",
 ]
 
 [dev-dependencies.futures-channel]
-version = "0.3.13"
+version = "0.3.30"
 
 [dev-dependencies.slab]
-version = "0.4.2"
+version = "0.4.9"
 
 [dev-dependencies.tokio]
-version = "1.4.0"
+version = "1.37.0"
 features = [
     "macros",
     "rt-multi-thread",
@@ -279,6 +283,10 @@ features = [
 ]
 
 [features]
+altair = [
+    "handlebars",
+    "schemars",
+]
 apollo_persisted_queries = [
     "lru",
     "sha2",
@@ -306,6 +314,7 @@ email-validator = ["fast_chemail"]
 graphiql = ["handlebars"]
 password-strength-validator = ["zxcvbn"]
 playground = []
+raw_value = ["async-graphql-value/raw_value"]
 string_number = []
 tokio-sync = ["tokio"]
 tracing = [

@@ -4,13 +4,20 @@ use core::fmt;
 use core::future::Future;
 use core::mem::{forget, MaybeUninit};
 use core::ptr;
-use core::sync::atomic::{AtomicUsize, Ordering};
+
+use crate::sync::atomic::{AtomicUsize, Ordering};
+
+#[cfg(not(loom))]
+use crate::sync::WithMut;
 
 #[cfg(all(feature = "std", not(target_family = "wasm")))]
 use core::task::{Context, Poll, RawWaker, RawWakerVTable, Waker};
 
-use event_listener::{Event, EventListener};
+use event_listener::Event;
 use event_listener_strategy::{NonBlocking, Strategy};
+
+#[cfg(all(feature = "std", not(target_family = "wasm")))]
+use event_listener::Listener;
 
 /// The current state of the `OnceCell`.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -104,22 +111,25 @@ unsafe impl<T: Send> Send for OnceCell<T> {}
 unsafe impl<T: Send + Sync> Sync for OnceCell<T> {}
 
 impl<T> OnceCell<T> {
-    /// Create a new, uninitialized `OnceCell`.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// use async_lock::OnceCell;
-    ///
-    /// let cell = OnceCell::new();
-    /// # cell.set_blocking(1);
-    /// ```
-    pub const fn new() -> Self {
-        Self {
-            active_initializers: Event::new(),
-            passive_waiters: Event::new(),
-            state: AtomicUsize::new(State::Uninitialized as _),
-            value: UnsafeCell::new(MaybeUninit::uninit()),
+    const_fn! {
+        const_if: #[cfg(not(loom))];
+        /// Create a new, uninitialized `OnceCell`.
+        ///
+        /// # Example
+        ///
+        /// ```rust
+        /// use async_lock::OnceCell;
+        ///
+        /// let cell = OnceCell::new();
+        /// # cell.set_blocking(1);
+        /// ```
+        pub const fn new() -> Self {
+            Self {
+                active_initializers: Event::new(),
+                passive_waiters: Event::new(),
+                state: AtomicUsize::new(State::Uninitialized as _),
+                value: UnsafeCell::new(MaybeUninit::uninit()),
+            }
         }
     }
 
@@ -191,13 +201,15 @@ impl<T> OnceCell<T> {
     /// # });
     /// ```
     pub fn get_mut(&mut self) -> Option<&mut T> {
-        if State::from(*self.state.get_mut()) == State::Initialized {
-            // SAFETY: We know that the value is initialized, so it is safe to
-            // read it.
-            Some(unsafe { &mut *self.value.get().cast() })
-        } else {
-            None
-        }
+        self.state.with_mut(|state| {
+            if State::from(*state) == State::Initialized {
+                // SAFETY: We know that the value is initialized, so it is safe to
+                // read it.
+                Some(unsafe { &mut *self.value.get().cast() })
+            } else {
+                None
+            }
+        })
     }
 
     /// Take the value out of this `OnceCell`, moving it back to the uninitialized
@@ -216,15 +228,17 @@ impl<T> OnceCell<T> {
     /// # });
     /// ```
     pub fn take(&mut self) -> Option<T> {
-        if State::from(*self.state.get_mut()) == State::Initialized {
-            // SAFETY: We know that the value is initialized, so it is safe to
-            // read it.
-            let value = unsafe { ptr::read(self.value.get().cast()) };
-            *self.state.get_mut() = State::Uninitialized.into();
-            Some(value)
-        } else {
-            None
-        }
+        self.state.with_mut(|state| {
+            if State::from(*state) == State::Initialized {
+                // SAFETY: We know that the value is initialized, so it is safe to
+                // read it.
+                let value = unsafe { ptr::read(self.value.get().cast()) };
+                *state = State::Uninitialized.into();
+                Some(value)
+            } else {
+                None
+            }
+        })
     }
 
     /// Convert this `OnceCell` into the inner value, if it is initialized.
@@ -274,9 +288,7 @@ impl<T> OnceCell<T> {
         }
 
         // Slow path: wait for the value to be initialized.
-        let listener = EventListener::new(&self.passive_waiters);
-        pin!(listener);
-        listener.as_mut().listen();
+        event_listener::listener!(self.passive_waiters => listener);
 
         // Try again.
         if let Some(value) = self.get() {
@@ -329,9 +341,7 @@ impl<T> OnceCell<T> {
         }
 
         // Slow path: wait for the value to be initialized.
-        let listener = EventListener::new(&self.passive_waiters);
-        pin!(listener);
-        listener.as_mut().listen();
+        event_listener::listener!(self.passive_waiters => listener);
 
         // Try again.
         if let Some(value) = self.get() {
@@ -503,10 +513,11 @@ impl<T> OnceCell<T> {
     /// ```
     #[cfg(all(feature = "std", not(target_family = "wasm")))]
     pub fn get_or_init_blocking(&self, closure: impl FnOnce() -> T + Unpin) -> &T {
-        match self.get_or_try_init_blocking(move || {
+        let result = self.get_or_try_init_blocking(move || {
             let result: Result<T, Infallible> = Ok(closure());
             result
-        }) {
+        });
+        match result {
             Ok(value) => value,
             Err(infallible) => match infallible {},
         }
@@ -591,8 +602,7 @@ impl<T> OnceCell<T> {
         strategy: &mut impl for<'a> Strategy<'a>,
     ) -> Result<(), E> {
         // The event listener we're currently waiting on.
-        let event_listener = EventListener::new(&self.active_initializers);
-        pin!(event_listener);
+        let mut event_listener = None;
 
         let mut closure = Some(closure);
 
@@ -611,10 +621,10 @@ impl<T> OnceCell<T> {
                     // but we do not have the ability to initialize it.
                     //
                     // We need to wait the initialization to complete.
-                    if event_listener.is_listening() {
-                        strategy.wait(event_listener.as_mut()).await;
+                    if let Some(listener) = event_listener.take() {
+                        strategy.wait(listener).await;
                     } else {
-                        event_listener.as_mut().listen();
+                        event_listener = Some(self.active_initializers.listen());
                     }
                 }
                 State::Uninitialized => {
@@ -755,11 +765,21 @@ impl<T: fmt::Debug> fmt::Debug for OnceCell<T> {
 
 impl<T> Drop for OnceCell<T> {
     fn drop(&mut self) {
-        if State::from(*self.state.get_mut()) == State::Initialized {
-            // SAFETY: We know that the value is initialized, so it is safe to
-            // drop it.
-            unsafe { self.value.get().cast::<T>().drop_in_place() }
-        }
+        self.state.with_mut(|state| {
+            if State::from(*state) == State::Initialized {
+                // SAFETY: We know that the value is initialized, so it is safe to
+                // drop it.
+                unsafe { self.value.get().cast::<T>().drop_in_place() }
+            }
+        });
+    }
+}
+
+impl<T> Default for OnceCell<T> {
+    // Calls `OnceCell::new`.
+    #[inline]
+    fn default() -> Self {
+        Self::new()
     }
 }
 

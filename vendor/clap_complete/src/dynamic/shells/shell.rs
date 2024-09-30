@@ -8,10 +8,14 @@ use clap::ValueEnum;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 #[non_exhaustive]
 pub enum Shell {
-    /// Bourne Again SHell (bash)
+    /// Bourne Again `SHell` (bash)
     Bash,
-    /// Friendly Interactive SHell (fish)
+    /// Friendly Interactive `SHell` (fish)
     Fish,
+    /// Z shell (zsh)
+    Zsh,
+    /// Elf `SHell` (elvish)
+    Elvish,
 }
 
 impl Display for Shell {
@@ -39,13 +43,15 @@ impl FromStr for Shell {
 // Hand-rolled so it can work even when `derive` feature is disabled
 impl ValueEnum for Shell {
     fn value_variants<'a>() -> &'a [Self] {
-        &[Shell::Bash, Shell::Fish]
+        &[Shell::Bash, Shell::Fish, Shell::Zsh, Shell::Elvish]
     }
 
-    fn to_possible_value<'a>(&self) -> Option<PossibleValue> {
+    fn to_possible_value(&self) -> Option<PossibleValue> {
         Some(match self {
             Shell::Bash => PossibleValue::new("bash"),
             Shell::Fish => PossibleValue::new("fish"),
+            Shell::Zsh => PossibleValue::new("zsh"),
+            Shell::Elvish => PossibleValue::new("elvish"),
         })
     }
 }
@@ -55,6 +61,8 @@ impl Shell {
         match self {
             Self::Bash => &super::Bash,
             Self::Fish => &super::Fish,
+            Self::Zsh => &super::Zsh,
+            Self::Elvish => &super::Elvish,
         }
     }
 }

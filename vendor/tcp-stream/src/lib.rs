@@ -1,6 +1,4 @@
 #![deny(missing_docs)]
-#![warn(rust_2018_idioms)]
-#![doc(html_root_url = "https://docs.rs/tcp-stream/0.26.0/")]
 
 //! # std::net::TCP stream on steroids
 //!
@@ -59,9 +57,6 @@ use std::{
     ops::{Deref, DerefMut},
     time::Duration,
 };
-
-#[cfg(feature = "native-tls")]
-use native_tls_crate as native_tls;
 
 #[cfg(feature = "native-tls")]
 /// Reexport native-tls's `TlsConnector`
@@ -332,32 +327,28 @@ fn into_rustls_common(
     domain: &str,
     config: TLSConfig<'_, '_, '_>,
 ) -> HandshakeResult {
-    use rustls_connector::rustls::{Certificate, PrivateKey};
+    use rustls_connector::rustls_pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 
     if let Some(cert_chain) = config.cert_chain {
         let mut cert_chain = std::io::BufReader::new(cert_chain.as_bytes());
         let certs = rustls_pemfile::certs(&mut cert_chain)
+            .collect::<Result<Vec<_>, _>>()
             .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
-        c.add_parsable_certificates(&certs);
+        c.add_parsable_certificates(certs);
     }
     let connector = if let Some(identity) = config.identity {
-        let pfx = p12::PFX::parse(identity.der).map_err(io::Error::from)?;
-        let key = if let Some(key) = pfx
-            .key_bags(identity.password)
-            .map_err(io::Error::from)?
-            .get(0)
-        {
-            PrivateKey(key.clone())
-        } else {
+        let pfx = p12_keystore::KeyStore::from_pkcs12(identity.der, identity.password)
+            .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+        let Some((_, keychain)) = pfx.private_key_chain() else {
             return Err(
                 io::Error::new(io::ErrorKind::Other, "No private key in pkcs12 DER").into(),
             );
         };
-        let certs = pfx
-            .cert_bags(identity.password)
-            .map_err(io::Error::from)?
+        let key = PrivateKeyDer::from(PrivatePkcs8KeyDer::from(keychain.key().to_vec()));
+        let certs = keychain
+            .chain()
             .iter()
-            .map(|cert| Certificate(cert.clone()))
+            .map(|cert| CertificateDer::from(cert.as_der().to_vec()))
             .collect();
         c.connector_with_single_cert(certs, key)
             .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?
@@ -412,10 +403,8 @@ cfg_if! {
             }
             if let Some(cert_chain) = config.cert_chain {
                 let mut cert_chain = std::io::BufReader::new(cert_chain.as_bytes());
-                for cert in rustls_pemfile::read_all(&mut cert_chain)?.iter().rev() {
-                    if let rustls_pemfile::Item::X509Certificate(cert) = cert {
-                        builder.add_root_certificate(Certificate::from_der(&cert[..]).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?);
-                    }
+                for cert in rustls_pemfile::certs(&mut cert_chain).collect::<Result<Vec<_>, _>>()? {
+                    builder.add_root_certificate(Certificate::from_der(&cert[..]).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?);
                 }
             }
             s.into_native_tls(&builder.build().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?, domain)

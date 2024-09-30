@@ -3,12 +3,13 @@ use core::ops::{
     BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, RangeInclusive, Sub, SubAssign,
 };
 
-use alloc::vec::Vec;
-
 use super::store::{self, Store};
 use super::util;
 
 pub const ARRAY_LIMIT: u64 = 4096;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 #[derive(PartialEq, Clone)]
 pub struct Container {
@@ -34,6 +35,10 @@ impl Container {
 impl Container {
     pub fn len(&self) -> u64 {
         self.store.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.store.is_empty()
     }
 
     pub fn insert(&mut self, index: u16) -> bool {

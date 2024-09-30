@@ -44,6 +44,7 @@ Combined, this looks like:
 use serde::{Deserialize, Serialize};
 use serde_with::{serde_as, DisplayFromStr};
 
+# #[allow(dead_code)]
 #[serde_as]
 #[derive(Serialize, Deserialize)]
 struct A {
@@ -60,6 +61,7 @@ For example, the `mime` field from above could be nested in one or more data str
 # use serde::{Deserialize, Serialize};
 # use serde_with::{serde_as, DisplayFromStr};
 #
+# #[allow(dead_code)]
 #[serde_as]
 #[derive(Serialize, Deserialize)]
 struct A {
@@ -76,6 +78,7 @@ This means the field can still be missing during deserialization and will be fil
 This "magic" can break in some cases. Then it becomes necessary to apply `#[serde(default)]` on the field in question.
 If the field is of type `Option<T>` and the conversion type is of `Option<S>`, the default attribute is automatically applied.
 These variants are detected as `Option`.
+
 * `Option`
 * `std::option::Option`, with or without leading `::`
 * `core::option::Option`, with or without leading `::`
@@ -87,6 +90,7 @@ For more information, you can inspect the documentation of the `serde_as` macro.
 # use serde::{Deserialize, Serialize};
 # use serde_with::{serde_as, DisplayFromStr};
 #
+# #[allow(dead_code)]
 #[serde_as]
 #[derive(Serialize, Deserialize)]
 struct A {
@@ -144,7 +148,7 @@ Our goal is to serialize this `Data` struct.
 Currently, we do not have anything we can use to replace `???` with, since `_` only works if `RemoteType` would implement `Serialize`, which it does not.
 
 ```rust
-# #[cfg(FALSE)] {
+# #[cfg(any())] {
 #[serde_as]
 #[derive(serde::Serialize)]
 struct Data {
@@ -159,7 +163,7 @@ The `SerializeAs` implementation is **always** written for a local type.
 This allows it to seamlessly work with types from dependencies without running into orphan rule problems.
 
 ```rust
-# #[cfg(FALSE)] {
+# #[cfg(any())] {
 struct LocalType;
 
 impl SerializeAs<RemoteType> for LocalType {
@@ -188,7 +192,7 @@ As can be seen, this is mostly boilerplate, since the most part is encapsulated 
 The final `Data` struct will now look like:
 
 ```rust
-# #[cfg(FALSE)] {
+# #[cfg(any())] {
 #[serde_as]
 #[derive(serde::Serialize)]
 struct Data {
@@ -205,7 +209,7 @@ This is a special functionality of serde, where it derives the de/serialization 
 You can find all the details in the [official serde documentation](https://serde.rs/remote-derive.html).
 
 ```rust
-# #[cfg(FALSE)] {
+# #[cfg(any())] {
 // Pretend that this is somebody else's crate, not a module.
 mod other_crate {
     // Neither Serde nor the other crate provides Serialize and Deserialize
@@ -238,7 +242,7 @@ We can write this implementation.
 The implementation for `DeserializeAs` works analogue.
 
 ```rust
-# #[cfg(FALSE)] {
+# #[cfg(any())] {
 impl SerializeAs<Duration> for DurationDef {
     fn serialize_as<S>(value: &Duration, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -253,7 +257,7 @@ impl SerializeAs<Duration> for DurationDef {
 This now allows us to use `Duration` for serialization.
 
 ```rust
-# #[cfg(FALSE)] {
+# #[cfg(any())] {
 use other_crate::Duration;
 
 #[serde_as]

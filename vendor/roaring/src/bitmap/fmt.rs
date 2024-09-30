@@ -1,8 +1,9 @@
 use core::fmt;
 
-use alloc::vec::Vec;
-
 use crate::RoaringBitmap;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 impl fmt::Debug for RoaringBitmap {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {

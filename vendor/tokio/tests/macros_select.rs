@@ -1,3 +1,4 @@
+#![allow(unknown_lints, unexpected_cfgs)]
 #![cfg(feature = "macros")]
 #![allow(clippy::disallowed_names)]
 
@@ -17,6 +18,25 @@ use std::task::Poll::Ready;
 async fn sync_one_lit_expr_comma() {
     let foo = tokio::select! {
         foo = async { 1 } => foo,
+    };
+
+    assert_eq!(foo, 1);
+}
+
+#[maybe_tokio_test]
+async fn no_branch_else_only() {
+    let foo = tokio::select! {
+        else => 1,
+    };
+
+    assert_eq!(foo, 1);
+}
+
+#[maybe_tokio_test]
+async fn no_branch_else_only_biased() {
+    let foo = tokio::select! {
+        biased;
+        else => 1,
     };
 
     assert_eq!(foo, 1);
@@ -670,5 +690,22 @@ mod unstable {
             x = async { 8 } => x,
             x = async { 9 } => x,
         )
+    }
+}
+
+#[tokio::test]
+async fn select_into_future() {
+    struct NotAFuture;
+    impl std::future::IntoFuture for NotAFuture {
+        type Output = ();
+        type IntoFuture = std::future::Ready<()>;
+
+        fn into_future(self) -> Self::IntoFuture {
+            std::future::ready(())
+        }
+    }
+
+    tokio::select! {
+        () = NotAFuture => {},
     }
 }

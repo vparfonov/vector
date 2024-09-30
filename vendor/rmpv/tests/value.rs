@@ -157,8 +157,8 @@ fn monadic_index() {
     ]);
 
     assert_eq!("value", val[0][0].as_str().unwrap());
-    assert_eq!(true,    val[0][1].as_bool().unwrap());
-    assert_eq!(false,   val[1].as_bool().unwrap());
+    assert!(val[0][1].as_bool().unwrap());
+    assert!(!val[1].as_bool().unwrap());
 
     assert!(val[0][0][0].is_nil());
     assert!(val[2].is_nil());
@@ -188,8 +188,8 @@ fn index_into_map() {
 
 #[test]
 fn try_from_val() {
-  use rmpv::Utf8String;
-  use std::convert::TryInto;
+    use rmpv::Utf8String;
+    use std::convert::TryInto;
 
   assert_eq!(false, Value::Boolean(false).try_into().unwrap());
   assert_eq!(Utf8String::from("spook"), Value::from("spook").try_into().unwrap());

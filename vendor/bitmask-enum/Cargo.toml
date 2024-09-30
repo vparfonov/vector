@@ -12,8 +12,13 @@
 [package]
 edition = "2021"
 name = "bitmask-enum"
-version = "2.2.3"
+version = "2.2.4"
 authors = ["Lukas3674 <lukashassler@web.de>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A bitmask enum attribute macro"
 documentation = "https://docs.rs/bitmask-enum"
 readme = "README.md"
@@ -29,7 +34,21 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/Lukas3674/rust-bitmask-enum"
 
 [lib]
+name = "bitmask_enum"
+path = "src/lib.rs"
 proc-macro = true
+
+[[example]]
+name = "custom"
+path = "examples/custom.rs"
+
+[[example]]
+name = "simple"
+path = "examples/simple.rs"
+
+[[test]]
+name = "tests"
+path = "tests/tests.rs"
 
 [dependencies.quote]
 version = "1.0"

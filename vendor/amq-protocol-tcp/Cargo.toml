@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.63.0"
 name = "amq-protocol-tcp"
-version = "7.1.2"
+version = "7.2.1"
 authors = ["Marc-Antoine Perennou <%arc-Antoine@Perennou.com>"]
 description = "AMQP URI TCP connection handling"
 documentation = "https://docs.rs/amq-protocol-tcp"
@@ -28,16 +28,15 @@ categories = [
 ]
 license = "BSD-2-Clause"
 repository = "https://github.com/amqp-rs/amq-protocol"
-resolver = "1"
 
 [lib]
 name = "amq_protocol_tcp"
 
 [dependencies.amq-protocol-uri]
-version = "=7.1.2"
+version = "=7.2.1"
 
 [dependencies.tcp-stream]
-version = "^0.26"
+version = "^0.28"
 default-features = false
 
 [dependencies.tracing]

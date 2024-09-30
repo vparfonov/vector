@@ -147,9 +147,10 @@ impl Key {
         &self.dotted_decor
     }
 
-    /// Returns the location within the original document
-    #[cfg(feature = "serde")]
-    pub(crate) fn span(&self) -> Option<std::ops::Range<usize>> {
+    /// The location within the original document
+    ///
+    /// This generally requires an [`ImDocument`][crate::ImDocument].
+    pub fn span(&self) -> Option<std::ops::Range<usize>> {
         self.repr.as_ref().and_then(|r| r.span())
     }
 
@@ -157,7 +158,7 @@ impl Key {
         self.leaf_decor.despan(input);
         self.dotted_decor.despan(input);
         if let Some(repr) = &mut self.repr {
-            repr.despan(input)
+            repr.despan(input);
         }
     }
 
@@ -288,17 +289,13 @@ fn to_key_repr(key: &str) -> Repr {
             crate::encode::to_string_repr(
                 key,
                 Some(crate::encode::StringStyle::OnelineSingle),
-                Some(false),
+                None,
             )
         }
     }
     #[cfg(not(feature = "parse"))]
     {
-        crate::encode::to_string_repr(
-            key,
-            Some(crate::encode::StringStyle::OnelineSingle),
-            Some(false),
-        )
+        crate::encode::to_string_repr(key, Some(crate::encode::StringStyle::OnelineSingle), None)
     }
 }
 
@@ -358,7 +355,7 @@ impl<'k> KeyMut<'k> {
 
     /// Returns a raw representation.
     #[cfg(feature = "display")]
-    pub fn display_repr(&self) -> Cow<str> {
+    pub fn display_repr(&self) -> Cow<'_, str> {
         self.key.display_repr()
     }
 
@@ -401,7 +398,7 @@ impl<'k> KeyMut<'k> {
 
     /// Auto formats the key.
     pub fn fmt(&mut self) {
-        self.key.fmt()
+        self.key.fmt();
     }
 }
 

@@ -1,65 +1,6 @@
-//! This crate connects Rust MessagePack library with [`serde`][serde] providing an ability to
-//! easily serialize and deserialize both Rust built-in types, the standard library and custom data
-//! structures.
-//!
-//! ## Motivating example
-//!
-//! ```
-//! let buf = rmp_serde::to_vec(&(42, "the Answer")).unwrap();
-//!
-//! assert_eq!(
-//!     vec![0x92, 0x2a, 0xaa, 0x74, 0x68, 0x65, 0x20, 0x41, 0x6e, 0x73, 0x77, 0x65, 0x72],
-//!     buf
-//! );
-//!
-//! assert_eq!((42, "the Answer"), rmp_serde::from_slice(&buf).unwrap());
-//! ```
-//!
-//! # Type-based Serialization and Deserialization
-//!
-//! Serde provides a mechanism for low boilerplate serialization & deserialization of values to and
-//! from MessagePack via the serialization API.
-//!
-//! To be able to serialize a piece of data, it must implement the `serde::Serialize` trait. To be
-//! able to deserialize a piece of data, it must implement the `serde::Deserialize` trait. Serde
-//! provides an annotation to automatically generate the code for these
-//! traits: `#[derive(Serialize, Deserialize)]`.
-//!
-//! # Examples
-//!
-//! ```
-//! extern crate serde;
-//! #[macro_use]
-//! extern crate serde_derive;
-//! extern crate rmp_serde as rmps;
-//!
-//! use std::collections::HashMap;
-//! use serde::{Deserialize, Serialize};
-//! use rmps::{Deserializer, Serializer};
-//!
-//! #[derive(Debug, PartialEq, Deserialize, Serialize)]
-//! struct Human {
-//!     age: u32,
-//!     name: String,
-//! }
-//!
-//! fn main() {
-//!     let mut buf = Vec::new();
-//!     let val = Human {
-//!         age: 42,
-//!         name: "John".into(),
-//!     };
-//!
-//!     val.serialize(&mut Serializer::new(&mut buf)).unwrap();
-//! }
-//! ```
-//!
-//! [serde]: https://serde.rs/
+#![doc = include_str!("../README.md")]
 #![forbid(unsafe_code)]
 #![warn(missing_debug_implementations, missing_docs)]
-
-#[macro_use]
-extern crate serde;
 
 use std::fmt::{self, Display, Formatter};
 use std::str::{self, Utf8Error};
@@ -67,20 +8,27 @@ use std::str::{self, Utf8Error};
 use serde::de;
 use serde::{Deserialize, Serialize};
 
-pub use crate::decode::{from_read, Deserializer};
 #[allow(deprecated)]
 pub use crate::decode::from_read_ref;
+pub use crate::decode::{from_read, Deserializer};
 pub use crate::encode::{to_vec, to_vec_named, Serializer};
 
 pub use crate::decode::from_slice;
 
+mod bytes;
 pub mod config;
 pub mod decode;
 pub mod encode;
 
+/// Hack used to serialize MessagePack Extension types.
+///
+/// A special `ExtStruct` type is used to represent
+/// extension types. This struct is renamed in serde.
+///
 /// Name of Serde newtype struct to Represent Msgpack's Ext
-/// Msgpack Ext: Ext(tag, binary)
-/// Serde data model: _ExtStruct((tag, binary))
+/// Msgpack Ext: `Ext(tag, binary)`
+/// Serde data model: `_ExtStruct((tag, binary))`
+///
 /// Example Serde impl for custom type:
 ///
 /// ```ignore
@@ -106,12 +54,14 @@ pub struct Raw {
 impl Raw {
     /// Constructs a new `Raw` from the UTF-8 string.
     #[inline]
+    #[must_use]
     pub fn new(v: String) -> Self {
         Self { s: Ok(v) }
     }
 
     /// DO NOT USE. See <https://github.com/3Hren/msgpack-rust/issues/305>
     #[deprecated(note = "This feature has been removed")]
+    #[must_use]
     pub fn from_utf8(v: Vec<u8>) -> Self {
         match String::from_utf8(v) {
             Ok(v) => Raw::new(v),
@@ -126,18 +76,21 @@ impl Raw {
 
     /// Returns `true` if the raw is valid UTF-8.
     #[inline]
+    #[must_use]
     pub fn is_str(&self) -> bool {
         self.s.is_ok()
     }
 
     /// Returns `true` if the raw contains invalid UTF-8 sequence.
     #[inline]
+    #[must_use]
     pub fn is_err(&self) -> bool {
         self.s.is_err()
     }
 
     /// Returns the string reference if the raw is valid UTF-8, or else `None`.
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self.s {
             Ok(ref s) => Some(s.as_str()),
@@ -148,6 +101,7 @@ impl Raw {
     /// Returns the underlying `Utf8Error` if the raw contains invalid UTF-8 sequence, or
     /// else `None`.
     #[inline]
+    #[must_use]
     pub fn as_err(&self) -> Option<&Utf8Error> {
         match self.s {
             Ok(..) => None,
@@ -157,6 +111,7 @@ impl Raw {
 
     /// Returns a byte slice of this raw's contents.
     #[inline]
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         match self.s {
             Ok(ref s) => s.as_bytes(),
@@ -166,12 +121,14 @@ impl Raw {
 
     /// Consumes this object, yielding the string if the raw is valid UTF-8, or else `None`.
     #[inline]
+    #[must_use]
     pub fn into_str(self) -> Option<String> {
         self.s.ok()
     }
 
     /// Converts a `Raw` into a byte vector.
     #[inline]
+    #[must_use]
     pub fn into_bytes(self) -> Vec<u8> {
         match self.s {
             Ok(s) => s.into_bytes(),
@@ -183,7 +140,7 @@ impl Raw {
 impl Serialize for Raw {
     fn serialize<S>(&self, se: S) -> Result<S::Ok, S::Error>
     where
-        S: serde::Serializer
+        S: serde::Serializer,
     {
         match self.s {
             Ok(ref s) => se.serialize_str(s),
@@ -264,11 +221,13 @@ pub struct RawRef<'a> {
 impl<'a> RawRef<'a> {
     /// Constructs a new `RawRef` from the UTF-8 string.
     #[inline]
+    #[must_use]
     pub fn new(v: &'a str) -> Self {
         Self { s: Ok(v) }
     }
 
     #[deprecated(note = "This feature has been removed")]
+    #[must_use]
     pub fn from_utf8(v: &'a [u8]) -> Self {
         match str::from_utf8(v) {
             Ok(v) => RawRef::new(v),
@@ -282,18 +241,21 @@ impl<'a> RawRef<'a> {
 
     /// Returns `true` if the raw is valid UTF-8.
     #[inline]
+    #[must_use]
     pub fn is_str(&self) -> bool {
         self.s.is_ok()
     }
 
     /// Returns `true` if the raw contains invalid UTF-8 sequence.
     #[inline]
+    #[must_use]
     pub fn is_err(&self) -> bool {
         self.s.is_err()
     }
 
     /// Returns the string reference if the raw is valid UTF-8, or else `None`.
     #[inline]
+    #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self.s {
             Ok(s) => Some(s),
@@ -304,6 +266,7 @@ impl<'a> RawRef<'a> {
     /// Returns the underlying `Utf8Error` if the raw contains invalid UTF-8 sequence, or
     /// else `None`.
     #[inline]
+    #[must_use]
     pub fn as_err(&self) -> Option<&Utf8Error> {
         match self.s {
             Ok(..) => None,
@@ -313,6 +276,7 @@ impl<'a> RawRef<'a> {
 
     /// Returns a byte slice of this raw's contents.
     #[inline]
+    #[must_use]
     pub fn as_bytes(&self) -> &[u8] {
         match self.s {
             Ok(s) => s.as_bytes(),

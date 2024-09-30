@@ -1,9 +1,8 @@
-use http_types::headers::{HeaderName, HeaderValue};
-use http_types::{Response, StatusCode};
+use http::{HeaderMap, HeaderName, HeaderValue, Response, StatusCode};
+use http_body_util::Full;
+use hyper::body::Bytes;
 use serde::Serialize;
-use std::collections::HashMap;
 use std::convert::TryInto;
-use std::str::FromStr;
 use std::time::Duration;
 
 /// The blueprint for the response returned by a [`MockServer`] when a [`Mock`] matches on an incoming request.
@@ -12,9 +11,9 @@ use std::time::Duration;
 /// [`MockServer`]: crate::MockServer
 #[derive(Clone, Debug)]
 pub struct ResponseTemplate {
-    mime: Option<http_types::Mime>,
+    mime: String,
     status_code: StatusCode,
-    headers: HashMap<HeaderName, Vec<HeaderValue>>,
+    headers: HeaderMap,
     body: Option<Vec<u8>>,
     delay: Option<Duration>,
 }
@@ -37,8 +36,8 @@ impl ResponseTemplate {
         let status_code = s.try_into().expect("Failed to convert into status code.");
         Self {
             status_code,
-            headers: HashMap::new(),
-            mime: None,
+            headers: HeaderMap::new(),
+            mime: String::new(),
             body: None,
             delay: None,
         }
@@ -61,14 +60,7 @@ impl ResponseTemplate {
         let value = value
             .try_into()
             .expect("Failed to convert into header value.");
-        match self.headers.get_mut(&key) {
-            Some(headers) => {
-                headers.push(value);
-            }
-            None => {
-                self.headers.insert(key, vec![value]);
-            }
-        }
+        self.headers.append(key, value);
         self
     }
 
@@ -118,7 +110,60 @@ impl ResponseTemplate {
         let value = value
             .try_into()
             .expect("Failed to convert into header value.");
-        self.headers.insert(key, vec![value]);
+        self.headers.insert(key, value);
+        self
+    }
+
+    /// Append multiple header key-value pairs.
+    ///
+    /// Existing header values will not be overridden.
+    ///
+    /// # Example
+    /// ```rust
+    /// use wiremock::{MockServer, Mock, ResponseTemplate};
+    /// use wiremock::matchers::method;
+    ///
+    /// #[async_std::main]
+    /// async fn main() {
+    ///     // Arrange
+    ///     let mock_server = MockServer::start().await;
+    ///     let headers = vec![
+    ///         ("Set-Cookie", "name=value"),
+    ///         ("Set-Cookie", "name2=value2; Domain=example.com"),
+    ///     ];
+    ///     let template = ResponseTemplate::new(200).append_headers(headers);
+    ///     Mock::given(method("GET"))
+    ///         .respond_with(template)
+    ///         .mount(&mock_server)
+    ///         .await;
+    ///
+    ///     // Act
+    ///     let res = surf::get(&mock_server.uri())
+    ///         .await
+    ///         .unwrap();
+    ///
+    ///     // Assert
+    ///     assert_eq!(res.header("Set-Cookie").unwrap().iter().count(), 2);
+    /// }
+    /// ```
+    pub fn append_headers<K, V, I>(mut self, headers: I) -> Self
+    where
+        K: TryInto<HeaderName>,
+        <K as TryInto<HeaderName>>::Error: std::fmt::Debug,
+        V: TryInto<HeaderValue>,
+        <V as TryInto<HeaderValue>>::Error: std::fmt::Debug,
+        I: IntoIterator<Item = (K, V)>,
+    {
+        let headers = headers.into_iter().map(|(key, value)| {
+            (
+                key.try_into().expect("Failed to convert into header name."),
+                value
+                    .try_into()
+                    .expect("Failed to convert into header value."),
+            )
+        });
+        // The `Extend<(HeaderName, T)>` impl uses `HeaderMap::append` internally: https://docs.rs/http/1.0.0/src/http/header/map.rs.html#1953
+        self.headers.extend(headers);
         self
     }
 
@@ -145,10 +190,7 @@ impl ResponseTemplate {
         let body = serde_json::to_vec(&body).expect("Failed to convert into body.");
 
         self.body = Some(body);
-        self.mime = Some(
-            http_types::Mime::from_str("application/json")
-                .expect("Failed to convert into Mime header"),
-        );
+        self.mime = "application/json".to_string();
         self
     }
 
@@ -163,9 +205,7 @@ impl ResponseTemplate {
         let body = body.try_into().expect("Failed to convert into body.");
 
         self.body = Some(body.into_bytes());
-        self.mime = Some(
-            http_types::Mime::from_str("text/plain").expect("Failed to convert into Mime header"),
-        );
+        self.mime = "text/plain".to_string();
         self
     }
 
@@ -220,8 +260,7 @@ impl ResponseTemplate {
     {
         let body = body.try_into().expect("Failed to convert into body.");
         self.body = Some(body);
-        self.mime =
-            Some(http_types::Mime::from_str(mime).expect("Failed to convert into Mime header"));
+        self.mime = mime.to_string();
         self
     }
 
@@ -234,7 +273,6 @@ impl ResponseTemplate {
     ///
     /// ### Example:
     /// ```rust
-    /// use isahc::config::Configurable;
     /// use wiremock::{MockServer, Mock, ResponseTemplate};
     /// use wiremock::matchers::method;
     /// use std::time::Duration;
@@ -272,25 +310,18 @@ impl ResponseTemplate {
     }
 
     /// Generate a response from the template.
-    pub(crate) fn generate_response(&self) -> Response {
-        let mut response = Response::new(self.status_code);
+    pub(crate) fn generate_response(&self) -> Response<Full<Bytes>> {
+        let mut response = Response::builder().status(self.status_code);
 
-        // Add headers
-        for (header_name, header_values) in &self.headers {
-            response.insert_header(header_name.clone(), header_values.as_slice());
-        }
-
-        // Add body, if specified
-        if let Some(body) = &self.body {
-            response.set_body(body.clone());
-        }
-
+        let mut headers = self.headers.clone();
         // Set content-type, if needed
-        if let Some(mime) = &self.mime {
-            response.set_content_type(mime.to_owned());
+        if !self.mime.is_empty() {
+            headers.insert(http::header::CONTENT_TYPE, self.mime.parse().unwrap());
         }
+        *response.headers_mut().unwrap() = headers;
 
-        response
+        let body = self.body.clone().unwrap_or_default();
+        response.body(body.into()).unwrap()
     }
 
     /// Retrieve the response delay.

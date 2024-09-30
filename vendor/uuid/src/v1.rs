@@ -48,7 +48,7 @@ impl Uuid {
     /// # Examples
     ///
     /// A UUID can be created from a unix [`Timestamp`] with a
-    /// [`ClockSequence`]. RFC4122 requires the clock sequence
+    /// [`ClockSequence`]. RFC 9562 requires the clock sequence
     /// is seeded with a random value:
     ///
     /// ```
@@ -66,12 +66,12 @@ impl Uuid {
     /// );
     /// ```
     ///
-    /// The timestamp can also be created manually as per RFC4122:
+    /// The timestamp can also be created manually as per RFC 9562:
     ///
     /// ```
     /// # use uuid::{Uuid, Timestamp, Context, ClockSequence};
     /// let context = Context::new(42);
-    /// let ts = Timestamp::from_rfc4122(14976234442241191232, context.generate_sequence(0, 0));
+    /// let ts = Timestamp::from_gregorian(14976234442241191232, context.generate_sequence(0, 0));
     ///
     /// let uuid = Uuid::new_v1(ts, &[1, 2, 3, 4, 5, 6]);
     ///
@@ -83,15 +83,15 @@ impl Uuid {
     ///
     /// # References
     ///
-    /// * [Version 1 UUIDs in RFC4122](https://www.rfc-editor.org/rfc/rfc4122#section-4.2)
+    /// * [UUID Version 1 in RFC 9562](https://www.ietf.org/rfc/rfc9562.html#section-5.1)
     ///
     /// [`Timestamp`]: v1/struct.Timestamp.html
     /// [`ClockSequence`]: v1/trait.ClockSequence.html
     /// [`Context`]: v1/struct.Context.html
     pub fn new_v1(ts: Timestamp, node_id: &[u8; 6]) -> Self {
-        let (ticks, counter) = ts.to_rfc4122();
+        let (ticks, counter) = ts.to_gregorian();
 
-        Builder::from_rfc4122_timestamp(ticks, counter, node_id).into_uuid()
+        Builder::from_gregorian_timestamp(ticks, counter, node_id).into_uuid()
     }
 }
 
@@ -131,9 +131,11 @@ mod tests {
             "20616934-4ba2-11e7-8000-010203040506"
         );
 
-        let ts = uuid.get_timestamp().unwrap().to_rfc4122();
+        let ts = uuid.get_timestamp().unwrap().to_gregorian();
 
         assert_eq!(ts.0 - 0x01B2_1DD2_1381_4000, 14_968_545_358_129_460);
+
+        assert_eq!(Some(node), uuid.get_node_id(),);
 
         // Ensure parsing the same UUID produces the same timestamp
         let parsed = Uuid::parse_str("20616934-4ba2-11e7-8000-010203040506").unwrap();
@@ -142,6 +144,8 @@ mod tests {
             uuid.get_timestamp().unwrap(),
             parsed.get_timestamp().unwrap()
         );
+
+        assert_eq!(uuid.get_node_id().unwrap(), parsed.get_node_id().unwrap(),);
     }
 
     #[test]
@@ -161,40 +165,5 @@ mod tests {
 
         assert_eq!(uuid.get_version(), Some(Version::Mac));
         assert_eq!(uuid.get_variant(), Variant::RFC4122);
-    }
-
-    #[test]
-    #[cfg_attr(
-        all(
-            target_arch = "wasm32",
-            target_vendor = "unknown",
-            target_os = "unknown"
-        ),
-        wasm_bindgen_test
-    )]
-    fn test_new_context() {
-        let time: u64 = 1_496_854_535;
-        let time_fraction: u32 = 812_946_000;
-        let node = [1, 2, 3, 4, 5, 6];
-
-        // This context will wrap
-        let context = Context::new(u16::MAX >> 2);
-
-        let uuid1 = Uuid::new_v1(Timestamp::from_unix(&context, time, time_fraction), &node);
-
-        let time: u64 = 1_496_854_536;
-
-        let uuid2 = Uuid::new_v1(Timestamp::from_unix(&context, time, time_fraction), &node);
-
-        assert_eq!(uuid1.get_timestamp().unwrap().to_rfc4122().1, 16383);
-        assert_eq!(uuid2.get_timestamp().unwrap().to_rfc4122().1, 0);
-
-        let time = 1_496_854_535;
-
-        let uuid3 = Uuid::new_v1(Timestamp::from_unix(&context, time, time_fraction), &node);
-        let uuid4 = Uuid::new_v1(Timestamp::from_unix(&context, time, time_fraction), &node);
-
-        assert_eq!(uuid3.get_timestamp().unwrap().to_rfc4122().1, 1);
-        assert_eq!(uuid4.get_timestamp().unwrap().to_rfc4122().1, 2);
     }
 }

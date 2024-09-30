@@ -1,4 +1,3 @@
-use core::iter::FromIterator;
 use proptest::arbitrary::any;
 use proptest::collection::btree_set;
 use proptest::proptest;
@@ -65,6 +64,20 @@ proptest! {
         let bitmap = RoaringBitmap::from_sorted_iter(values.iter().cloned()).unwrap();
         // Iterator::eq != PartialEq::eq - cannot use assert_eq macro
         assert!(values.into_iter().eq(bitmap));
+    }
+}
+
+proptest! {
+    #[test]
+    fn fold(values in btree_set(any::<u32>(), ..=10_000)) {
+        let bitmap = RoaringBitmap::from_sorted_iter(values.iter().cloned()).unwrap();
+        let mut val_iter = values.into_iter();
+        // `Iterator::all` uses currently unimplementable `try_fold`, we test `fold`
+        #[allow(clippy::unnecessary_fold)]
+        let r = bitmap.into_iter().fold(true, |b, i| {
+            b && i == val_iter.next().unwrap()
+        });
+        assert!(r)
     }
 }
 

@@ -10,6 +10,8 @@
 #[cfg(feature = "alloc")]
 mod duplicates;
 mod impls;
+#[cfg(feature = "alloc")]
+mod skip_error;
 
 use crate::prelude::*;
 
@@ -73,7 +75,7 @@ use crate::prelude::*;
 /// This shows a simplified implementation for [`DisplayFromStr`].
 ///
 /// ```rust
-/// # #[cfg(all(feature = "macros"))] {
+/// # #[cfg(feature = "macros")] {
 /// # use serde_with::{serde_as, SerializeAs};
 /// # use std::fmt::Display;
 /// struct DisplayFromStr;

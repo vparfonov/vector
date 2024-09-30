@@ -162,6 +162,7 @@ type Cache = BTreeMap<String, CacheEntry>;
 struct CacheEntry {
     manifest_ts: SystemTime,
     workspace_manifest_ts: SystemTime,
+    workspace_manifest_path: PathBuf,
     crate_names: CrateNames,
 }
 
@@ -186,10 +187,7 @@ pub fn crate_name(orig_name: &str) -> Result<FoundCrate, Error> {
     let manifest_dir = env::var("CARGO_MANIFEST_DIR").map_err(|_| Error::CargoManifestDirNotSet)?;
     let manifest_path = Path::new(&manifest_dir).join("Cargo.toml");
 
-    let workspace_manifest_path = workspace_manifest_path(&manifest_path)?;
-
     let manifest_ts = cargo_toml_timestamp(&manifest_path)?;
-    let workspace_manifest_ts = cargo_toml_timestamp(&workspace_manifest_path)?;
 
     static CACHE: Mutex<Cache> = Mutex::new(BTreeMap::new());
     let mut cache = CACHE.lock().unwrap();
@@ -197,6 +195,8 @@ pub fn crate_name(orig_name: &str) -> Result<FoundCrate, Error> {
     let crate_names = match cache.entry(manifest_dir) {
         btree_map::Entry::Occupied(entry) => {
             let cache_entry = entry.into_mut();
+            let workspace_manifest_path = cache_entry.workspace_manifest_path.as_path();
+            let workspace_manifest_ts = cargo_toml_timestamp(&workspace_manifest_path)?;
 
             // Timestamp changed, rebuild this cache entry.
             if manifest_ts != cache_entry.manifest_ts ||
@@ -213,6 +213,14 @@ pub fn crate_name(orig_name: &str) -> Result<FoundCrate, Error> {
             &cache_entry.crate_names
         },
         btree_map::Entry::Vacant(entry) => {
+            // If `workspace_manifest_path` returns `None`, we are probably in a vendored deps
+            // folder and cargo complaining that we have some package inside a workspace, that isn't
+            // part of the workspace. In this case we just use the `manifest_path` as the
+            // `workspace_manifest_path`.
+            let workspace_manifest_path =
+                workspace_manifest_path(&manifest_path)?.unwrap_or_else(|| manifest_path.clone());
+            let workspace_manifest_ts = cargo_toml_timestamp(&workspace_manifest_path)?;
+
             let cache_entry = entry.insert(read_cargo_toml(
                 &manifest_path,
                 &workspace_manifest_path,
@@ -232,7 +240,7 @@ pub fn crate_name(orig_name: &str) -> Result<FoundCrate, Error> {
         .clone())
 }
 
-fn workspace_manifest_path(cargo_toml_manifest: &Path) -> Result<PathBuf, Error> {
+fn workspace_manifest_path(cargo_toml_manifest: &Path) -> Result<Option<PathBuf>, Error> {
     let stdout = Command::new(env::var("CARGO").map_err(|_| Error::CargoEnvVariableNotSet)?)
         .arg("locate-project")
         .args(&["--workspace", "--message-format=plain"])
@@ -243,7 +251,15 @@ fn workspace_manifest_path(cargo_toml_manifest: &Path) -> Result<PathBuf, Error>
 
     String::from_utf8(stdout)
         .map_err(|_| Error::FailedGettingWorkspaceManifestPath)
-        .map(|s| s.trim().into())
+        .map(|s| {
+            let path = s.trim();
+
+            if path.is_empty() {
+                None
+            } else {
+                Some(path.into())
+            }
+        })
 }
 
 fn cargo_toml_timestamp(manifest_path: &Path) -> Result<SystemTime, Error> {
@@ -266,14 +282,19 @@ fn read_cargo_toml(
 
     let workspace_dependencies = if manifest_path != workspace_manifest_path {
         let workspace_manifest = open_cargo_toml(workspace_manifest_path)?;
-        extract_workspace_dependencies(workspace_manifest)?
+        extract_workspace_dependencies(&workspace_manifest)?
     } else {
-        Default::default()
+        extract_workspace_dependencies(&manifest)?
     };
 
     let crate_names = extract_crate_names(&manifest, workspace_dependencies)?;
 
-    Ok(CacheEntry { manifest_ts, workspace_manifest_ts, crate_names })
+    Ok(CacheEntry {
+        manifest_ts,
+        workspace_manifest_ts,
+        crate_names,
+        workspace_manifest_path: workspace_manifest_path.to_path_buf(),
+    })
 }
 
 /// Extract all `[workspace.dependencies]`.
@@ -281,7 +302,7 @@ fn read_cargo_toml(
 /// Returns a hash map that maps from dep name to the package name. Dep name
 /// and package name can be the same if there doesn't exist any rename.
 fn extract_workspace_dependencies(
-    workspace_toml: Document,
+    workspace_toml: &Document,
 ) -> Result<BTreeMap<String, String>, Error> {
     Ok(workspace_dep_tables(&workspace_toml)
         .into_iter()
@@ -392,7 +413,7 @@ mod tests {
                 let workspace_cargo_toml = $workspace_toml.parse::<Document>()
                     .expect("Parses workspace `Cargo.toml`");
 
-                let workspace_deps = extract_workspace_dependencies(workspace_cargo_toml)
+                let workspace_deps = extract_workspace_dependencies(&workspace_cargo_toml)
                     .expect("Extracts workspace dependencies");
 
                 match extract_crate_names(&cargo_toml, workspace_deps)
@@ -530,18 +551,5 @@ mod tests {
             my_crate_cool = { package = "my_crate" }
         "#,
         Ok(Some(FoundCrate::Name(name))) if name == "my_crate_cool"
-    }
-
-    create_test! {
-        workspace_deps_twice_renamed,
-        r#"
-            [dependencies]
-            my_crate_cool_renamed = { package = "my-crate-cool", workspace = true }
-        "#,
-        r#"
-            [workspace.dependencies]
-            my-crate-cool = { package = "my_crate" }
-        "#,
-        Ok(Some(FoundCrate::Name(name))) if name == "my_crate_cool_renamed"
     }
 }

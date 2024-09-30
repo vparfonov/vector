@@ -11,8 +11,9 @@
 
 [package]
 edition = "2021"
+rust-version = "1.67.1"
 name = "rstest_macros"
-version = "0.18.2"
+version = "0.21.0"
 authors = ["Michele d'Amico <michele.damico@gmail.com>"]
 description = """
 Rust fixture based test framework. It use procedural macro
@@ -27,7 +28,6 @@ keywords = [
 categories = ["development-tools::testing"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/la10736/rstest"
-resolver = "1"
 
 [lib]
 proc-macro = true
@@ -37,6 +37,10 @@ version = "1.0.0"
 
 [dependencies.glob]
 version = "0.3.1"
+
+[dependencies.proc-macro-crate]
+version = "3.1.0"
+optional = true
 
 [dependencies.proc-macro2]
 version = "1.0.39"
@@ -76,19 +80,13 @@ version = "1.0.2"
 [dev-dependencies.pretty_assertions]
 version = "1.2.1"
 
-[dev-dependencies.rstest]
-version = "0.18.1"
-default-features = false
-
-[dev-dependencies.rstest_reuse]
-version = "0.6.0"
-
-[dev-dependencies.rstest_test]
-version = "0.11.0"
-
 [build-dependencies.rustc_version]
 version = "0.4.0"
 
 [features]
 async-timeout = []
-default = ["async-timeout"]
+crate-name = ["dep:proc-macro-crate"]
+default = [
+    "async-timeout",
+    "crate-name",
+]

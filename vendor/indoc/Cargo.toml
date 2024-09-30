@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.56"
 name = "indoc"
-version = "2.0.4"
+version = "2.0.5"
 authors = ["David Tolnay <dtolnay@gmail.com>"]
 description = "Indented document literals"
 documentation = "https://docs.rs/indoc"

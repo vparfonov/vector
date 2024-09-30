@@ -129,7 +129,6 @@ use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::Ordering::{Acquire, Relaxed, Release, SeqCst};
 use std::task::{Context, Poll, Waker};
-use std::usize;
 
 /// Sending-half of the [`broadcast`] channel.
 ///
@@ -741,7 +740,7 @@ impl<T> Sender<T> {
         self.shared.buffer[idx].read().unwrap().rem.load(SeqCst) == 0
     }
 
-    /// Returns the number of active receivers
+    /// Returns the number of active receivers.
     ///
     /// An active receiver is a [`Receiver`] handle returned from [`channel`] or
     /// [`subscribe`]. These are the handles that will receive values sent on

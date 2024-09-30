@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use std::ffi::{CStr, CString};
 
+use bstr::BString;
 use maplit::{btreemap, btreeset, hashmap, hashset};
 use mlua::{
     AnyUserData, Error, Function, IntoLua, Lua, RegistryKey, Result, Table, Thread, UserDataRef,
@@ -232,14 +233,22 @@ fn test_owned_anyuserdata_into_lua() -> Result<()> {
 fn test_registry_value_into_lua() -> Result<()> {
     let lua = Lua::new();
 
-    let t = lua.create_table()?;
-    let r = lua.create_registry_value(t)?;
-    let f = lua.create_function(|_, t: Table| t.raw_set("hello", "world"))?;
+    // Direct conversion
+    let s = lua.create_string("hello, world")?;
+    let r = lua.create_registry_value(&s)?;
+    let value1 = lua.pack(&r)?;
+    let value2 = lua.pack(r)?;
+    assert_eq!(value1.as_str(), Some("hello, world"));
+    assert_eq!(value2.to_pointer(), value2.to_pointer());
 
-    f.call(&r)?;
-    let v = r.into_lua(&lua)?;
-    let t = v.as_table().unwrap();
+    // Push into stack
+    let t = lua.create_table()?;
+    let r = lua.create_registry_value(&t)?;
+    let f = lua.create_function(|_, (t, k, v): (Table, Value, Value)| t.set(k, v))?;
+    f.call((&r, "hello", "world"))?;
+    f.call((r, "welcome", "to the jungle"))?;
     assert_eq!(t.get::<_, String>("hello")?, "world");
+    assert_eq!(t.get::<_, String>("welcome")?, "to the jungle");
 
     // Try to set nil registry key
     let r_nil = lua.create_registry_value(Value::Nil)?;
@@ -398,6 +407,67 @@ fn test_conv_array() -> Result<()> {
 
     let v2 = lua.globals().get::<_, [i32; 4]>("v");
     assert!(matches!(v2, Err(Error::FromLuaConversionError { .. })));
+
+    Ok(())
+}
+
+#[test]
+fn test_bstring_from_lua() -> Result<()> {
+    let lua = Lua::new();
+
+    let s = lua.create_string("hello, world")?;
+    let bstr = lua.unpack::<BString>(Value::String(s))?;
+    assert_eq!(bstr, "hello, world");
+
+    let bstr = lua.unpack::<BString>(Value::Integer(123))?;
+    assert_eq!(bstr, "123");
+
+    let bstr = lua.unpack::<BString>(Value::Number(-123.55))?;
+    assert_eq!(bstr, "-123.55");
+
+    // Test from stack
+    let f = lua.create_function(|_, bstr: BString| Ok(bstr))?;
+    let bstr = f.call::<_, BString>("hello, world")?;
+    assert_eq!(bstr, "hello, world");
+
+    let bstr = f.call::<_, BString>(-43.22)?;
+    assert_eq!(bstr, "-43.22");
+
+    Ok(())
+}
+
+#[cfg(feature = "luau")]
+#[test]
+fn test_bstring_from_lua_buffer() -> Result<()> {
+    let lua = Lua::new();
+
+    let b = lua.create_buffer("hello, world")?;
+    let bstr = lua.unpack::<BString>(Value::UserData(b))?;
+    assert_eq!(bstr, "hello, world");
+
+    // Test from stack
+    let f = lua.create_function(|_, bstr: BString| Ok(bstr))?;
+    let buf = lua.create_buffer("hello, world")?;
+    let bstr = f.call::<_, BString>(buf)?;
+    assert_eq!(bstr, "hello, world");
+
+    Ok(())
+}
+
+#[test]
+fn test_option_into_from_lua() -> Result<()> {
+    let lua = Lua::new();
+
+    // Direct conversion
+    let v = Some(42);
+    let v2 = v.into_lua(&lua)?;
+    assert_eq!(v, v2.as_i32());
+
+    // Push into stack / get from stack
+    let f = lua.create_function(|_, v: Option<i32>| Ok(v))?;
+    assert_eq!(f.call::<_, Option<i32>>(Some(42))?, Some(42));
+    assert_eq!(f.call::<_, Option<i32>>(Option::<i32>::None)?, None);
+    assert_eq!(f.call::<_, Option<i32>>(())?, None);
 
     Ok(())
 }

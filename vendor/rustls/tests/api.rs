@@ -3438,6 +3438,7 @@ impl rustls::server::StoresServerSessions for ServerStorage {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)] // complete mock, but not 100% used in tests
 enum ClientStorageOp {
     SetKxHint(ServerName<'static>, rustls::NamedGroup),
     GetKxHint(ServerName<'static>, Option<rustls::NamedGroup>),
@@ -5119,6 +5120,56 @@ fn test_client_tls12_no_resume_after_server_downgrade() {
     );
 }
 
+#[cfg(feature = "tls12")]
+#[test]
+fn test_client_with_custom_verifier_can_accept_ecdsa_sha1_signatures() {
+    fn alter_server_signature_to_ecdsa_sha1(msg: &mut Message) -> Altered {
+        if let MessagePayload::Handshake {
+            parsed,
+            ref mut encoded,
+        } = &mut msg.payload
+        {
+            if let HandshakePayload::ServerKeyExchange(_) = &mut parsed.payload {
+                // nb. we don't care that this corrupts the signature, key exchange, etc.
+                let original = &encoded.0;
+                let offset = 40; // of signature scheme
+                assert_eq!(
+                    &original[offset..offset + 2],
+                    &SignatureScheme::ECDSA_NISTP256_SHA256
+                        .get_u16()
+                        .to_be_bytes(),
+                    "expected ecdsa-sha256"
+                );
+                let mut altered = original.to_vec();
+                altered[offset..offset + 2].copy_from_slice(
+                    &SignatureScheme::ECDSA_SHA1_Legacy
+                        .get_u16()
+                        .to_be_bytes(),
+                );
+
+                *encoded = Payload::new(altered);
+            }
+        }
+        Altered::InPlace
+    }
+
+    let client_config = client_config_builder_with_versions(&[&rustls::version::TLS12])
+        .dangerous()
+        .with_custom_certificate_verifier(Arc::new(MockServerVerifier::accepts_anything()))
+        .with_no_client_auth();
+    let server_config = make_server_config(KeyType::EcdsaP256);
+    let (mut client, mut server) = make_pair_for_configs(client_config, server_config);
+    transfer(&mut client, &mut server);
+    server.process_new_packets().unwrap();
+    let (mut client, mut server) = (client.into(), server.into());
+    transfer_altered(
+        &mut server,
+        alter_server_signature_to_ecdsa_sha1,
+        &mut client,
+    );
+    client.process_new_packets().unwrap();
+}
+
 #[test]
 fn test_acceptor() {
     use rustls::server::Acceptor;
@@ -5365,6 +5416,75 @@ fn test_secret_extraction_enabled() {
         assert_secrets_equal(client_secrets.tx, server_secrets.rx);
         assert_secrets_equal(client_secrets.rx, server_secrets.tx);
     }
+}
+
+#[test]
+fn test_secret_extract_produces_correct_variant() {
+    fn check(suite: SupportedCipherSuite, f: impl Fn(ConnectionTrafficSecrets) -> bool) {
+        let kt = KeyType::Rsa;
+
+        let provider: Arc<CryptoProvider> = CryptoProvider {
+            cipher_suites: vec![suite],
+            ..provider::default_provider()
+        }
+        .into();
+
+        let mut server_config = finish_server_config(
+            kt,
+            ServerConfig::builder_with_provider(provider.clone())
+                .with_safe_default_protocol_versions()
+                .unwrap(),
+        );
+
+        server_config.enable_secret_extraction = true;
+        let server_config = Arc::new(server_config);
+
+        let mut client_config = finish_client_config(
+            kt,
+            ClientConfig::builder_with_provider(provider)
+                .with_safe_default_protocol_versions()
+                .unwrap(),
+        );
+        client_config.enable_secret_extraction = true;
+
+        let (mut client, mut server) =
+            make_pair_for_arc_configs(&Arc::new(client_config), &server_config);
+
+        do_handshake(&mut client, &mut server);
+
+        let client_secrets = client
+            .dangerous_extract_secrets()
+            .unwrap();
+        let server_secrets = server
+            .dangerous_extract_secrets()
+            .unwrap();
+
+        assert!(f(client_secrets.tx.1));
+        assert!(f(client_secrets.rx.1));
+        assert!(f(server_secrets.tx.1));
+        assert!(f(server_secrets.rx.1));
+    }
+
+    check(cipher_suite::TLS13_AES_128_GCM_SHA256, |sec| {
+        matches!(sec, ConnectionTrafficSecrets::Aes128Gcm { .. })
+    });
+    check(cipher_suite::TLS13_AES_256_GCM_SHA384, |sec| {
+        matches!(sec, ConnectionTrafficSecrets::Aes256Gcm { .. })
+    });
+    check(cipher_suite::TLS13_CHACHA20_POLY1305_SHA256, |sec| {
+        matches!(sec, ConnectionTrafficSecrets::Chacha20Poly1305 { .. })
+    });
+
+    check(cipher_suite::TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, |sec| {
+        matches!(sec, ConnectionTrafficSecrets::Aes128Gcm { .. })
+    });
+    check(cipher_suite::TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, |sec| {
+        matches!(sec, ConnectionTrafficSecrets::Aes256Gcm { .. })
+    });
+    check(
+        cipher_suite::TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256,
+        |sec| matches!(sec, ConnectionTrafficSecrets::Chacha20Poly1305 { .. }),
+    );
 }
 
 /// Test that secrets cannot be extracted unless explicitly enabled, and until
@@ -5704,4 +5824,93 @@ fn test_client_removes_tls12_session_if_server_sends_undecryptable_first_message
         storage.ops()[0],
         ClientStorageOp::RemoveTls12Session(_)
     ));
+}
+
+#[test]
+fn test_complete_io_errors_if_close_notify_received_too_early() {
+    let mut server = ServerConnection::new(Arc::new(make_server_config(KeyType::Rsa))).unwrap();
+    let client_hello_followed_by_close_notify_alert = b"\
+        \x16\x03\x01\x00\xc8\x01\x00\x00\xc4\x03\x03\xec\x12\xdd\x17\x64\
+        \xa4\x39\xfd\x7e\x8c\x85\x46\xb8\x4d\x1e\xa0\x6e\xb3\xd7\xa0\x51\
+        \xf0\x3c\xb8\x17\x47\x0d\x4c\x54\xc5\xdf\x72\x00\x00\x1c\xea\xea\
+        \xc0\x2b\xc0\x2f\xc0\x2c\xc0\x30\xcc\xa9\xcc\xa8\xc0\x13\xc0\x14\
+        \x00\x9c\x00\x9d\x00\x2f\x00\x35\x00\x0a\x01\x00\x00\x7f\xda\xda\
+        \x00\x00\xff\x01\x00\x01\x00\x00\x00\x00\x16\x00\x14\x00\x00\x11\
+        \x77\x77\x77\x2e\x77\x69\x6b\x69\x70\x65\x64\x69\x61\x2e\x6f\x72\
+        \x67\x00\x17\x00\x00\x00\x23\x00\x00\x00\x0d\x00\x14\x00\x12\x04\
+        \x03\x08\x04\x04\x01\x05\x03\x08\x05\x05\x01\x08\x06\x06\x01\x02\
+        \x01\x00\x05\x00\x05\x01\x00\x00\x00\x00\x00\x12\x00\x00\x00\x10\
+        \x00\x0e\x00\x0c\x02\x68\x32\x08\x68\x74\x74\x70\x2f\x31\x2e\x31\
+        \x75\x50\x00\x00\x00\x0b\x00\x02\x01\x00\x00\x0a\x00\x0a\x00\x08\
+        \x1a\x1a\x00\x1d\x00\x17\x00\x18\x1a\x1a\x00\x01\x00\
+        \x15\x03\x03\x00\x02\x01\x00";
+
+    let mut stream = FakeStream(client_hello_followed_by_close_notify_alert);
+    assert_eq!(
+        server
+            .complete_io(&mut stream)
+            .unwrap_err()
+            .kind(),
+        io::ErrorKind::UnexpectedEof
+    );
+}
+
+#[test]
+fn test_complete_io_with_no_io_needed() {
+    let (mut client, mut server) = make_pair(KeyType::Rsa);
+    do_handshake(&mut client, &mut server);
+    client
+        .writer()
+        .write_all(b"hello")
+        .unwrap();
+    client.send_close_notify();
+    transfer(&mut client, &mut server);
+    server.process_new_packets().unwrap();
+    server
+        .writer()
+        .write_all(b"hello")
+        .unwrap();
+    server.send_close_notify();
+    transfer(&mut server, &mut client);
+    client.process_new_packets().unwrap();
+
+    // neither want any IO: both directions are closed.
+    assert!(!client.wants_write());
+    assert!(!client.wants_read());
+    assert!(!server.wants_write());
+    assert!(!server.wants_read());
+    assert_eq!(
+        client
+            .complete_io(&mut FakeStream(&[]))
+            .unwrap(),
+        (0, 0)
+    );
+    assert_eq!(
+        server
+            .complete_io(&mut FakeStream(&[]))
+            .unwrap(),
+        (0, 0)
+    );
+}
+
+struct FakeStream<'a>(&'a [u8]);
+
+impl<'a> io::Read for FakeStream<'a> {
+    fn read(&mut self, b: &mut [u8]) -> io::Result<usize> {
+        let take = core::cmp::min(b.len(), self.0.len());
+        let (taken, remain) = self.0.split_at(take);
+        b[..take].copy_from_slice(taken);
+        self.0 = remain;
+        Ok(take)
+    }
+}
+
+impl<'a> io::Write for FakeStream<'a> {
+    fn write(&mut self, b: &[u8]) -> io::Result<usize> {
+        Ok(b.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
 }

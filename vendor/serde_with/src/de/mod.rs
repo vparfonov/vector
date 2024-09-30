@@ -10,6 +10,8 @@
 #[cfg(feature = "alloc")]
 mod duplicates;
 mod impls;
+#[cfg(feature = "alloc")]
+mod skip_error;
 
 use crate::prelude::*;
 
@@ -72,7 +74,7 @@ use crate::prelude::*;
 /// This shows a simplified implementation for [`DisplayFromStr`].
 ///
 /// ```rust
-/// # #[cfg(all(feature = "macros"))] {
+/// # #[cfg(feature = "macros")] {
 /// # use serde::Deserialize;
 /// # use serde::de::Error;
 /// # use serde_with::{serde_as, DeserializeAs};
@@ -98,7 +100,7 @@ use crate::prelude::*;
 /// # #[derive(serde::Deserialize)]
 /// # struct S (#[serde_as(as = "DisplayFromStr")] bool);
 /// #
-/// # assert_eq!(false, serde_json::from_str::<S>(r#""false""#).unwrap().0);
+/// # assert!(!serde_json::from_str::<S>(r#""false""#).unwrap().0);
 /// # }
 /// ```
 /// [`Box`]: std::boxed::Box

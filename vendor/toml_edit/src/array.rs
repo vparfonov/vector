@@ -87,8 +87,10 @@ impl Array {
         &self.decor
     }
 
-    /// Returns the location within the original document
-    pub(crate) fn span(&self) -> Option<std::ops::Range<usize>> {
+    /// The location within the original document
+    ///
+    /// This generally requires an [`ImDocument`][crate::ImDocument].
+    pub fn span(&self) -> Option<std::ops::Range<usize>> {
         self.span.clone()
     }
 
@@ -130,7 +132,7 @@ impl Array {
         self.values.len()
     }
 
-    /// Return true iff `self.len() == 0`.
+    /// Return true if `self.len() == 0`.
     ///
     /// # Examples
     ///
@@ -148,7 +150,7 @@ impl Array {
 
     /// Clears the array, removing all values. Keeps the allocated memory for reuse.
     pub fn clear(&mut self) {
-        self.values.clear()
+        self.values.clear();
     }
 
     /// Returns a reference to the value at the given index, or `None` if the index is out of
@@ -174,8 +176,8 @@ impl Array {
     /// ```
     pub fn push<V: Into<Value>>(&mut self, v: V) {
         self.value_op(v.into(), true, |items, value| {
-            items.push(Item::Value(value))
-        })
+            items.push(Item::Value(value));
+        });
     }
 
     /// Appends a new, already formatted value to the end of the array.
@@ -211,8 +213,8 @@ impl Array {
     /// ```
     pub fn insert<V: Into<Value>>(&mut self, index: usize, v: V) {
         self.value_op(v.into(), true, |items, value| {
-            items.insert(index, Item::Value(value))
-        })
+            items.insert(index, Item::Value(value));
+        });
     }
 
     /// Inserts an already formatted value at the given position within the array, shifting all
@@ -235,7 +237,7 @@ impl Array {
     /// # }
     /// ```
     pub fn insert_formatted(&mut self, index: usize, v: Value) {
-        self.values.insert(index, Item::Value(v))
+        self.values.insert(index, Item::Value(v));
     }
 
     /// Replaces the element at the given position within the array, preserving existing formatting.
@@ -350,7 +352,7 @@ impl Array {
                 (None, Some(_)) => std::cmp::Ordering::Less,
                 (Some(lhs), Some(rhs)) => compare(lhs, rhs),
             }
-        })
+        });
     }
 
     /// Sorts the array with a key extraction function.

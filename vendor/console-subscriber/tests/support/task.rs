@@ -1,5 +1,7 @@
 use std::{error, fmt};
 
+use console_api::tasks;
+
 use super::MAIN_TASK_NAME;
 
 /// An actual task
@@ -13,6 +15,7 @@ pub(super) struct ActualTask {
     pub(super) name: Option<String>,
     pub(super) wakes: u64,
     pub(super) self_wakes: u64,
+    pub(super) polls: u64,
 }
 
 impl ActualTask {
@@ -22,6 +25,15 @@ impl ActualTask {
             name: None,
             wakes: 0,
             self_wakes: 0,
+            polls: 0,
+        }
+    }
+
+    pub(super) fn update_from_stats(&mut self, stats: &tasks::Stats) {
+        self.wakes = stats.wakes;
+        self.self_wakes = stats.self_wakes;
+        if let Some(poll_stats) = &stats.poll_stats {
+            self.polls = poll_stats.polls;
         }
     }
 }
@@ -72,25 +84,16 @@ impl fmt::Debug for TaskValidationFailure {
 /// This struct contains the fields that an expected task will attempt to match
 /// actual tasks on, as well as the expectations that will be used to validate
 /// which the actual task is as expected.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ExpectedTask {
     match_name: Option<String>,
     expect_present: Option<bool>,
     expect_wakes: Option<u64>,
     expect_self_wakes: Option<u64>,
+    expect_polls: Option<u64>,
 }
 
-impl Default for ExpectedTask {
-    fn default() -> Self {
-        Self {
-            match_name: None,
-            expect_present: None,
-            expect_wakes: None,
-            expect_self_wakes: None,
-        }
-    }
-}
-
+#[allow(clippy::result_large_err)]
 impl ExpectedTask {
     /// Returns whether or not an actual task matches this expected task.
     ///
@@ -121,7 +124,7 @@ impl ExpectedTask {
     /// No check that the actual task matches is performed. That must have been
     /// done prior.
     ///
-    /// If all expections are met, this method returns `Ok(())`. If any
+    /// If all expectations are met, this method returns `Ok(())`. If any
     /// expectations are not met, then the first incorrect expectation will
     /// be returned as an `Err`.
     pub(super) fn validate_actual_task(
@@ -159,6 +162,21 @@ impl ExpectedTask {
                         {expected_self_wakes}, but actual was \
                         {actual_self_wakes}",
                         actual_self_wakes = actual_task.self_wakes,
+                    ),
+                });
+            }
+        }
+
+        if let Some(expected_polls) = self.expect_polls {
+            no_expectations = false;
+            if expected_polls != actual_task.polls {
+                return Err(TaskValidationFailure {
+                    expected: self.clone(),
+                    actual: Some(actual_task.clone()),
+                    failure: format!(
+                        "{self}: expected `polls` to be {expected_polls}, but \
+                        actual was {actual_polls}",
+                        actual_polls = actual_task.polls,
                     ),
                 });
             }
@@ -227,6 +245,16 @@ impl ExpectedTask {
     #[allow(dead_code)]
     pub(crate) fn expect_self_wakes(mut self, self_wakes: u64) -> Self {
         self.expect_self_wakes = Some(self_wakes);
+        self
+    }
+
+    /// Expects that a task has a specific value for `polls`.
+    ///
+    /// To validate, the actual task must have a count of polls (on
+    /// `PollStats`) equal to `polls`.
+    #[allow(dead_code)]
+    pub(crate) fn expect_polls(mut self, polls: u64) -> Self {
+        self.expect_polls = Some(polls);
         self
     }
 }

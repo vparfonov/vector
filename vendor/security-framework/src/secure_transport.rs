@@ -814,7 +814,7 @@ impl SslContext {
             cvt(SSLSetProtocolVersionEnabled(
                 self.0,
                 protocol.0,
-                enabled as Boolean,
+                Boolean::from(enabled),
             ))
         }
     }
@@ -1500,7 +1500,6 @@ impl ServerBuilder {
 
 #[cfg(test)]
 mod test {
-    use std::io;
     use std::io::prelude::*;
     use std::net::TcpStream;
 
@@ -1686,7 +1685,7 @@ mod test {
     }
 
     #[test]
-    #[cfg_attr(target_os = "ios", ignore)] // FIXME what's going on with ios?
+    #[cfg_attr(any(target_os = "ios", target_os = "tvos", target_os = "watchos"), ignore)] // FIXME what's going on with ios?
     fn cipher_configuration() {
         let mut ctx = p!(SslContext::new(
             SslProtocolSide::SERVER,
@@ -1722,7 +1721,7 @@ mod test {
     }
 
     #[test]
-    #[cfg_attr(target_os = "ios", ignore)] // FIXME same issue as cipher_configuration
+    #[cfg_attr(any(target_os = "ios", target_os = "tvos", target_os = "watchos"), ignore)] // FIXME same issue as cipher_configuration
     fn test_builder_blacklist_ciphers() {
         let stream = p!(TcpStream::connect("google.com:443"));
 

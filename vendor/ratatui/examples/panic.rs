@@ -31,11 +31,16 @@
 
 use std::{error::Error, io};
 
-use crossterm::{
-    event::{self, Event, KeyCode},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    crossterm::{
+        event::{self, Event, KeyCode},
+        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    },
+    terminal::{Frame, Terminal},
+    text::Line,
+    widgets::{Block, Paragraph},
 };
-use ratatui::{prelude::*, widgets::*};
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
 
@@ -139,11 +144,9 @@ fn ui(f: &mut Frame, app: &App) {
         Line::from("try first without the panic handler to see the difference"),
     ];
 
-    let b = Block::default()
-        .title("Panic Handler Demo")
-        .borders(Borders::ALL);
+    let paragraph = Paragraph::new(text)
+        .block(Block::bordered().title("Panic Handler Demo"))
+        .centered();
 
-    let p = Paragraph::new(text).block(b).centered();
-
-    f.render_widget(p, f.size());
+    f.render_widget(paragraph, f.size());
 }

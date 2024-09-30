@@ -27,6 +27,7 @@ criterion_group!(
               decode_percent,
               decode_punycode,
               decrypt,
+              dns_lookup,
               // TODO: Cannot pass a Path to bench_function
               //del,
               downcase,
@@ -156,6 +157,7 @@ criterion_group!(
               unique,
               // TODO: Cannot pass a Path to bench_function
               //unnest
+              uuid_from_friendly_id,
               // TODO: value is dynamic so we cannot assert equality
               //uuidv4,
               upcase,
@@ -2297,6 +2299,15 @@ bench_function! {
 }
 
 bench_function! {
+    dns_lookup => vrl::stdlib::DnsLookup;
+
+    localhost {
+        args: func_args![value: value!("8.8.8.8")],
+        want: Ok(value!("dns.google")),
+    }
+}
+
+bench_function! {
     reverse_dns => vrl::stdlib::ReverseDns;
 
     google {
@@ -2726,6 +2737,15 @@ bench_function! {
     literal {
         args: func_args![value: "foo"],
         want: Ok("FOO")
+    }
+}
+
+bench_function! {
+    uuid_from_friendly_id => vrl::stdlib::UuidFromFriendlyId;
+
+    literal {
+        args: func_args![value: "1s87yavXmkiPBMHsj8baw5"],
+        want: Ok("3d8b2932-6ac0-b083-4bdb-910cbc8db059"),
     }
 }
 

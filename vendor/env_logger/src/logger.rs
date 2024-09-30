@@ -2,8 +2,6 @@ use std::{borrow::Cow, cell::RefCell, env, io};
 
 use log::{LevelFilter, Log, Metadata, Record, SetLoggerError};
 
-use crate::filter;
-use crate::filter::Filter;
 use crate::fmt;
 use crate::fmt::writer::{self, Writer};
 use crate::fmt::{FormatFn, Formatter};
@@ -38,7 +36,7 @@ pub const DEFAULT_WRITE_STYLE_ENV: &str = "RUST_LOG_STYLE";
 /// ```
 #[derive(Default)]
 pub struct Builder {
-    filter: filter::Builder,
+    filter: env_filter::Builder,
     writer: writer::Builder,
     format: fmt::Builder,
     built: bool,
@@ -223,6 +221,9 @@ impl Builder {
     /// to format and output without intermediate heap allocations. The default
     /// `env_logger` formatter takes advantage of this.
     ///
+    /// When the `color` feature is enabled, styling via ANSI escape codes is supported and the
+    /// output will automatically respect [`Builder::write_style`].
+    ///
     /// # Examples
     ///
     /// Use a custom format to write only the log message:
@@ -239,9 +240,9 @@ impl Builder {
     /// [`Formatter`]: fmt/struct.Formatter.html
     /// [`String`]: https://doc.rust-lang.org/stable/std/string/struct.String.html
     /// [`std::fmt`]: https://doc.rust-lang.org/std/fmt/index.html
-    pub fn format<F: 'static>(&mut self, format: F) -> &mut Self
+    pub fn format<F>(&mut self, format: F) -> &mut Self
     where
-        F: Fn(&mut Formatter, &Record) -> io::Result<()> + Sync + Send,
+        F: Fn(&mut Formatter, &Record<'_>) -> io::Result<()> + Sync + Send + 'static,
     {
         self.format.custom_format = Some(Box::new(format));
         self
@@ -309,6 +310,25 @@ impl Builder {
     /// Configures the end of line suffix.
     pub fn format_suffix(&mut self, suffix: &'static str) -> &mut Self {
         self.format.format_suffix = suffix;
+        self
+    }
+
+    /// Set the format for structured key/value pairs in the log record
+    ///
+    /// With the default format, this function is called for each record and should format
+    /// the structured key-value pairs as returned by [`log::Record::key_values`].
+    ///
+    /// The format function is expected to output the string directly to the `Formatter` so that
+    /// implementations can use the [`std::fmt`] macros, similar to the main format function.
+    ///
+    /// The default format uses a space to separate each key-value pair, with an "=" between
+    /// the key and value.
+    #[cfg(feature = "unstable-kv")]
+    pub fn format_key_values<F>(&mut self, format: F) -> &mut Self
+    where
+        F: Fn(&mut Formatter, &dyn log::kv::Source) -> io::Result<()> + Sync + Send + 'static,
+    {
+        self.format.kv_format = Some(Box::new(format));
         self
     }
 
@@ -496,7 +516,7 @@ impl Builder {
 }
 
 impl std::fmt::Debug for Builder {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         if self.built {
             f.debug_struct("Logger").field("built", &true).finish()
         } else {
@@ -529,7 +549,7 @@ impl std::fmt::Debug for Builder {
 /// [`Builder`]: struct.Builder.html
 pub struct Logger {
     writer: Writer,
-    filter: Filter,
+    filter: env_filter::Filter,
     format: FormatFn,
 }
 
@@ -595,17 +615,17 @@ impl Logger {
     }
 
     /// Checks if this record matches the configured filter.
-    pub fn matches(&self, record: &Record) -> bool {
+    pub fn matches(&self, record: &Record<'_>) -> bool {
         self.filter.matches(record)
     }
 }
 
 impl Log for Logger {
-    fn enabled(&self, metadata: &Metadata) -> bool {
+    fn enabled(&self, metadata: &Metadata<'_>) -> bool {
         self.filter.enabled(metadata)
     }
 
-    fn log(&self, record: &Record) {
+    fn log(&self, record: &Record<'_>) {
         if self.matches(record) {
             // Log records are written to a thread-local buffer before being printed
             // to the terminal. We clear these buffers afterwards, but they aren't shrunk
@@ -617,10 +637,10 @@ impl Log for Logger {
             // formatter and its buffer are discarded and recreated.
 
             thread_local! {
-                static FORMATTER: RefCell<Option<Formatter>> = RefCell::new(None);
+                static FORMATTER: RefCell<Option<Formatter>> = const { RefCell::new(None) };
             }
 
-            let print = |formatter: &mut Formatter, record: &Record| {
+            let print = |formatter: &mut Formatter, record: &Record<'_>| {
                 let _ =
                     (self.format)(formatter, record).and_then(|_| formatter.print(&self.writer));
 
@@ -630,31 +650,28 @@ impl Log for Logger {
 
             let printed = FORMATTER
                 .try_with(|tl_buf| {
-                    match tl_buf.try_borrow_mut() {
+                    if let Ok(mut tl_buf) = tl_buf.try_borrow_mut() {
                         // There are no active borrows of the buffer
-                        Ok(mut tl_buf) => match *tl_buf {
+                        if let Some(ref mut formatter) = *tl_buf {
                             // We have a previously set formatter
-                            Some(ref mut formatter) => {
-                                // Check the buffer style. If it's different from the logger's
-                                // style then drop the buffer and recreate it.
-                                if formatter.write_style() != self.writer.write_style() {
-                                    *formatter = Formatter::new(&self.writer);
-                                }
 
-                                print(formatter, record);
+                            // Check the buffer style. If it's different from the logger's
+                            // style then drop the buffer and recreate it.
+                            if formatter.write_style() != self.writer.write_style() {
+                                *formatter = Formatter::new(&self.writer);
                             }
+
+                            print(formatter, record);
+                        } else {
                             // We don't have a previously set formatter
-                            None => {
-                                let mut formatter = Formatter::new(&self.writer);
-                                print(&mut formatter, record);
+                            let mut formatter = Formatter::new(&self.writer);
+                            print(&mut formatter, record);
 
-                                *tl_buf = Some(formatter);
-                            }
-                        },
-                        // There's already an active borrow of the buffer (due to re-entrancy)
-                        Err(_) => {
-                            print(&mut Formatter::new(&self.writer), record);
+                            *tl_buf = Some(formatter);
                         }
+                    } else {
+                        // There's already an active borrow of the buffer (due to re-entrancy)
+                        print(&mut Formatter::new(&self.writer), record);
                     }
                 })
                 .is_ok();
@@ -672,7 +689,7 @@ impl Log for Logger {
 }
 
 impl std::fmt::Debug for Logger {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Logger")
             .field("filter", &self.filter)
             .finish()
@@ -829,7 +846,7 @@ impl<'a> Var<'a> {
     fn get(&self) -> Option<String> {
         env::var(&*self.name)
             .ok()
-            .or_else(|| self.default.to_owned().map(|v| v.into_owned()))
+            .or_else(|| self.default.clone().map(|v| v.into_owned()))
     }
 }
 

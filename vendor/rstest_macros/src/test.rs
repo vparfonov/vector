@@ -4,13 +4,12 @@
 /// testing bolilerplate.
 ///
 use std::borrow::Cow;
-use std::iter::FromIterator;
 
 pub(crate) use pretty_assertions::assert_eq;
 use proc_macro2::TokenTree;
 use quote::quote;
 pub(crate) use rstest::{fixture, rstest};
-use syn::{parse::Parse, parse2, parse_quote, parse_str, Error, Expr, Ident, ItemFn, Stmt};
+use syn::{parse::Parse, parse2, parse_quote, parse_str, Error, Expr, Ident, Stmt};
 
 use super::*;
 use crate::parse::{
@@ -116,8 +115,18 @@ pub(crate) fn ident(s: impl AsRef<str>) -> Ident {
     s.as_ref().ast()
 }
 
+pub(crate) fn path(s: impl AsRef<str>) -> syn::Path {
+    s.as_ref().ast()
+}
+
 pub(crate) fn expr(s: impl AsRef<str>) -> syn::Expr {
     s.as_ref().ast()
+}
+
+pub(crate) fn attr(s: impl AsRef<str>) -> syn::Attribute {
+    let a = attrs(s);
+    assert_eq!(1, a.len());
+    a.into_iter().next().unwrap()
 }
 
 pub(crate) fn attrs(s: impl AsRef<str>) -> Vec<syn::Attribute> {
@@ -213,8 +222,8 @@ impl RsTestInfo {
 }
 
 impl Fixture {
-    pub fn with_resolve(mut self, resolve_ident: &str) -> Self {
-        self.resolve = Some(ident(resolve_ident));
+    pub fn with_resolve(mut self, resolve_path: &str) -> Self {
+        self.resolve = Some(path(resolve_path));
         self
     }
 }
@@ -307,7 +316,7 @@ impl<T: ToTokens> DisplayCode for T {
 
 impl crate::parse::fixture::FixtureInfo {
     pub(crate) fn with_once(mut self) -> Self {
-        self.arguments.set_once(Some(ident("once")));
+        self.arguments.set_once(Some(attr("#[once]")));
         self
     }
 }
@@ -318,4 +327,20 @@ pub(crate) fn await_argument_code_string(arg_name: &str) -> String {
         let #arg_name = #arg_name.await;
     };
     statment.display_code()
+}
+
+pub(crate) fn ref_argument_code_string(arg_name: &str) -> String {
+    let arg_name = ident(arg_name);
+    let statment: Expr = parse_quote! {
+        &#arg_name
+    };
+    statment.display_code()
+}
+
+pub(crate) fn mut_await_argument_code_string(arg_name: &str) -> String {
+    let arg_name = ident(arg_name);
+    let statement: Stmt = parse_quote! {
+        let mut #arg_name = #arg_name.await;
+    };
+    statement.display_code()
 }

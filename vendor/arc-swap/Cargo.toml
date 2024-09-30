@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "arc-swap"
-version = "1.7.0"
+version = "1.7.1"
 authors = ["Michal 'vorner' Vaner <vorner@vorner.cz>"]
 description = "Atomically swappable Arc"
 documentation = "https://docs.rs/arc-swap"
@@ -29,7 +29,10 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/vorner/arc-swap"
 
 [package.metadata.docs.rs]
-all-features = true
+features = [
+    "serde",
+    "weak",
+]
 
 [profile.bench]
 debug = 2

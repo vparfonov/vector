@@ -23,9 +23,9 @@ struct TestFailure {
 
 impl fmt::Display for TestFailure {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Task validation failed:\n")?;
+        writeln!(f, "Task validation failed:")?;
         for failure in &self.failures {
-            write!(f, " - {failure}\n")?;
+            writeln!(f, " - {failure}")?;
         }
         Ok(())
     }
@@ -283,8 +283,7 @@ async fn record_actual_tasks(
 
             for (id, stats) in &task_update.stats_update {
                 if let Some(task) = tasks.get_mut(id) {
-                    task.wakes = stats.wakes;
-                    task.self_wakes = stats.self_wakes;
+                    task.update_from_stats(stats);
                 }
             }
         }
@@ -319,10 +318,11 @@ fn validate_expected_tasks(
     if failures.is_empty() {
         Ok(())
     } else {
-        Err(TestFailure { failures: failures })
+        Err(TestFailure { failures })
     }
 }
 
+#[allow(clippy::result_large_err)]
 fn validate_expected_task(
     expected: &ExpectedTask,
     actual_tasks: &Vec<ActualTask>,

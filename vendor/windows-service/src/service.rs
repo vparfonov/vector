@@ -1,5 +1,4 @@
 use std::borrow::Cow;
-use std::convert::TryFrom;
 use std::ffi::{OsStr, OsString};
 use std::os::raw::c_void;
 use std::os::windows::ffi::{OsStrExt, OsStringExt};
@@ -13,8 +12,9 @@ use windows_sys::{
     core::GUID,
     Win32::{
         Foundation::{ERROR_SERVICE_SPECIFIC_ERROR, NO_ERROR},
+        Security,
         Storage::FileSystem,
-        System::{Power, RemoteDesktop, Services, SystemServices, WindowsProgramming::INFINITE},
+        System::{Power, RemoteDesktop, Services, SystemServices, Threading::INFINITE},
         UI::WindowsAndMessaging,
     },
 };
@@ -25,6 +25,7 @@ use crate::{double_nul_terminated, Error};
 
 bitflags::bitflags! {
     /// Enum describing the types of Windows services.
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct ServiceType: u32 {
         /// File system driver service.
         const FILE_SYSTEM_DRIVER = Services::SERVICE_FILE_SYSTEM_DRIVER;
@@ -51,6 +52,7 @@ bitflags::bitflags! {
 
 bitflags::bitflags! {
     /// Flags describing the access permissions when working with services
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct ServiceAccess: u32 {
         /// Can query the service status
         const QUERY_STATUS = Services::SERVICE_QUERY_STATUS;
@@ -75,6 +77,12 @@ bitflags::bitflags! {
 
         /// Can change the services configuration
         const CHANGE_CONFIG = Services::SERVICE_CHANGE_CONFIG;
+
+        /// Can use user-defined control codes
+        const USER_DEFINED_CONTROL = Services::SERVICE_USER_DEFINED_CONTROL;
+
+        /// Full access to the service object
+        const ALL_ACCESS = Services::SERVICE_ALL_ACCESS;
     }
 }
 
@@ -88,6 +96,12 @@ pub enum ServiceStartType {
     OnDemand = Services::SERVICE_DEMAND_START,
     /// Disabled service
     Disabled = Services::SERVICE_DISABLED,
+    /// Driver start on system startup.
+    /// This start type is only applicable to driver services.
+    SystemStart = Services::SERVICE_SYSTEM_START,
+    /// Driver start on OS boot.
+    /// This start type is only applicable to driver services.
+    BootStart = Services::SERVICE_BOOT_START,
 }
 
 impl ServiceStartType {
@@ -100,6 +114,8 @@ impl ServiceStartType {
             x if x == ServiceStartType::AutoStart.to_raw() => Ok(ServiceStartType::AutoStart),
             x if x == ServiceStartType::OnDemand.to_raw() => Ok(ServiceStartType::OnDemand),
             x if x == ServiceStartType::Disabled.to_raw() => Ok(ServiceStartType::Disabled),
+            x if x == ServiceStartType::SystemStart.to_raw() => Ok(ServiceStartType::SystemStart),
+            x if x == ServiceStartType::BootStart.to_raw() => Ok(ServiceStartType::BootStart),
             _ => Err(ParseRawError::InvalidInteger(raw)),
         }
     }
@@ -565,9 +581,9 @@ impl ServiceConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(u32)]
 pub enum HardwareProfileChangeParam {
-    ConfigChanged = SystemServices::DBT_CONFIGCHANGED,
-    QueryChangeConfig = SystemServices::DBT_QUERYCHANGECONFIG,
-    ConfigChangeCanceled = SystemServices::DBT_CONFIGCHANGECANCELED,
+    ConfigChanged = WindowsAndMessaging::DBT_CONFIGCHANGED,
+    QueryChangeConfig = WindowsAndMessaging::DBT_QUERYCHANGECONFIG,
+    ConfigChangeCanceled = WindowsAndMessaging::DBT_CONFIGCHANGECANCELED,
 }
 
 impl HardwareProfileChangeParam {
@@ -647,8 +663,8 @@ impl DisplayState {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[repr(i32)]
 pub enum UserStatus {
-    Present = SystemServices::PowerUserPresent,
-    Inactive = SystemServices::PowerUserInactive,
+    Present = Power::PowerUserPresent,
+    Inactive = Power::PowerUserInactive,
 }
 
 impl UserStatus {
@@ -765,11 +781,35 @@ impl AwayModeState {
     }
 }
 
+/// Enum indicates the current lid switch state as
+/// the Data member of GUID_LIDSWITCH_STATE_CHANGE notification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u32)]
+pub enum LidSwitchStateChange {
+    Closed = 0,
+    Open = 1,
+}
+
+impl LidSwitchStateChange {
+    pub fn to_raw(&self) -> u32 {
+        *self as u32
+    }
+
+    pub fn from_raw(raw: u32) -> Result<LidSwitchStateChange, ParseRawError> {
+        match raw {
+            x if x == LidSwitchStateChange::Closed.to_raw() => Ok(LidSwitchStateChange::Closed),
+            x if x == LidSwitchStateChange::Open.to_raw() => Ok(LidSwitchStateChange::Open),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
+        }
+    }
+}
+
 /// Struct converted from Power::POWERBROADCAST_SETTING
 ///
 /// Please refer to MSDN for more info about the data members:
 /// <https://docs.microsoft.com/en-us/windows/win32/power/power-setting-guid>
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum PowerBroadcastSetting {
     AcdcPowerSource(PowerSource),
     BatteryPercentageRemaining(u32),
@@ -780,6 +820,7 @@ pub enum PowerBroadcastSetting {
     PowerSavingStatus(BatterySaverState),
     PowerSchemePersonality(PowerSchemePersonality),
     SystemAwayMode(AwayModeState),
+    LidSwitchStateChange(LidSwitchStateChange),
 }
 
 impl PowerBroadcastSetting {
@@ -845,6 +886,12 @@ impl PowerBroadcastSetting {
                     AwayModeState::from_raw(away_mode_state)?,
                 ))
             }
+            x if is_equal_guid(x, &SystemServices::GUID_LIDSWITCH_STATE_CHANGE) => {
+                let lid_switch_state = *(data as *const u32);
+                Ok(PowerBroadcastSetting::LidSwitchStateChange(
+                    LidSwitchStateChange::from_raw(lid_switch_state)?,
+                ))
+            }
             x => Err(ParseRawError::InvalidGuid(string_from_guid(x))),
         }
     }
@@ -852,6 +899,7 @@ impl PowerBroadcastSetting {
 
 /// Enum describing the PowerEvent event
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum PowerEventParam {
     PowerStatusChange,
     ResumeAutomatic,
@@ -1002,8 +1050,40 @@ impl SessionChangeParam {
     }
 }
 
+/// Struct describing a user-defined control code (**128** to **255**)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(transparent)]
+pub struct UserEventCode(u32); // invariant: always in 128..=255
+
+impl UserEventCode {
+    /// Mainly for declaring user events as constants:
+    ///
+    /// ```
+    /// # use windows_service::service::UserEventCode;
+    /// const MY_EVENT: UserEventCode = unsafe { UserEventCode::from_unchecked(130) };
+    /// ```
+    ///
+    /// # Safety
+    /// `raw` should be a valid user control code in the range of **128** to **255**.
+    pub const unsafe fn from_unchecked(raw: u32) -> Self {
+        Self(raw)
+    }
+
+    pub fn from_raw(raw: u32) -> Result<UserEventCode, ParseRawError> {
+        match raw {
+            128..=255 => Ok(Self(raw)),
+            _ => Err(ParseRawError::InvalidInteger(raw)),
+        }
+    }
+
+    pub fn to_raw(&self) -> u32 {
+        self.0
+    }
+}
+
 /// Enum describing the service control operations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum ServiceControl {
     Continue,
     Interrogate,
@@ -1021,6 +1101,7 @@ pub enum ServiceControl {
     SessionChange(SessionChangeParam),
     TimeChange,
     TriggerEvent,
+    UserEvent(UserEventCode),
 }
 
 impl ServiceControl {
@@ -1061,7 +1142,7 @@ impl ServiceControl {
             }
             Services::SERVICE_CONTROL_TIMECHANGE => Ok(ServiceControl::TimeChange),
             Services::SERVICE_CONTROL_TRIGGEREVENT => Ok(ServiceControl::TriggerEvent),
-            _ => Err(ParseRawError::InvalidInteger(raw)),
+            _ => UserEventCode::from_raw(raw).map(ServiceControl::UserEvent),
         }
     }
 
@@ -1085,6 +1166,7 @@ impl ServiceControl {
             ServiceControl::SessionChange(_) => Services::SERVICE_CONTROL_SESSIONCHANGE,
             ServiceControl::TimeChange => Services::SERVICE_CONTROL_TIMECHANGE,
             ServiceControl::TriggerEvent => Services::SERVICE_CONTROL_TRIGGEREVENT,
+            ServiceControl::UserEvent(event) => event.to_raw(),
         }
     }
 }
@@ -1187,6 +1269,7 @@ impl<'a> From<&'a Services::SERVICE_STATUS_PROCESS> for ServiceExitCode {
 
 bitflags::bitflags! {
     /// Flags describing accepted types of service control events.
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy)]
     pub struct ServiceControlAccept: u32 {
         /// The service is a network component that can accept changes in its binding without being
         /// stopped and restarted. This allows service to receive `ServiceControl::Netbind*`
@@ -1361,6 +1444,11 @@ impl Service {
         Service { service_handle }
     }
 
+    /// Provides access to the underlying system service handle
+    pub fn raw_handle(&self) -> Security::SC_HANDLE {
+        self.service_handle.raw_handle()
+    }
+
     /// Start the service.
     ///
     /// # Example
@@ -1432,6 +1520,11 @@ impl Service {
     /// Resume the paused service.
     pub fn resume(&self) -> crate::Result<ServiceStatus> {
         self.send_control_command(ServiceControl::Continue)
+    }
+
+    /// Send user-defined control code.
+    pub fn notify(&self, code: UserEventCode) -> crate::Result<ServiceStatus> {
+        self.send_control_command(ServiceControl::UserEvent(code))
     }
 
     /// Get the service status from the system.
@@ -1570,11 +1663,31 @@ impl Service {
         Ok(raw_failure_actions_flag.fFailureActionsOnNonCrashFailures != 0)
     }
 
+    /// Query the system for the service's SID type information.
+    ///
+    /// The service must be open with the [`ServiceAccess::QUERY_CONFIG`]
+    /// access permission prior to calling this method.
+    pub fn get_config_service_sid_info(&self) -> crate::Result<ServiceSidType> {
+        let mut data = vec![0u8; u32::BITS as usize / 8];
+
+        // SAFETY: The structure we get back is `SERVICE_SID_INFO`. It has a
+        // single member that specifies the new SID type as a `u32`, and as
+        // such, we can get away with not explicitly creating a structure and
+        // instead re-using `ServiceSidType` that is `repr(u32)`.
+        unsafe { self.query_config2(Services::SERVICE_CONFIG_SERVICE_SID_INFO, &mut data) }
+            .map_err(Error::Winapi)
+    }
+
+    /// Require the system to set the service's SID type information to the
+    /// provided value.
+    ///
+    /// The service must be open with the [`ServiceAccess::CHANGE_CONFIG`]
+    /// access permission prior to calling this method.
     pub fn set_config_service_sid_info(
         &self,
         mut service_sid_type: ServiceSidType,
     ) -> crate::Result<()> {
-        // The structure we need to pass in is `SERVICE_SID_INFO`.
+        // SAFETY: The structure we need to pass in is `SERVICE_SID_INFO`.
         // It has a single member that specifies the new SID type, and as such,
         // we can get away with not explicitly creating a structure in Rust.
         unsafe {

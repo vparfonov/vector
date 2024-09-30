@@ -1,14 +1,12 @@
-extern crate rmp_serde as rmps;
-
 use std::fmt::{self, Formatter};
 use std::io::Cursor;
 
 use serde::de;
 use serde::Deserialize;
 
-use crate::rmps::decode::{self, Error};
-use crate::rmps::{Deserializer, Raw, RawRef};
 use rmp::Marker;
+use rmp_serde::decode::{self, Error};
+use rmp_serde::{Deserializer, Raw, RawRef};
 
 #[test]
 fn pass_nil() {
@@ -25,7 +23,7 @@ fn fail_nil_from_reserved() {
     let res: Result<(), Error> = Deserialize::deserialize(&mut de);
     match res.err() {
         Some(Error::TypeMismatch(Marker::Reserved)) => (),
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 }
 
@@ -48,7 +46,7 @@ fn fail_bool_from_fixint() {
     let res: Result<bool, Error> = Deserialize::deserialize(&mut deserializer);
     match res.err().unwrap() {
         Error::Syntax(..) => (),
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 }
 
@@ -82,7 +80,7 @@ fn fail_u32_from_u64() {
     let res: Result<u32, Error> = Deserialize::deserialize(&mut de);
     match res.err().unwrap() {
         Error::Syntax(..) => (),
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 }
 
@@ -251,7 +249,7 @@ fn fail_tuple_len_mismatch() {
 
     match actual.err().unwrap() {
         Error::LengthMismatch(1) => (),
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 }
 
@@ -300,7 +298,7 @@ fn fail_option_u8_from_reserved() {
     let actual: Result<Option<u8>, Error> = Deserialize::deserialize(&mut de);
     match actual.err() {
         Some(Error::TypeMismatch(Marker::Reserved)) => (),
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 }
 
@@ -488,7 +486,7 @@ fn pass_from() {
 #[test]
 fn pass_raw_valid_utf8() {
     let buf = vec![0xa3, 0x6b, 0x65, 0x79];
-    let raw: Raw = rmps::from_slice(&buf[..]).unwrap();
+    let raw: Raw = rmp_serde::from_slice(&buf[..]).unwrap();
 
     assert!(raw.is_str());
     assert_eq!("key", raw.as_str().unwrap());
@@ -500,7 +498,7 @@ fn pass_raw_invalid_utf8() {
     // >>> msgpack.dumps(msgpack.dumps([200, []]))
     // '\xa4\x92\xcc\xc8\x90'
     let buf = vec![0xa4, 0x92, 0xcc, 0xc8, 0x90];
-    let raw: Raw = rmps::from_slice(&buf[..]).unwrap();
+    let raw: Raw = rmp_serde::from_slice(&buf[..]).unwrap();
 
     assert!(raw.is_err());
     assert_eq!(0, raw.as_err().unwrap().valid_up_to());
@@ -510,7 +508,7 @@ fn pass_raw_invalid_utf8() {
 #[test]
 fn pass_raw_ref_valid_utf8() {
     let buf = vec![0xa3, 0x6b, 0x65, 0x79];
-    let raw: RawRef<'_> = rmps::from_slice(&buf[..]).unwrap();
+    let raw: RawRef<'_> = rmp_serde::from_slice(&buf[..]).unwrap();
 
     assert!(raw.is_str());
     assert_eq!("key", raw.as_str().unwrap());
@@ -522,7 +520,7 @@ fn pass_raw_ref_invalid_utf8() {
     // >>> msgpack.dumps(msgpack.dumps([200, []]))
     // '\xa4\x92\xcc\xc8\x90'
     let buf = vec![0xa4, 0x92, 0xcc, 0xc8, 0x90];
-    let raw: RawRef<'_> = rmps::from_slice(&buf[..]).unwrap();
+    let raw: RawRef<'_> = rmp_serde::from_slice(&buf[..]).unwrap();
 
     assert!(raw.is_err());
     assert_eq!(0, raw.as_err().unwrap().valid_up_to());
@@ -532,7 +530,7 @@ fn pass_raw_ref_invalid_utf8() {
 #[test]
 fn fail_str_invalid_utf8() {
     let buf = vec![0xa4, 0x92, 0xcc, 0xc8, 0x90];
-    let err: Result<String, decode::Error> = rmps::from_slice(&buf[..]);
+    let err: Result<String, decode::Error> = rmp_serde::from_slice(&buf[..]);
 
     assert!(err.is_err());
     match err.err().unwrap() {
@@ -566,6 +564,6 @@ fn fail_depth_limit() {
     let res = Nested::deserialize(&mut reader);
     match res.err().unwrap() {
         decode::Error::DepthLimitExceeded => (),
-        other => panic!("unexpected result: {:?}", other),
+        other => panic!("unexpected result: {other:?}"),
     }
 }

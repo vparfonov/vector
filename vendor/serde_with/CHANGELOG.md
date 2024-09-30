@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ## [Unreleased]
 
+## [3.9.0] - 2024-07-14
+
+### Added
+
+* Deserialize a map` and skip all elements failing to deserialize by @johnmave126 (#763)
+
+    `MapSkipError` acts like a map (`HashMap`/`BTreeMap`), but keys or values that fail to deserialize, like are ignored.
+
+    For formats with heterogeneously typed maps, we can collect only the elements where both key and value are deserializable.
+    This is also useful in conjunction to `#[serde(flatten)]` to ignore some entries when capturing additional fields.
+
+    ```text
+    // JSON
+    "value": {"0": "v0", "5": "v5", "str": "str", "10": 2},
+
+    // Rust
+    #[serde_as(as = "MapSkipError<DisplayFromStr, _>")]
+    value: BTreeMap<u32, String>,
+
+    // Only deserializes entries with a numerical key and a string value, i.e.,
+    {0 => "v0", 5 => "v5"}
+    ```
+
+## [3.8.3] - 2024-07-03
+
+### Fixed
+
+* Fix compile issues when dependency `schemars_0_8` is used with the `preserve_order` features (#762)
+
+## [3.8.2] - 2024-06-30
+
+### Changed
+
+* Bump MSRV to 1.67, since that is required for the `time` dependency.
+    The `time` version needed to be updated for nightly compatibility.
+
+### Fixed
+
+* Implement `JsonSchemaAs` for `OneOrMany` instead of `JsonSchema` by @swlynch99 (#760)
+
+## [3.8.1] - 2024-04-28
+
+### Fixed
+
+* Do not emit `schemars(deserialize_with = "...")` annotations, as `schemars` does not support them (#735)
+    Thanks to @sivizius for reporting the issue.
+
+## [3.8.0] - 2024-04-24
+
+### Added
+
+* Implement (De)Serialization for Pinned Smart Pointers by @Astralchroma (#733)
+* Implement `JsonSchemaAs` for `PickFirst` by @swlynch99  (#721)
+
+### Changed
+
+* Bump `base64` dependency to v0.22 (#724)
+* Update dev dependencies
+
+### Fixed
+
+* `serde_conv` regressed and triggered `clippy::ptr_arg` and add test to prevent future problems. (#731)
+
 ## [3.7.0] - 2024-03-11
 
 ### Added

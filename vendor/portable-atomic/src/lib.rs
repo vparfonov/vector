@@ -195,14 +195,12 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
         allow(dead_code, unused_variables)
     )
 ))]
+#![cfg_attr(not(portable_atomic_no_unsafe_op_in_unsafe_fn), warn(unsafe_op_in_unsafe_fn))] // unsafe_op_in_unsafe_fn requires Rust 1.52
+#![cfg_attr(portable_atomic_no_unsafe_op_in_unsafe_fn, allow(unused_unsafe))]
 #![warn(
-    rust_2018_idioms,
-    single_use_lifetimes,
-    unreachable_pub,
-    clippy::pedantic,
     // Lints that may help when writing public library.
     missing_debug_implementations,
-    missing_docs,
+    // missing_docs,
     clippy::alloc_instead_of_core,
     clippy::exhaustive_enums,
     clippy::exhaustive_structs,
@@ -210,31 +208,12 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
     clippy::missing_inline_in_public_items,
     clippy::std_instead_of_alloc,
     clippy::std_instead_of_core,
-    // Lints that may help when writing unsafe code.
-    improper_ctypes,
-    // improper_ctypes_definitions, // requires Rust 1.46
-    // unsafe_op_in_unsafe_fn, // set conditionally since it requires Rust 1.52
-    clippy::as_ptr_cast_mut,
-    clippy::default_union_representation,
-    clippy::inline_asm_x86_att_syntax,
-    clippy::trailing_empty_array,
-    clippy::transmute_undefined_repr,
-    clippy::undocumented_unsafe_blocks,
 )]
-#![cfg_attr(not(portable_atomic_no_unsafe_op_in_unsafe_fn), warn(unsafe_op_in_unsafe_fn))] // unsafe_op_in_unsafe_fn requires Rust 1.52
-#![cfg_attr(portable_atomic_no_unsafe_op_in_unsafe_fn, allow(unused_unsafe))]
+#![cfg_attr(not(portable_atomic_no_asm), warn(missing_docs))] // module-level #![allow(missing_docs)] doesn't work for macros on old rustc
 #![allow(
     clippy::cast_lossless,
-    clippy::doc_markdown,
-    clippy::float_cmp,
     clippy::inline_always,
-    clippy::missing_errors_doc,
-    clippy::module_inception,
     clippy::naive_bytecount,
-    clippy::similar_names,
-    clippy::single_match,
-    clippy::too_many_lines,
-    clippy::type_complexity,
     clippy::unreadable_literal
 )]
 // asm_experimental_arch
@@ -320,7 +299,7 @@ RUSTFLAGS="--cfg portable_atomic_no_outline_atomics" cargo ...
     feature(stdsimd)
 )]
 // docs.rs only
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(portable_atomic_doc_cfg, feature(doc_cfg))]
 #![cfg_attr(
     all(
         portable_atomic_no_atomic_load_store,
@@ -460,6 +439,17 @@ compile_error!(
 
 #[cfg(any(test, feature = "std"))]
 extern crate std;
+
+#[macro_use]
+mod cfgs;
+#[cfg(target_pointer_width = "128")]
+pub use {cfg_has_atomic_128 as cfg_has_atomic_ptr, cfg_no_atomic_128 as cfg_no_atomic_ptr};
+#[cfg(target_pointer_width = "16")]
+pub use {cfg_has_atomic_16 as cfg_has_atomic_ptr, cfg_no_atomic_16 as cfg_no_atomic_ptr};
+#[cfg(target_pointer_width = "32")]
+pub use {cfg_has_atomic_32 as cfg_has_atomic_ptr, cfg_no_atomic_32 as cfg_no_atomic_ptr};
+#[cfg(target_pointer_width = "64")]
+pub use {cfg_has_atomic_64 as cfg_has_atomic_ptr, cfg_no_atomic_64 as cfg_no_atomic_ptr};
 
 #[macro_use]
 mod utils;
@@ -843,7 +833,7 @@ impl AtomicBool {
     /// assert_eq!(some_bool.load(Ordering::Relaxed), false);
     /// ```
     #[inline]
-    #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+    #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
     #[cfg_attr(
         any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
         track_caller
@@ -911,7 +901,7 @@ impl AtomicBool {
     /// }
     /// ```
     #[inline]
-    #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+    #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
     #[cfg_attr(
         any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
         track_caller
@@ -1695,7 +1685,7 @@ impl<T> AtomicPtr<T> {
     /// let value = some_ptr.compare_exchange(ptr, other_ptr, Ordering::SeqCst, Ordering::Relaxed);
     /// ```
     #[inline]
-    #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+    #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
     #[cfg_attr(
         any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
         track_caller
@@ -1746,7 +1736,7 @@ impl<T> AtomicPtr<T> {
     /// }
     /// ```
     #[inline]
-    #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+    #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
     #[cfg_attr(
         any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
         track_caller
@@ -2369,6 +2359,7 @@ impl<T> AtomicPtr<T> {
 } // cfg_has_atomic_ptr!
 
 macro_rules! atomic_int {
+    // TODO: support AtomicF{16,128} once https://github.com/rust-lang/rust/issues/116909 stabilized.
     (AtomicU32, $int_type:ident, $align:literal) => {
         atomic_int!(int, AtomicU32, $int_type, $align);
         #[cfg(feature = "float")]
@@ -2699,7 +2690,7 @@ assert_eq!(
 assert_eq!(some_var.load(Ordering::Relaxed), 10);
 ```"),
                 #[inline]
-                #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+                #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
                 #[cfg_attr(
                     any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
                     track_caller
@@ -2753,7 +2744,7 @@ loop {
 }
 ```"),
                 #[inline]
-                #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+                #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
                 #[cfg_attr(
                     any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
                     track_caller
@@ -3509,7 +3500,7 @@ This type has the same in-memory representation as the underlying floating point
 [`", stringify!($float_type), "`].
 "
             ),
-            #[cfg_attr(docsrs, doc(cfg(feature = "float")))]
+            #[cfg_attr(portable_atomic_doc_cfg, doc(cfg(feature = "float")))]
             // We can use #[repr(transparent)] here, but #[repr(C, align(N))]
             // will show clearer docs.
             #[repr(C, align($align))]
@@ -3697,7 +3688,7 @@ This type has the same in-memory representation as the underlying floating point
             ///
             /// Panics if `failure` is [`Release`], [`AcqRel`].
             #[inline]
-            #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+            #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
             #[cfg_attr(
                 any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
                 track_caller
@@ -3732,7 +3723,7 @@ This type has the same in-memory representation as the underlying floating point
             ///
             /// Panics if `failure` is [`Release`], [`AcqRel`].
             #[inline]
-            #[cfg_attr(docsrs, doc(alias = "compare_and_swap"))]
+            #[cfg_attr(portable_atomic_doc_cfg, doc(alias = "compare_and_swap"))]
             #[cfg_attr(
                 any(all(debug_assertions, not(portable_atomic_no_track_caller)), miri),
                 track_caller

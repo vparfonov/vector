@@ -162,7 +162,7 @@ pub struct Time {
     pub minute: u8,
     /// Second: 0 to {58, 59, 60} (based on leap second rules)
     pub second: u8,
-    /// Nanosecond: 0 to 999_999_999
+    /// Nanosecond: 0 to `999_999_999`
     pub nanosecond: u32,
 }
 
@@ -179,7 +179,7 @@ pub enum Offset {
 
     /// Offset between local time and UTC
     Custom {
-        /// Minutes: -1_440..1_440
+        /// Minutes: -`1_440..1_440`
         minutes: i16,
     },
 }
@@ -357,6 +357,7 @@ impl FromStr for Datetime {
 
                 let mut end = whole.len();
                 for (i, byte) in whole.bytes().enumerate() {
+                    #[allow(clippy::single_match_else)]
                     match byte {
                         b'0'..=b'9' => {
                             if i < 9 {

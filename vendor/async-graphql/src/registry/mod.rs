@@ -107,7 +107,7 @@ impl<'a> MetaTypeName<'a> {
 }
 
 /// actual directive invocation on SDL definitions
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct MetaDirectiveInvocation {
     /// name of directive to invoke
     pub name: String,
@@ -155,6 +155,8 @@ pub struct MetaInputValue {
     pub tags: Vec<String>,
     /// Indicate that an input obnject is secret
     pub is_secret: bool,
+    /// Custom directive invocations
+    pub directive_invocations: Vec<MetaDirectiveInvocation>,
 }
 
 type ComputeComplexityFn = fn(
@@ -244,6 +246,7 @@ pub struct MetaEnumValue {
     pub visible: Option<MetaVisibleFn>,
     pub inaccessible: bool,
     pub tags: Vec<String>,
+    pub directive_invocations: Vec<MetaDirectiveInvocation>,
 }
 
 type MetaVisibleFn = fn(&Context<'_>) -> bool;
@@ -298,6 +301,7 @@ impl MetaTypeId {
                 keys: None,
                 visible: None,
                 rust_typename: Some(rust_typename),
+                directive_invocations: vec![],
             },
             MetaTypeId::Union => MetaType::Union {
                 name: "".to_string(),
@@ -316,6 +320,7 @@ impl MetaTypeId {
                 inaccessible: false,
                 tags: vec![],
                 rust_typename: Some(rust_typename),
+                directive_invocations: vec![],
             },
             MetaTypeId::InputObject => MetaType::InputObject {
                 name: "".to_string(),
@@ -326,6 +331,7 @@ impl MetaTypeId {
                 tags: vec![],
                 rust_typename: Some(rust_typename),
                 oneof: false,
+                directive_invocations: vec![],
             },
         }
     }
@@ -484,6 +490,8 @@ pub enum MetaType {
         tags: Vec<String>,
         /// The Rust typename corresponding to the interface
         rust_typename: Option<&'static str>,
+        /// custom directive invocations
+        directive_invocations: Vec<MetaDirectiveInvocation>,
     },
     /// Union
     ///
@@ -536,6 +544,8 @@ pub enum MetaType {
         tags: Vec<String>,
         /// The Rust typename corresponding to the enum
         rust_typename: Option<&'static str>,
+        /// custom directive invocations
+        directive_invocations: Vec<MetaDirectiveInvocation>,
     },
     /// Input object
     ///
@@ -566,6 +576,8 @@ pub enum MetaType {
         ///
         /// Reference: <https://github.com/graphql/graphql-spec/pull/825>
         oneof: bool,
+        /// custom directive invocations
+        directive_invocations: Vec<MetaDirectiveInvocation>,
     },
 }
 
@@ -757,33 +769,6 @@ pub struct Registry {
 impl Registry {
     pub(crate) fn add_system_types(&mut self) {
         self.add_directive(MetaDirective {
-            name: "include".into(),
-            description: Some("Directs the executor to include this field or fragment only when the `if` argument is true.".to_string()),
-            locations: vec![
-                __DirectiveLocation::FIELD,
-                __DirectiveLocation::FRAGMENT_SPREAD,
-                __DirectiveLocation::INLINE_FRAGMENT
-            ],
-            args: {
-                let mut args = IndexMap::new();
-                args.insert("if".to_string(), MetaInputValue {
-                    name: "if".to_string(),
-                    description: Some("Included when true.".to_string()),
-                    ty: "Boolean!".to_string(),
-                    default_value: None,
-                    visible: None,
-                    inaccessible: false,
-                    tags: Default::default(),
-                    is_secret: false,
-                });
-                args
-            },
-            is_repeatable: false,
-            visible: None,
-            composable: None,
-        });
-
-        self.add_directive(MetaDirective {
             name: "skip".into(),
             description: Some("Directs the executor to skip this field or fragment when the `if` argument is true.".to_string()),
             locations: vec![
@@ -802,9 +787,116 @@ impl Registry {
                     inaccessible: false,
                     tags: Default::default(),
                     is_secret: false,
+                    directive_invocations: vec![]
                 });
                 args
             },
+            is_repeatable: false,
+            visible: None,
+            composable: None,
+        });
+
+        self.add_directive(MetaDirective {
+            name: "include".into(),
+            description: Some("Directs the executor to include this field or fragment only when the `if` argument is true.".to_string()),
+            locations: vec![
+                __DirectiveLocation::FIELD,
+                __DirectiveLocation::FRAGMENT_SPREAD,
+                __DirectiveLocation::INLINE_FRAGMENT
+            ],
+            args: {
+                let mut args = IndexMap::new();
+                args.insert("if".to_string(), MetaInputValue {
+                    name: "if".to_string(),
+                    description: Some("Included when true.".to_string()),
+                    ty: "Boolean!".to_string(),
+                    default_value: None,
+                    visible: None,
+                    inaccessible: false,
+                    tags: Default::default(),
+                    is_secret: false,
+                    directive_invocations: vec![]
+                });
+                args
+            },
+            is_repeatable: false,
+            visible: None,
+            composable: None,
+        });
+
+        self.add_directive(MetaDirective {
+            name: "deprecated".into(),
+            description: Some(
+                "Marks an element of a GraphQL schema as no longer supported.".into(),
+            ),
+            locations: vec![
+                __DirectiveLocation::FIELD_DEFINITION,
+                __DirectiveLocation::ARGUMENT_DEFINITION,
+                __DirectiveLocation::INPUT_FIELD_DEFINITION,
+                __DirectiveLocation::ENUM_VALUE,
+            ],
+            args: {
+                let mut args = IndexMap::new();
+                args.insert(
+                    "reason".into(),
+                    MetaInputValue {
+                        name: "reason".into(),
+                        description: Some(
+                            "A reason for why it is deprecated, formatted using Markdown syntax"
+                                .into(),
+                        ),
+                        ty: "String".into(),
+                        default_value: Some(r#""No longer supported""#.into()),
+                        visible: None,
+                        inaccessible: false,
+                        tags: Default::default(),
+                        is_secret: false,
+                        directive_invocations: vec![],
+                    },
+                );
+                args
+            },
+            is_repeatable: false,
+            visible: None,
+            composable: None,
+        });
+
+        self.add_directive(MetaDirective {
+            name: "specifiedBy".into(),
+            description: Some("Provides a scalar specification URL for specifying the behavior of custom scalar types.".into()),
+            locations: vec![__DirectiveLocation::SCALAR],
+            args: {
+                let mut args = IndexMap::new();
+                args.insert(
+                    "url".into(),
+                    MetaInputValue {
+                        name: "url".into(),
+                        description: Some("URL that specifies the behavior of this scalar.".into()),
+                        ty: "String!".into(),
+                        default_value: None,
+                        visible: None,
+                        inaccessible: false,
+                        tags: Default::default(),
+                        is_secret: false,
+                        directive_invocations: vec![],
+                    },
+                );
+                args
+            },
+            is_repeatable: false,
+            visible: None,
+            composable: None,
+        });
+
+        self.add_directive(MetaDirective {
+            name: "oneOf".into(),
+            description: Some(
+                "Indicates that an Input Object is a OneOf Input Object (and thus requires
+                        exactly one of its field be provided)"
+                    .to_string(),
+            ),
+            locations: vec![__DirectiveLocation::INPUT_OBJECT],
+            args: Default::default(),
             is_repeatable: false,
             visible: None,
             composable: None,
@@ -1059,6 +1151,7 @@ impl Registry {
                                     inaccessible: false,
                                     tags: Default::default(),
                                     is_secret: false,
+                                    directive_invocations: vec![],
                                 },
                             );
                             args
@@ -1126,6 +1219,7 @@ impl Registry {
                                 inaccessible: false,
                                 tags: Default::default(),
                                 is_secret: false,
+                                directive_invocations: vec![],
                             },
                         );
                         args

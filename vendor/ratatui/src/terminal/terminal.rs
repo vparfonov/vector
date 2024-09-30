@@ -1,6 +1,6 @@
 use std::io;
 
-use crate::{backend::ClearType, prelude::*};
+use crate::{backend::ClearType, prelude::*, CompletedFrame, TerminalOptions, Viewport};
 
 /// An interface to interact and draw [`Frame`]s on the user's terminal.
 ///
@@ -111,8 +111,8 @@ where
     /// let terminal = Terminal::new(backend)?;
     /// # std::io::Result::Ok(())
     /// ```
-    pub fn new(backend: B) -> io::Result<Terminal<B>> {
-        Terminal::with_options(
+    pub fn new(backend: B) -> io::Result<Self> {
+        Self::with_options(
             backend,
             TerminalOptions {
                 viewport: Viewport::Fullscreen,
@@ -126,13 +126,13 @@ where
     ///
     /// ```rust
     /// # use std::io::stdout;
-    /// # use ratatui::{prelude::*, backend::TestBackend};
+    /// # use ratatui::{prelude::*, backend::TestBackend, terminal::{Viewport, TerminalOptions}};
     /// let backend = CrosstermBackend::new(stdout());
     /// let viewport = Viewport::Fixed(Rect::new(0, 0, 10, 10));
     /// let terminal = Terminal::with_options(backend, TerminalOptions { viewport })?;
     /// # std::io::Result::Ok(())
     /// ```
-    pub fn with_options(mut backend: B, options: TerminalOptions) -> io::Result<Terminal<B>> {
+    pub fn with_options(mut backend: B, options: TerminalOptions) -> io::Result<Self> {
         let size = match options.viewport {
             Viewport::Fullscreen | Viewport::Inline(_) => backend.size()?,
             Viewport::Fixed(area) => area,
@@ -142,7 +142,7 @@ where
             Viewport::Inline(height) => compute_inline_size(&mut backend, height, size, 0)?,
             Viewport::Fixed(area) => (area, (area.left(), area.top())),
         };
-        Ok(Terminal {
+        Ok(Self {
             backend,
             buffers: [Buffer::empty(viewport_area), Buffer::empty(viewport_area)],
             current: 0,
@@ -172,7 +172,7 @@ where
     }
 
     /// Gets the backend
-    pub fn backend(&self) -> &B {
+    pub const fn backend(&self) -> &B {
         &self.backend
     }
 

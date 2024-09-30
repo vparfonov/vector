@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.70.0"
 name = "anstream"
-version = "0.6.7"
+version = "0.6.13"
 include = [
     "build.rs",
     "src/**/*",
@@ -107,7 +107,6 @@ optional = true
 
 [dependencies.colorchoice]
 version = "1.0.0"
-optional = true
 
 [dependencies.utf8parse]
 version = "0.2.1"
@@ -128,10 +127,7 @@ version = "1.4.0"
 version = "0.2.0"
 
 [features]
-auto = [
-    "dep:anstyle-query",
-    "dep:colorchoice",
-]
+auto = ["dep:anstyle-query"]
 default = [
     "auto",
     "wincon",

@@ -1,9 +1,9 @@
 //! Helper for parsing the microsyntax of the `[features]` section and computing implied features from optional dependencies.
 
-use crate::{Dependency, Manifest, Product, DepsSet, TargetDepsSet};
+use crate::{Dependency, DepsSet, Manifest, Product, TargetDepsSet};
 use std::borrow::Cow;
 use std::collections::hash_map::{Entry, RandomState};
-use std::collections::{HashMap, BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::hash::BuildHasher;
 use std::marker::PhantomData;
 
@@ -102,7 +102,6 @@ impl<'a> Feature<'a> {
 
     /// Just `enabled_by` except the "default" feature
     #[inline]
-    #[must_use]
     pub fn non_default_enabled_by(&self) -> impl Iterator<Item = &str> {
         self.enabled_by.iter().copied().filter(|&e| e != "default")
     }
@@ -282,7 +281,6 @@ pub enum Kind {
     Dev,
 }
 
-
 impl<'a, 'c, S: BuildHasher + Default> Resolver<'c, S> {
     fn parse_features(features: impl Iterator<Item = (&'a String, &'a Vec<String>)>, has_explicit_default: bool) -> HashMap<&'a str, Feature<'a>, S> {
         features
@@ -311,7 +309,7 @@ impl<'a, 'c, S: BuildHasher + Default> Resolver<'c, S> {
                 let action = enables_deps.entry(atarget).or_insert(DepAction {
                     is_conditional,
                     is_dep_only,
-                    dep_features: Default::default(),
+                    dep_features: BTreeSet::default(),
                 });
                 if !is_conditional { action.is_conditional = false; }
                 if is_dep_only { action.is_dep_only = true; }
@@ -366,7 +364,7 @@ impl<'a, 'c, S: BuildHasher + Default> Resolver<'c, S> {
                 enables_deps: BTreeMap::from_iter([(key, DepAction {
                     is_dep_only: false,
                     is_conditional: false,
-                    dep_features: Default::default(),
+                    dep_features: BTreeSet::default(),
                 })]),
                 explicit: false,
                 enabled_by: BTreeSet::new(), // will do later
@@ -381,13 +379,13 @@ impl<'a, 'c, S: BuildHasher + Default> Resolver<'c, S> {
         // explicit features exist, even if their name clashes with a `dep:name`.
         let mut named_using_dep_syntax: HashMap::<_, _, S> = features.keys().map(|&k| (k, false)).collect();
 
-        features.values().for_each(|f| {
+        for f in features.values() {
             f.enables_deps.iter().for_each(|(&dep_key, a)| {
                 named_using_dep_syntax.entry(dep_key)
                     .and_modify(|v| *v |= a.is_dep_only)
                     .or_insert(a.is_dep_only);
             });
-        });
+        }
 
         named_using_dep_syntax
     }
@@ -399,12 +397,12 @@ impl<'a, 'c, S: BuildHasher + Default> Resolver<'c, S> {
         let mut all_deps = HashMap::<_, _, S>::default();
         Self::add_implied_optional_deps(features, &mut all_deps, dependencies, &named_using_dep_syntax, Kind::Normal, None);
         Self::add_implied_optional_deps(features, &mut all_deps, build_dependencies, &named_using_dep_syntax, Kind::Build, None);
-        for (target_cfg, target_deps) in target  {
+        for (target_cfg, target_deps) in target {
             Self::add_implied_optional_deps(features, &mut all_deps, &target_deps.dependencies, &named_using_dep_syntax, Kind::Normal, Some(target_cfg));
             Self::add_implied_optional_deps(features, &mut all_deps, &target_deps.build_dependencies, &named_using_dep_syntax, Kind::Build, Some(target_cfg));
         }
         Self::add_implied_optional_deps(features, &mut all_deps, dev_dependencies, &named_using_dep_syntax, Kind::Dev, None);
-        for (target_cfg, target_deps) in target  {
+        for (target_cfg, target_deps) in target {
             Self::add_implied_optional_deps(features, &mut all_deps, &target_deps.dev_dependencies, &named_using_dep_syntax, Kind::Dev, Some(target_cfg));
         }
         all_deps
@@ -412,7 +410,7 @@ impl<'a, 'c, S: BuildHasher + Default> Resolver<'c, S> {
 
     #[inline(never)]
     fn set_required_by_bins(features: &mut HashMap<&'a str, Feature<'a>, S>, bin: &'a [Product], package_name: &'a str) {
-        bin.iter().for_each(move |bin| {
+        for bin in bin {
             for f in &bin.required_features {
                 let bin_name = bin.name.as_deref().unwrap_or(package_name);
                 if let Some(f) = features.get_mut(f.as_str()) {
@@ -420,7 +418,7 @@ impl<'a, 'c, S: BuildHasher + Default> Resolver<'c, S> {
                     f.required_by_bins.push(bin_name);
                 }
             }
-        });
+        }
     }
 
     #[inline(never)]
@@ -442,27 +440,27 @@ impl<'a, 'c, S: BuildHasher + Default> Resolver<'c, S> {
     #[inline(never)]
     fn set_enabled_by(features: &mut HashMap<&'a str, Feature<'a>, S>) {
         let mut all_enabled_by = HashMap::<_, _, S>::default();
-        features.iter().for_each(|(&feature_key, f)| {
+        for (&feature_key, f) in features.iter() {
             f.enables_features.iter().copied().for_each(|action_key| if action_key != feature_key {
                 all_enabled_by.entry(action_key).or_insert_with(BTreeSet::new).insert(feature_key);
             });
             f.enables_deps.iter().for_each(|(&action_key, action)| if !action.is_conditional && !action.is_dep_only && action_key != feature_key {
                 all_enabled_by.entry(action_key).or_insert_with(BTreeSet::new).insert(feature_key);
             });
-        });
+        }
 
-        all_enabled_by.into_iter().for_each(move |(key, enabled_by)| {
+        for (key, enabled_by) in all_enabled_by {
             if let Some(f) = features.get_mut(key) {
                 f.enabled_by = enabled_by;
             }
-        });
+        }
     }
 
     /// find `__features` and inline them
     #[inline(never)]
     fn remove_hidden_features(&self, features: &mut HashMap<&'a str, Feature<'a>, S>) -> HashMap<&'a str, BTreeSet<&'a str>, S> {
         let features_to_remove: BTreeSet<_> = features.keys().copied().filter(|&k| {
-            k.starts_with('_') && !self.always_keep.map_or(false, |cb| (cb)(k)) // if user thinks that is useful info
+            k.starts_with('_') && !self.always_keep.is_some_and(|cb| (cb)(k)) // if user thinks that is useful info
         }).collect();
 
         let mut removed_mapping = HashMap::<_, _, S>::default();
@@ -568,22 +566,22 @@ loop3 = ["loop1", "implied_referenced/from_loop_3"]
     // __hidden completely removed
     assert!(!f.iter().any(|(&k, f)| {
         k.starts_with('_') ||
-        f.enables_features.iter().any(|&k| k.starts_with('_')) ||
-        f.enables_deps.iter().any(|(&k, _)| k.starts_with('_')) ||
-        f.enabled_by.iter().any(|&k| k.starts_with('_'))
+            f.enables_features.iter().any(|&k| k.starts_with('_')) ||
+            f.enables_deps.iter().any(|(&k, _)| k.starts_with('_')) ||
+            f.enabled_by.iter().any(|&k| k.starts_with('_'))
     }));
 
     assert!(!d.keys().any(|&k| k.starts_with('_') && k != "__hidden_dep"));
-    assert!(f.get("__hidden_dep").is_none());
+    assert!(!f.contains_key("__hidden_dep"));
 
     assert_eq!(f.len(), 13);
-    assert!(f.get("depend").is_none());
+    assert!(!f.contains_key("depend"));
 
     assert_eq!(d.len(), 7);
-    assert!(d.get("not_relevant").is_none());
-    assert!(f.get("not_relevant").is_none());
+    assert!(!d.contains_key("not_relevant"));
+    assert!(!f.contains_key("not_relevant"));
 
-    assert!(f.get("not_optional").is_none());
+    assert!(!f.contains_key("not_optional"));
     assert_eq!(d["not_optional"].crate_name, "actual_pkg");
 
     assert_eq!(d["implied_standalone"].crate_name, "implied_standalone");
@@ -621,6 +619,6 @@ loop3 = ["loop1", "implied_referenced/from_loop_3"]
     assert_eq!(rf["loop3"].key, "loop3");
     assert_eq!(rd["implied_referenced"][0].0, "loop3");
     assert_eq!(rd["depend"][0].0, "loop2");
-    assert!(rd.get("a_dep").is_none());
+    assert!(!rd.contains_key("a_dep"));
 }
 

@@ -84,6 +84,20 @@ This works using Lua [coroutines](https://www.lua.org/manual/5.3/manual.html#2.6
 - [HTTP Server](examples/async_http_server.rs)
 - [TCP Server](examples/async_tcp_server.rs)
 
+
+**shell command examples**:
+```shell
+# async http client (hyper)
+cargo run --example async_http_client --features=lua54,async,macros
+
+# async http client (reqwest)
+cargo run --example async_http_reqwest --features=lua54,async,macros,serialize
+
+# async http server
+cargo run --example async_http_server --features=lua54,async,macros
+curl -v http://localhost:3000
+```
+
 ### Serialization (serde) support
 
 With `serialize` feature flag enabled, `mlua` allows you to serialize/deserialize any type that implements [`serde::Serialize`] and [`serde::Deserialize`] into/from [`mlua::Value`]. In addition `mlua` provides [`serde::Serialize`] trait implementation for it (including `UserData` support).
@@ -119,7 +133,7 @@ Add to `Cargo.toml` :
 
 ``` toml
 [dependencies]
-mlua = { version = "0.9.1", features = ["lua54", "vendored"] }
+mlua = { version = "0.9.9", features = ["lua54", "vendored"] }
 ```
 
 `main.rs`
@@ -154,7 +168,7 @@ Add to `Cargo.toml` :
 crate-type = ["cdylib"]
 
 [dependencies]
-mlua = { version = "0.9.1", features = ["lua54", "module"] }
+mlua = { version = "0.9.9", features = ["lua54", "module"] }
 ```
 
 `lib.rs` :

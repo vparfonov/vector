@@ -283,7 +283,7 @@ impl SecStaticCode {
                 code.as_mut_ptr(),
             ))?;
 
-            Ok(Self::wrap_under_get_rule(code.assume_init()))
+            Ok(Self::wrap_under_create_rule(code.assume_init()))
         }
     }
 
@@ -443,7 +443,7 @@ mod test {
             task_info(
                 mach_task_self(),
                 TASK_AUDIT_TOKEN,
-                token.as_mut_ptr() as *mut c_void,
+                token.as_mut_ptr().cast::<c_void>(),
                 &mut token_len,
             )
         };

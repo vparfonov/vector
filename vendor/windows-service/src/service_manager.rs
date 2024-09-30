@@ -11,6 +11,7 @@ use crate::{Error, Result};
 
 bitflags::bitflags! {
     /// Flags describing access permissions for [`ServiceManager`].
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Debug, Copy, Clone, Hash)]
     pub struct ServiceManagerAccess: u32 {
         /// Can connect to service control manager.
         const CONNECT = Services::SC_MANAGER_CONNECT;
@@ -20,6 +21,9 @@ bitflags::bitflags! {
 
         /// Can enumerate services or receive notifications.
         const ENUMERATE_SERVICE = Services::SC_MANAGER_ENUMERATE_SERVICE;
+
+        /// Includes all possible access rights.
+        const ALL_ACCESS = Services::SC_MANAGER_ALL_ACCESS;
     }
 }
 

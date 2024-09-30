@@ -1,7 +1,12 @@
 #![doc(test(attr(
-    // Problematic handling for foreign From<T> impls in tests
-    // https://github.com/rust-lang/rust/issues/121621
-    allow(unknown_lints, non_local_definitions),
+    allow(
+        unknown_lints,
+        // Problematic handling for foreign From<T> impls in tests
+        // https://github.com/rust-lang/rust/issues/121621
+        non_local_definitions,
+        // Some tests use foo as name
+        clippy::disallowed_names,
+    ),
     deny(
         missing_debug_implementations,
         rust_2018_idioms,
@@ -16,7 +21,7 @@
 )))]
 // Not needed for 2018 edition and conflicts with `rust_2018_idioms`
 #![doc(test(no_crate_inject))]
-#![doc(html_root_url = "https://docs.rs/serde_with/3.7.0/")]
+#![doc(html_root_url = "https://docs.rs/serde_with/3.9.0/")]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![no_std]
 
@@ -72,11 +77,9 @@
 //!
 //! [![Rustexplorer](https://img.shields.io/badge/Try%20on-rustexplorer-lightgrey?logo=rust&logoColor=orange)](https://www.rustexplorer.com/b/py7ida)
 //! ```rust
-//! # #[cfg(feature = "macros")]
+//! # #[cfg(all(feature = "macros", feature = "json"))] {
 //! # use serde::{Deserialize, Serialize};
-//! # #[cfg(feature = "macros")]
 //! # use serde_with::{serde_as, DisplayFromStr};
-//! # #[cfg(feature = "macros")]
 //! #[serde_as]
 //! # #[derive(Debug, Eq, PartialEq)]
 //! #[derive(Deserialize, Serialize)]
@@ -86,7 +89,6 @@
 //!     bar: u8,
 //! }
 //!
-//! # #[cfg(all(feature = "macros", feature = "json"))] {
 //! // This will serialize
 //! # let foo =
 //! Foo {bar: 12}
@@ -97,7 +99,7 @@
 //! {"bar": "12"}
 //! # "#;
 //! # assert_eq!(json.replace(" ", "").replace("\n", ""), serde_json::to_string(&foo).unwrap());
-//! # assert_eq!(foo, serde_json::from_str(&json).unwrap());
+//! # assert_eq!(foo, serde_json::from_str(json).unwrap());
 //! # }
 //! ```
 //!
@@ -110,11 +112,9 @@
 //!
 //! [![Rustexplorer](https://img.shields.io/badge/Try%20on-rustexplorer-lightgrey?logo=rust&logoColor=orange)](https://www.rustexplorer.com/b/um0xyi)
 //! ```rust
-//! # #[cfg(feature = "macros")]
+//! # #[cfg(all(feature = "macros", feature = "json"))] {
 //! # use serde::{Deserialize, Serialize};
-//! # #[cfg(feature = "macros")]
 //! # use serde_with::{serde_as, Bytes};
-//! # #[cfg(feature = "macros")]
 //! #[serde_as]
 //! # #[derive(Debug, Eq, PartialEq)]
 //! #[derive(Deserialize, Serialize)]
@@ -132,7 +132,6 @@
 //!     bytes: [u8; M],
 //! }
 //!
-//! # #[cfg(all(feature = "macros", feature = "json"))] {
 //! // This allows us to serialize a struct like this
 //! let arrays: Arrays<100, 128> = Arrays {
 //!     constgeneric: [true; 100],
@@ -152,11 +151,9 @@
 //!
 //! [![Rustexplorer](https://img.shields.io/badge/Try%20on-rustexplorer-lightgrey?logo=rust&logoColor=orange)](https://www.rustexplorer.com/b/xr1tm0)
 //! ```rust
-//! # #[cfg(feature = "macros")]
+//! # #[cfg(all(feature = "macros", feature = "json"))] {
 //! # use serde::{Deserialize, Serialize};
-//! # #[cfg(feature = "macros")]
 //! # use serde_with::skip_serializing_none;
-//! # #[cfg(feature = "macros")]
 //! #[skip_serializing_none]
 //! # #[derive(Debug, Eq, PartialEq)]
 //! #[derive(Deserialize, Serialize)]
@@ -170,7 +167,6 @@
 //!     g: Option<usize>,
 //! }
 //!
-//! # #[cfg(all(feature = "macros", feature = "json"))] {
 //! // This will serialize
 //! # let foo =
 //! Foo {a: None, b: None, c: None, d: Some(4), e: None, f: None, g: Some(7)}
@@ -181,7 +177,7 @@
 //! {"d": 4, "g": 7}
 //! # "#;
 //! # assert_eq!(json.replace(" ", "").replace("\n", ""), serde_json::to_string(&foo).unwrap());
-//! # assert_eq!(foo, serde_json::from_str(&json).unwrap());
+//! # assert_eq!(foo, serde_json::from_str(json).unwrap());
 //! # }
 //! ```
 //!
@@ -232,7 +228,7 @@
 //! }
 //! # "#;
 //! # assert_eq!(json.replace(" ", "").replace("\n", ""), serde_json::to_string(&foo).unwrap());
-//! # assert_eq!(foo, serde_json::from_str(&json).unwrap());
+//! # assert_eq!(foo, serde_json::from_str(json).unwrap());
 //!
 //! // and serializes
 //! # let foo =
@@ -257,18 +253,18 @@
 //! }
 //! # "#;
 //! # assert_eq!(json.replace(" ", "").replace("\n", ""), serde_json::to_string(&foo).unwrap());
-//! # assert_eq!(foo, serde_json::from_str(&json).unwrap());
+//! # assert_eq!(foo, serde_json::from_str(json).unwrap());
 //! # }
 //! ```
 //!
-//! [`DisplayFromStr`]: https://docs.rs/serde_with/3.7.0/serde_with/struct.DisplayFromStr.html
-//! [`with_prefix!`]: https://docs.rs/serde_with/3.7.0/serde_with/macro.with_prefix.html
-//! [feature flags]: https://docs.rs/serde_with/3.7.0/serde_with/guide/feature_flags/index.html
-//! [skip_serializing_none]: https://docs.rs/serde_with/3.7.0/serde_with/attr.skip_serializing_none.html
-//! [StringWithSeparator]: https://docs.rs/serde_with/3.7.0/serde_with/struct.StringWithSeparator.html
-//! [user guide]: https://docs.rs/serde_with/3.7.0/serde_with/guide/index.html
+//! [`DisplayFromStr`]: https://docs.rs/serde_with/3.9.0/serde_with/struct.DisplayFromStr.html
+//! [`with_prefix!`]: https://docs.rs/serde_with/3.9.0/serde_with/macro.with_prefix.html
+//! [feature flags]: https://docs.rs/serde_with/3.9.0/serde_with/guide/feature_flags/index.html
+//! [skip_serializing_none]: https://docs.rs/serde_with/3.9.0/serde_with/attr.skip_serializing_none.html
+//! [StringWithSeparator]: https://docs.rs/serde_with/3.9.0/serde_with/struct.StringWithSeparator.html
+//! [user guide]: https://docs.rs/serde_with/3.9.0/serde_with/guide/index.html
 //! [with-annotation]: https://serde.rs/field-attrs.html#with
-//! [as-annotation]: https://docs.rs/serde_with/3.7.0/serde_with/guide/serde_as/index.html
+//! [as-annotation]: https://docs.rs/serde_with/3.9.0/serde_with/guide/serde_as/index.html
 
 #[cfg(feature = "alloc")]
 extern crate alloc;
@@ -390,6 +386,7 @@ pub(crate) mod prelude {
         marker::PhantomData,
         ops::Bound,
         option::Option,
+        pin::Pin,
         result::Result,
         str::FromStr,
         time::Duration,
@@ -455,6 +452,7 @@ pub use serde_with_macros::*;
 /// # use serde::{Deserialize, Serialize};
 /// # use serde_with::{As, DisplayFromStr};
 /// #
+/// # #[allow(dead_code)]
 /// #[derive(Deserialize, Serialize)]
 /// # struct S {
 /// // Serialize numbers as sequence of strings, using Display and FromStr
@@ -472,6 +470,7 @@ pub use serde_with_macros::*;
 /// # use serde_with::{As, DisplayFromStr, Same};
 /// # use std::collections::BTreeMap;
 /// #
+/// # #[allow(dead_code)]
 /// #[derive(Deserialize, Serialize)]
 /// # struct S {
 /// // Serialize map, turn keys into strings but keep type of value
@@ -481,7 +480,7 @@ pub use serde_with_macros::*;
 /// # }
 /// ```
 ///
-/// [serde_as]: https://docs.rs/serde_with/3.7.0/serde_with/attr.serde_as.html
+/// [serde_as]: https://docs.rs/serde_with/3.9.0/serde_with/attr.serde_as.html
 pub struct As<T: ?Sized>(PhantomData<T>);
 
 /// Adapter to convert from `serde_as` to the serde traits.
@@ -531,7 +530,7 @@ pub struct Same;
 ///     mime: mime::STAR_STAR,
 ///     number: 777,
 /// };
-/// assert_eq!(json!({ "mime": "*/*", "number": "777" }), serde_json::to_value(&x).unwrap());
+/// assert_eq!(json!({ "mime": "*/*", "number": "777" }), serde_json::to_value(x).unwrap());
 /// # }
 /// ```
 ///
@@ -611,12 +610,12 @@ pub struct IfIsHumanReadable<H, F = Same>(PhantomData<H>, PhantomData<F>);
 /// let x = A {
 ///     tags: Some("This is text".to_string()),
 /// };
-/// assert_eq!(json!({ "tags": "This is text" }), serde_json::to_value(&x).unwrap());
+/// assert_eq!(json!({ "tags": "This is text" }), serde_json::to_value(x).unwrap());
 ///
 /// let x = A {
 ///     tags: None,
 /// };
-/// assert_eq!(json!({ "tags": "" }), serde_json::to_value(&x).unwrap());
+/// assert_eq!(json!({ "tags": "" }), serde_json::to_value(x).unwrap());
 /// # }
 /// ```
 ///
@@ -878,7 +877,7 @@ pub struct BytesOrString;
 ///     "d_f64": 12346.0,
 ///     "d_string": "12346",
 /// });
-/// assert_eq!(expected, serde_json::to_value(&d).unwrap());
+/// assert_eq!(expected, serde_json::to_value(d).unwrap());
 ///
 /// // Deserialization works too
 /// // Subsecond precision in numbers will be rounded away
@@ -936,7 +935,7 @@ pub struct BytesOrString;
 ///     "d_f64": -12345.0,
 ///     "d_string": "12346",
 /// });
-/// assert_eq!(expected, serde_json::to_value(&d).unwrap());
+/// assert_eq!(expected, serde_json::to_value(d).unwrap());
 ///
 /// // Deserialization works too
 /// // Subsecond precision in numbers will be rounded away
@@ -956,7 +955,7 @@ pub struct BytesOrString;
 /// ```
 ///
 /// [`chrono::Duration`]: ::chrono_0_4::Duration
-/// [feature flag]: https://docs.rs/serde_with/3.7.0/serde_with/guide/feature_flags/index.html
+/// [feature flag]: https://docs.rs/serde_with/3.9.0/serde_with/guide/feature_flags/index.html
 pub struct DurationSeconds<
     FORMAT: formats::Format = u64,
     STRICTNESS: formats::Strictness = formats::Strict,
@@ -1020,7 +1019,7 @@ pub struct DurationSeconds<
 ///     "d_f64": 12345.5,
 ///     "d_string": "12345.999999",
 /// });
-/// assert_eq!(expected, serde_json::to_value(&d).unwrap());
+/// assert_eq!(expected, serde_json::to_value(d).unwrap());
 ///
 /// // Deserialization works too
 /// // Subsecond precision in numbers will be rounded away
@@ -1071,7 +1070,7 @@ pub struct DurationSeconds<
 ///     "d_f64": -12344.5,
 ///     "d_string": "12345.999999",
 /// });
-/// assert_eq!(expected, serde_json::to_value(&d).unwrap());
+/// assert_eq!(expected, serde_json::to_value(d).unwrap());
 ///
 /// // Deserialization works too
 ///
@@ -1088,7 +1087,7 @@ pub struct DurationSeconds<
 /// ```
 ///
 /// [`chrono::Duration`]: ::chrono_0_4::Duration
-/// [feature flag]: https://docs.rs/serde_with/3.7.0/serde_with/guide/feature_flags/index.html
+/// [feature flag]: https://docs.rs/serde_with/3.9.0/serde_with/guide/feature_flags/index.html
 pub struct DurationSecondsWithFrac<
     FORMAT: formats::Format = f64,
     STRICTNESS: formats::Strictness = formats::Strict,
@@ -1210,7 +1209,7 @@ pub struct DurationNanoSecondsWithFrac<
 ///     "st_f64": 12346.0,
 ///     "st_string": "12346",
 /// });
-/// assert_eq!(expected, serde_json::to_value(&ts).unwrap());
+/// assert_eq!(expected, serde_json::to_value(ts).unwrap());
 ///
 /// // Deserialization works too
 /// // Subsecond precision in numbers will be rounded away
@@ -1268,7 +1267,7 @@ pub struct DurationNanoSecondsWithFrac<
 ///     "dt_f64": -12345.0,
 ///     "dt_string": "12346",
 /// });
-/// assert_eq!(expected, serde_json::to_value(&ts).unwrap());
+/// assert_eq!(expected, serde_json::to_value(ts).unwrap());
 ///
 /// // Deserialization works too
 /// // Subsecond precision in numbers will be rounded away
@@ -1290,7 +1289,7 @@ pub struct DurationNanoSecondsWithFrac<
 /// [`SystemTime`]: std::time::SystemTime
 /// [`chrono::DateTime<Local>`]: ::chrono_0_4::DateTime
 /// [`chrono::DateTime<Utc>`]: ::chrono_0_4::DateTime
-/// [feature flag]: https://docs.rs/serde_with/3.7.0/serde_with/guide/feature_flags/index.html
+/// [feature flag]: https://docs.rs/serde_with/3.9.0/serde_with/guide/feature_flags/index.html
 pub struct TimestampSeconds<
     FORMAT: formats::Format = i64,
     STRICTNESS: formats::Strictness = formats::Strict,
@@ -1360,7 +1359,7 @@ pub struct TimestampSeconds<
 ///     "st_f64": 12345.5,
 ///     "st_string": "12345.999999",
 /// });
-/// assert_eq!(expected, serde_json::to_value(&ts).unwrap());
+/// assert_eq!(expected, serde_json::to_value(ts).unwrap());
 ///
 /// // Deserialization works too
 /// // Subsecond precision in numbers will be rounded away
@@ -1411,7 +1410,7 @@ pub struct TimestampSeconds<
 ///     "dt_f64": -12344.5,
 ///     "dt_string": "12345.999999",
 /// });
-/// assert_eq!(expected, serde_json::to_value(&ts).unwrap());
+/// assert_eq!(expected, serde_json::to_value(ts).unwrap());
 ///
 /// // Deserialization works too
 ///
@@ -1432,7 +1431,7 @@ pub struct TimestampSeconds<
 /// [`chrono::DateTime<Local>`]: ::chrono_0_4::DateTime
 /// [`chrono::DateTime<Utc>`]: ::chrono_0_4::DateTime
 /// [NaiveDateTime]: ::chrono_0_4::NaiveDateTime
-/// [feature flag]: https://docs.rs/serde_with/3.7.0/serde_with/guide/feature_flags/index.html
+/// [feature flag]: https://docs.rs/serde_with/3.9.0/serde_with/guide/feature_flags/index.html
 pub struct TimestampSecondsWithFrac<
     FORMAT: formats::Format = f64,
     STRICTNESS: formats::Strictness = formats::Strict,
@@ -1533,7 +1532,7 @@ pub struct TimestampNanoSecondsWithFrac<
 /// }
 ///
 /// let value = Test {
-///     array: b"0123456789ABCDE".clone(),
+///     array: *b"0123456789ABCDE",
 ///     boxed: b"...".to_vec().into_boxed_slice(),
 ///     cow: Cow::Borrowed(b"FooBar"),
 ///     cow_array: Cow::Borrowed(&[42u8; 15]),
@@ -1550,7 +1549,7 @@ pub struct TimestampNanoSecondsWithFrac<
 /// # let pretty_config = ron::ser::PrettyConfig::new()
 /// #     .new_line("\n".into());
 /// assert_eq!(expected, ron::ser::to_string_pretty(&value, pretty_config).unwrap());
-/// assert_eq!(value, ron::from_str(&expected).unwrap());
+/// assert_eq!(value, ron::from_str(expected).unwrap());
 /// # }
 /// ```
 ///
@@ -1662,9 +1661,9 @@ pub struct Bytes;
 /// # #[derive(Debug, PartialEq)]
 /// #[derive(Deserialize, serde::Serialize)]
 /// struct Data {
-///     #[serde_as(deserialize_as = "OneOrMany<_, PreferOne>")]
+///     #[serde_as(as = "OneOrMany<_, PreferOne>")]
 ///     countries: Vec<String>,
-///     #[serde_as(deserialize_as = "OneOrMany<_, PreferMany>")]
+///     #[serde_as(as = "OneOrMany<_, PreferMany>")]
 ///     cities: Vec<String>,
 /// }
 ///
@@ -1693,7 +1692,7 @@ pub struct Bytes;
 ///     "countries": "Spain",
 ///     "cities": ["Berlin"],
 /// });
-/// assert_eq!(data, serde_json::from_value(j).unwrap());
+/// assert_eq!(serde_json::to_value(data).unwrap(), j);
 /// # }
 /// ```
 #[cfg(feature = "alloc")]
@@ -1766,7 +1765,7 @@ pub struct PickFirst<T>(PhantomData<T>);
 /// Deserializing works analogue, by deserializing a `T` and then converting into `O`.
 ///
 /// ```rust
-/// # #[cfg(FALSE)] {
+/// # #[cfg(any())] {
 /// struct S {
 ///     #[serde_as(as = "FromInto<T>")]
 ///     value: O,
@@ -1848,7 +1847,7 @@ pub struct FromInto<T>(PhantomData<T>);
 /// Deserializing works analogue, by deserializing a `T` and then converting into `O`.
 ///
 /// ```rust
-/// # #[cfg(FALSE)] {
+/// # #[cfg(any())] {
 /// struct S {
 ///     #[serde_as(as = "FromIntoRef<T>")]
 ///     value: O,
@@ -1929,7 +1928,7 @@ pub struct FromIntoRef<T>(PhantomData<T>);
 /// Deserializing works analogue, by deserializing a `T` and then converting into `O`.
 ///
 /// ```rust
-/// # #[cfg(FALSE)] {
+/// # #[cfg(any())] {
 /// struct S {
 ///     #[serde_as(as = "TryFromInto<T>")]
 ///     value: O,
@@ -2018,7 +2017,7 @@ pub struct TryFromInto<T>(PhantomData<T>);
 /// Deserializing works analogue, by deserializing a `T` and then converting into `O`.
 ///
 /// ```rust
-/// # #[cfg(FALSE)] {
+/// # #[cfg(any())] {
 /// struct S {
 ///     #[serde_as(as = "TryFromIntoRef<T>")]
 ///     value: O,
@@ -2205,6 +2204,64 @@ pub struct BorrowCow;
 /// ```
 #[cfg(feature = "alloc")]
 pub struct VecSkipError<T>(PhantomData<T>);
+
+/// Deserialize a map, skipping keys and values which fail to deserialize.
+///
+/// By default serde terminates if it fails to deserialize a key or a value when deserializing
+/// a map. Sometimes a map has heterogeneous keys or values but we only care about some specific
+/// types, and it is desirable to skip entries on errors.
+///
+/// It is especially useful in conjunction to `#[serde(flatten)]` to capture a map mixed in with
+/// other entries which we don't want to exhaust in the type definition.
+///
+/// The serialization behavior is identical to the underlying map.
+///
+/// The implementation supports both the [`HashMap`] and the [`BTreeMap`] from the standard library.
+///
+/// [`BTreeMap`]: std::collections::BTreeMap
+/// [`HashMap`]: std::collections::HashMap
+///
+/// # Examples
+///
+/// ```rust
+/// # #[cfg(feature = "macros")] {
+/// # use serde::{Deserialize, Serialize};
+/// # use std::collections::BTreeMap;
+/// # use serde_with::{serde_as, DisplayFromStr, MapSkipError};
+/// #
+/// #[serde_as]
+/// # #[derive(Debug, PartialEq)]
+/// #[derive(Deserialize, Serialize)]
+/// struct VersionNames {
+///     yanked: Vec<u16>,
+///     #[serde_as(as = "MapSkipError<DisplayFromStr, _>")]
+///     #[serde(flatten)]
+///     names: BTreeMap<u16, String>,
+/// }
+///
+/// let data = VersionNames {
+///     yanked: vec![2, 5],
+///     names: BTreeMap::from_iter([
+///         (0u16, "v0".to_string()),
+///         (1, "v1".to_string()),
+///         (4, "v4".to_string())
+///     ]),
+/// };
+/// let source_json = r#"{
+///   "0": "v0",
+///   "1": "v1",
+///   "4": "v4",
+///   "yanked": [2, 5],
+///   "last_updated": 1704085200
+/// }"#;
+/// let data_json = r#"{"yanked":[2,5],"0":"v0","1":"v1","4":"v4"}"#;
+/// // Ensure serialization and deserialization produce the expected results
+/// assert_eq!(data_json, serde_json::to_string(&data).unwrap());
+/// assert_eq!(data, serde_json::from_str(source_json).unwrap());
+/// # }
+/// ```
+#[cfg(feature = "alloc")]
+pub struct MapSkipError<K, V>(PhantomData<(K, V)>);
 
 /// Deserialize a boolean from a number
 ///

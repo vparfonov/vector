@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use clap::*;
+use clap::{Arg, ArgAction, Command, ValueHint};
 
 use crate::generator::{utils, Generator};
 use crate::INTERNAL_ERROR_MSG;
@@ -110,12 +110,15 @@ _{bin_name_underscore}_commands() {{
     ret.push(parent_text);
 
     // Next we start looping through all the children, grandchildren, etc.
-    let mut all_subcommands = utils::all_subcommands(p);
+    let mut all_subcommand_bins: Vec<_> = utils::all_subcommands(p)
+        .into_iter()
+        .map(|(_sc_name, bin_name)| bin_name)
+        .collect();
 
-    all_subcommands.sort();
-    all_subcommands.dedup();
+    all_subcommand_bins.sort();
+    all_subcommand_bins.dedup();
 
-    for (_, ref bin_name) in &all_subcommands {
+    for bin_name in &all_subcommand_bins {
         debug!("subcommand_details:iter: bin_name={bin_name}");
 
         ret.push(format!(
@@ -319,7 +322,7 @@ fn parser_of<'cmd>(parent: &'cmd Command, bin_name: &str) -> Option<&'cmd Comman
 fn get_args_of(parent: &Command, p_global: Option<&Command>) -> String {
     debug!("get_args_of");
 
-    let mut segments = vec![String::from("_arguments \"${_arguments_options[@]}\" \\")];
+    let mut segments = vec![String::from("_arguments \"${_arguments_options[@]}\" : \\")];
     let opts = write_opts_of(parent, p_global);
     let flags = write_flags_of(parent, p_global);
     let positionals = write_positionals_of(parent);
@@ -356,7 +359,7 @@ fn get_args_of(parent: &Command, p_global: Option<&Command>) -> String {
 
 // Uses either `possible_vals` or `value_hint` to give hints about possible argument values
 fn value_completion(arg: &Arg) -> Option<String> {
-    if let Some(values) = crate::generator::utils::possible_values(arg) {
+    if let Some(values) = utils::possible_values(arg) {
         if values
             .iter()
             .any(|value| !value.is_hide_set() && value.get_help().is_some())
@@ -678,7 +681,7 @@ mod tests {
         assert_eq!(
             escape_value(raw_string),
             "\\\\\\ \\[foo\\]\\(\\)\\ \\`bar\\ https\\://\\$PATH"
-        )
+        );
     }
 
     #[test]
@@ -687,6 +690,6 @@ mod tests {
         assert_eq!(
             escape_help(raw_string),
             "\\\\ \\[foo\\]() \\`bar https\\://\\$PATH"
-        )
+        );
     }
 }

@@ -8,8 +8,6 @@ use common::check_yields_when_contended;
 #[cfg(not(target_family = "wasm"))]
 use futures_lite::prelude::*;
 #[cfg(not(target_family = "wasm"))]
-use std::future::Future;
-#[cfg(not(target_family = "wasm"))]
 use std::thread;
 
 use futures_lite::future;
@@ -27,13 +25,13 @@ wasm_bindgen_test::wasm_bindgen_test_configure!(run_in_browser);
 
 #[cfg(not(target_family = "wasm"))]
 fn spawn<T: Send + 'static>(f: impl Future<Output = T> + Send + 'static) -> future::Boxed<T> {
-    let (s, r) = async_channel::bounded(1);
+    let (s, r) = flume::bounded(1);
     thread::spawn(move || {
         future::block_on(async {
-            let _ = s.send(f.await).await;
+            let _ = s.send_async(f.await).await;
         })
     });
-    async move { r.recv().await.unwrap() }.boxed()
+    async move { r.recv_async().await.unwrap() }.boxed()
 }
 
 #[test]
@@ -54,7 +52,25 @@ fn smoke_blocking() {
     drop(lock.read_blocking());
     drop(lock.write_blocking());
     drop((lock.read_blocking(), lock.read_blocking()));
+    let read = lock.read_blocking();
+    let upgradabe = lock.upgradable_read_blocking();
+    drop(read);
+    drop(RwLockUpgradableReadGuard::upgrade_blocking(upgradabe));
     drop(lock.write_blocking());
+}
+
+#[cfg(all(feature = "std", not(target_family = "wasm")))]
+#[test]
+fn smoke_arc_blocking() {
+    let lock = Arc::new(RwLock::new(()));
+    drop(lock.read_arc_blocking());
+    drop(lock.write_arc_blocking());
+    drop((lock.read_arc_blocking(), lock.read_arc_blocking()));
+    let read = lock.read_arc_blocking();
+    let upgradabe = lock.upgradable_read_arc_blocking();
+    drop(read);
+    drop(RwLockUpgradableReadGuardArc::upgrade_blocking(upgradabe));
+    drop(lock.write_arc_blocking());
 }
 
 #[test]
@@ -102,13 +118,15 @@ fn get_mut() {
     assert_eq!(lock.into_inner(), 20);
 }
 
+// Miri bug; this works when async is replaced with blocking
 #[cfg(not(target_family = "wasm"))]
 #[test]
+#[cfg_attr(miri, ignore)]
 fn contention() {
     const N: u32 = 10;
     const M: usize = if cfg!(miri) { 100 } else { 1000 };
 
-    let (tx, rx) = async_channel::unbounded();
+    let (tx, rx) = flume::unbounded();
     let tx = Arc::new(tx);
     let rw = Arc::new(RwLock::new(()));
 
@@ -117,7 +135,7 @@ fn contention() {
         let tx = tx.clone();
         let rw = rw.clone();
 
-        spawn(async move {
+        let _spawned = spawn(async move {
             for _ in 0..M {
                 if fastrand::u32(..N) == 0 {
                     drop(rw.write().await);
@@ -125,24 +143,25 @@ fn contention() {
                     drop(rw.read().await);
                 }
             }
-            tx.send(()).await.unwrap();
+            tx.send_async(()).await.unwrap();
         });
     }
 
     future::block_on(async move {
         for _ in 0..N {
-            rx.recv().await.unwrap();
+            rx.recv_async().await.unwrap();
         }
     });
 }
 
 #[cfg(not(target_family = "wasm"))]
 #[test]
+#[cfg_attr(miri, ignore)]
 fn contention_arc() {
     const N: u32 = 10;
     const M: usize = if cfg!(miri) { 100 } else { 1000 };
 
-    let (tx, rx) = async_channel::unbounded();
+    let (tx, rx) = flume::unbounded();
     let tx = Arc::new(tx);
     let rw = Arc::new(RwLock::new(()));
 
@@ -151,7 +170,7 @@ fn contention_arc() {
         let tx = tx.clone();
         let rw = rw.clone();
 
-        spawn(async move {
+        let _spawned = spawn(async move {
             for _ in 0..M {
                 if fastrand::u32(..N) == 0 {
                     drop(rw.write_arc().await);
@@ -159,13 +178,13 @@ fn contention_arc() {
                     drop(rw.read_arc().await);
                 }
             }
-            tx.send(()).await.unwrap();
+            tx.send_async(()).await.unwrap();
         });
     }
 
     future::block_on(async move {
         for _ in 0..N {
-            rx.recv().await.unwrap();
+            rx.recv_async().await.unwrap();
         }
     });
 }
@@ -174,10 +193,10 @@ fn contention_arc() {
 #[test]
 fn writer_and_readers() {
     let lock = Arc::new(RwLock::new(0i32));
-    let (tx, rx) = async_channel::unbounded();
+    let (tx, rx) = flume::unbounded();
 
     // Spawn a writer task.
-    spawn({
+    let _spawned = spawn({
         let lock = lock.clone();
         async move {
             let mut lock = lock.write().await;
@@ -187,7 +206,7 @@ fn writer_and_readers() {
                 future::yield_now().await;
                 *lock = tmp + 1;
             }
-            tx.send(()).await.unwrap();
+            tx.send_async(()).await.unwrap();
         }
     });
 
@@ -210,7 +229,7 @@ fn writer_and_readers() {
         }
 
         // Wait for writer to finish.
-        rx.recv().await.unwrap();
+        rx.recv_async().await.unwrap();
         let lock = lock.read().await;
         assert_eq!(*lock, 1000);
     });
@@ -220,10 +239,10 @@ fn writer_and_readers() {
 #[test]
 fn writer_and_readers_arc() {
     let lock = Arc::new(RwLock::new(0i32));
-    let (tx, rx) = async_channel::unbounded();
+    let (tx, rx) = flume::unbounded();
 
     // Spawn a writer task.
-    spawn({
+    let _spawned = spawn({
         let lock = lock.clone();
         async move {
             let mut lock = lock.write_arc().await;
@@ -233,7 +252,7 @@ fn writer_and_readers_arc() {
                 future::yield_now().await;
                 *lock = tmp + 1;
             }
-            tx.send(()).await.unwrap();
+            tx.send_async(()).await.unwrap();
         }
     });
 
@@ -256,7 +275,7 @@ fn writer_and_readers_arc() {
         }
 
         // Wait for writer to finish.
-        rx.recv().await.unwrap();
+        rx.recv_async().await.unwrap();
         let lock = lock.read_arc().await;
         assert_eq!(*lock, 1000);
     });

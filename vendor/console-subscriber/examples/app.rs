@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::{future::Future, task::Poll, time::Duration};
 
 static HELP: &str = r#"
 Example console-instrumented app
@@ -43,6 +43,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
                 tokio::task::Builder::new()
                     .name("noyield")
                     .spawn(no_yield(20))
+                    .unwrap();
+            }
+            "blocking" => {
+                tokio::task::Builder::new()
+                    .name("spawns_blocking")
+                    .spawn(spawn_blocking(5))
                     .unwrap();
             }
             "help" | "-h" => {
@@ -115,7 +121,7 @@ async fn burn(min: u64, max: u64) {
     loop {
         for i in min..max {
             for _ in 0..i {
-                tokio::task::yield_now().await;
+                self_wake().await;
             }
             tokio::time::sleep(Duration::from_secs(i - min)).await;
         }
@@ -134,4 +140,40 @@ async fn no_yield(seconds: u64) {
 
         _ = handle.await;
     }
+}
+
+#[tracing::instrument]
+async fn spawn_blocking(seconds: u64) {
+    loop {
+        _ = tokio::task::spawn_blocking(move || {
+            std::thread::sleep(Duration::from_secs(seconds));
+        })
+        .await;
+    }
+}
+
+fn self_wake() -> impl Future<Output = ()> {
+    struct SelfWake {
+        yielded: bool,
+    }
+
+    impl Future for SelfWake {
+        type Output = ();
+
+        fn poll(
+            mut self: std::pin::Pin<&mut Self>,
+            cx: &mut std::task::Context<'_>,
+        ) -> Poll<Self::Output> {
+            if self.yielded {
+                return Poll::Ready(());
+            }
+
+            self.yielded = true;
+            cx.waker().wake_by_ref();
+
+            Poll::Pending
+        }
+    }
+
+    SelfWake { yielded: false }
 }

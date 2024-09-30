@@ -137,6 +137,7 @@ pub struct ItemSearchOptions {
     load_attributes: bool,
     load_data: bool,
     limit: Option<Limit>,
+    trusted_only: Option<bool>,
     label: Option<CFString>,
     service: Option<CFString>,
     account: Option<CFString>,
@@ -170,7 +171,7 @@ impl ItemSearchOptions {
     }
 
     /// Search only for keys of the specified class. Also sets self.class to
-    /// ItemClass::key().
+    /// `ItemClass::key()`.
     #[inline(always)]
     pub fn key_class(&mut self, key_class: KeyClass) -> &mut Self {
         self.class(ItemClass::key());
@@ -215,6 +216,13 @@ impl ItemSearchOptions {
     #[inline(always)]
     pub fn label(&mut self, label: &str) -> &mut Self {
         self.label = Some(CFString::new(label));
+        self
+    }
+
+    /// Whether untrusted certificates should be returned.
+    #[inline(always)]
+    pub fn trusted_only(&mut self, trusted_only: Option<bool>) -> &mut Self {
+        self.trusted_only = trusted_only;
         self
     }
 
@@ -316,6 +324,13 @@ impl ItemSearchOptions {
                 ));
             }
 
+            if let Some(ref trusted_only) = self.trusted_only {
+                params.push((
+                    CFString::wrap_under_get_rule(kSecMatchTrustedOnly),
+                    if *trusted_only { CFBoolean::true_value().into_CFType() } else { CFBoolean::false_value().into_CFType() },
+                ));
+            }
+
             if let Some(ref service) = self.service {
                 params.push((
                     CFString::wrap_under_get_rule(kSecAttrService),
@@ -412,7 +427,7 @@ unsafe fn get_item(item: CFTypeRef) -> SearchResult {
     } else if type_id == SecIdentity::type_id() {
         Reference::Identity(SecIdentity::wrap_under_get_rule(item as *mut _))
     } else {
-        panic!("Got bad type from SecItemCopyMatching: {}", type_id);
+        panic!("Got bad type from SecItemCopyMatching: {type_id}");
     };
 
     SearchResult::Ref(reference)
@@ -504,7 +519,7 @@ impl SearchResult {
                         ),
                         _ => String::from("unknown"),
                     };
-                    retmap.insert(format!("{}", keycfstr), val);
+                    retmap.insert(format!("{keycfstr}"), val);
                 }
                 Some(retmap)
             },
@@ -562,7 +577,7 @@ impl ItemAddOptions {
 
         if let Some(location) = &self.location {
             match location {
-                #[cfg(any(feature = "OSX_10_15", target_os = "ios"))]
+                #[cfg(any(feature = "OSX_10_15", target_os = "ios", target_os = "tvos", target_os = "watchos"))]
                 Location::DataProtectionKeychain => {
                     dict.add(
                         &unsafe { kSecUseDataProtectionKeychain }.to_void(),
@@ -602,11 +617,11 @@ pub enum ItemAddValue {
 
 /// Type of Ref to add to the keychain.
 pub enum AddRef {
-    /// SecKey
+    /// `SecKey`
     Key(SecKey),
-    /// SecIdentity
+    /// `SecIdentity`
     Identity(SecIdentity),
-    /// SecCertificate
+    /// `SecCertificate`
     Certificate(SecCertificate),
 }
 
@@ -641,7 +656,7 @@ pub enum Location {
     /// This keychain requires the calling binary to be codesigned with
     /// entitlements for the KeychainAccessGroups it is supposed to
     /// access.
-    #[cfg(any(feature = "OSX_10_15", target_os = "ios"))]
+    #[cfg(any(feature = "OSX_10_15", target_os = "ios", target_os = "tvos", target_os = "watchos"))]
     DataProtectionKeychain,
     /// Store the key in the default file-based keychain. On macOS, defaults to
     /// the Login keychain.

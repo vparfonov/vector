@@ -97,7 +97,7 @@
 //! | Input      | `data-encoding` | `base64`  | GNU `base64`  |
 //! | ---------- | --------------- | --------- | ------------- |
 //! | `AAB=`     | `Trailing(2)`   | `Last(2)` | `\x00\x00`    |
-//! | `AA\nB=`   | `Length(4)`     | `Length`  | `\x00\x00`    |
+//! | `AA\nB=`   | `Length(4)`     | `Byte(2)` | `\x00\x00`    |
 //! | `AAB`      | `Length(0)`     | `Padding` | Invalid input |
 //! | `AAA`      | `Length(0)`     | `Padding` | Invalid input |
 //! | `A\rA\nB=` | `Length(4)`     | `Byte(1)` | Invalid input |
@@ -155,6 +155,8 @@
 #![warn(unused_results)]
 #![allow(unused_unsafe)] // TODO(msrv)
 #![warn(clippy::pedantic)]
+#![allow(clippy::assigning_clones)] // TODO(msrv)
+#![allow(clippy::doc_markdown)]
 #![allow(clippy::enum_glob_use)]
 #![allow(clippy::similar_names)]
 #![allow(clippy::uninlined_format_args)] // TODO(msrv)
@@ -987,7 +989,7 @@ pub struct Wrap {
 /// ### Ignore characters when decoding
 ///
 /// Ignoring characters when decoding is useful if after encoding some characters are added for
-/// convenience or any other reason (like wrapping). In that case we want to first ignore thoses
+/// convenience or any other reason (like wrapping). In that case we want to first ignore those
 /// characters before decoding.
 ///
 /// To preserve correctness, ignored characters must not contain symbols or the padding character.
@@ -2385,7 +2387,7 @@ const BASE64_NOPAD_IMPL: &[u8] = &[
 /// This encoding is a static version of:
 ///
 /// ```rust
-/// # use data_encoding::{Specification, Wrap, BASE64_MIME};
+/// # use data_encoding::{Specification, BASE64_MIME};
 /// let mut spec = Specification::new();
 /// spec.symbols.push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
 /// spec.padding = Some('=');
@@ -2425,6 +2427,54 @@ const BASE64_MIME_IMPL: &[u8] = &[
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
     128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 61, 30, 76, 13, 10,
+];
+
+/// MIME base64 encoding without trailing bits check
+///
+/// This encoding is a static version of:
+///
+/// ```rust
+/// # use data_encoding::{Specification, BASE64_MIME_PERMISSIVE};
+/// let mut spec = Specification::new();
+/// spec.symbols.push_str("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/");
+/// spec.padding = Some('=');
+/// spec.wrap.width = 76;
+/// spec.wrap.separator.push_str("\r\n");
+/// spec.check_trailing_bits = false;
+/// assert_eq!(BASE64_MIME_PERMISSIVE, spec.encoding().unwrap());
+/// ```
+///
+/// It does not exactly conform to [RFC2045] because it does not print the header
+/// and does not ignore all characters.
+///
+/// [RFC2045]: https://tools.ietf.org/html/rfc2045
+pub const BASE64_MIME_PERMISSIVE: Encoding = Encoding::internal_new(BASE64_MIME_PERMISSIVE_IMPL);
+const BASE64_MIME_PERMISSIVE_IMPL: &[u8] = &[
+    65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88,
+    89, 90, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114,
+    115, 116, 117, 118, 119, 120, 121, 122, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 43, 47, 65, 66,
+    67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90,
+    97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115,
+    116, 117, 118, 119, 120, 121, 122, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 43, 47, 65, 66, 67,
+    68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 97,
+    98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116,
+    117, 118, 119, 120, 121, 122, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 43, 47, 65, 66, 67, 68,
+    69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 97, 98,
+    99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117,
+    118, 119, 120, 121, 122, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 43, 47, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 129, 128, 128, 129, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 62, 128, 128, 128, 63, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 128, 128, 128, 130, 128,
+    128, 128, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+    24, 25, 128, 128, 128, 128, 128, 128, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+    40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 128,
+    128, 128, 128, 128, 128, 128, 128, 128, 128, 128, 61, 14, 76, 13, 10,
 ];
 
 /// Padded base64url encoding

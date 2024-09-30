@@ -4,7 +4,7 @@ use crate::loom::sync::{Arc, Mutex};
 #[cfg(tokio_unstable)]
 use crate::runtime;
 use crate::runtime::task::{self, JoinHandle, LocalOwnedTasks, Task};
-use crate::runtime::{context, ThreadId};
+use crate::runtime::{context, ThreadId, BOX_FUTURE_THRESHOLD};
 use crate::sync::AtomicWaker;
 use crate::util::RcCell;
 
@@ -367,7 +367,11 @@ cfg_rt! {
         F: Future + 'static,
         F::Output: 'static,
     {
-        spawn_local_inner(future, None)
+        if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            spawn_local_inner(Box::pin(future), None)
+        } else {
+            spawn_local_inner(future, None)
+        }
     }
 
 
@@ -598,7 +602,7 @@ impl LocalSet {
     /// allowing it to call [`spawn_local`] to spawn additional `!Send` futures.
     /// Any local futures spawned on the local set will be driven in the
     /// background until the future passed to `run_until` completes. When the future
-    /// passed to `run` finishes, any local futures which have not completed
+    /// passed to `run_until` finishes, any local futures which have not completed
     /// will remain on the local set, and will be driven on subsequent calls to
     /// `run_until` or when [awaiting the local set] itself.
     ///
@@ -641,6 +645,19 @@ impl LocalSet {
         future: F,
         name: Option<&str>,
     ) -> JoinHandle<F::Output>
+    where
+        F: Future + 'static,
+        F::Output: 'static,
+    {
+        if cfg!(debug_assertions) && std::mem::size_of::<F>() > BOX_FUTURE_THRESHOLD {
+            self.spawn_named_inner(Box::pin(future), name)
+        } else {
+            self.spawn_named_inner(future, name)
+        }
+    }
+
+    #[track_caller]
+    fn spawn_named_inner<F>(&self, future: F, name: Option<&str>) -> JoinHandle<F::Output>
     where
         F: Future + 'static,
         F::Output: 'static,

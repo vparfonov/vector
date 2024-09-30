@@ -21,7 +21,7 @@
     - [domain](#domain)
     - [http method](#http-method)
     - [ipv4](#ipv4)
-  - [Generators with arguments](#generators-with-arguments)
+    - [gen_prime](#gen_prime)
     - [enum](#enum)
     - [int](#int)
     - [private ipv4](#private-ipv4)
@@ -29,7 +29,7 @@
       - [Without special chars](#without-special-chars)
       - [With special chars](#with-special-chars)
   - [Corpora generator](#corpora-generator)
-- [Example](#example)
+- [Examples](#examples)
 - [Contributing](#contributing)
   - [Where to start?](#where-to-start)
   - [Tooling](#tooling)
@@ -49,7 +49,7 @@ Add the library as dependency to your `Cargo.toml`.
 
 ```
 [dependencies]
-fakedata_generator = "0.3"
+fakedata_generator = "0.4"
 ```
 
 Now the the library can be loaded with `use fakedata_generator::*`.    
@@ -153,6 +153,20 @@ let ip: String = gen_ipv4();
 // ip = "168.11.40.75"
 ```
 
+#### gen_prime
+
+Returns one of the first 1000 prime numners, randomely.
+
+Function signature
+```rust
+gen_prime() -> usize
+``` 
+
+Example call
+```rust
+let prime: usize = gen_prime();
+// prime = 6323
+```
 ### Generators with arguments
 [⬆️ Back to Top](#table-of-contents)
 
@@ -245,7 +259,9 @@ let pw: String = gen_password_with_special_chars(32);
 ### Corpora generator
 [⬆️ Back to Top](#table-of-contents)
 
-`gen_corpora_switch` is a special generator that gets its data in JSON format taken from the [Corpora Project](https://github.com/dariusk/corpora). A copy of the entire Corpora project is included in the `data` directory.
+`gen_corpora_switch` is deprecated and should not be used anymore.
+
+Instead there's a new `gen_switch` function that gets its data in JSON format taken from the [Corpora Project](https://github.com/dariusk/corpora). A copy of the entire Corpora project is included in the `data` directory.
 Not all data sets are available as of now. See the [src/corpora/data.rs](https://github.com/kevingimbel/fakedata_generator/blob/master/src/corpora/data.rs) file for all available sets.
 
 Possible input values: 
@@ -256,24 +272,25 @@ Possible input values:
 - `gemstone`
 - `mood`
 - `fabric`
+- `tvshow`
 
 Each of these will return a random word from the list.
 
 Function signature
 ```rust
-gen_corpora_switch(input: String) -> String
+gen_switch(input: String) -> String
 ```
 
 Example call
 ```rust
-let word: String = gen_corpora_switch("cat".to_string());
+let word: String = gen_switch("cat".to_string());
 // word = "European Shorthair"
 
-let fabric: String = gen_corpora_switch("fabric".to_string());
+let fabric: String = gen_switch("fabric".to_string());
 // word = "longcloth"
 ```
 
-## Example
+## Examples
 [⬆️ Back to Top](#table-of-contents)
 
 The following examples show how `fakedata_generator` can be used in a Rust project.

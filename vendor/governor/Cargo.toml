@@ -12,11 +12,11 @@
 [package]
 edition = "2018"
 name = "governor"
-version = "0.6.0"
+version = "0.6.3"
 authors = ["Andreas Fuchs <asf@boinkor.net>"]
 autobenches = false
 description = "A rate-limiting implementation in Rust"
-homepage = "https://github.com/antifuchs/governor"
+homepage = "https://github.com/boinkor-net/governor"
 documentation = "https://docs.rs/governor"
 readme = "README.md"
 keywords = [
@@ -32,7 +32,7 @@ categories = [
     "no-std",
 ]
 license = "MIT"
-repository = "https://github.com/antifuchs/governor.git"
+repository = "https://github.com/boinkor-net/governor.git"
 
 [lib]
 bench = false
@@ -65,10 +65,15 @@ version = "0.3.0"
 default-features = false
 
 [dependencies.parking_lot]
-version = "0.12.0"
+version = "0.12"
+optional = true
+
+[dependencies.portable-atomic]
+version = "1.6"
+features = ["require-cas"]
 
 [dependencies.quanta]
-version = "0.11.1"
+version = "0.12.0"
 optional = true
 
 [dependencies.rand]
@@ -77,6 +82,9 @@ optional = true
 
 [dependencies.smallvec]
 version = "1.6.1"
+
+[dependencies.spinning_top]
+version = "0.3"
 
 [dev-dependencies.all_asserts]
 version = "2.2.0"
@@ -115,6 +123,7 @@ std = [
     "nonzero_ext/std",
     "futures-timer",
     "futures",
+    "dep:parking_lot",
 ]
 
 [badges.maintenance]

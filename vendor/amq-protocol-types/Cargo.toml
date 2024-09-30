@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.63.0"
 name = "amq-protocol-types"
-version = "7.1.2"
+version = "7.2.1"
 authors = ["Marc-Antoine Perennou <%arc-Antoine@Perennou.com>"]
 description = "AMQP specifications - types"
 documentation = "https://docs.rs/amq-protocol-types"
@@ -29,7 +29,6 @@ categories = [
 ]
 license = "BSD-2-Clause"
 repository = "https://github.com/amqp-rs/amq-protocol"
-resolver = "1"
 
 [lib]
 name = "amq_protocol_types"
@@ -37,6 +36,7 @@ name = "amq_protocol_types"
 [dependencies.cookie-factory]
 version = "^0.3"
 features = ["std"]
+default-features = false
 
 [dependencies.nom]
 version = "^7.0"

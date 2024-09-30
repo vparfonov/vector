@@ -3,6 +3,70 @@
 All notable changes to this project will be documented in this file.
 This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## console-api-v0.7.0 - (2024-06-10)
+
+### <a id = "0.7.0-breaking"></a>Breaking Changes
+- **Bump tonic to 0.11 ([#547](https://github.com/tokio-rs/console/pull/547))** ([ef6816c](https://github.com/tokio-rs/console/commit/ef6816caa0fe84171105b513425506f25d3082af))<br />This is a breaking change for users of `console-api` and
+`console-subscriber`, as it changes the public `tonic` dependency to a
+semver-incompatible version. This breaks compatibility with `tonic`
+0.10.x.
+
+### Documented
+
+- Fix typo in proto ([#472](https://github.com/tokio-rs/console/pull/472)) ([2dd3559](https://github.com/tokio-rs/console/commit/2dd3559ccf8a88e0e0a140f076135ea3f6f26f02))
+
+### Updated
+
+- [**breaking**](#0.7.0-breaking) Bump tonic to 0.11 ([#547](https://github.com/tokio-rs/console/pull/547)) ([ef6816c](https://github.com/tokio-rs/console/commit/ef6816caa0fe84171105b513425506f25d3082af))
+
+
+## console-api-v0.6.0 - (2023-09-29)
+
+### <a id = "console-api-v0.6.0-breaking"></a>Breaking Changes
+- **Update `tonic` to v0.10 and increase MSRV to 1.64 ([#464](https://github.com/tokio-rs/console/issues/464))** ([882318a](https://github.com/tokio-rs/console/commit/882318a006d060c763f97afa7e03a45ef9736fe6))<br />This is a breaking change for users of `console-api` and
+`console-subscriber`, as it changes the public `tonic` dependency to a
+semver-incompatible version. This breaks compatibility with `tonic`
+0.9.x and `prost` 0.11.x.
+
+### Added
+
+- [**breaking**](#console-api-v0.6.0-breaking) Update `tonic` to v0.10 and increase MSRV to 1.64 ([#464](https://github.com/tokio-rs/console/issues/464)) ([882318a](https://github.com/tokio-rs/console/commit/882318a006d060c763f97afa7e03a45ef9736fe6))
+
+### Documented
+
+- Update MSRV version docs to 1.64 ([#467](https://github.com/tokio-rs/console/issues/467)) ([a7acbcc](https://github.com/tokio-rs/console/commit/a7acbcc966ef61825f67d93988add8643be760d5))
+
+### Fixed
+
+- Add explicit `futures-core` dep to fix broken builds ([#453](https://github.com/tokio-rs/console/issues/453)) ([88638f9](https://github.com/tokio-rs/console/commit/88638f992c3ada6c97ca1921c66a3a4bbf5b23c1))
+
+## console-api-v0.5.0 - (2023-09-29)
+
+### <a id = "console-api-v0.5.0-breaking"></a>Breaking Changes
+- **Update `tonic` to v0.9 ([#420](https://github.com/tokio-rs/console/issues/420))** ([b70c1d8](https://github.com/tokio-rs/console/commit/b70c1d886d64fc43de6715f07ae49313f778e92b))<br />This is a breaking change for users of `console-api`, as it changes the
+public `tonic` dependency to a semver-incompatible version. This breaks
+compatibility with `tonic` 0.8.
+
+### Added
+
+- Use tokio task ids in task views ([#403](https://github.com/tokio-rs/console/issues/403)) ([001fc49](https://github.com/tokio-rs/console/commit/001fc49f09ad78cc4ab50770cf4a677ae177103f))
+- Add scheduled time per task ([#406](https://github.com/tokio-rs/console/issues/406)) ([ac20daa](https://github.com/tokio-rs/console/commit/ac20daaf301f80e87002593813965d11d11371e4))
+- Add task scheduled times histogram ([#409](https://github.com/tokio-rs/console/issues/409)) ([3b37dda](https://github.com/tokio-rs/console/commit/3b37dda773f8cd237f6759d193fdc83a75ab7653))
+- [**breaking**](#console-api-v0.5.0-breaking) Update `tonic` to v0.9 ([#420](https://github.com/tokio-rs/console/issues/420)) ([b70c1d8](https://github.com/tokio-rs/console/commit/b70c1d886d64fc43de6715f07ae49313f778e92b))
+- Update MSRV to Rust 1.60.0 ([e3c5656](https://github.com/tokio-rs/console/commit/e3c56561a062be123be460dd477f512a6a9ec3cd))
+
+## console-api-v0.4.0 - (2023-09-29)
+
+### <a id = "console-api-v0.4.0-breaking"></a>Breaking Changes
+- **Update Tonic and Prost dependencies ([#364](https://github.com/tokio-rs/console/issues/364))** ([f9b8e03](https://github.com/tokio-rs/console/commit/f9b8e03bd7ee1d0edb441c94a93a350d5b06ed3b))<br />This commit updates the public dependencies `prost` and `tonic` to
+semver-incompatible versions (v0.11.0 and v0.8.0, respectively). This is
+a breaking change for users who are integrating the `console-api` protos
+with their own `tonic` servers or clients.
+
+### Added
+
+- [**breaking**](#console-api-v0.4.0-breaking) Update Tonic and Prost dependencies ([#364](https://github.com/tokio-rs/console/issues/364)) ([f9b8e03](https://github.com/tokio-rs/console/commit/f9b8e03bd7ee1d0edb441c94a93a350d5b06ed3b))
+
 ## console-api-v0.6.0 - (2023-09-29)
 
 [2cb6ee5](https://github.com/tokio-rs/console/commit/2cb6ee5b813837324f5f9934a929ac928cfbb03f)...[a7acbcc](https://github.com/tokio-rs/console/commit/a7acbcc966ef61825f67d93988add8643be760d5)

@@ -21,10 +21,9 @@ fn wrap_return_type_as_static_ref(rt: ReturnType) -> ReturnType {
 fn wrap_call_impl_with_call_once_impl(call_impl: TokenStream, rt: &ReturnType) -> TokenStream {
     match rt {
         syn::ReturnType::Type(_, t) => parse_quote! {
-            static mut S: Option<#t> = None;
-            static CELL: std::sync::Once = std::sync::Once::new();
-            CELL.call_once(|| unsafe { S = Some(#call_impl) });
-            unsafe { S.as_ref().unwrap() }
+            static CELL: std::sync::OnceLock<#t> =
+                std::sync::OnceLock::new();
+            CELL.get_or_init(|| #call_impl )
         },
         _ => parse_quote! {
             static CELL: std::sync::Once = std::sync::Once::new();
@@ -66,8 +65,12 @@ pub(crate) fn render(mut fixture: ItemFn, info: FixtureInfo) -> TokenStream {
     let partials =
         (1..=orig_args.len()).map(|n| render_partial_impl(&fixture, n, &resolver, &info));
 
-    let call_get = render_exec_call(parse_quote! { Self::get }, args, asyncness.is_some());
-    let mut call_impl = render_exec_call(parse_quote! { #name }, args, asyncness.is_some());
+    let args = args
+        .iter()
+        .map(|arg| parse_quote! { #arg })
+        .collect::<Vec<_>>();
+    let call_get = render_exec_call(parse_quote! { Self::get }, &args, asyncness.is_some());
+    let mut call_impl = render_exec_call(parse_quote! { #name }, &args, asyncness.is_some());
 
     if info.arguments.is_once() {
         call_impl = wrap_call_impl_with_call_once_impl(call_impl, &output);
@@ -127,7 +130,9 @@ fn render_partial_impl(
         inject::resolve_aruments(fixture.sig.inputs.iter().skip(n), resolver, &genercs_idents);
 
     let sign_args = fn_args(fixture).take(n);
-    let fixture_args = fn_args_idents(fixture).cloned().collect::<Vec<_>>();
+    let fixture_args = fn_args_idents(fixture)
+        .map(|arg| parse_quote! {#arg})
+        .collect::<Vec<_>>();
     let name = Ident::new(&format!("partial_{n}"), Span::call_site());
 
     let call_get = render_exec_call(
@@ -150,7 +155,7 @@ mod should {
     use rstest_test::{assert_in, assert_not_in};
     use syn::{
         parse::{Parse, ParseStream},
-        parse2, parse_str, ItemFn, ItemImpl, ItemStruct, Result,
+        parse2, parse_str, ItemImpl, ItemStruct, Result,
     };
 
     use crate::parse::{

@@ -32,8 +32,10 @@ impl ArrayOfTables {
         a
     }
 
-    /// Returns the location within the original document
-    pub(crate) fn span(&self) -> Option<std::ops::Range<usize>> {
+    /// The location within the original document
+    ///
+    /// This generally requires an [`ImDocument`][crate::ImDocument].
+    pub fn span(&self) -> Option<std::ops::Range<usize>> {
         self.span.clone()
     }
 
@@ -62,14 +64,14 @@ impl ArrayOfTables {
         self.values.len()
     }
 
-    /// Returns true iff `self.len() == 0`.
+    /// Returns true if `self.len() == 0`.
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }
 
     /// Removes all the tables.
     pub fn clear(&mut self) {
-        self.values.clear()
+        self.values.clear();
     }
 
     /// Returns an optional reference to the table.

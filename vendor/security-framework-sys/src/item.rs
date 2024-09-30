@@ -11,6 +11,8 @@ extern "C" {
     pub static kSecMatchLimit: CFStringRef;
     pub static kSecMatchLimitAll: CFStringRef;
 
+    pub static kSecMatchTrustedOnly: CFStringRef;
+
     pub static kSecReturnData: CFStringRef;
     pub static kSecReturnAttributes: CFStringRef;
     pub static kSecReturnRef: CFStringRef;
@@ -32,11 +34,11 @@ extern "C" {
     pub static kSecAttrKeyClassSymmetric: CFStringRef;
 
     pub static kSecUseKeychain: CFStringRef;
-    #[cfg(any(feature = "OSX_10_15", target_os = "ios"))]
+    #[cfg(any(feature = "OSX_10_15", target_os = "ios", target_os = "tvos", target_os = "watchos"))]
     pub static kSecUseDataProtectionKeychain: CFStringRef;
-    #[cfg(any(feature = "OSX_10_12", target_os = "ios"))]
+    #[cfg(any(feature = "OSX_10_12", target_os = "ios", target_os = "tvos", target_os = "watchos"))]
     pub static kSecAttrTokenID: CFStringRef;
-    #[cfg(any(feature = "OSX_10_12", target_os = "ios"))]
+    #[cfg(any(feature = "OSX_10_12", target_os = "ios", target_os = "tvos", target_os = "watchos"))]
     pub static kSecAttrTokenIDSecureEnclave: CFStringRef;
 
     pub static kSecAttrKeySizeInBits: CFStringRef;
@@ -57,7 +59,7 @@ extern "C" {
     pub static kSecAttrKeyTypeRC2: CFStringRef;
     #[cfg(target_os = "macos")]
     pub static kSecAttrKeyTypeCAST: CFStringRef;
-    #[cfg(any(feature = "OSX_10_9", target_os = "ios"))]
+    #[cfg(any(feature = "OSX_10_9", target_os = "ios", target_os = "tvos", target_os = "watchos"))]
     pub static kSecAttrKeyTypeEC: CFStringRef;
 
     pub static kSecAttrAccessGroup: CFStringRef;

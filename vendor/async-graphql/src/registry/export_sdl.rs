@@ -95,15 +95,6 @@ impl Registry {
     pub(crate) fn export_sdl(&self, options: SDLExportOptions) -> String {
         let mut sdl = String::new();
 
-        let has_oneof = self
-            .types
-            .values()
-            .any(|ty| matches!(ty, MetaType::InputObject { oneof: true, .. }));
-
-        if has_oneof {
-            sdl.write_str("directive @oneOf on INPUT_OBJECT\n\n").ok();
-        }
-
         for ty in self.types.values() {
             if ty.name().starts_with("__") {
                 continue;
@@ -121,6 +112,46 @@ impl Registry {
         }
 
         self.directives.values().for_each(|directive| {
+            // Filter out deprecated directive from SDL if it is not used
+            if directive.name == "deprecated"
+                && !self.types.values().any(|ty| match ty {
+                    MetaType::Object { fields, .. } => fields
+                        .values()
+                        .any(|field| field.deprecation.is_deprecated()),
+                    MetaType::Enum { enum_values, .. } => enum_values
+                        .values()
+                        .any(|value| value.deprecation.is_deprecated()),
+                    _ => false,
+                })
+            {
+                return;
+            }
+
+            // Filter out specifiedBy directive from SDL if it is not used
+            if directive.name == "specifiedBy"
+                && !self.types.values().any(|ty| {
+                    matches!(
+                        ty,
+                        MetaType::Scalar {
+                            specified_by_url: Some(_),
+                            ..
+                        }
+                    )
+                })
+            {
+                return;
+            }
+
+            // Filter out oneOf directive from SDL if it is not used
+            if directive.name == "oneOf"
+                && !self
+                    .types
+                    .values()
+                    .any(|ty| matches!(ty, MetaType::InputObject { oneof: true, .. }))
+            {
+                return;
+            }
+
             writeln!(sdl, "{}", directive.sdl()).ok();
         });
 
@@ -227,6 +258,10 @@ impl Registry {
                         for tag in &arg.tags {
                             write!(sdl, " @tag(name: \"{}\")", tag.replace('"', "\\\"")).ok();
                         }
+                    }
+
+                    for directive in &arg.directive_invocations {
+                        write!(sdl, " {}", directive.sdl()).ok();
                     }
                 }
 
@@ -406,6 +441,7 @@ impl Registry {
                 description,
                 inaccessible,
                 tags,
+                directive_invocations,
                 ..
             } => {
                 if let Some(description) = description {
@@ -431,6 +467,11 @@ impl Registry {
                         write!(sdl, " @tag(name: \"{}\")", tag.replace('"', "\\\"")).ok();
                     }
                 }
+
+                for directive in directive_invocations {
+                    write!(sdl, " {}", directive.sdl()).ok();
+                }
+
                 self.write_implements(sdl, name);
 
                 writeln!(sdl, " {{").ok();
@@ -443,6 +484,7 @@ impl Registry {
                 description,
                 inaccessible,
                 tags,
+                directive_invocations,
                 ..
             } => {
                 if let Some(description) = description {
@@ -458,6 +500,11 @@ impl Registry {
                         write!(sdl, " @tag(name: \"{}\")", tag.replace('"', "\\\"")).ok();
                     }
                 }
+
+                for directive in directive_invocations {
+                    write!(sdl, " {}", directive.sdl()).ok();
+                }
+
                 writeln!(sdl, " {{").ok();
 
                 let mut values = enum_values.values().collect::<Vec<_>>();
@@ -481,6 +528,11 @@ impl Registry {
                             write!(sdl, " @tag(name: \"{}\")", tag.replace('"', "\\\"")).ok();
                         }
                     }
+
+                    for directive in &value.directive_invocations {
+                        write!(sdl, " {}", directive.sdl()).ok();
+                    }
+
                     writeln!(sdl).ok();
                 }
 
@@ -493,6 +545,7 @@ impl Registry {
                 inaccessible,
                 tags,
                 oneof,
+                directive_invocations: raw_directives,
                 ..
             } => {
                 if let Some(description) = description {
@@ -512,6 +565,11 @@ impl Registry {
                         write!(sdl, " @tag(name: \"{}\")", tag.replace('"', "\\\"")).ok();
                     }
                 }
+
+                for directive in raw_directives {
+                    write!(sdl, " {}", directive.sdl()).ok();
+                }
+
                 writeln!(sdl, " {{").ok();
 
                 let mut fields = input_fields.values().collect::<Vec<_>>();
@@ -531,6 +589,9 @@ impl Registry {
                         for tag in &field.tags {
                             write!(sdl, " @tag(name: \"{}\")", tag.replace('"', "\\\"")).ok();
                         }
+                    }
+                    for directive in &field.directive_invocations {
+                        write!(sdl, " {}", directive.sdl()).ok();
                     }
                     writeln!(sdl).ok();
                 }
@@ -722,6 +783,7 @@ schema {
                         inaccessible: false,
                         tags: vec![],
                         is_secret: false,
+                        directive_invocations: vec![],
                     },
                 ),
                 (
@@ -735,6 +797,7 @@ schema {
                         inaccessible: false,
                         tags: vec![],
                         is_secret: false,
+                        directive_invocations: vec![],
                     },
                 ),
             ]

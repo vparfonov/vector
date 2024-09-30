@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "tikv-jemallocator"
-version = "0.5.4"
+version = "0.6.0"
 authors = [
     "Alex Crichton <alex@alexcrichton.com>",
     "Gonzalo Brito Gadeschi <gonzalobg88@gmail.com>",
@@ -48,19 +48,20 @@ rustdoc-args = [
 test = false
 bench = false
 
+[[test]]
+name = "ffi"
+required-features = ["stats"]
+
 [dependencies.libc]
 version = "^0.2.8"
 default-features = false
 
 [dependencies.tikv-jemalloc-sys]
-version = "0.5.0"
+version = "0.6.0"
 default-features = false
 
 [dev-dependencies.paste]
 version = "1"
-
-[dev-dependencies.tikv-jemalloc-ctl]
-version = "0.5.0"
 
 [features]
 alloc_trait = []

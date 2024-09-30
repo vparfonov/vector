@@ -2,6 +2,11 @@
 
 // Atomic load/store implementation on RISC-V.
 //
+// This is for RISC-V targets without atomic CAS. (rustc doesn't provide atomics
+// at all on such targets. https://github.com/rust-lang/rust/pull/114499)
+//
+// Also, optionally provides RMW implementation when force-amo is enabled.
+//
 // Refs:
 // - RISC-V Instruction Set Manual Volume I: Unprivileged ISA
 //   https://riscv.org/wp-content/uploads/2019/12/riscv-spec-20191213.pdf
@@ -282,8 +287,7 @@ macro_rules! atomic {
 
             #[inline]
             pub(crate) fn fetch_not(&self, order: Ordering) -> $value_type {
-                const NOT_MASK: $value_type = (0 as $value_type).wrapping_sub(1);
-                self.fetch_xor(NOT_MASK, order)
+                self.fetch_xor(!0, order)
             }
 
             #[inline]
@@ -350,8 +354,7 @@ macro_rules! atomic_sub_word {
 
             #[inline]
             pub(crate) fn fetch_not(&self, order: Ordering) -> $value_type {
-                const NOT_MASK: $value_type = (0 as $value_type).wrapping_sub(1);
-                self.fetch_xor(NOT_MASK, order)
+                self.fetch_xor(!0, order)
             }
         }
     };

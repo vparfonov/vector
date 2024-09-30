@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "postgres-types"
-version = "0.2.6"
+version = "0.2.7"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 description = "Conversions between Rust and Postgres values"
 readme = "README.md"
@@ -23,7 +23,7 @@ keywords = [
     "sql",
 ]
 categories = ["database"]
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/sfackler/rust-postgres"
 resolver = "2"
 
@@ -59,6 +59,7 @@ package = "eui48"
 [dependencies.eui48-1]
 version = "1.0"
 optional = true
+default-features = false
 package = "eui48"
 
 [dependencies.fallible-iterator]
@@ -79,7 +80,7 @@ version = "0.4.5"
 optional = true
 
 [dependencies.postgres-protocol]
-version = "0.6.5"
+version = "0.6.7"
 
 [dependencies.serde-1]
 version = "1.0"
@@ -121,6 +122,7 @@ package = "uuid"
 [features]
 array-impls = ["array-init"]
 derive = ["postgres-derive"]
+js = ["postgres-protocol/js"]
 with-bit-vec-0_6 = ["bit-vec-06"]
 with-chrono-0_4 = ["chrono-04"]
 with-cidr-0_2 = ["cidr-02"]

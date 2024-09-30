@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "graphql_client"
-version = "0.13.0"
+version = "0.14.0"
 authors = ["Tom Houlé <tom@tomhoule.com>"]
 description = "Typed GraphQL requests and responses"
 homepage = "https://github.com/graphql-rust/graphql-client"
@@ -37,7 +37,7 @@ resolver = "2"
 features = ["reqwest"]
 
 [dependencies.graphql_query_derive]
-version = "0.13.0"
+version = "0.14.0"
 optional = true
 
 [dependencies.reqwest-crate]

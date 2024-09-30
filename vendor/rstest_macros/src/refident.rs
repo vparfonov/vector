@@ -34,10 +34,22 @@ impl<'a> RefIdent for &'a Ident {
 impl MaybeIdent for FnArg {
     fn maybe_ident(&self) -> Option<&Ident> {
         match self {
-            FnArg::Typed(PatType { pat, .. }) => match pat.as_ref() {
-                Pat::Ident(ident) => Some(&ident.ident),
-                _ => None,
-            },
+            FnArg::Typed(pat) => pat.maybe_ident(),
+            _ => None,
+        }
+    }
+}
+
+impl MaybeIdent for PatType {
+    fn maybe_ident(&self) -> Option<&Ident> {
+        self.pat.maybe_ident()
+    }
+}
+
+impl MaybeIdent for Pat {
+    fn maybe_ident(&self) -> Option<&Ident> {
+        match self {
+            Pat::Ident(ident) => Some(&ident.ident),
             _ => None,
         }
     }
@@ -84,5 +96,35 @@ impl MaybeIdent for crate::parse::Attribute {
         match self {
             Attr(ident) | Tagged(ident, _) | Type(ident, _) => Some(ident),
         }
+    }
+}
+
+pub trait MaybePatIdent {
+    fn maybe_patident(&self) -> Option<&syn::PatIdent>;
+}
+
+impl MaybePatIdent for FnArg {
+    fn maybe_patident(&self) -> Option<&syn::PatIdent> {
+        match self {
+            FnArg::Typed(PatType { pat, .. }) => match pat.as_ref() {
+                Pat::Ident(ident) => Some(ident),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+}
+
+pub trait RemoveMutability {
+    fn remove_mutability(&mut self);
+}
+
+impl RemoveMutability for FnArg {
+    fn remove_mutability(&mut self) {
+        if let FnArg::Typed(PatType { pat, .. }) = self {
+            if let Pat::Ident(ident) = pat.as_mut() {
+                ident.mutability = None
+            }
+        };
     }
 }

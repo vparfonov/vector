@@ -1,17 +1,36 @@
 //! Contains definitions from `luacode.h`.
 
 use std::os::raw::{c_char, c_int, c_void};
-use std::slice;
+use std::{ptr, slice};
 
 #[repr(C)]
+#[non_exhaustive]
 pub struct lua_CompileOptions {
     pub optimizationLevel: c_int,
     pub debugLevel: c_int,
+    pub typeInfoLevel: c_int,
     pub coverageLevel: c_int,
     pub vectorLib: *const c_char,
     pub vectorCtor: *const c_char,
     pub vectorType: *const c_char,
     pub mutableGlobals: *const *const c_char,
+    pub userdataTypes: *const *const c_char,
+}
+
+impl Default for lua_CompileOptions {
+    fn default() -> Self {
+        Self {
+            optimizationLevel: 1,
+            debugLevel: 1,
+            typeInfoLevel: 0,
+            coverageLevel: 0,
+            vectorLib: ptr::null(),
+            vectorCtor: ptr::null(),
+            vectorType: ptr::null(),
+            mutableGlobals: ptr::null(),
+            userdataTypes: ptr::null(),
+        }
+    }
 }
 
 extern "C-unwind" {
@@ -36,6 +55,7 @@ pub unsafe fn luau_compile(source: &[u8], mut options: lua_CompileOptions) -> Ve
         &mut options,
         &mut outsize,
     );
+    assert!(!data_ptr.is_null(), "luau_compile failed");
     let data = slice::from_raw_parts(data_ptr as *mut u8, outsize).to_vec();
     free(data_ptr as *mut c_void);
     data

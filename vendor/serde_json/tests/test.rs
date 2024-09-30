@@ -1,4 +1,3 @@
-#![cfg(not(feature = "preserve_order"))]
 #![allow(
     clippy::assertions_on_result_states,
     clippy::cast_precision_loss,
@@ -7,6 +6,7 @@
     clippy::float_cmp,
     clippy::incompatible_msrv, // https://github.com/rust-lang/rust-clippy/issues/12257
     clippy::items_after_statements,
+    clippy::large_digit_groups,
     clippy::let_underscore_untyped,
     clippy::shadow_unrelated,
     clippy::too_many_lines,
@@ -44,8 +44,6 @@ use std::marker::PhantomData;
 use std::mem;
 use std::str::FromStr;
 use std::{f32, f64};
-use std::{i16, i32, i64, i8};
-use std::{u16, u32, u64, u8};
 
 macro_rules! treemap {
     () => {
@@ -158,28 +156,28 @@ fn test_write_f64() {
 
 #[test]
 fn test_encode_nonfinite_float_yields_null() {
-    let v = to_value(::std::f64::NAN.copysign(1.0)).unwrap();
+    let v = to_value(f64::NAN.copysign(1.0)).unwrap();
     assert!(v.is_null());
 
-    let v = to_value(::std::f64::NAN.copysign(-1.0)).unwrap();
+    let v = to_value(f64::NAN.copysign(-1.0)).unwrap();
     assert!(v.is_null());
 
-    let v = to_value(::std::f64::INFINITY).unwrap();
+    let v = to_value(f64::INFINITY).unwrap();
     assert!(v.is_null());
 
-    let v = to_value(-::std::f64::INFINITY).unwrap();
+    let v = to_value(-f64::INFINITY).unwrap();
     assert!(v.is_null());
 
-    let v = to_value(::std::f32::NAN.copysign(1.0)).unwrap();
+    let v = to_value(f32::NAN.copysign(1.0)).unwrap();
     assert!(v.is_null());
 
-    let v = to_value(::std::f32::NAN.copysign(-1.0)).unwrap();
+    let v = to_value(f32::NAN.copysign(-1.0)).unwrap();
     assert!(v.is_null());
 
-    let v = to_value(::std::f32::INFINITY).unwrap();
+    let v = to_value(f32::INFINITY).unwrap();
     assert!(v.is_null());
 
-    let v = to_value(-::std::f32::INFINITY).unwrap();
+    let v = to_value(-f32::INFINITY).unwrap();
     assert!(v.is_null());
 }
 
@@ -2102,20 +2100,20 @@ fn issue_220() {
     assert_eq!(from_str::<E>(r#"{"V": 0}"#).unwrap(), E::V(0));
 }
 
-macro_rules! number_partialeq_ok {
-    ($($n:expr)*) => {
-        $(
-            let value = to_value($n).unwrap();
-            let s = $n.to_string();
-            assert_eq!(value, $n);
-            assert_eq!($n, value);
-            assert_ne!(value, s);
-        )*
-    }
-}
-
 #[test]
 fn test_partialeq_number() {
+    macro_rules! number_partialeq_ok {
+        ($($n:expr)*) => {
+            $(
+                let value = to_value($n).unwrap();
+                let s = $n.to_string();
+                assert_eq!(value, $n);
+                assert_eq!($n, value);
+                assert_ne!(value, s);
+            )*
+        };
+    }
+
     number_partialeq_ok!(0 1 100
         i8::MIN i8::MAX i16::MIN i16::MAX i32::MIN i32::MAX i64::MIN i64::MAX
         u8::MIN u8::MAX u16::MIN u16::MAX u32::MIN u32::MAX u64::MIN u64::MAX
@@ -2124,13 +2122,6 @@ fn test_partialeq_number() {
         f32::consts::E f32::consts::PI f32::consts::LN_2 f32::consts::LOG2_E
         f64::consts::E f64::consts::PI f64::consts::LN_2 f64::consts::LOG2_E
     );
-}
-
-#[test]
-#[cfg(integer128)]
-#[cfg(feature = "arbitrary_precision")]
-fn test_partialeq_integer128() {
-    number_partialeq_ok!(i128::MIN i128::MAX u128::MIN u128::MAX)
 }
 
 #[test]
@@ -2240,8 +2231,8 @@ fn null_invalid_type() {
 
 #[test]
 fn test_integer128() {
-    let signed = &[i128::min_value(), -1, 0, 1, i128::max_value()];
-    let unsigned = &[0, 1, u128::max_value()];
+    let signed = &[i128::MIN, -1, 0, 1, i128::MAX];
+    let unsigned = &[0, 1, u128::MAX];
 
     for integer128 in signed {
         let expected = integer128.to_string();
@@ -2277,8 +2268,8 @@ fn test_integer128() {
 
 #[test]
 fn test_integer128_to_value() {
-    let signed = &[i128::from(i64::min_value()), i128::from(u64::max_value())];
-    let unsigned = &[0, u128::from(u64::max_value())];
+    let signed = &[i128::from(i64::MIN), i128::from(u64::MAX)];
+    let unsigned = &[0, u128::from(u64::MAX)];
 
     for integer128 in signed {
         let expected = integer128.to_string();
@@ -2291,7 +2282,7 @@ fn test_integer128_to_value() {
     }
 
     if !cfg!(feature = "arbitrary_precision") {
-        let err = to_value(u128::from(u64::max_value()) + 1).unwrap_err();
+        let err = to_value(u128::from(u64::MAX) + 1).unwrap_err();
         assert_eq!(err.to_string(), "number out of range");
     }
 }
@@ -2320,9 +2311,9 @@ fn test_borrowed_raw_value() {
     let array_from_str: Vec<&RawValue> =
         serde_json::from_str(r#"["a", 42, {"foo": "bar"}, null]"#).unwrap();
     assert_eq!(r#""a""#, array_from_str[0].get());
-    assert_eq!(r#"42"#, array_from_str[1].get());
+    assert_eq!("42", array_from_str[1].get());
     assert_eq!(r#"{"foo": "bar"}"#, array_from_str[2].get());
-    assert_eq!(r#"null"#, array_from_str[3].get());
+    assert_eq!("null", array_from_str[3].get());
 
     let array_to_string = serde_json::to_string(&array_from_str).unwrap();
     assert_eq!(r#"["a",42,{"foo": "bar"},null]"#, array_to_string);
@@ -2335,6 +2326,8 @@ fn test_raw_value_in_map_key() {
     #[repr(transparent)]
     struct RawMapKey(RawValue);
 
+    #[allow(unknown_lints)]
+    #[allow(non_local_definitions)] // false positive: https://github.com/rust-lang/rust/issues/121621
     impl<'de> Deserialize<'de> for &'de RawMapKey {
         fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where
@@ -2397,16 +2390,16 @@ fn test_boxed_raw_value() {
     let array_from_str: Vec<Box<RawValue>> =
         serde_json::from_str(r#"["a", 42, {"foo": "bar"}, null]"#).unwrap();
     assert_eq!(r#""a""#, array_from_str[0].get());
-    assert_eq!(r#"42"#, array_from_str[1].get());
+    assert_eq!("42", array_from_str[1].get());
     assert_eq!(r#"{"foo": "bar"}"#, array_from_str[2].get());
-    assert_eq!(r#"null"#, array_from_str[3].get());
+    assert_eq!("null", array_from_str[3].get());
 
     let array_from_reader: Vec<Box<RawValue>> =
         serde_json::from_reader(br#"["a", 42, {"foo": "bar"}, null]"#.as_ref()).unwrap();
     assert_eq!(r#""a""#, array_from_reader[0].get());
-    assert_eq!(r#"42"#, array_from_reader[1].get());
+    assert_eq!("42", array_from_reader[1].get());
     assert_eq!(r#"{"foo": "bar"}"#, array_from_reader[2].get());
-    assert_eq!(r#"null"#, array_from_reader[3].get());
+    assert_eq!("null", array_from_reader[3].get());
 
     let array_to_string = serde_json::to_string(&array_from_str).unwrap();
     assert_eq!(r#"["a",42,{"foo": "bar"},null]"#, array_to_string);

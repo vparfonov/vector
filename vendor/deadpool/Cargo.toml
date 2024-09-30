@@ -11,8 +11,9 @@
 
 [package]
 edition = "2018"
+rust-version = "1.63"
 name = "deadpool"
-version = "0.9.5"
+version = "0.10.0"
 authors = ["Michael P. Jung <michael.jung@terreon.de>"]
 description = "Dead simple async pool"
 readme = "README.md"
@@ -21,7 +22,7 @@ keywords = [
     "database",
     "pool",
 ]
-license = "MIT/Apache-2.0"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/bikeshedder/deadpool"
 resolver = "2"
 
@@ -50,9 +51,6 @@ version = "0.1"
 [dependencies.num_cpus]
 version = "1.11.1"
 
-[dependencies.retain_mut]
-version = "0.1.6"
-
 [dependencies.serde]
 version = "1.0.103"
 features = ["derive"]
@@ -71,8 +69,11 @@ version = "0.13"
 features = ["json"]
 
 [dev-dependencies.criterion]
-version = "0.3"
-features = ["html_reports"]
+version = "0.3.4"
+features = [
+    "html_reports",
+    "async_tokio",
+]
 
 [dev-dependencies.itertools]
 version = "0.10.3"

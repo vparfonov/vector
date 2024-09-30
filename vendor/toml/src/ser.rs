@@ -43,9 +43,9 @@
 /// println!("{}", toml)
 /// ```
 #[cfg(feature = "display")]
-pub fn to_string<T: ?Sized>(value: &T) -> Result<String, Error>
+pub fn to_string<T>(value: &T) -> Result<String, Error>
 where
-    T: serde::ser::Serialize,
+    T: serde::ser::Serialize + ?Sized,
 {
     let mut output = String::new();
     let serializer = Serializer::new(&mut output);
@@ -63,9 +63,9 @@ where
 /// For greater customization, instead serialize to a
 /// [`toml_edit::DocumentMut`](https://docs.rs/toml_edit/latest/toml_edit/struct.DocumentMut.html).
 #[cfg(feature = "display")]
-pub fn to_string_pretty<T: ?Sized>(value: &T) -> Result<String, Error>
+pub fn to_string_pretty<T>(value: &T) -> Result<String, Error>
 where
-    T: serde::ser::Serialize,
+    T: serde::ser::Serialize + ?Sized,
 {
     let mut output = String::new();
     let serializer = Serializer::pretty(&mut output);
@@ -301,9 +301,9 @@ impl<'d> serde::ser::Serializer for Serializer<'d> {
         )
     }
 
-    fn serialize_some<T: ?Sized>(self, v: &T) -> Result<Self::Ok, Self::Error>
+    fn serialize_some<T>(self, v: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: serde::ser::Serialize,
+        T: serde::ser::Serialize + ?Sized,
     {
         write_document(
             self.dst,
@@ -345,13 +345,9 @@ impl<'d> serde::ser::Serializer for Serializer<'d> {
         )
     }
 
-    fn serialize_newtype_struct<T: ?Sized>(
-        self,
-        name: &'static str,
-        v: &T,
-    ) -> Result<Self::Ok, Self::Error>
+    fn serialize_newtype_struct<T>(self, name: &'static str, v: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: serde::ser::Serialize,
+        T: serde::ser::Serialize + ?Sized,
     {
         write_document(
             self.dst,
@@ -360,7 +356,7 @@ impl<'d> serde::ser::Serializer for Serializer<'d> {
         )
     }
 
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T>(
         self,
         name: &'static str,
         variant_index: u32,
@@ -368,7 +364,7 @@ impl<'d> serde::ser::Serializer for Serializer<'d> {
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: serde::ser::Serialize,
+        T: serde::ser::Serialize + ?Sized,
     {
         write_document(
             self.dst,
@@ -617,9 +613,9 @@ impl<'d> serde::ser::Serializer for ValueSerializer<'d> {
         )
     }
 
-    fn serialize_some<T: ?Sized>(self, v: &T) -> Result<Self::Ok, Self::Error>
+    fn serialize_some<T>(self, v: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: serde::ser::Serialize,
+        T: serde::ser::Serialize + ?Sized,
     {
         write_value(
             self.dst,
@@ -657,13 +653,9 @@ impl<'d> serde::ser::Serializer for ValueSerializer<'d> {
         )
     }
 
-    fn serialize_newtype_struct<T: ?Sized>(
-        self,
-        name: &'static str,
-        v: &T,
-    ) -> Result<Self::Ok, Self::Error>
+    fn serialize_newtype_struct<T>(self, name: &'static str, v: &T) -> Result<Self::Ok, Self::Error>
     where
-        T: serde::ser::Serialize,
+        T: serde::ser::Serialize + ?Sized,
     {
         write_value(
             self.dst,
@@ -671,7 +663,7 @@ impl<'d> serde::ser::Serializer for ValueSerializer<'d> {
         )
     }
 
-    fn serialize_newtype_variant<T: ?Sized>(
+    fn serialize_newtype_variant<T>(
         self,
         name: &'static str,
         variant_index: u32,
@@ -679,7 +671,7 @@ impl<'d> serde::ser::Serializer for ValueSerializer<'d> {
         value: &T,
     ) -> Result<Self::Ok, Self::Error>
     where
-        T: serde::ser::Serialize,
+        T: serde::ser::Serialize + ?Sized,
     {
         write_value(
             self.dst,
@@ -750,11 +742,14 @@ impl<'d> serde::ser::Serializer for ValueSerializer<'d> {
 }
 
 #[cfg(feature = "display")]
-use internal::*;
+use internal::{
+    write_document, write_value, SerializeDocumentArray, SerializeDocumentTable,
+    SerializeValueArray, SerializeValueTable,
+};
 
 #[cfg(feature = "display")]
 mod internal {
-    use super::*;
+    use super::{Error, Serializer, ValueSerializer};
 
     use crate::fmt::DocumentFormatter;
 
@@ -782,9 +777,9 @@ mod internal {
         type Ok = ();
         type Error = Error;
 
-        fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+        fn serialize_element<T>(&mut self, value: &T) -> Result<(), Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_element(value).map_err(Error::wrap)
         }
@@ -798,9 +793,9 @@ mod internal {
         type Ok = ();
         type Error = Error;
 
-        fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+        fn serialize_element<T>(&mut self, value: &T) -> Result<(), Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_element(value).map_err(Error::wrap)
         }
@@ -814,9 +809,9 @@ mod internal {
         type Ok = ();
         type Error = Error;
 
-        fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+        fn serialize_field<T>(&mut self, value: &T) -> Result<(), Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_field(value).map_err(Error::wrap)
         }
@@ -830,9 +825,9 @@ mod internal {
         type Ok = ();
         type Error = Error;
 
-        fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+        fn serialize_field<T>(&mut self, value: &T) -> Result<(), Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_field(value).map_err(Error::wrap)
         }
@@ -866,16 +861,16 @@ mod internal {
         type Ok = ();
         type Error = Error;
 
-        fn serialize_key<T: ?Sized>(&mut self, input: &T) -> Result<(), Self::Error>
+        fn serialize_key<T>(&mut self, input: &T) -> Result<(), Self::Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_key(input).map_err(Error::wrap)
         }
 
-        fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+        fn serialize_value<T>(&mut self, value: &T) -> Result<(), Self::Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_value(value).map_err(Error::wrap)
         }
@@ -889,13 +884,9 @@ mod internal {
         type Ok = ();
         type Error = Error;
 
-        fn serialize_field<T: ?Sized>(
-            &mut self,
-            key: &'static str,
-            value: &T,
-        ) -> Result<(), Self::Error>
+        fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_field(key, value).map_err(Error::wrap)
         }
@@ -911,6 +902,7 @@ mod internal {
         value: Result<toml_edit::Value, crate::edit::ser::Error>,
     ) -> Result<(), Error> {
         use std::fmt::Write;
+        use toml_edit::visit_mut::VisitMut as _;
 
         let value = value.map_err(Error::wrap)?;
         let mut table = match toml_edit::Item::Value(value).into_table() {
@@ -920,7 +912,6 @@ mod internal {
             }
         };
 
-        use toml_edit::visit_mut::VisitMut as _;
         settings.visit_table_mut(&mut table);
 
         let doc: toml_edit::DocumentMut = table.into();
@@ -951,9 +942,9 @@ mod internal {
         type Ok = ();
         type Error = Error;
 
-        fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+        fn serialize_element<T>(&mut self, value: &T) -> Result<(), Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_element(value).map_err(Error::wrap)
         }
@@ -967,9 +958,9 @@ mod internal {
         type Ok = ();
         type Error = Error;
 
-        fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+        fn serialize_element<T>(&mut self, value: &T) -> Result<(), Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_element(value).map_err(Error::wrap)
         }
@@ -983,9 +974,9 @@ mod internal {
         type Ok = ();
         type Error = Error;
 
-        fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+        fn serialize_field<T>(&mut self, value: &T) -> Result<(), Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_field(value).map_err(Error::wrap)
         }
@@ -999,9 +990,9 @@ mod internal {
         type Ok = ();
         type Error = Error;
 
-        fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Error>
+        fn serialize_field<T>(&mut self, value: &T) -> Result<(), Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_field(value).map_err(Error::wrap)
         }
@@ -1033,16 +1024,16 @@ mod internal {
         type Ok = ();
         type Error = Error;
 
-        fn serialize_key<T: ?Sized>(&mut self, input: &T) -> Result<(), Self::Error>
+        fn serialize_key<T>(&mut self, input: &T) -> Result<(), Self::Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_key(input).map_err(Error::wrap)
         }
 
-        fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+        fn serialize_value<T>(&mut self, value: &T) -> Result<(), Self::Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_value(value).map_err(Error::wrap)
         }
@@ -1056,13 +1047,9 @@ mod internal {
         type Ok = ();
         type Error = Error;
 
-        fn serialize_field<T: ?Sized>(
-            &mut self,
-            key: &'static str,
-            value: &T,
-        ) -> Result<(), Self::Error>
+        fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
         where
-            T: serde::ser::Serialize,
+            T: serde::ser::Serialize + ?Sized,
         {
             self.inner.serialize_field(key, value).map_err(Error::wrap)
         }

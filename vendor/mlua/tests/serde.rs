@@ -99,7 +99,7 @@ fn test_serialize_in_scope() -> LuaResult<()> {
         Err(e) => panic!("expected destructed error, got {}", e),
     }
 
-    struct MyUserDataRef<'a>(&'a ());
+    struct MyUserDataRef<'a>(#[allow(unused)] &'a ());
 
     impl<'a> UserData for MyUserDataRef<'a> {}
 
@@ -111,6 +111,21 @@ fn test_serialize_in_scope() -> LuaResult<()> {
         };
         Ok(())
     })?;
+
+    Ok(())
+}
+
+#[test]
+fn test_serialize_any_userdata() -> Result<(), Box<dyn StdError>> {
+    let lua = Lua::new();
+
+    let json_val = serde_json::json!({
+        "a": 1,
+        "b": "test",
+    });
+    let json_ud = lua.create_ser_any_userdata(json_val)?;
+    let json_str = serde_json::to_string_pretty(&json_ud)?;
+    assert_eq!(json_str, "{\n  \"a\": 1,\n  \"b\": \"test\"\n}");
 
     Ok(())
 }
@@ -250,6 +265,27 @@ fn test_serialize_globals() -> LuaResult<()> {
     ) {
         panic!("expected no errors, got {err:?}");
     }
+
+    Ok(())
+}
+
+#[test]
+fn test_serialize_same_table_twice() -> LuaResult<()> {
+    let lua = Lua::new();
+
+    let value = lua
+        .load(
+            r#"
+        local foo = {}
+        return {
+            a = foo,
+            b = foo,
+        }
+    "#,
+        )
+        .eval::<Value>()?;
+    let json = serde_json::to_string(&value.to_serializable().sort_keys(true)).unwrap();
+    assert_eq!(json, r#"{"a":{},"b":{}}"#);
 
     Ok(())
 }
@@ -696,4 +732,62 @@ fn test_from_value_sorted() -> Result<(), Box<dyn StdError>> {
     .unwrap();
 
     Ok(())
+}
+
+#[test]
+fn test_arbitrary_precision() {
+    let lua = Lua::new();
+
+    let opts = SerializeOptions::new().detect_serde_json_arbitrary_precision(true);
+
+    // Number
+    let num = serde_json::Value::Number(serde_json::Number::from_f64(1.244e2).unwrap());
+    let num = lua.to_value_with(&num, opts).unwrap();
+    assert_eq!(num, Value::Number(1.244e2));
+
+    // Integer
+    let num = serde_json::Value::Number(serde_json::Number::from_f64(123.0).unwrap());
+    let num = lua.to_value_with(&num, opts).unwrap();
+    assert_eq!(num, Value::Integer(123));
+
+    // Max u64
+    let num = serde_json::Value::Number(serde_json::Number::from(i64::MAX));
+    let num = lua.to_value_with(&num, opts).unwrap();
+    assert_eq!(num, Value::Number(i64::MAX as f64));
+
+    // Check that the option is disabled by default
+    let num = serde_json::Value::Number(serde_json::Number::from_f64(1.244e2).unwrap());
+    let num = lua.to_value(&num).unwrap();
+    assert_eq!(num.type_name(), "table");
+    assert_eq!(
+        format!("{:#?}", num),
+        "{\n  [\"$serde_json::private::Number\"] = \"124.4\",\n}"
+    );
+}
+
+#[cfg(feature = "luau")]
+#[test]
+fn test_buffer_serialize() {
+    let lua = Lua::new();
+
+    let buf = lua.create_buffer(&[1, 2, 3, 4]).unwrap();
+    let val = serde_value::to_value(&buf).unwrap();
+    assert_eq!(val, serde_value::Value::Bytes(vec![1, 2, 3, 4]));
+
+    // Try empty buffer
+    let buf = lua.create_buffer(&[]).unwrap();
+    let val = serde_value::to_value(&buf).unwrap();
+    assert_eq!(val, serde_value::Value::Bytes(vec![]));
+}
+
+#[cfg(feature = "luau")]
+#[test]
+fn test_buffer_from_value() {
+    let lua = Lua::new();
+
+    let buf = lua.create_buffer(&[1, 2, 3, 4]).unwrap();
+    let val = lua
+        .from_value::<serde_value::Value>(Value::UserData(buf))
+        .unwrap();
+    assert_eq!(val, serde_value::Value::Bytes(vec![1, 2, 3, 4]));
 }

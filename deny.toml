@@ -12,6 +12,7 @@ allow = [
   "ISC",
   "MIT",
   "OpenSSL",
+  "Unicode-3.0",
   "Unicode-DFS-2016",
   "Zlib"
 ]
@@ -47,5 +48,5 @@ ignore = [
 [bans]
 multiple-versions = "allow"
 deny = [
-    { name = "ring", wrappers = ["rustls", "sct", "rustls-webpki"] },
+    { name = "ring", wrappers = ["rustls", "sct", "rustls-webpki", "async-nats"] },
 ]

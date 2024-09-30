@@ -15,7 +15,6 @@ use core::cmp::Ordering;
 use core::convert::TryFrom;
 use core::fmt;
 use core::hash::{Hash, Hasher};
-use core::hint::unreachable_unchecked;
 use core::iter::{Product, Sum};
 use core::num::FpCategory;
 use core::ops::{
@@ -1163,10 +1162,10 @@ impl Borrow<f64> for NotNan<f64> {
 #[allow(clippy::derive_ord_xor_partial_ord)]
 impl<T: FloatCore> Ord for NotNan<T> {
     fn cmp(&self, other: &NotNan<T>) -> Ordering {
-        match self.partial_cmp(other) {
-            Some(ord) => ord,
-            None => unsafe { unreachable_unchecked() },
-        }
+        // Can't use unreachable_unchecked because unsafe code can't depend on FloatCore impl.
+        // https://github.com/reem/rust-ordered-float/issues/150
+        self.partial_cmp(other)
+            .expect("partial_cmp failed for non-NaN value")
     }
 }
 
@@ -1189,6 +1188,9 @@ impl NotNan<f64> {
     /// Converts this [`NotNan`]`<`[`f64`]`>` to a [`NotNan`]`<`[`f32`]`>` while giving up on
     /// precision, [using `roundTiesToEven` as rounding mode, yielding `Infinity` on
     /// overflow](https://doc.rust-lang.org/reference/expressions/operator-expr.html#semantics).
+    ///
+    /// Note: For the reverse conversion (from `NotNan<f32>` to `NotNan<f64>`), you can use
+    /// `.into()`.
     pub fn as_f32(self) -> NotNan<f32> {
         // This is not destroying invariants, as it is a pure rounding operation. The only two special
         // cases are where f32 would be overflowing, then the operation yields Infinity, or where
@@ -2532,7 +2534,7 @@ mod impl_rand {
         fn uniform_sampling_panic_on_infinity_notnan() {
             let (low, high) = (
                 NotNan::new(0f64).unwrap(),
-                NotNan::new(core::f64::INFINITY).unwrap(),
+                NotNan::new(f64::INFINITY).unwrap(),
             );
             let uniform = Uniform::new(low, high);
             let _ = uniform.sample(&mut rand::thread_rng());
@@ -2541,7 +2543,7 @@ mod impl_rand {
         #[test]
         #[should_panic]
         fn uniform_sampling_panic_on_infinity_ordered() {
-            let (low, high) = (OrderedFloat(0f64), OrderedFloat(core::f64::INFINITY));
+            let (low, high) = (OrderedFloat(0f64), OrderedFloat(f64::INFINITY));
             let uniform = Uniform::new(low, high);
             let _ = uniform.sample(&mut rand::thread_rng());
         }
@@ -2549,7 +2551,7 @@ mod impl_rand {
         #[test]
         #[should_panic]
         fn uniform_sampling_panic_on_nan_ordered() {
-            let (low, high) = (OrderedFloat(0f64), OrderedFloat(core::f64::NAN));
+            let (low, high) = (OrderedFloat(0f64), OrderedFloat(f64::NAN));
             let uniform = Uniform::new(low, high);
             let _ = uniform.sample(&mut rand::thread_rng());
         }

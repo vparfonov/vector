@@ -10,10 +10,10 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
-rust-version = "1.59"
+edition = "2021"
+rust-version = "1.60"
 name = "event-listener-strategy"
-version = "0.3.0"
+version = "0.5.2"
 authors = ["John Nunley <dev@notgull.net>"]
 exclude = ["/.*"]
 description = "Block or poll on event_listener easily"
@@ -30,7 +30,7 @@ categories = [
     "concurrency",
 ]
 license = "Apache-2.0 OR MIT"
-repository = "https://github.com/smol-rs/event-listener"
+repository = "https://github.com/smol-rs/event-listener-strategy"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -40,14 +40,14 @@ rustdoc-args = [
 ]
 
 [dependencies.event-listener]
-version = "3"
+version = "5.0.0"
 default-features = false
 
 [dependencies.pin-project-lite]
 version = "0.2.12"
 
 [dev-dependencies.futures-lite]
-version = "1.12.0"
+version = "2.0.0"
 
 [features]
 default = ["std"]

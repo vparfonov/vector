@@ -1,5 +1,4 @@
 use alloc::collections::btree_map::{BTreeMap, Entry};
-use alloc::vec::Vec;
 use core::iter;
 use core::ops::RangeBounds;
 
@@ -7,6 +6,9 @@ use crate::RoaringBitmap;
 use crate::RoaringTreemap;
 
 use super::util;
+
+#[cfg(not(feature = "std"))]
+use alloc::vec::Vec;
 
 impl RoaringTreemap {
     /// Creates an empty `RoaringTreemap`.

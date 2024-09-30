@@ -1,4 +1,6 @@
 #![warn(missing_docs)]
+use std::fmt;
+
 use crate::layout::Rect;
 
 /// Position in the terminal
@@ -38,14 +40,14 @@ pub struct Position {
 
 impl Position {
     /// Create a new position
-    pub fn new(x: u16, y: u16) -> Self {
-        Position { x, y }
+    pub const fn new(x: u16, y: u16) -> Self {
+        Self { x, y }
     }
 }
 
 impl From<(u16, u16)> for Position {
     fn from((x, y): (u16, u16)) -> Self {
-        Position { x, y }
+        Self { x, y }
     }
 }
 
@@ -58,6 +60,12 @@ impl From<Position> for (u16, u16) {
 impl From<Rect> for Position {
     fn from(rect: Rect) -> Self {
         rect.as_position()
+    }
+}
+
+impl fmt::Display for Position {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
     }
 }
 
@@ -93,5 +101,11 @@ mod tests {
         let position = Position::from(rect);
         assert_eq!(position.x, 1);
         assert_eq!(position.y, 2);
+    }
+
+    #[test]
+    fn to_string() {
+        let position = Position::new(1, 2);
+        assert_eq!(position.to_string(), "(1, 2)");
     }
 }

@@ -37,7 +37,7 @@ use serde::ser::{Serialize, Serializer};
 /// # }
 /// ```
 #[derive(Eq, Ord)]
-#[cfg_attr(not(doc), repr(transparent))]
+#[repr(transparent)]
 pub struct Bytes {
     bytes: [u8],
 }
@@ -78,6 +78,12 @@ impl Deref for Bytes {
 impl DerefMut for Bytes {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.bytes
+    }
+}
+
+impl<'a> From<&'a [u8]> for &'a Bytes {
+    fn from(bytes: &'a [u8]) -> Self {
+        Bytes::new(bytes)
     }
 }
 

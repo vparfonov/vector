@@ -53,7 +53,7 @@
 //! ```
 
 use std::any::Any;
-use std::convert::{TryFrom};
+use std::convert::TryFrom;
 use std::fmt;
 
 use crate::header::{HeaderMap, HeaderName, HeaderValue};
@@ -233,7 +233,6 @@ impl Request<()> {
     where
         Uri: TryFrom<T>,
         <Uri as TryFrom<T>>::Error: Into<crate::Error>,
-
     {
         Builder::new().method(Method::GET).uri(uri)
     }
@@ -256,7 +255,6 @@ impl Request<()> {
     where
         Uri: TryFrom<T>,
         <Uri as TryFrom<T>>::Error: Into<crate::Error>,
-
     {
         Builder::new().method(Method::PUT).uri(uri)
     }
@@ -279,7 +277,6 @@ impl Request<()> {
     where
         Uri: TryFrom<T>,
         <Uri as TryFrom<T>>::Error: Into<crate::Error>,
-
     {
         Builder::new().method(Method::POST).uri(uri)
     }
@@ -302,7 +299,6 @@ impl Request<()> {
     where
         Uri: TryFrom<T>,
         <Uri as TryFrom<T>>::Error: Into<crate::Error>,
-
     {
         Builder::new().method(Method::DELETE).uri(uri)
     }
@@ -326,7 +322,6 @@ impl Request<()> {
     where
         Uri: TryFrom<T>,
         <Uri as TryFrom<T>>::Error: Into<crate::Error>,
-
     {
         Builder::new().method(Method::OPTIONS).uri(uri)
     }
@@ -349,7 +344,6 @@ impl Request<()> {
     where
         Uri: TryFrom<T>,
         <Uri as TryFrom<T>>::Error: Into<crate::Error>,
-
     {
         Builder::new().method(Method::HEAD).uri(uri)
     }
@@ -372,7 +366,6 @@ impl Request<()> {
     where
         Uri: TryFrom<T>,
         <Uri as TryFrom<T>>::Error: Into<crate::Error>,
-
     {
         Builder::new().method(Method::CONNECT).uri(uri)
     }
@@ -441,7 +434,7 @@ impl<T> Request<T> {
     pub fn new(body: T) -> Request<T> {
         Request {
             head: Parts::new(),
-            body: body,
+            body,
         }
     }
 
@@ -459,10 +452,7 @@ impl<T> Request<T> {
     /// ```
     #[inline]
     pub fn from_parts(parts: Parts, body: T) -> Request<T> {
-        Request {
-            head: parts,
-            body: body,
-        }
+        Request { head: parts, body }
     }
 
     /// Returns a reference to the associated HTTP method.
@@ -918,7 +908,7 @@ impl Builder {
         self.and_then(move |mut head| {
             let name = <HeaderName as TryFrom<K>>::try_from(key).map_err(Into::into)?;
             let value = <HeaderValue as TryFrom<V>>::try_from(value).map_err(Into::into)?;
-            head.headers.append(name, value);
+            head.headers.try_append(name, value)?;
             Ok(head)
         })
     }
@@ -1044,19 +1034,14 @@ impl Builder {
     ///     .unwrap();
     /// ```
     pub fn body<T>(self, body: T) -> Result<Request<T>> {
-        self.inner.map(move |head| {
-            Request {
-                head,
-                body,
-            }
-        })
+        self.inner.map(move |head| Request { head, body })
     }
 
     // private
 
     fn and_then<F>(self, func: F) -> Self
     where
-        F: FnOnce(Parts) -> Result<Parts>
+        F: FnOnce(Parts) -> Result<Parts>,
     {
         Builder {
             inner: self.inner.and_then(func),

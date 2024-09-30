@@ -1,5 +1,5 @@
 /*
- * Copyright 1995-2023 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -817,7 +817,7 @@ BIO *BIO_find_type(BIO *bio, int type)
         ERR_raise(ERR_LIB_BIO, ERR_R_PASSED_NULL_PARAMETER);
         return NULL;
     }
-    mask = type & 0xff;
+    mask = type & BIO_TYPE_MASK;
     do {
         if (bio->method != NULL) {
             mt = bio->method->type;
@@ -965,8 +965,12 @@ static int bio_wait(BIO *bio, time_t max_time, unsigned int nap_milliseconds)
         return 1;
 
 #ifndef OPENSSL_NO_SOCK
-    if (BIO_get_fd(bio, &fd) > 0 && fd < FD_SETSIZE)
-        return BIO_socket_wait(fd, BIO_should_read(bio), max_time);
+    if (BIO_get_fd(bio, &fd) > 0) {
+        int ret = BIO_socket_wait(fd, BIO_should_read(bio), max_time);
+
+        if (ret != -1)
+            return ret;
+    }
 #endif
     /* fall back to polling since no sockets are available */
 

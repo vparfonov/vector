@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.63.0"
+rust-version = "1.74.0"
 name = "lapin"
-version = "2.3.1"
+version = "2.4.0"
 authors = [
     "Geoffroy Couprie <geo.couprie@gmail.com>",
     "Marc-Antoine Perennou <Marc-Antoine@Perennou.com>",
@@ -37,7 +37,7 @@ name = "custom_tls_connection"
 required-features = ["native-tls"]
 
 [dependencies.amq-protocol]
-version = "^7.0"
+version = "^7.2.1"
 default-features = false
 
 [dependencies.async-global-executor-trait]
@@ -54,7 +54,7 @@ version = "^0.1.42"
 version = "^2.1"
 
 [dependencies.flume]
-version = "^0.10"
+version = "^0.11"
 features = ["async"]
 default-features = false
 
@@ -88,7 +88,7 @@ version = "^1.1"
 version = "^2.0"
 
 [dev-dependencies.futures-lite]
-version = "^1.7"
+version = "^2.0"
 
 [dev-dependencies.serde_json]
 version = "^1.0"
@@ -111,7 +111,7 @@ features = ["fmt"]
 version = "^1.1"
 
 [build-dependencies.amq-protocol-codegen]
-version = "^7.0"
+version = "^7.2.1"
 optional = true
 
 [build-dependencies.serde_json]

@@ -1,7 +1,7 @@
 mod array_store;
 mod bitmap_store;
 
-use alloc::{boxed::Box, vec};
+use alloc::vec;
 use core::mem;
 use core::ops::{
     BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, RangeInclusive, Sub, SubAssign,
@@ -15,6 +15,9 @@ pub use self::array_store::ArrayStore;
 pub use self::bitmap_store::{BitmapIter, BitmapStore};
 
 use crate::bitmap::container::ARRAY_LIMIT;
+
+#[cfg(not(feature = "std"))]
+use alloc::boxed::Box;
 
 #[derive(Clone)]
 pub enum Store {
@@ -171,6 +174,13 @@ impl Store {
         match self {
             Array(vec) => vec.len(),
             Bitmap(bits) => bits.len(),
+        }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Array(vec) => vec.is_empty(),
+            Bitmap(bits) => bits.is_empty(),
         }
     }
 

@@ -3,6 +3,10 @@
 //! Strum is a set of macros and traits for working with
 //! enums and strings easier in Rust.
 //!
+//! This crate only contains derive macros for use with the
+//! [`strum`](https://docs.rs/strum)
+//! crate.  The macros provied by this crate are also available by
+//! enabling the `derive` feature in aforementioned `strum` crate.
 
 #![recursion_limit = "128"]
 
@@ -118,11 +122,14 @@ pub fn from_string(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     toks.into()
 }
 
-/// Converts enum variants to `&'static str`.
+/// Converts enum variants to `&'a str`, where `'a` is the lifetime of the input enum reference.
 ///
 /// Implements `AsRef<str>` on your enum using the same rules as
 /// `Display` for determining what string is returned. The difference is that `as_ref()` returns
 /// a `&str` instead of a `String` so you don't allocate any additional memory with each call.
+///
+/// If you require a `&'static str`, you can use
+/// [`strum::IntoStaticStr`](crate::IntoStaticStr) instead.
 ///
 /// ```
 /// // You need to bring the AsRef trait into scope to use it
@@ -152,6 +159,18 @@ pub fn from_string(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 ///     Color::Blue(10).as_ref(),
 ///     Color::Green { range: 42 }.as_ref()
 /// );
+///
+/// // With prefix on all variants
+/// #[derive(AsRefStr, Debug)]
+/// #[strum(prefix = "/")]
+/// enum ColorWithPrefix {
+///     #[strum(serialize = "redred")]
+///     Red,
+///     Green,
+/// }
+///
+/// assert_eq!("/redred", ColorWithPrefix::Red.as_ref());
+/// assert_eq!("/Green", ColorWithPrefix::Green.as_ref());
 /// ```
 #[proc_macro_derive(AsRefStr, attributes(strum))]
 pub fn as_ref_str(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
@@ -163,7 +182,7 @@ pub fn as_ref_str(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     toks.into()
 }
 
-/// Implements `Strum::VariantNames` which adds an associated constant `VARIANTS` which is an array of discriminant names.
+/// Implements `Strum::VariantNames` which adds an associated constant `VARIANTS` which is a `'static` slice of discriminant names.
 ///
 /// Adds an `impl` block for the `enum` that adds a static `VARIANTS` array of `&'static str` that are the discriminant names.
 /// This will respect the `serialize_all` attribute on the `enum` (like `#[strum(serialize_all = "snake_case")]`.
@@ -209,7 +228,7 @@ pub fn variant_names_deprecated(input: proc_macro::TokenStream) -> proc_macro::T
     toks.into()
 }
 
-/// Adds a static array with all of the Enum's variants.
+/// Adds a `'static` slice with all of the Enum's variants.
 ///
 /// Implements `strum::VariantArray` which adds an associated constant `VARIANTS`.
 /// This constant contains an array with all the variants of the enumerator.
@@ -352,7 +371,7 @@ pub fn to_string(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// 3. The name of the variant will be used if there are no `serialize` or `to_string` attributes.
 /// 4. If the enum has a `strum(prefix = "some_value_")`, every variant will have that prefix prepended
 ///    to the serialization.
-/// 5. Enums with named fields support named field interpolation. The value will be interpolated into the output string.
+/// 5. Enums with fields support string interpolation.
 ///    Note this means the variant will not "round trip" if you then deserialize the string.
 ///
 ///    ```rust
@@ -360,6 +379,8 @@ pub fn to_string(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 ///    pub enum Color {
 ///        #[strum(to_string = "saturation is {sat}")]
 ///        Red { sat: usize },
+///        #[strum(to_string = "hue is {1}, saturation is {0}")]
+///        Blue(usize, usize),
 ///    }
 ///    ```
 ///
@@ -411,7 +432,7 @@ pub fn display(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// Creates a new type that iterates of the variants of an enum.
 ///
 /// Iterate over the variants of an Enum. Any additional data on your variants will be set to `Default::default()`.
-/// The macro implements `strum::IntoEnumIterator` on your enum and creates a new type called `YourEnumIter` that is the iterator object.
+/// The macro implements [`strum::IntoEnumIterator`](https://docs.rs/strum/latest/strum/trait.IntoEnumIterator.html) on your enum and creates a new type called `YourEnumIter` that is the iterator object.
 /// You cannot derive `EnumIter` on any type with a lifetime bound (`<'a>`) because the iterator would surely
 /// create [unbounded lifetimes](https://doc.rust-lang.org/nightly/nomicon/unbounded-lifetimes.html).
 ///
@@ -554,6 +575,7 @@ pub fn enum_try_as(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// complex_map[Color::Green] = complex_map[Color::Red];
 /// assert_eq!(complex_map, ColorTable::new(0, 3, 0, 3));
 /// ```
+#[doc(hidden)]
 #[proc_macro_derive(EnumTable, attributes(strum))]
 pub fn enum_table(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let ast = syn::parse_macro_input!(input as DeriveInput);
@@ -572,7 +594,7 @@ pub fn enum_table(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 /// data. The discriminant follows the same rules as `rustc`. The first discriminant is zero and each
 /// successive variant has a discriminant of one greater than the previous variant, except where an
 /// explicit discriminant is specified. The type of the discriminant will match the `repr` type if
-/// it is specifed.
+/// it is specified.
 ///
 /// When the macro is applied using rustc >= 1.46 and when there is no additional data on any of
 /// the variants, the `from_repr` function is marked `const`. rustc >= 1.46 is required
@@ -652,7 +674,7 @@ pub fn from_repr(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
 ///
 /// Encode strings into the enum itself. The `strum_macros::EmumMessage` macro implements the `strum::EnumMessage` trait.
 /// `EnumMessage` looks for `#[strum(message="...")]` attributes on your variants.
-/// You can also provided a `detailed_message="..."` attribute to create a seperate more detailed message than the first.
+/// You can also provided a `detailed_message="..."` attribute to create a separate more detailed message than the first.
 ///
 /// `EnumMessage` also exposes the variants doc comments through `get_documentation()`. This is useful in some scenarios,
 /// but `get_message` should generally be preferred. Rust doc comments are intended for developer facing documentation,
@@ -738,7 +760,7 @@ pub fn enum_messages(input: proc_macro::TokenStream) -> proc_macro::TokenStream 
 
 /// Add custom properties to enum variants.
 ///
-/// Enables the encoding of arbitary constants into enum variants. This method
+/// Enables the encoding of arbitrary constants into enum variants. This method
 /// currently only supports adding additional string values. Other types of literals are still
 /// experimental in the rustc compiler. The generated code works by nesting match statements.
 /// The first match statement matches on the type of the enum, and the inner match statement

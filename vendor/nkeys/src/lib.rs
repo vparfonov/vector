@@ -59,6 +59,7 @@ mod xkeys;
 pub use xkeys::XKey;
 
 const ENCODED_SEED_LENGTH: usize = 58;
+const ENCODED_PUBKEY_LENGTH: usize = 56;
 
 const PREFIX_BYTE_SEED: u8 = 18 << 3;
 const PREFIX_BYTE_PRIVATE: u8 = 15 << 3;
@@ -263,6 +264,13 @@ impl KeyPair {
 
     /// Attempts to verify that the given signature is valid for the given input
     pub fn verify(&self, input: &[u8], sig: &[u8]) -> Result<()> {
+        if sig.len() != ed25519::Signature::BYTE_SIZE {
+            return Err(err!(
+                InvalidSignatureLength,
+                "Signature did not match expected length"
+            ));
+        }
+
         let mut fixedsig = [0; ed25519::Signature::BYTE_SIZE];
         fixedsig.copy_from_slice(sig);
         let insig = ed25519::Signature::from_bytes(&fixedsig);
@@ -286,33 +294,22 @@ impl KeyPair {
 
     /// Attempts to produce a public-only key pair from the given encoded public key string
     pub fn from_public_key(source: &str) -> Result<KeyPair> {
-        let source_bytes = source.as_bytes();
-        let mut raw = decode_raw(source_bytes)?;
+        let (prefix, bytes) = from_public_key(source)?;
 
-        let prefix = raw[0];
-        if !valid_public_key_prefix(prefix) {
-            Err(err!(
-                InvalidPrefix,
-                "Not a valid public key prefix: {}",
-                raw[0]
-            ))
-        } else {
-            raw.remove(0);
-            match VerifyingKey::try_from(&raw[..]) {
-                Ok(pk) => Ok(KeyPair {
-                    kp_type: KeyPairType::from(prefix),
-                    pk,
-                    sk: None,
-                    signing_key: None,
-                }),
-                Err(_) => Err(err!(VerifyError, "Could not read public key")),
-            }
-        }
+        let pk = VerifyingKey::from_bytes(&bytes)
+            .map_err(|_| err!(VerifyError, "Could not read public key"))?;
+
+        Ok(KeyPair {
+            kp_type: KeyPairType::from(prefix),
+            pk,
+            sk: None,
+            signing_key: None,
+        })
     }
 
     /// Attempts to produce a full key pair from the given encoded seed string
     pub fn from_seed(source: &str) -> Result<KeyPair> {
-        let (ty, seed) = from_seed(source)?;
+        let (ty, seed) = decode_seed(source)?;
 
         let signing_key = SigningKey::from_bytes(&seed);
 
@@ -333,7 +330,7 @@ impl KeyPair {
 fn decode_raw(raw: &[u8]) -> Result<Vec<u8>> {
     let mut b32_decoded = data_encoding::BASE32_NOPAD.decode(raw)?;
 
-    let checksum = extract_crc(&mut b32_decoded);
+    let checksum = extract_crc(&mut b32_decoded)?;
     let v_checksum = valid_checksum(&b32_decoded, checksum);
     if !v_checksum {
         Err(err!(ChecksumFailure, "Checksum mismatch"))
@@ -342,11 +339,39 @@ fn decode_raw(raw: &[u8]) -> Result<Vec<u8>> {
     }
 }
 
-/// Returns the type and the seed
-fn from_seed(source: &str) -> Result<(u8, [u8; 32])> {
+/// Returns the prefix byte and the underlying public key bytes
+/// NOTE: This is considered an advanced use case, it's generally recommended to stick with [`KeyPair::from_public_key`] instead.
+pub fn from_public_key(source: &str) -> Result<(u8, [u8; 32])> {
+    if source.len() != ENCODED_PUBKEY_LENGTH {
+        let l = source.len();
+        return Err(err!(InvalidKeyLength, "Bad key length: {}", l));
+    }
+
+    let source_bytes = source.as_bytes();
+    let mut raw = decode_raw(source_bytes)?;
+
+    let prefix = raw[0];
+    if !valid_public_key_prefix(prefix) {
+        return Err(err!(
+            InvalidPrefix,
+            "Not a valid public key prefix: {}",
+            raw[0]
+        ));
+    }
+    raw.remove(0);
+
+    let mut public_key = [0u8; 32];
+    public_key.copy_from_slice(&raw[..]);
+
+    Ok((prefix, public_key))
+}
+
+/// Attempts to decode the provided base32 encoded string into a valid prefix byte and the private key seed bytes.
+/// NOTE: This is considered an advanced use case, it's generally recommended to stick with [`KeyPair::from_seed`] instead.
+pub fn decode_seed(source: &str) -> Result<(u8, [u8; 32])> {
     if source.len() != ENCODED_SEED_LENGTH {
         let l = source.len();
-        return Err(err!(InvalidSeedLength, "Bad seed length: {}", l));
+        return Err(err!(InvalidKeyLength, "Bad seed length: {}", l));
     }
 
     let source_bytes = source.as_bytes();
@@ -420,6 +445,28 @@ mod tests {
     use crate::error::ErrorKind;
 
     #[test]
+    fn validate_decode_seed() {
+        let input_bytes = generate_seed_rand();
+        let seed = encode_seed(&KeyPairType::User, input_bytes.as_slice());
+
+        let (prefix, decoded_bytes) = decode_seed(&seed).unwrap();
+
+        assert_eq!(prefix, PREFIX_BYTE_USER);
+        assert_eq!(decoded_bytes, input_bytes);
+    }
+
+    #[test]
+    fn validate_from_public_key() {
+        let input_bytes = generate_seed_rand();
+        let public_key = encode(&KeyPairType::User, input_bytes.as_slice());
+
+        let (prefix, decoded_bytes) = from_public_key(&public_key).unwrap();
+
+        assert_eq!(prefix, PREFIX_BYTE_USER);
+        assert_eq!(decoded_bytes, input_bytes);
+    }
+
+    #[test]
     fn seed_encode_decode_round_trip() {
         let pair = KeyPair::new_user();
         let s = pair.seed().unwrap();
@@ -446,7 +493,7 @@ mod tests {
 
     #[test]
     fn from_seed_rejects_bad_prefix() {
-        let seed = "FAAPN4W3EG6KCJGUQTKTJ5GSB5NHK5CHAJL4DBGFUM3HHROI4XUEP4OBK4";
+        let seed = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
         let pair = KeyPair::from_seed(seed);
         assert!(pair.is_err());
         if let Err(e) = pair {
@@ -454,20 +501,15 @@ mod tests {
         }
     }
 
-    /*
-    * TODO - uncomment this test when I can figure out how to encode a bad checksum
-     * without first triggering a base32 decoding failure :)
-
-        #[test]
-        fn from_seed_rejects_bad_checksum() {
-            let seed = "SAAPN4W3EG6KCJGUQTKTJ5GSB5NHK5CHAJL4DBGFUM3HHROI4XUEP4OBK4";
-            let pair = KeyPair::from_seed(seed);
-            assert!(pair.is_err());
-            if let Err(e) = pair {
-                assert_eq!(e.kind(), ErrorKind::ChecksumFailure);
-            }
+    #[test]
+    fn from_seed_rejects_bad_checksum() {
+        let seed = "FAAPN4W3EG6KCJGUQTKTJ5GSB5NHK5CHAJL4DBGFUM3HHROI4XUEP4OBK4";
+        let pair = KeyPair::from_seed(seed);
+        assert!(pair.is_err());
+        if let Err(e) = pair {
+            assert_eq!(e.kind(), ErrorKind::ChecksumFailure);
         }
-    */
+    }
 
     #[test]
     fn from_seed_rejects_bad_length() {
@@ -475,7 +517,7 @@ mod tests {
         let pair = KeyPair::from_seed(seed);
         assert!(pair.is_err());
         if let Err(e) = pair {
-            assert_eq!(e.kind(), ErrorKind::InvalidSeedLength);
+            assert_eq!(e.kind(), ErrorKind::InvalidKeyLength);
         }
     }
 
@@ -508,6 +550,36 @@ mod tests {
         let sig = user.sign(msg).unwrap();
         let res = user.verify(b"this doesn't match the message", sig.as_slice());
         assert!(res.is_err());
+    }
+
+    #[test]
+    fn sign_and_verify_rejects_invalid_signature_length() {
+        let kp = KeyPair::new_user();
+        let res = kp.verify(&[], &[]);
+        assert!(res.is_err());
+        if let Err(e) = res {
+            assert_eq!(e.kind(), ErrorKind::InvalidSignatureLength);
+        }
+    }
+
+    #[test]
+    fn from_public_key_rejects_bad_length() {
+        let public_key = "ACARVGW77LDNWYXBAH62YKKQRVHYOTKKDDVVJVOISOU75WQPXOO7N3";
+        let pair = KeyPair::from_public_key(public_key);
+        assert!(pair.is_err());
+        if let Err(e) = pair {
+            assert_eq!(e.kind(), ErrorKind::InvalidKeyLength);
+        }
+    }
+
+    #[test]
+    fn from_public_key_rejects_bad_prefix() {
+        let public_key = "ZCO4XYNKEN7ZFQ42BHYCBYI3K7USOGG43C2DIJZYWSQ2YEMBOZWN6PYH";
+        let pair = KeyPair::from_public_key(public_key);
+        assert!(pair.is_err());
+        if let Err(e) = pair {
+            assert_eq!(e.kind(), ErrorKind::InvalidPrefix);
+        }
     }
 
     #[test]

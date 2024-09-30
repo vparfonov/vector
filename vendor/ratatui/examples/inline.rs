@@ -23,7 +23,16 @@ use std::{
 };
 
 use rand::distributions::{Distribution, Uniform};
-use ratatui::{prelude::*, widgets::*};
+use ratatui::{
+    backend::{Backend, CrosstermBackend},
+    layout::{Alignment, Constraint, Layout, Rect},
+    style::{Color, Modifier, Style},
+    symbols,
+    terminal::{Frame, Terminal, Viewport},
+    text::{Line, Span},
+    widgets::{block, Block, Gauge, LineGauge, List, ListItem, Paragraph, Widget},
+    TerminalOptions,
+};
 
 const NUM_DOWNLOADS: usize = 10;
 
@@ -129,6 +138,7 @@ fn input_handling(tx: mpsc::Sender<Event>) {
     });
 }
 
+#[allow(clippy::cast_precision_loss, clippy::needless_pass_by_value)]
 fn workers(tx: mpsc::Sender<Event>) -> Vec<Worker> {
     (0..4)
         .map(|id| {
@@ -168,6 +178,7 @@ fn downloads() -> Downloads {
     }
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn run_app<B: Backend>(
     terminal: &mut Terminal<B>,
     workers: Vec<Worker>,
@@ -194,7 +205,7 @@ fn run_app<B: Backend>(
             Event::DownloadUpdate(worker_id, _download_id, progress) => {
                 let download = downloads.in_progress.get_mut(&worker_id).unwrap();
                 download.progress = progress;
-                redraw = false
+                redraw = false;
             }
             Event::DownloadDone(worker_id, download_id) => {
                 let download = downloads.in_progress.remove(&worker_id).unwrap();
@@ -232,7 +243,7 @@ fn run_app<B: Backend>(
 fn ui(f: &mut Frame, downloads: &Downloads) {
     let area = f.size();
 
-    let block = Block::default().title(block::Title::from("Progress").alignment(Alignment::Center));
+    let block = Block::new().title(block::Title::from("Progress").alignment(Alignment::Center));
     f.render_widget(block, area);
 
     let vertical = Layout::vertical([Constraint::Length(2), Constraint::Length(4)]).margin(1);
@@ -242,8 +253,9 @@ fn ui(f: &mut Frame, downloads: &Downloads) {
 
     // total progress
     let done = NUM_DOWNLOADS - downloads.pending.len() - downloads.in_progress.len();
+    #[allow(clippy::cast_precision_loss)]
     let progress = LineGauge::default()
-        .gauge_style(Style::default().fg(Color::Blue))
+        .filled_style(Style::default().fg(Color::Blue))
         .label(format!("{done}/{NUM_DOWNLOADS}"))
         .ratio(done as f64 / NUM_DOWNLOADS as f64);
     f.render_widget(progress, progress_area);
@@ -271,6 +283,7 @@ fn ui(f: &mut Frame, downloads: &Downloads) {
     let list = List::new(items);
     f.render_widget(list, list_area);
 
+    #[allow(clippy::cast_possible_truncation)]
     for (i, (_, download)) in downloads.in_progress.iter().enumerate() {
         let gauge = Gauge::default()
             .gauge_style(Style::default().fg(Color::Yellow))

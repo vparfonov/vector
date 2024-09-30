@@ -242,8 +242,10 @@ impl Table {
         self.items.get(key).map(|kv| kv.key.leaf_decor())
     }
 
-    /// Returns the location within the original document
-    pub(crate) fn span(&self) -> Option<std::ops::Range<usize>> {
+    /// The location within the original document
+    ///
+    /// This generally requires an [`ImDocument`][crate::ImDocument].
+    pub fn span(&self) -> Option<std::ops::Range<usize>> {
         self.span.clone()
     }
 
@@ -290,7 +292,7 @@ impl Table {
 
     /// Clears the table, removing all key-value pairs. Keeps the allocated memory for reuse.
     pub fn clear(&mut self) {
-        self.items.clear()
+        self.items.clear();
     }
 
     /// Gets the given key's corresponding entry in the Table for in-place manipulation.
@@ -502,6 +504,7 @@ fn decorate_table(table: &mut Table) {
 }
 
 // `key1 = value1`
+pub(crate) const DEFAULT_ROOT_DECOR: (&str, &str) = ("", "");
 pub(crate) const DEFAULT_KEY_DECOR: (&str, &str) = ("", " ");
 pub(crate) const DEFAULT_TABLE_DECOR: (&str, &str) = ("\n", "");
 pub(crate) const DEFAULT_KEY_PATH_DECOR: (&str, &str) = ("", "");
@@ -630,16 +633,16 @@ impl TableLike for Table {
         self.get_values()
     }
     fn fmt(&mut self) {
-        self.fmt()
+        self.fmt();
     }
     fn sort_values(&mut self) {
-        self.sort_values()
+        self.sort_values();
     }
     fn is_dotted(&self) -> bool {
         self.is_dotted()
     }
     fn set_dotted(&mut self, yes: bool) {
-        self.set_dotted(yes)
+        self.set_dotted(yes);
     }
 
     fn key(&self, key: &str) -> Option<&'_ Key> {
@@ -740,7 +743,7 @@ impl<'a> OccupiedEntry<'a> {
         &mut self.entry.get_mut().value
     }
 
-    /// Converts the OccupiedEntry into a mutable reference to the value in the entry
+    /// Converts the `OccupiedEntry` into a mutable reference to the value in the entry
     /// with a lifetime bound to the map itself
     pub fn into_mut(self) -> &'a mut Item {
         &mut self.entry.into_mut().value
@@ -780,7 +783,7 @@ impl<'a> VacantEntry<'a> {
         self.entry.key().as_str()
     }
 
-    /// Sets the value of the entry with the VacantEntry's key,
+    /// Sets the value of the entry with the `VacantEntry`'s key,
     /// and returns a mutable reference to it
     pub fn insert(self, value: Item) -> &'a mut Item {
         let entry = self.entry;

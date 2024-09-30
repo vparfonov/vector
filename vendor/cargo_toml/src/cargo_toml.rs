@@ -1,17 +1,22 @@
 #![forbid(unsafe_code)]
+#![allow(clippy::inline_always)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::needless_for_each)]
+#![allow(clippy::new_without_default)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::trivially_copy_pass_by_ref)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 //! This crate defines `struct`s that can be deserialized with Serde
 //! to load and inspect `Cargo.toml` metadata.
 //!
-//! See [`Manifest::from_slice`].
-//!
-//! Correct interpretation of the manifest requires two things:
+//! See [`Manifest::from_path`]. Note that `Cargo.toml` files are not self-contained. Correct interpretation of the manifest requires other files on disk:
 //!
 //! * List of files in order to auto-discover binaries, examples, benchmarks, and tests.
-//! * Potentially `Manifest` from parent directories that acts as a workspace root for inheritance of shared workspace information.
+//! * Potentially a `Manifest` from one of parent directories, that acts as a workspace root for inheritance of shared workspace information.
 //!
-//! The crate has methods for processing this information, but you will need to write some glue code to obtain it. See [`Manifest::complete_from_path_and_workspace`].
+//! Because of this filesystem-dependence, loading `Cargo.toml` [from a string](`Manifest::from_str`) is [an advanced operation](`Manifest::complete_from_abstract_filesystem`).
+//! The crate has methods for processing this information, but if you don't already have a full crate on disk, you will need to write some glue code to obtain it. See [`Manifest::complete_from_path_and_workspace`].
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::{BTreeMap, BTreeSet};
@@ -163,7 +168,7 @@ pub struct Workspace<Metadata = Value> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub resolver: Option<Resolver>,
 
-    /// Template for needs_workspace_inheritance
+    /// Template for `needs_workspace_inheritance`
     #[serde(default, skip_serializing_if = "DepsSet::is_empty")]
     pub dependencies: DepsSet,
 
@@ -260,24 +265,30 @@ fn is_false(val: &bool) -> bool {
 impl Manifest<Value> {
     /// Parse contents from a `Cargo.toml` file on disk.
     ///
-    /// Calls [`Manifest::complete_from_path`] to discover implicit binaries, etc. It will search for a workspace.
+    /// Calls [`Manifest::complete_from_path`] to discover implicit binaries, etc.
+    /// If needed, it will search the file system for a workspace, and fill in data inherited from the workspace.
     #[inline]
     pub fn from_path(cargo_toml_path: impl AsRef<Path>) -> Result<Self, Error> {
         Self::from_path_with_metadata(cargo_toml_path)
     }
 
-    /// Parse contents of a `Cargo.toml` file already loaded as a byte slice.
+    /// Warning: this will make an incomplete manifest, which will be missing data and panic when using workspace inheritance.
     ///
-    /// It does not call [`Manifest::complete_from_path`], so may be missing implicit data, and panic if workspace inheritance is used.
+    /// Parse contents of a `Cargo.toml` file already loaded as a byte slice. It's **not** a file name, but file's TOML-syntax content.
+    ///
+    /// If you don't call [`Manifest::complete_from_path`], it may be missing implicit data, and panic if workspace inheritance is used.
     #[inline(always)]
     pub fn from_slice(cargo_toml_content: &[u8]) -> Result<Self, Error> {
         Self::from_slice_with_metadata(cargo_toml_content)
     }
-    /// Parse contents of a `Cargo.toml` file loaded as a string
+
+    /// Warning: this will make an incomplete manifest, which will be missing data and panic when using workspace inheritance.
     ///
-    /// Note: this is **not** a file name, but file's TOML-syntax content. See `from_path`.
+    /// It parses contents of a `Cargo.toml` file loaded as a string. It's **not** a file name, but file's TOML-syntax content.
     ///
-    /// It does not call [`Manifest::complete_from_path`], so may be missing implicit data, and panic if workspace inheritance is used.
+    /// For a more reliable method, see `from_path`.
+    ///
+    /// If you don't call [`Manifest::complete_from_path`], it may be missing implicit data, and panic if workspace inheritance is used.
     #[inline(always)]
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(cargo_toml_content: &str) -> Result<Self, Error> {
@@ -286,7 +297,8 @@ impl Manifest<Value> {
 }
 
 impl<Metadata: for<'a> Deserialize<'a>> Manifest<Metadata> {
-
+    /// Warning: this will make an incomplete manifest, which will be missing data and panic when using workspace inheritance.
+    ///
     /// Parse `Cargo.toml`, and parse its `[package.metadata]` into a custom Serde-compatible type.
     ///
     /// It does not call [`Manifest::complete_from_path`], so may be missing implicit data.
@@ -304,7 +316,7 @@ impl<Metadata: for<'a> Deserialize<'a>> Manifest<Metadata> {
             // This is a clumsy implementation of Cargo's rule that missing version defaults publish to false.
             // Serde just doesn't support such relationship for default field values, so this will be incorrect
             // for explicit `version = "0.0.0"` and `publish = true`.
-            if package.version.get().map_or(false, |v| v == "0.0.0") && package.publish.get().map_or(false, |p| p.is_default()) {
+            if package.version.get().is_ok_and(|v| v == "0.0.0") && package.publish.get().is_ok_and(|p| p.is_default()) {
                 package.publish = Inheritable::Set(Publish::Flag(false));
             }
         }
@@ -313,7 +325,7 @@ impl<Metadata: for<'a> Deserialize<'a>> Manifest<Metadata> {
 
     /// Parse contents from `Cargo.toml` file on disk, with custom Serde-compatible metadata type.
     ///
-    /// Calls [`Manifest::complete_from_path`]
+    /// Calls [`Manifest::complete_from_path`], so it will load a workspace if necessary.
     pub fn from_path_with_metadata<P: AsRef<Path>>(cargo_toml_path: P) -> Result<Self, Error> {
         let cargo_toml_path = cargo_toml_path.as_ref();
         let cargo_toml_content = fs::read_to_string(cargo_toml_path)?;
@@ -354,8 +366,10 @@ impl<Metadata> Manifest<Metadata> {
     ///
     /// If `workspace_manifest_and_path` is set, it will inherit from this workspace.
     /// If it's `None`, it will try to find a workspace if needed.
+    ///
+    /// Call it like `complete_from_abstract_filesystem::<cargo_toml::Value, _>(…)` if the arguments are ambiguous.
     pub fn complete_from_abstract_filesystem<PackageMetadataTypeDoesNotMatterHere, Fs: AbstractFilesystem>(
-        &mut self, fs: Fs, workspace_manifest_and_path: Option<(&Manifest<PackageMetadataTypeDoesNotMatterHere>, &Path)>
+        &mut self, fs: Fs, workspace_manifest_and_path: Option<(&Manifest<PackageMetadataTypeDoesNotMatterHere>, &Path)>,
     ) -> Result<(), Error> {
         if let Some((ws, ws_path)) = workspace_manifest_and_path {
             self._inherit_workspace(ws.workspace.as_ref(), ws_path)?;
@@ -364,7 +378,11 @@ impl<Metadata> Manifest<Metadata> {
             self._inherit_workspace(Some(&ws), Path::new(""))?;
             self.workspace = Some(ws);
         } else if self.needs_workspace_inheritance() {
-            let (ws_manifest, base_path) = fs.parse_root_workspace(self.package.as_ref().and_then(|p| p.workspace.as_deref()))?;
+            let (ws_manifest, base_path) = match fs.parse_root_workspace(self.package.as_ref().and_then(|p| p.workspace.as_deref())) {
+                Ok(res) => res,
+                Err(e @ Error::Workspace(_)) => return Err(e),
+                Err(e) => return Err(Error::Workspace(e.into())),
+            };
             self._inherit_workspace(ws_manifest.workspace.as_ref(), &base_path)?;
         }
         self.complete_from_abstract_filesystem_inner(&fs)
@@ -388,6 +406,7 @@ impl<Metadata> Manifest<Metadata> {
     /// `workspace_base_path` should be an absolute path to a directory where the workspace manifest is located.
     /// Used as a base for `readme` and `license-file`.
     #[deprecated(note = "this functionality has been merged into `complete_from_path_and_workspace` or `complete_from_abstract_filesystem`")]
+    #[doc(hidden)]
     pub fn inherit_workspace<Ignored>(&mut self, workspace_manifest: &Manifest<Ignored>, workspace_base_path: &Path) -> Result<(), Error> {
         self._inherit_workspace(workspace_manifest.workspace.as_ref(), workspace_base_path)
     }
@@ -402,6 +421,12 @@ impl<Metadata> Manifest<Metadata> {
         inherit_dependencies(&mut self.dependencies, workspace, workspace_base_path)?;
         inherit_dependencies(&mut self.build_dependencies, workspace, workspace_base_path)?;
         inherit_dependencies(&mut self.dev_dependencies, workspace, workspace_base_path)?;
+
+        for target in self.target.values_mut() {
+            inherit_dependencies(&mut target.dependencies, workspace, workspace_base_path)?;
+            inherit_dependencies(&mut target.build_dependencies, workspace, workspace_base_path)?;
+            inherit_dependencies(&mut target.dev_dependencies, workspace, workspace_base_path)?;
+        }
 
         let package = match &mut self.package {
             Some(p) => p,
@@ -453,10 +478,9 @@ impl<Metadata> Manifest<Metadata> {
             },
             _ => {},
         }
-        match (package.license_file.as_mut(), ws.license_file.as_ref()) {
-            (Some(f), Some(ws)) => f.set(workspace_base_path.join(ws)),
-            _ => {}
-        };
+        if let Some((f, ws)) = package.license_file.as_mut().zip(ws.license_file.as_ref()) {
+            f.set(workspace_base_path.join(ws))
+        }
         Ok(())
     }
 
@@ -470,20 +494,22 @@ impl<Metadata> Manifest<Metadata> {
             Err(err) => return Err(err.into()),
         };
 
-        if let Some(ref mut lib) = self.lib {
-            lib.required_features.clear(); // not applicable
-        }
-
-        let has_path = self.lib.as_ref().map_or(false, |l| l.path.is_some());
+        let has_path = self.lib.as_ref().is_some_and(|l| l.path.is_some());
         if !has_path && src.contains("lib.rs") {
-            let old_lib = self.lib.take().unwrap_or_default();
-            self.lib = Some(Product {
-                name: if let Some(name) = old_lib.name { Some(name)} else {Some(package.name.replace('-', "_"))},
-                path: Some("src/lib.rs".to_string()),
-                edition: *package.edition.get()?,
-                crate_type: vec!["rlib".to_string()],
-                ..old_lib
-            });
+            self.lib
+                .get_or_insert_with(Product::default)
+                .path = Some("src/lib.rs".to_string());
+        }
+        if let Some(lib) = &mut self.lib {
+            lib.name.get_or_insert_with(|| package.name.replace('-', "_"));
+            // FIXME: this field should have been an `Option`
+            if is_default(&lib.edition) {
+                lib.edition = *package.edition.get()?;
+            }
+            if lib.crate_type.is_empty() {
+                lib.crate_type.push("lib".to_string());
+            }
+            lib.required_features.clear(); // not applicable
         }
 
         if package.autobins {
@@ -538,17 +564,14 @@ impl<Metadata> Manifest<Metadata> {
 
         let Some(package) = &mut self.package else { return Ok(()) };
 
-        if matches!(package.build, None | Some(OptionalFile::Flag(true))) && fs.file_names_in(".").map_or(false, |dir| dir.contains("build.rs")) {
+        let root_files = fs.file_names_in("")?;
+
+        if matches!(package.build, None | Some(OptionalFile::Flag(true))) && root_files.contains("build.rs") {
             package.build = Some(OptionalFile::Path("build.rs".into()));
         }
 
         if matches!(package.readme.get()?, OptionalFile::Flag(true)) {
-            let files = fs.file_names_in(".").ok();
-            if let Some(name) = files.as_ref().and_then(|dir| {
-                dir.get("README.md")
-                    .or_else(|| dir.get("README.txt"))
-                    .or_else(|| dir.get("README"))
-            }) {
+            if let Some(name) = root_files.get("README.md").or_else(|| root_files.get("README.txt")).or_else(|| root_files.get("README")) {
                 package.readme = Inheritable::Set(OptionalFile::Path(PathBuf::from(&**name)));
             }
         }
@@ -633,7 +656,11 @@ impl<Metadata> Manifest<Metadata> {
 
     /// Panics if it's not a package (only a workspace).
     ///
-    /// You can access `.package` field directly to handle the `Option`.
+    /// You can access the `.package` field directly to handle the `Option`:
+    ///
+    /// ```rust,ignore
+    /// manifest.package.as_ref().ok_or(SomeError::NotAPackage)?;
+    /// ```
     #[track_caller]
     #[inline]
     pub fn package(&self) -> &Package<Metadata> {
@@ -744,6 +771,7 @@ pub enum DebugSetting {
 
 impl TryFrom<Value> for DebugSetting {
     type Error = Error;
+
     fn try_from(v: Value) -> Result<Self, Error> {
         Ok(match v {
             Value::Boolean(b) => if b { Self::Full } else { Self::None },
@@ -968,6 +996,8 @@ pub struct Product {
     /// `[package]` is configured to use, perhaps only compiling a library with the
     /// 2018 edition or only compiling one unit test with the 2015 edition. By default
     /// all products are compiled with the edition specified in `[package]`.
+    ///
+    /// FIXME: this field should have been an `Option`. It will deserialize as 2015 if unset.
     #[serde(default, skip_serializing_if = "is_default")]
     pub edition: Edition,
 
@@ -1036,7 +1066,8 @@ impl Dependency {
     ///
     /// Returns `None` if it's inherited and the value is not available
     #[inline]
-    #[must_use] pub fn detail(&self) -> Option<&DependencyDetail> {
+    #[must_use]
+    pub fn detail(&self) -> Option<&DependencyDetail> {
         match *self {
             Dependency::Detailed(ref d) => Some(d),
             Dependency::Simple(_) | Dependency::Inherited(_) => None,
@@ -1070,17 +1101,26 @@ impl Dependency {
         }
     }
 
-    /// Version requirement
-    ///
     /// Panics if inherited value is not available
+    ///
+    /// Version requirement
     #[inline]
     #[track_caller]
     #[must_use]
     pub fn req(&self) -> &str {
+        self.try_req().unwrap()
+    }
+
+    /// Version requirement
+    ///
+    /// Returns Error if inherited value is not available
+    #[inline]
+    #[track_caller]
+    pub fn try_req(&self) -> Result<&str, Error> {
         match *self {
-            Dependency::Simple(ref v) => v,
-            Dependency::Detailed(ref d) => d.version.as_deref().unwrap_or("*"),
-            Dependency::Inherited(_) => panic!("version requirement not available with workspace inheritance"),
+            Dependency::Simple(ref v) => Ok(v),
+            Dependency::Detailed(ref d) => Ok(d.version.as_deref().unwrap_or("*")),
+            Dependency::Inherited(_) =>  Err(Error::InheritedUnknownValue),
         }
     }
 
@@ -1141,13 +1181,13 @@ impl Dependency {
             Dependency::Simple(_) => true,
             Dependency::Detailed(ref d) => {
                 // TODO: allow registry to be set to crates.io explicitly?
-                d.path.is_none()
-                    && d.registry.is_none()
-                    && d.registry_index.is_none()
-                    && d.git.is_none()
-                    && d.tag.is_none()
-                    && d.branch.is_none()
-                    && d.rev.is_none()
+                d.path.is_none() &&
+                    d.registry.is_none() &&
+                    d.registry_index.is_none() &&
+                    d.git.is_none() &&
+                    d.tag.is_none() &&
+                    d.branch.is_none() &&
+                    d.rev.is_none()
             },
             Dependency::Inherited(_) => panic!("data not available with workspace inheritance"),
         }
@@ -1219,7 +1259,7 @@ pub struct DependencyDetail {
 
     /// Contains the remaining unstable keys and values for the dependency.
     #[serde(flatten)]
-    pub unstable: BTreeMap<String, Value>
+    pub unstable: BTreeMap<String, Value>,
 }
 
 impl Default for DependencyDetail {
@@ -1264,12 +1304,21 @@ pub struct InheritedDependencyDetail {
 ///
 /// You can replace `Metadata` generic type with your own
 /// to parse into something more useful than a generic toml `Value`
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub struct Package<Metadata = Value> {
     /// Careful: some names are uppercase, case-sensitive. `-` changes to `_` when used as a Rust identifier.
     pub name: String,
+
+    /// Must parse as semver, e.g. "1.9.0"
+    ///
+    /// This field may have unknown value when using workspace inheritance,
+    /// and when the `Manifest` has been loaded without its workspace.
+    ///
+    /// See [the getter for more info](`Package::version()`).
+    #[serde(default = "default_version")]
+    pub version: Inheritable<String>,
 
     /// Package's edition opt-in.
     #[serde(default)]
@@ -1278,10 +1327,6 @@ pub struct Package<Metadata = Value> {
     /// MSRV 1.x (beware: does not require semver formatting)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub rust_version: Option<Inheritable<String>>,
-
-    /// Must parse as semver, e.g. "1.9.0"
-    #[serde(default = "default_version")]
-    pub version: Inheritable<String>,
 
     /// Build script definition
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1292,7 +1337,9 @@ pub struct Package<Metadata = Value> {
     pub workspace: Option<String>,
 
     #[serde(default)]
-    /// e.g. ["Author <e@mail>", "etc"] Deprecated.
+    /// e.g. `["Author <e@mail>", "etc"]`
+    ///
+    /// Deprecated.
     #[serde(skip_serializing_if = "Inheritable::is_empty")]
     pub authors: Inheritable<Vec<String>>,
 
@@ -1323,7 +1370,7 @@ pub struct Package<Metadata = Value> {
     pub keywords: Inheritable<Vec<String>>,
 
     /// This is a list of up to five categories where this crate would fit.
-    /// e.g. ["command-line-utilities", "development-tools::cargo-plugins"]
+    /// e.g. `["command-line-utilities", "development-tools::cargo-plugins"]`
     #[serde(default, skip_serializing_if = "Inheritable::is_empty")]
     pub categories: Inheritable<Vec<String>>,
 
@@ -1352,18 +1399,26 @@ pub struct Package<Metadata = Value> {
     pub default_run: Option<String>,
 
     /// Discover binaries from the file system
+    ///
+    /// This may be incorrectly set to `true` if the crate uses 2015 edition and has explicit `[[bin]]` sections
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub autobins: bool,
 
     /// Discover examples from the file system
+    ///
+    /// This may be incorrectly set to `true` if the crate uses 2015 edition and has explicit `[[example]]` sections
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub autoexamples: bool,
 
     /// Discover tests from the file system
+    ///
+    /// This may be incorrectly set to `true` if the crate uses 2015 edition and has explicit `[[test]]` sections
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub autotests: bool,
 
     /// Discover benchmarks from the file system
+    ///
+    /// This may be incorrectly set to `true` if the crate uses 2015 edition and has explicit `[[bench]]` sections
     #[serde(default = "default_true", skip_serializing_if = "is_true")]
     pub autobenches: bool,
 
@@ -1416,6 +1471,25 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// [`Manifest::from_str`] does not know where the TOML data came from, so it has no way of
+    /// searching the file system (or tarball or git) for a matching
+    /// [Cargo Workspace Manifest](https://doc.rust-lang.org/cargo/reference/workspaces.html).
+    ///
+    /// Without a workspace, properties that use
+    /// [inheritance](https://doc.rust-lang.org/cargo/reference/workspaces.html#the-package-table)
+    /// are missing data, and therefore can't be returned, and will panic.
+    ///
+    /// You can access these properties directly, they are an [`Inheritable`] enum.
+    #[track_caller]
+    #[inline]
+    pub fn version(&self) -> &str {
+        self.version.as_ref().unwrap()
+    }
+
+    /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn authors(&self) -> &[String] {
@@ -1423,6 +1497,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn categories(&self) -> &[String] {
@@ -1430,6 +1506,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn categories_mut(&mut self) -> &mut Vec<String> {
@@ -1437,6 +1515,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn description(&self) -> Option<&str> {
@@ -1449,6 +1529,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn documentation(&self) -> Option<&str> {
@@ -1461,6 +1543,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn edition(&self) -> Edition {
@@ -1468,6 +1552,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn exclude(&self) -> &[String] {
@@ -1475,6 +1561,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn include(&self) -> &[String] {
@@ -1482,6 +1570,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn homepage(&self) -> Option<&str> {
@@ -1494,6 +1584,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn keywords(&self) -> &[String] {
@@ -1501,6 +1593,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn license(&self) -> Option<&str> {
@@ -1508,6 +1602,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn license_file(&self) -> Option<&Path> {
@@ -1515,6 +1611,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn publish(&self) -> &Publish {
@@ -1522,6 +1620,8 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn readme(&self) -> &OptionalFile {
@@ -1529,29 +1629,29 @@ impl<Metadata> Package<Metadata> {
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn repository(&self) -> Option<&str> {
         Some(self.repository.as_ref()?.as_ref().unwrap())
     }
 
-    #[inline]
     pub fn set_repository(&mut self, repository: Option<String>) {
         self.repository = repository.map(Inheritable::Set);
     }
 
     /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
+    ///
+    /// See [`version`](`Package::version()`) for more information.
     #[track_caller]
     #[inline]
     pub fn rust_version(&self) -> Option<&str> {
         Some(self.rust_version.as_ref()?.as_ref().unwrap())
     }
 
-    /// Panics if the field is not available (inherited from a workspace that hasn't been loaded)
-    #[track_caller]
-    #[inline]
-    pub fn version(&self) -> &str {
-        self.version.as_ref().unwrap()
+    pub fn set_rust_version(&mut self, rust_version: Option<String>) {
+        self.rust_version = rust_version.map(Inheritable::Set);
     }
 
     /// The property that doesn't actually link with anything.
@@ -1594,9 +1694,7 @@ impl<Metadata> Package<Metadata> {
 }
 
 impl<Metadata: Default> Default for Package<Metadata> {
-    fn default() -> Self {
-        Self::new("", "")
-    }
+    fn default() -> Self { Self::new("", "") }
 }
 
 /// A way specify or disable README or `build.rs`.
@@ -1611,23 +1709,30 @@ pub enum OptionalFile {
 
 impl Default for OptionalFile {
     #[inline]
-    fn default() -> Self {
-        Self::Flag(true)
-    }
+    fn default() -> Self { Self::Flag(true) }
 }
 
 impl OptionalFile {
+    pub fn display(&self) -> &str {
+        match self {
+            Self::Path(p) => p.to_str().unwrap_or("<non-utf8>"),
+            Self::Flag(true) => "<default>",
+            Self::Flag(false) => "<disabled>",
+        }
+    }
+
     #[inline]
     fn is_default(&self) -> bool {
         matches!(self, Self::Flag(flag) if *flag)
     }
 
+    /// This returns `none` even if `Flag(true)` is set.
     #[inline]
     #[must_use]
     pub fn as_path(&self) -> Option<&Path> {
         match self {
             Self::Path(p) => Some(p),
-            _ => None,
+            Self::Flag(_) => None,
         }
     }
 
@@ -1654,9 +1759,7 @@ impl Publish {
 
 impl Default for Publish {
     #[inline]
-    fn default() -> Self {
-        Publish::Flag(true)
-    }
+    fn default() -> Self { Publish::Flag(true) }
 }
 
 impl PartialEq<Publish> for bool {
@@ -1768,6 +1871,11 @@ pub struct Badges {
     /// Maintenance: `status` is required. Available options are `actively-developed`,
     /// `passively-maintained`, `as-is`, `experimental`, `looking-for-maintainer`,
     /// `deprecated`, and the default `none`, which displays no badge on crates.io.
+    ///
+    /// ```toml
+    /// [badges]
+    /// maintenance.status = "as-is"
+    /// ```
     #[serde(default, deserialize_with = "ok_or_default")]
     pub maintenance: Maintenance,
 }
@@ -1776,25 +1884,35 @@ impl Badges {
     #[allow(deprecated)]
     /// Determine whether or not a Profiles struct should be serialized
     fn should_skip_serializing(&self) -> bool {
-        self.appveyor.is_none()
-            && self.circle_ci.is_none()
-            && self.gitlab.is_none()
-            && self.travis_ci.is_none()
-            && self.codecov.is_none()
-            && self.coveralls.is_none()
-            && self.is_it_maintained_issue_resolution.is_none()
-            && self.is_it_maintained_open_issues.is_none()
-            && matches!(self.maintenance.status, MaintenanceStatus::None)
+        self.appveyor.is_none() &&
+            self.circle_ci.is_none() &&
+            self.gitlab.is_none() &&
+            self.travis_ci.is_none() &&
+            self.codecov.is_none() &&
+            self.coveralls.is_none() &&
+            self.is_it_maintained_issue_resolution.is_none() &&
+            self.is_it_maintained_open_issues.is_none() &&
+            matches!(self.maintenance.status, MaintenanceStatus::None)
     }
 }
 
 /// A [`Badges`] field with [`MaintenanceStatus`].
+///
+/// ```toml
+/// [badges]
+/// maintenance.status = "experimental"
+/// ```
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Default, Serialize, Deserialize)]
 pub struct Maintenance {
     pub status: MaintenanceStatus,
 }
 
 /// Mainly used to deprecate crates.
+///
+/// ```toml
+/// [badges]
+/// maintenance.status = "deprecated"
+/// ```
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 #[derive(Default)]
@@ -1810,10 +1928,12 @@ pub enum MaintenanceStatus {
 }
 
 /// Edition setting, which opts in to new Rust/Cargo behaviors.
-#[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum Edition {
     /// 2015
     #[serde(rename = "2015")]
+    #[default]
     E2015 = 2015,
     /// 2018
     #[serde(rename = "2018")]
@@ -1821,18 +1941,29 @@ pub enum Edition {
     /// 2021
     #[serde(rename = "2021")]
     E2021 = 2021,
+    /// 2024
+    #[serde(rename = "2024")]
+    E2024 = 2024,
 }
 
-impl Default for Edition {
-    fn default() -> Self {
-        Self::E2015
+impl Edition {
+    /// Returns minor version (1.x) of the oldest rustc that supports this edition
+    #[must_use]
+    pub fn min_rust_version_minor(self) -> u16 {
+        match self {
+            Edition::E2015 => 1,
+            Edition::E2018 => 31,
+            Edition::E2021 => 56,
+            Edition::E2024 => unreachable!("2024 edition is not yet released"),
+        }
     }
 }
 
 /// `resolver = "2"` setting. Needed in [`Workspace`], but implied by [`Edition`] in packages.
-#[derive(Debug, PartialEq, Eq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize)]
+#[derive(Debug, Default, PartialEq, Eq, Ord, PartialOrd, Copy, Clone, Hash, Serialize, Deserialize)]
 pub enum Resolver {
     #[serde(rename = "1")]
+    #[default]
     V1 = 1,
     #[serde(rename = "2")]
     V2 = 2,
@@ -1847,12 +1978,6 @@ impl Display for Resolver {
     }
 }
 
-impl Default for Resolver {
-    fn default() -> Self { Self::V1 }
-}
-
-
-
 /// Lint definition.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(untagged)]
@@ -1862,7 +1987,7 @@ pub enum Lint {
         level: LintLevel,
         /// Controls which lints or lint groups override other lint groups.
         priority: Option<i32>,
-    }
+    },
 }
 
 /// Lint level.

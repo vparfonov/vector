@@ -30,8 +30,7 @@
 //! practical purposes, it can be assumed that an unintentional collision would
 //! be extremely unlikely.
 //!
-//! UUIDs have a number of standardized encodings that are specified in [RFC4122](http://tools.ietf.org/html/rfc4122),
-//! with recent additions [in draft](https://datatracker.ietf.org/doc/html/draft-peabody-dispatch-new-uuid-format-04).
+//! UUIDs have a number of standardized encodings that are specified in [RFC 9562](https://www.ietf.org/rfc/rfc9562.html).
 //!
 //! # Getting started
 //!
@@ -39,7 +38,7 @@
 //!
 //! ```toml
 //! [dependencies.uuid]
-//! version = "1.8.0"
+//! version = "1.10.0"
 //! features = [
 //!     "v4",                # Lets you generate random UUIDs
 //!     "fast-rng",          # Use a faster (but still sufficiently random) RNG
@@ -83,8 +82,6 @@
 //! * `v6` - Version 6 UUIDs using a timestamp and monotonic counter.
 //! * `v7` - Version 7 UUIDs using a Unix timestamp.
 //! * `v8` - Version 8 UUIDs using user-defined data.
-//!
-//! Versions that are in draft are also supported. See the _unstable features_ section for details.
 //!
 //! This library also includes a [`Builder`] type that can be used to help construct UUIDs of any
 //! version without any additional dependencies or features. It's a lower-level API than [`Uuid`]
@@ -141,7 +138,7 @@
 //!
 //! ```toml
 //! [dependencies.uuid]
-//! version = "1.8.0"
+//! version = "1.10.0"
 //! features = [
 //!     "v4",
 //!     "v7",
@@ -156,7 +153,7 @@
 //!
 //! ```toml
 //! [dependencies.uuid]
-//! version = "1.8.0"
+//! version = "1.10.0"
 //! default-features = false
 //! ```
 //!
@@ -202,8 +199,7 @@
 //! # References
 //!
 //! * [Wikipedia: Universally Unique Identifier](http://en.wikipedia.org/wiki/Universally_unique_identifier)
-//! * [RFC4122: A Universally Unique Identifier (UUID) URN Namespace](http://tools.ietf.org/html/rfc4122)
-//! * [Draft RFC: New UUID Formats, Version 4](https://datatracker.ietf.org/doc/html/draft-peabody-dispatch-new-uuid-format-04)
+//! * [RFC 9562: Universally Unique IDentifiers (UUID)](https://www.ietf.org/rfc/rfc9562.html).
 //!
 //! [`wasm-bindgen`]: https://crates.io/crates/wasm-bindgen
 //! [`cargo-web`]: https://crates.io/crates/cargo-web
@@ -211,10 +207,11 @@
 
 #![no_std]
 #![deny(missing_debug_implementations, missing_docs)]
+#![allow(clippy::mixed_attributes_style)]
 #![doc(
     html_logo_url = "https://www.rust-lang.org/logos/rust-logo-128x128-blk-v2.png",
     html_favicon_url = "https://www.rust-lang.org/favicon.ico",
-    html_root_url = "https://docs.rs/uuid/1.8.0"
+    html_root_url = "https://docs.rs/uuid/1.10.0"
 )]
 
 #[cfg(any(feature = "std", test))]
@@ -226,7 +223,7 @@ extern crate std;
 extern crate core as std;
 
 #[cfg(all(uuid_unstable, feature = "zerocopy"))]
-use zerocopy::{AsBytes, FromBytes, Unaligned};
+use zerocopy::{AsBytes, FromBytes, FromZeroes, Unaligned};
 
 mod builder;
 mod error;
@@ -239,6 +236,9 @@ pub use timestamp::{context::NoContext, ClockSequence, Timestamp};
 
 #[cfg(any(feature = "v1", feature = "v6"))]
 pub use timestamp::context::Context;
+
+#[cfg(feature = "v7")]
+pub use timestamp::context::ContextV7;
 
 #[cfg(feature = "v1")]
 #[doc(hidden)]
@@ -294,7 +294,7 @@ pub type Bytes = [u8; 16];
 ///
 /// # References
 ///
-/// * [Version in RFC4122](https://datatracker.ietf.org/doc/html/rfc4122#section-4.1.3)
+/// * [Version Field in RFC 9562](https://www.ietf.org/rfc/rfc9562.html#section-4.2)
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
 #[repr(u8)]
@@ -325,14 +325,15 @@ pub enum Version {
 ///
 /// # References
 ///
-/// * [Variant in RFC4122](http://tools.ietf.org/html/rfc4122#section-4.1.1)
+/// * [Variant Field in RFC 9562](https://www.ietf.org/rfc/rfc9562.html#section-4.1)
 #[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
 #[repr(u8)]
 pub enum Variant {
     /// Reserved by the NCS for backward compatibility.
     NCS = 0u8,
-    /// As described in the RFC4122 Specification (default).
+    /// As described in the RFC 9562 Specification (default).
+    /// (for backward compatibility it is not yet renamed)
     RFC4122,
     /// Reserved by Microsoft for backward compatibility.
     Microsoft,
@@ -437,7 +438,7 @@ pub enum Variant {
 #[derive(Clone, Copy, Eq, Hash, Ord, PartialEq, PartialOrd)]
 #[cfg_attr(
     all(uuid_unstable, feature = "zerocopy"),
-    derive(AsBytes, FromBytes, Unaligned)
+    derive(AsBytes, FromBytes, FromZeroes, Unaligned)
 )]
 #[cfg_attr(
     feature = "borsh",
@@ -497,7 +498,7 @@ impl Uuid {
     ///
     /// # References
     ///
-    /// * [Variant in RFC4122](http://tools.ietf.org/html/rfc4122#section-4.1.1)
+    /// * [Variant Field in RFC 9562](https://www.ietf.org/rfc/rfc9562.html#section-4.1)
     pub const fn get_variant(&self) -> Variant {
         match self.as_bytes()[8] {
             x if x & 0x80 == 0x00 => Variant::NCS,
@@ -532,7 +533,7 @@ impl Uuid {
     ///
     /// # References
     ///
-    /// * [Version in RFC4122](https://datatracker.ietf.org/doc/html/rfc4122#section-4.1.3)
+    /// * [Version Field in RFC 9562](https://www.ietf.org/rfc/rfc9562.html#section-4.2)
     pub const fn get_version_num(&self) -> usize {
         (self.as_bytes()[6] >> 4) as usize
     }
@@ -562,7 +563,7 @@ impl Uuid {
     ///
     /// # References
     ///
-    /// * [Version in RFC4122](https://datatracker.ietf.org/doc/html/rfc4122#section-4.1.3)
+    /// * [Version Field in RFC 9562](https://www.ietf.org/rfc/rfc9562.html#section-4.2)
     pub const fn get_version(&self) -> Option<Version> {
         match self.get_version_num() {
             0 if self.is_nil() => Some(Version::Nil),
@@ -877,35 +878,25 @@ impl Uuid {
     }
 
     /// If the UUID is the correct version (v1, v6, or v7) this will return
-    /// the timestamp and counter portion parsed from a V1 UUID.
-    ///
-    /// Returns `None` if the supplied UUID is not V1.
-    ///
-    /// The V1 timestamp format defined in RFC4122 specifies a 60-bit
-    /// integer representing the number of 100-nanosecond intervals
-    /// since 00:00:00.00, 15 Oct 1582.
-    ///
-    /// [`Timestamp`] offers several options for converting the raw RFC4122
-    /// value into more commonly-used formats, such as a unix timestamp.
+    /// the timestamp in a version-agnostic [`Timestamp`]. For other versions
+    /// this will return `None`.
     ///
     /// # Roundtripping
     ///
     /// This method is unlikely to roundtrip a timestamp in a UUID due to the way
     /// UUIDs encode timestamps. The timestamp returned from this method will be truncated to
     /// 100ns precision for version 1 and 6 UUIDs, and to millisecond precision for version 7 UUIDs.
-    ///
-    /// [`Timestamp`]: v1/struct.Timestamp.html
     pub const fn get_timestamp(&self) -> Option<Timestamp> {
         match self.get_version() {
             Some(Version::Mac) => {
-                let (ticks, counter) = timestamp::decode_rfc4122_timestamp(self);
+                let (ticks, counter) = timestamp::decode_gregorian_timestamp(self);
 
-                Some(Timestamp::from_rfc4122(ticks, counter))
+                Some(Timestamp::from_gregorian(ticks, counter))
             }
             Some(Version::SortMac) => {
-                let (ticks, counter) = timestamp::decode_sorted_rfc4122_timestamp(self);
+                let (ticks, counter) = timestamp::decode_sorted_gregorian_timestamp(self);
 
-                Some(Timestamp::from_rfc4122(ticks, counter))
+                Some(Timestamp::from_gregorian(ticks, counter))
             }
             Some(Version::SortRand) => {
                 let millis = timestamp::decode_unix_timestamp_millis(self);
@@ -913,12 +904,27 @@ impl Uuid {
                 let seconds = millis / 1000;
                 let nanos = ((millis % 1000) * 1_000_000) as u32;
 
-                Some(Timestamp {
-                    seconds,
-                    nanos,
-                    #[cfg(any(feature = "v1", feature = "v6"))]
-                    counter: 0,
-                })
+                Some(Timestamp::from_unix_time(seconds, nanos, 0, 0))
+            }
+            _ => None,
+        }
+    }
+
+    /// If the UUID is the correct version (v1, or v6) this will return the
+    /// node value as a 6-byte array. For other versions this will return `None`.
+    pub const fn get_node_id(&self) -> Option<[u8; 6]> {
+        match self.get_version() {
+            Some(Version::Mac) | Some(Version::SortMac) => {
+                let mut node_id = [0; 6];
+
+                node_id[0] = self.0[10];
+                node_id[1] = self.0[11];
+                node_id[2] = self.0[12];
+                node_id[3] = self.0[13];
+                node_id[4] = self.0[14];
+                node_id[5] = self.0[15];
+
+                Some(node_id)
             }
             _ => None,
         }
@@ -1249,6 +1255,43 @@ mod tests {
 
         assert_eq!(uuid.get_version().unwrap(), Version::Md5);
         assert_eq!(uuid.get_version_num(), 3);
+    }
+
+    #[test]
+    #[cfg_attr(
+        all(
+            target_arch = "wasm32",
+            target_vendor = "unknown",
+            target_os = "unknown"
+        ),
+        wasm_bindgen_test
+    )]
+    fn test_get_timestamp_unsupported_version() {
+        let uuid = new();
+
+        assert_ne!(Version::Mac, uuid.get_version().unwrap());
+        assert_ne!(Version::SortMac, uuid.get_version().unwrap());
+        assert_ne!(Version::SortRand, uuid.get_version().unwrap());
+
+        assert!(uuid.get_timestamp().is_none());
+    }
+
+    #[test]
+    #[cfg_attr(
+        all(
+            target_arch = "wasm32",
+            target_vendor = "unknown",
+            target_os = "unknown"
+        ),
+        wasm_bindgen_test
+    )]
+    fn test_get_node_id_unsupported_version() {
+        let uuid = new();
+
+        assert_ne!(Version::Mac, uuid.get_version().unwrap());
+        assert_ne!(Version::SortMac, uuid.get_version().unwrap());
+
+        assert!(uuid.get_node_id().is_none());
     }
 
     #[test]

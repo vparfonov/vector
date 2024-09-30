@@ -11,7 +11,7 @@
 
 [package]
 name = "crc32fast"
-version = "1.4.0"
+version = "1.4.2"
 authors = [
     "Sam Rijs <srijs@airpost.net>",
     "Alex Crichton <alex@alexcrichton.com>",

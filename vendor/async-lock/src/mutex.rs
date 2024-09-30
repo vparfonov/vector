@@ -1,14 +1,16 @@
 use core::borrow::Borrow;
 use core::cell::UnsafeCell;
 use core::fmt;
-use core::marker::PhantomData;
+use core::marker::{PhantomData, PhantomPinned};
 use core::ops::{Deref, DerefMut};
 use core::pin::Pin;
-use core::sync::atomic::{AtomicUsize, Ordering};
 use core::task::Poll;
 use core::usize;
 
 use alloc::sync::Arc;
+
+// We don't use loom::UnsafeCell as that doesn't work with the Mutex API.
+use crate::sync::atomic::{AtomicUsize, Ordering};
 
 #[cfg(all(feature = "std", not(target_family = "wasm")))]
 use std::time::{Duration, Instant};
@@ -56,20 +58,23 @@ unsafe impl<T: Send + ?Sized> Send for Mutex<T> {}
 unsafe impl<T: Send + ?Sized> Sync for Mutex<T> {}
 
 impl<T> Mutex<T> {
-    /// Creates a new async mutex.
-    ///
-    /// # Examples
-    ///
-    /// ```
-    /// use async_lock::Mutex;
-    ///
-    /// let mutex = Mutex::new(0);
-    /// ```
-    pub const fn new(data: T) -> Mutex<T> {
-        Mutex {
-            state: AtomicUsize::new(0),
-            lock_ops: Event::new(),
-            data: UnsafeCell::new(data),
+    const_fn! {
+        const_if: #[cfg(not(loom))];
+        /// Creates a new async mutex.
+        ///
+        /// # Examples
+        ///
+        /// ```
+        /// use async_lock::Mutex;
+        ///
+        /// let mutex = Mutex::new(0);
+        /// ```
+        pub const fn new(data: T) -> Mutex<T> {
+            Mutex {
+                state: AtomicUsize::new(0),
+                lock_ops: Event::new(),
+                data: UnsafeCell::new(data),
+            }
         }
     }
 
@@ -118,8 +123,8 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// # Blocking
     ///
-    /// Rather than using asynchronous waiting, like the [`lock`] method, this method will
-    /// block the current thread until the lock is acquired.
+    /// Rather than using asynchronous waiting, like the [`lock`][Mutex::lock] method,
+    /// this method will block the current thread until the lock is acquired.
     ///
     /// This method should not be used in an asynchronous context. It is intended to be
     /// used in a way that a mutex can be used in both asynchronous and synchronous contexts.
@@ -186,7 +191,7 @@ impl<T: ?Sized> Mutex<T> {
     /// # })
     /// ```
     pub fn get_mut(&mut self) -> &mut T {
-        unsafe { &mut *self.data.get() }
+        self.data.get_mut()
     }
 
     /// Unlocks the mutex directly.
@@ -233,8 +238,8 @@ impl<T: ?Sized> Mutex<T> {
     ///
     /// # Blocking
     ///
-    /// Rather than using asynchronous waiting, like the [`lock_arc`] method, this method will
-    /// block the current thread until the lock is acquired.
+    /// Rather than using asynchronous waiting, like the [`lock_arc`][Mutex::lock_arc] method,
+    /// this method will block the current thread until the lock is acquired.
     ///
     /// This method should not be used in an asynchronous context. It is intended to be
     /// used in a way that a mutex can be used in both asynchronous and synchronous contexts.
@@ -337,7 +342,7 @@ pin_project_lite::pin_project! {
 unsafe impl<T: Send + ?Sized> Send for Lock<'_, T> {}
 unsafe impl<T: Sync + ?Sized> Sync for Lock<'_, T> {}
 
-impl<T: ?Sized> fmt::Debug for LockInner<'_, T> {
+impl<T: ?Sized> fmt::Debug for Lock<'_, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Lock { .. }")
     }
@@ -445,8 +450,7 @@ pin_project_lite::pin_project! {
         mutex: Option<B>,
 
         // The event listener waiting on the mutex.
-        #[pin]
-        listener: EventListener,
+        listener: Option<EventListener>,
 
         // The point at which the mutex lock was started.
         start: Start,
@@ -457,6 +461,10 @@ pin_project_lite::pin_project! {
         // Capture the `T` lifetime.
         #[pin]
         _marker: PhantomData<T>,
+
+        // Keeping this type `!Unpin` enables future optimizations.
+        #[pin]
+        _pin: PhantomPinned
     }
 
     impl<T: ?Sized, B: Borrow<Mutex<T>>> PinnedDrop for AcquireSlow<B, T> {
@@ -477,21 +485,16 @@ impl<T: ?Sized, B: Borrow<Mutex<T>>> AcquireSlow<B, T> {
     /// Create a new `AcquireSlow` future.
     #[cold]
     fn new(mutex: B) -> Self {
-        // Create a new instance of the listener.
-        let listener = {
-            let mutex = Borrow::<Mutex<T>>::borrow(&mutex);
-            EventListener::new(&mutex.lock_ops)
-        };
-
         AcquireSlow {
             mutex: Some(mutex),
-            listener,
+            listener: None,
             start: Start {
                 #[cfg(all(feature = "std", not(target_family = "wasm")))]
                 start: None,
             },
             starved: false,
             _marker: PhantomData,
+            _pin: PhantomPinned,
         }
     }
 
@@ -520,7 +523,7 @@ impl<T: ?Sized, B: Unpin + Borrow<Mutex<T>>> EventListenerFuture for AcquireSlow
         strategy: &mut S,
         context: &mut S::Context,
     ) -> Poll<Self::Output> {
-        let mut this = self.as_mut().project();
+        let this = self.as_mut().project();
         #[cfg(all(feature = "std", not(target_family = "wasm")))]
         let start = *this.start.start.get_or_insert_with(Instant::now);
         let mutex = Borrow::<Mutex<T>>::borrow(
@@ -531,8 +534,8 @@ impl<T: ?Sized, B: Unpin + Borrow<Mutex<T>>> EventListenerFuture for AcquireSlow
         if !*this.starved {
             loop {
                 // Start listening for events.
-                if !this.listener.is_listening() {
-                    this.listener.as_mut().listen();
+                if this.listener.is_none() {
+                    *this.listener = Some(mutex.lock_ops.listen());
 
                     // Try locking if nobody is being starved.
                     match mutex
@@ -550,7 +553,7 @@ impl<T: ?Sized, B: Unpin + Borrow<Mutex<T>>> EventListenerFuture for AcquireSlow
                         _ => break,
                     }
                 } else {
-                    ready!(strategy.poll(this.listener.as_mut(), context));
+                    ready!(strategy.poll(this.listener, context));
 
                     // Try locking if nobody is being starved.
                     match mutex
@@ -594,9 +597,9 @@ impl<T: ?Sized, B: Unpin + Borrow<Mutex<T>>> EventListenerFuture for AcquireSlow
 
         // Fairer locking loop.
         loop {
-            if !this.listener.is_listening() {
+            if this.listener.is_none() {
                 // Start listening for events.
-                this.listener.as_mut().listen();
+                *this.listener = Some(mutex.lock_ops.listen());
 
                 // Try locking if nobody else is being starved.
                 match mutex
@@ -618,7 +621,7 @@ impl<T: ?Sized, B: Unpin + Borrow<Mutex<T>>> EventListenerFuture for AcquireSlow
                 }
             } else {
                 // Wait for a notification.
-                ready!(strategy.poll(this.listener.as_mut(), context));
+                ready!(strategy.poll(this.listener, context));
 
                 // Try acquiring the lock without waiting for others.
                 if mutex.state.fetch_or(1, Ordering::Acquire) % 2 == 0 {
@@ -756,14 +759,5 @@ impl<T: ?Sized> Deref for MutexGuardArc<T> {
 impl<T: ?Sized> DerefMut for MutexGuardArc<T> {
     fn deref_mut(&mut self) -> &mut T {
         unsafe { &mut *self.0.data.get() }
-    }
-}
-
-/// Calls a function when dropped.
-struct CallOnDrop<F: Fn()>(F);
-
-impl<F: Fn()> Drop for CallOnDrop<F> {
-    fn drop(&mut self) {
-        (self.0)();
     }
 }

@@ -26,14 +26,14 @@ macro_rules! color_methods {
         $(
             #[$fg_meta]
             #[must_use]
-            pub fn $fg_method(mut self) -> Self {
+            pub const fn $fg_method(mut self) -> Self {
                 self.fg = Some(DynColors::Ansi(AnsiColors::$color));
                 self
             }
 
             #[$fg_meta]
             #[must_use]
-            pub fn $bg_method(mut self) -> Self {
+            pub const fn $bg_method(mut self) -> Self {
                 self.bg = Some(DynColors::Ansi(AnsiColors::$color));
                 self
             }
@@ -64,8 +64,9 @@ pub struct Styled<T> {
     pub style: Style,
 }
 
-/// A pre-computed style that can be applied to a struct using [`OwoColorize::style`]. Its
-/// interface mimics that of [`OwoColorize`], but instead of chaining methods on your
+/// A pre-computed style that can be applied to a struct using [`OwoColorize::style`].
+///
+/// Its interface mimics that of [`OwoColorize`], but instead of chaining methods on your
 /// object, you instead chain them on the `Style` object before applying it.
 ///
 /// ```rust
@@ -78,7 +79,7 @@ pub struct Styled<T> {
 ///
 /// println!("{}", "red text, white background, struck through".style(my_style));
 /// ```
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Style {
     pub(crate) fg: Option<DynColors>,
     pub(crate) bg: Option<DynColors>,
@@ -87,7 +88,7 @@ pub struct Style {
 }
 
 #[repr(transparent)]
-#[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub(crate) struct StyleFlags(pub(crate) u8);
 
 const DIMMED_SHIFT: u8 = 0;
@@ -114,6 +115,10 @@ macro_rules! style_flags_methods {
 }
 
 impl StyleFlags {
+    const fn new() -> Self {
+        Self(0)
+    }
+
     style_flags_methods! {
         (DIMMED_SHIFT, dimmed, set_dimmed),
         (ITALIC_SHIFT, italic, set_italic),
@@ -126,11 +131,22 @@ impl StyleFlags {
     }
 }
 
+impl Default for StyleFlags {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Style {
     /// Create a new style to be applied later
     #[must_use]
-    pub fn new() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self {
+            fg: None,
+            bg: None,
+            bold: false,
+            style_flags: StyleFlags::new(),
+        }
     }
 
     /// Apply the style to a given struct to output
@@ -263,7 +279,7 @@ impl Style {
         (dimmed, set_dimmed),
         /// Make the text italicized
         (italic, set_italic),
-        /// Make the text italicized
+        /// Make the text underlined
         (underline, set_underline),
         /// Make the text blink
         (blink, set_blink),
@@ -486,8 +502,14 @@ impl Style {
     }
 }
 
+impl Default for Style {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Helper to create [`Style`]s more ergonomically
-pub fn style() -> Style {
+pub const fn style() -> Style {
     Style::new()
 }
 

@@ -4,6 +4,89 @@
 
 <!-- changelog start -->
 
+## [0.20.1 (2024-12-09)]
+
+
+### Fixes
+
+- Reverted `to_float` [change](https://github.com/vectordotdev/vrl/pull/1107) because the new logic is too restrictive
+  e.g. attempting to convert "0" returns an error. (https://github.com/vectordotdev/vrl/pull/1179)
+
+
+## [0.20.0 (2024-11-27)]
+
+
+### Breaking Changes & Upgrade Guide
+
+- Fixes the `to_float` function to return an error instead of `f64::INFINITY` when parsing [non-normal](https://doc.rust-lang.org/std/primitive.f64.html#method.is_normal) numbers. (https://github.com/vectordotdev/vrl/pull/1107)
+
+### New Features
+
+- The `decrypt` and `encrypt` VRL functions now support aes-siv (RFC 5297) encryption and decryption. (https://github.com/vectordotdev/vrl/pull/1100)
+
+### Enhancements
+
+- `decode_punycode` and `encode_punycode` with `validate` flag set to false should be faster now, in cases when input data needs no encoding or decoding. (https://github.com/vectordotdev/vrl/pull/1104)
+- `vrl::value::Value` now implements `PartialCmp` that first checks whether the enum discriminants
+  (that both are floats for example), and if they are calls `partial_cmp` on the inner values.
+  Otherwise, it will return `None`. (https://github.com/vectordotdev/vrl/pull/1117)
+- The `encode_proto` function was enhanced to automatically convert valid string fields to numeric proto
+  fields. (https://github.com/vectordotdev/vrl/pull/1114)
+
+### Fixes
+
+- The `parse_groks` VRL function and Datadog grok parsing now catch the panic coming from `rust-onig` on too many regex match retries, and handles it as a custom error. (https://github.com/vectordotdev/vrl/pull/1079)
+- `encode_punycode` with `validate` flag set to false should be more consistent with `validate` set to true, turning all uppercase character to lowercase besides doing punycode encoding (https://github.com/vectordotdev/vrl/pull/1115)
+- Removed false warning when using `set_semantic_meaning`. (https://github.com/vectordotdev/vrl/pull/1148)
+
+
+## [0.19.0 (2024-09-30)]
+
+
+### Breaking Changes & Upgrade Guide
+
+- The multi-line mode of the `parse_groks` VRL function is now enabled by default.
+  Use the `(?-m)` modifier to disable this behaviour. (https://github.com/vectordotdev/vrl/pull/1022)
+
+### Enhancements
+
+- The `keyvalue` grok filter is extended to match Datadog implementation. (https://github.com/vectordotdev/vrl/pull/1015)
+
+### Fixes
+
+- The `parse_xml` function now doesn't add an unnecessary `text` key when processing single nodes. (https://github.com/vectordotdev/vrl/pull/849)
+- `parse_grok` and `parse_groks` no longer require field names containing a hyphen (e.g. `@a-b`) to be quoted.
+- The function `match_datadog_query` doesn't panic if an invalid path is passed, instead it returns an error. (https://github.com/vectordotdev/vrl/pull/1031)
+- The `parse_ruby_hash` parser is extended to match Datadog implementation. Previously it would parse the key in `{:key => "value"}` as `:key`, now it will parse it as `key`. (https://github.com/vectordotdev/vrl/pull/1050)
+
+
+## [0.18.0 (2024-09-05)]
+
+
+### New Features
+
+- Added `unflatten` function to inverse the result of the `flatten` function. This function is useful when you want to convert a flattened object back to its original form.
+- The `parse_json` function now accepts an optional `lossy` parameter (which defaults to `true`).
+
+  This new parameter allows to control whether the UTF-8 decoding should be lossy or not, replacing
+  invalid UTF-8 sequences with the Unicode replacement character (U+FFFD) if set to `true` or raising an error
+  if set to `false` and an invalid utf-8 sequence is found. (https://github.com/vectordotdev/vrl/pull/269)
+- Added casing functions `camelcase`, `kebabcase`, `screamingsnakecase`, `snakecase`, `pascalcase` (https://github.com/vectordotdev/vrl/pull/973)
+- Added `parse_influxdb` function to parse events encoded using the [InfluxDB line protocol](https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol/).
+
+### Enhancements
+
+- The `match_datadog_query` function now accepts `||` in place of `OR` and `&&` in
+  place of `AND` in the query string, which is common Datadog syntax. (https://github.com/vectordotdev/vrl/pull/1001)
+
+### Fixes
+
+- `decode_base64` no longer requires canonical padding. (https://github.com/vectordotdev/vrl/pull/960)
+- The assumption of a Datadog Logs-based intake event structure has been removed
+  from the `match_datadog_query` function. (https://github.com/vectordotdev/vrl/pull/1003)
+- For the `parse_influxdb` function the `timestamp` and `tags` fields of returned objects are now
+  correctly marked as nullable.
+
 ## [0.17.0 (2024-07-24)]
 
 

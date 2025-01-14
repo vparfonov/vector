@@ -1,9 +1,9 @@
-#![allow(dead_code)]
-use super::utf8_util::BrotliIsMostlyUTF8;
-use super::util::FastLog2f64;
 use core::cmp::min;
 
-static kMinUTF8Ratio: super::util::floatX = 0.75 as super::util::floatX;
+use super::util::{floatX, FastLog2f64};
+use crate::enc::utf8_util::is_mostly_utf8;
+
+static kMinUTF8Ratio: floatX = 0.75;
 
 fn UTF8Position(last: usize, c: usize, clamp: usize) -> usize {
     if c < 128usize {
@@ -49,7 +49,7 @@ fn EstimateBitCostsForLiteralsUTF8(
     len: usize,
     mask: usize,
     data: &[u8],
-    cost: &mut [super::util::floatX],
+    cost: &mut [floatX],
 ) {
     let max_utf8: usize = DecideMultiByteStatsLevel(pos, len, mask, data);
     let mut histogram = [[0usize; 256]; 3];
@@ -168,7 +168,7 @@ fn EstimateBitCostsForLiteralsUTF8(
                 if i < 2000usize {
                     lit_cost += (0.7 - (2000usize).wrapping_sub(i) as (f64) / 2000.0 * 0.35);
                 }
-                cost[i] = lit_cost as (super::util::floatX);
+                cost[i] = lit_cost as floatX;
             }
         }
         i = i.wrapping_add(1);
@@ -180,9 +180,9 @@ pub fn BrotliEstimateBitCostsForLiterals(
     len: usize,
     mask: usize,
     data: &[u8],
-    cost: &mut [super::util::floatX],
+    cost: &mut [floatX],
 ) {
-    if BrotliIsMostlyUTF8(data, pos, mask, len, kMinUTF8Ratio) != 0 {
+    if is_mostly_utf8(data, pos, mask, len, kMinUTF8Ratio) {
         EstimateBitCostsForLiteralsUTF8(pos, len, mask, data, cost);
     } else {
         let mut histogram: [usize; 256] = [0; 256];
@@ -230,7 +230,7 @@ pub fn BrotliEstimateBitCostsForLiterals(
                         lit_cost *= 0.5;
                         lit_cost += 0.5;
                     }
-                    cost[i] = lit_cost as (super::util::floatX);
+                    cost[i] = lit_cost as floatX;
                 }
             }
             i = i.wrapping_add(1);

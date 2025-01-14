@@ -11,7 +11,7 @@ use ratatui::{
         execute,
         terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
     },
-    terminal::Terminal,
+    Terminal,
 };
 
 use crate::{app::App, ui};
@@ -26,7 +26,7 @@ pub fn run(tick_rate: Duration, enhanced_graphics: bool) -> Result<(), Box<dyn E
 
     // create app and run it
     let app = App::new("Crossterm Demo", enhanced_graphics);
-    let res = run_app(&mut terminal, app, tick_rate);
+    let app_result = run_app(&mut terminal, app, tick_rate);
 
     // restore terminal
     disable_raw_mode()?;
@@ -37,7 +37,7 @@ pub fn run(tick_rate: Duration, enhanced_graphics: bool) -> Result<(), Box<dyn E
     )?;
     terminal.show_cursor()?;
 
-    if let Err(err) = res {
+    if let Err(err) = app_result {
         println!("{err:?}");
     }
 
@@ -51,10 +51,10 @@ fn run_app<B: Backend>(
 ) -> io::Result<()> {
     let mut last_tick = Instant::now();
     loop {
-        terminal.draw(|f| ui::draw(f, &mut app))?;
+        terminal.draw(|frame| ui::draw(frame, &mut app))?;
 
         let timeout = tick_rate.saturating_sub(last_tick.elapsed());
-        if crossterm::event::poll(timeout)? {
+        if event::poll(timeout)? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     match key.code {

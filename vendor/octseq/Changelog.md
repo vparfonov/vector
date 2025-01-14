@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.5.2
+
+New
+
+* Added `Str::try_copy_from_str` and `Str::copy_from_str` to create a new
+  `Str<_>` by copying from a `&str`. ([#56])
+
+Bug fixes
+
+* Fixed an infinite loop in the `OctetsBuilder::with_capacity` impl for
+  `heapless::Vec<..>`. ([#59])
+
+[#56]: https://github.com/NLnetLabs/octseq/pull/56
+[#59]: https://github.com/NLnetLabs/octseq/pull/59
+
+
 ## 0.5.1
 
 Released 2024-02-13

@@ -38,7 +38,7 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
         let v_attrs = &v.attrs;
         let v_ident = &v.ident;
 
-        all_flags.push(quote::quote!(Self::#v_ident));
+        all_flags.push(v_ident.clone());
         all_flags_names.push(quote::quote!(stringify!(#v_ident)));
 
         let expr = if let Some((_, expr)) = v.discriminant.as_ref() {
@@ -54,7 +54,7 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
             .then(|| {
                 let i_ident = Ident::new(&format!("Inverted{}", v_ident), v_ident.span());
 
-                all_flags.push(quote::quote!(Self::#i_ident));
+                all_flags.push(i_ident.clone());
                 all_flags_names.push(quote::quote!(stringify!(#i_ident)));
 
                 quote::quote!(
@@ -72,17 +72,37 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
         ))
     }
 
+    let flags_iter = config.flags_iter.then(|| {
+        quote::quote!(
+            /// Returns an iterator over all flags of the bitmask.
+            /// Where each Item = (name, flag).
+            #vis fn flags() -> impl core::iter::Iterator<Item = &'static (&'static str, Self)> {
+                static FLAGS: [(&'static str, #ident); #flags_amount] = [
+                    #((#all_flags_names, #ident::#all_flags),)*
+                ];
+
+                FLAGS.iter()
+            }
+        )
+    }).into_iter();
+
     let debug_impl = if config.vec_debug {
         quote::quote! {
             impl core::fmt::Debug for #ident {
                 fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
-                    let mut matches = Vec::new();
+                    write!(f, "{}[", stringify!(#ident))?;
 
-                    #(if self.contains(#all_flags) {
-                        matches.push(#all_flags_names);
+                    let mut has_flags = false;
+                    #(if self.contains(Self::#all_flags) {
+                        if has_flags {
+                            write!(f, ", {}", #all_flags_names)?;
+                        } else {
+                            write!(f, "{}", #all_flags_names)?;
+                            has_flags = true;
+                        }
                     })*
 
-                    write!(f, "{}[{}]", stringify!(#ident), matches.join(", "))
+                    write!(f, "]")
                 }
             }
         }
@@ -110,6 +130,8 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
         impl #ident {
             #(#flags)*
 
+            #(#flags_iter)*
+
             /// Returns the underlying bits of the bitmask.
             #[inline]
             #vis const fn bits(&self) -> #typ {
@@ -128,7 +150,7 @@ pub fn parse(attr: TokenStream, mut item: ItemEnum) -> Result<TokenStream> {
             /// Returns a bitmask that contains all flags.
             #[inline]
             #vis const fn all_flags() -> Self {
-                Self { bits: #(#all_flags.bits |)* 0 }
+                Self { bits: #(Self::#all_flags.bits |)* 0 }
             }
 
             /// Returns `true` if the bitmask contains all values.
@@ -373,6 +395,7 @@ fn parse_typ(attr: TokenStream) -> Result<Ident> {
 struct Config {
     inverted_flags: bool,
     vec_debug: bool,
+    flags_iter: bool,
 }
 
 impl Config {
@@ -380,6 +403,7 @@ impl Config {
         Self {
             inverted_flags: false,
             vec_debug: false,
+            flags_iter: false,
         }
     }
 }
@@ -392,6 +416,7 @@ impl Parse for Config {
             match arg.to_string().as_str() {
                 "inverted_flags" => config.inverted_flags = true,
                 "vec_debug" => config.vec_debug = true,
+                "flags_iter" => config.flags_iter = true,
                 _ => return Err(Error::new_spanned(arg, "unknown config option")),
             }
         }

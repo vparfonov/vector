@@ -1,19 +1,21 @@
 #![cfg(not(feature = "safe"))]
 
+use core;
 #[cfg(feature = "std")]
 use std::io::Write;
 #[cfg(feature = "std")]
 use std::{io, panic, thread};
 
-use super::alloc_util::BrotliSubclassableAllocator;
-use brotli_decompressor::ffi::alloc_util;
 use brotli_decompressor::ffi::alloc_util::SubclassableAllocator;
 use brotli_decompressor::ffi::interface::{
     brotli_alloc_func, brotli_free_func, c_void, CAllocator,
 };
-use brotli_decompressor::ffi::{slice_from_raw_parts_or_nil, slice_from_raw_parts_or_nil_mut};
-use core;
-use enc::encode::BrotliEncoderStateStruct;
+use brotli_decompressor::ffi::{
+    alloc_util, slice_from_raw_parts_or_nil, slice_from_raw_parts_or_nil_mut,
+};
+
+use super::alloc_util::BrotliSubclassableAllocator;
+use crate::enc::encode::BrotliEncoderStateStruct;
 
 #[repr(C)]
 pub enum BrotliEncoderOperation {
@@ -229,7 +231,7 @@ pub unsafe extern "C" fn BrotliEncoderCompress(
         let empty_m8 =
             BrotliSubclassableAllocator::new(SubclassableAllocator::new(allocators.clone()));
 
-        ::enc::encode::BrotliEncoderCompress(
+        crate::enc::encode::encoder_compress(
             empty_m8,
             &mut m8,
             quality,
@@ -241,6 +243,7 @@ pub unsafe extern "C" fn BrotliEncoderCompress(
             encoded_buf,
             &mut |_a, _b, _c, _d| (),
         )
+        .into()
     })
     .unwrap_or_else(|panic_err| {
         error_print(panic_err);

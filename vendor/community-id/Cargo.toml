@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "community-id"
-version = "0.2.2"
+version = "0.2.3"
 authors = ["Julian Wang <traceflight@outlook.com>"]
 description = "This package provides a Rust implementation of the open Community ID flow hashing standard."
 readme = "README.md"

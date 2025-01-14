@@ -9,88 +9,41 @@
 //! See the [examples readme] for more information on finding examples that match the version of the
 //! library you are using.
 //!
-//! [Ratatui]: https://github.com/ratatui-org/ratatui
-//! [examples]: https://github.com/ratatui-org/ratatui/blob/main/examples
-//! [examples readme]: https://github.com/ratatui-org/ratatui/blob/main/examples/README.md
+//! [Ratatui]: https://github.com/ratatui/ratatui
+//! [examples]: https://github.com/ratatui/ratatui/blob/main/examples
+//! [examples readme]: https://github.com/ratatui/ratatui/blob/main/examples/README.md
 
-use std::{
-    error::Error,
-    io::{stdout, Stdout},
-    ops::ControlFlow,
-    time::Duration,
-};
-
-use itertools::Itertools;
+use color_eyre::Result;
 use ratatui::{
-    backend::CrosstermBackend,
-    crossterm::{
-        event::{self, Event, KeyCode},
-        execute,
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    },
+    crossterm::event::{self, Event, KeyCode, KeyEventKind},
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Style, Stylize},
-    terminal::Frame,
     text::Line,
-    widgets::{
-        block::{Position, Title},
-        Block, BorderType, Borders, Padding, Paragraph, Wrap,
-    },
+    widgets::{Block, BorderType, Borders, Padding, Paragraph, Wrap},
+    DefaultTerminal, Frame,
 };
 
-// These type aliases are used to make the code more readable by reducing repetition of the generic
-// types. They are not necessary for the functionality of the code.
-type Terminal = ratatui::Terminal<CrosstermBackend<Stdout>>;
-type Result<T> = std::result::Result<T, Box<dyn Error>>;
-
 fn main() -> Result<()> {
-    let mut terminal = setup_terminal()?;
-    let result = run(&mut terminal);
-    restore_terminal(terminal)?;
-
-    if let Err(err) = result {
-        eprintln!("{err:?}");
-    }
-    Ok(())
+    color_eyre::install()?;
+    let terminal = ratatui::init();
+    let result = run(terminal);
+    ratatui::restore();
+    result
 }
 
-fn setup_terminal() -> Result<Terminal> {
-    enable_raw_mode()?;
-    let mut stdout = stdout();
-    execute!(stdout, EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(stdout);
-    let terminal = Terminal::new(backend)?;
-    Ok(terminal)
-}
-
-fn restore_terminal(mut terminal: Terminal) -> Result<()> {
-    disable_raw_mode()?;
-    execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
-    Ok(())
-}
-
-fn run(terminal: &mut Terminal) -> Result<()> {
+fn run(mut terminal: DefaultTerminal) -> Result<()> {
     loop {
-        terminal.draw(ui)?;
-        if handle_events()?.is_break() {
-            return Ok(());
-        }
-    }
-}
-
-fn handle_events() -> Result<ControlFlow<()>> {
-    if event::poll(Duration::from_millis(100))? {
+        terminal.draw(draw)?;
         if let Event::Key(key) = event::read()? {
-            if key.code == KeyCode::Char('q') {
-                return Ok(ControlFlow::Break(()));
+            if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
+                break Ok(());
             }
         }
     }
-    Ok(ControlFlow::Continue(()))
 }
 
-fn ui(frame: &mut Frame) {
-    let (title_area, layout) = calculate_layout(frame.size());
+fn draw(frame: &mut Frame) {
+    let (title_area, layout) = calculate_layout(frame.area());
 
     render_title(frame, title_area);
 
@@ -133,7 +86,7 @@ fn calculate_layout(area: Rect) -> (Rect, Vec<Vec<Rect>>) {
                 .split(area)
                 .to_vec()
         })
-        .collect_vec();
+        .collect();
     (title_area, main_areas)
 }
 
@@ -183,7 +136,6 @@ fn render_styled_block(paragraph: &Paragraph, frame: &mut Frame, area: Rect) {
     frame.render_widget(paragraph.clone().block(block), area);
 }
 
-// Note: this currently renders incorrectly, see https://github.com/ratatui-org/ratatui/issues/349
 fn render_styled_title(paragraph: &Paragraph, frame: &mut Frame, area: Rect) {
     let block = Block::bordered()
         .title("Styled title")
@@ -209,36 +161,12 @@ fn render_multiple_titles(paragraph: &Paragraph, frame: &mut Frame, area: Rect) 
 
 fn render_multiple_title_positions(paragraph: &Paragraph, frame: &mut Frame, area: Rect) {
     let block = Block::bordered()
-        .title(
-            Title::from("top left")
-                .position(Position::Top)
-                .alignment(Alignment::Left),
-        )
-        .title(
-            Title::from("top center")
-                .position(Position::Top)
-                .alignment(Alignment::Center),
-        )
-        .title(
-            Title::from("top right")
-                .position(Position::Top)
-                .alignment(Alignment::Right),
-        )
-        .title(
-            Title::from("bottom left")
-                .position(Position::Bottom)
-                .alignment(Alignment::Left),
-        )
-        .title(
-            Title::from("bottom center")
-                .position(Position::Bottom)
-                .alignment(Alignment::Center),
-        )
-        .title(
-            Title::from("bottom right")
-                .position(Position::Bottom)
-                .alignment(Alignment::Right),
-        );
+        .title(Line::from("top left").left_aligned())
+        .title(Line::from("top center").centered())
+        .title(Line::from("top right").right_aligned())
+        .title_bottom(Line::from("bottom left").left_aligned())
+        .title_bottom(Line::from("bottom center").centered())
+        .title_bottom(Line::from("bottom right").right_aligned());
     frame.render_widget(paragraph.clone().block(block), area);
 }
 

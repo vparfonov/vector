@@ -5,9 +5,9 @@ use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
-#[cfg(target_arch = "wasm32")]
-use instant::Instant;
 use portable_atomic::{AtomicU64, AtomicU8, Ordering};
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 use crate::draw_target::ProgressDrawTarget;
 use crate::style::ProgressStyle;
@@ -94,6 +94,11 @@ impl BarState {
         if tick {
             self.tick(now);
         }
+    }
+
+    pub(crate) fn unset_length(&mut self, now: Instant) {
+        self.state.len = None;
+        self.update_estimate_and_draw(now);
     }
 
     pub(crate) fn set_length(&mut self, now: Instant, len: u64) {
@@ -537,7 +542,7 @@ impl AtomicPosition {
         }
 
         let mut capacity = self.capacity.load(Ordering::Acquire);
-        // `prev` is the number of ms after `self.started` we last returned `true`, in ns
+        // `prev` is the number of ns after `self.started` we last returned `true`
         let prev = self.prev.load(Ordering::Acquire);
         // `elapsed` is the number of ns since `self.started`
         let elapsed = (now - self.start).as_nanos() as u64;
@@ -551,10 +556,10 @@ impl AtomicPosition {
             return false;
         }
 
-        // We now calculate `new`, the number of ms, in ns, since we last returned `true`,
-        // and `remainder`, which represents a number of ns less than 1ms which we cannot
+        // We now calculate `new`, the number of INTERVALs since we last returned `true`,
+        // and `remainder`, which represents a number of ns less than INTERVAL which we cannot
         // convert into capacity now, so we're saving it for later. We do this by
-        // substracting this from `elapsed` before storing it into `self.prev`.
+        // subtracting this from `elapsed` before storing it into `self.prev`.
         let (new, remainder) = ((diff / INTERVAL), (diff % INTERVAL));
         // We add `new` to `capacity`, subtract one for returning `true` from here,
         // then make sure it does not exceed a maximum of `MAX_BURST`.
@@ -568,7 +573,7 @@ impl AtomicPosition {
 
     fn reset(&self, now: Instant) {
         self.set(0);
-        let elapsed = (now.saturating_duration_since(self.start)).as_millis() as u64;
+        let elapsed = (now.saturating_duration_since(self.start)).as_nanos() as u64;
         self.prev.store(elapsed, Ordering::Release);
     }
 
@@ -798,5 +803,16 @@ mod tests {
         let later = atomic_position.start + Duration::from_nanos(INTERVAL * u64::from(u8::MAX));
         // Should not panic.
         atomic_position.allow(later);
+    }
+
+    #[test]
+    fn test_atomic_position_reset() {
+        const ELAPSE_TIME: Duration = Duration::from_millis(20);
+        let mut pos = AtomicPosition::new();
+        pos.reset(pos.start + ELAPSE_TIME);
+
+        // prev should be exactly ELAPSE_TIME after reset
+        assert_eq!(*pos.pos.get_mut(), 0);
+        assert_eq!(*pos.prev.get_mut(), ELAPSE_TIME.as_nanos() as u64);
     }
 }

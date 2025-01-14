@@ -1,8 +1,8 @@
 use std::fmt::Debug;
 
 use octseq::{OctetsBuilder, Truncate};
+use tracing::trace;
 
-use crate::base::iana::rcode::Rcode;
 use crate::base::iana::Opcode;
 use crate::base::message_builder::AdditionalBuilder;
 use crate::base::wire::Composer;
@@ -28,20 +28,43 @@ where
 {
     let ranges = &stelline.scenario.ranges;
     let step = step_value.get();
+    let mut opt_entry = None;
+
+    // Take the last entry. That works better if the RPL is written with
+    // a recursive resolver in mind.
+    trace!(
+        "Looking for matching Stelline range response for opcode {} qtype {}",
+        msg.header().opcode(),
+        msg.first_question().unwrap().qtype()
+    );
     for range in ranges {
+        trace!(
+            "Checking against range {} <= {}",
+            range.start_value,
+            range.end_value
+        );
         if step < range.start_value || step > range.end_value {
             continue;
         }
         for entry in &range.entry {
-            if !match_msg(entry, msg, false) {
-                continue;
+            if match_msg(entry, msg, false) {
+                trace!("Match found");
+                opt_entry = Some(entry);
             }
-            let reply = do_adjust(entry, msg);
-            return Some(reply);
         }
     }
-    println!("do_server: no reply at step value {step}");
-    todo!();
+
+    match opt_entry {
+        Some(entry) => {
+            let reply = do_adjust(entry, msg);
+            Some(reply)
+        }
+        None => {
+            trace!("No matching reply found");
+            println!("do_server: no reply at step value {step}");
+            todo!();
+        }
+    }
 }
 
 fn do_adjust<Octs, Target>(
@@ -71,7 +94,7 @@ where
         }
     }
     let mut msg = msg.answer();
-    for a in &sections.answer {
+    for a in &sections.answer[0] {
         let rec = if let ZonefileEntry::Record(record) = a {
             record
         } else {
@@ -105,34 +128,10 @@ where
     header.set_aa(reply.aa);
     header.set_ad(reply.ad);
     header.set_cd(reply.cd);
-    if reply.fl_do {
-        todo!()
-    }
-    if reply.formerr {
-        header.set_rcode(Rcode::FORMERR);
-    }
-    if reply.noerror {
-        header.set_rcode(Rcode::NOERROR);
-    }
-    if reply.notimp {
-        header.set_rcode(Rcode::NOTIMP);
-    }
-    if reply.nxdomain {
-        header.set_rcode(Rcode::NXDOMAIN);
-    }
     header.set_qr(reply.qr);
     header.set_ra(reply.ra);
     header.set_rd(reply.rd);
-    if reply.refused {
-        header.set_rcode(Rcode::REFUSED);
-    }
-    if reply.servfail {
-        todo!()
-    }
     if reply.tc {
-        todo!()
-    }
-    if reply.yxdomain {
         todo!()
     }
     if reply.notify {
@@ -142,6 +141,28 @@ where
         header.set_id(reqmsg.header().id());
     } else {
         todo!();
+    }
+
+    // Assume there is no existing Opt record.
+    if reply.fl_do {
+        msg.opt(|o| {
+            o.set_dnssec_ok(reply.fl_do);
+            if let Some(rcode) = reply.rcode {
+                o.set_rcode(rcode);
+            }
+            Ok(())
+        })
+        .unwrap()
+    } else if let Some(rcode) = reply.rcode {
+        if rcode.is_ext() {
+            msg.opt(|o| {
+                o.set_rcode(rcode);
+                Ok(())
+            })
+            .unwrap();
+        } else {
+            header.set_rcode(rcode.rcode());
+        }
     }
     msg
 }

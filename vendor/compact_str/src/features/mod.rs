@@ -2,8 +2,12 @@
 
 #[cfg(feature = "arbitrary")]
 mod arbitrary;
+#[cfg(feature = "borsh")]
+mod borsh;
 #[cfg(feature = "bytes")]
 mod bytes;
+#[cfg(feature = "diesel")]
+mod diesel;
 #[cfg(feature = "markup")]
 mod markup;
 #[cfg(feature = "proptest")]
@@ -16,3 +20,5 @@ mod rkyv;
 mod serde;
 #[cfg(feature = "smallvec")]
 mod smallvec;
+#[cfg(feature = "sqlx")]
+mod sqlx;

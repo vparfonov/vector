@@ -12,11 +12,16 @@
 [package]
 edition = "2018"
 name = "ndarray-stats"
-version = "0.5.1"
+version = "0.6.0"
 authors = [
     "Jim Turner <ndarray-stats@turner.link>",
     "LukeMathWalker <rust@lpalmieri.com>",
 ]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Statistical routines for ArrayBase, the n-dimensional array data structure provided by ndarray."
 documentation = "https://docs.rs/ndarray-stats/"
 readme = "README.md"
@@ -34,27 +39,54 @@ categories = [
 license = "MIT/Apache-2.0"
 repository = "https://github.com/rust-ndarray/ndarray-stats"
 
+[lib]
+name = "ndarray_stats"
+path = "src/lib.rs"
+
+[[test]]
+name = "deviation"
+path = "tests/deviation.rs"
+
+[[test]]
+name = "maybe_nan"
+path = "tests/maybe_nan.rs"
+
+[[test]]
+name = "quantile"
+path = "tests/quantile.rs"
+
+[[test]]
+name = "sort"
+path = "tests/sort.rs"
+
+[[test]]
+name = "summary_statistics"
+path = "tests/summary_statistics.rs"
+
+[[bench]]
+name = "deviation"
+path = "benches/deviation.rs"
+harness = false
+
 [[bench]]
 name = "sort"
+path = "benches/sort.rs"
 harness = false
 
 [[bench]]
 name = "summary_statistics"
-harness = false
-
-[[bench]]
-name = "deviation"
+path = "benches/summary_statistics.rs"
 harness = false
 
 [dependencies.indexmap]
-version = "1.6.2"
+version = "2.4"
 
 [dependencies.itertools]
-version = "0.10.0"
+version = "0.13"
 default-features = false
 
 [dependencies.ndarray]
-version = "0.15.0"
+version = "0.16.0"
 
 [dependencies.noisy_float]
 version = "0.2.0"
@@ -69,17 +101,17 @@ version = "0.2"
 version = "0.8.3"
 
 [dev-dependencies.approx]
-version = "0.4"
+version = "0.5"
 
 [dev-dependencies.criterion]
 version = "0.3"
 
 [dev-dependencies.ndarray]
-version = "0.15.0"
+version = "0.16.1"
 features = ["approx"]
 
 [dev-dependencies.ndarray-rand]
-version = "0.14.0"
+version = "0.15.0"
 
 [dev-dependencies.num-bigint]
 version = "0.4.0"

@@ -20,9 +20,9 @@
 //! The `rstest` crate defines the following procedural macros:
 //!
 //! - [`[rstest]`](macro@rstest): Declare that a test or a group of tests that may take
-//! [fixtures](attr.rstest.html#injecting-fixtures),
-//! [input table](attr.rstest.html#test-parametrized-cases) or
-//! [list of values](attr.rstest.html#values-lists).
+//!   [fixtures](attr.rstest.html#injecting-fixtures),
+//!   [input table](attr.rstest.html#test-parametrized-cases) or
+//!   [list of values](attr.rstest.html#values-lists).
 //! - [`[fixture]`](macro@fixture): To mark a function as a fixture.
 //!
 //! ## Why
@@ -238,7 +238,7 @@
 //! speed up compilation.
 //!
 //! - **`async-timeout`** *(enabled by default)* — Implement timeout for async
-//! tests.
+//!   tests.
 //!
 //! # Rust version compatibility
 //!
@@ -353,6 +353,22 @@ pub mod timeout;
 /// Sometimes you want to have long and descriptive name for your fixture but you prefer to use a much
 /// shorter name for argument that represent it in your fixture or test. You can rename the fixture
 /// using `#[from(short_name)]` attribute like following example:
+///
+/// ## Destructuring
+///
+/// It's possible to destructure the fixture type but, in this case, your're forced to use renaming syntax
+/// because it's not possible to guess the fixture name from this syntax:
+///
+/// ```
+/// use rstest::*;
+/// #[fixture]
+/// fn two_values() -> (u32, u32) { (42, 24) }
+///
+/// #[rstest]
+/// fn the_test(#[from(two_values)] (first, _): (u32, u32)) {
+///     assert_eq!(42, first)
+/// }
+/// ```
 ///
 /// ```
 /// use rstest::*;
@@ -568,6 +584,9 @@ pub use rstest_macros::fixture;
 /// - return results
 /// - marked by `#[should_panic]` attribute
 ///
+/// In the function signature, where you define your tests inputs, you can also destructuring
+/// the values like any other rust function.
+///
 /// If the test function is an [`async` function](#async) `rstest` will run all tests as `async`
 /// tests. You can use it just with `async-std` and you should include `attributes` in
 /// `async-std`'s features.
@@ -621,6 +640,20 @@ pub use rstest_macros::fixture;
 /// #[rstest]
 /// fn the_test(#[from(long_and_boring_descriptive_name)] short: i32) {
 ///     assert_eq!(42, short)
+/// }
+/// ```
+///
+/// The use of `#[from(...)]` attribute is mandatory if you need to destructure the value:
+///
+/// ```
+/// use rstest::*;
+///
+/// #[fixture]
+/// fn tuple() -> (u32, f32) { (42, 42.0) }
+///
+/// #[rstest]
+/// fn the_test(#[from(tuple)] (u, _): (u32, f32)) {
+///     assert_eq!(42, u)
 /// }
 /// ```
 ///
@@ -695,7 +728,7 @@ pub use rstest_macros::fixture;
 ///
 /// ```
 /// use rstest::rstest;
-///  
+///
 /// fn sum(a: usize, b: usize) -> usize { a + b }
 ///
 /// #[rstest]
@@ -897,6 +930,27 @@ pub use rstest_macros::fixture;
 /// }
 /// ```
 ///
+/// ## Destructuring inputs
+///
+/// Both paramtrized case and values can be destructured:
+///
+/// ```
+/// # use rstest::*;
+/// struct S {
+///     first: u32,
+///     second: u32,
+/// }
+///
+/// struct T(i32);
+///
+/// #[rstest]
+/// #[case(S{first: 21, second: 42})]
+/// fn some_test(#[case] S{first, second} : S, #[values(T(-1), T(1))] T(t): T) {
+///     assert_eq!(1, t * t);
+///     assert_eq!(2 * first, second);
+/// }
+/// ```
+///
 /// ## Files path as input arguments
 ///
 /// If you need to create a test for each file in a given location you can use
@@ -912,6 +966,7 @@ pub use rstest_macros::fixture;
 ///     assert!(check_file(&path))
 /// }
 /// ```
+///
 /// The default behavior is to ignore the files that start with `"."`, but you can
 /// modify this by use `#[include_dot_files]` attribute. The `files` attribute can be
 /// used more than once on the same variable, and you can also create some custom
@@ -924,6 +979,30 @@ pub use rstest_macros::fixture;
 /// where the parent folder components are replaced by `_UP`: for instance if you have a
 /// `valid_call.yaml` in the folder `../test_cases` (from your crate root) a test name could be
 /// `path_1__UP_test_cases_valid_call_yaml`.
+///
+/// If you want to change the base path for the test files. You can do that by using
+/// `#[base_dir = "..."]` attribute. The `base_dir` is resolved relative to the crate root
+/// (similar to the `files` attribute without `base_dir`). If you want to use an absolute
+/// path you can use `#[base_dir = "/path/to/your/files"]`.
+///
+/// Both `files` and `base_dir` attributes can use environment variables using the syntax
+/// `$VAR` or `${VAR}`. If the environment variable is not set, the attribute will cause
+/// an error. This can be ignored using the `#[ignore_missing_env_vars]` attribute. A
+/// default value can be provided for the environment variable using the syntax
+/// `${VAR:-default}` (similar to bash). This can be really useful when you want to override
+/// the cargo root on some environments: use `#[base_dir = "BASE_TEST_DIR:-"]` do the trick.
+///
+/// Finally, often you would to recompile tests sources when file the folders or the
+/// environment variables changed. In this case you should provide a `build.rs` script file
+/// that tell to the compiler what to look in order to recompile the tests. For instance
+/// follow a simple example:
+///
+/// ```ignore
+/// pub fn main() {
+///     println!("cargo::rerun-if-changed=tests/resources");
+///     println!("cargo::rerun-if-env-changed=BASE_TEST_DIR");
+/// }
+/// ```
 ///
 /// ## Use Parametrize definition in more tests
 ///
@@ -978,7 +1057,7 @@ pub use rstest_macros::fixture;
 /// features list in your `Cargo.toml`:
 ///
 /// ```toml
-/// async-std = { version = "1.5", features = ["attributes"] }
+/// async-std = { version = "1.13", features = ["attributes"] }
 /// ```
 ///
 /// If your test input is an async value (fixture or test parameter) you can use `#[future]`
@@ -1107,6 +1186,10 @@ pub use rstest_macros::fixture;
 /// in this case the `#[actix_rt::test]` attribute will replace the standard `#[test]`
 /// attribute.
 ///
+/// Some test attributes allow to inject arguments into the test function, in a similar way to rstest.
+/// This can lead to compile errors when rstest is not able to resolve the additional arguments.
+/// To avoid this, see [Ignoring Arguments](attr.rstest.html#ignoring-arguments).
+///
 /// ## Local lifetime and `#[by_ref]` attribute
 ///
 /// In some cases you may want to use a local lifetime for some arguments of your test.
@@ -1128,7 +1211,7 @@ pub use rstest_macros::fixture;
 ///
 /// #[fixture]
 /// fn bump() -> () {}
-///  
+///
 /// #[rstest]
 /// #[case(true, E::A(true))]
 /// fn it_works<'a>(#[by_ref] bump: &'a (), #[case] b: bool, #[case] expected: E<'a>) {
@@ -1181,6 +1264,30 @@ pub use rstest_macros::fixture;
 ///     repository.find_items(&user, query).unwrap();
 /// }
 /// ```
+///
+/// ## Ignoring Arguments
+///
+/// Sometimes, you may want to inject and use fixtures not managed by rstest
+/// (e.g. db connection pools for sqlx tests).
+///
+/// In these cases, you can use the `#[ignore]` attribute to ignore the additional
+/// parameter and let another crate take care of it:
+///
+/// ```rust, ignore
+/// use rstest::*;
+/// use sqlx::*;
+///
+/// #[fixture]
+/// fn my_fixture() -> i32 { 42 }
+///
+/// #[rstest]
+/// #[sqlx::test]
+/// async fn test_db(my_fixture: i32, #[ignore] pool: PgPool) {
+///     assert_eq!(42, injected);
+///     // do stuff with the connection pool
+/// }
+/// ```
+///
 ///
 /// ## Trace Input Arguments
 ///
@@ -1266,10 +1373,10 @@ pub use rstest_macros::fixture;
 ///   - `ident` that match to one of function arguments for parametrized cases
 ///   - `case[::description](v1, ..., vl)` a test case
 ///   - `fixture(v1, ..., vl) [as argument_name]` where fixture is the injected
-/// fixture and argument_name (default use fixture) is one of function arguments
-/// that and `v1, ..., vl` is a partial list of fixture's arguments
+///     fixture and argument_name (default use fixture) is one of function arguments
+///     that and `v1, ..., vl` is a partial list of fixture's arguments
 ///   - `ident => [v1, ..., vl]` where `ident` is one of function arguments and
-/// `v1, ..., vl` is a list of values for ident
+///     `v1, ..., vl` is a list of values for ident
 /// - `attribute_j` a test attribute like `trace` or `notrace`
 ///
 /// ## Fixture Arguments

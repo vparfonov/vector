@@ -64,6 +64,36 @@ base: components: sinks: honeycomb: configuration: {
 			}
 		}
 	}
+	compression: {
+		description: "The compression algorithm to use."
+		required:    false
+		type: string: {
+			default: "zstd"
+			enum: {
+				gzip: """
+					[Gzip][gzip] compression.
+
+					[gzip]: https://www.gzip.org/
+					"""
+				none: "No compression."
+				snappy: """
+					[Snappy][snappy] compression.
+
+					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
+					"""
+				zlib: """
+					[Zlib][zlib] compression.
+
+					[zlib]: https://zlib.net/
+					"""
+				zstd: """
+					[Zstandard][zstd] compression.
+
+					[zstd]: https://facebook.github.io/zstd/
+					"""
+			}
+		}
+	}
 	dataset: {
 		description: "The dataset to which logs are sent."
 		required:    true
@@ -95,6 +125,14 @@ base: components: sinks: honeycomb: configuration: {
 					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
 				}
 			}
+		}
+	}
+	endpoint: {
+		description: "Honeycomb's endpoint to send logs to"
+		required:    false
+		type: string: {
+			default: "https://api.honeycomb.io"
+			examples: ["https://api.honeycomb.io", "https://api.eu1.honeycomb.io"]
 		}
 	}
 	request: {

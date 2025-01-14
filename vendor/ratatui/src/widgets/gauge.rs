@@ -1,4 +1,11 @@
-use crate::{prelude::*, style::Styled, widgets::Block};
+use crate::{
+    buffer::Buffer,
+    layout::Rect,
+    style::{Color, Style, Styled},
+    symbols::{self},
+    text::{Line, Span},
+    widgets::{block::BlockExt, Block, Widget, WidgetRef},
+};
 
 /// A widget to display a progress bar.
 ///
@@ -16,16 +23,14 @@ use crate::{prelude::*, style::Styled, widgets::Block};
 /// # Example
 ///
 /// ```
-/// use ratatui::{prelude::*, widgets::*};
+/// use ratatui::{
+///     style::{Style, Stylize},
+///     widgets::{Block, Gauge},
+/// };
 ///
 /// Gauge::default()
 ///     .block(Block::bordered().title("Progress"))
-///     .gauge_style(
-///         Style::default()
-///             .fg(Color::White)
-///             .bg(Color::Black)
-///             .add_modifier(Modifier::ITALIC),
-///     )
+///     .gauge_style(Style::new().white().on_black().italic())
 ///     .percent(20);
 /// ```
 ///
@@ -184,23 +189,23 @@ impl Gauge<'_> {
         for y in gauge_area.top()..gauge_area.bottom() {
             // render the filled area (left to end)
             for x in gauge_area.left()..end {
-                let cell = buf.get_mut(x, y);
                 // Use full block for the filled part of the gauge and spaces for the part that is
                 // covered by the label. Note that the background and foreground colors are swapped
                 // for the label part, otherwise the gauge will be inverted
                 if x < label_col || x > label_col + clamped_label_width || y != label_row {
-                    cell.set_symbol(symbols::block::FULL)
+                    buf[(x, y)]
+                        .set_symbol(symbols::block::FULL)
                         .set_fg(self.gauge_style.fg.unwrap_or(Color::Reset))
                         .set_bg(self.gauge_style.bg.unwrap_or(Color::Reset));
                 } else {
-                    cell.set_symbol(" ")
+                    buf[(x, y)]
+                        .set_symbol(" ")
                         .set_fg(self.gauge_style.bg.unwrap_or(Color::Reset))
                         .set_bg(self.gauge_style.fg.unwrap_or(Color::Reset));
                 }
             }
             if self.use_unicode && self.ratio < 1.0 {
-                buf.get_mut(end, y)
-                    .set_symbol(get_unicode_block(filled_width % 1.0));
+                buf[(end, y)].set_symbol(get_unicode_block(filled_width % 1.0));
             }
         }
         // render the label
@@ -242,16 +247,15 @@ fn get_unicode_block<'a>(frac: f64) -> &'a str {
 /// # Examples:
 ///
 /// ```
-/// use ratatui::{prelude::*, widgets::*};
+/// use ratatui::{
+///     style::{Style, Stylize},
+///     symbols,
+///     widgets::{Block, LineGauge},
+/// };
 ///
 /// LineGauge::default()
 ///     .block(Block::bordered().title("Progress"))
-///     .filled_style(
-///         Style::default()
-///             .fg(Color::White)
-///             .bg(Color::Black)
-///             .add_modifier(Modifier::BOLD),
-///     )
+///     .filled_style(Style::new().white().on_black().bold())
 ///     .line_set(symbols::line::THICK)
 ///     .ratio(0.4);
 /// ```
@@ -404,12 +408,12 @@ impl WidgetRef for LineGauge<'_> {
         let end = start
             + (f64::from(gauge_area.right().saturating_sub(start)) * self.ratio).floor() as u16;
         for col in start..end {
-            buf.get_mut(col, row)
+            buf[(col, row)]
                 .set_symbol(self.line_set.horizontal)
                 .set_style(self.filled_style);
         }
         for col in end..gauge_area.right() {
-            buf.get_mut(col, row)
+            buf[(col, row)]
                 .set_symbol(self.line_set.horizontal)
                 .set_style(self.unfilled_style);
         }
@@ -443,7 +447,10 @@ impl<'a> Styled for LineGauge<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use crate::{
+        style::{Color, Modifier, Style, Stylize},
+        symbols,
+    };
     #[test]
     #[should_panic = "Percentage should be between 0 and 100 inclusively"]
     fn gauge_invalid_percentage() {

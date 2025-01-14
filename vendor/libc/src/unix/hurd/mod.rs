@@ -72,8 +72,6 @@ pub type __ptrdiff_t = __sword_type;
 pub type __socklen_t = __u32_type;
 pub type __sig_atomic_t = ::c_int;
 pub type __time64_t = __int64_t;
-pub type ssize_t = __ssize_t;
-pub type size_t = ::c_ulong;
 pub type wchar_t = ::c_int;
 pub type wint_t = ::c_uint;
 pub type gid_t = __gid_t;
@@ -341,7 +339,7 @@ s! {
         pub ai_family: ::c_int,
         pub ai_socktype: ::c_int,
         pub ai_protocol: ::c_int,
-        pub ai_addrlen: socklen_t,
+        pub ai_addrlen: ::socklen_t,
         pub ai_addr: *mut sockaddr,
         pub ai_canonname: *mut ::c_char,
         pub ai_next: *mut addrinfo,
@@ -349,11 +347,11 @@ s! {
 
     pub struct msghdr {
         pub msg_name: *mut ::c_void,
-        pub msg_namelen: socklen_t,
+        pub msg_namelen: ::socklen_t,
         pub msg_iov: *mut ::iovec,
         pub msg_iovlen: ::c_int,
         pub msg_control: *mut ::c_void,
-        pub msg_controllen: socklen_t,
+        pub msg_controllen: ::socklen_t,
         pub msg_flags: ::c_int,
     }
 
@@ -429,7 +427,7 @@ s! {
         pub sigev_value: ::sigval,
         pub sigev_signo: ::c_int,
         pub sigev_notify: ::c_int,
-        __unused1: *mut ::c_void,       //actually a function pointer
+        __unused1: *mut ::c_void, //actually a function pointer
         pub sigev_notify_attributes: *mut pthread_attr_t,
     }
 
@@ -448,6 +446,11 @@ s! {
     pub struct timespec {
         pub tv_sec: __time_t,
         pub tv_nsec: __syscall_slong_t,
+    }
+
+    pub struct __timeval {
+        pub tv_sec: i32,
+        pub tv_usec: i32,
     }
 
     pub struct __locale_data {
@@ -477,7 +480,7 @@ s! {
 
     pub struct stat64 {
         pub st_fstype: ::c_int,
-        pub st_fsid: __fsid_t,
+        pub st_dev: __fsid_t, /* Actually st_fsid */
         pub st_ino: __ino64_t,
         pub st_gen: ::c_uint,
         pub st_rdev: __dev_t,
@@ -555,7 +558,7 @@ s! {
         pub f_favail: __fsfilcnt64_t,
         pub f_frsize: ::c_ulong,
         pub f_flag: ::c_ulong,
-        pub f_spare: [::c_uint ; 3usize],
+        pub f_spare: [::c_uint; 3usize],
     }
 
     pub struct statvfs {
@@ -605,7 +608,7 @@ s! {
         pub aio_offset: off_t,
         #[cfg(all(not(target_arch = "x86_64"), target_pointer_width = "32"))]
         __unused1: [::c_char; 4],
-        __glibc_reserved: [::c_char; 32]
+        __glibc_reserved: [::c_char; 32],
     }
 
     pub struct mq_attr {
@@ -620,10 +623,8 @@ s! {
         pub e_exit: ::c_short,
     }
 
-    #[cfg_attr(target_pointer_width = "32",
-               repr(align(4)))]
-    #[cfg_attr(target_pointer_width = "64",
-               repr(align(8)))]
+    #[cfg_attr(target_pointer_width = "32", repr(align(4)))]
+    #[cfg_attr(target_pointer_width = "64", repr(align(8)))]
     pub struct sem_t {
         __size: [::c_char; 20usize],
     }
@@ -678,8 +679,8 @@ s! {
     pub struct __pthread_attr {
         pub __schedparam: sched_param,
         pub __stackaddr: *mut ::c_void,
-        pub __stacksize: size_t,
-        pub __guardsize: size_t,
+        pub __stacksize: ::size_t,
+        pub __guardsize: ::size_t,
         pub __detachstate: __pthread_detachstate,
         pub __inheritsched: __pthread_inheritsched,
         pub __contentionscope: __pthread_contentionscope,
@@ -728,7 +729,7 @@ s! {
 
     pub struct iovec {
         pub iov_base: *mut ::c_void,
-        pub iov_len: size_t,
+        pub iov_len: ::size_t,
     }
 
     pub struct passwd {
@@ -813,7 +814,7 @@ s! {
         pub ifa_addr: *mut ::sockaddr,
         pub ifa_netmask: *mut ::sockaddr,
         pub ifa_ifu: *mut ::sockaddr, // FIXME This should be a union
-        pub ifa_data: *mut ::c_void
+        pub ifa_data: *mut ::c_void,
     }
 
     pub struct arpreq {
@@ -868,12 +869,12 @@ s! {
     }
 
     pub struct utsname {
-        pub sysname: [::c_char; 65],
-        pub nodename: [::c_char; 65],
-        pub release: [::c_char; 65],
-        pub version: [::c_char; 65],
-        pub machine: [::c_char; 65],
-        pub domainname: [::c_char; 65]
+        pub sysname: [::c_char; _UTSNAME_LENGTH],
+        pub nodename: [::c_char; _UTSNAME_LENGTH],
+        pub release: [::c_char; _UTSNAME_LENGTH],
+        pub version: [::c_char; _UTSNAME_LENGTH],
+        pub machine: [::c_char; _UTSNAME_LENGTH],
+        pub domainname: [::c_char; _UTSNAME_LENGTH],
     }
 
     pub struct rlimit64 {
@@ -882,7 +883,7 @@ s! {
     }
 
     pub struct stack_t {
-        pub ss_sp: * mut ::c_void,
+        pub ss_sp: *mut ::c_void,
         pub ss_size: ::size_t,
         pub ss_flags: ::c_int,
     }
@@ -900,30 +901,30 @@ s! {
 
     pub struct flock {
         #[cfg(target_pointer_width = "32")]
-        pub l_type : ::c_int,
+        pub l_type: ::c_int,
         #[cfg(target_pointer_width = "32")]
-        pub l_whence : ::c_int,
+        pub l_whence: ::c_int,
         #[cfg(target_pointer_width = "64")]
-        pub l_type : ::c_short,
+        pub l_type: ::c_short,
         #[cfg(target_pointer_width = "64")]
-        pub l_whence : ::c_short,
-        pub l_start : __off_t,
-        pub l_len : __off_t,
-        pub l_pid : __pid_t,
+        pub l_whence: ::c_short,
+        pub l_start: __off_t,
+        pub l_len: __off_t,
+        pub l_pid: __pid_t,
     }
 
     pub struct flock64 {
         #[cfg(target_pointer_width = "32")]
-        pub l_type : ::c_int,
+        pub l_type: ::c_int,
         #[cfg(target_pointer_width = "32")]
-        pub l_whence : ::c_int,
+        pub l_whence: ::c_int,
         #[cfg(target_pointer_width = "64")]
-        pub l_type : ::c_short,
+        pub l_type: ::c_short,
         #[cfg(target_pointer_width = "64")]
-        pub l_whence : ::c_short,
-        pub l_start : __off_t,
-        pub l_len : __off64_t,
-        pub l_pid : __pid_t,
+        pub l_whence: ::c_short,
+        pub l_start: __off_t,
+        pub l_len: __off64_t,
+        pub l_pid: __pid_t,
     }
 
     pub struct glob_t {
@@ -964,11 +965,9 @@ s! {
     }
 
     pub struct cpu_set_t {
-        #[cfg(all(target_pointer_width = "32",
-                  not(target_arch = "x86_64")))]
+        #[cfg(all(target_pointer_width = "32", not(target_arch = "x86_64")))]
         bits: [u32; 32],
-        #[cfg(not(all(target_pointer_width = "32",
-                      not(target_arch = "x86_64"))))]
+        #[cfg(not(all(target_pointer_width = "32", not(target_arch = "x86_64"))))]
         bits: [u64; 16],
     }
 
@@ -1032,7 +1031,6 @@ s! {
         pub flag: *mut ::c_int,
         pub val: ::c_int,
     }
-
 }
 
 s_no_extra_traits! {
@@ -1046,18 +1044,14 @@ s_no_extra_traits! {
         pub ut_host: [::c_char; __UT_HOSTSIZE],
         pub ut_exit: __exit_status,
 
-        #[cfg(any( all(target_pointer_width = "32",
-                      not(target_arch = "x86_64"))))]
+        #[cfg(any(all(target_pointer_width = "32", not(target_arch = "x86_64"))))]
         pub ut_session: ::c_long,
-        #[cfg(any(all(target_pointer_width = "32",
-                      not(target_arch = "x86_64"))))]
+        #[cfg(any(all(target_pointer_width = "32", not(target_arch = "x86_64"))))]
         pub ut_tv: ::timeval,
 
-        #[cfg(not(any(all(target_pointer_width = "32",
-                          not(target_arch = "x86_64")))))]
+        #[cfg(not(any(all(target_pointer_width = "32", not(target_arch = "x86_64")))))]
         pub ut_session: i32,
-        #[cfg(not(any(all(target_pointer_width = "32",
-                          not(target_arch = "x86_64")))))]
+        #[cfg(not(any(all(target_pointer_width = "32", not(target_arch = "x86_64")))))]
         pub ut_tv: __timeval,
 
         pub ut_addr_v6: [i32; 4],
@@ -1075,10 +1069,10 @@ cfg_if! {
                     && self.ut_id == other.ut_id
                     && self.ut_user == other.ut_user
                     && self
-                    .ut_host
-                    .iter()
-                    .zip(other.ut_host.iter())
-                    .all(|(a,b)| a == b)
+                        .ut_host
+                        .iter()
+                        .zip(other.ut_host.iter())
+                        .all(|(a, b)| a == b)
                     && self.ut_exit == other.ut_exit
                     && self.ut_session == other.ut_session
                     && self.ut_tv == other.ut_tv
@@ -1097,7 +1091,7 @@ cfg_if! {
                     .field("ut_line", &self.ut_line)
                     .field("ut_id", &self.ut_id)
                     .field("ut_user", &self.ut_user)
-                // FIXME: .field("ut_host", &self.ut_host)
+                    // FIXME: .field("ut_host", &self.ut_host)
                     .field("ut_exit", &self.ut_exit)
                     .field("ut_session", &self.ut_session)
                     .field("ut_tv", &self.ut_tv)
@@ -2117,29 +2111,29 @@ pub const MINSIGSTKSZ: usize = 8192;
 pub const SIGSTKSZ: usize = 40960;
 
 // sys/stat.h
-pub const __S_IFMT: mode_t = 61440;
-pub const __S_IFDIR: mode_t = 16384;
-pub const __S_IFCHR: mode_t = 8192;
-pub const __S_IFBLK: mode_t = 24576;
-pub const __S_IFREG: mode_t = 32768;
-pub const __S_IFLNK: mode_t = 40960;
-pub const __S_IFSOCK: mode_t = 49152;
-pub const __S_IFIFO: mode_t = 4096;
-pub const __S_ISUID: mode_t = 2048;
-pub const __S_ISGID: mode_t = 1024;
-pub const __S_ISVTX: mode_t = 512;
-pub const __S_IREAD: mode_t = 256;
-pub const __S_IWRITE: mode_t = 128;
-pub const __S_IEXEC: mode_t = 64;
-pub const S_INOCACHE: mode_t = 65536;
-pub const S_IUSEUNK: mode_t = 131072;
-pub const S_IUNKNOWN: mode_t = 1835008;
-pub const S_IUNKSHIFT: mode_t = 12;
-pub const S_IPTRANS: mode_t = 2097152;
-pub const S_IATRANS: mode_t = 4194304;
-pub const S_IROOT: mode_t = 8388608;
-pub const S_ITRANS: mode_t = 14680064;
-pub const S_IMMAP0: mode_t = 16777216;
+pub const __S_IFMT: mode_t = 0o17_0000;
+pub const __S_IFDIR: mode_t = 0o4_0000;
+pub const __S_IFCHR: mode_t = 0o2_0000;
+pub const __S_IFBLK: mode_t = 0o6_0000;
+pub const __S_IFREG: mode_t = 0o10_0000;
+pub const __S_IFLNK: mode_t = 0o12_0000;
+pub const __S_IFSOCK: mode_t = 0o14_0000;
+pub const __S_IFIFO: mode_t = 0o1_0000;
+pub const __S_ISUID: mode_t = 0o4000;
+pub const __S_ISGID: mode_t = 0o2000;
+pub const __S_ISVTX: mode_t = 0o1000;
+pub const __S_IREAD: mode_t = 0o0400;
+pub const __S_IWRITE: mode_t = 0o0200;
+pub const __S_IEXEC: mode_t = 0o0100;
+pub const S_INOCACHE: mode_t = 0o20_0000;
+pub const S_IUSEUNK: mode_t = 0o40_0000;
+pub const S_IUNKNOWN: mode_t = 0o700_0000;
+pub const S_IUNKSHIFT: mode_t = 0o0014;
+pub const S_IPTRANS: mode_t = 0o1000_0000;
+pub const S_IATRANS: mode_t = 0o2000_0000;
+pub const S_IROOT: mode_t = 0o4000_0000;
+pub const S_ITRANS: mode_t = 0o7000_0000;
+pub const S_IMMAP0: mode_t = 0o10000_0000;
 pub const CMASK: mode_t = 18;
 pub const UF_SETTABLE: ::c_uint = 65535;
 pub const UF_NODUMP: ::c_uint = 1;
@@ -2155,32 +2149,32 @@ pub const SF_NOUNLINK: ::c_uint = 1048576;
 pub const SF_SNAPSHOT: ::c_uint = 2097152;
 pub const UTIME_NOW: ::c_long = -1;
 pub const UTIME_OMIT: ::c_long = -2;
-pub const S_IFMT: ::mode_t = 61440;
-pub const S_IFDIR: ::mode_t = 16384;
-pub const S_IFCHR: ::mode_t = 8192;
-pub const S_IFBLK: ::mode_t = 24576;
-pub const S_IFREG: ::mode_t = 32768;
-pub const S_IFIFO: ::mode_t = 4096;
-pub const S_IFLNK: ::mode_t = 40960;
-pub const S_IFSOCK: ::mode_t = 49152;
-pub const S_ISUID: ::mode_t = 2048;
-pub const S_ISGID: ::mode_t = 1024;
-pub const S_ISVTX: ::mode_t = 512;
-pub const S_IRUSR: ::mode_t = 256;
-pub const S_IWUSR: ::mode_t = 128;
-pub const S_IXUSR: ::mode_t = 64;
-pub const S_IRWXU: ::mode_t = 448;
-pub const S_IREAD: ::mode_t = 256;
-pub const S_IWRITE: ::mode_t = 128;
-pub const S_IEXEC: ::mode_t = 64;
-pub const S_IRGRP: ::mode_t = 32;
-pub const S_IWGRP: ::mode_t = 16;
-pub const S_IXGRP: ::mode_t = 8;
-pub const S_IRWXG: ::mode_t = 56;
-pub const S_IROTH: ::mode_t = 4;
-pub const S_IWOTH: ::mode_t = 2;
-pub const S_IXOTH: ::mode_t = 1;
-pub const S_IRWXO: ::mode_t = 7;
+pub const S_IFMT: ::mode_t = 0o17_0000;
+pub const S_IFDIR: ::mode_t = 0o4_0000;
+pub const S_IFCHR: ::mode_t = 0o2_0000;
+pub const S_IFBLK: ::mode_t = 0o6_0000;
+pub const S_IFREG: ::mode_t = 0o10_0000;
+pub const S_IFIFO: ::mode_t = 0o1_0000;
+pub const S_IFLNK: ::mode_t = 0o12_0000;
+pub const S_IFSOCK: ::mode_t = 0o14_0000;
+pub const S_ISUID: ::mode_t = 0o4000;
+pub const S_ISGID: ::mode_t = 0o2000;
+pub const S_ISVTX: ::mode_t = 0o1000;
+pub const S_IRUSR: ::mode_t = 0o0400;
+pub const S_IWUSR: ::mode_t = 0o0200;
+pub const S_IXUSR: ::mode_t = 0o0100;
+pub const S_IRWXU: ::mode_t = 0o0700;
+pub const S_IREAD: ::mode_t = 0o0400;
+pub const S_IWRITE: ::mode_t = 0o0200;
+pub const S_IEXEC: ::mode_t = 0o0100;
+pub const S_IRGRP: ::mode_t = 0o0040;
+pub const S_IWGRP: ::mode_t = 0o0020;
+pub const S_IXGRP: ::mode_t = 0o0010;
+pub const S_IRWXG: ::mode_t = 0o0070;
+pub const S_IROTH: ::mode_t = 0o0004;
+pub const S_IWOTH: ::mode_t = 0o0002;
+pub const S_IXOTH: ::mode_t = 0o0001;
+pub const S_IRWXO: ::mode_t = 0o0007;
 pub const ACCESSPERMS: ::mode_t = 511;
 pub const ALLPERMS: ::mode_t = 4095;
 pub const DEFFILEMODE: ::mode_t = 438;
@@ -2738,8 +2732,10 @@ pub const MAP_SHARED: ::c_int = 16;
 pub const MAP_PRIVATE: ::c_int = 0;
 pub const MAP_FIXED: ::c_int = 256;
 pub const MAP_NOEXTEND: ::c_int = 512;
-pub const MAP_HASSEMPHORE: ::c_int = 1024;
+pub const MAP_HASSEMAPHORE: ::c_int = 1024;
 pub const MAP_INHERIT: ::c_int = 2048;
+pub const MAP_32BIT: ::c_int = 4096;
+pub const MAP_EXCL: ::c_int = 16384;
 pub const MAP_FAILED: *mut ::c_void = !0 as *mut ::c_void;
 pub const MADV_NORMAL: ::c_int = 0;
 pub const MADV_RANDOM: ::c_int = 1;
@@ -2759,6 +2755,10 @@ pub const MREMAP_MAYMOVE: ::c_int = 1;
 pub const MREMAP_FIXED: ::c_int = 2;
 pub const MCL_CURRENT: ::c_int = 0x0001;
 pub const MCL_FUTURE: ::c_int = 0x0002;
+
+// sys/xattr.h
+pub const XATTR_CREATE: ::c_int = 0x1;
+pub const XATTR_REPLACE: ::c_int = 0x2;
 
 // spawn.h
 pub const POSIX_SPAWN_USEVFORK: ::c_int = 64;
@@ -3428,6 +3428,9 @@ pub const PTHREAD_RWLOCK_INITIALIZER: pthread_rwlock_t = pthread_rwlock_t {
 };
 pub const PTHREAD_STACK_MIN: ::size_t = 0;
 
+// Non-public helper constants
+const _UTSNAME_LENGTH: usize = 1024;
+
 const_fn! {
     {const} fn CMSG_ALIGN(len: usize) -> usize {
         len + ::mem::size_of::<usize>() - 1 & !(::mem::size_of::<usize>() - 1)
@@ -3449,26 +3452,21 @@ f! {
     }
 
     pub {const} fn CMSG_SPACE(length: ::c_uint) -> ::c_uint {
-        (CMSG_ALIGN(length as usize) + CMSG_ALIGN(::mem::size_of::<cmsghdr>()))
-            as ::c_uint
+        (CMSG_ALIGN(length as usize) + CMSG_ALIGN(::mem::size_of::<cmsghdr>())) as ::c_uint
     }
 
     pub {const} fn CMSG_LEN(length: ::c_uint) -> ::c_uint {
         CMSG_ALIGN(::mem::size_of::<cmsghdr>()) as ::c_uint + length
     }
 
-    pub fn CMSG_NXTHDR(mhdr: *const msghdr,
-                       cmsg: *const cmsghdr) -> *mut cmsghdr {
+    pub fn CMSG_NXTHDR(mhdr: *const msghdr, cmsg: *const cmsghdr) -> *mut cmsghdr {
         if ((*cmsg).cmsg_len as usize) < ::mem::size_of::<cmsghdr>() {
             return 0 as *mut cmsghdr;
         };
-        let next = (cmsg as usize +
-                    CMSG_ALIGN((*cmsg).cmsg_len as usize))
-            as *mut cmsghdr;
-        let max = (*mhdr).msg_control as usize
-            + (*mhdr).msg_controllen as usize;
-        if (next.offset(1)) as usize > max ||
-            next as usize + CMSG_ALIGN((*next).cmsg_len as usize) > max
+        let next = (cmsg as usize + CMSG_ALIGN((*cmsg).cmsg_len as usize)) as *mut cmsghdr;
+        let max = (*mhdr).msg_control as usize + (*mhdr).msg_controllen as usize;
+        if (next.offset(1)) as usize > max
+            || next as usize + CMSG_ALIGN((*next).cmsg_len as usize) > max
         {
             0 as *mut cmsghdr
         } else {
@@ -3489,16 +3487,14 @@ f! {
     }
 
     pub fn CPU_SET(cpu: usize, cpuset: &mut cpu_set_t) -> () {
-        let size_in_bits
-            = 8 * ::mem::size_of_val(&cpuset.bits[0]); // 32, 64 etc
+        let size_in_bits = 8 * ::mem::size_of_val(&cpuset.bits[0]); // 32, 64 etc
         let (idx, offset) = (cpu / size_in_bits, cpu % size_in_bits);
         cpuset.bits[idx] |= 1 << offset;
         ()
     }
 
     pub fn CPU_CLR(cpu: usize, cpuset: &mut cpu_set_t) -> () {
-        let size_in_bits
-            = 8 * ::mem::size_of_val(&cpuset.bits[0]); // 32, 64 etc
+        let size_in_bits = 8 * ::mem::size_of_val(&cpuset.bits[0]); // 32, 64 etc
         let (idx, offset) = (cpu / size_in_bits, cpu % size_in_bits);
         cpuset.bits[idx] &= !(1 << offset);
         ()
@@ -3515,7 +3511,7 @@ f! {
         let size_of_mask = ::mem::size_of_val(&cpuset.bits[0]);
         for i in cpuset.bits[..(size / size_of_mask)].iter() {
             s += i.count_ones();
-        };
+        }
         s as ::c_int
     }
 
@@ -3528,7 +3524,7 @@ f! {
     }
 
     pub fn major(dev: ::dev_t) -> ::c_uint {
-         ((dev >> 8) & 0xff) as ::c_uint
+        ((dev >> 8) & 0xff) as ::c_uint
     }
 
     pub fn minor(dev: ::dev_t) -> ::c_uint {
@@ -3547,20 +3543,20 @@ f! {
         let fd = fd as usize;
         let size = ::mem::size_of_val(&(*set).fds_bits[0]) * 8;
         (*set).fds_bits[fd / size] &= !(1 << (fd % size));
-        return
+        return;
     }
 
     pub fn FD_ISSET(fd: ::c_int, set: *const fd_set) -> bool {
         let fd = fd as usize;
         let size = ::mem::size_of_val(&(*set).fds_bits[0]) * 8;
-        return ((*set).fds_bits[fd / size] & (1 << (fd % size))) != 0
+        return ((*set).fds_bits[fd / size] & (1 << (fd % size))) != 0;
     }
 
     pub fn FD_SET(fd: ::c_int, set: *mut fd_set) -> () {
         let fd = fd as usize;
         let size = ::mem::size_of_val(&(*set).fds_bits[0]) * 8;
         (*set).fds_bits[fd / size] |= 1 << (fd % size);
-        return
+        return;
     }
 
     pub fn FD_ZERO(set: *mut fd_set) -> () {
@@ -3640,13 +3636,13 @@ extern "C" {
         __iovec: *const ::iovec,
         __count: ::c_int,
         __offset: __off_t,
-    ) -> ssize_t;
+    ) -> ::ssize_t;
     pub fn pwritev(
         __fd: ::c_int,
         __iovec: *const ::iovec,
         __count: ::c_int,
         __offset: __off_t,
-    ) -> ssize_t;
+    ) -> ::ssize_t;
 
     pub fn preadv64(
         fd: ::c_int,
@@ -3727,7 +3723,7 @@ extern "C" {
     pub fn fsetpos64(stream: *mut ::FILE, ptr: *const fpos64_t) -> ::c_int;
     pub fn ftello64(stream: *mut ::FILE) -> ::off64_t;
 
-    pub fn bind(__fd: ::c_int, __addr: *const sockaddr, __len: socklen_t) -> ::c_int;
+    pub fn bind(__fd: ::c_int, __addr: *const sockaddr, __len: ::socklen_t) -> ::c_int;
 
     pub fn accept4(
         fd: ::c_int,
@@ -3745,7 +3741,7 @@ extern "C" {
 
     pub fn recvmsg(__fd: ::c_int, __message: *mut msghdr, __flags: ::c_int) -> ::ssize_t;
 
-    pub fn sendmsg(__fd: ::c_int, __message: *const msghdr, __flags: ::c_int) -> ssize_t;
+    pub fn sendmsg(__fd: ::c_int, __message: *const msghdr, __flags: ::c_int) -> ::ssize_t;
 
     pub fn recvfrom(
         socket: ::c_int,
@@ -4200,6 +4196,8 @@ extern "C" {
         envp: *const *mut c_char,
         flags: ::c_int,
     ) -> ::c_int;
+
+    // DIFF(main): changed to `*const *mut` in e77f551de9
     pub fn execvpe(
         file: *const ::c_char,
         argv: *const *const ::c_char,
@@ -4349,7 +4347,7 @@ extern "C" {
 
     pub fn mmap64(
         __addr: *mut ::c_void,
-        __len: size_t,
+        __len: ::size_t,
         __prot: ::c_int,
         __flags: ::c_int,
         __fd: ::c_int,
@@ -4663,16 +4661,6 @@ safe_f! {
 
     pub {const} fn IPTOS_ECN(x: u8) -> u8 {
         x & ::IPTOS_ECN_MASK
-    }
-}
-
-cfg_if! {
-    if #[cfg(libc_align)] {
-        mod align;
-        pub use self::align::*;
-    } else {
-        mod no_align;
-        pub use self::no_align::*;
     }
 }
 

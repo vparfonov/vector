@@ -12,14 +12,20 @@
 [package]
 edition = "2018"
 name = "base62"
-version = "2.0.2"
+version = "2.0.3"
 authors = [
     "François Bernier <frankbernier@gmail.com>",
     "Chai T. Rex <ChaiTRex@users.noreply.github.com>",
     "Kevin Darlington <kevin@outroot.com>",
     "Christopher Tarquini <code@tarq.io>",
 ]
+build = false
 exclude = [".github/*"]
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A Base62 encoding/decoding library"
 homepage = "https://github.com/fbernier/base62"
 documentation = "https://docs.rs/base62/"
@@ -34,12 +40,17 @@ keywords = [
 license = "MIT"
 repository = "https://github.com/fbernier/base62"
 
+[lib]
+name = "base62"
+path = "src/lib.rs"
+
 [[bench]]
 name = "base62"
+path = "benches/base62.rs"
 harness = false
 
 [dev-dependencies.criterion]
-version = "0.4"
+version = "0.5"
 default-features = false
 
 [dev-dependencies.quickcheck]

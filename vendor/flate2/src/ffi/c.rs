@@ -263,7 +263,9 @@ impl InflateBackend for Inflate {
             (*raw).avail_out = 0;
 
             match rc {
-                MZ_DATA_ERROR | MZ_STREAM_ERROR => mem::decompress_failed(self.inner.msg()),
+                MZ_DATA_ERROR | MZ_STREAM_ERROR | MZ_MEM_ERROR => {
+                    mem::decompress_failed(self.inner.msg())
+                }
                 MZ_OK => Ok(Status::Ok),
                 MZ_BUF_ERROR => Ok(Status::BufError),
                 MZ_STREAM_END => Ok(Status::StreamEnd),
@@ -431,6 +433,7 @@ mod c_backend {
     pub use libz::Z_DEFLATED as MZ_DEFLATED;
     pub use libz::Z_FINISH as MZ_FINISH;
     pub use libz::Z_FULL_FLUSH as MZ_FULL_FLUSH;
+    pub use libz::Z_MEM_ERROR as MZ_MEM_ERROR;
     pub use libz::Z_NEED_DICT as MZ_NEED_DICT;
     pub use libz::Z_NO_FLUSH as MZ_NO_FLUSH;
     pub use libz::Z_OK as MZ_OK;
@@ -444,7 +447,7 @@ mod c_backend {
     #[cfg(feature = "zlib-ng")]
     const ZLIB_VERSION: &'static str = "2.1.0.devel\0";
     #[cfg(all(not(feature = "zlib-ng"), feature = "zlib-rs"))]
-    const ZLIB_VERSION: &'static str = "0.1.0\0";
+    const ZLIB_VERSION: &'static str = "1.3.0-zlib-rs-0.4.0\0";
     #[cfg(not(any(feature = "zlib-ng", feature = "zlib-rs")))]
     const ZLIB_VERSION: &'static str = "1.2.8\0";
 

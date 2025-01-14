@@ -14,7 +14,7 @@
 
 use serde::Deserialize;
 
-use crate::request::SessionState;
+use crate::session::SessionState;
 
 #[derive(Deserialize, Debug)]
 pub struct QueryError {
@@ -55,10 +55,11 @@ pub struct SchemaField {
 #[derive(Deserialize, Debug)]
 pub struct QueryResponse {
     pub id: String,
+    pub node_id: String,
     pub session_id: Option<String>,
     pub session: Option<SessionState>,
     pub schema: Vec<SchemaField>,
-    pub data: Vec<Vec<String>>,
+    pub data: Vec<Vec<Option<String>>>,
     pub state: String,
     pub error: Option<QueryError>,
     // make it optional for backward compatibility

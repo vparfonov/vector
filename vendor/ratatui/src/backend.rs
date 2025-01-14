@@ -27,7 +27,7 @@
 //! ```rust,no_run
 //! use std::io::stdout;
 //!
-//! use ratatui::prelude::*;
+//! use ratatui::{backend::CrosstermBackend, Terminal};
 //!
 //! let backend = CrosstermBackend::new(stdout());
 //! let mut terminal = Terminal::new(backend)?;
@@ -96,19 +96,22 @@
 //! [Crossterm]: https://crates.io/crates/crossterm
 //! [Termion]: https://crates.io/crates/termion
 //! [Termwiz]: https://crates.io/crates/termwiz
-//! [Examples]: https://github.com/ratatui-org/ratatui/tree/main/examples/README.md
+//! [Examples]: https://github.com/ratatui/ratatui/tree/main/examples/README.md
 //! [Backend Comparison]:
 //!     https://ratatui.rs/concepts/backends/comparison/
-//! [Ratatui Website]: https://ratatui-org.github.io/ratatui-book
+//! [Ratatui Website]: https://ratatui.rs
 use std::io;
 
 use strum::{Display, EnumString};
 
-use crate::{buffer::Cell, layout::Size, prelude::Rect};
+use crate::{
+    buffer::Cell,
+    layout::{Position, Size},
+};
 
-#[cfg(feature = "termion")]
+#[cfg(all(not(windows), feature = "termion"))]
 mod termion;
-#[cfg(feature = "termion")]
+#[cfg(all(not(windows), feature = "termion"))]
 pub use self::termion::TermionBackend;
 
 #[cfg(feature = "crossterm")]
@@ -184,33 +187,35 @@ pub trait Backend {
     /// # Example
     ///
     /// ```rust
-    /// # use ratatui::backend::{Backend, TestBackend};
+    /// # use ratatui::backend::{TestBackend};
     /// # let mut backend = TestBackend::new(80, 25);
+    /// use ratatui::backend::Backend;
+    ///
     /// backend.hide_cursor()?;
     /// // do something with hidden cursor
     /// backend.show_cursor()?;
     /// # std::io::Result::Ok(())
     /// ```
     ///
-    /// [`show_cursor`]: Backend::show_cursor
+    /// [`show_cursor`]: Self::show_cursor
     fn hide_cursor(&mut self) -> io::Result<()>;
 
     /// Show the cursor on the terminal screen.
     ///
     /// See [`hide_cursor`] for an example.
     ///
-    /// [`hide_cursor`]: Backend::hide_cursor
+    /// [`hide_cursor`]: Self::hide_cursor
     fn show_cursor(&mut self) -> io::Result<()>;
 
     /// Get the current cursor position on the terminal screen.
     ///
-    /// The returned tuple contains the x and y coordinates of the cursor. The origin
-    /// (0, 0) is at the top left corner of the screen.
+    /// The returned tuple contains the x and y coordinates of the cursor.
+    /// The origin (0, 0) is at the top left corner of the screen.
     ///
-    /// See [`set_cursor`] for an example.
+    /// See [`set_cursor_position`] for an example.
     ///
-    /// [`set_cursor`]: Backend::set_cursor
-    fn get_cursor(&mut self) -> io::Result<(u16, u16)>;
+    /// [`set_cursor_position`]: Self::set_cursor_position
+    fn get_cursor_position(&mut self) -> io::Result<Position>;
 
     /// Set the cursor position on the terminal screen to the given x and y coordinates.
     ///
@@ -219,23 +224,43 @@ pub trait Backend {
     /// # Example
     ///
     /// ```rust
-    /// # use ratatui::backend::{Backend, TestBackend};
+    /// # use ratatui::backend::{TestBackend};
     /// # let mut backend = TestBackend::new(80, 25);
-    /// backend.set_cursor(10, 20)?;
-    /// assert_eq!(backend.get_cursor()?, (10, 20));
+    /// use ratatui::{backend::Backend, layout::Position};
+    ///
+    /// backend.set_cursor_position(Position { x: 10, y: 20 })?;
+    /// assert_eq!(backend.get_cursor_position()?, Position { x: 10, y: 20 });
     /// # std::io::Result::Ok(())
     /// ```
+    fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> io::Result<()>;
+
+    /// Get the current cursor position on the terminal screen.
     ///
-    /// [`get_cursor`]: Backend::get_cursor
-    fn set_cursor(&mut self, x: u16, y: u16) -> io::Result<()>;
+    /// The returned tuple contains the x and y coordinates of the cursor. The origin
+    /// (0, 0) is at the top left corner of the screen.
+    #[deprecated = "the method get_cursor_position indicates more clearly what about the cursor to get"]
+    fn get_cursor(&mut self) -> io::Result<(u16, u16)> {
+        let Position { x, y } = self.get_cursor_position()?;
+        Ok((x, y))
+    }
+
+    /// Set the cursor position on the terminal screen to the given x and y coordinates.
+    ///
+    /// The origin (0, 0) is at the top left corner of the screen.
+    #[deprecated = "the method set_cursor_position indicates more clearly what about the cursor to set"]
+    fn set_cursor(&mut self, x: u16, y: u16) -> io::Result<()> {
+        self.set_cursor_position(Position { x, y })
+    }
 
     /// Clears the whole terminal screen
     ///
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use ratatui::backend::{Backend, TestBackend};
+    /// # use ratatui::backend::{TestBackend};
     /// # let mut backend = TestBackend::new(80, 25);
+    /// use ratatui::backend::Backend;
+    ///
     /// backend.clear()?;
     /// # std::io::Result::Ok(())
     /// ```
@@ -250,8 +275,10 @@ pub trait Backend {
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use ratatui::{prelude::*, backend::{TestBackend, ClearType}};
+    /// # use ratatui::{backend::{TestBackend}};
     /// # let mut backend = TestBackend::new(80, 25);
+    /// use ratatui::backend::{Backend, ClearType};
+    ///
     /// backend.clear_region(ClearType::All)?;
     /// # std::io::Result::Ok(())
     /// ```
@@ -261,7 +288,7 @@ pub trait Backend {
     /// This method will return an error if the terminal screen could not be cleared. It will also
     /// return an error if the `clear_type` is not supported by the backend.
     ///
-    /// [`clear`]: Backend::clear
+    /// [`clear`]: Self::clear
     fn clear_region(&mut self, clear_type: ClearType) -> io::Result<()> {
         match clear_type {
             ClearType::All => self.clear(),
@@ -275,19 +302,21 @@ pub trait Backend {
         }
     }
 
-    /// Get the size of the terminal screen in columns/rows as a [`Rect`].
+    /// Get the size of the terminal screen in columns/rows as a [`Size`].
     ///
-    /// The returned [`Rect`] contains the width and height of the terminal screen.
+    /// The returned [`Size`] contains the width and height of the terminal screen.
     ///
     /// # Example
     ///
-    /// ```rust,no_run
-    /// # use ratatui::{prelude::*, backend::TestBackend};
-    /// let backend = TestBackend::new(80, 25);
-    /// assert_eq!(backend.size()?, Rect::new(0, 0, 80, 25));
+    /// ```rust
+    /// # use ratatui::{backend::{TestBackend}};
+    /// # let backend = TestBackend::new(80, 25);
+    /// use ratatui::{backend::Backend, layout::Size};
+    ///
+    /// assert_eq!(backend.size()?, Size::new(80, 25));
     /// # std::io::Result::Ok(())
     /// ```
-    fn size(&self) -> io::Result<Rect>;
+    fn size(&self) -> io::Result<Size>;
 
     /// Get the size of the terminal screen in columns/rows and pixels as a [`WindowSize`].
     ///
@@ -298,6 +327,64 @@ pub trait Backend {
 
     /// Flush any buffered content to the terminal screen.
     fn flush(&mut self) -> io::Result<()>;
+
+    /// Scroll a region of the screen upwards, where a region is specified by a (half-open) range
+    /// of rows.
+    ///
+    /// Each row in the region is replaced by the row `line_count` rows below it, except the bottom
+    /// `line_count` rows, which are replaced by empty rows. If `line_count` is equal to or larger
+    /// than the number of rows in the region, then all rows are replaced with empty rows.
+    ///
+    /// If the region includes row 0, then `line_count` rows are copied into the bottom of the
+    /// scrollback buffer. These rows are first taken from the old contents of the region, starting
+    /// from the top. If there aren't sufficient rows in the region, then the remainder are empty
+    /// rows.
+    ///
+    /// The position of the cursor afterwards is undefined.
+    ///
+    /// The behavior is designed to match what ANSI terminals do when scrolling regions are
+    /// established. With ANSI terminals, a scrolling region can be established with the "^[[X;Yr"
+    /// sequence, where X and Y define the lines of the region. The scrolling region can be reset
+    /// to be the whole screen with the "^[[r" sequence.
+    ///
+    /// When a scrolling region is established in an ANSI terminal, various operations' behaviors
+    /// are changed in such a way that the scrolling region acts like a "virtual screen". In
+    /// particular, the scrolling sequence "^[[NS", which scrolls lines up by a count of N.
+    ///
+    /// On an ANSI terminal, this method will probably translate to something like:
+    /// "^[[X;Yr^[[NS^[[r". That is, set the scrolling region, scroll up, then reset the scrolling
+    /// region.
+    ///
+    /// For examples of how this function is expected to work, refer to the tests for
+    /// [`TestBackend::scroll_region_up`].
+    #[cfg(feature = "scrolling-regions")]
+    fn scroll_region_up(&mut self, region: std::ops::Range<u16>, line_count: u16)
+        -> io::Result<()>;
+
+    /// Scroll a region of the screen downwards, where a region is specified by a (half-open) range
+    /// of rows.
+    ///
+    /// Each row in the region is replaced by the row `line_count` rows above it, except the top
+    /// `line_count` rows, which are replaced by empty rows. If `line_count` is equal to or larger
+    /// than the number of rows in the region, then all rows are replaced with empty rows.
+    ///
+    /// The position of the cursor afterwards is undefined.
+    ///
+    /// See the documentation for [`Self::scroll_region_down`] for more information about how this
+    /// is expected to be implemented for ANSI terminals. All of that applies, except the ANSI
+    /// sequence to scroll down is "^[[NT".
+    ///
+    /// This function is asymmetrical with regards to the scrollback buffer. The reason is that
+    /// this how terminals seem to implement things.
+    ///
+    /// For examples of how this function is expected to work, refer to the tests for
+    /// [`TestBackend::scroll_region_down`].
+    #[cfg(feature = "scrolling-regions")]
+    fn scroll_region_down(
+        &mut self,
+        region: std::ops::Range<u16>,
+        line_count: u16,
+    ) -> io::Result<()>;
 }
 
 #[cfg(test)]

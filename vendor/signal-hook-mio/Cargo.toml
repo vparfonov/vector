@@ -12,11 +12,16 @@
 [package]
 edition = "2018"
 name = "signal-hook-mio"
-version = "0.2.3"
+version = "0.2.4"
 authors = [
     "Michal 'vorner' Vaner <vorner@vorner.cz>",
     "Thomas Himmelstoss <thimm@posteo.de>",
 ]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "MIO support for signal-hook"
 documentation = "https://docs.rs/signal-hook-mio"
 readme = "README.md"
@@ -34,6 +39,26 @@ rustdoc-args = [
     "--cfg",
     "docsrs",
 ]
+
+[lib]
+name = "signal_hook_mio"
+path = "src/lib.rs"
+
+[[test]]
+name = "mio_0_6"
+path = "tests/mio_0_6.rs"
+
+[[test]]
+name = "mio_0_7"
+path = "tests/mio_0_7.rs"
+
+[[test]]
+name = "mio_0_8"
+path = "tests/mio_0_8.rs"
+
+[[test]]
+name = "mio_1_0"
+path = "tests/mio_1_0.rs"
 
 [dependencies.libc]
 version = "~0.2"
@@ -54,6 +79,15 @@ package = "mio"
 
 [dependencies.mio-0_8]
 version = "~0.8"
+features = [
+    "net",
+    "os-ext",
+]
+optional = true
+package = "mio"
+
+[dependencies.mio-1_0]
+version = "~1.0"
 features = [
     "net",
     "os-ext",
@@ -87,6 +121,7 @@ support-v0_6 = [
 ]
 support-v0_7 = ["mio-0_7"]
 support-v0_8 = ["mio-0_8"]
+support-v1_0 = ["mio-1_0"]
 
 [badges.maintenance]
 status = "actively-developed"

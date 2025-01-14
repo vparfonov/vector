@@ -614,6 +614,7 @@ impl From<http::uri::InvalidUriParts> for Parse {
 }
 
 #[doc(hidden)]
+#[allow(dead_code)]
 trait AssertSendSync: Send + Sync + 'static {}
 #[doc(hidden)]
 impl AssertSendSync for Error {}

@@ -12,9 +12,16 @@
 [package]
 edition = "2021"
 name = "mlua_derive"
-version = "0.9.3"
+version = "0.10.0"
 authors = ["Aleksandr Orlenko <zxteam@pm.me>"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Procedural macros for the mlua crate."
+readme = false
 keywords = [
     "lua",
     "mlua",
@@ -23,10 +30,12 @@ license = "MIT"
 repository = "https://github.com/khvzak/mlua"
 
 [lib]
+name = "mlua_derive"
+path = "src/lib.rs"
 proc-macro = true
 
 [dependencies.itertools]
-version = "0.12"
+version = "0.13"
 optional = true
 
 [dependencies.once_cell]

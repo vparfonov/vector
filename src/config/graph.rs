@@ -1,10 +1,10 @@
-use indexmap::{set::IndexSet, IndexMap};
-use std::collections::{HashMap, HashSet, VecDeque};
-
 use super::{
     schema, ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
     TransformOutput,
 };
+use indexmap::{set::IndexSet, IndexMap};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::fmt;
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -18,6 +18,33 @@ pub enum Node {
     Sink {
         ty: DataType,
     },
+}
+
+impl fmt::Display for Node {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Node::Source { outputs } => {
+                write!(f, "component_kind: source\n  outputs:")?;
+                for output in outputs {
+                    write!(f, "\n    {}", output)?;
+                }
+                Ok(())
+            }
+            Node::Transform { in_ty, outputs } => {
+                write!(
+                    f,
+                    "component_kind: source\n  input_types: {in_ty}\n  outputs:"
+                )?;
+                for output in outputs {
+                    write!(f, "\n    {}", output)?;
+                }
+                Ok(())
+            }
+            Node::Sink { ty } => {
+                write!(f, "component_kind: sink\n  types: {ty}")
+            }
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -139,9 +166,16 @@ impl Graph {
                 Some(Node::Sink { .. }) => "sink",
                 _ => panic!("only transforms and sinks have inputs"),
             };
+            info!(
+                "Available components:\n{}",
+                self.nodes
+                    .iter()
+                    .map(|(key, node)| format!("\"{}\":\n  {}", key, node))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            );
             Err(format!(
-                "Input \"{}\" for {} \"{}\" doesn't match any components.",
-                from, output_type, to
+                "Input \"{from}\" for {output_type} \"{to}\" doesn't match any components.",
             ))
         }
     }
@@ -379,7 +413,7 @@ mod test {
                     outputs: vec![match ty {
                         DataType::Metric => SourceOutput::new_metrics(),
                         DataType::Trace => SourceOutput::new_traces(),
-                        _ => SourceOutput::new_logs(ty, Definition::any()),
+                        _ => SourceOutput::new_maybe_logs(ty, Definition::any()),
                     }],
                 },
             );
@@ -510,7 +544,7 @@ mod test {
 
         assert_eq!(
             Err(vec![
-                "Data type mismatch between in (Log) and out (Metric)".into()
+                "Data type mismatch between in ([\"Log\"]) and out ([\"Metric\"])".into()
             ]),
             graph.typecheck()
         );
@@ -639,7 +673,7 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(
+                outputs: vec![SourceOutput::new_maybe_logs(
                     DataType::all_bits(),
                     Definition::any(),
                 )],
@@ -648,7 +682,7 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("foo.bar"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(
+                outputs: vec![SourceOutput::new_maybe_logs(
                     DataType::all_bits(),
                     Definition::any(),
                 )],
@@ -676,7 +710,7 @@ mod test {
         graph.nodes.insert(
             ComponentKey::from("baz.errors"),
             Node::Source {
-                outputs: vec![SourceOutput::new_logs(
+                outputs: vec![SourceOutput::new_maybe_logs(
                     DataType::all_bits(),
                     Definition::any(),
                 )],

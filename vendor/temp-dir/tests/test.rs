@@ -257,3 +257,11 @@ fn leak() {
     std::fs::metadata(&file1_path).unwrap();
     std::fs::remove_dir_all(&dir_path).unwrap();
 }
+
+#[test]
+fn as_ref_path() {
+    let _guard = LOCK.lock();
+    let temp_dir = TempDir::new().unwrap();
+    let path_ref: &Path = temp_dir.as_ref();
+    assert_eq!(path_ref, temp_dir.path());
+}

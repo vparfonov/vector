@@ -4,6 +4,51 @@
 
 ## [Unreleased] - ReleaseDate
 
+## [[0.7.0](https://docs.rs/governor/0.7.0/governor/)] - 2024-10-21
+
+This is a quick bug-fix release to address the semver incompatibility
+in 0.6.4. It is functionally identical to 0.6.4, with the exception of
+the dashmap version upgrade.
+
+### Changed
+
+* Upgraded dashmap to 6.1.0.
+
+## [[0.6.4](https://docs.rs/governor/0.6.4/governor/)] - 2024-10-19
+
+This release has been yanked because it violates Semantic Versioning
+ideals: The Clock argument type in functions like `direct_with_clock`
+changed, which breaks existing code.
+
+Instead of 0.6.4, please use 0.7.0.
+
+### Added
+
+* https://docs.rs/governor now lists the features required for
+  feature-gated types and functions.
+
+* A
+  [`RateLimiter`](https://docs.rs/governor/0.6.4/governor/struct.RateLimiter.html)
+  now has a
+  [`clock`](https://docs.rs/governor/0.6.4/governor/struct.RateLimiter.html#method.clock)
+  method to retrieve the clock providing its timestamps. Added by
+  [@max-heller](https://github.com/max-heller) in
+  [#232](https://github.com/boinkor-net/governor/pull/232).
+
+### Changed
+
+* [`Clock`](https://docs.rs/governor/0.6.4/governor/clock/trait.Clock.html)s
+  no longer need to be `Clone`. Changed by
+  [@max-heller](https://github.com/max-heller) in
+  [#232](https://github.com/boinkor-net/governor/pull/232).
+
+* governor now depends only on
+  [`futures-util`](https://crates.io/crates/futures-util) and
+  [`futures-executor`](https://crates.io/crates/futures-executor) instead of
+  the much larger `futures` crate. Fixed by
+  [@negezor](https://github.com/negezor) in
+  [#239](https://github.com/boinkor-net/governor/pull/239).
+
 ## [[0.6.3](https://docs.rs/governor/0.6.3/governor/)] - 2024-02-16
 
 ### Changed

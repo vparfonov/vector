@@ -1,8 +1,12 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+#![warn(rust_2018_idioms)]
 
 extern crate alloc;
 
 use alloc::{string::String, vec::Vec};
+#[rustversion::since(1.81)]
+#[cfg(not(feature = "std"))]
+use core::error::Error;
 use core::fmt;
 #[cfg(feature = "std")]
 use std::error::Error;
@@ -147,7 +151,7 @@ impl<L, T, E> From<E> for ParseError<L, T, E> {
     }
 }
 
-#[cfg(feature = "std")]
+#[cfg_attr(not(feature = "std"), rustversion::since(1.81))]
 impl<L, T, E> Error for ParseError<L, T, E>
 where
     L: fmt::Debug + fmt::Display,
@@ -181,12 +185,14 @@ pub struct ErrorRecovery<L, T, E> {
 ///
 /// // define a public module
 /// lalrpop_mod!(pub parser);
+///
+/// // specify attributes for the generated module
+/// lalrpop_mod!(#[allow(clippy::ptr_arg)]#[rustfmt::skip] parser);
 /// ```
-
 #[macro_export]
 macro_rules! lalrpop_mod {
     ($(#[$attr:meta])* $vis:vis $modname:ident) => {
-        lalrpop_mod!($(#[$attr])* $vis $modname, concat!("/", stringify!($modname), ".rs"));
+        lalrpop_util::lalrpop_mod!($(#[$attr])* $vis $modname, concat!("/", stringify!($modname), ".rs"));
     };
 
     ($(#[$attr:meta])* $vis:vis $modname:ident, $source:expr) => {

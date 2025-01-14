@@ -52,6 +52,10 @@ enum ResolveNameResult<'a, 'b> {
         name: Cow<'b, str>,
         file: FileIndex,
     },
+    Shadowed {
+        name: Cow<'b, str>,
+        shadowed_name: Cow<'b, str>,
+    },
     NotFound,
 }
 
@@ -209,6 +213,13 @@ impl<'a, 'b> ResolveNameResult<'a, 'b> {
                 name: Cow::Owned(name.into_owned()),
                 file,
             },
+            ResolveNameResult::Shadowed {
+                name,
+                shadowed_name,
+            } => ResolveNameResult::Shadowed {
+                name: Cow::Owned(name.into_owned()),
+                shadowed_name: Cow::Owned(shadowed_name.into_owned()),
+            },
             ResolveNameResult::NotFound => ResolveNameResult::NotFound,
         }
     }
@@ -268,6 +279,19 @@ impl<'a, 'b> ResolveNameResult<'a, 'b> {
                 ),
                 help: None,
             }),
+            ResolveNameResult::Shadowed { name, shadowed_name } => Err(DescriptorErrorKind::NameShadowed {
+                found: Label::new(
+                    files,
+                    "found here",
+                    found_file,
+                    join_path(found_path1, found_path2),
+                ),
+                help: Some(format!(
+                    "The innermost scope is searched first in name resolution. Consider using a leading '.' (i.e., '.{name}') to start from the outermost scope.",
+                )),
+                name: name.into_owned(),
+                shadowed_name: shadowed_name.into_owned(),
+            }),
         }
     }
 }
@@ -304,38 +328,62 @@ fn resolve_name<'a, 'b>(
     }
 }
 
-fn resolve_relative_name<'a>(
+fn resolve_relative_name<'a, 'b>(
     dependencies: &HashSet<FileIndex>,
     names: &'a HashMap<Box<str>, Definition>,
     scope: &str,
-    relative_name: &str,
+    relative_name: &'b str,
     filter: ResolveNameFilter,
-) -> ResolveNameResult<'a, 'static> {
+) -> ResolveNameResult<'a, 'b> {
     let mut err = ResolveNameResult::NotFound;
+    let relative_first_part = relative_name.split('.').next().unwrap_or_default();
 
-    for candidate in resolve_relative_name_candidates(scope, relative_name) {
-        let res = ResolveNameResult::new(dependencies, names, candidate, filter);
-        if res.is_found() {
-            return res.into_owned();
-        } else if matches!(err, ResolveNameResult::NotFound) {
-            err = res;
+    for candidate_parent in resolve_relative_candidate_parents(scope) {
+        let candidate = match candidate_parent {
+            "" => Cow::Borrowed(relative_first_part),
+            _ => Cow::Owned(format!("{}.{}", candidate_parent, relative_first_part)),
+        };
+
+        if relative_first_part.len() == relative_name.len() {
+            // Looking up a simple name e.g. `Foo`
+            let res = ResolveNameResult::new(dependencies, names, candidate, filter);
+            if res.is_found() {
+                return res.into_owned();
+            } else if matches!(err, ResolveNameResult::NotFound) {
+                err = res;
+            }
+        } else {
+            // Looking up a name including a namespace e.g. `foo.Foo`. First determine the scope using the first component of the name.
+            match names.get(candidate.as_ref()) {
+                Some(def) if def.kind.is_parent() => {
+                    let candidate_full = match candidate_parent {
+                        "" => Cow::Borrowed(relative_name),
+                        _ => Cow::Owned(format!("{}.{}", candidate_parent, relative_name)),
+                    };
+
+                    let res =
+                        ResolveNameResult::new(dependencies, names, candidate_full.clone(), filter);
+                    if matches!(res, ResolveNameResult::NotFound) {
+                        return ResolveNameResult::Shadowed {
+                            name: Cow::Borrowed(relative_name),
+                            shadowed_name: candidate_full,
+                        };
+                    } else {
+                        return res;
+                    }
+                }
+                _ => continue,
+            }
         }
     }
 
     err.into_owned()
 }
 
-fn resolve_relative_name_candidates<'b: 'c, 'c>(
-    scope: &'c str,
-    relative_name: &'b str,
-) -> impl Iterator<Item = Cow<'b, str>> + 'c {
-    iter::once(Cow::Owned(format!("{scope}.{relative_name}")))
-        .chain(
-            scope
-                .rmatch_indices('.')
-                .map(move |(i, _)| Cow::Owned(format!("{}.{relative_name}", &scope[..i]))),
-        )
-        .chain(iter::once(Cow::Borrowed(relative_name)))
+fn resolve_relative_candidate_parents(scope: &str) -> impl Iterator<Item = &str> {
+    iter::once(scope)
+        .chain(scope.rmatch_indices('.').map(move |(i, _)| &scope[..i]))
+        .chain(iter::once(""))
 }
 
 fn join_path(path1: &[i32], path2: &[i32]) -> Box<[i32]> {

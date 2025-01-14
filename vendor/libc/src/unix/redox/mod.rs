@@ -22,7 +22,7 @@ pub type clockid_t = ::c_int;
 pub type dev_t = ::c_long;
 pub type fsblkcnt_t = ::c_ulong;
 pub type fsfilcnt_t = ::c_ulong;
-pub type ino_t = ::c_ulong;
+pub type ino_t = ::c_ulonglong;
 pub type mode_t = ::c_int;
 pub type nfds_t = ::c_ulong;
 pub type nlink_t = ::c_ulong;
@@ -75,17 +75,13 @@ s_no_extra_traits! {
 
     pub struct sockaddr_un {
         pub sun_family: ::sa_family_t,
-        pub sun_path: [::c_char; 108]
+        pub sun_path: [::c_char; 108],
     }
 
     pub struct sockaddr_storage {
         pub ss_family: ::sa_family_t,
-        __ss_padding: [
-            u8;
-            128 -
-            ::core::mem::size_of::<sa_family_t>() -
-            ::core::mem::size_of::<c_ulong>()
-        ],
+        __ss_padding:
+            [u8; 128 - ::core::mem::size_of::<sa_family_t>() - ::core::mem::size_of::<c_ulong>()],
         __ss_align: ::c_ulong,
     }
 }
@@ -116,7 +112,7 @@ s! {
     }
 
     pub struct fd_set {
-        fds_bits: [::c_ulong; ::FD_SETSIZE / ULONG_SIZE],
+        fds_bits: [::c_ulong; ::FD_SETSIZE as usize / ULONG_SIZE],
     }
 
     pub struct in_addr {
@@ -162,7 +158,7 @@ s! {
     pub struct sigaction {
         pub sa_sigaction: ::sighandler_t,
         pub sa_flags: ::c_ulong,
-        pub sa_restorer: ::Option<extern fn()>,
+        pub sa_restorer: ::Option<extern "C" fn()>,
         pub sa_mask: ::sigset_t,
     }
 
@@ -585,7 +581,13 @@ pub const IP_MULTICAST_TTL: ::c_int = 33;
 pub const IP_MULTICAST_LOOP: ::c_int = 34;
 pub const IP_ADD_MEMBERSHIP: ::c_int = 35;
 pub const IP_DROP_MEMBERSHIP: ::c_int = 36;
+pub const IP_TOS: ::c_int = 1;
+pub const IP_RECVTOS: ::c_int = 2;
+pub const IPPROTO_IGMP: ::c_int = 2;
+pub const IPPROTO_PUP: ::c_int = 12;
+pub const IPPROTO_IDP: ::c_int = 22;
 pub const IPPROTO_RAW: ::c_int = 255;
+pub const IPPROTO_MAX: ::c_int = 255;
 // }
 
 // netinet/tcp.h
@@ -695,26 +697,26 @@ pub const EPOLLONESHOT: ::c_int = 1 << 30;
 pub const EPOLLET: ::c_int = 1 << 31;
 
 // sys/stat.h
-pub const S_IFMT: ::c_int = 0o0_170_000;
-pub const S_IFDIR: ::c_int = 0o040_000;
-pub const S_IFCHR: ::c_int = 0o020_000;
-pub const S_IFBLK: ::c_int = 0o060_000;
-pub const S_IFREG: ::c_int = 0o100_000;
-pub const S_IFIFO: ::c_int = 0o010_000;
-pub const S_IFLNK: ::c_int = 0o120_000;
-pub const S_IFSOCK: ::c_int = 0o140_000;
-pub const S_IRWXU: ::c_int = 0o0_700;
-pub const S_IRUSR: ::c_int = 0o0_400;
-pub const S_IWUSR: ::c_int = 0o0_200;
-pub const S_IXUSR: ::c_int = 0o0_100;
-pub const S_IRWXG: ::c_int = 0o0_070;
-pub const S_IRGRP: ::c_int = 0o0_040;
-pub const S_IWGRP: ::c_int = 0o0_020;
-pub const S_IXGRP: ::c_int = 0o0_010;
-pub const S_IRWXO: ::c_int = 0o0_007;
-pub const S_IROTH: ::c_int = 0o0_004;
-pub const S_IWOTH: ::c_int = 0o0_002;
-pub const S_IXOTH: ::c_int = 0o0_001;
+pub const S_IFMT: ::c_int = 0o17_0000;
+pub const S_IFDIR: ::c_int = 0o4_0000;
+pub const S_IFCHR: ::c_int = 0o2_0000;
+pub const S_IFBLK: ::c_int = 0o6_0000;
+pub const S_IFREG: ::c_int = 0o10_0000;
+pub const S_IFIFO: ::c_int = 0o1_0000;
+pub const S_IFLNK: ::c_int = 0o12_0000;
+pub const S_IFSOCK: ::c_int = 0o14_0000;
+pub const S_IRWXU: ::c_int = 0o0700;
+pub const S_IRUSR: ::c_int = 0o0400;
+pub const S_IWUSR: ::c_int = 0o0200;
+pub const S_IXUSR: ::c_int = 0o0100;
+pub const S_IRWXG: ::c_int = 0o0070;
+pub const S_IRGRP: ::c_int = 0o0040;
+pub const S_IWGRP: ::c_int = 0o0020;
+pub const S_IXGRP: ::c_int = 0o0010;
+pub const S_IRWXO: ::c_int = 0o0007;
+pub const S_IROTH: ::c_int = 0o0004;
+pub const S_IWOTH: ::c_int = 0o0002;
+pub const S_IXOTH: ::c_int = 0o0001;
 
 // stdlib.h
 pub const EXIT_SUCCESS: ::c_int = 0;
@@ -810,6 +812,7 @@ pub const SO_PROTOCOL: ::c_int = 38;
 pub const SO_DOMAIN: ::c_int = 39;
 pub const SOCK_STREAM: ::c_int = 1;
 pub const SOCK_DGRAM: ::c_int = 2;
+pub const SOCK_RAW: ::c_int = 3;
 pub const SOCK_NONBLOCK: ::c_int = 0o4_000;
 pub const SOCK_CLOEXEC: ::c_int = 0o2_000_000;
 pub const SOCK_SEQPACKET: ::c_int = 5;
@@ -1015,20 +1018,20 @@ f! {
         let fd = fd as usize;
         let size = ::mem::size_of_val(&(*set).fds_bits[0]) * 8;
         (*set).fds_bits[fd / size] &= !(1 << (fd % size));
-        return
+        return;
     }
 
     pub fn FD_ISSET(fd: ::c_int, set: *const fd_set) -> bool {
         let fd = fd as usize;
         let size = ::mem::size_of_val(&(*set).fds_bits[0]) * 8;
-        return ((*set).fds_bits[fd / size] & (1 << (fd % size))) != 0
+        return ((*set).fds_bits[fd / size] & (1 << (fd % size))) != 0;
     }
 
     pub fn FD_SET(fd: ::c_int, set: *mut fd_set) -> () {
         let fd = fd as usize;
         let size = ::mem::size_of_val(&(*set).fds_bits[0]) * 8;
         (*set).fds_bits[fd / size] |= 1 << (fd % size);
-        return
+        return;
     }
 
     pub fn FD_ZERO(set: *mut fd_set) -> () {
@@ -1261,10 +1264,10 @@ cfg_if! {
                     && self.d_reclen == other.d_reclen
                     && self.d_type == other.d_type
                     && self
-                    .d_name
-                    .iter()
-                    .zip(other.d_name.iter())
-                    .all(|(a,b)| a == b)
+                        .d_name
+                        .iter()
+                        .zip(other.d_name.iter())
+                        .all(|(a, b)| a == b)
             }
         }
 
@@ -1277,7 +1280,7 @@ cfg_if! {
                     .field("d_off", &self.d_off)
                     .field("d_reclen", &self.d_reclen)
                     .field("d_type", &self.d_type)
-                // FIXME: .field("d_name", &self.d_name)
+                    // FIXME: .field("d_name", &self.d_name)
                     .finish()
             }
         }
@@ -1296,10 +1299,10 @@ cfg_if! {
             fn eq(&self, other: &sockaddr_un) -> bool {
                 self.sun_family == other.sun_family
                     && self
-                    .sun_path
-                    .iter()
-                    .zip(other.sun_path.iter())
-                    .all(|(a,b)| a == b)
+                        .sun_path
+                        .iter()
+                        .zip(other.sun_path.iter())
+                        .all(|(a, b)| a == b)
             }
         }
 
@@ -1309,7 +1312,7 @@ cfg_if! {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sockaddr_un")
                     .field("sun_family", &self.sun_family)
-                // FIXME: .field("sun_path", &self.sun_path)
+                    // FIXME: .field("sun_path", &self.sun_path)
                     .finish()
             }
         }
@@ -1326,10 +1329,10 @@ cfg_if! {
                 self.ss_family == other.ss_family
                     && self.__ss_align == self.__ss_align
                     && self
-                    .__ss_padding
-                    .iter()
-                    .zip(other.__ss_padding.iter())
-                    .all(|(a,b)| a == b)
+                        .__ss_padding
+                        .iter()
+                        .zip(other.__ss_padding.iter())
+                        .all(|(a, b)| a == b)
             }
         }
 
@@ -1340,7 +1343,7 @@ cfg_if! {
                 f.debug_struct("sockaddr_storage")
                     .field("ss_family", &self.ss_family)
                     .field("__ss_align", &self.__ss_align)
-                // FIXME: .field("__ss_padding", &self.__ss_padding)
+                    // FIXME: .field("__ss_padding", &self.__ss_padding)
                     .finish()
             }
         }
@@ -1360,30 +1363,30 @@ cfg_if! {
                     .zip(other.sysname.iter())
                     .all(|(a, b)| a == b)
                     && self
-                    .nodename
-                    .iter()
-                    .zip(other.nodename.iter())
-                    .all(|(a, b)| a == b)
+                        .nodename
+                        .iter()
+                        .zip(other.nodename.iter())
+                        .all(|(a, b)| a == b)
                     && self
-                    .release
-                    .iter()
-                    .zip(other.release.iter())
-                    .all(|(a, b)| a == b)
+                        .release
+                        .iter()
+                        .zip(other.release.iter())
+                        .all(|(a, b)| a == b)
                     && self
-                    .version
-                    .iter()
-                    .zip(other.version.iter())
-                    .all(|(a, b)| a == b)
+                        .version
+                        .iter()
+                        .zip(other.version.iter())
+                        .all(|(a, b)| a == b)
                     && self
-                    .machine
-                    .iter()
-                    .zip(other.machine.iter())
-                    .all(|(a, b)| a == b)
+                        .machine
+                        .iter()
+                        .zip(other.machine.iter())
+                        .all(|(a, b)| a == b)
                     && self
-                    .domainname
-                    .iter()
-                    .zip(other.domainname.iter())
-                    .all(|(a, b)| a == b)
+                        .domainname
+                        .iter()
+                        .zip(other.domainname.iter())
+                        .all(|(a, b)| a == b)
             }
         }
 
@@ -1392,12 +1395,12 @@ cfg_if! {
         impl ::fmt::Debug for utsname {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("utsname")
-                // FIXME: .field("sysname", &self.sysname)
-                // FIXME: .field("nodename", &self.nodename)
-                // FIXME: .field("release", &self.release)
-                // FIXME: .field("version", &self.version)
-                // FIXME: .field("machine", &self.machine)
-                // FIXME: .field("domainname", &self.domainname)
+                    // FIXME: .field("sysname", &self.sysname)
+                    // FIXME: .field("nodename", &self.nodename)
+                    // FIXME: .field("release", &self.release)
+                    // FIXME: .field("version", &self.version)
+                    // FIXME: .field("machine", &self.machine)
+                    // FIXME: .field("domainname", &self.domainname)
                     .finish()
             }
         }

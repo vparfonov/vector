@@ -1,8 +1,38 @@
-use core::convert::{TryFrom, TryInto};
-
 /// Returns whether a buffer is an ePub.
 pub fn is_epub(buf: &[u8]) -> bool {
-    crate::book::is_epub(buf)
+    buf.len() > 57
+        && buf[0] == 0x50
+        && buf[1] == 0x4B
+        && buf[2] == 0x3
+        && buf[3] == 0x4
+        && buf[30] == 0x6D
+        && buf[31] == 0x69
+        && buf[32] == 0x6D
+        && buf[33] == 0x65
+        && buf[34] == 0x74
+        && buf[35] == 0x79
+        && buf[36] == 0x70
+        && buf[37] == 0x65
+        && buf[38] == 0x61
+        && buf[39] == 0x70
+        && buf[40] == 0x70
+        && buf[41] == 0x6C
+        && buf[42] == 0x69
+        && buf[43] == 0x63
+        && buf[44] == 0x61
+        && buf[45] == 0x74
+        && buf[46] == 0x69
+        && buf[47] == 0x6F
+        && buf[48] == 0x6E
+        && buf[49] == 0x2F
+        && buf[50] == 0x65
+        && buf[51] == 0x70
+        && buf[52] == 0x75
+        && buf[53] == 0x62
+        && buf[54] == 0x2B
+        && buf[55] == 0x7A
+        && buf[56] == 0x69
+        && buf[57] == 0x70
 }
 
 /// Returns whether a buffer is a zip archive.
@@ -10,19 +40,8 @@ pub fn is_zip(buf: &[u8]) -> bool {
     buf.len() > 3
         && buf[0] == 0x50
         && buf[1] == 0x4B
-        && (((buf[2] == 0x3 && buf[3] == 0x4)
-            || (buf[2] == 0x5 && buf[3] == 0x6)
-            || (buf[2] == 0x7 && buf[3] == 0x8))
-            || (
-                // winzip
-                buf.len() > 7
-                    && (buf[2] == 0x30
-                        && buf[3] == 0x30
-                        && buf[4] == 0x50
-                        && buf[5] == 0x4B
-                        && buf[6] == 0x3
-                        && buf[7] == 0x4)
-            ))
+        && (buf[2] == 0x3 || buf[2] == 0x5 || buf[2] == 0x7)
+        && (buf[3] == 0x4 || buf[3] == 0x6 || buf[3] == 0x8)
 }
 
 /// Returns whether a buffer is a tar archive.
@@ -201,67 +220,7 @@ pub fn is_dcm(buf: &[u8]) -> bool {
     buf.len() > 131 && buf[128] == 0x44 && buf[129] == 0x49 && buf[130] == 0x43 && buf[131] == 0x4D
 }
 
-const ZSTD_SKIP_START: usize = 0x184D2A50;
-const ZSTD_SKIP_MASK: usize = 0xFFFFFFF0;
-
 /// Returns whether a buffer is a Zstd archive.
-// Zstandard compressed data is made of one or more frames.
-// There are two frame formats defined by Zstandard: Zstandard frames and Skippable frames.
-// See more details from https://tools.ietf.org/id/draft-kucherawy-dispatch-zstd-00.html#rfc.section.2
 pub fn is_zst(buf: &[u8]) -> bool {
-    if buf.len() > 3 && buf[0] == 0x28 && buf[1] == 0xB5 && buf[2] == 0x2F && buf[3] == 0xFD {
-        return true;
-    }
-
-    if buf.len() < 8 {
-        return false;
-    }
-
-    let magic = u32::from_le_bytes(buf[0..4].try_into().unwrap());
-    let Ok(magic) = usize::try_from(magic) else {
-        return false;
-    };
-
-    if magic & ZSTD_SKIP_MASK != ZSTD_SKIP_START {
-        return false;
-    }
-
-    let data_len = u32::from_le_bytes(buf[4..8].try_into().unwrap());
-    let Ok(data_len) = usize::try_from(data_len) else {
-        return false;
-    };
-
-    if buf.len() < 8 + data_len {
-        return false;
-    }
-
-    let next_frame = &buf[8 + data_len..];
-    is_zst(next_frame)
-}
-
-/// Returns whether a buffer is a MSI Windows Installer archive.
-pub fn is_msi(buf: &[u8]) -> bool {
-    buf.len() > 7
-        && buf[0] == 0xD0
-        && buf[1] == 0xCF
-        && buf[2] == 0x11
-        && buf[3] == 0xE0
-        && buf[4] == 0xA1
-        && buf[5] == 0xB1
-        && buf[6] == 0x1A
-        && buf[7] == 0xE1
-}
-
-/// Returns whether a buffer is a CPIO archive.
-pub fn is_cpio(buf: &[u8]) -> bool {
-    (buf.len() > 1
-        && ((buf[0] == 0xC7 && buf[1] == 0x71) // little endian, old format
-        || (buf[0] == 0x71 && buf[1] == 0xC7))) // big endian, old format
-    || (buf.len() > 6
-        && buf[0] == 0x30
-        && buf[1] == 0x37
-        && buf[2] == 0x30
-        && buf[3] == 0x37
-        && buf[4] == 0x30
-        && buf[5] == 0x31) // newc format
+    buf.len() > 3 && buf[0] == 0x28 && buf[1] == 0xB5 && buf[2] == 0x2F && buf[3] == 0xFD
 }

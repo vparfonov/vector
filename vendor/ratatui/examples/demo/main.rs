@@ -9,9 +9,9 @@
 //! See the [examples readme] for more information on finding examples that match the version of the
 //! library you are using.
 //!
-//! [Ratatui]: https://github.com/ratatui-org/ratatui
-//! [examples]: https://github.com/ratatui-org/ratatui/blob/main/examples
-//! [examples readme]: https://github.com/ratatui-org/ratatui/blob/main/examples/README.md
+//! [Ratatui]: https://github.com/ratatui/ratatui
+//! [examples]: https://github.com/ratatui/ratatui/blob/main/examples
+//! [examples readme]: https://github.com/ratatui/ratatui/blob/main/examples/README.md
 
 use std::{error::Error, time::Duration};
 
@@ -20,7 +20,7 @@ use argh::FromArgs;
 mod app;
 #[cfg(feature = "crossterm")]
 mod crossterm;
-#[cfg(feature = "termion")]
+#[cfg(all(not(windows), feature = "termion"))]
 mod termion;
 #[cfg(feature = "termwiz")]
 mod termwiz;
@@ -43,9 +43,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let tick_rate = Duration::from_millis(cli.tick_rate);
     #[cfg(feature = "crossterm")]
     crate::crossterm::run(tick_rate, cli.enhanced_graphics)?;
-    #[cfg(feature = "termion")]
+    #[cfg(all(not(windows), feature = "termion", not(feature = "crossterm")))]
     crate::termion::run(tick_rate, cli.enhanced_graphics)?;
-    #[cfg(feature = "termwiz")]
+    #[cfg(all(
+        feature = "termwiz",
+        not(feature = "crossterm"),
+        not(feature = "termion")
+    ))]
     crate::termwiz::run(tick_rate, cli.enhanced_graphics)?;
     Ok(())
 }

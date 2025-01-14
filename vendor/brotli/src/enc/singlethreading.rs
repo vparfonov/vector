@@ -1,14 +1,16 @@
-use super::backward_references::UnionHasher;
 use alloc::{Allocator, SliceWrapper};
 use core::marker::PhantomData;
 use core::mem;
-use enc::threading::{
+#[cfg(feature = "std")]
+use std;
+
+use super::backward_references::UnionHasher;
+use crate::enc::threading::{
     BatchSpawnable, BatchSpawnableLite, BrotliEncoderThreadError, CompressMulti,
     CompressionThreadResult, InternalOwned, InternalSendAlloc, Joinable, Owned, OwnedRetriever,
     PoisonedThreadError, SendAlloc,
 };
-use enc::BrotliAlloc;
-use enc::BrotliEncoderParams;
+use crate::enc::{BrotliAlloc, BrotliEncoderParams};
 
 pub struct SingleThreadedJoinable<T: Send + 'static, U: Send + 'static> {
     result: Result<T, U>,

@@ -33,6 +33,64 @@ fn start_with_name_with_include(
     assert!(contents.starts_with(name.to_str().unwrap()))
 }
 
+#[rstest]
+fn ignore_missing_env_vars(
+    #[ignore_missing_env_vars]
+    #[files("files/**/${__SHOULD_NOT_BE_DECLARED__}*.txt")]
+    #[exclude("exclude")]
+    path: PathBuf,
+) {
+    let name = path.file_name().unwrap();
+    let mut f = File::open(&path).unwrap();
+    let mut contents = String::new();
+    f.read_to_string(&mut contents).unwrap();
+
+    assert!(contents.starts_with(name.to_str().unwrap()))
+}
+
+#[rstest]
+fn env_vars(
+    #[files("${FILES_ENV_VAR}/**/*.txt")]
+    #[exclude("exclude")]
+    path: PathBuf,
+) {
+    let name = path.file_name().unwrap();
+    let mut f = File::open(&path).unwrap();
+    let mut contents = String::new();
+    f.read_to_string(&mut contents).unwrap();
+
+    assert!(contents.starts_with(name.to_str().unwrap()))
+}
+
+#[rstest]
+fn env_vars_unknown(
+    #[files("${__UNKNOWN__:-files}/**/*.txt")]
+    #[exclude("exclude")]
+    path: PathBuf,
+) {
+    let name = path.file_name().unwrap();
+    let mut f = File::open(&path).unwrap();
+    let mut contents = String::new();
+    f.read_to_string(&mut contents).unwrap();
+
+    assert!(contents.starts_with(name.to_str().unwrap()))
+}
+
+#[rstest]
+fn env_vars_base_dir(
+    #[files("**/*.txt")]
+    #[base_dir = "files"]
+    #[exclude("exclude")]
+    path: PathBuf,
+) {
+    let name = path.file_name().unwrap();
+    let mut f = File::open(&path).unwrap();
+    let mut contents = String::new();
+    f.read_to_string(&mut contents).unwrap();
+
+    assert!(contents.starts_with(name.to_str().unwrap()))
+}
+
 mod module {
     #[rstest::rstest]
     fn pathbuf_need_not_be_in_scope(
@@ -41,5 +99,6 @@ mod module {
         #[include_dot_files]
         path: std::path::PathBuf,
     ) {
+        let _ = path;
     }
 }

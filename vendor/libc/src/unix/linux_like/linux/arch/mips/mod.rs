@@ -192,6 +192,34 @@ pub const BLKIOMIN: ::Ioctl = 0x20001278;
 pub const BLKIOOPT: ::Ioctl = 0x20001279;
 pub const BLKSSZGET: ::Ioctl = 0x20001268;
 pub const BLKPBSZGET: ::Ioctl = 0x2000127B;
+// linux/if_tun.h
+pub const TUNSETNOCSUM: ::Ioctl = 0x800454c8;
+pub const TUNSETDEBUG: ::Ioctl = 0x800454c9;
+pub const TUNSETIFF: ::Ioctl = 0x800454ca;
+pub const TUNSETPERSIST: ::Ioctl = 0x800454cb;
+pub const TUNSETOWNER: ::Ioctl = 0x800454cc;
+pub const TUNSETLINK: ::Ioctl = 0x800454cd;
+pub const TUNSETGROUP: ::Ioctl = 0x800454ce;
+pub const TUNGETFEATURES: ::Ioctl = 0x400454cf;
+pub const TUNSETOFFLOAD: ::Ioctl = 0x800454d0;
+pub const TUNSETTXFILTER: ::Ioctl = 0x800454d1;
+pub const TUNGETIFF: ::Ioctl = 0x400454d2;
+pub const TUNGETSNDBUF: ::Ioctl = 0x400454d3;
+pub const TUNSETSNDBUF: ::Ioctl = 0x800454d4;
+pub const TUNGETVNETHDRSZ: ::Ioctl = 0x400454d7;
+pub const TUNSETVNETHDRSZ: ::Ioctl = 0x800454d8;
+pub const TUNSETQUEUE: ::Ioctl = 0x800454d9;
+pub const TUNSETIFINDEX: ::Ioctl = 0x800454da;
+pub const TUNSETVNETLE: ::Ioctl = 0x800454dc;
+pub const TUNGETVNETLE: ::Ioctl = 0x400454dd;
+/* The TUNSETVNETBE and TUNGETVNETBE ioctls are for cross-endian support on
+ * little-endian hosts. Not all kernel configurations support them, but all
+ * configurations that support SET also support GET.
+ */
+pub const TUNSETVNETBE: ::Ioctl = 0x800454de;
+pub const TUNGETVNETBE: ::Ioctl = 0x400454df;
+pub const TUNSETSTEERINGEBPF: ::Ioctl = 0x400454e0;
+pub const TUNSETFILTEREBPF: ::Ioctl = 0x400454e1;
 
 cfg_if! {
     // Those type are constructed using the _IOC macro
@@ -209,6 +237,9 @@ cfg_if! {
         pub const FS_IOC32_SETFLAGS: ::Ioctl = 0x80046602;
         pub const FS_IOC32_GETVERSION: ::Ioctl = 0x40047601;
         pub const FS_IOC32_SETVERSION: ::Ioctl = 0x80047602;
+        pub const TUNATTACHFILTER: ::Ioctl = 0x800854d5;
+        pub const TUNDETACHFILTER: ::Ioctl = 0x800854d6;
+        pub const TUNGETFILTER: ::Ioctl = 0x400854db;
     } else if #[cfg(any(target_arch = "mips64", target_arch = "mips64r6"))] {
         pub const FS_IOC_GETFLAGS: ::Ioctl = 0x40086601;
         pub const FS_IOC_SETFLAGS: ::Ioctl = 0x80086602;
@@ -218,6 +249,9 @@ cfg_if! {
         pub const FS_IOC32_SETFLAGS: ::Ioctl = 0x80046602;
         pub const FS_IOC32_GETVERSION: ::Ioctl = 0x40047601;
         pub const FS_IOC32_SETVERSION: ::Ioctl = 0x80047602;
+        pub const TUNATTACHFILTER: ::Ioctl = 0x801054d5;
+        pub const TUNDETACHFILTER: ::Ioctl = 0x801054d6;
+        pub const TUNGETFILTER: ::Ioctl = 0x401054db;
     }
 }
 
@@ -246,9 +280,7 @@ pub const IBSHIFT: ::tcflag_t = 16;
 // RLIMIT Constants
 
 cfg_if! {
-    if #[cfg(any(target_env = "gnu",
-                 target_env = "uclibc"))] {
-
+    if #[cfg(any(target_env = "gnu", target_env = "uclibc"))] {
         pub const RLIMIT_CPU: ::__rlimit_resource_t = 0;
         pub const RLIMIT_FSIZE: ::__rlimit_resource_t = 1;
         pub const RLIMIT_DATA: ::__rlimit_resource_t = 2;
@@ -268,9 +300,7 @@ cfg_if! {
         #[allow(deprecated)]
         #[deprecated(since = "0.2.64", note = "Not stable across OS versions")]
         pub const RLIMIT_NLIMITS: ::__rlimit_resource_t = RLIM_NLIMITS;
-
     } else if #[cfg(target_env = "musl")] {
-
         pub const RLIMIT_CPU: ::c_int = 0;
         pub const RLIMIT_FSIZE: ::c_int = 1;
         pub const RLIMIT_DATA: ::c_int = 2;
@@ -307,17 +337,19 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(any(target_arch = "mips64", target_arch = "mips64r6"),
-         any(target_env = "gnu",
-             target_env = "uclibc"))] {
+    if #[cfg(
+        any(target_arch = "mips64", target_arch = "mips64r6"),
+        any(target_env = "gnu", target_env = "uclibc")
+    )] {
         pub const RLIM_INFINITY: ::rlim_t = !0;
     }
 }
 
 cfg_if! {
-    if #[cfg(any(target_arch = "mips", target_arch = "mips32r6"),
-         any(target_env = "gnu",
-             target_env = "uclibc"))] {
+    if #[cfg(
+        any(target_arch = "mips", target_arch = "mips32r6"),
+        any(target_env = "gnu", target_env = "uclibc")
+    )] {
         pub const RLIM_INFINITY: ::rlim_t = 0x7fffffff;
     }
 }

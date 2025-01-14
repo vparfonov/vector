@@ -9,12 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - ReleaseDate
 
+## [0.18.0] - 2024-10-12
+
+### Added
+
+- Added `Debug` derive to numerous types. ([#504](https://github.com/metrics-rs/metrics/pull/504))
+
+### Changed
+
+- Replaced `num_cpus::get` with `std::thread::available_parallelism`.
+  ([#500](https://github.com/metrics-rs/metrics/pull/500))
+- Fixed a number of Clippy lints. ([#510](https://github.com/metrics-rs/metrics/pull/510))
+- Added `Sync` constraint to generic parameter in `RecoverableRecorder` and `Stack`.
+  ([#511](https://github.com/metrics-rs/metrics/pull/511))
+- Bump MSRV to 1.71.1. ([#530](https://github.com/metrics-rs/metrics/pull/530))
+
+## [0.17.0] - 2024-05-27
+
+### Changed
+
+- Bump MSRV to 1.70.0.
+- `Snapshotter` now implements `Clone`.
+  ([#472](https://github.com/metrics-rs/metrics/pull/472))
+- Relaxed some bounds for different categories of methods on `Registry<K, S>`.
+  ([#484](https://github.com/metrics-rs/metrics/pull/484))
+
 ## [0.16.3] - 2024-03-16
 
 ### Added
 
 - New set of methods on `Registry` for getting a metric handle if it exists. ([#457](https://github.com/metrics-rs/metrics/pull/457))
-- New set of methods on `Registry` for retaining metric handles that match a given predicate. ([#461](https://github.com/metrics-rs/metrics/pull/461))
+- New set of methods on `Registry` for retaining metric handles that match a given predicate.
+  ([#461](https://github.com/metrics-rs/metrics/pull/461))
 
 ### Fixed
 

@@ -1,0 +1,75 @@
+// Copyright 2023 Greptime Team
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package greptime.v1.flow;
+
+option java_package = "io.greptime.v1.flow";
+option java_outer_classname = "Server";
+option go_package = "github.com/GreptimeTeam/greptime-proto/go/greptime/v1/flow";
+
+import "greptime/v1/common.proto";
+import "greptime/v1/ddl.proto";
+import "greptime/v1/row.proto";
+
+service Flow {
+  // Handle the control plane request for creating or removing a flow.
+  rpc HandleCreateRemove(FlowRequest) returns (FlowResponse);
+  // Handle the data plane request for inserting or deleting rows
+  // only expect `RegionRequest` to be one of `InsertRequests` or
+  // `DeleteRequests` other types of `RegionRequest` will be ignored
+  rpc HandleMirrorRequest(InsertRequests) returns (FlowResponse);
+}
+
+message InsertRequests { repeated InsertRequest requests = 1; }
+
+message InsertRequest {
+  uint64 region_id = 1;
+  Rows rows = 2;
+}
+
+message FlowRequest {
+  oneof body {
+    CreateRequest create = 1;
+    RemoveRequest remove = 2;
+  }
+}
+
+message FlowResponse {
+  ResponseHeader header = 1;
+  uint64 affected_rows = 2;
+  map<string, bytes> extension = 3;
+  // affected task ids
+  repeated TaskId affected_tasks = 4;
+}
+
+// Create a flow task
+// 
+// Very similar to `ddl.CreateTaskExpr`, 
+// replace `source_table_names` with `source_table_ids`
+message CreateRequest {
+  TaskId task_id = 1; 
+  repeated TableId source_table_ids = 2;
+  TableName sink_table_name = 3;
+  bool create_if_not_exists = 4;
+  string expire_when = 5;
+  string comment = 6;
+  string sql = 7;
+  map<string, string> task_options = 8;
+}
+
+message RemoveRequest { TaskId task_id = 1; }
+
+message TaskId { uint32 id = 1; }

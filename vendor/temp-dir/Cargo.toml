@@ -12,8 +12,13 @@
 [package]
 edition = "2021"
 name = "temp-dir"
-version = "0.1.13"
+version = "0.1.14"
 authors = ["Michael Leonhard <michael@leonhardllc.com>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Simple temporary directory with cleanup"
 readme = "Readme.md"
 keywords = [
@@ -29,6 +34,14 @@ categories = [
 ]
 license = "Apache-2.0"
 repository = "https://gitlab.com/leonhard-llc/ops"
+
+[lib]
+name = "temp_dir"
+path = "src/lib.rs"
+
+[[test]]
+name = "test"
+path = "tests/test.rs"
 
 [dependencies]
 

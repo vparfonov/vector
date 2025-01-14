@@ -11,10 +11,15 @@
 
 [package]
 edition = "2021"
-rust-version = "1.56"
+rust-version = "1.63"
 name = "tokio-util"
-version = "0.7.8"
+version = "0.7.11"
 authors = ["Tokio Contributors <team@tokio.rs>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
 Additional utilities for working with Tokio.
 """
@@ -39,11 +44,111 @@ rustdoc-args = [
     "tokio_unstable",
 ]
 
+[lib]
+name = "tokio_util"
+path = "src/lib.rs"
+
+[[test]]
+name = "_require_full"
+path = "tests/_require_full.rs"
+
+[[test]]
+name = "codecs"
+path = "tests/codecs.rs"
+
+[[test]]
+name = "compat"
+path = "tests/compat.rs"
+
+[[test]]
+name = "context"
+path = "tests/context.rs"
+
+[[test]]
+name = "framed"
+path = "tests/framed.rs"
+
+[[test]]
+name = "framed_read"
+path = "tests/framed_read.rs"
+
+[[test]]
+name = "framed_stream"
+path = "tests/framed_stream.rs"
+
+[[test]]
+name = "framed_write"
+path = "tests/framed_write.rs"
+
+[[test]]
+name = "io_inspect"
+path = "tests/io_inspect.rs"
+
+[[test]]
+name = "io_reader_stream"
+path = "tests/io_reader_stream.rs"
+
+[[test]]
+name = "io_sink_writer"
+path = "tests/io_sink_writer.rs"
+
+[[test]]
+name = "io_stream_reader"
+path = "tests/io_stream_reader.rs"
+
+[[test]]
+name = "io_sync_bridge"
+path = "tests/io_sync_bridge.rs"
+
+[[test]]
+name = "length_delimited"
+path = "tests/length_delimited.rs"
+
+[[test]]
+name = "mpsc"
+path = "tests/mpsc.rs"
+
+[[test]]
+name = "panic"
+path = "tests/panic.rs"
+
+[[test]]
+name = "poll_semaphore"
+path = "tests/poll_semaphore.rs"
+
+[[test]]
+name = "reusable_box"
+path = "tests/reusable_box.rs"
+
+[[test]]
+name = "spawn_pinned"
+path = "tests/spawn_pinned.rs"
+
+[[test]]
+name = "sync_cancellation_token"
+path = "tests/sync_cancellation_token.rs"
+
+[[test]]
+name = "task_join_map"
+path = "tests/task_join_map.rs"
+
+[[test]]
+name = "task_tracker"
+path = "tests/task_tracker.rs"
+
+[[test]]
+name = "time_delay_queue"
+path = "tests/time_delay_queue.rs"
+
+[[test]]
+name = "udp"
+path = "tests/udp.rs"
+
 [dependencies]
 bytes = "1.0.0"
 futures-core = "0.3.0"
 futures-sink = "0.3.0"
-pin-project-lite = "0.2.0"
+pin-project-lite = "0.2.11"
 
 [dependencies.futures-io]
 version = "0.3.0"
@@ -58,7 +163,7 @@ version = "0.4.4"
 optional = true
 
 [dependencies.tokio]
-version = "1.22.0"
+version = "1.28.0"
 features = ["sync"]
 
 [dependencies.tracing]
@@ -72,6 +177,7 @@ async-stream = "0.3.0"
 futures = "0.3.0"
 futures-test = "0.3.5"
 parking_lot = "0.12.0"
+tempfile = "3.1.0"
 
 [dev-dependencies.tokio]
 version = "1.0.0"
@@ -87,7 +193,7 @@ path = "../tokio-test"
 
 [features]
 __docs_rs = ["futures-util"]
-codec = ["tracing"]
+codec = []
 compat = ["futures-io"]
 default = []
 full = [
@@ -117,5 +223,5 @@ time = [
 ]
 
 [target."cfg(tokio_unstable)".dependencies.hashbrown]
-version = "0.12.0"
+version = "0.14.0"
 optional = true

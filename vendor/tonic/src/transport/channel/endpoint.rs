@@ -1,15 +1,16 @@
-use super::super::service;
+#[cfg(feature = "tls")]
+use super::service::TlsConnector;
+use super::service::{self, Executor, SharedExec};
 use super::Channel;
 #[cfg(feature = "tls")]
 use super::ClientTlsConfig;
-#[cfg(feature = "tls")]
-use crate::transport::service::TlsConnector;
-use crate::transport::{service::SharedExec, Error, Executor};
+use crate::transport::Error;
 use bytes::Bytes;
 use http::{uri::Uri, HeaderValue};
+use hyper::rt;
+use hyper_util::client::legacy::connect::HttpConnector;
 use std::{fmt, future::Future, pin::Pin, str::FromStr, time::Duration};
-use tower::make::MakeConnection;
-// use crate::transport::E
+use tower_service::Service;
 
 /// Channel builder.
 ///
@@ -32,6 +33,7 @@ pub struct Endpoint {
     pub(crate) http2_keep_alive_interval: Option<Duration>,
     pub(crate) http2_keep_alive_timeout: Option<Duration>,
     pub(crate) http2_keep_alive_while_idle: Option<bool>,
+    pub(crate) http2_max_header_list_size: Option<u32>,
     pub(crate) connect_timeout: Option<Duration>,
     pub(crate) http2_adaptive_window: Option<bool>,
     pub(crate) executor: SharedExec,
@@ -47,6 +49,11 @@ impl Endpoint {
         D::Error: Into<crate::Error>,
     {
         let me = dst.try_into().map_err(|e| Error::from_source(e.into()))?;
+        #[cfg(feature = "tls")]
+        if me.uri.scheme() == Some(&http::uri::Scheme::HTTPS) {
+            return me.tls_config(ClientTlsConfig::new().with_enabled_roots());
+        }
+
         Ok(me)
     }
 
@@ -238,12 +245,11 @@ impl Endpoint {
 
     /// Configures TLS for the endpoint.
     #[cfg(feature = "tls")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "tls")))]
     pub fn tls_config(self, tls_config: ClientTlsConfig) -> Result<Self, Error> {
         Ok(Endpoint {
             tls: Some(
                 tls_config
-                    .tls_connector(self.uri.clone())
+                    .into_tls_connector(&self.uri)
                     .map_err(Error::from_source)?,
             ),
             ..self
@@ -290,6 +296,16 @@ impl Endpoint {
         }
     }
 
+    /// Sets the max size of received header frames.
+    ///
+    /// This will default to whatever the default in hyper is. As of v1.4.1, it is 16 KiB.
+    pub fn http2_max_header_list_size(self, size: u32) -> Self {
+        Endpoint {
+            http2_max_header_list_size: Some(size),
+            ..self
+        }
+    }
+
     /// Sets the executor used to spawn async tasks.
     ///
     /// Uses `tokio::spawn` by default.
@@ -302,31 +318,24 @@ impl Endpoint {
     }
 
     pub(crate) fn connector<C>(&self, c: C) -> service::Connector<C> {
-        #[cfg(feature = "tls")]
-        let connector = service::Connector::new(c, self.tls.clone());
-
-        #[cfg(not(feature = "tls"))]
-        let connector = service::Connector::new(c);
-
-        connector
+        service::Connector::new(
+            c,
+            #[cfg(feature = "tls")]
+            self.tls.clone(),
+        )
     }
 
     /// Create a channel from this config.
     pub async fn connect(&self) -> Result<Channel, Error> {
-        let mut http = hyper::client::connect::HttpConnector::new();
+        let mut http = HttpConnector::new();
         http.enforce_http(false);
         http.set_nodelay(self.tcp_nodelay);
         http.set_keepalive(self.tcp_keepalive);
+        http.set_connect_timeout(self.connect_timeout);
 
         let connector = self.connector(http);
 
-        if let Some(connect_timeout) = self.connect_timeout {
-            let mut connector = hyper_timeout::TimeoutConnector::new(connector);
-            connector.set_connect_timeout(Some(connect_timeout));
-            Channel::connect(connector, self.clone()).await
-        } else {
-            Channel::connect(connector, self.clone()).await
-        }
+        Channel::connect(connector, self.clone()).await
     }
 
     /// Create a channel from this config.
@@ -334,20 +343,15 @@ impl Endpoint {
     /// The channel returned by this method does not attempt to connect to the endpoint until first
     /// use.
     pub fn connect_lazy(&self) -> Channel {
-        let mut http = hyper::client::connect::HttpConnector::new();
+        let mut http = HttpConnector::new();
         http.enforce_http(false);
         http.set_nodelay(self.tcp_nodelay);
         http.set_keepalive(self.tcp_keepalive);
+        http.set_connect_timeout(self.connect_timeout);
 
         let connector = self.connector(http);
 
-        if let Some(connect_timeout) = self.connect_timeout {
-            let mut connector = hyper_timeout::TimeoutConnector::new(connector);
-            connector.set_connect_timeout(Some(connect_timeout));
-            Channel::new(connector, self.clone())
-        } else {
-            Channel::new(connector, self.clone())
-        }
+        Channel::new(connector, self.clone())
     }
 
     /// Connect with a custom connector.
@@ -359,10 +363,10 @@ impl Endpoint {
     /// The [`connect_timeout`](Endpoint::connect_timeout) will still be applied.
     pub async fn connect_with_connector<C>(&self, connector: C) -> Result<Channel, Error>
     where
-        C: MakeConnection<Uri> + Send + 'static,
-        C::Connection: Unpin + Send + 'static,
-        C::Future: Send + 'static,
-        crate::Error: From<C::Error> + Send + 'static,
+        C: Service<Uri> + Send + 'static,
+        C::Response: rt::Read + rt::Write + Send + Unpin,
+        C::Future: Send,
+        crate::Error: From<C::Error> + Send,
     {
         let connector = self.connector(connector);
 
@@ -384,10 +388,10 @@ impl Endpoint {
     /// uses a Unix socket transport.
     pub fn connect_with_connector_lazy<C>(&self, connector: C) -> Channel
     where
-        C: MakeConnection<Uri> + Send + 'static,
-        C::Connection: Unpin + Send + 'static,
-        C::Future: Send + 'static,
-        crate::Error: From<C::Error> + Send + 'static,
+        C: Service<Uri> + Send + 'static,
+        C::Response: rt::Read + rt::Write + Send + Unpin,
+        C::Future: Send,
+        crate::Error: From<C::Error> + Send,
     {
         let connector = self.connector(connector);
         if let Some(connect_timeout) = self.connect_timeout {
@@ -432,6 +436,7 @@ impl From<Uri> for Endpoint {
             http2_keep_alive_interval: None,
             http2_keep_alive_timeout: None,
             http2_keep_alive_while_idle: None,
+            http2_max_header_list_size: None,
             connect_timeout: None,
             http2_adaptive_window: None,
             executor: SharedExec::tokio(),

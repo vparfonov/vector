@@ -1,5 +1,7 @@
 //! Linux-specific definitions for linux-like values
 
+use core::mem;
+
 pub type useconds_t = u32;
 pub type dev_t = u64;
 pub type socklen_t = u32;
@@ -16,6 +18,8 @@ pub type loff_t = ::c_longlong;
 pub type pthread_key_t = ::c_uint;
 pub type pthread_once_t = ::c_int;
 pub type pthread_spinlock_t = ::c_int;
+pub type __kernel_fsid_t = __c_anonymous__kernel_fsid_t;
+pub type __kernel_clockid_t = ::c_int;
 
 pub type __u8 = ::c_uchar;
 pub type __u16 = ::c_ushort;
@@ -27,6 +31,8 @@ pub type Elf32_Half = u16;
 pub type Elf32_Word = u32;
 pub type Elf32_Off = u32;
 pub type Elf32_Addr = u32;
+pub type Elf32_Xword = u64;
+pub type Elf32_Sword = i32;
 
 pub type Elf64_Half = u16;
 pub type Elf64_Word = u32;
@@ -34,9 +40,22 @@ pub type Elf64_Off = u64;
 pub type Elf64_Addr = u64;
 pub type Elf64_Xword = u64;
 pub type Elf64_Sxword = i64;
+pub type Elf64_Sword = i32;
 
 pub type Elf32_Section = u16;
 pub type Elf64_Section = u16;
+
+pub type Elf32_Relr = Elf32_Word;
+pub type Elf64_Relr = Elf32_Xword;
+pub type Elf32_Rel = __c_anonymous_elf32_rel;
+pub type Elf64_Rel = __c_anonymous_elf64_rel;
+
+cfg_if! {
+    if #[cfg(not(target_arch = "sparc64"))] {
+        pub type Elf32_Rela = __c_anonymous_elf32_rela;
+        pub type Elf64_Rela = __c_anonymous_elf64_rela;
+    }
+}
 
 // linux/can.h
 pub type canid_t = u32;
@@ -56,6 +75,15 @@ pub type eventfd_t = u64;
 missing! {
     #[cfg_attr(feature = "extra_traits", derive(Debug))]
     pub enum fpos64_t {} // FIXME: fill this out with a struct
+}
+
+e! {
+    #[repr(u32)]
+    pub enum tpacket_versions {
+        TPACKET_V1,
+        TPACKET_V2,
+        TPACKET_V3,
+    }
 }
 
 s! {
@@ -140,6 +168,15 @@ s! {
         __val: [::c_int; 2],
     }
 
+    pub struct fanout_args {
+        #[cfg(target_endian = "little")]
+        pub id: ::__u16,
+        pub type_flags: ::__u16,
+        #[cfg(target_endian = "big")]
+        pub id: ::__u16,
+        pub max_num_members: ::__u32,
+    }
+
     pub struct packet_mreq {
         pub mr_ifindex: ::c_int,
         pub mr_type: ::c_ushort,
@@ -147,12 +184,120 @@ s! {
         pub mr_address: [::c_uchar; 8],
     }
 
+    pub struct sockaddr_pkt {
+        pub spkt_family: ::c_ushort,
+        pub spkt_device: [::c_uchar; 14],
+        pub spkt_protocol: ::c_ushort,
+    }
+
+    pub struct tpacket_auxdata {
+        pub tp_status: ::__u32,
+        pub tp_len: ::__u32,
+        pub tp_snaplen: ::__u32,
+        pub tp_mac: ::__u16,
+        pub tp_net: ::__u16,
+        pub tp_vlan_tci: ::__u16,
+        pub tp_vlan_tpid: ::__u16,
+    }
+
+    pub struct tpacket_hdr {
+        pub tp_status: ::c_ulong,
+        pub tp_len: ::c_uint,
+        pub tp_snaplen: ::c_uint,
+        pub tp_mac: ::c_ushort,
+        pub tp_net: ::c_ushort,
+        pub tp_sec: ::c_uint,
+        pub tp_usec: ::c_uint,
+    }
+
+    pub struct tpacket_hdr_variant1 {
+        pub tp_rxhash: ::__u32,
+        pub tp_vlan_tci: ::__u32,
+        pub tp_vlan_tpid: ::__u16,
+        pub tp_padding: ::__u16,
+    }
+
+    pub struct tpacket2_hdr {
+        pub tp_status: ::__u32,
+        pub tp_len: ::__u32,
+        pub tp_snaplen: ::__u32,
+        pub tp_mac: ::__u16,
+        pub tp_net: ::__u16,
+        pub tp_sec: ::__u32,
+        pub tp_nsec: ::__u32,
+        pub tp_vlan_tci: ::__u16,
+        pub tp_vlan_tpid: ::__u16,
+        pub tp_padding: [::__u8; 4],
+    }
+
+    pub struct tpacket_req {
+        pub tp_block_size: ::c_uint,
+        pub tp_block_nr: ::c_uint,
+        pub tp_frame_size: ::c_uint,
+        pub tp_frame_nr: ::c_uint,
+    }
+
+    pub struct tpacket_req3 {
+        pub tp_block_size: ::c_uint,
+        pub tp_block_nr: ::c_uint,
+        pub tp_frame_size: ::c_uint,
+        pub tp_frame_nr: ::c_uint,
+        pub tp_retire_blk_tov: ::c_uint,
+        pub tp_sizeof_priv: ::c_uint,
+        pub tp_feature_req_word: ::c_uint,
+    }
+
+    #[repr(align(8))]
+    pub struct tpacket_rollover_stats {
+        pub tp_all: ::__u64,
+        pub tp_huge: ::__u64,
+        pub tp_failed: ::__u64,
+    }
+
+    pub struct tpacket_stats {
+        pub tp_packets: ::c_uint,
+        pub tp_drops: ::c_uint,
+    }
+
+    pub struct tpacket_stats_v3 {
+        pub tp_packets: ::c_uint,
+        pub tp_drops: ::c_uint,
+        pub tp_freeze_q_cnt: ::c_uint,
+    }
+
+    pub struct tpacket3_hdr {
+        pub tp_next_offset: ::__u32,
+        pub tp_sec: ::__u32,
+        pub tp_nsec: ::__u32,
+        pub tp_snaplen: ::__u32,
+        pub tp_len: ::__u32,
+        pub tp_status: ::__u32,
+        pub tp_mac: ::__u16,
+        pub tp_net: ::__u16,
+        pub hv1: ::tpacket_hdr_variant1,
+        pub tp_padding: [::__u8; 8],
+    }
+
+    pub struct tpacket_bd_ts {
+        pub ts_sec: ::c_uint,
+        pub ts_usec: ::c_uint,
+    }
+
+    #[repr(align(8))]
+    pub struct tpacket_hdr_v1 {
+        pub block_status: ::__u32,
+        pub num_pkts: ::__u32,
+        pub offset_to_first_pkt: ::__u32,
+        pub blk_len: ::__u32,
+        pub seq_num: ::__u64,
+        pub ts_first_pkt: ::tpacket_bd_ts,
+        pub ts_last_pkt: ::tpacket_bd_ts,
+    }
+
     pub struct cpu_set_t {
-        #[cfg(all(target_pointer_width = "32",
-                  not(target_arch = "x86_64")))]
+        #[cfg(all(target_pointer_width = "32", not(target_arch = "x86_64")))]
         bits: [u32; 32],
-        #[cfg(not(all(target_pointer_width = "32",
-                      not(target_arch = "x86_64"))))]
+        #[cfg(not(all(target_pointer_width = "32", not(target_arch = "x86_64"))))]
         bits: [u64; 16],
     }
 
@@ -279,7 +424,7 @@ s! {
         pub direction: ::__u16,
         pub trigger: ff_trigger,
         pub replay: ff_replay,
-        // FIXME this is actually a union
+        // FIXME(1.0): this is actually a union
         #[cfg(target_pointer_width = "64")]
         pub u: [u64; 4],
         #[cfg(target_pointer_width = "32")]
@@ -327,13 +472,14 @@ s! {
         // to false. So I'm just removing these, and if uClibc changes
         // the #if block in the future to include the following fields, these
         // will probably need including here. tsidea, skrap
-        #[cfg(not(target_env = "uclibc"))]
+        // QNX (NTO) platform does not define these fields
+        #[cfg(not(any(target_env = "uclibc", target_os = "nto")))]
         pub dlpi_adds: ::c_ulonglong,
-        #[cfg(not(target_env = "uclibc"))]
+        #[cfg(not(any(target_env = "uclibc", target_os = "nto")))]
         pub dlpi_subs: ::c_ulonglong,
-        #[cfg(not(target_env = "uclibc"))]
+        #[cfg(not(any(target_env = "uclibc", target_os = "nto")))]
         pub dlpi_tls_modid: ::size_t,
-        #[cfg(not(target_env = "uclibc"))]
+        #[cfg(not(any(target_env = "uclibc", target_os = "nto")))]
         pub dlpi_tls_data: *mut ::c_void,
     }
 
@@ -437,6 +583,20 @@ s! {
         pub sh_entsize: Elf64_Xword,
     }
 
+    pub struct __c_anonymous_elf32_rel {
+        pub r_offset: Elf32_Addr,
+        pub r_info: Elf32_Word,
+    }
+
+    pub struct __c_anonymous_elf64_rel {
+        pub r_offset: Elf64_Addr,
+        pub r_info: Elf64_Xword,
+    }
+
+    pub struct __c_anonymous__kernel_fsid_t {
+        pub val: [::c_int; 2],
+    }
+
     pub struct ucred {
         pub pid: ::pid_t,
         pub uid: ::uid_t,
@@ -496,7 +656,7 @@ s! {
         pub wd: ::c_int,
         pub mask: u32,
         pub cookie: u32,
-        pub len: u32
+        pub len: u32,
     }
 
     pub struct fanotify_response {
@@ -504,12 +664,24 @@ s! {
         pub response: __u32,
     }
 
+    pub struct fanotify_event_info_header {
+        pub info_type: __u8,
+        pub pad: __u8,
+        pub len: __u16,
+    }
+
+    pub struct fanotify_event_info_fid {
+        pub hdr: fanotify_event_info_header,
+        pub fsid: ::__kernel_fsid_t,
+        pub handle: [::c_uchar; 0],
+    }
+
     pub struct sockaddr_vm {
         pub svm_family: ::sa_family_t,
         pub svm_reserved1: ::c_ushort,
         pub svm_port: ::c_uint,
         pub svm_cid: ::c_uint,
-        pub svm_zero: [u8; 4]
+        pub svm_zero: [u8; 4],
     }
 
     pub struct regmatch_t {
@@ -637,17 +809,59 @@ s! {
         pub port: ::c_uchar,
     }
 
-   pub struct in6_ifreq {
-       pub ifr6_addr: ::in6_addr,
-       pub ifr6_prefixlen: u32,
-       pub ifr6_ifindex: ::c_int,
-   }
+    pub struct in6_ifreq {
+        pub ifr6_addr: ::in6_addr,
+        pub ifr6_prefixlen: u32,
+        pub ifr6_ifindex: ::c_int,
+    }
 
     pub struct option {
         pub name: *const ::c_char,
         pub has_arg: ::c_int,
         pub flag: *mut ::c_int,
         pub val: ::c_int,
+    }
+
+    // linux/openat2.h
+    #[non_exhaustive]
+    pub struct open_how {
+        pub flags: ::__u64,
+        pub mode: ::__u64,
+        pub resolve: ::__u64,
+    }
+
+    // linux/ptp_clock.h
+    pub struct ptp_clock_time {
+        pub sec: ::__s64,
+        pub nsec: ::__u32,
+        pub reserved: ::__u32,
+    }
+
+    pub struct ptp_extts_request {
+        pub index: ::c_uint,
+        pub flags: ::c_uint,
+        pub rsv: [::c_uint; 2],
+    }
+
+    pub struct ptp_sys_offset_extended {
+        pub n_samples: ::c_uint,
+        pub clockid: __kernel_clockid_t,
+        pub rsv: [::c_uint; 2],
+        pub ts: [[ptp_clock_time; 3]; PTP_MAX_SAMPLES as usize],
+    }
+
+    pub struct ptp_sys_offset_precise {
+        pub device: ptp_clock_time,
+        pub sys_realtime: ptp_clock_time,
+        pub sys_monoraw: ptp_clock_time,
+        pub rsv: [::c_uint; 4],
+    }
+
+    pub struct ptp_extts_event {
+        pub t: ptp_clock_time,
+        index: ::c_uint,
+        flags: ::c_uint,
+        rsv: [::c_uint; 2],
     }
 
     // linux/sctp.h
@@ -742,6 +956,313 @@ s! {
         pub salt: [::c_uchar; TLS_CIPHER_CHACHA20_POLY1305_SALT_SIZE],
         pub rec_seq: [::c_uchar; TLS_CIPHER_CHACHA20_POLY1305_REC_SEQ_SIZE],
     }
+
+    // linux/wireless.h
+
+    pub struct iw_param {
+        pub value: __s32,
+        pub fixed: __u8,
+        pub disabled: __u8,
+        pub flags: __u16,
+    }
+
+    pub struct iw_point {
+        pub pointer: *mut ::c_void,
+        pub length: __u16,
+        pub flags: __u16,
+    }
+
+    pub struct iw_freq {
+        pub m: __s32,
+        pub e: __s16,
+        pub i: __u8,
+        pub flags: __u8,
+    }
+
+    pub struct iw_quality {
+        pub qual: __u8,
+        pub level: __u8,
+        pub noise: __u8,
+        pub updated: __u8,
+    }
+
+    pub struct iw_discarded {
+        pub nwid: __u32,
+        pub code: __u32,
+        pub fragment: __u32,
+        pub retries: __u32,
+        pubmisc: __u32,
+    }
+
+    pub struct iw_missed {
+        pub beacon: __u32,
+    }
+
+    pub struct iw_scan_req {
+        pub scan_type: __u8,
+        pub essid_len: __u8,
+        pub num_channels: __u8,
+        pub flags: __u8,
+        pub bssid: ::sockaddr,
+        pub essid: [__u8; IW_ESSID_MAX_SIZE],
+        pub min_channel_time: __u32,
+        pub max_channel_time: __u32,
+        pub channel_list: [iw_freq; IW_MAX_FREQUENCIES],
+    }
+
+    pub struct iw_encode_ext {
+        pub ext_flags: __u32,
+        pub tx_seq: [__u8; IW_ENCODE_SEQ_MAX_SIZE],
+        pub rx_seq: [__u8; IW_ENCODE_SEQ_MAX_SIZE],
+        pub addr: ::sockaddr,
+        pub alg: __u16,
+        pub key_len: __u16,
+        pub key: [__u8; 0],
+    }
+
+    pub struct iw_pmksa {
+        pub cmd: __u32,
+        pub bssid: ::sockaddr,
+        pub pmkid: [__u8; IW_PMKID_LEN],
+    }
+
+    pub struct iw_pmkid_cand {
+        pub flags: __u32,
+        pub index: __u32,
+        pub bssid: ::sockaddr,
+    }
+
+    pub struct iw_statistics {
+        pub status: __u16,
+        pub qual: iw_quality,
+        pub discard: iw_discarded,
+        pub miss: iw_missed,
+    }
+
+    pub struct iw_range {
+        pub throughput: __u32,
+        pub min_nwid: __u32,
+        pub max_nwid: __u32,
+        pub old_num_channels: __u16,
+        pub old_num_frequency: __u8,
+        pub scan_capa: __u8,
+        pub event_capa: [__u32; 6],
+        pub sensitivity: __s32,
+        pub max_qual: iw_quality,
+        pub avg_qual: iw_quality,
+        pub num_bitrates: __u8,
+        pub bitrate: [__s32; IW_MAX_BITRATES],
+        pub min_rts: __s32,
+        pub max_rts: __s32,
+        pub min_frag: __s32,
+        pub max_frag: __s32,
+        pub min_pmp: __s32,
+        pub max_pmp: __s32,
+        pub min_pmt: __s32,
+        pub max_pmt: __s32,
+        pub pmp_flags: __u16,
+        pub pmt_flags: __u16,
+        pub pm_capa: __u16,
+        pub encoding_size: [__u16; IW_MAX_ENCODING_SIZES],
+        pub num_encoding_sizes: __u8,
+        pub max_encoding_tokens: __u8,
+        pub encoding_login_index: __u8,
+        pub txpower_capa: __u16,
+        pub num_txpower: __u8,
+        pub txpower: [__s32; IW_MAX_TXPOWER],
+        pub we_version_compiled: __u8,
+        pub we_version_source: __u8,
+        pub retry_capa: __u16,
+        pub retry_flags: __u16,
+        pub r_time_flags: __u16,
+        pub min_retry: __s32,
+        pub max_retry: __s32,
+        pub min_r_time: __s32,
+        pub max_r_time: __s32,
+        pub num_channels: __u16,
+        pub num_frequency: __u8,
+        pub freq: [iw_freq; IW_MAX_FREQUENCIES],
+        pub enc_capa: __u32,
+    }
+
+    pub struct iw_priv_args {
+        pub cmd: __u32,
+        pub set_args: __u16,
+        pub get_args: __u16,
+        pub name: [c_char; ::IFNAMSIZ],
+    }
+
+    // #include <linux/eventpoll.h>
+
+    pub struct epoll_params {
+        pub busy_poll_usecs: u32,
+        pub busy_poll_budget: u16,
+        pub prefer_busy_poll: u8,
+        pub __pad: u8, // Must be zero
+    }
+
+    #[cfg_attr(
+        any(
+            target_pointer_width = "32",
+            target_arch = "x86_64",
+            target_arch = "powerpc64",
+            target_arch = "mips64",
+            target_arch = "mips64r6",
+            target_arch = "s390x",
+            target_arch = "sparc64",
+            target_arch = "aarch64",
+            target_arch = "riscv64",
+            target_arch = "riscv32",
+            target_arch = "loongarch64"
+        ),
+        repr(align(4))
+    )]
+    #[cfg_attr(
+        not(any(
+            target_pointer_width = "32",
+            target_arch = "x86_64",
+            target_arch = "powerpc64",
+            target_arch = "mips64",
+            target_arch = "mips64r6",
+            target_arch = "s390x",
+            target_arch = "sparc64",
+            target_arch = "aarch64",
+            target_arch = "riscv64",
+            target_arch = "riscv32",
+            target_arch = "loongarch64"
+        )),
+        repr(align(8))
+    )]
+    pub struct pthread_mutexattr_t {
+        #[doc(hidden)]
+        size: [u8; ::__SIZEOF_PTHREAD_MUTEXATTR_T],
+    }
+
+    #[cfg_attr(
+        any(target_env = "musl", target_env = "ohos", target_pointer_width = "32"),
+        repr(align(4))
+    )]
+    #[cfg_attr(
+        all(
+            not(target_env = "musl"),
+            not(target_env = "ohos"),
+            target_pointer_width = "64"
+        ),
+        repr(align(8))
+    )]
+    pub struct pthread_rwlockattr_t {
+        #[doc(hidden)]
+        size: [u8; ::__SIZEOF_PTHREAD_RWLOCKATTR_T],
+    }
+
+    #[repr(align(4))]
+    pub struct pthread_condattr_t {
+        #[doc(hidden)]
+        size: [u8; ::__SIZEOF_PTHREAD_CONDATTR_T],
+    }
+
+    #[repr(align(4))]
+    pub struct pthread_barrierattr_t {
+        #[doc(hidden)]
+        size: [u8; ::__SIZEOF_PTHREAD_BARRIERATTR_T],
+    }
+
+    #[repr(align(8))]
+    pub struct fanotify_event_metadata {
+        pub event_len: __u32,
+        pub vers: __u8,
+        pub reserved: __u8,
+        pub metadata_len: __u16,
+        pub mask: __u64,
+        pub fd: ::c_int,
+        pub pid: ::c_int,
+    }
+
+    // linux/ptp_clock.h
+
+    pub struct ptp_sys_offset {
+        pub n_samples: ::c_uint,
+        pub rsv: [::c_uint; 3],
+        // FIXME(garando): replace length with `2 * PTP_MAX_SAMPLES + 1` when supported
+        pub ts: [ptp_clock_time; 51],
+    }
+
+    pub struct ptp_pin_desc {
+        pub name: [::c_char; 64],
+        pub index: ::c_uint,
+        pub func: ::c_uint,
+        pub chan: ::c_uint,
+        pub rsv: [::c_uint; 5],
+    }
+
+    pub struct ptp_clock_caps {
+        pub max_adj: ::c_int,
+        pub n_alarm: ::c_int,
+        pub n_ext_ts: ::c_int,
+        pub n_per_out: ::c_int,
+        pub pps: ::c_int,
+        pub n_pins: ::c_int,
+        pub cross_timestamping: ::c_int,
+        pub adjust_phase: ::c_int,
+        pub max_phase_adj: ::c_int,
+        pub rsv: [::c_int; 11],
+    }
+
+    // linux/if_xdp.h
+    pub struct xsk_tx_metadata_completion {
+        pub tx_timestamp: ::__u64,
+    }
+
+    pub struct xsk_tx_metadata_request {
+        pub csum_start: ::__u16,
+        pub csum_offset: ::__u16,
+    }
+
+    // linux/mount.h
+
+    pub struct mount_attr {
+        pub attr_set: ::__u64,
+        pub attr_clr: ::__u64,
+        pub propagation: ::__u64,
+        pub userns_fd: ::__u64,
+    }
+}
+
+cfg_if! {
+    if #[cfg(not(target_arch = "sparc64"))] {
+        s! {
+            pub struct iw_thrspy {
+                pub addr: ::sockaddr,
+                pub qual: iw_quality,
+                pub low: iw_quality,
+                pub high: iw_quality,
+            }
+
+            pub struct iw_mlme {
+                pub cmd: __u16,
+                pub reason_code: __u16,
+                pub addr: ::sockaddr,
+            }
+
+            pub struct iw_michaelmicfailure {
+                pub flags: __u32,
+                pub src_addr: ::sockaddr,
+                pub tsc: [__u8; IW_ENCODE_SEQ_MAX_SIZE],
+            }
+
+            pub struct __c_anonymous_elf32_rela {
+                pub r_offset: Elf32_Addr,
+                pub r_info: Elf32_Word,
+                pub r_addend: Elf32_Sword,
+            }
+
+            pub struct __c_anonymous_elf64_rela {
+                pub r_offset: Elf64_Addr,
+                pub r_info: Elf64_Xword,
+                pub r_addend: Elf64_Sxword,
+            }
+        }
+    }
 }
 
 s_no_extra_traits! {
@@ -749,7 +1270,7 @@ s_no_extra_traits! {
         pub nl_family: ::sa_family_t,
         nl_pad: ::c_ushort,
         pub nl_pid: u32,
-        pub nl_groups: u32
+        pub nl_groups: u32,
     }
 
     pub struct dirent {
@@ -822,7 +1343,6 @@ s_no_extra_traits! {
         pad: [::c_long; 4],
     }
 
-    #[cfg(libc_union)]
     pub union __c_anonymous_ifr_ifru {
         pub ifru_addr: ::sockaddr,
         pub ifru_dstaddr: ::sockaddr,
@@ -842,27 +1362,20 @@ s_no_extra_traits! {
     pub struct ifreq {
         /// interface name, e.g. "en0"
         pub ifr_name: [::c_char; ::IFNAMSIZ],
-        #[cfg(libc_union)]
         pub ifr_ifru: __c_anonymous_ifr_ifru,
-        #[cfg(not(libc_union))]
-        pub ifr_ifru: ::sockaddr,
     }
 
-    #[cfg(libc_union)]
     pub union __c_anonymous_ifc_ifcu {
         pub ifcu_buf: *mut ::c_char,
         pub ifcu_req: *mut ::ifreq,
     }
 
-    /*  Structure used in SIOCGIFCONF request.  Used to retrieve interface
-    configuration for machine (useful for programs which must know all
-    networks accessible).  */
+    /// Structure used in SIOCGIFCONF request.  Used to retrieve interface configuration for
+    /// machine (useful for programs which must know all networks accessible).
     pub struct ifconf {
-        pub ifc_len: ::c_int,       /* Size of buffer.  */
-        #[cfg(libc_union)]
+        /// Size of buffer
+        pub ifc_len: ::c_int,
         pub ifc_ifcu: __c_anonymous_ifc_ifcu,
-        #[cfg(not(libc_union))]
-        pub ifc_ifcu: *mut ::ifreq,
     }
 
     pub struct hwtstamp_config {
@@ -889,34 +1402,303 @@ s_no_extra_traits! {
         pub sched_deadline: ::__u64,
         pub sched_period: ::__u64,
     }
-}
 
-s_no_extra_traits! {
+    #[allow(missing_debug_implementations)]
+    pub union tpacket_req_u {
+        pub req: ::tpacket_req,
+        pub req3: ::tpacket_req3,
+    }
+
+    #[allow(missing_debug_implementations)]
+    pub union tpacket_bd_header_u {
+        pub bh1: ::tpacket_hdr_v1,
+    }
+
+    #[allow(missing_debug_implementations)]
+    pub struct tpacket_block_desc {
+        pub version: ::__u32,
+        pub offset_to_priv: ::__u32,
+        pub hdr: ::tpacket_bd_header_u,
+    }
+
+    #[cfg_attr(
+        all(
+            any(target_env = "musl", target_env = "ohos"),
+            target_pointer_width = "32"
+        ),
+        repr(align(4))
+    )]
+    #[cfg_attr(
+        all(
+            any(target_env = "musl", target_env = "ohos"),
+            target_pointer_width = "64"
+        ),
+        repr(align(8))
+    )]
+    #[cfg_attr(
+        all(
+            not(any(target_env = "musl", target_env = "ohos")),
+            target_arch = "x86"
+        ),
+        repr(align(4))
+    )]
+    #[cfg_attr(
+        all(
+            not(any(target_env = "musl", target_env = "ohos")),
+            not(target_arch = "x86")
+        ),
+        repr(align(8))
+    )]
+    pub struct pthread_cond_t {
+        #[doc(hidden)]
+        size: [u8; ::__SIZEOF_PTHREAD_COND_T],
+    }
+
+    #[cfg_attr(
+        all(
+            target_pointer_width = "32",
+            any(
+                target_arch = "mips",
+                target_arch = "mips32r6",
+                target_arch = "arm",
+                target_arch = "hexagon",
+                target_arch = "m68k",
+                target_arch = "csky",
+                target_arch = "powerpc",
+                target_arch = "sparc",
+                target_arch = "x86_64",
+                target_arch = "x86"
+            )
+        ),
+        repr(align(4))
+    )]
+    #[cfg_attr(
+        any(
+            target_pointer_width = "64",
+            not(any(
+                target_arch = "mips",
+                target_arch = "mips32r6",
+                target_arch = "arm",
+                target_arch = "hexagon",
+                target_arch = "m68k",
+                target_arch = "csky",
+                target_arch = "powerpc",
+                target_arch = "sparc",
+                target_arch = "x86_64",
+                target_arch = "x86"
+            ))
+        ),
+        repr(align(8))
+    )]
+    pub struct pthread_mutex_t {
+        #[doc(hidden)]
+        size: [u8; ::__SIZEOF_PTHREAD_MUTEX_T],
+    }
+
+    #[cfg_attr(
+        all(
+            target_pointer_width = "32",
+            any(
+                target_arch = "mips",
+                target_arch = "mips32r6",
+                target_arch = "arm",
+                target_arch = "hexagon",
+                target_arch = "m68k",
+                target_arch = "csky",
+                target_arch = "powerpc",
+                target_arch = "sparc",
+                target_arch = "x86_64",
+                target_arch = "x86"
+            )
+        ),
+        repr(align(4))
+    )]
+    #[cfg_attr(
+        any(
+            target_pointer_width = "64",
+            not(any(
+                target_arch = "mips",
+                target_arch = "mips32r6",
+                target_arch = "arm",
+                target_arch = "hexagon",
+                target_arch = "m68k",
+                target_arch = "powerpc",
+                target_arch = "sparc",
+                target_arch = "x86_64",
+                target_arch = "x86"
+            ))
+        ),
+        repr(align(8))
+    )]
+    pub struct pthread_rwlock_t {
+        size: [u8; ::__SIZEOF_PTHREAD_RWLOCK_T],
+    }
+
+    #[cfg_attr(
+        all(
+            target_pointer_width = "32",
+            any(
+                target_arch = "mips",
+                target_arch = "mips32r6",
+                target_arch = "arm",
+                target_arch = "hexagon",
+                target_arch = "m68k",
+                target_arch = "csky",
+                target_arch = "powerpc",
+                target_arch = "sparc",
+                target_arch = "x86_64",
+                target_arch = "x86"
+            )
+        ),
+        repr(align(4))
+    )]
+    #[cfg_attr(
+        any(
+            target_pointer_width = "64",
+            not(any(
+                target_arch = "mips",
+                target_arch = "mips32r6",
+                target_arch = "arm",
+                target_arch = "hexagon",
+                target_arch = "m68k",
+                target_arch = "csky",
+                target_arch = "powerpc",
+                target_arch = "sparc",
+                target_arch = "x86_64",
+                target_arch = "x86"
+            ))
+        ),
+        repr(align(8))
+    )]
+    pub struct pthread_barrier_t {
+        size: [u8; ::__SIZEOF_PTHREAD_BARRIER_T],
+    }
+
     // linux/net_tstamp.h
     #[allow(missing_debug_implementations)]
     pub struct sock_txtime {
         pub clockid: ::clockid_t,
         pub flags: ::__u32,
     }
-}
 
-cfg_if! {
-    if #[cfg(libc_union)] {
-        s_no_extra_traits! {
-            // linux/can.h
-            #[allow(missing_debug_implementations)]
-            pub union __c_anonymous_sockaddr_can_can_addr {
-                pub tp: __c_anonymous_sockaddr_can_tp,
-                pub j1939: __c_anonymous_sockaddr_can_j1939,
-            }
+    // linux/can.h
+    #[repr(align(8))]
+    #[allow(missing_debug_implementations)]
+    pub struct can_frame {
+        pub can_id: canid_t,
+        // FIXME(1.0): this field was renamed to `len` in Linux 5.11
+        pub can_dlc: u8,
+        __pad: u8,
+        __res0: u8,
+        pub len8_dlc: u8,
+        pub data: [u8; CAN_MAX_DLEN],
+    }
 
-            #[allow(missing_debug_implementations)]
-            pub struct sockaddr_can {
-                pub can_family: ::sa_family_t,
-                pub can_ifindex: ::c_int,
-                pub can_addr: __c_anonymous_sockaddr_can_can_addr,
-            }
-        }
+    #[repr(align(8))]
+    #[allow(missing_debug_implementations)]
+    pub struct canfd_frame {
+        pub can_id: canid_t,
+        pub len: u8,
+        pub flags: u8,
+        __res0: u8,
+        __res1: u8,
+        pub data: [u8; CANFD_MAX_DLEN],
+    }
+
+    #[repr(align(8))]
+    #[allow(missing_debug_implementations)]
+    pub struct canxl_frame {
+        pub prio: canid_t,
+        pub flags: u8,
+        pub sdt: u8,
+        pub len: u16,
+        pub af: u32,
+        pub data: [u8; CANXL_MAX_DLEN],
+    }
+
+    #[allow(missing_debug_implementations)]
+    pub union __c_anonymous_sockaddr_can_can_addr {
+        pub tp: __c_anonymous_sockaddr_can_tp,
+        pub j1939: __c_anonymous_sockaddr_can_j1939,
+    }
+
+    #[allow(missing_debug_implementations)]
+    pub struct sockaddr_can {
+        pub can_family: ::sa_family_t,
+        pub can_ifindex: ::c_int,
+        pub can_addr: __c_anonymous_sockaddr_can_can_addr,
+    }
+
+    // linux/wireless.h
+    pub union iwreq_data {
+        pub name: [c_char; ::IFNAMSIZ],
+        pub essid: iw_point,
+        pub nwid: iw_param,
+        pub freq: iw_freq,
+        pub sens: iw_param,
+        pub bitrate: iw_param,
+        pub txpower: iw_param,
+        pub rts: iw_param,
+        pub frag: iw_param,
+        pub mode: __u32,
+        pub retry: iw_param,
+        pub encoding: iw_point,
+        pub power: iw_param,
+        pub qual: iw_quality,
+        pub ap_addr: ::sockaddr,
+        pub addr: ::sockaddr,
+        pub param: iw_param,
+        pub data: iw_point,
+    }
+
+    pub struct iw_event {
+        pub len: __u16,
+        pub cmd: __u16,
+        pub u: iwreq_data,
+    }
+
+    pub union __c_anonymous_iwreq {
+        pub ifrn_name: [c_char; ::IFNAMSIZ],
+    }
+
+    pub struct iwreq {
+        pub ifr_ifrn: __c_anonymous_iwreq,
+        pub u: iwreq_data,
+    }
+
+    // linux/ptp_clock.h
+    #[allow(missing_debug_implementations)]
+    pub union __c_anonymous_ptp_perout_request_1 {
+        pub start: ptp_clock_time,
+        pub phase: ptp_clock_time,
+    }
+
+    #[allow(missing_debug_implementations)]
+    pub union __c_anonymous_ptp_perout_request_2 {
+        pub on: ptp_clock_time,
+        pub rsv: [::c_uint; 4],
+    }
+
+    #[allow(missing_debug_implementations)]
+    pub struct ptp_perout_request {
+        pub anonymous_1: __c_anonymous_ptp_perout_request_1,
+        pub period: ptp_clock_time,
+        pub index: ::c_uint,
+        pub flags: ::c_uint,
+        pub anonymous_2: __c_anonymous_ptp_perout_request_2,
+    }
+
+    // linux/if_xdp.h
+    #[allow(missing_debug_implementations)]
+    pub struct xsk_tx_metadata {
+        pub flags: ::__u64,
+        pub xsk_tx_metadata_union: __c_anonymous_xsk_tx_metadata_union,
+    }
+
+    #[allow(missing_debug_implementations)]
+    pub union __c_anonymous_xsk_tx_metadata_union {
+        pub request: xsk_tx_metadata_request,
+        pub completion: xsk_tx_metadata_completion,
     }
 }
 
@@ -924,9 +1706,9 @@ cfg_if! {
     if #[cfg(feature = "extra_traits")] {
         impl PartialEq for sockaddr_nl {
             fn eq(&self, other: &sockaddr_nl) -> bool {
-                self.nl_family == other.nl_family &&
-                    self.nl_pid == other.nl_pid &&
-                    self.nl_groups == other.nl_groups
+                self.nl_family == other.nl_family
+                    && self.nl_pid == other.nl_pid
+                    && self.nl_groups == other.nl_groups
             }
         }
         impl Eq for sockaddr_nl {}
@@ -954,10 +1736,10 @@ cfg_if! {
                     && self.d_reclen == other.d_reclen
                     && self.d_type == other.d_type
                     && self
-                    .d_name
-                    .iter()
-                    .zip(other.d_name.iter())
-                    .all(|(a,b)| a == b)
+                        .d_name
+                        .iter()
+                        .zip(other.d_name.iter())
+                        .all(|(a, b)| a == b)
             }
         }
 
@@ -970,7 +1752,7 @@ cfg_if! {
                     .field("d_off", &self.d_off)
                     .field("d_reclen", &self.d_reclen)
                     .field("d_type", &self.d_type)
-                // FIXME: .field("d_name", &self.d_name)
+                    // FIXME: .field("d_name", &self.d_name)
                     .finish()
             }
         }
@@ -992,10 +1774,10 @@ cfg_if! {
                     && self.d_reclen == other.d_reclen
                     && self.d_type == other.d_type
                     && self
-                    .d_name
-                    .iter()
-                    .zip(other.d_name.iter())
-                    .all(|(a,b)| a == b)
+                        .d_name
+                        .iter()
+                        .zip(other.d_name.iter())
+                        .all(|(a, b)| a == b)
             }
         }
 
@@ -1008,7 +1790,7 @@ cfg_if! {
                     .field("d_off", &self.d_off)
                     .field("d_reclen", &self.d_reclen)
                     .field("d_type", &self.d_type)
-                // FIXME: .field("d_name", &self.d_name)
+                    // FIXME: .field("d_name", &self.d_name)
                     .finish()
             }
         }
@@ -1025,7 +1807,7 @@ cfg_if! {
 
         impl PartialEq for pthread_cond_t {
             fn eq(&self, other: &pthread_cond_t) -> bool {
-                self.size.iter().zip(other.size.iter()).all(|(a,b)| a == b)
+                self.size.iter().zip(other.size.iter()).all(|(a, b)| a == b)
             }
         }
 
@@ -1034,7 +1816,7 @@ cfg_if! {
         impl ::fmt::Debug for pthread_cond_t {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("pthread_cond_t")
-                // FIXME: .field("size", &self.size)
+                    // FIXME: .field("size", &self.size)
                     .finish()
             }
         }
@@ -1047,7 +1829,7 @@ cfg_if! {
 
         impl PartialEq for pthread_mutex_t {
             fn eq(&self, other: &pthread_mutex_t) -> bool {
-                self.size.iter().zip(other.size.iter()).all(|(a,b)| a == b)
+                self.size.iter().zip(other.size.iter()).all(|(a, b)| a == b)
             }
         }
 
@@ -1056,7 +1838,7 @@ cfg_if! {
         impl ::fmt::Debug for pthread_mutex_t {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("pthread_mutex_t")
-                // FIXME: .field("size", &self.size)
+                    // FIXME: .field("size", &self.size)
                     .finish()
             }
         }
@@ -1069,7 +1851,7 @@ cfg_if! {
 
         impl PartialEq for pthread_rwlock_t {
             fn eq(&self, other: &pthread_rwlock_t) -> bool {
-                self.size.iter().zip(other.size.iter()).all(|(a,b)| a == b)
+                self.size.iter().zip(other.size.iter()).all(|(a, b)| a == b)
             }
         }
 
@@ -1078,7 +1860,7 @@ cfg_if! {
         impl ::fmt::Debug for pthread_rwlock_t {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("pthread_rwlock_t")
-                // FIXME: .field("size", &self.size)
+                    // FIXME: .field("size", &self.size)
                     .finish()
             }
         }
@@ -1091,7 +1873,7 @@ cfg_if! {
 
         impl PartialEq for pthread_barrier_t {
             fn eq(&self, other: &pthread_barrier_t) -> bool {
-                self.size.iter().zip(other.size.iter()).all(|(a,b)| a == b)
+                self.size.iter().zip(other.size.iter()).all(|(a, b)| a == b)
             }
         }
 
@@ -1115,18 +1897,18 @@ cfg_if! {
             fn eq(&self, other: &sockaddr_alg) -> bool {
                 self.salg_family == other.salg_family
                     && self
-                    .salg_type
-                    .iter()
-                    .zip(other.salg_type.iter())
-                    .all(|(a, b)| a == b)
+                        .salg_type
+                        .iter()
+                        .zip(other.salg_type.iter())
+                        .all(|(a, b)| a == b)
                     && self.salg_feat == other.salg_feat
                     && self.salg_mask == other.salg_mask
                     && self
-                    .salg_name
-                    .iter()
-                    .zip(other.salg_name.iter())
-                    .all(|(a, b)| a == b)
-           }
+                        .salg_name
+                        .iter()
+                        .zip(other.salg_name.iter())
+                        .all(|(a, b)| a == b)
+            }
         }
 
         impl Eq for sockaddr_alg {}
@@ -1158,7 +1940,7 @@ cfg_if! {
                 self.id == other.id
                     && self.name[..] == other.name[..]
                     && self.ff_effects_max == other.ff_effects_max
-           }
+            }
         }
         impl Eq for uinput_setup {}
 
@@ -1182,14 +1964,14 @@ cfg_if! {
 
         impl PartialEq for uinput_user_dev {
             fn eq(&self, other: &uinput_user_dev) -> bool {
-                 self.name[..] == other.name[..]
+                self.name[..] == other.name[..]
                     && self.id == other.id
                     && self.ff_effects_max == other.ff_effects_max
                     && self.absmax[..] == other.absmax[..]
                     && self.absmin[..] == other.absmin[..]
                     && self.absfuzz[..] == other.absfuzz[..]
                     && self.absflat[..] == other.absflat[..]
-           }
+            }
         }
         impl Eq for uinput_user_dev {}
 
@@ -1222,12 +2004,7 @@ cfg_if! {
         #[allow(deprecated)]
         impl af_alg_iv {
             fn as_slice(&self) -> &[u8] {
-                unsafe {
-                    ::core::slice::from_raw_parts(
-                        self.iv.as_ptr(),
-                        self.ivlen as usize
-                    )
-                }
+                unsafe { ::core::slice::from_raw_parts(self.iv.as_ptr(), self.ivlen as usize) }
             }
         }
 
@@ -1235,7 +2012,7 @@ cfg_if! {
         impl PartialEq for af_alg_iv {
             fn eq(&self, other: &af_alg_iv) -> bool {
                 *self.as_slice() == *other.as_slice()
-           }
+            }
         }
 
         #[allow(deprecated)]
@@ -1259,10 +2036,10 @@ cfg_if! {
 
         impl PartialEq for mq_attr {
             fn eq(&self, other: &mq_attr) -> bool {
-                self.mq_flags == other.mq_flags &&
-                self.mq_maxmsg == other.mq_maxmsg &&
-                self.mq_msgsize == other.mq_msgsize &&
-                self.mq_curmsgs == other.mq_curmsgs
+                self.mq_flags == other.mq_flags
+                    && self.mq_maxmsg == other.mq_maxmsg
+                    && self.mq_msgsize == other.mq_msgsize
+                    && self.mq_curmsgs == other.mq_curmsgs
             }
         }
         impl Eq for mq_attr {}
@@ -1284,7 +2061,6 @@ cfg_if! {
                 self.mq_curmsgs.hash(state);
             }
         }
-        #[cfg(libc_union)]
         impl ::fmt::Debug for __c_anonymous_ifr_ifru {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("ifr_ifru")
@@ -1313,7 +2089,6 @@ cfg_if! {
             }
         }
 
-        #[cfg(libc_union)]
         impl ::fmt::Debug for __c_anonymous_ifc_ifcu {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("ifr_ifru")
@@ -1341,9 +2116,9 @@ cfg_if! {
         }
         impl PartialEq for hwtstamp_config {
             fn eq(&self, other: &hwtstamp_config) -> bool {
-                self.flags == other.flags &&
-                self.tx_type == other.tx_type &&
-                self.rx_filter == other.rx_filter
+                self.flags == other.flags
+                    && self.tx_type == other.tx_type
+                    && self.rx_filter == other.rx_filter
             }
         }
         impl Eq for hwtstamp_config {}
@@ -1371,14 +2146,14 @@ cfg_if! {
         }
         impl PartialEq for sched_attr {
             fn eq(&self, other: &sched_attr) -> bool {
-                self.size == other.size &&
-                self.sched_policy == other.sched_policy &&
-                self.sched_flags == other.sched_flags &&
-                self.sched_nice == other.sched_nice &&
-                self.sched_priority == other.sched_priority &&
-                self.sched_runtime == other.sched_runtime &&
-                self.sched_deadline == other.sched_deadline &&
-                self.sched_period == other.sched_period
+                self.size == other.size
+                    && self.sched_policy == other.sched_policy
+                    && self.sched_flags == other.sched_flags
+                    && self.sched_nice == other.sched_nice
+                    && self.sched_priority == other.sched_priority
+                    && self.sched_runtime == other.sched_runtime
+                    && self.sched_deadline == other.sched_deadline
+                    && self.sched_period == other.sched_period
             }
         }
         impl Eq for sched_attr {}
@@ -1394,11 +2169,79 @@ cfg_if! {
                 self.sched_period.hash(state);
             }
         }
+
+        impl ::fmt::Debug for iwreq_data {
+            fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
+                f.debug_struct("iwreq_data")
+                    .field("name", unsafe { &self.name })
+                    .field("essid", unsafe { &self.essid })
+                    .field("nwid", unsafe { &self.nwid })
+                    .field("freq", unsafe { &self.freq })
+                    .field("sens", unsafe { &self.sens })
+                    .field("bitrate", unsafe { &self.bitrate })
+                    .field("txpower", unsafe { &self.txpower })
+                    .field("rts", unsafe { &self.rts })
+                    .field("frag", unsafe { &self.frag })
+                    .field("mode", unsafe { &self.mode })
+                    .field("retry", unsafe { &self.retry })
+                    .field("encoding", unsafe { &self.encoding })
+                    .field("power", unsafe { &self.power })
+                    .field("qual", unsafe { &self.qual })
+                    .field("ap_addr", unsafe { &self.ap_addr })
+                    .field("addr", unsafe { &self.addr })
+                    .field("param", unsafe { &self.param })
+                    .field("data", unsafe { &self.data })
+                    .finish()
+            }
+        }
+
+        impl ::fmt::Debug for iw_event {
+            fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
+                f.debug_struct("iw_event")
+                    .field("len", &self.len)
+                    .field("cmd", &self.cmd)
+                    .field("u", &self.u)
+                    .finish()
+            }
+        }
+
+        impl ::fmt::Debug for __c_anonymous_iwreq {
+            fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
+                f.debug_struct("__c_anonymous_iwreq")
+                    .field("ifrn_name", unsafe { &self.ifrn_name })
+                    .finish()
+            }
+        }
+
+        impl ::fmt::Debug for iwreq {
+            fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
+                f.debug_struct("iwreq")
+                    .field("ifr_ifrn", &self.ifr_ifrn)
+                    .field("u", &self.u)
+                    .finish()
+            }
+        }
     }
 }
 
 cfg_if! {
-    if #[cfg(any(target_env = "gnu", target_env = "musl", target_env = "ohos"))] {
+    if #[cfg(all(
+        any(target_env = "gnu", target_env = "musl", target_env = "ohos"),
+        any(target_arch = "x86_64", target_arch = "x86")
+    ))] {
+        extern "C" {
+            pub fn iopl(level: ::c_int) -> ::c_int;
+            pub fn ioperm(from: ::c_ulong, num: ::c_ulong, turn_on: ::c_int) -> ::c_int;
+        }
+    }
+}
+
+cfg_if! {
+    if #[cfg(any(
+        target_env = "gnu",
+        target_env = "musl",
+        target_env = "ohos"
+    ))] {
         pub const ABDAY_1: ::nl_item = 0x20000;
         pub const ABDAY_2: ::nl_item = 0x20001;
         pub const ABDAY_3: ::nl_item = 0x20002;
@@ -1634,6 +2477,43 @@ pub const _SC_XOPEN_STREAMS: ::c_int = 246;
 pub const _SC_THREAD_ROBUST_PRIO_INHERIT: ::c_int = 247;
 pub const _SC_THREAD_ROBUST_PRIO_PROTECT: ::c_int = 248;
 
+pub const _CS_PATH: ::c_int = 0;
+pub const _CS_POSIX_V6_WIDTH_RESTRICTED_ENVS: ::c_int = 1;
+pub const _CS_POSIX_V5_WIDTH_RESTRICTED_ENVS: ::c_int = 4;
+pub const _CS_POSIX_V7_WIDTH_RESTRICTED_ENVS: ::c_int = 5;
+pub const _CS_POSIX_V6_ILP32_OFF32_CFLAGS: ::c_int = 1116;
+pub const _CS_POSIX_V6_ILP32_OFF32_LDFLAGS: ::c_int = 1117;
+pub const _CS_POSIX_V6_ILP32_OFF32_LIBS: ::c_int = 1118;
+pub const _CS_POSIX_V6_ILP32_OFF32_LINTFLAGS: ::c_int = 1119;
+pub const _CS_POSIX_V6_ILP32_OFFBIG_CFLAGS: ::c_int = 1120;
+pub const _CS_POSIX_V6_ILP32_OFFBIG_LDFLAGS: ::c_int = 1121;
+pub const _CS_POSIX_V6_ILP32_OFFBIG_LIBS: ::c_int = 1122;
+pub const _CS_POSIX_V6_ILP32_OFFBIG_LINTFLAGS: ::c_int = 1123;
+pub const _CS_POSIX_V6_LP64_OFF64_CFLAGS: ::c_int = 1124;
+pub const _CS_POSIX_V6_LP64_OFF64_LDFLAGS: ::c_int = 1125;
+pub const _CS_POSIX_V6_LP64_OFF64_LIBS: ::c_int = 1126;
+pub const _CS_POSIX_V6_LP64_OFF64_LINTFLAGS: ::c_int = 1127;
+pub const _CS_POSIX_V6_LPBIG_OFFBIG_CFLAGS: ::c_int = 1128;
+pub const _CS_POSIX_V6_LPBIG_OFFBIG_LDFLAGS: ::c_int = 1129;
+pub const _CS_POSIX_V6_LPBIG_OFFBIG_LIBS: ::c_int = 1130;
+pub const _CS_POSIX_V6_LPBIG_OFFBIG_LINTFLAGS: ::c_int = 1131;
+pub const _CS_POSIX_V7_ILP32_OFF32_CFLAGS: ::c_int = 1132;
+pub const _CS_POSIX_V7_ILP32_OFF32_LDFLAGS: ::c_int = 1133;
+pub const _CS_POSIX_V7_ILP32_OFF32_LIBS: ::c_int = 1134;
+pub const _CS_POSIX_V7_ILP32_OFF32_LINTFLAGS: ::c_int = 1135;
+pub const _CS_POSIX_V7_ILP32_OFFBIG_CFLAGS: ::c_int = 1136;
+pub const _CS_POSIX_V7_ILP32_OFFBIG_LDFLAGS: ::c_int = 1137;
+pub const _CS_POSIX_V7_ILP32_OFFBIG_LIBS: ::c_int = 1138;
+pub const _CS_POSIX_V7_ILP32_OFFBIG_LINTFLAGS: ::c_int = 1139;
+pub const _CS_POSIX_V7_LP64_OFF64_CFLAGS: ::c_int = 1140;
+pub const _CS_POSIX_V7_LP64_OFF64_LDFLAGS: ::c_int = 1141;
+pub const _CS_POSIX_V7_LP64_OFF64_LIBS: ::c_int = 1142;
+pub const _CS_POSIX_V7_LP64_OFF64_LINTFLAGS: ::c_int = 1143;
+pub const _CS_POSIX_V7_LPBIG_OFFBIG_CFLAGS: ::c_int = 1144;
+pub const _CS_POSIX_V7_LPBIG_OFFBIG_LDFLAGS: ::c_int = 1145;
+pub const _CS_POSIX_V7_LPBIG_OFFBIG_LIBS: ::c_int = 1146;
+pub const _CS_POSIX_V7_LPBIG_OFFBIG_LINTFLAGS: ::c_int = 1147;
+
 pub const RLIM_SAVED_MAX: ::rlim_t = RLIM_INFINITY;
 pub const RLIM_SAVED_CUR: ::rlim_t = RLIM_INFINITY;
 
@@ -1862,9 +2742,9 @@ pub const POSIX_MADV_WILLNEED: ::c_int = 3;
 pub const POSIX_SPAWN_USEVFORK: ::c_int = 64;
 pub const POSIX_SPAWN_SETSID: ::c_int = 128;
 
-pub const S_IEXEC: mode_t = 64;
-pub const S_IWRITE: mode_t = 128;
-pub const S_IREAD: mode_t = 256;
+pub const S_IEXEC: mode_t = 0o0100;
+pub const S_IWRITE: mode_t = 0o0200;
+pub const S_IREAD: mode_t = 0o0400;
 
 pub const F_LOCK: ::c_int = 1;
 pub const F_TEST: ::c_int = 3;
@@ -1970,6 +2850,7 @@ pub const IFLA_INFO_SLAVE_KIND: ::c_ushort = 4;
 pub const IFLA_INFO_SLAVE_DATA: ::c_ushort = 5;
 
 // linux/if_tun.h
+/* TUNSETIFF ifr flags */
 pub const IFF_TUN: ::c_int = 0x0001;
 pub const IFF_TAP: ::c_int = 0x0002;
 pub const IFF_NAPI: ::c_int = 0x0010;
@@ -2053,17 +2934,17 @@ pub const MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE: ::c_int = 1 << 6;
 pub const MEMBARRIER_CMD_PRIVATE_EXPEDITED_RSEQ: ::c_int = 1 << 7;
 pub const MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_RSEQ: ::c_int = 1 << 8;
 
-align_const! {
-    pub const PTHREAD_MUTEX_INITIALIZER: pthread_mutex_t = pthread_mutex_t {
-        size: [0; __SIZEOF_PTHREAD_MUTEX_T],
-    };
-    pub const PTHREAD_COND_INITIALIZER: pthread_cond_t = pthread_cond_t {
-        size: [0; __SIZEOF_PTHREAD_COND_T],
-    };
-    pub const PTHREAD_RWLOCK_INITIALIZER: pthread_rwlock_t = pthread_rwlock_t {
-        size: [0; __SIZEOF_PTHREAD_RWLOCK_T],
-    };
-}
+pub const PTHREAD_MUTEX_INITIALIZER: pthread_mutex_t = pthread_mutex_t {
+    size: [0; __SIZEOF_PTHREAD_MUTEX_T],
+};
+pub const PTHREAD_COND_INITIALIZER: pthread_cond_t = pthread_cond_t {
+    size: [0; __SIZEOF_PTHREAD_COND_T],
+};
+pub const PTHREAD_RWLOCK_INITIALIZER: pthread_rwlock_t = pthread_rwlock_t {
+    size: [0; __SIZEOF_PTHREAD_RWLOCK_T],
+};
+
+pub const PTHREAD_BARRIER_SERIAL_THREAD: ::c_int = -1;
 pub const PTHREAD_ONCE_INIT: pthread_once_t = 0;
 pub const PTHREAD_MUTEX_NORMAL: ::c_int = 0;
 pub const PTHREAD_MUTEX_RECURSIVE: ::c_int = 1;
@@ -2618,6 +3499,7 @@ pub const ETH_P_PHONET: ::c_int = 0x00F5;
 pub const ETH_P_IEEE802154: ::c_int = 0x00F6;
 pub const ETH_P_CAIF: ::c_int = 0x00F7;
 
+// DIFF(main): changed to `c_short` in f62eb023ab
 pub const POSIX_SPAWN_RESETIDS: ::c_int = 0x01;
 pub const POSIX_SPAWN_SETPGROUP: ::c_int = 0x02;
 pub const POSIX_SPAWN_SETSIGDEF: ::c_int = 0x04;
@@ -2823,12 +3705,76 @@ pub const CTRL_ATTR_MCAST_GRP_NAME: ::c_int = 1;
 pub const CTRL_ATTR_MCAST_GRP_ID: ::c_int = 2;
 
 // linux/if_packet.h
+pub const PACKET_HOST: ::c_uchar = 0;
+pub const PACKET_BROADCAST: ::c_uchar = 1;
+pub const PACKET_MULTICAST: ::c_uchar = 2;
+pub const PACKET_OTHERHOST: ::c_uchar = 3;
+pub const PACKET_OUTGOING: ::c_uchar = 4;
+pub const PACKET_LOOPBACK: ::c_uchar = 5;
+pub const PACKET_USER: ::c_uchar = 6;
+pub const PACKET_KERNEL: ::c_uchar = 7;
+
 pub const PACKET_ADD_MEMBERSHIP: ::c_int = 1;
 pub const PACKET_DROP_MEMBERSHIP: ::c_int = 2;
+pub const PACKET_RX_RING: ::c_int = 5;
+pub const PACKET_STATISTICS: ::c_int = 6;
+pub const PACKET_AUXDATA: ::c_int = 8;
+pub const PACKET_VERSION: ::c_int = 10;
+pub const PACKET_RESERVE: ::c_int = 12;
+pub const PACKET_TX_RING: ::c_int = 13;
+pub const PACKET_LOSS: ::c_int = 14;
+pub const PACKET_TIMESTAMP: ::c_int = 17;
+pub const PACKET_FANOUT: ::c_int = 18;
+pub const PACKET_QDISC_BYPASS: ::c_int = 20;
+
+pub const PACKET_FANOUT_HASH: ::c_uint = 0;
+pub const PACKET_FANOUT_LB: ::c_uint = 1;
+pub const PACKET_FANOUT_CPU: ::c_uint = 2;
+pub const PACKET_FANOUT_ROLLOVER: ::c_uint = 3;
+pub const PACKET_FANOUT_RND: ::c_uint = 4;
+pub const PACKET_FANOUT_QM: ::c_uint = 5;
+pub const PACKET_FANOUT_CBPF: ::c_uint = 6;
+pub const PACKET_FANOUT_EBPF: ::c_uint = 7;
+pub const PACKET_FANOUT_FLAG_ROLLOVER: ::c_uint = 0x1000;
+pub const PACKET_FANOUT_FLAG_UNIQUEID: ::c_uint = 0x2000;
+pub const PACKET_FANOUT_FLAG_DEFRAG: ::c_uint = 0x8000;
 
 pub const PACKET_MR_MULTICAST: ::c_int = 0;
 pub const PACKET_MR_PROMISC: ::c_int = 1;
 pub const PACKET_MR_ALLMULTI: ::c_int = 2;
+
+pub const TP_STATUS_KERNEL: ::__u32 = 0;
+pub const TP_STATUS_USER: ::__u32 = 1 << 0;
+pub const TP_STATUS_COPY: ::__u32 = 1 << 1;
+pub const TP_STATUS_LOSING: ::__u32 = 1 << 2;
+pub const TP_STATUS_CSUMNOTREADY: ::__u32 = 1 << 3;
+pub const TP_STATUS_VLAN_VALID: ::__u32 = 1 << 4;
+pub const TP_STATUS_BLK_TMO: ::__u32 = 1 << 5;
+pub const TP_STATUS_VLAN_TPID_VALID: ::__u32 = 1 << 6;
+pub const TP_STATUS_CSUM_VALID: ::__u32 = 1 << 7;
+
+pub const TP_STATUS_AVAILABLE: ::__u32 = 0;
+pub const TP_STATUS_SEND_REQUEST: ::__u32 = 1 << 0;
+pub const TP_STATUS_SENDING: ::__u32 = 1 << 1;
+pub const TP_STATUS_WRONG_FORMAT: ::__u32 = 1 << 2;
+
+pub const TP_STATUS_TS_SOFTWARE: ::__u32 = 1 << 29;
+pub const TP_STATUS_TS_SYS_HARDWARE: ::__u32 = 1 << 30;
+pub const TP_STATUS_TS_RAW_HARDWARE: ::__u32 = 1 << 31;
+
+pub const TP_FT_REQ_FILL_RXHASH: ::__u32 = 1;
+
+pub const TPACKET_ALIGNMENT: usize = 16;
+
+pub const TPACKET_HDRLEN: usize = ((mem::size_of::<::tpacket_hdr>() + TPACKET_ALIGNMENT - 1)
+    & !(TPACKET_ALIGNMENT - 1))
+    + mem::size_of::<::sockaddr_ll>();
+pub const TPACKET2_HDRLEN: usize = ((mem::size_of::<::tpacket2_hdr>() + TPACKET_ALIGNMENT - 1)
+    & !(TPACKET_ALIGNMENT - 1))
+    + mem::size_of::<::sockaddr_ll>();
+pub const TPACKET3_HDRLEN: usize = ((mem::size_of::<::tpacket3_hdr>() + TPACKET_ALIGNMENT - 1)
+    & !(TPACKET_ALIGNMENT - 1))
+    + mem::size_of::<::sockaddr_ll>();
 
 // linux/netfilter.h
 pub const NF_DROP: ::c_int = 0;
@@ -2853,20 +3799,47 @@ pub const NF_INET_FORWARD: ::c_int = 2;
 pub const NF_INET_LOCAL_OUT: ::c_int = 3;
 pub const NF_INET_POST_ROUTING: ::c_int = 4;
 pub const NF_INET_NUMHOOKS: ::c_int = 5;
+pub const NF_INET_INGRESS: ::c_int = NF_INET_NUMHOOKS;
+
+pub const NF_NETDEV_INGRESS: ::c_int = 0;
+pub const NF_NETDEV_EGRESS: ::c_int = 1;
+pub const NF_NETDEV_NUMHOOKS: ::c_int = 2;
 
 // Some NFPROTO are not compatible with musl and are defined in submodules.
 pub const NFPROTO_UNSPEC: ::c_int = 0;
+pub const NFPROTO_INET: ::c_int = 1;
 pub const NFPROTO_IPV4: ::c_int = 2;
 pub const NFPROTO_ARP: ::c_int = 3;
+pub const NFPROTO_NETDEV: ::c_int = 5;
 pub const NFPROTO_BRIDGE: ::c_int = 7;
 pub const NFPROTO_IPV6: ::c_int = 10;
 pub const NFPROTO_DECNET: ::c_int = 12;
 pub const NFPROTO_NUMPROTO: ::c_int = 13;
-pub const NFPROTO_INET: ::c_int = 1;
-pub const NFPROTO_NETDEV: ::c_int = 5;
 
-pub const NF_NETDEV_INGRESS: ::c_int = 0;
-pub const NF_NETDEV_NUMHOOKS: ::c_int = 1;
+// linux/netfilter_arp.h
+pub const NF_ARP: ::c_int = 0;
+pub const NF_ARP_IN: ::c_int = 0;
+pub const NF_ARP_OUT: ::c_int = 1;
+pub const NF_ARP_FORWARD: ::c_int = 2;
+pub const NF_ARP_NUMHOOKS: ::c_int = 3;
+
+// linux/netfilter_bridge.h
+pub const NF_BR_PRE_ROUTING: ::c_int = 0;
+pub const NF_BR_LOCAL_IN: ::c_int = 1;
+pub const NF_BR_FORWARD: ::c_int = 2;
+pub const NF_BR_LOCAL_OUT: ::c_int = 3;
+pub const NF_BR_POST_ROUTING: ::c_int = 4;
+pub const NF_BR_BROUTING: ::c_int = 5;
+pub const NF_BR_NUMHOOKS: ::c_int = 6;
+
+pub const NF_BR_PRI_FIRST: ::c_int = ::INT_MIN;
+pub const NF_BR_PRI_NAT_DST_BRIDGED: ::c_int = -300;
+pub const NF_BR_PRI_FILTER_BRIDGED: ::c_int = -200;
+pub const NF_BR_PRI_BRNF: ::c_int = 0;
+pub const NF_BR_PRI_NAT_DST_OTHER: ::c_int = 100;
+pub const NF_BR_PRI_FILTER_OTHER: ::c_int = 200;
+pub const NF_BR_PRI_NAT_SRC: ::c_int = 300;
+pub const NF_BR_PRI_LAST: ::c_int = ::INT_MAX;
 
 // linux/netfilter_ipv4.h
 pub const NF_IP_PRE_ROUTING: ::c_int = 0;
@@ -2877,6 +3850,7 @@ pub const NF_IP_POST_ROUTING: ::c_int = 4;
 pub const NF_IP_NUMHOOKS: ::c_int = 5;
 
 pub const NF_IP_PRI_FIRST: ::c_int = ::INT_MIN;
+pub const NF_IP_PRI_RAW_BEFORE_DEFRAG: ::c_int = -450;
 pub const NF_IP_PRI_CONNTRACK_DEFRAG: ::c_int = -400;
 pub const NF_IP_PRI_RAW: ::c_int = -300;
 pub const NF_IP_PRI_SELINUX_FIRST: ::c_int = -225;
@@ -2900,6 +3874,7 @@ pub const NF_IP6_POST_ROUTING: ::c_int = 4;
 pub const NF_IP6_NUMHOOKS: ::c_int = 5;
 
 pub const NF_IP6_PRI_FIRST: ::c_int = ::INT_MIN;
+pub const NF_IP6_PRI_RAW_BEFORE_DEFRAG: ::c_int = -450;
 pub const NF_IP6_PRI_CONNTRACK_DEFRAG: ::c_int = -400;
 pub const NF_IP6_PRI_RAW: ::c_int = -300;
 pub const NF_IP6_PRI_SELINUX_FIRST: ::c_int = -225;
@@ -3249,6 +4224,9 @@ pub const IW_ENC_CAPA_CIPHER_TKIP: ::c_ulong = 0x00000004;
 pub const IW_ENC_CAPA_CIPHER_CCMP: ::c_ulong = 0x00000008;
 pub const IW_ENC_CAPA_4WAY_HANDSHAKE: ::c_ulong = 0x00000010;
 
+pub const IW_EVENT_CAPA_K_0: c_ulong = 0x4000050; //   IW_EVENT_CAPA_MASK(0x8B04) | IW_EVENT_CAPA_MASK(0x8B06) | IW_EVENT_CAPA_MASK(0x8B1A);
+pub const IW_EVENT_CAPA_K_1: c_ulong = 0x400; //   W_EVENT_CAPA_MASK(0x8B2A);
+
 pub const IW_PMKSA_ADD: usize = 1;
 pub const IW_PMKSA_REMOVE: usize = 2;
 pub const IW_PMKSA_FLUSH: usize = 3;
@@ -3259,8 +4237,13 @@ pub const IW_PMKID_CAND_PREAUTH: ::c_ulong = 0x00000001;
 
 pub const IW_EV_LCP_PK_LEN: usize = 4;
 
-pub const IW_EV_CHAR_PK_LEN: usize = IW_EV_LCP_PK_LEN + ::IFNAMSIZ;
-pub const IW_EV_POINT_PK_LEN: usize = IW_EV_LCP_PK_LEN + 4;
+pub const IW_EV_CHAR_PK_LEN: usize = 20; // IW_EV_LCP_PK_LEN + ::IFNAMSIZ;
+pub const IW_EV_UINT_PK_LEN: usize = 8; // IW_EV_LCP_PK_LEN + ::mem::size_of::<u32>();
+pub const IW_EV_FREQ_PK_LEN: usize = 12; // IW_EV_LCP_PK_LEN + ::mem::size_of::<iw_freq>();
+pub const IW_EV_PARAM_PK_LEN: usize = 12; // IW_EV_LCP_PK_LEN + ::mem::size_of::<iw_param>();
+pub const IW_EV_ADDR_PK_LEN: usize = 20; // IW_EV_LCP_PK_LEN + ::mem::size_of::<::sockaddr>();
+pub const IW_EV_QUAL_PK_LEN: usize = 8; // IW_EV_LCP_PK_LEN + ::mem::size_of::<iw_quality>();
+pub const IW_EV_POINT_PK_LEN: usize = 8; // IW_EV_LCP_PK_LEN + 4;
 
 pub const IPTOS_TOS_MASK: u8 = 0x1E;
 pub const IPTOS_PREC_MASK: u8 = 0xE0;
@@ -3641,6 +4624,37 @@ pub const HWTSTAMP_FILTER_PTP_V2_SYNC: ::c_uint = 13;
 pub const HWTSTAMP_FILTER_PTP_V2_DELAY_REQ: ::c_uint = 14;
 pub const HWTSTAMP_FILTER_NTP_ALL: ::c_uint = 15;
 
+// linux/ptp_clock.h
+pub const PTP_MAX_SAMPLES: ::c_uint = 25; // Maximum allowed offset measurement samples.
+
+const PTP_CLK_MAGIC: u32 = b'=' as u32;
+
+pub const PTP_CLOCK_GETCAPS: ::c_uint = _IOR::<ptp_clock_caps>(PTP_CLK_MAGIC, 1);
+pub const PTP_EXTTS_REQUEST: ::c_uint = _IOW::<ptp_extts_request>(PTP_CLK_MAGIC, 2);
+pub const PTP_PEROUT_REQUEST: ::c_uint = _IOW::<ptp_perout_request>(PTP_CLK_MAGIC, 3);
+pub const PTP_ENABLE_PPS: ::c_uint = _IOW::<::c_int>(PTP_CLK_MAGIC, 4);
+pub const PTP_SYS_OFFSET: ::c_uint = _IOW::<ptp_sys_offset>(PTP_CLK_MAGIC, 5);
+pub const PTP_PIN_GETFUNC: ::c_uint = _IOWR::<ptp_pin_desc>(PTP_CLK_MAGIC, 6);
+pub const PTP_PIN_SETFUNC: ::c_uint = _IOW::<ptp_pin_desc>(PTP_CLK_MAGIC, 7);
+pub const PTP_SYS_OFFSET_PRECISE: ::c_uint = _IOWR::<ptp_sys_offset_precise>(PTP_CLK_MAGIC, 8);
+pub const PTP_SYS_OFFSET_EXTENDED: ::c_uint = _IOWR::<ptp_sys_offset_extended>(PTP_CLK_MAGIC, 9);
+
+pub const PTP_CLOCK_GETCAPS2: ::c_uint = _IOR::<ptp_clock_caps>(PTP_CLK_MAGIC, 10);
+pub const PTP_EXTTS_REQUEST2: ::c_uint = _IOW::<ptp_extts_request>(PTP_CLK_MAGIC, 11);
+pub const PTP_PEROUT_REQUEST2: ::c_uint = _IOW::<ptp_perout_request>(PTP_CLK_MAGIC, 12);
+pub const PTP_ENABLE_PPS2: ::c_uint = _IOW::<::c_int>(PTP_CLK_MAGIC, 13);
+pub const PTP_SYS_OFFSET2: ::c_uint = _IOW::<ptp_sys_offset>(PTP_CLK_MAGIC, 14);
+pub const PTP_PIN_GETFUNC2: ::c_uint = _IOWR::<ptp_pin_desc>(PTP_CLK_MAGIC, 15);
+pub const PTP_PIN_SETFUNC2: ::c_uint = _IOW::<ptp_pin_desc>(PTP_CLK_MAGIC, 16);
+pub const PTP_SYS_OFFSET_PRECISE2: ::c_uint = _IOWR::<ptp_sys_offset_precise>(PTP_CLK_MAGIC, 17);
+pub const PTP_SYS_OFFSET_EXTENDED2: ::c_uint = _IOWR::<ptp_sys_offset_extended>(PTP_CLK_MAGIC, 18);
+
+// enum ptp_pin_function
+pub const PTP_PF_NONE: ::c_uint = 0;
+pub const PTP_PF_EXTTS: ::c_uint = 1;
+pub const PTP_PF_PEROUT: ::c_uint = 2;
+pub const PTP_PF_PHYSYNC: ::c_uint = 3;
+
 // linux/tls.h
 pub const TLS_TX: ::c_int = 1;
 pub const TLS_RX: ::c_int = 2;
@@ -3978,6 +4992,13 @@ pub const NFT_CT_PROTO_DST: ::c_int = 12;
 pub const NFT_CT_LABELS: ::c_int = 13;
 pub const NFT_CT_PKTS: ::c_int = 14;
 pub const NFT_CT_BYTES: ::c_int = 15;
+pub const NFT_CT_AVGPKT: ::c_int = 16;
+pub const NFT_CT_ZONE: ::c_int = 17;
+pub const NFT_CT_EVENTMASK: ::c_int = 18;
+pub const NFT_CT_SRC_IP: ::c_int = 19;
+pub const NFT_CT_DST_IP: ::c_int = 20;
+pub const NFT_CT_SRC_IP6: ::c_int = 21;
+pub const NFT_CT_DST_IP6: ::c_int = 22;
 
 pub const NFT_LIMIT_PKTS: ::c_int = 0;
 pub const NFT_LIMIT_PKT_BYTES: ::c_int = 1;
@@ -4134,6 +5155,7 @@ pub const FAN_NOFD: ::c_int = -1;
 pub const FAN_NOPIDFD: ::c_int = FAN_NOFD;
 pub const FAN_EPIDFD: ::c_int = -2;
 
+// linux/futex.h
 pub const FUTEX_WAIT: ::c_int = 0;
 pub const FUTEX_WAKE: ::c_int = 1;
 pub const FUTEX_FD: ::c_int = 2;
@@ -4152,6 +5174,10 @@ pub const FUTEX_LOCK_PI2: ::c_int = 13;
 pub const FUTEX_PRIVATE_FLAG: ::c_int = 128;
 pub const FUTEX_CLOCK_REALTIME: ::c_int = 256;
 pub const FUTEX_CMD_MASK: ::c_int = !(FUTEX_PRIVATE_FLAG | FUTEX_CLOCK_REALTIME);
+
+pub const FUTEX_WAITERS: u32 = 0x80000000;
+pub const FUTEX_OWNER_DIED: u32 = 0x40000000;
+pub const FUTEX_TID_MASK: u32 = 0x3fffffff;
 
 pub const FUTEX_BITSET_MATCH_ANY: ::c_int = 0xffffffff;
 
@@ -4296,19 +5322,15 @@ pub const CANXL_MAX_DLEN: usize = 2048;
 pub const CANXL_XLF: ::c_int = 0x80;
 pub const CANXL_SEC: ::c_int = 0x01;
 
-cfg_if! {
-    if #[cfg(libc_align)] {
-        pub const CAN_MTU: usize = ::mem::size_of::<can_frame>();
-        pub const CANFD_MTU: usize = ::mem::size_of::<canfd_frame>();
-        pub const CANXL_MTU: usize = ::mem::size_of::<canxl_frame>();
-        // FIXME: use `core::mem::offset_of!` once that is available
-        // https://github.com/rust-lang/rfcs/pull/3308
-        // pub const CANXL_HDR_SIZE: usize = core::mem::offset_of!(canxl_frame, data);
-        pub const CANXL_HDR_SIZE: usize = 12;
-        pub const CANXL_MIN_MTU: usize = CANXL_HDR_SIZE + 64;
-        pub const CANXL_MAX_MTU: usize = CANXL_MTU;
-    }
-}
+pub const CAN_MTU: usize = ::mem::size_of::<can_frame>();
+pub const CANFD_MTU: usize = ::mem::size_of::<canfd_frame>();
+pub const CANXL_MTU: usize = ::mem::size_of::<canxl_frame>();
+// FIXME(offset_of): use `core::mem::offset_of!` once that is available
+// https://github.com/rust-lang/rfcs/pull/3308
+// pub const CANXL_HDR_SIZE: usize = core::mem::offset_of!(canxl_frame, data);
+pub const CANXL_HDR_SIZE: usize = 12;
+pub const CANXL_MIN_MTU: usize = CANXL_HDR_SIZE + 64;
+pub const CANXL_MAX_MTU: usize = CANXL_MTU;
 
 pub const CAN_RAW: ::c_int = 1;
 pub const CAN_BCM: ::c_int = 2;
@@ -4654,6 +5676,49 @@ pub const SCHED_FLAG_KEEP_PARAMS: ::c_int = 0x10;
 pub const SCHED_FLAG_UTIL_CLAMP_MIN: ::c_int = 0x20;
 pub const SCHED_FLAG_UTIL_CLAMP_MAX: ::c_int = 0x40;
 
+// linux/if_xdp.h
+pub const XDP_UMEM_TX_SW_CSUM: ::__u32 = 1 << 1;
+pub const XDP_UMEM_TX_METADATA_LEN: ::__u32 = 1 << 2;
+
+pub const XDP_TXMD_FLAGS_TIMESTAMP: ::__u32 = 1 << 0;
+pub const XDP_TXMD_FLAGS_CHECKSUM: ::__u32 = 1 << 1;
+
+pub const XDP_TX_METADATA: ::__u32 = 1 << 1;
+
+// linux/mount.h
+pub const MOUNT_ATTR_RDONLY: ::__u64 = 0x00000001;
+pub const MOUNT_ATTR_NOSUID: ::__u64 = 0x00000002;
+pub const MOUNT_ATTR_NODEV: ::__u64 = 0x00000004;
+pub const MOUNT_ATTR_NOEXEC: ::__u64 = 0x00000008;
+pub const MOUNT_ATTR__ATIME: ::__u64 = 0x00000070;
+pub const MOUNT_ATTR_RELATIME: ::__u64 = 0x00000000;
+pub const MOUNT_ATTR_NOATIME: ::__u64 = 0x00000010;
+pub const MOUNT_ATTR_STRICTATIME: ::__u64 = 0x00000020;
+pub const MOUNT_ATTR_NODIRATIME: ::__u64 = 0x00000080;
+pub const MOUNT_ATTR_IDMAP: ::__u64 = 0x00100000;
+pub const MOUNT_ATTR_NOSYMFOLLOW: ::__u64 = 0x00200000;
+
+pub const MOUNT_ATTR_SIZE_VER0: ::c_int = 32;
+
+// elf.h
+pub const NT_PRSTATUS: ::c_int = 1;
+pub const NT_PRFPREG: ::c_int = 2;
+pub const NT_FPREGSET: ::c_int = 2;
+pub const NT_PRPSINFO: ::c_int = 3;
+pub const NT_PRXREG: ::c_int = 4;
+pub const NT_TASKSTRUCT: ::c_int = 4;
+pub const NT_PLATFORM: ::c_int = 5;
+pub const NT_AUXV: ::c_int = 6;
+pub const NT_GWINDOWS: ::c_int = 7;
+pub const NT_ASRS: ::c_int = 8;
+pub const NT_PSTATUS: ::c_int = 10;
+pub const NT_PSINFO: ::c_int = 13;
+pub const NT_PRCRED: ::c_int = 14;
+pub const NT_UTSNAME: ::c_int = 15;
+pub const NT_LWPSTATUS: ::c_int = 16;
+pub const NT_LWPSINFO: ::c_int = 17;
+pub const NT_PRFPXREG: ::c_int = 20;
+
 pub const SCHED_FLAG_KEEP_ALL: ::c_int = SCHED_FLAG_KEEP_POLICY | SCHED_FLAG_KEEP_PARAMS;
 
 pub const SCHED_FLAG_UTIL_CLAMP: ::c_int = SCHED_FLAG_UTIL_CLAMP_MIN | SCHED_FLAG_UTIL_CLAMP_MAX;
@@ -4664,23 +5729,103 @@ pub const SCHED_FLAG_ALL: ::c_int = SCHED_FLAG_RESET_ON_FORK
     | SCHED_FLAG_KEEP_ALL
     | SCHED_FLAG_UTIL_CLAMP;
 
+// ioctl_eventpoll: added in Linux 6.9
+pub const EPIOCSPARAMS: ::Ioctl = 0x40088a01;
+pub const EPIOCGPARAMS: ::Ioctl = 0x80088a02;
+
+const _IOC_NRBITS: u32 = 8;
+const _IOC_TYPEBITS: u32 = 8;
+
+// https://github.com/search?q=repo%3Atorvalds%2Flinux+%22%23define+_IOC_NONE%22&type=code
+cfg_if! {
+    if #[cfg(any(
+        any(target_arch = "powerpc", target_arch = "powerpc64"),
+        any(target_arch = "sparc", target_arch = "sparc64"),
+        any(target_arch = "mips", target_arch = "mips64"),
+    ))] {
+        // https://github.com/torvalds/linux/blob/b311c1b497e51a628aa89e7cb954481e5f9dced2/arch/powerpc/include/uapi/asm/ioctl.h
+        // https://github.com/torvalds/linux/blob/b311c1b497e51a628aa89e7cb954481e5f9dced2/arch/sparc/include/uapi/asm/ioctl.h
+        // https://github.com/torvalds/linux/blob/b311c1b497e51a628aa89e7cb954481e5f9dced2/arch/mips/include/uapi/asm/ioctl.h
+
+        const _IOC_SIZEBITS: u32 = 13;
+        const _IOC_DIRBITS: u32 = 3;
+
+        const _IOC_NONE: u32 = 1;
+        const _IOC_READ: u32 = 2;
+        const _IOC_WRITE: u32 = 4;
+    } else {
+        // https://github.com/torvalds/linux/blob/b311c1b497e51a628aa89e7cb954481e5f9dced2/include/uapi/asm-generic/ioctl.h
+
+        const _IOC_SIZEBITS: u32 = 14;
+        const _IOC_DIRBITS: u32 = 2;
+
+        const _IOC_NONE: u32 = 0;
+        const _IOC_WRITE: u32 = 1;
+        const _IOC_READ: u32 = 2;
+    }
+}
+
+const _IOC_NRMASK: u32 = (1 << _IOC_NRBITS) - 1;
+const _IOC_TYPEMASK: u32 = (1 << _IOC_TYPEBITS) - 1;
+const _IOC_SIZEMASK: u32 = (1 << _IOC_SIZEBITS) - 1;
+const _IOC_DIRMASK: u32 = (1 << _IOC_DIRBITS) - 1;
+
+const _IOC_NRSHIFT: u32 = 0;
+const _IOC_TYPESHIFT: u32 = _IOC_NRSHIFT + _IOC_NRBITS;
+const _IOC_SIZESHIFT: u32 = _IOC_TYPESHIFT + _IOC_TYPEBITS;
+const _IOC_DIRSHIFT: u32 = _IOC_SIZESHIFT + _IOC_SIZEBITS;
+
+// adapted from https://github.com/torvalds/linux/blob/8a696a29c6905594e4abf78eaafcb62165ac61f1/rust/kernel/ioctl.rs
+
+/// Build an ioctl number, analogous to the C macro of the same name.
+const fn _IOC(dir: u32, ty: u32, nr: u32, size: usize) -> u32 {
+    // FIXME(ctest) the `garando_syntax` crate (used by ctest2 in the CI test suite)
+    // cannot currently parse these `debug_assert!`s
+    //
+    // debug_assert!(dir <= _IOC_DIRMASK);
+    // debug_assert!(ty <= _IOC_TYPEMASK);
+    // debug_assert!(nr <= _IOC_NRMASK);
+    // debug_assert!(size <= (_IOC_SIZEMASK as usize));
+
+    (dir << _IOC_DIRSHIFT)
+        | (ty << _IOC_TYPESHIFT)
+        | (nr << _IOC_NRSHIFT)
+        | ((size as u32) << _IOC_SIZESHIFT)
+}
+
+/// Build an ioctl number for an argumentless ioctl.
+pub(crate) const fn _IO(ty: u32, nr: u32) -> u32 {
+    _IOC(_IOC_NONE, ty, nr, 0)
+}
+
+/// Build an ioctl number for an read-only ioctl.
+pub(crate) const fn _IOR<T>(ty: u32, nr: u32) -> u32 {
+    _IOC(_IOC_READ, ty, nr, core::mem::size_of::<T>())
+}
+
+/// Build an ioctl number for an write-only ioctl.
+pub(crate) const fn _IOW<T>(ty: u32, nr: u32) -> u32 {
+    _IOC(_IOC_WRITE, ty, nr, core::mem::size_of::<T>())
+}
+
+/// Build an ioctl number for a read-write ioctl.
+pub(crate) const fn _IOWR<T>(ty: u32, nr: u32) -> u32 {
+    _IOC(_IOC_READ | _IOC_WRITE, ty, nr, core::mem::size_of::<T>())
+}
+
 f! {
     pub fn NLA_ALIGN(len: ::c_int) -> ::c_int {
-        return ((len) + NLA_ALIGNTO - 1) & !(NLA_ALIGNTO - 1)
+        return ((len) + NLA_ALIGNTO - 1) & !(NLA_ALIGNTO - 1);
     }
 
-    pub fn CMSG_NXTHDR(mhdr: *const msghdr,
-                       cmsg: *const cmsghdr) -> *mut cmsghdr {
+    pub fn CMSG_NXTHDR(mhdr: *const msghdr, cmsg: *const cmsghdr) -> *mut cmsghdr {
         if ((*cmsg).cmsg_len as usize) < ::mem::size_of::<cmsghdr>() {
             return 0 as *mut cmsghdr;
         };
-        let next = (cmsg as usize +
-                    super::CMSG_ALIGN((*cmsg).cmsg_len as usize))
-            as *mut cmsghdr;
-        let max = (*mhdr).msg_control as usize
-            + (*mhdr).msg_controllen as usize;
-        if (next.wrapping_offset(1)) as usize > max ||
-            next as usize + super::CMSG_ALIGN((*next).cmsg_len as usize) > max
+        let next = (cmsg as usize + super::CMSG_ALIGN((*cmsg).cmsg_len as usize)) as *mut cmsghdr;
+        let max = (*mhdr).msg_control as usize + (*mhdr).msg_controllen as usize;
+        if (next.wrapping_offset(1)) as usize > max
+            || next as usize + super::CMSG_ALIGN((*next).cmsg_len as usize) > max
         {
             0 as *mut cmsghdr
         } else {
@@ -4701,16 +5846,14 @@ f! {
     }
 
     pub fn CPU_SET(cpu: usize, cpuset: &mut cpu_set_t) -> () {
-        let size_in_bits
-            = 8 * ::mem::size_of_val(&cpuset.bits[0]); // 32, 64 etc
+        let size_in_bits = 8 * ::mem::size_of_val(&cpuset.bits[0]); // 32, 64 etc
         let (idx, offset) = (cpu / size_in_bits, cpu % size_in_bits);
         cpuset.bits[idx] |= 1 << offset;
         ()
     }
 
     pub fn CPU_CLR(cpu: usize, cpuset: &mut cpu_set_t) -> () {
-        let size_in_bits
-            = 8 * ::mem::size_of_val(&cpuset.bits[0]); // 32, 64 etc
+        let size_in_bits = 8 * ::mem::size_of_val(&cpuset.bits[0]); // 32, 64 etc
         let (idx, offset) = (cpu / size_in_bits, cpu % size_in_bits);
         cpuset.bits[idx] &= !(1 << offset);
         ()
@@ -4727,7 +5870,7 @@ f! {
         let size_of_mask = ::mem::size_of_val(&cpuset.bits[0]);
         for i in cpuset.bits[..(size / size_of_mask)].iter() {
             s += i.count_ones();
-        };
+        }
         s as ::c_int
     }
 
@@ -4791,6 +5934,10 @@ f! {
         ee.offset(1) as *mut ::sockaddr
     }
 
+    pub fn TPACKET_ALIGN(x: usize) -> usize {
+        (x + TPACKET_ALIGNMENT - 1) & !(TPACKET_ALIGNMENT - 1)
+    }
+
     pub fn BPF_RVAL(code: ::__u32) -> ::__u32 {
         code & 0x18
     }
@@ -4800,11 +5947,45 @@ f! {
     }
 
     pub fn BPF_STMT(code: ::__u16, k: ::__u32) -> sock_filter {
-        sock_filter{code: code, jt: 0, jf: 0, k: k}
+        sock_filter {
+            code: code,
+            jt: 0,
+            jf: 0,
+            k: k,
+        }
     }
 
     pub fn BPF_JUMP(code: ::__u16, k: ::__u32, jt: ::__u8, jf: ::__u8) -> sock_filter {
-        sock_filter{code: code, jt: jt, jf: jf, k: k}
+        sock_filter {
+            code: code,
+            jt: jt,
+            jf: jf,
+            k: k,
+        }
+    }
+
+    pub fn ELF32_R_SYM(val: Elf32_Word) -> Elf32_Word {
+        val >> 8
+    }
+
+    pub fn ELF32_R_TYPE(val: Elf32_Word) -> Elf32_Word {
+        val & 0xff
+    }
+
+    pub fn ELF32_R_INFO(sym: Elf32_Word, t: Elf32_Word) -> Elf32_Word {
+        sym << 8 + t & 0xff
+    }
+
+    pub fn ELF64_R_SYM(val: Elf64_Xword) -> Elf64_Xword {
+        val >> 32
+    }
+
+    pub fn ELF64_R_TYPE(val: Elf64_Xword) -> Elf64_Xword {
+        val & 0xffffffff
+    }
+
+    pub fn ELF64_R_INFO(sym: Elf64_Xword, t: Elf64_Xword) -> Elf64_Xword {
+        sym << 32 + t
     }
 }
 
@@ -4881,10 +6062,7 @@ cfg_if! {
                 servlen: ::socklen_t,
                 flags: ::c_int,
             ) -> ::c_int;
-            pub fn getloadavg(
-                loadavg: *mut ::c_double,
-                nelem: ::c_int
-            ) -> ::c_int;
+            pub fn getloadavg(loadavg: *mut ::c_double, nelem: ::c_int) -> ::c_int;
             pub fn process_vm_readv(
                 pid: ::pid_t,
                 local_iov: *const ::iovec,
@@ -4901,10 +6079,7 @@ cfg_if! {
                 riovcnt: ::c_ulong,
                 flags: ::c_ulong,
             ) -> isize;
-            pub fn futimes(
-                fd: ::c_int,
-                times: *const ::timeval
-            ) -> ::c_int;
+            pub fn futimes(fd: ::c_int, times: *const ::timeval) -> ::c_int;
         }
     }
 }
@@ -4923,9 +6098,6 @@ cfg_if! {
                 buflen: ::size_t,
                 spbufp: *mut *mut spwd,
             ) -> ::c_int;
-
-            pub fn shm_open(name: *const c_char, oflag: ::c_int, mode: mode_t) -> ::c_int;
-            pub fn shm_unlink(name: *const ::c_char) -> ::c_int;
 
             pub fn mq_open(name: *const ::c_char, oflag: ::c_int, ...) -> ::mqd_t;
             pub fn mq_close(mqd: ::mqd_t) -> ::c_int;
@@ -4960,7 +6132,7 @@ cfg_if! {
             pub fn mq_setattr(
                 mqd: ::mqd_t,
                 newattr: *const ::mq_attr,
-                oldattr: *mut ::mq_attr
+                oldattr: *mut ::mq_attr,
             ) -> ::c_int;
 
             pub fn pthread_mutex_consistent(mutex: *mut pthread_mutex_t) -> ::c_int;
@@ -5012,6 +6184,9 @@ extern "C" {
     pub fn getspent() -> *mut spwd;
 
     pub fn getspnam(name: *const ::c_char) -> *mut spwd;
+
+    pub fn shm_open(name: *const c_char, oflag: ::c_int, mode: mode_t) -> ::c_int;
+    pub fn shm_unlink(name: *const ::c_char) -> ::c_int;
 
     // System V IPC
     pub fn shmget(key: ::key_t, size: ::size_t, shmflg: ::c_int) -> ::c_int;
@@ -5112,8 +6287,6 @@ extern "C" {
         sigmask: *const ::sigset_t,
     ) -> ::c_int;
     pub fn dup3(oldfd: ::c_int, newfd: ::c_int, flags: ::c_int) -> ::c_int;
-    pub fn mkostemp(template: *mut ::c_char, flags: ::c_int) -> ::c_int;
-    pub fn mkostemps(template: *mut ::c_char, suffixlen: ::c_int, flags: ::c_int) -> ::c_int;
     pub fn sigtimedwait(
         set: *const sigset_t,
         info: *mut siginfo_t,
@@ -5619,6 +6792,10 @@ extern "C" {
         len: ::size_t,
         flags: ::c_uint,
     ) -> ::ssize_t;
+
+    pub fn klogctl(syslog_type: ::c_int, bufp: *mut ::c_char, len: ::c_int) -> ::c_int;
+
+    pub fn ioctl(fd: ::c_int, request: ::Ioctl, ...) -> ::c_int;
 }
 
 // LFS64 extensions
@@ -5631,7 +6808,7 @@ cfg_if! {
                 fd: ::c_int,
                 mode: ::c_int,
                 offset: ::off64_t,
-                len: ::off64_t
+                len: ::off64_t,
             ) -> ::c_int;
             pub fn fgetpos64(stream: *mut ::FILE, ptr: *mut fpos64_t) -> ::c_int;
             pub fn fopen64(filename: *const c_char, mode: *const c_char) -> *mut ::FILE;
@@ -5670,21 +6847,3 @@ cfg_if! {
 
 mod arch;
 pub use self::arch::*;
-
-cfg_if! {
-    if #[cfg(libc_align)] {
-        #[macro_use]
-        mod align;
-    } else {
-        #[macro_use]
-        mod no_align;
-    }
-}
-expand_align!();
-
-cfg_if! {
-    if #[cfg(libc_non_exhaustive)] {
-        mod non_exhaustive;
-        pub use self::non_exhaustive::*;
-    }
-}

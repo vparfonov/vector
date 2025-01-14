@@ -74,7 +74,7 @@ fn check_ssl_kind() {
 }
 
 fn main() {
-    println!("cargo:rustc-check-cfg=cfg(osslconf, values(\"OPENSSL_NO_OCB\", \"OPENSSL_NO_SM4\", \"OPENSSL_NO_SEED\", \"OPENSSL_NO_CHACHA\", \"OPENSSL_NO_CAST\", \"OPENSSL_NO_IDEA\", \"OPENSSL_NO_CAMELLIA\", \"OPENSSL_NO_RC4\", \"OPENSSL_NO_BF\", \"OPENSSL_NO_PSK\", \"OPENSSL_NO_DEPRECATED_3_0\", \"OPENSSL_NO_SCRYPT\", \"OPENSSL_NO_SM3\", \"OPENSSL_NO_RMD160\", \"OPENSSL_NO_EC2M\", \"OPENSSL_NO_OCSP\", \"OPENSSL_NO_CMS\", \"OPENSSL_NO_COMP\", \"OPENSSL_NO_SOCK\", \"OPENSSL_NO_STDIO\"))");
+    println!("cargo:rustc-check-cfg=cfg(osslconf, values(\"OPENSSL_NO_OCB\", \"OPENSSL_NO_SM4\", \"OPENSSL_NO_SEED\", \"OPENSSL_NO_CHACHA\", \"OPENSSL_NO_CAST\", \"OPENSSL_NO_IDEA\", \"OPENSSL_NO_CAMELLIA\", \"OPENSSL_NO_RC4\", \"OPENSSL_NO_BF\", \"OPENSSL_NO_PSK\", \"OPENSSL_NO_DEPRECATED_3_0\", \"OPENSSL_NO_SCRYPT\", \"OPENSSL_NO_SM3\", \"OPENSSL_NO_RMD160\", \"OPENSSL_NO_EC2M\", \"OPENSSL_NO_OCSP\", \"OPENSSL_NO_CMS\", \"OPENSSL_NO_COMP\", \"OPENSSL_NO_SOCK\", \"OPENSSL_NO_STDIO\", \"OPENSSL_NO_EC\", \"OPENSSL_NO_SSL3_METHOD\", \"OPENSSL_NO_KRB5\", \"OPENSSL_NO_TLSEXT\", \"OPENSSL_NO_SRP\", \"OPENSSL_NO_RFC3779\", \"OPENSSL_NO_SHA\", \"OPENSSL_NO_NEXTPROTONEG\", \"OPENSSL_NO_ENGINE\", \"OPENSSL_NO_BUF_FREELISTS\"))");
 
     println!("cargo:rustc-check-cfg=cfg(openssl)");
     println!("cargo:rustc-check-cfg=cfg(libressl)");
@@ -120,6 +120,7 @@ fn main() {
     println!("cargo:rustc-check-cfg=cfg(ossl310)");
     println!("cargo:rustc-check-cfg=cfg(ossl320)");
     println!("cargo:rustc-check-cfg=cfg(ossl330)");
+    println!("cargo:rustc-check-cfg=cfg(ossl340)");
 
     check_ssl_kind();
 
@@ -379,6 +380,8 @@ See rust-openssl documentation for more information:
             (3, 8, _) => ('3', '8', 'x'),
             (3, 9, 0) => ('3', '9', '0'),
             (3, 9, _) => ('3', '9', 'x'),
+            (4, 0, 0) => ('4', '0', '0'),
+            (4, 0, _) => ('4', '0', 'x'),
             _ => version_error(),
         };
 
@@ -421,7 +424,7 @@ fn version_error() -> ! {
         "
 
 This crate is only compatible with OpenSSL (version 1.0.1 through 1.1.1, or 3), or LibreSSL 2.5
-through 3.9.x, but a different version of OpenSSL was found. The build is now aborting
+through 4.0.x, but a different version of OpenSSL was found. The build is now aborting
 due to this version mismatch.
 
 "

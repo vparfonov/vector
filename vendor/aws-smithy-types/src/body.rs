@@ -62,7 +62,8 @@ enum BoxBody {
         feature = "http-body-1-x",
         feature = "rt-tokio"
     ))]
-    HttpBody04(http_body_0_4::combinators::BoxBody<Bytes, Error>),
+    // will be dead code with `--no-default-features --features rt-tokio`
+    HttpBody04(#[allow(dead_code)] http_body_0_4::combinators::BoxBody<Bytes, Error>),
 }
 
 pin_project! {
@@ -231,6 +232,11 @@ impl SdkBody {
                 bytes_contents: self.bytes_contents.clone(),
             }
         })
+    }
+
+    /// Return `true` if this SdkBody is streaming, `false` if it is in-memory.
+    pub fn is_streaming(&self) -> bool {
+        matches!(self.inner, Inner::Dyn { .. })
     }
 
     /// Return the length, in bytes, of this SdkBody. If this returns `None`, then the body does not

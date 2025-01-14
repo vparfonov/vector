@@ -318,7 +318,7 @@ impl Timer {
         self.when.is_some()
     }
 
-    /// Sets the timer to emit an en event once after the given duration of time.
+    /// Sets the timer to emit an event once after the given duration of time.
     ///
     /// Note that resetting a timer is different from creating a new timer because
     /// [`set_after()`][`Timer::set_after()`] does not remove the waker associated with the task
@@ -1256,7 +1256,7 @@ unsafe impl<T: IoSafe + Write> IoSafe for std::io::BufWriter<T> {}
 unsafe impl<T: IoSafe + Write> IoSafe for std::io::LineWriter<T> {}
 unsafe impl<T: IoSafe + ?Sized> IoSafe for &mut T {}
 unsafe impl<T: IoSafe + ?Sized> IoSafe for Box<T> {}
-unsafe impl<T: Clone + IoSafe + ?Sized> IoSafe for std::borrow::Cow<'_, T> {}
+unsafe impl<T: Clone + IoSafe> IoSafe for std::borrow::Cow<'_, T> {}
 
 impl<T: IoSafe + Read> AsyncRead for Async<T> {
     fn poll_read(
@@ -1639,7 +1639,7 @@ impl Async<UdpSocket> {
 
     /// Sends data to the specified address.
     ///
-    /// Returns the number of bytes writen.
+    /// Returns the number of bytes written.
     ///
     /// # Examples
     ///
@@ -1847,12 +1847,10 @@ impl Async<UnixStream> {
     /// # std::io::Result::Ok(()) });
     /// ```
     pub async fn connect<P: AsRef<Path>>(path: P) -> io::Result<Async<UnixStream>> {
+        let address = convert_path_to_socket_address(path.as_ref())?;
+
         // Begin async connect.
-        let socket = connect(
-            rn::SocketAddrUnix::new(path.as_ref())?.into(),
-            rn::AddressFamily::UNIX,
-            None,
-        )?;
+        let socket = connect(address.into(), rn::AddressFamily::UNIX, None)?;
         // Use new_nonblocking because connect already sets socket to non-blocking mode.
         let stream = Async::new_nonblocking(UnixStream::from(socket))?;
 
@@ -2071,6 +2069,8 @@ fn connect(
     #[cfg(windows)]
     use rustix::fd::AsFd;
 
+    setup_networking();
+
     #[cfg(any(
         target_os = "android",
         target_os = "dragonfly",
@@ -2100,19 +2100,15 @@ fn connect(
     )))]
     let socket = {
         #[cfg(not(any(
-            target_os = "macos",
-            target_os = "ios",
-            target_os = "tvos",
-            target_os = "watchos",
+            target_os = "aix",
+            target_vendor = "apple",
             target_os = "espidf",
             windows,
         )))]
         let flags = rn::SocketFlags::CLOEXEC;
         #[cfg(any(
-            target_os = "macos",
-            target_os = "ios",
-            target_os = "tvos",
-            target_os = "watchos",
+            target_os = "aix",
+            target_vendor = "apple",
             target_os = "espidf",
             windows,
         ))]
@@ -2122,12 +2118,7 @@ fn connect(
         let socket = rn::socket_with(domain, rn::SocketType::STREAM, flags, protocol)?;
 
         // Set cloexec if necessary.
-        #[cfg(any(
-            target_os = "macos",
-            target_os = "ios",
-            target_os = "tvos",
-            target_os = "watchos",
-        ))]
+        #[cfg(any(target_os = "aix", target_vendor = "apple"))]
         rio::fcntl_setfd(&socket, rio::fcntl_getfd(&socket)? | rio::FdFlags::CLOEXEC)?;
 
         // Set non-blocking mode.
@@ -2138,11 +2129,10 @@ fn connect(
 
     // Set nosigpipe if necessary.
     #[cfg(any(
-        target_os = "macos",
-        target_os = "ios",
-        target_os = "tvos",
-        target_os = "watchos",
-        target_os = "freebsd"
+        target_vendor = "apple",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "dragonfly",
     ))]
     rn::sockopt::set_socket_nosigpipe(&socket, true)?;
 
@@ -2171,6 +2161,20 @@ fn connect(
 }
 
 #[inline]
+fn setup_networking() {
+    #[cfg(windows)]
+    {
+        // On Windows, we need to call WSAStartup before calling any networking code.
+        // Make sure to call it at least once.
+        static INIT: std::sync::Once = std::sync::Once::new();
+
+        INIT.call_once(|| {
+            let _ = rustix::net::wsa_startup();
+        });
+    }
+}
+
+#[inline]
 fn set_nonblocking(
     #[cfg(unix)] fd: BorrowedFd<'_>,
     #[cfg(windows)] fd: BorrowedSocket<'_>,
@@ -2194,4 +2198,32 @@ fn set_nonblocking(
     }
 
     Ok(())
+}
+
+/// Converts a `Path` to its socket address representation.
+///
+/// This function is abstract socket-aware.
+#[cfg(unix)]
+#[inline]
+fn convert_path_to_socket_address(path: &Path) -> io::Result<rn::SocketAddrUnix> {
+    // SocketAddrUnix::new() will throw EINVAL when a path with a zero in it is passed in.
+    // However, some users expect to be able to pass in paths to abstract sockets, which
+    // triggers this error as it has a zero in it. Therefore, if a path starts with a zero,
+    // make it an abstract socket.
+    #[cfg(any(target_os = "linux", target_os = "android"))]
+    let address = {
+        use std::os::unix::ffi::OsStrExt;
+
+        let path = path.as_os_str();
+        match path.as_bytes().first() {
+            Some(0) => rn::SocketAddrUnix::new_abstract_name(path.as_bytes().get(1..).unwrap())?,
+            _ => rn::SocketAddrUnix::new(path)?,
+        }
+    };
+
+    // Only Linux and Android support abstract sockets.
+    #[cfg(not(any(target_os = "linux", target_os = "android")))]
+    let address = rn::SocketAddrUnix::new(path)?;
+
+    Ok(address)
 }

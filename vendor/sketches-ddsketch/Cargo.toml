@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "sketches-ddsketch"
-version = "0.2.1"
+version = "0.3.0"
 authors = ["Mike Heffner <mikeh@fesnel.com>"]
 exclude = [".gitignore"]
 description = "A direct port of the Golang DDSketch implementation.\n"
@@ -29,10 +29,10 @@ package = "serde"
 version = "0.5.1"
 
 [dev-dependencies.rand]
-version = "0.7.2"
+version = "0.8.5"
 
 [dev-dependencies.rand_distr]
-version = "0.2.2"
+version = "0.4.3"
 
 [features]
 use_serde = ["serde", "serde/derive"]

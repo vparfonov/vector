@@ -12,6 +12,7 @@ struct TupleStruct<T, U>(#[pin] T, U);
 #[allow(clippy::redundant_pub_crate)]
 #[allow(clippy::type_repetition_in_bounds)]
 #[allow(unused_qualifications)]
+#[allow(clippy::needless_lifetimes)]
 #[allow(clippy::semicolon_if_nothing_returned)]
 #[allow(clippy::use_self)]
 #[allow(clippy::used_underscore_binding)]
@@ -73,17 +74,21 @@ const _: () = {
     #[doc(hidden)]
     impl<'pin, T, U> _pin_project::__private::Unpin for TupleStruct<T, U>
     where
-        _pin_project::__private::Wrapper<
-            'pin,
-            _pin_project::__private::PhantomPinned,
+        ::pin_project::__private::PinnedFieldsOf<
+            _pin_project::__private::Wrapper<
+                'pin,
+                _pin_project::__private::PhantomPinned,
+            >,
         >: _pin_project::__private::Unpin,
     {}
     #[doc(hidden)]
     unsafe impl<'pin, T, U> _pin_project::UnsafeUnpin for TupleStruct<T, U>
     where
-        _pin_project::__private::Wrapper<
-            'pin,
-            _pin_project::__private::PhantomPinned,
+        ::pin_project::__private::PinnedFieldsOf<
+            _pin_project::__private::Wrapper<
+                'pin,
+                _pin_project::__private::PhantomPinned,
+            >,
         >: _pin_project::__private::Unpin,
     {}
     trait TupleStructMustNotImplDrop {}

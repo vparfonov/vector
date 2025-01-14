@@ -10,7 +10,7 @@ impl BSTR {
     ///
     /// This function does not allocate memory.
     pub const fn new() -> Self {
-        Self(std::ptr::null_mut())
+        Self(core::ptr::null_mut())
     }
 
     /// Returns `true` if the string is empty.
@@ -23,17 +23,23 @@ impl BSTR {
         if self.0.is_null() {
             0
         } else {
-            unsafe { crate::imp::SysStringLen(self.0) as usize }
+            unsafe { imp::SysStringLen(self.0) as usize }
         }
     }
 
     /// Get the string as 16-bit wide characters (wchars).
     pub fn as_wide(&self) -> &[u16] {
-        if self.0.is_null() {
-            return &[];
-        }
+        unsafe { core::slice::from_raw_parts(self.as_ptr(), self.len()) }
+    }
 
-        unsafe { std::slice::from_raw_parts(self.0, self.len()) }
+    /// Returns a raw pointer to the `BSTR` buffer.
+    pub fn as_ptr(&self) -> *const u16 {
+        if !self.is_empty() {
+            self.0
+        } else {
+            const EMPTY: [u16; 1] = [0];
+            EMPTY.as_ptr()
+        }
     }
 
     /// Create a `BSTR` from a slice of 16 bit characters (wchars).
@@ -42,10 +48,15 @@ impl BSTR {
             return Ok(Self::new());
         }
 
-        let result = unsafe { Self(crate::imp::SysAllocStringLen(value.as_ptr(), value.len().try_into()?)) };
+        let result = unsafe {
+            Self(imp::SysAllocStringLen(
+                value.as_ptr(),
+                value.len().try_into()?,
+            ))
+        };
 
         if result.is_empty() {
-            Err(crate::imp::E_OUTOFMEMORY.into())
+            Err(imp::E_OUTOFMEMORY.into())
         } else {
             Ok(result)
         }
@@ -60,103 +71,106 @@ impl BSTR {
     /// # Safety
     #[doc(hidden)]
     pub fn into_raw(self) -> *const u16 {
-        unsafe { std::mem::transmute(self) }
+        unsafe { core::mem::transmute(self) }
     }
 }
 
-impl std::clone::Clone for BSTR {
+impl Clone for BSTR {
     fn clone(&self) -> Self {
         Self::from_wide(self.as_wide()).unwrap()
     }
 }
 
-impl std::convert::From<&str> for BSTR {
+impl From<&str> for BSTR {
     fn from(value: &str) -> Self {
-        let value: std::vec::Vec<u16> = value.encode_utf16().collect();
+        let value: Vec<u16> = value.encode_utf16().collect();
         Self::from_wide(&value).unwrap()
     }
 }
 
-impl std::convert::From<std::string::String> for BSTR {
-    fn from(value: std::string::String) -> Self {
+impl From<String> for BSTR {
+    fn from(value: String) -> Self {
         value.as_str().into()
     }
 }
 
-impl std::convert::From<&std::string::String> for BSTR {
-    fn from(value: &std::string::String) -> Self {
+impl From<&String> for BSTR {
+    fn from(value: &String) -> Self {
         value.as_str().into()
     }
 }
 
-impl<'a> std::convert::TryFrom<&'a BSTR> for std::string::String {
-    type Error = std::string::FromUtf16Error;
+impl<'a> TryFrom<&'a BSTR> for String {
+    type Error = alloc::string::FromUtf16Error;
 
-    fn try_from(value: &BSTR) -> std::result::Result<Self, Self::Error> {
-        std::string::String::from_utf16(value.as_wide())
+    fn try_from(value: &BSTR) -> core::result::Result<Self, Self::Error> {
+        String::from_utf16(value.as_wide())
     }
 }
 
-impl std::convert::TryFrom<BSTR> for std::string::String {
-    type Error = std::string::FromUtf16Error;
+impl TryFrom<BSTR> for String {
+    type Error = alloc::string::FromUtf16Error;
 
-    fn try_from(value: BSTR) -> std::result::Result<Self, Self::Error> {
-        std::string::String::try_from(&value)
+    fn try_from(value: BSTR) -> core::result::Result<Self, Self::Error> {
+        String::try_from(&value)
     }
 }
 
-impl std::default::Default for BSTR {
+impl Default for BSTR {
     fn default() -> Self {
-        Self(std::ptr::null_mut())
+        Self(core::ptr::null_mut())
     }
 }
 
-impl std::fmt::Display for BSTR {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::write!(f, "{}", crate::Decode(|| std::char::decode_utf16(self.as_wide().iter().cloned())))
+impl core::fmt::Display for BSTR {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::write!(
+            f,
+            "{}",
+            Decode(|| core::char::decode_utf16(self.as_wide().iter().cloned()))
+        )
     }
 }
 
-impl std::fmt::Debug for BSTR {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        std::write!(f, "{}", self)
+impl core::fmt::Debug for BSTR {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        core::write!(f, "{}", self)
     }
 }
 
-impl std::cmp::PartialEq for BSTR {
+impl PartialEq for BSTR {
     fn eq(&self, other: &Self) -> bool {
         self.as_wide() == other.as_wide()
     }
 }
 
-impl std::cmp::Eq for BSTR {}
+impl Eq for BSTR {}
 
-impl std::cmp::PartialEq<BSTR> for &str {
+impl PartialEq<BSTR> for &str {
     fn eq(&self, other: &BSTR) -> bool {
         other == self
     }
 }
 
-impl std::cmp::PartialEq<BSTR> for String {
+impl PartialEq<BSTR> for String {
     fn eq(&self, other: &BSTR) -> bool {
         other == self
     }
 }
 
-impl<T: AsRef<str> + ?Sized> std::cmp::PartialEq<T> for BSTR {
+impl<T: AsRef<str> + ?Sized> PartialEq<T> for BSTR {
     fn eq(&self, other: &T) -> bool {
-        self.as_wide().iter().copied().eq(other.as_ref().encode_utf16())
+        self.as_wide()
+            .iter()
+            .copied()
+            .eq(other.as_ref().encode_utf16())
     }
 }
 
-impl std::ops::Drop for BSTR {
+impl Drop for BSTR {
     fn drop(&mut self) {
         if !self.0.is_null() {
-            unsafe { crate::imp::SysFreeString(self.0) }
+            unsafe { imp::SysFreeString(self.0) }
         }
     }
-}
-
-impl TypeKind for BSTR {
-    type TypeKind = ValueType;
 }

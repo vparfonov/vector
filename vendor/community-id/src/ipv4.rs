@@ -5,7 +5,7 @@ use base64::prelude::*;
 use sha1::digest::Update;
 use sha1::{Digest, Sha1};
 
-use crate::{icmpv4, PADDING, IPPROTO_ICMP, IPPROTO_ICMPV6};
+use crate::{icmpv4, IPPROTO_ICMP, IPPROTO_ICMPV6, PADDING};
 
 pub fn calculate_ipv4_community_id(
     seed: u16,
@@ -19,32 +19,34 @@ pub fn calculate_ipv4_community_id(
     let mut sip = <Ipv4Addr as Into<u32>>::into(src_ip).to_be();
     let mut dip = <Ipv4Addr as Into<u32>>::into(dst_ip).to_be();
 
-    let mut sport = src_port.map(|p| p.to_be());
-    let mut dport = dst_port.map(|p| p.to_be());
-
     let mut is_one_way = false;
 
-    if src_port.is_some() && dst_port.is_some() {
-        let tmp_src_port = src_port.unwrap();
-        let tmp_dst_port = dst_port.unwrap();
-        match ip_proto {
-            IPPROTO_ICMP => {
-                let (src, dst, one_way) = icmpv4::get_port_equivalents(tmp_src_port, tmp_dst_port);
-                is_one_way = one_way;
-                sport = Some(src.to_be());
-                dport = Some(dst.to_be());
-            }
-            IPPROTO_ICMPV6 => return Err(anyhow!("icmpv6 can not over ipv4!")),
-            _ => {}
+    let mut sport = src_port;
+    let mut dport = dst_port;
+
+    match ip_proto {
+        IPPROTO_ICMP => {
+            let (src, dst, one_way) = icmpv4::get_port_equivalents(
+                src_port.unwrap_or_default(),
+                dst_port.unwrap_or_default(),
+            );
+            is_one_way = one_way;
+            sport = Some(src);
+            dport = Some(dst);
         }
+        IPPROTO_ICMPV6 => return Err(anyhow!("icmpv6 can not over ipv4!")),
+        _ => {}
     }
 
-    if !(is_one_way || src_ip < dst_ip || (src_ip == dst_ip && src_port < dst_port)) {
+    if !(is_one_way || src_ip < dst_ip || (src_ip == dst_ip && sport < dport)) {
         std::mem::swap(&mut sip, &mut dip);
         std::mem::swap(&mut sport, &mut dport);
     }
 
-    let hash = if src_port.is_some() && dst_port.is_some() {
+    sport = sport.map(|p| p.to_be());
+    dport = dport.map(|p| p.to_be());
+
+    let hash = if sport.is_some() && dport.is_some() {
         let ipv4 = Ipv4Data {
             seed: seed.to_be(),
             src_ip: sip,
@@ -141,6 +143,10 @@ mod tests {
     fn test_baseline_ipv4_default_data() -> Vec<(Ipv4Input, String)> {
         let raw = vec![
             (
+                (0, "0.0.0.0", "0.0.0.0", Some(23376), Some(443), 6),
+                "1:EWt4TLjkII9rdzFzQrCecjyvdNs=",
+            ),
+            (
                 (0, "1.2.3.4", "5.6.7.8", Some(1122), Some(3344), 6),
                 "1:wCb3OG7yAFWelaUydu0D+125CLM=",
             ),
@@ -183,6 +189,10 @@ mod tests {
             (
                 (0, "5.6.7.8", "1.2.3.4", None, None, 46),
                 "1:ikv3kmf89luf73WPz1jOs49S768=",
+            ),
+            (
+                (0, "100.66.124.24", "172.31.98.44", None, None, 47),
+                "1:Uo11LCySQ1S0c9jtHZVIb4Pm/2k=",
             ),
         ];
         raw.into_iter()

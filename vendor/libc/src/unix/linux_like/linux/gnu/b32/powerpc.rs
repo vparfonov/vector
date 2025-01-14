@@ -6,7 +6,7 @@ s! {
         pub sa_sigaction: ::sighandler_t,
         pub sa_mask: ::sigset_t,
         pub sa_flags: ::c_int,
-        pub sa_restorer: ::Option<extern fn()>,
+        pub sa_restorer: ::Option<extern "C" fn()>,
     }
 
     pub struct statfs {
@@ -22,7 +22,8 @@ s! {
 
         pub f_namelen: ::__fsword_t,
         pub f_frsize: ::__fsword_t,
-        f_spare: [::__fsword_t; 5],
+        pub f_flags: ::__fsword_t,
+        f_spare: [::__fsword_t; 4],
     }
 
     pub struct flock {
@@ -147,8 +148,8 @@ s! {
         pub si_code: ::c_int,
         #[doc(hidden)]
         #[deprecated(
-            since="0.2.54",
-            note="Please leave a comment on \
+            since = "0.2.54",
+            note = "Please leave a comment on \
                   https://github.com/rust-lang/libc/pull/1316 if you're using \
                   this field"
         )]
@@ -159,7 +160,7 @@ s! {
     pub struct stack_t {
         pub ss_sp: *mut ::c_void,
         pub ss_flags: ::c_int,
-        pub ss_size: ::size_t
+        pub ss_size: ::size_t,
     }
 }
 
@@ -823,3 +824,4 @@ pub const SYS_memfd_secret: ::c_long = 447;
 pub const SYS_process_mrelease: ::c_long = 448;
 pub const SYS_futex_waitv: ::c_long = 449;
 pub const SYS_set_mempolicy_home_node: ::c_long = 450;
+pub const SYS_mseal: ::c_long = 462;

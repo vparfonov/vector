@@ -22,15 +22,13 @@ import "greptime/v1/meta/common.proto";
 import "greptime/v1/meta/route.proto";
 import "greptime/v1/ddl.proto";
 
-
-service DdlTask {
-    // Submits a DDL task to meta.
-    rpc SubmitDdlTask(SubmitDdlTaskRequest) returns (SubmitDdlTaskResponse);
-}
-
 enum DdlTaskType {
     Create = 0;
     Drop = 1;
+}
+
+message CreateDatabaseTask {
+    CreateDatabaseExpr create_database = 1;
 }
 
 message CreateTableTask {
@@ -39,19 +37,37 @@ message CreateTableTask {
     bytes table_info = 3;
 }
 
+message CreateTableTasks { repeated CreateTableTask tasks = 1; }
+
 message DropTableTask{
     DropTableExpr drop_table = 1;
 }
+
+message DropTableTasks { repeated DropTableTask tasks = 1; }
 
 message AlterTableTask{
     AlterExpr alter_table = 1;
 }
 
+message AlterTableTasks { repeated AlterTableTask tasks = 1; }
+
 message TruncateTableTask {
     TruncateTableExpr truncate_table = 1;
 }
 
-message SubmitDdlTaskRequest {
+message DropDatabaseTask {
+    DropDatabaseExpr drop_database = 1;
+}
+
+message CreateFlowTask {
+    CreateFlowTaskExpr create_flow_task = 1;
+}
+
+message DropFlowTask {
+    DropFlowTaskExpr drop_flow_task = 1;
+}
+
+message DdlTaskRequest {
     RequestHeader header = 1;
 
     oneof task {
@@ -59,14 +75,23 @@ message SubmitDdlTaskRequest {
         DropTableTask drop_table_task = 3;
         AlterTableTask alter_table_task = 4;
         TruncateTableTask truncate_table_task = 5;
+        CreateTableTasks create_table_tasks = 6;
+        DropTableTasks drop_table_tasks = 7;
+        AlterTableTasks alter_table_tasks = 8;
+        DropDatabaseTask drop_database_task = 9;
+        CreateDatabaseTask create_database_task = 10;
+        CreateFlowTask create_flow_task = 11;
+        DropFlowTask drop_flow_task = 12;
      }
 }
 
-message SubmitDdlTaskResponse {
+message DdlTaskResponse {
     ResponseHeader header = 1;
-    // Key is the identifier for the ddl task.
-    bytes key = 2;
+    ProcedureId pid = 2;
 
     // Returns if table created.
+    // TODO(jeremy): remove it?
     TableId table_id = 4;
+    // Returns if the tables created.
+    repeated TableId table_ids = 5;
 }

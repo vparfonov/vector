@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "bitmask-enum"
-version = "2.2.4"
+version = "2.2.5"
 authors = ["Lukas3674 <lukashassler@web.de>"]
 build = false
 autobins = false
@@ -43,8 +43,16 @@ name = "custom"
 path = "examples/custom.rs"
 
 [[example]]
+name = "display"
+path = "examples/display.rs"
+
+[[example]]
 name = "simple"
 path = "examples/simple.rs"
+
+[[test]]
+name = "no_std"
+path = "tests/no_std.rs"
 
 [[test]]
 name = "tests"

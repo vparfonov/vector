@@ -1,8 +1,13 @@
 #![cfg(feature = "full")]
 #![warn(rust_2018_idioms)]
 #![cfg(unix)]
+#![cfg(not(miri))]
 
 use std::io;
+#[cfg(target_os = "android")]
+use std::os::android::net::SocketAddrExt;
+#[cfg(target_os = "linux")]
+use std::os::linux::net::SocketAddrExt;
 use std::task::Poll;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt, Interest};
@@ -406,6 +411,36 @@ async fn epollhup() -> io::Result<()> {
     drop(listener);
 
     let err = connect.await.unwrap_err();
-    assert_eq!(err.kind(), io::ErrorKind::ConnectionReset);
+    let errno = err.kind();
+    assert!(
+        // As far as I can tell, whether we see ECONNREFUSED or ECONNRESET here
+        // seems relatively inconsistent, at least on non-Linux operating
+        // systems. The difference in meaning between these errnos is not
+        // particularly well-defined, so let's just accept either.
+        matches!(
+            errno,
+            io::ErrorKind::ConnectionRefused | io::ErrorKind::ConnectionReset
+        ),
+        "unexpected error kind: {errno:?} (expected ConnectionRefused or ConnectionReset)"
+    );
     Ok(())
+}
+
+// test for https://github.com/tokio-rs/tokio/issues/6767
+#[tokio::test]
+#[cfg(any(target_os = "linux", target_os = "android"))]
+async fn abstract_socket_name() {
+    let socket_path = "\0aaa";
+    let listener = UnixListener::bind(socket_path).unwrap();
+
+    let accept = listener.accept();
+    let connect = UnixStream::connect(&socket_path);
+
+    let ((stream, _), _) = try_join(accept, connect).await.unwrap();
+
+    let local_addr = stream.into_std().unwrap().local_addr().unwrap();
+    let abstract_path_name = local_addr.as_abstract_name().unwrap();
+
+    // `as_abstract_name` removes leading zero bytes
+    assert_eq!(abstract_path_name, b"aaa");
 }

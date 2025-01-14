@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.78"
+rust-version = "1.79"
 name = "vrl"
-version = "0.17.0"
+version = "0.20.1"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 description = "Vector Remap Language"
 homepage = "https://vrl.dev/"
@@ -30,18 +30,10 @@ repository = "https://github.com/vectordotdev/vrl"
 [[bench]]
 name = "kind"
 harness = false
-required-features = [
-    "default",
-    "test",
-]
 
 [[bench]]
 name = "keyvalue"
 harness = false
-required-features = [
-    "default",
-    "test",
-]
 
 [[bench]]
 name = "stdlib"
@@ -53,6 +45,10 @@ required-features = [
 
 [dependencies.aes]
 version = "0.8"
+optional = true
+
+[dependencies.aes-siv]
+version = "0.7.0"
 optional = true
 
 [dependencies.ansi_term]
@@ -69,7 +65,7 @@ version = "0.2"
 optional = true
 
 [dependencies.base62]
-version = "2.0.2"
+version = "2.0.3"
 optional = true
 
 [dependencies.base64]
@@ -112,7 +108,7 @@ optional = true
 default-features = false
 
 [dependencies.chrono-tz]
-version = "0.9"
+version = "0.10"
 optional = true
 default-features = false
 
@@ -131,6 +127,10 @@ optional = true
 
 [dependencies.community-id]
 version = "0.2"
+optional = true
+
+[dependencies.convert_case]
+version = "0.6.0"
 optional = true
 
 [dependencies.crypto_secretbox]
@@ -163,6 +163,11 @@ default-features = false
 version = "1"
 optional = true
 
+[dependencies.fancy-regex]
+version = "0.14.0"
+optional = true
+default-features = false
+
 [dependencies.flate2]
 version = "1"
 features = ["default"]
@@ -182,11 +187,11 @@ version = "0.1"
 optional = true
 
 [dependencies.idna]
-version = "0.5"
+version = "1.0"
 optional = true
 
 [dependencies.indexmap]
-version = "~2.2.6"
+version = "2"
 features = ["std"]
 optional = true
 default-features = false
@@ -195,13 +200,18 @@ default-features = false
 version = "2"
 optional = true
 
+[dependencies.influxdb-line-protocol]
+version = "2.0.0"
+optional = true
+
 [dependencies.itertools]
 version = "0.13"
+features = ["use_std"]
 optional = true
 default-features = false
 
 [dependencies.lalrpop-util]
-version = "0.20"
+version = "0.22"
 optional = true
 
 [dependencies.md-5]
@@ -209,7 +219,7 @@ version = "0.10"
 optional = true
 
 [dependencies.mlua]
-version = "0.9"
+version = "0.10"
 features = [
     "lua54",
     "send",
@@ -266,7 +276,7 @@ optional = true
 default-features = false
 
 [dependencies.prettydiff]
-version = "0.7"
+version = "0.8"
 optional = true
 default-features = false
 
@@ -280,17 +290,17 @@ version = "1"
 optional = true
 
 [dependencies.proptest-derive]
-version = "0.4"
+version = "0.5"
 optional = true
 
 [dependencies.prost]
-version = "0.12"
+version = "0.13"
 features = ["std"]
 optional = true
 default-features = false
 
 [dependencies.prost-reflect]
-version = "0.13"
+version = "0.14"
 optional = true
 default-features = false
 
@@ -394,7 +404,7 @@ version = "1"
 optional = true
 
 [dependencies.thiserror]
-version = "1"
+version = "2"
 optional = true
 
 [dependencies.tracing]
@@ -433,7 +443,7 @@ default-features = false
 version = "1"
 
 [dev-dependencies.chrono-tz]
-version = "0.9"
+version = "0.10"
 
 [dev-dependencies.criterion]
 version = "0.5"
@@ -442,7 +452,7 @@ version = "0.5"
 version = "2"
 
 [dev-dependencies.mlua]
-version = "0.9"
+version = "0.10"
 features = [
     "lua54",
     "send",
@@ -458,7 +468,7 @@ default-features = false
 version = "1"
 
 [dev-dependencies.proptest-derive]
-version = "0.4"
+version = "0.5"
 
 [dev-dependencies.quickcheck]
 version = "1"
@@ -532,6 +542,7 @@ datadog = [
     "datadog_search",
 ]
 datadog_filter = [
+    "path",
     "datadog_search",
     "dep:regex",
     "dep:dyn-clone",
@@ -548,6 +559,7 @@ datadog_grok = [
     "dep:chrono",
     "dep:chrono-tz",
     "dep:percent-encoding",
+    "dep:fancy-regex",
 ]
 datadog_search = [
     "dep:pest",
@@ -555,6 +567,7 @@ datadog_search = [
     "dep:itertools",
     "dep:once_cell",
     "dep:regex",
+    "dep:serde",
 ]
 default = [
     "compiler",
@@ -609,6 +622,7 @@ stdlib = [
     "datadog",
     "parsing",
     "dep:aes",
+    "dep:aes-siv",
     "dep:base16",
     "dep:base62",
     "dep:base64",
@@ -616,6 +630,7 @@ stdlib = [
     "dep:cfb-mode",
     "dep:chacha20poly1305",
     "dep:charset",
+    "dep:convert_case",
     "dep:cidr-utils",
     "dep:community-id",
     "dep:crypto_secretbox",
@@ -633,6 +648,7 @@ stdlib = [
     "dep:iana-time-zone",
     "dep:idna",
     "dep:indexmap",
+    "dep:influxdb-line-protocol",
     "dep:md-5",
     "dep:nom",
     "dep:ofb",
@@ -684,7 +700,7 @@ version = "2"
 optional = true
 
 [target."cfg(not(target_arch = \"wasm32\"))".dependencies.domain]
-version = "0.10.1"
+version = "0.10.3"
 features = [
     "resolv-sync",
     "serde",

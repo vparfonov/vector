@@ -16,7 +16,7 @@ s! {
         pub sa_flags: ::c_int,
         pub sa_sigaction: ::sighandler_t,
         pub sa_mask: ::sigset_t,
-        pub sa_restorer: ::Option<extern fn()>,
+        pub sa_restorer: ::Option<extern "C" fn()>,
     }
 
     pub struct rlimit64 {
@@ -136,7 +136,7 @@ s_no_extra_traits! {
     }
 
     pub struct sigset64_t {
-        __bits: [::c_ulong; 1]
+        __bits: [::c_ulong; 1],
     }
 }
 
@@ -146,10 +146,10 @@ cfg_if! {
             fn eq(&self, other: &pthread_mutex_t) -> bool {
                 self.value == other.value
                     && self
-                    .__reserved
-                    .iter()
-                    .zip(other.__reserved.iter())
-                    .all(|(a,b)| a == b)
+                        .__reserved
+                        .iter()
+                        .zip(other.__reserved.iter())
+                        .all(|(a, b)| a == b)
             }
         }
 
@@ -175,10 +175,10 @@ cfg_if! {
             fn eq(&self, other: &pthread_cond_t) -> bool {
                 self.value == other.value
                     && self
-                    .__reserved
-                    .iter()
-                    .zip(other.__reserved.iter())
-                    .all(|(a,b)| a == b)
+                        .__reserved
+                        .iter()
+                        .zip(other.__reserved.iter())
+                        .all(|(a, b)| a == b)
             }
         }
 
@@ -208,10 +208,10 @@ cfg_if! {
                     && self.pendingWriters == other.pendingWriters
                     && self.attr == other.attr
                     && self
-                    .__reserved
-                    .iter()
-                    .zip(other.__reserved.iter())
-                    .all(|(a,b)| a == b)
+                        .__reserved
+                        .iter()
+                        .zip(other.__reserved.iter())
+                        .all(|(a, b)| a == b)
             }
         }
 
@@ -264,31 +264,6 @@ pub const RTLD_GLOBAL: ::c_int = 0x00100;
 pub const RTLD_NOW: ::c_int = 2;
 pub const RTLD_DEFAULT: *mut ::c_void = 0i64 as *mut ::c_void;
 
-// From NDK's linux/auxvec.h
-pub const AT_NULL: ::c_ulong = 0;
-pub const AT_IGNORE: ::c_ulong = 1;
-pub const AT_EXECFD: ::c_ulong = 2;
-pub const AT_PHDR: ::c_ulong = 3;
-pub const AT_PHENT: ::c_ulong = 4;
-pub const AT_PHNUM: ::c_ulong = 5;
-pub const AT_PAGESZ: ::c_ulong = 6;
-pub const AT_BASE: ::c_ulong = 7;
-pub const AT_FLAGS: ::c_ulong = 8;
-pub const AT_ENTRY: ::c_ulong = 9;
-pub const AT_NOTELF: ::c_ulong = 10;
-pub const AT_UID: ::c_ulong = 11;
-pub const AT_EUID: ::c_ulong = 12;
-pub const AT_GID: ::c_ulong = 13;
-pub const AT_EGID: ::c_ulong = 14;
-pub const AT_PLATFORM: ::c_ulong = 15;
-pub const AT_HWCAP: ::c_ulong = 16;
-pub const AT_CLKTCK: ::c_ulong = 17;
-pub const AT_SECURE: ::c_ulong = 23;
-pub const AT_BASE_PLATFORM: ::c_ulong = 24;
-pub const AT_RANDOM: ::c_ulong = 25;
-pub const AT_HWCAP2: ::c_ulong = 26;
-pub const AT_EXECFN: ::c_ulong = 31;
-
 pub const PTHREAD_MUTEX_INITIALIZER: pthread_mutex_t = pthread_mutex_t {
     value: 0,
     __reserved: [0; 36],
@@ -323,7 +298,7 @@ f! {
         fd: ::c_int,
         addr: *mut ::sockaddr,
         len: *mut ::socklen_t,
-        flg: ::c_int
+        flg: ::c_int,
     ) -> ::c_int {
         ::syscall(SYS_accept4, fd, addr, len, flg) as ::c_int
     }

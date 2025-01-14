@@ -59,7 +59,6 @@ use crate::prelude::*;
 /// assert_eq!(b64, serde_json::from_value(json).unwrap());
 /// # }
 /// ```
-
 // The padding might be better as `const PADDING: bool = true`
 // https://blog.rust-lang.org/inside-rust/2021/09/06/Splitting-const-generics.html#featureconst_generics_default/
 pub struct Base64<ALPHABET: Alphabet = Standard, PADDING: formats::Format = formats::Padded>(
@@ -123,7 +122,7 @@ where
     {
         struct Helper<T, ALPHABET>(PhantomData<(T, ALPHABET)>);
 
-        impl<'de, T, ALPHABET> Visitor<'de> for Helper<T, ALPHABET>
+        impl<T, ALPHABET> Visitor<'_> for Helper<T, ALPHABET>
         where
             T: TryFrom<Vec<u8>>,
             ALPHABET: Alphabet,

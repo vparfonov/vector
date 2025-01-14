@@ -12,6 +12,10 @@
     redundant_semicolons,
     unused_macros,
     unused_macro_rules,
+    // FIXME: temporarily allow dead_code to fix CI:
+    // - https://github.com/rust-lang/libc/issues/3740
+    // - https://github.com/rust-lang/rust/pull/126456
+    dead_code,
 )]
 #![cfg_attr(libc_deny_warnings, deny(warnings))]
 // Attributes needed when building as part of the standard library
@@ -22,7 +26,6 @@
 #![deny(missing_copy_implementations, safe_packed_borrows)]
 #![cfg_attr(not(feature = "rustc-dep-of-std"), no_std)]
 #![cfg_attr(feature = "rustc-dep-of-std", no_core)]
-#![cfg_attr(libc_const_extern_fn_unstable, feature(const_extern_fn))]
 
 #[macro_use]
 mod macros;
@@ -39,52 +42,26 @@ cfg_if! {
     }
 }
 
-cfg_if! {
-    if #[cfg(libc_priv_mod_use)] {
-        #[cfg(libc_core_cvoid)]
-        #[allow(unused_imports)]
-        use core::ffi;
-        #[allow(unused_imports)]
-        use core::fmt;
-        #[allow(unused_imports)]
-        use core::hash;
-        #[allow(unused_imports)]
-        use core::num;
-        #[allow(unused_imports)]
-        use core::mem;
-        #[doc(hidden)]
-        #[allow(unused_imports)]
-        use core::clone::Clone;
-        #[doc(hidden)]
-        #[allow(unused_imports)]
-        use core::marker::{Copy, Send, Sync};
-        #[doc(hidden)]
-        #[allow(unused_imports)]
-        use core::option::Option;
-    } else {
-        #[doc(hidden)]
-        #[allow(unused_imports)]
-        pub use core::fmt;
-        #[doc(hidden)]
-        #[allow(unused_imports)]
-        pub use core::hash;
-        #[doc(hidden)]
-        #[allow(unused_imports)]
-        pub use core::num;
-        #[doc(hidden)]
-        #[allow(unused_imports)]
-        pub use core::mem;
-        #[doc(hidden)]
-        #[allow(unused_imports)]
-        pub use core::clone::Clone;
-        #[doc(hidden)]
-        #[allow(unused_imports)]
-        pub use core::marker::{Copy, Send, Sync};
-        #[doc(hidden)]
-        #[allow(unused_imports)]
-        pub use core::option::Option;
-    }
-}
+#[doc(hidden)]
+#[allow(unused_imports)]
+use core::clone::Clone;
+#[allow(unused_imports)]
+use core::ffi;
+pub use core::ffi::c_void;
+#[allow(unused_imports)]
+use core::fmt;
+#[allow(unused_imports)]
+use core::hash;
+#[doc(hidden)]
+#[allow(unused_imports)]
+use core::marker::{Copy, Send, Sync};
+#[allow(unused_imports)]
+use core::mem;
+#[allow(unused_imports)]
+use core::num;
+#[doc(hidden)]
+#[allow(unused_imports)]
+use core::option::Option;
 
 cfg_if! {
     if #[cfg(windows)] {
@@ -141,6 +118,12 @@ cfg_if! {
 
         mod teeos;
         pub use teeos::*;
+    } else if #[cfg(target_os = "trusty")] {
+        mod fixed_width_ints;
+        pub use fixed_width_ints::*;
+
+        mod trusty;
+        pub use trusty::*;
     } else if #[cfg(all(target_env = "sgx", target_vendor = "fortanix"))] {
         mod fixed_width_ints;
         pub use fixed_width_ints::*;

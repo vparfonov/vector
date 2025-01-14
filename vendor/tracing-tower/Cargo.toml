@@ -15,10 +15,16 @@ rust-version = "1.49.0"
 name = "tracing-tower"
 version = "0.1.0"
 authors = ["Eliza Weisman <eliza@buoyant.io>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
 Compatibility with the `tower` ecosystem.
 """
 homepage = "https://tokio.rs"
+readme = false
 keywords = [
     "logging",
     "tracing",
@@ -37,6 +43,10 @@ rustdoc-args = [
     "--cfg",
     "docsrs",
 ]
+
+[lib]
+name = "tracing_tower"
+path = "src/lib.rs"
 
 [dependencies]
 futures = "0.3"

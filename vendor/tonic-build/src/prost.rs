@@ -506,7 +506,7 @@ impl Builder {
     /// should be enabled automatically when run from a build script. However,
     /// the method of detection is not completely reliable since the `CARGO`
     /// environment variable can have been set by anything else. If writing the
-    /// instructions to `stdout` is undesireable, you can disable this setting
+    /// instructions to `stdout` is undesirable, you can disable this setting
     /// explicitly.
     pub fn emit_rerun_if_changed(mut self, enable: bool) -> Self {
         self.emit_rerun_if_changed = enable;
@@ -541,13 +541,9 @@ impl Builder {
         protos: &[impl AsRef<Path>],
         includes: &[impl AsRef<Path>],
     ) -> io::Result<()> {
-        let out_dir = if let Some(out_dir) = self.out_dir.as_ref() {
-            out_dir.clone()
-        } else {
-            PathBuf::from(std::env::var("OUT_DIR").unwrap())
-        };
-
-        config.out_dir(out_dir);
+        if let Some(out_dir) = self.out_dir.as_ref() {
+            config.out_dir(out_dir);
+        }
         if let Some(path) = self.file_descriptor_set_path.as_ref() {
             config.file_descriptor_set_path(path);
         }

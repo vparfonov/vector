@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "ntapi"
-version = "0.3.7"
+version = "0.4.1"
 authors = ["MSxDOS <melcodos@gmail.com>"]
 include = [
     "src/**/*",
@@ -42,7 +42,6 @@ repository = "https://github.com/MSxDOS/ntapi"
 
 [package.metadata.docs.rs]
 default-target = "x86_64-pc-windows-msvc"
-features = ["beta"]
 targets = [
     "aarch64-pc-windows-msvc",
     "i686-pc-windows-msvc",
@@ -63,10 +62,8 @@ features = [
 ]
 
 [features]
-beta = []
 default = ["user"]
 func-types = []
 impl-default = ["winapi/impl-default"]
 kernel = []
-nightly = ["beta"]
 user = []

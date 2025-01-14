@@ -18,7 +18,7 @@ macro_rules! assert_buffer_eq {
                     .into_iter()
                     .enumerate()
                     .map(|(i, (x, y, cell))| {
-                        let expected_cell = expected.get(x, y);
+                        let expected_cell = &expected[(x, y)];
                         format!("{i}: at ({x}, {y})\n  expected: {expected_cell:?}\n  actual:   {cell:?}")
                     })
                     .collect::<Vec<String>>()
@@ -41,7 +41,11 @@ macro_rules! assert_buffer_eq {
 #[allow(deprecated)]
 #[cfg(test)]
 mod tests {
-    use crate::prelude::*;
+    use crate::{
+        buffer::Buffer,
+        layout::Rect,
+        style::{Color, Style},
+    };
 
     #[test]
     fn assert_buffer_eq_does_not_panic_on_equal_buffers() {

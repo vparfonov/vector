@@ -34,7 +34,7 @@ s! {
         pub __seq: ::c_ushort,
         __pad2: ::c_ushort,
         __unused1: ::c_ulong,
-        __unused2: ::c_ulong
+        __unused2: ::c_ulong,
     }
 
     #[cfg(not(target_os = "l4re"))]
@@ -55,9 +55,9 @@ s! {
     }
 
     pub struct siginfo_t {
-        si_signo: ::c_int, // signal number
-        si_errno: ::c_int, // if not zero: error value of signal, see errno.h
-        si_code: ::c_int,  // signal code
+        si_signo: ::c_int,       // signal number
+        si_errno: ::c_int,       // if not zero: error value of signal, see errno.h
+        si_code: ::c_int,        // signal code
         pub _pad: [::c_int; 28], // unported union
         _align: [usize; 0],
     }
@@ -72,7 +72,7 @@ s! {
         pub shm_lpid: ::pid_t,
         pub shm_nattch: ::shmatt_t,
         __unused1: ::c_ulong,
-        __unused2: ::c_ulong
+        __unused2: ::c_ulong,
     }
 
     pub struct msqid_ds {
@@ -109,17 +109,17 @@ s! {
         pub sin6_scope_id: u32,
     }
 
-    // ------------------------------------------------------------
-    // definitions below are *unverified* and might **break** the software
-//    pub struct in_addr {
-//        pub s_addr: in_addr_t,
-//    }
-//
-//    pub struct in6_addr {
-//        pub s6_addr: [u8; 16],
-//        #[cfg(not(libc_align))]
-//        __align: [u32; 0],
-//    }
+    /* ------------------------------------------------------------
+     * definitions below are *unverified* and might **break** the software
+     */
+
+    //    pub struct in_addr {
+    //        pub s_addr: in_addr_t,
+    //    }
+    //
+    //    pub struct in6_addr {
+    //        pub s6_addr: [u8; 16],
+    //    }
 
     pub struct stat {
         pub st_dev: ::c_ulong,
@@ -131,7 +131,7 @@ s! {
         pub st_uid: ::uid_t,
         pub st_gid: ::gid_t,
         pub st_rdev: ::c_ulong, // dev_t
-        pub st_size: off_t, // file size
+        pub st_size: off_t,     // file size
         pub st_blksize: ::blksize_t,
         pub st_blocks: ::blkcnt_t,
         pub st_atime: ::time_t,
@@ -140,23 +140,25 @@ s! {
         pub st_mtime_nsec: ::c_ulong,
         pub st_ctime: ::time_t,
         pub st_ctime_nsec: ::c_ulong,
-        st_pad4: [::c_long; 3]
+        st_pad4: [::c_long; 3],
     }
 
     pub struct sigaction {
         pub sa_handler: ::sighandler_t,
         pub sa_flags: ::c_ulong,
-        pub sa_restorer: ::Option<extern fn()>,
+        pub sa_restorer: ::Option<extern "C" fn()>,
         pub sa_mask: ::sigset_t,
     }
 
-    pub struct stack_t { // FIXME
+    pub struct stack_t {
+        // FIXME
         pub ss_sp: *mut ::c_void,
         pub ss_flags: ::c_int,
-        pub ss_size: ::size_t
+        pub ss_size: ::size_t,
     }
 
-    pub struct statfs { // FIXME
+    pub struct statfs {
+        // FIXME
         pub f_type: fsword_t,
         pub f_bsize: fsword_t,
         pub f_blocks: ::fsblkcnt_t,
@@ -201,7 +203,8 @@ s! {
         __f_spare: [::c_int; 6],
     }
 
-    pub struct msghdr { // FIXME
+    pub struct msghdr {
+        // FIXME
         pub msg_name: *mut ::c_void,
         pub msg_namelen: ::socklen_t,
         pub msg_iov: *mut ::iovec,
@@ -211,7 +214,8 @@ s! {
         pub msg_flags: ::c_int,
     }
 
-    pub struct termios { // FIXME
+    pub struct termios {
+        // FIXME
         pub c_iflag: ::tcflag_t,
         pub c_oflag: ::tcflag_t,
         pub c_cflag: ::tcflag_t,
@@ -220,11 +224,13 @@ s! {
         pub c_cc: [::cc_t; ::NCCS],
     }
 
-    pub struct sigset_t { // FIXME
+    pub struct sigset_t {
+        // FIXME
         __val: [::c_ulong; 16],
     }
 
-    pub struct sysinfo { // FIXME
+    pub struct sysinfo {
+        // FIXME
         pub uptime: ::c_long,
         pub loads: [::c_ulong; 3],
         pub totalram: ::c_ulong,
@@ -241,7 +247,8 @@ s! {
         pub _f: [::c_char; 0],
     }
 
-    pub struct glob_t { // FIXME
+    pub struct glob_t {
+        // FIXME
         pub gl_pathc: ::size_t,
         pub gl_pathv: *mut *mut c_char,
         pub gl_offs: ::size_t,
@@ -253,18 +260,20 @@ s! {
         __unused5: *mut ::c_void,
     }
 
-    pub struct cpu_set_t { // FIXME
+    pub struct cpu_set_t {
+        // FIXME
         #[cfg(target_pointer_width = "32")]
         bits: [u32; 32],
         #[cfg(target_pointer_width = "64")]
         bits: [u64; 16],
     }
 
-    pub struct fsid_t { // FIXME
+    pub struct fsid_t {
+        // FIXME
         __val: [::c_int; 2],
     }
 
-    // FIXME this is actually a union
+    // FIXME(1.0): this is actually a union
     pub struct sem_t {
         #[cfg(target_pointer_width = "32")]
         __size: [::c_char; 16],
@@ -311,15 +320,15 @@ pub const EHOSTUNREACH: ::c_int = 113; // No route to host
 pub const EDQUOT: ::c_int = 122; // Quota exceeded
 pub const EOPNOTSUPP: ::c_int = 0x5f;
 pub const ENODATA: ::c_int = 0x3d;
-pub const O_APPEND: ::c_int = 02000;
-pub const O_ACCMODE: ::c_int = 0003;
+pub const O_APPEND: ::c_int = 0o2000;
+pub const O_ACCMODE: ::c_int = 0o003;
 pub const O_CLOEXEC: ::c_int = 0x80000;
 pub const O_CREAT: ::c_int = 0100;
-pub const O_DIRECTORY: ::c_int = 0200000;
-pub const O_EXCL: ::c_int = 0200;
+pub const O_DIRECTORY: ::c_int = 0o200000;
+pub const O_EXCL: ::c_int = 0o200;
 pub const O_NOFOLLOW: ::c_int = 0x20000;
-pub const O_NONBLOCK: ::c_int = 04000;
-pub const O_TRUNC: ::c_int = 01000;
+pub const O_NONBLOCK: ::c_int = 0o4000;
+pub const O_TRUNC: ::c_int = 0o1000;
 pub const NCCS: usize = 32;
 pub const SIG_SETMASK: ::c_int = 2; // Set the set of blocked signals
 pub const __SIZEOF_PTHREAD_MUTEX_T: usize = 40;
@@ -332,7 +341,7 @@ pub const __SIZEOF_PTHREAD_RWLOCK_T: usize = 56;
 pub const __SIZEOF_PTHREAD_RWLOCKATTR_T: usize = 8;
 pub const __SIZEOF_PTHREAD_BARRIER_T: usize = 32;
 pub const __SIZEOF_PTHREAD_BARRIERATTR_T: usize = 4;
-pub const PIDFD_NONBLOCK: ::c_int = 04000;
+pub const PIDFD_NONBLOCK: ::c_int = 0o4000;
 
 cfg_if! {
     if #[cfg(target_os = "l4re")] {

@@ -6,6 +6,45 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0), 
 
 ## Unreleased
 
+## [0.4.18](https://github.com/Nullus157/async-compression/compare/v0.4.17...v0.4.18) - 2024-11-23
+
+### Fixed
+
+- Adjust `Level::Precise` clamp range for flate2.
+
+## [0.4.17](https://github.com/Nullus157/async-compression/compare/v0.4.16...v0.4.17) - 2024-10-20
+
+### Fixed
+
+- Fix occasional panics when consuming from pending buffers.
+
+## [0.4.16](https://github.com/Nullus157/async-compression/compare/v0.4.15...v0.4.16) - 2024-10-16
+
+### Other
+
+- Implement pass-through `AsyncBufRead` on write-based encoders & decoders.
+
+## [0.4.15](https://github.com/Nullus157/async-compression/compare/v0.4.14...v0.4.15) - 2024-10-13
+
+### Feature
+- Implement pass-through `AsyncRead` or `AsyncWrite` where appropriate.
+- Relax `AsyncRead`/`AsyncWrite` bounds on `*::{get_ref, get_mut, get_pin_mut, into_inner}()` methods.
+
+## [0.4.14](https://github.com/Nullus157/async-compression/compare/v0.4.13...v0.4.14) - 2024-10-10
+
+### Fixed
+- In Tokio-based decoders, attempt to decode from internal state even if nothing was read.
+
+## [0.4.13](https://github.com/Nullus157/async-compression/compare/v0.4.12...v0.4.13) - 2024-10-02
+
+### Feature
+- Update `brotli` dependency to to `7`.
+
+## [0.4.12](https://github.com/Nullus157/async-compression/compare/v0.4.11...v0.4.12) - 2024-07-21
+
+### Feature
+- Enable customizing Zstd decoding parameters.
+
 ## [0.4.11](https://github.com/Nullus157/async-compression/compare/v0.4.10...v0.4.11) - 2024-05-30
 
 ### Other

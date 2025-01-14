@@ -1,4 +1,7 @@
-use crate::{prelude::*, style::Styled};
+use crate::style::{Style, Styled};
+
+const NBSP: &str = "\u{00a0}";
+const ZWSP: &str = "\u{200b}";
 
 /// A grapheme associated to a style.
 /// Note that, although `StyledGrapheme` is the smallest divisible unit of text,
@@ -16,11 +19,18 @@ impl<'a> StyledGrapheme<'a> {
     ///
     /// `style` accepts any type that is convertible to [`Style`] (e.g. [`Style`], [`Color`], or
     /// your own type that implements [`Into<Style>`]).
+    ///
+    /// [`Color`]: crate::style::Color
     pub fn new<S: Into<Style>>(symbol: &'a str, style: S) -> Self {
         Self {
             symbol,
             style: style.into(),
         }
+    }
+
+    pub(crate) fn is_whitespace(&self) -> bool {
+        let symbol = self.symbol;
+        symbol == ZWSP || symbol.chars().all(char::is_whitespace) && symbol != NBSP
     }
 }
 
@@ -40,6 +50,7 @@ impl<'a> Styled for StyledGrapheme<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::style::Stylize;
 
     #[test]
     fn new() {

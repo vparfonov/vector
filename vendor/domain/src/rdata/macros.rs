@@ -506,6 +506,17 @@ macro_rules! rdata_types {
         /// This enum collects the record data types for all currently
         /// implemented record types.
         #[derive(Clone)]
+        #[cfg_attr(
+            feature = "serde",
+            derive(serde::Serialize),
+            serde(bound(
+                serialize = "
+                    O: AsRef<[u8]> + octseq::serde::SerializeOctets,
+                    N: serde::Serialize,
+                ",
+            )),
+            serde(rename_all = "UPPERCASE")
+        )]
         #[non_exhaustive]
         pub enum AllRecordData<O, N> {
             $( $( $(
@@ -1156,7 +1167,6 @@ macro_rules! name_type_base {
                 Target::try_octets_from(self.$field).map($target::new)
             }
 
-            #[allow(dead_code)] // XXX Remove
             pub(in crate::rdata) fn flatten<Target>(
                 self
             ) -> Result<$target<Target>, N::AppendError>

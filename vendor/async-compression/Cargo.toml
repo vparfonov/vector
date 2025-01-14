@@ -12,11 +12,16 @@
 [package]
 edition = "2018"
 name = "async-compression"
-version = "0.4.11"
+version = "0.4.18"
 authors = [
     "Wim Looman <wim@nemo157.com>",
     "Allen Bui <fairingrey@gmail.com>",
 ]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
 Adaptors between compression crates and Rust's modern asynchronous IO types.
 """
@@ -42,8 +47,13 @@ rustdoc-args = [
     "docsrs",
 ]
 
+[lib]
+name = "async_compression"
+path = "src/lib.rs"
+
 [[example]]
 name = "zlib_tokio_write"
+path = "examples/zlib_tokio_write.rs"
 required-features = [
     "zlib",
     "tokio",
@@ -51,6 +61,7 @@ required-features = [
 
 [[example]]
 name = "zstd_gzip"
+path = "examples/zstd_gzip.rs"
 required-features = [
     "zstd",
     "gzip",
@@ -59,45 +70,66 @@ required-features = [
 
 [[test]]
 name = "brotli"
+path = "tests/brotli.rs"
 required-features = ["brotli"]
 
 [[test]]
 name = "bzip2"
+path = "tests/bzip2.rs"
 required-features = ["bzip2"]
 
 [[test]]
 name = "deflate"
+path = "tests/deflate.rs"
 required-features = ["deflate"]
 
 [[test]]
 name = "gzip"
+path = "tests/gzip.rs"
 required-features = ["gzip"]
 
 [[test]]
 name = "lzma"
+path = "tests/lzma.rs"
 required-features = ["lzma"]
 
 [[test]]
+name = "proptest"
+path = "tests/proptest.rs"
+
+[[test]]
 name = "xz"
+path = "tests/xz.rs"
 required-features = ["xz"]
 
 [[test]]
 name = "zlib"
+path = "tests/zlib.rs"
 required-features = ["zlib"]
 
 [[test]]
 name = "zstd"
+path = "tests/zstd.rs"
 required-features = ["zstd"]
 
 [[test]]
 name = "zstd-dict"
+path = "tests/zstd-dict.rs"
+required-features = [
+    "zstd",
+    "tokio",
+]
+
+[[test]]
+name = "zstd-window-size"
+path = "tests/zstd-window-size.rs"
 required-features = [
     "zstd",
     "tokio",
 ]
 
 [dependencies.brotli]
-version = "6.0"
+version = "7.0"
 optional = true
 
 [dependencies.bzip2]
@@ -123,7 +155,7 @@ optional = true
 default-features = false
 
 [dependencies.libzstd]
-version = "0.13"
+version = "0.13.1"
 optional = true
 default-features = false
 package = "zstd"
@@ -164,7 +196,7 @@ version = "0.9"
 version = "1"
 
 [dev-dependencies.proptest-derive]
-version = "0.4"
+version = "0.5"
 
 [dev-dependencies.rand]
 version = "0.8.5"

@@ -52,7 +52,18 @@ s! {
 s_no_extra_traits! {
     pub struct pthread_attr_t {
         __sig: c_long,
-        __opaque: [::c_char; 36]
+        __opaque: [::c_char; 36],
+    }
+
+    pub struct pthread_once_t {
+        __sig: c_long,
+        __opaque: [::c_char; ::__PTHREAD_ONCE_SIZE__],
+    }
+
+    #[allow(missing_debug_implementations)]
+    #[repr(align(16))]
+    pub struct max_align_t {
+        priv_: [f64; 2],
     }
 }
 
@@ -61,10 +72,11 @@ cfg_if! {
         impl PartialEq for pthread_attr_t {
             fn eq(&self, other: &pthread_attr_t) -> bool {
                 self.__sig == other.__sig
-                    && self.__opaque
-                    .iter()
-                    .zip(other.__opaque.iter())
-                    .all(|(a,b)| a == b)
+                    && self
+                        .__opaque
+                        .iter()
+                        .zip(other.__opaque.iter())
+                        .all(|(a, b)| a == b)
             }
         }
         impl Eq for pthread_attr_t {}
@@ -72,11 +84,35 @@ cfg_if! {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("pthread_attr_t")
                     .field("__sig", &self.__sig)
-                // FIXME: .field("__opaque", &self.__opaque)
+                    // FIXME: .field("__opaque", &self.__opaque)
                     .finish()
             }
         }
         impl ::hash::Hash for pthread_attr_t {
+            fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
+                self.__sig.hash(state);
+                self.__opaque.hash(state);
+            }
+        }
+        impl PartialEq for pthread_once_t {
+            fn eq(&self, other: &pthread_once_t) -> bool {
+                self.__sig == other.__sig
+                    && self
+                        .__opaque
+                        .iter()
+                        .zip(other.__opaque.iter())
+                        .all(|(a, b)| a == b)
+            }
+        }
+        impl Eq for pthread_once_t {}
+        impl ::fmt::Debug for pthread_once_t {
+            fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
+                f.debug_struct("pthread_once_t")
+                    .field("__sig", &self.__sig)
+                    .finish()
+            }
+        }
+        impl ::hash::Hash for pthread_once_t {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
                 self.__sig.hash(state);
                 self.__opaque.hash(state);
@@ -92,6 +128,7 @@ pub const NET_RT_MAXID: ::c_int = 10;
 pub const __PTHREAD_MUTEX_SIZE__: usize = 40;
 pub const __PTHREAD_COND_SIZE__: usize = 24;
 pub const __PTHREAD_CONDATTR_SIZE__: usize = 4;
+pub const __PTHREAD_ONCE_SIZE__: usize = 4;
 pub const __PTHREAD_RWLOCK_SIZE__: usize = 124;
 pub const __PTHREAD_RWLOCKATTR_SIZE__: usize = 12;
 
@@ -103,17 +140,16 @@ pub const BIOCSRTIMEOUT: ::c_ulong = 0x8008426d;
 pub const BIOCGRTIMEOUT: ::c_ulong = 0x4008426e;
 pub const BIOCSETFNR: ::c_ulong = 0x8008427e;
 
+const _PTHREAD_ONCE_SIG_INIT: c_long = 0x30B1BCBA;
+pub const PTHREAD_ONCE_INIT: ::pthread_once_t = ::pthread_once_t {
+    __sig: _PTHREAD_ONCE_SIG_INIT,
+    __opaque: [0; 4],
+};
+
 extern "C" {
     pub fn exchangedata(
         path1: *const ::c_char,
         path2: *const ::c_char,
         options: ::c_ulong,
     ) -> ::c_int;
-}
-
-cfg_if! {
-    if #[cfg(libc_align)] {
-        mod align;
-        pub use self::align::*;
-    }
 }

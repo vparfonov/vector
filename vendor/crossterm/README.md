@@ -70,7 +70,11 @@ WARNING: Do not change following heading title as it's used in the URL by other 
 - Console Host
     - Windows 10 (Pro)
     - Windows 8.1 (N)
+- Windows Terminal
+    - Windows 10 x86_64 (Enterprise)
+    - Windows 11 arm64 (Enterprise)
 - Ubuntu Desktop Terminal
+    - Ubuntu 23.04 64-bit
     - Ubuntu 17.10
     - Pop!_OS ( Ubuntu ) 20.04
 - (Arch, Manjaro) KDE Konsole
@@ -78,6 +82,9 @@ WARNING: Do not change following heading title as it's used in the URL by other 
 - Linux Mint
 - (OpenSuse) Alacritty
 - (Chrome OS) Crostini
+- Apple
+    - macOS Monterey 12.7.1 (Intel-Chip)
+    - macOS Sonama 14.4 (M1 Max, Apple Silicon-Chip)
 
 This crate supports all UNIX terminals and Windows terminals down to Windows 7; however, not all of the
 terminals have been tested. If you have used this library for a terminal other than the above list without
@@ -93,7 +100,7 @@ Click to show Cargo.toml.
 
 ```toml
 [dependencies]
-crossterm = "0.26"
+crossterm = "0.27"
 ```
 
 </details>
@@ -105,7 +112,7 @@ use std::io::{stdout, Write};
 use crossterm::{
     execute,
     style::{Color, Print, ResetColor, SetBackgroundColor, SetForegroundColor},
-    ExecutableCommand, Result,
+    ExecutableCommand,
     event,
 };
 
@@ -136,7 +143,7 @@ Checkout this [list](https://docs.rs/crossterm/latest/crossterm/index.html#suppo
 
 ```toml
 [dependencies.crossterm]
-version = "0.26"
+version = "0.27"
 features = ["event-stream"] 
 ```
 
@@ -148,7 +155,7 @@ features = ["event-stream"]
 | `filedescriptor` | Use raw filedescriptor for all events rather then mio dependency |
 
 
-To use crossterm as a very tin layer you can disable the `events` feature or use `filedescriptor` feature. 
+To use crossterm as a very thin layer you can disable the `events` feature or use `filedescriptor` feature. 
 This can disable `mio` / `signal-hook` / `signal-hook-mio` dependencies.
 
 ### Dependency Justification

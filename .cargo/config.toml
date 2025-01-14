@@ -40,14 +40,14 @@ rustflags = ["-C", "codegen-units=1"]
 [source.crates-io]
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/GreptimeTeam/greptime-proto.git?tag=v0.4.1"]
+[source."git+https://github.com/GreptimeTeam/greptime-proto.git?tag=v0.7.0"]
 git = "https://github.com/GreptimeTeam/greptime-proto.git"
-tag = "v0.4.1"
+tag = "v0.7.0"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/GreptimeTeam/greptimedb-ingester-rust.git?rev=d21dbcff680139ed2065b62100bac3123da7c789"]
-git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust.git"
-rev = "d21dbcff680139ed2065b62100bac3123da7c789"
+[source."git+https://github.com/GreptimeTeam/greptimedb-ingester-rust?rev=2e6b0c5eb6a5e7549c3100e4d356b07d15cce66d"]
+git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust"
+rev = "2e6b0c5eb6a5e7549c3100e4d356b07d15cce66d"
 replace-with = "vendored-sources"
 
 [source."git+https://github.com/MSxDOS/ntapi.git?rev=24fc1e47677fc9f6e38e5f154e6011dc9b270da6"]
@@ -60,11 +60,6 @@ git = "https://github.com/tokio-rs/tracing"
 rev = "e0642d949891546a3bb7e47080365ee7274f05cd"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/vectordotdev/aws-sdk-rust?rev=3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"]
-git = "https://github.com/vectordotdev/aws-sdk-rust"
-rev = "3d6aefb7fcfced5fc2a7e761a87e4ddbda1ee670"
-replace-with = "vendored-sources"
-
 [source."git+https://github.com/vectordotdev/heim.git?branch=update-nix"]
 git = "https://github.com/vectordotdev/heim.git"
 branch = "update-nix"
@@ -75,9 +70,9 @@ git = "https://github.com/vectordotdev/nix.git"
 branch = "memfd/gnu/musl"
 replace-with = "vendored-sources"
 
-[source."git+https://github.com/vectordotdev/tokio?branch=tokio-util-0.7.8-framed-read-continue-on-error"]
+[source."git+https://github.com/vectordotdev/tokio?branch=tokio-util-0.7.11-framed-read-continue-on-error"]
 git = "https://github.com/vectordotdev/tokio"
-branch = "tokio-util-0.7.8-framed-read-continue-on-error"
+branch = "tokio-util-0.7.11-framed-read-continue-on-error"
 replace-with = "vendored-sources"
 
 [source.vendored-sources]

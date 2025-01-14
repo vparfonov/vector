@@ -2,11 +2,11 @@ use core::{
     pin::Pin,
     task::{Context, Poll},
 };
-use std::io::Result;
+use std::io::{IoSlice, Result};
 
 use crate::{codec::Decode, util::PartialBuffer};
 use futures_core::ready;
-use futures_io::{AsyncBufRead, AsyncRead};
+use futures_io::{AsyncBufRead, AsyncRead, AsyncWrite};
 use pin_project_lite::pin_project;
 
 #[derive(Debug)]
@@ -19,7 +19,7 @@ enum State {
 
 pin_project! {
     #[derive(Debug)]
-    pub struct Decoder<R, D: Decode> {
+    pub struct Decoder<R, D> {
         #[pin]
         reader: R,
         decoder: D,
@@ -37,7 +37,9 @@ impl<R: AsyncBufRead, D: Decode> Decoder<R, D> {
             multiple_members: false,
         }
     }
+}
 
+impl<R, D> Decoder<R, D> {
     pub fn get_ref(&self) -> &R {
         &self.reader
     }
@@ -57,7 +59,9 @@ impl<R: AsyncBufRead, D: Decode> Decoder<R, D> {
     pub fn multiple_members(&mut self, enabled: bool) {
         self.multiple_members = enabled;
     }
+}
 
+impl<R: AsyncBufRead, D: Decode> Decoder<R, D> {
     fn do_poll_read(
         self: Pin<&mut Self>,
         cx: &mut Context<'_>,
@@ -84,7 +88,7 @@ impl<R: AsyncBufRead, D: Decode> Decoder<R, D> {
                         State::Flushing
                     } else {
                         let mut input = PartialBuffer::new(input);
-                        let done = this.decoder.decode(&mut input, output).or_else(|err| {
+                        let res = this.decoder.decode(&mut input, output).or_else(|err| {
                             // ignore the first error, occurs when input is empty
                             // but we need to run decode to flush
                             if first {
@@ -92,13 +96,16 @@ impl<R: AsyncBufRead, D: Decode> Decoder<R, D> {
                             } else {
                                 Err(err)
                             }
-                        })?;
+                        });
+
+                        if !first {
+                            let len = input.written().len();
+                            this.reader.as_mut().consume(len);
+                        }
 
                         first = false;
 
-                        let len = input.written().len();
-                        this.reader.as_mut().consume(len);
-                        if done {
+                        if res? {
                             State::Flushing
                         } else {
                             State::Decoding
@@ -156,5 +163,27 @@ impl<R: AsyncBufRead, D: Decode> AsyncRead for Decoder<R, D> {
             Poll::Pending if output.written().is_empty() => Poll::Pending,
             _ => Poll::Ready(Ok(output.written().len())),
         }
+    }
+}
+
+impl<R: AsyncWrite, D> AsyncWrite for Decoder<R, D> {
+    fn poll_write(self: Pin<&mut Self>, cx: &mut Context<'_>, buf: &[u8]) -> Poll<Result<usize>> {
+        self.get_pin_mut().poll_write(cx, buf)
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+        self.get_pin_mut().poll_flush(cx)
+    }
+
+    fn poll_close(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
+        self.get_pin_mut().poll_close(cx)
+    }
+
+    fn poll_write_vectored(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        bufs: &[IoSlice<'_>],
+    ) -> Poll<Result<usize>> {
+        self.get_pin_mut().poll_write_vectored(cx, bufs)
     }
 }

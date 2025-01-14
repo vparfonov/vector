@@ -1,9 +1,13 @@
 use clap::builder::PossibleValue;
-#[cfg(feature = "unstable-dynamic")]
-use clap::{FromArgMatches, Subcommand};
 use clap_complete::{generate, Generator, Shell};
 
 fn main() {
+    #[cfg(feature = "unstable-dynamic")]
+    clap_complete::CompleteEnv::with_factory(cli)
+        // Avoid tests snapshotting a path into `target/`
+        .completer("exhaustive")
+        .complete();
+
     let matches = cli().get_matches();
     if let Some(generator) = matches.get_one::<Shell>("generate") {
         let mut cmd = cli();
@@ -12,15 +16,7 @@ fn main() {
         return;
     }
 
-    #[cfg(feature = "unstable-dynamic")]
-    if let Ok(completions) =
-        clap_complete::dynamic::shells::CompleteCommand::from_arg_matches(&matches)
-    {
-        completions.complete(&mut cli());
-        return;
-    };
-
-    println!("{:?}", matches);
+    println!("{matches:?}");
 }
 
 fn print_completions<G: Generator>(gen: G, cmd: &mut clap::Command) {
@@ -29,7 +25,7 @@ fn print_completions<G: Generator>(gen: G, cmd: &mut clap::Command) {
 
 #[allow(clippy::let_and_return)]
 fn cli() -> clap::Command {
-    let cli = clap::Command::new("exhaustive")
+    clap::Command::new("exhaustive")
         .version("3.0")
         .propagate_version(true)
         .args([
@@ -93,6 +89,7 @@ fn cli() -> clap::Command {
                         .long("choice")
                         .action(clap::ArgAction::Set)
                         .value_parser(clap::builder::PossibleValuesParser::new([
+                            PossibleValue::new("another shell").help("something with a space"),
                             PossibleValue::new("bash").help("bash (shell)"),
                             PossibleValue::new("fish").help("fish shell"),
                             PossibleValue::new("zsh").help("zsh shell"),
@@ -196,8 +193,5 @@ fn cli() -> clap::Command {
                     .long("email")
                     .value_hint(clap::ValueHint::EmailAddress),
             ]),
-        ]);
-    #[cfg(feature = "unstable-dynamic")]
-    let cli = clap_complete::dynamic::shells::CompleteCommand::augment_subcommands(cli);
-    cli
+        ])
 }

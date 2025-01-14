@@ -1,6 +1,5 @@
 use std::fmt;
 
-use itertools::Itertools;
 use strum::EnumIs;
 
 /// A constraint that defines the size of a layout element.
@@ -27,7 +26,8 @@ use strum::EnumIs;
 /// `Constraint` provides helper methods to create lists of constraints from various input formats.
 ///
 /// ```rust
-/// # use ratatui::prelude::*;
+/// use ratatui::layout::Constraint;
+///
 /// // Create a layout with specified lengths for each element
 /// let constraints = Constraint::from_lengths([10, 20, 10]);
 ///
@@ -117,8 +117,12 @@ pub enum Constraint {
 
     /// Applies a percentage of the available space to the element
     ///
-    /// Converts the given percentage to a floating-point value and multiplies that with area.
-    /// This value is rounded back to a integer as part of the layout split calculation.
+    /// Converts the given percentage to a floating-point value and multiplies that with area. This
+    /// value is rounded back to a integer as part of the layout split calculation.
+    ///
+    /// **Note**: As this value only accepts a `u16`, certain percentages that cannot be
+    /// represented exactly (e.g. 1/3) are not possible. You might want to use
+    /// [`Constraint::Ratio`] or [`Constraint::Fill`] in such cases.
     ///
     /// # Examples
     ///
@@ -220,7 +224,8 @@ impl Constraint {
     /// # Examples
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::layout::{Constraint, Layout, Rect};
+    ///
     /// # let area = Rect::default();
     /// let constraints = Constraint::from_lengths([1, 2, 3]);
     /// let layout = Layout::default().constraints(constraints).split(area);
@@ -229,7 +234,7 @@ impl Constraint {
     where
         T: IntoIterator<Item = u16>,
     {
-        lengths.into_iter().map(Self::Length).collect_vec()
+        lengths.into_iter().map(Self::Length).collect()
     }
 
     /// Convert an iterator of ratios into a vector of constraints
@@ -237,7 +242,8 @@ impl Constraint {
     /// # Examples
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::layout::{Constraint, Layout, Rect};
+    ///
     /// # let area = Rect::default();
     /// let constraints = Constraint::from_ratios([(1, 4), (1, 2), (1, 4)]);
     /// let layout = Layout::default().constraints(constraints).split(area);
@@ -246,10 +252,7 @@ impl Constraint {
     where
         T: IntoIterator<Item = (u32, u32)>,
     {
-        ratios
-            .into_iter()
-            .map(|(n, d)| Self::Ratio(n, d))
-            .collect_vec()
+        ratios.into_iter().map(|(n, d)| Self::Ratio(n, d)).collect()
     }
 
     /// Convert an iterator of percentages into a vector of constraints
@@ -257,7 +260,8 @@ impl Constraint {
     /// # Examples
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::layout::{Constraint, Layout, Rect};
+    ///
     /// # let area = Rect::default();
     /// let constraints = Constraint::from_percentages([25, 50, 25]);
     /// let layout = Layout::default().constraints(constraints).split(area);
@@ -266,7 +270,7 @@ impl Constraint {
     where
         T: IntoIterator<Item = u16>,
     {
-        percentages.into_iter().map(Self::Percentage).collect_vec()
+        percentages.into_iter().map(Self::Percentage).collect()
     }
 
     /// Convert an iterator of maxes into a vector of constraints
@@ -274,7 +278,8 @@ impl Constraint {
     /// # Examples
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::layout::{Constraint, Layout, Rect};
+    ///
     /// # let area = Rect::default();
     /// let constraints = Constraint::from_maxes([1, 2, 3]);
     /// let layout = Layout::default().constraints(constraints).split(area);
@@ -283,7 +288,7 @@ impl Constraint {
     where
         T: IntoIterator<Item = u16>,
     {
-        maxes.into_iter().map(Self::Max).collect_vec()
+        maxes.into_iter().map(Self::Max).collect()
     }
 
     /// Convert an iterator of mins into a vector of constraints
@@ -291,7 +296,8 @@ impl Constraint {
     /// # Examples
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::layout::{Constraint, Layout, Rect};
+    ///
     /// # let area = Rect::default();
     /// let constraints = Constraint::from_mins([1, 2, 3]);
     /// let layout = Layout::default().constraints(constraints).split(area);
@@ -300,7 +306,7 @@ impl Constraint {
     where
         T: IntoIterator<Item = u16>,
     {
-        mins.into_iter().map(Self::Min).collect_vec()
+        mins.into_iter().map(Self::Min).collect()
     }
 
     /// Convert an iterator of proportional factors into a vector of constraints
@@ -308,19 +314,17 @@ impl Constraint {
     /// # Examples
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::layout::{Constraint, Layout, Rect};
+    ///
     /// # let area = Rect::default();
-    /// let constraints = Constraint::from_mins([1, 2, 3]);
+    /// let constraints = Constraint::from_fills([1, 2, 3]);
     /// let layout = Layout::default().constraints(constraints).split(area);
     /// ```
     pub fn from_fills<T>(proportional_factors: T) -> Vec<Self>
     where
         T: IntoIterator<Item = u16>,
     {
-        proportional_factors
-            .into_iter()
-            .map(Self::Fill)
-            .collect_vec()
+        proportional_factors.into_iter().map(Self::Fill).collect()
     }
 }
 
@@ -333,7 +337,8 @@ impl From<u16> for Constraint {
     /// # Examples
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::layout::{Constraint, Direction, Layout, Rect};
+    ///
     /// # let area = Rect::default();
     /// let layout = Layout::new(Direction::Vertical, [1, 2, 3]).split(area);
     /// let layout = Layout::horizontal([1, 2, 3]).split(area);

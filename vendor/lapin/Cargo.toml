@@ -13,12 +13,16 @@
 edition = "2021"
 rust-version = "1.74.0"
 name = "lapin"
-version = "2.4.0"
+version = "2.5.0"
 authors = [
     "Geoffroy Couprie <geo.couprie@gmail.com>",
     "Marc-Antoine Perennou <Marc-Antoine@Perennou.com>",
 ]
 build = "build.rs"
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "AMQP client library"
 documentation = "https://docs.rs/lapin"
 readme = "README.md"
@@ -32,9 +36,58 @@ categories = ["database"]
 license = "MIT"
 repository = "https://github.com/amqp-rs/lapin"
 
+[lib]
+name = "lapin"
+path = "src/lib.rs"
+
+[[example]]
+name = "client-certificate"
+path = "examples/client-certificate.rs"
+
+[[example]]
+name = "connection"
+path = "examples/connection.rs"
+
+[[example]]
+name = "consumer"
+path = "examples/consumer.rs"
+
 [[example]]
 name = "custom_tls_connection"
+path = "examples/custom_tls_connection.rs"
 required-features = ["native-tls"]
+
+[[example]]
+name = "print-topology"
+path = "examples/print-topology.rs"
+
+[[example]]
+name = "publisher_confirms"
+path = "examples/publisher_confirms.rs"
+
+[[example]]
+name = "pubsub"
+path = "examples/pubsub.rs"
+
+[[example]]
+name = "reconnect"
+path = "examples/reconnect.rs"
+
+[[example]]
+name = "restore-topology"
+path = "examples/restore-topology.rs"
+
+[[example]]
+name = "tokio"
+path = "examples/tokio.rs"
+
+[[test]]
+name = "connection"
+path = "tests/connection.rs"
+
+[[test]]
+name = "publisher_confirms"
+path = "tests/publisher_confirms.rs"
 
 [dependencies.amq-protocol]
 version = "^7.2.1"

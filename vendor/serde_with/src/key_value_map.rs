@@ -415,7 +415,6 @@ where
 /// It uses [`ElementAsKeyValueSerializer`] for the map element serialization.
 ///
 /// The [`Serializer`] implementation handles `serialize_struct`, `serialize_map` and `serialize_seq` functions by deferring the work to [`SerializeStruct`], [`SerializeMap`] and [`SerializeSeq`] respectively.
-
 struct SerializeSeqElement<M> {
     delegate: M,
     is_human_readable: bool,
@@ -672,7 +671,7 @@ struct KeyValueSeqSerializer<'a, M> {
     key: Option<SerContent>,
 }
 
-impl<'a, M> SerializeSeq for KeyValueSeqSerializer<'a, M>
+impl<M> SerializeSeq for KeyValueSeqSerializer<'_, M>
 where
     M: SerializeMap,
 {
@@ -713,7 +712,7 @@ struct KeyValueTupleSerializer<'a, M> {
     key: Option<SerContent>,
 }
 
-impl<'a, M> SerializeTuple for KeyValueTupleSerializer<'a, M>
+impl<M> SerializeTuple for KeyValueTupleSerializer<'_, M>
 where
     M: SerializeMap,
 {
@@ -755,7 +754,7 @@ struct KeyValueTupleStructSerializer<'a, M> {
     key: Option<SerContent>,
 }
 
-impl<'a, M> SerializeTupleStruct for KeyValueTupleStructSerializer<'a, M>
+impl<M> SerializeTupleStruct for KeyValueTupleStructSerializer<'_, M>
 where
     M: SerializeMap,
 {
@@ -797,7 +796,7 @@ struct KeyValueMapSerializer<'a, M> {
     tmp: Option<SerContent>,
 }
 
-impl<'a, M> SerializeMap for KeyValueMapSerializer<'a, M>
+impl<M> SerializeMap for KeyValueMapSerializer<'_, M>
 where
     M: SerializeMap,
 {
@@ -858,7 +857,7 @@ struct KeyValueStructSerializer<'a, M> {
     key: Option<SerContent>,
 }
 
-impl<'a, M> SerializeStruct for KeyValueStructSerializer<'a, M>
+impl<M> SerializeStruct for KeyValueStructSerializer<'_, M>
 where
     M: SerializeMap,
 {

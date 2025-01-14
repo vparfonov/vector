@@ -20,7 +20,7 @@
 )))]
 // Not needed for 2018 edition and conflicts with `rust_2018_idioms`
 #![doc(test(no_crate_inject))]
-#![doc(html_root_url = "https://docs.rs/serde_with_macros/3.9.0/")]
+#![doc(html_root_url = "https://docs.rs/serde_with_macros/3.11.0/")]
 // Tarpaulin does not work well with proc macros and marks most of the lines as uncovered.
 #![cfg(not(tarpaulin_include))]
 
@@ -32,9 +32,13 @@
 //! [`serde_with`]: https://crates.io/crates/serde_with/
 
 mod apply;
+mod lazy_bool;
 mod utils;
 
-use crate::utils::{split_with_de_lifetime, DeriveOptions, IteratorExt as _, SchemaFieldConfig};
+use crate::utils::{
+    split_with_de_lifetime, DeriveOptions, IteratorExt as _, SchemaFieldCondition,
+    SchemaFieldConfig,
+};
 use darling::{
     ast::NestedMeta,
     util::{Flag, Override},
@@ -558,7 +562,7 @@ fn field_has_attribute(field: &Field, namespace: &str, name: &str) -> bool {
 ///
 ///     If the automatically applied attribute is undesired, the behavior can be suppressed by adding
 ///     `#[serde_as(no_default)]`.
-
+///
 ///      This can be combined like `#[serde_as(as = "Option<S>", no_default)]`.
 ///
 /// After all these steps, the code snippet will have transformed into roughly this.
@@ -593,8 +597,8 @@ fn field_has_attribute(field: &Field, namespace: &str, name: &str) -> bool {
 /// It will also work if the relevant derive is behind a `#[cfg_attr]` attribute
 /// and propagate the `#[cfg_attr]` to the various `#[schemars]` field attributes.
 ///
-/// [`serde_as`]: https://docs.rs/serde_with/3.9.0/serde_with/guide/index.html
-/// [re-exporting `serde_as`]: https://docs.rs/serde_with/3.9.0/serde_with/guide/serde_as/index.html#re-exporting-serde_as
+/// [`serde_as`]: https://docs.rs/serde_with/3.11.0/serde_with/guide/index.html
+/// [re-exporting `serde_as`]: https://docs.rs/serde_with/3.11.0/serde_with/guide/serde_as/index.html#re-exporting-serde_as
 #[proc_macro_attribute]
 pub fn serde_as(args: TokenStream, input: TokenStream) -> TokenStream {
     #[derive(FromMeta)]
@@ -619,10 +623,9 @@ pub fn serde_as(args: TokenStream, input: TokenStream) -> TokenStream {
                 .unwrap_or_else(|| syn::parse_quote!(::serde_with));
 
             let schemars_config = match container_options.enable_schemars_support {
-                _ if cfg!(not(feature = "schemars_0_8")) => SchemaFieldConfig::Disabled,
-                Some(true) => SchemaFieldConfig::Unconditional,
-                Some(false) => SchemaFieldConfig::Disabled,
-                None => utils::has_derive_jsonschema(input.clone()),
+                _ if cfg!(not(feature = "schemars_0_8")) => SchemaFieldConfig::False,
+                Some(condition) => condition.into(),
+                None => utils::has_derive_jsonschema(input.clone()).unwrap_or_default(),
             };
 
             // Convert any error message into a nice compiler error
@@ -772,21 +775,40 @@ fn serde_as_add_attr_to_field(
         let attr = parse_quote!(#[serde(with = #attr_inner_tokens)]);
         field.attrs.push(attr);
 
-        if let Some(cfg) = schemars_config.cfg_expr() {
-            let with_cfg = utils::schemars_with_attr_if(
-                &field.attrs,
-                &["with", "serialize_with", "deserialize_with", "schema_with"],
-            )?;
-            let attr_inner_tokens =
-                quote!(#serde_with_crate_path::Schema::<#type_original, #replacement_type>)
-                    .to_string();
-            let attr = parse_quote! {
-                #[cfg_attr(
-                    all(#cfg, not(#with_cfg)),
-                    schemars(with = #attr_inner_tokens))
-                ]
-            };
-            field.attrs.push(attr);
+        match schemars_config {
+            SchemaFieldConfig::False => {}
+            lhs => {
+                let rhs = utils::schemars_with_attr_if(
+                    &field.attrs,
+                    &["with", "serialize_with", "deserialize_with", "schema_with"],
+                )?;
+
+                match lhs & !rhs {
+                    SchemaFieldConfig::False => {}
+                    condition => {
+                        let attr_inner_tokens = quote! {
+                            #serde_with_crate_path::Schema::<#type_original, #replacement_type>
+                        };
+                        let attr_inner_tokens = attr_inner_tokens.to_string();
+                        let attr = match condition {
+                            SchemaFieldConfig::False => unreachable!(),
+                            SchemaFieldConfig::True => {
+                                parse_quote! { #[schemars(with = #attr_inner_tokens)] }
+                            }
+                            SchemaFieldConfig::Lazy(SchemaFieldCondition(condition)) => {
+                                parse_quote! {
+                                    #[cfg_attr(
+                                        #condition,
+                                        schemars(with = #attr_inner_tokens))
+                                    ]
+                                }
+                            }
+                        };
+
+                        field.attrs.push(attr);
+                    }
+                }
+            }
         }
     }
     if let Some(type_) = &serde_as_options.deserialize_as {
@@ -1039,7 +1061,7 @@ fn has_type_embedded(type_: &Type, embedded_type: &syn::Ident) -> bool {
 /// [`Display`]: std::fmt::Display
 /// [`FromStr`]: std::str::FromStr
 /// [cargo-toml-rename]: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#renaming-dependencies-in-cargotoml
-/// [serde-as-crate]: https://docs.rs/serde_with/3.9.0/serde_with/guide/serde_as/index.html#re-exporting-serde_as
+/// [serde-as-crate]: https://docs.rs/serde_with/3.11.0/serde_with/guide/serde_as/index.html#re-exporting-serde_as
 /// [serde-crate]: https://serde.rs/container-attrs.html#crate
 #[proc_macro_derive(DeserializeFromStr, attributes(serde_with))]
 pub fn derive_deserialize_fromstr(item: TokenStream) -> TokenStream {
@@ -1159,7 +1181,7 @@ fn deserialize_fromstr(mut input: DeriveInput, serde_with_crate_path: Path) -> T
 /// [`Display`]: std::fmt::Display
 /// [`FromStr`]: std::str::FromStr
 /// [cargo-toml-rename]: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html#renaming-dependencies-in-cargotoml
-/// [serde-as-crate]: https://docs.rs/serde_with/3.9.0/serde_with/guide/serde_as/index.html#re-exporting-serde_as
+/// [serde-as-crate]: https://docs.rs/serde_with/3.11.0/serde_with/guide/serde_as/index.html#re-exporting-serde_as
 /// [serde-crate]: https://serde.rs/container-attrs.html#crate
 #[proc_macro_derive(SerializeDisplay, attributes(serde_with))]
 pub fn derive_serialize_display(item: TokenStream) -> TokenStream {

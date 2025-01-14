@@ -1,5 +1,4 @@
 pub type fflags_t = u32;
-pub type clock_t = i32;
 
 pub type vm_prot_t = u_char;
 pub type kvaddr_t = u64;
@@ -250,7 +249,7 @@ s! {
         __unused3: ::c_long,
         __unused4: ::c_long,
         __unused5: *mut ::c_void,
-        pub aio_sigevent: sigevent
+        pub aio_sigevent: sigevent,
     }
 
     pub struct jail {
@@ -389,7 +388,6 @@ s! {
         #[cfg(target_pointer_width = "32")]
         m_pad: u32,
         m_spare: [u32; 2],
-
     }
 
     pub struct ucond {
@@ -610,7 +608,7 @@ s! {
 
     pub struct spacectl_range {
         pub r_offset: ::off_t,
-        pub r_len: ::off_t
+        pub r_len: ::off_t,
     }
 
     pub struct rusage_ext {
@@ -971,10 +969,7 @@ s! {
 
     pub struct ifconf {
         pub ifc_len: ::c_int,
-        #[cfg(libc_union)]
         pub ifc_ifcu: __c_anonymous_ifc_ifcu,
-        #[cfg(not(libc_union))]
-        pub ifc_ifcu: *mut ifreq,
     }
 
     pub struct au_mask_t {
@@ -1359,7 +1354,6 @@ s_no_extra_traits! {
         pub __ut_spare: [::c_char; 64],
     }
 
-    #[cfg(libc_union)]
     pub union __c_anonymous_cr_pid {
         __cr_unused: *mut ::c_void,
         pub cr_pid: ::pid_t,
@@ -1370,10 +1364,7 @@ s_no_extra_traits! {
         pub cr_uid: ::uid_t,
         pub cr_ngroups: ::c_short,
         pub cr_groups: [::gid_t; 16],
-        #[cfg(libc_union)]
         pub cr_pid__c_anonymous_union: __c_anonymous_cr_pid,
-        #[cfg(not(libc_union))]
-        __cr_unused1: *mut ::c_void,
     }
 
     pub struct sockaddr_dl {
@@ -1392,7 +1383,7 @@ s_no_extra_traits! {
         pub mq_maxmsg: ::c_long,
         pub mq_msgsize: ::c_long,
         pub mq_curmsgs: ::c_long,
-        __reserved: [::c_long; 4]
+        __reserved: [::c_long; 4],
     }
 
     pub struct sigevent {
@@ -1404,7 +1395,7 @@ s_no_extra_traits! {
         pub sigev_notify_thread_id: ::lwpid_t,
         #[cfg(target_pointer_width = "64")]
         __unused1: ::c_int,
-        __unused2: [::c_long; 7]
+        __unused2: [::c_long; 7],
     }
 
     pub struct ptsstat {
@@ -1415,24 +1406,20 @@ s_no_extra_traits! {
         pub devname: [::c_char; SPECNAMELEN as usize + 1],
     }
 
-    #[cfg(libc_union)]
     pub union __c_anonymous_elf32_auxv_union {
         pub a_val: ::c_int,
     }
 
     pub struct Elf32_Auxinfo {
         pub a_type: ::c_int,
-        #[cfg(libc_union)]
         pub a_un: __c_anonymous_elf32_auxv_union,
     }
 
-    #[cfg(libc_union)]
     pub union __c_anonymous_ifi_epoch {
         pub tt: ::time_t,
         pub ph: u64,
     }
 
-    #[cfg(libc_union)]
     pub union __c_anonymous_ifi_lastchange {
         pub tv: ::timeval,
         pub ph: __c_anonymous_ph,
@@ -1486,20 +1473,11 @@ s_no_extra_traits! {
         /// HW offload capabilities, see IFCAP
         pub ifi_hwassist: u64,
         /// uptime at attach or stat reset
-        #[cfg(libc_union)]
         pub __ifi_epoch: __c_anonymous_ifi_epoch,
-        /// uptime at attach or stat reset
-        #[cfg(not(libc_union))]
-        pub __ifi_epoch: u64,
         /// time of last administrative change
-        #[cfg(libc_union)]
         pub __ifi_lastchange: __c_anonymous_ifi_lastchange,
-        /// time of last administrative change
-        #[cfg(not(libc_union))]
-        pub __ifi_lastchange: ::timeval,
     }
 
-    #[cfg(libc_union)]
     pub union __c_anonymous_ifr_ifru {
         pub ifru_addr: ::sockaddr,
         pub ifru_dstaddr: ::sockaddr,
@@ -1521,13 +1499,9 @@ s_no_extra_traits! {
     pub struct ifreq {
         /// if name, e.g. "en0"
         pub ifr_name: [::c_char; ::IFNAMSIZ],
-        #[cfg(libc_union)]
         pub ifr_ifru: __c_anonymous_ifr_ifru,
-        #[cfg(not(libc_union))]
-        pub ifr_ifru: ::sockaddr,
     }
 
-    #[cfg(libc_union)]
     pub union __c_anonymous_ifc_ifcu {
         pub ifcu_buf: ::caddr_t,
         pub ifcu_req: *mut ifreq,
@@ -1637,6 +1611,32 @@ s_no_extra_traits! {
         pub cause: sctp_error_cause,
         pub hmac_id: u16,
     }
+
+    pub struct kinfo_file {
+        pub kf_structsize: ::c_int,
+        pub kf_type: ::c_int,
+        pub kf_fd: ::c_int,
+        pub kf_ref_count: ::c_int,
+        pub kf_flags: ::c_int,
+        _kf_pad0: ::c_int,
+        pub kf_offset: i64,
+        _priv: [u8; 304], // FIXME: this is really a giant union
+        pub kf_status: u16,
+        _kf_pad1: u16,
+        _kf_ispare0: ::c_int,
+        pub kf_cap_rights: ::cap_rights_t,
+        _kf_cap_spare: u64,
+        pub kf_path: [::c_char; ::PATH_MAX as usize],
+    }
+
+    pub struct ucontext_t {
+        pub uc_sigmask: ::sigset_t,
+        pub uc_mcontext: ::mcontext_t,
+        pub uc_link: *mut ::ucontext_t,
+        pub uc_stack: ::stack_t,
+        pub uc_flags: ::c_int,
+        __spare__: [::c_int; 4],
+    }
 }
 
 cfg_if! {
@@ -1650,15 +1650,15 @@ cfg_if! {
                     && self.ut_user == other.ut_user
                     && self.ut_line == other.ut_line
                     && self
-                    .ut_host
-                    .iter()
-                    .zip(other.ut_host.iter())
-                    .all(|(a,b)| a == b)
+                        .ut_host
+                        .iter()
+                        .zip(other.ut_host.iter())
+                        .all(|(a, b)| a == b)
                     && self
-                    .__ut_spare
-                    .iter()
-                    .zip(other.__ut_spare.iter())
-                    .all(|(a,b)| a == b)
+                        .__ut_spare
+                        .iter()
+                        .zip(other.__ut_spare.iter())
+                        .all(|(a, b)| a == b)
             }
         }
         impl Eq for utmpx {}
@@ -1689,15 +1689,12 @@ cfg_if! {
             }
         }
 
-        #[cfg(libc_union)]
         impl PartialEq for __c_anonymous_cr_pid {
             fn eq(&self, other: &__c_anonymous_cr_pid) -> bool {
-                unsafe { self.cr_pid == other.cr_pid}
+                unsafe { self.cr_pid == other.cr_pid }
             }
         }
-        #[cfg(libc_union)]
         impl Eq for __c_anonymous_cr_pid {}
-        #[cfg(libc_union)]
         impl ::fmt::Debug for __c_anonymous_cr_pid {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("cr_pid")
@@ -1705,7 +1702,6 @@ cfg_if! {
                     .finish()
             }
         }
-        #[cfg(libc_union)]
         impl ::hash::Hash for __c_anonymous_cr_pid {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
                 unsafe { self.cr_pid.hash(state) };
@@ -1714,33 +1710,23 @@ cfg_if! {
 
         impl PartialEq for xucred {
             fn eq(&self, other: &xucred) -> bool {
-                #[cfg(libc_union)]
-                let equal_cr_pid = self.cr_pid__c_anonymous_union
-                    == other.cr_pid__c_anonymous_union;
-                #[cfg(not(libc_union))]
-                let equal_cr_pid = self.__cr_unused1 == other.__cr_unused1;
-
                 self.cr_version == other.cr_version
                     && self.cr_uid == other.cr_uid
                     && self.cr_ngroups == other.cr_ngroups
                     && self.cr_groups == other.cr_groups
-                    && equal_cr_pid
+                    && self.cr_pid__c_anonymous_union == other.cr_pid__c_anonymous_union
             }
         }
         impl Eq for xucred {}
         impl ::fmt::Debug for xucred {
-            fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
-                let mut struct_formatter = f.debug_struct("xucred");
-                struct_formatter.field("cr_version", &self.cr_version);
-                struct_formatter.field("cr_uid", &self.cr_uid);
-                struct_formatter.field("cr_ngroups", &self.cr_ngroups);
-                struct_formatter.field("cr_groups", &self.cr_groups);
-                #[cfg(libc_union)]
-                struct_formatter.field(
-                    "cr_pid__c_anonymous_union",
-                    &self.cr_pid__c_anonymous_union
-                );
-                struct_formatter.finish()
+            fn fmt(&self, f: &mut ::fmt::Formatter<'_>) -> ::fmt::Result {
+                f.debug_struct("xucred")
+                    .field("cr_version", &self.cr_version)
+                    .field("cr_uid", &self.cr_uid)
+                    .field("cr_ngroups", &self.cr_ngroups)
+                    .field("cr_groups", &self.cr_groups)
+                    .field("cr_pid__c_anonymous_union", &self.cr_pid__c_anonymous_union)
+                    .finish()
             }
         }
         impl ::hash::Hash for xucred {
@@ -1749,10 +1735,7 @@ cfg_if! {
                 self.cr_uid.hash(state);
                 self.cr_ngroups.hash(state);
                 self.cr_groups.hash(state);
-                #[cfg(libc_union)]
                 self.cr_pid__c_anonymous_union.hash(state);
-                #[cfg(not(libc_union))]
-                self.__cr_unused1.hash(state);
             }
         }
 
@@ -1766,10 +1749,10 @@ cfg_if! {
                     && self.sdl_alen == other.sdl_alen
                     && self.sdl_slen == other.sdl_slen
                     && self
-                    .sdl_data
-                    .iter()
-                    .zip(other.sdl_data.iter())
-                    .all(|(a,b)| a == b)
+                        .sdl_data
+                        .iter()
+                        .zip(other.sdl_data.iter())
+                        .all(|(a, b)| a == b)
             }
         }
         impl Eq for sockaddr_dl {}
@@ -1802,10 +1785,10 @@ cfg_if! {
 
         impl PartialEq for mq_attr {
             fn eq(&self, other: &mq_attr) -> bool {
-                self.mq_flags == other.mq_flags &&
-                self.mq_maxmsg == other.mq_maxmsg &&
-                self.mq_msgsize == other.mq_msgsize &&
-                self.mq_curmsgs == other.mq_curmsgs
+                self.mq_flags == other.mq_flags
+                    && self.mq_maxmsg == other.mq_maxmsg
+                    && self.mq_msgsize == other.mq_msgsize
+                    && self.mq_curmsgs == other.mq_curmsgs
             }
         }
         impl Eq for mq_attr {}
@@ -1833,8 +1816,7 @@ cfg_if! {
                 self.sigev_notify == other.sigev_notify
                     && self.sigev_signo == other.sigev_signo
                     && self.sigev_value == other.sigev_value
-                    && self.sigev_notify_thread_id
-                        == other.sigev_notify_thread_id
+                    && self.sigev_notify_thread_id == other.sigev_notify_thread_id
             }
         }
         impl Eq for sigevent {}
@@ -1844,8 +1826,7 @@ cfg_if! {
                     .field("sigev_notify", &self.sigev_notify)
                     .field("sigev_signo", &self.sigev_signo)
                     .field("sigev_value", &self.sigev_value)
-                    .field("sigev_notify_thread_id",
-                           &self.sigev_notify_thread_id)
+                    .field("sigev_notify_thread_id", &self.sigev_notify_thread_id)
                     .finish()
             }
         }
@@ -1886,15 +1867,12 @@ cfg_if! {
             }
         }
 
-        #[cfg(libc_union)]
         impl PartialEq for __c_anonymous_elf32_auxv_union {
             fn eq(&self, other: &__c_anonymous_elf32_auxv_union) -> bool {
-                unsafe { self.a_val == other.a_val}
+                unsafe { self.a_val == other.a_val }
             }
         }
-        #[cfg(libc_union)]
         impl Eq for __c_anonymous_elf32_auxv_union {}
-        #[cfg(libc_union)]
         impl ::fmt::Debug for __c_anonymous_elf32_auxv_union {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("a_val")
@@ -1902,29 +1880,12 @@ cfg_if! {
                     .finish()
             }
         }
-        #[cfg(not(libc_union))]
         impl PartialEq for Elf32_Auxinfo {
             fn eq(&self, other: &Elf32_Auxinfo) -> bool {
-                self.a_type == other.a_type
-            }
-        }
-        #[cfg(libc_union)]
-        impl PartialEq for Elf32_Auxinfo {
-            fn eq(&self, other: &Elf32_Auxinfo) -> bool {
-                self.a_type == other.a_type
-                    && self.a_un == other.a_un
+                self.a_type == other.a_type && self.a_un == other.a_un
             }
         }
         impl Eq for Elf32_Auxinfo {}
-        #[cfg(not(libc_union))]
-        impl ::fmt::Debug for Elf32_Auxinfo {
-            fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
-                f.debug_struct("Elf32_Auxinfo")
-                    .field("a_type", &self.a_type)
-                    .finish()
-            }
-        }
-        #[cfg(libc_union)]
         impl ::fmt::Debug for Elf32_Auxinfo {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("Elf32_Auxinfo")
@@ -1934,31 +1895,28 @@ cfg_if! {
             }
         }
 
-        #[cfg(libc_union)]
         impl PartialEq for __c_anonymous_ifr_ifru {
             fn eq(&self, other: &__c_anonymous_ifr_ifru) -> bool {
                 unsafe {
-                    self.ifru_addr == other.ifru_addr &&
-                    self.ifru_dstaddr == other.ifru_dstaddr &&
-                    self.ifru_broadaddr == other.ifru_broadaddr &&
-                    self.ifru_buffer == other.ifru_buffer &&
-                    self.ifru_flags == other.ifru_flags &&
-                    self.ifru_index == other.ifru_index &&
-                    self.ifru_jid == other.ifru_jid &&
-                    self.ifru_metric == other.ifru_metric &&
-                    self.ifru_mtu == other.ifru_mtu &&
-                    self.ifru_phys == other.ifru_phys &&
-                    self.ifru_media == other.ifru_media &&
-                    self.ifru_data == other.ifru_data &&
-                    self.ifru_cap == other.ifru_cap &&
-                    self.ifru_fib == other.ifru_fib &&
-                    self.ifru_vlan_pcp == other.ifru_vlan_pcp
+                    self.ifru_addr == other.ifru_addr
+                        && self.ifru_dstaddr == other.ifru_dstaddr
+                        && self.ifru_broadaddr == other.ifru_broadaddr
+                        && self.ifru_buffer == other.ifru_buffer
+                        && self.ifru_flags == other.ifru_flags
+                        && self.ifru_index == other.ifru_index
+                        && self.ifru_jid == other.ifru_jid
+                        && self.ifru_metric == other.ifru_metric
+                        && self.ifru_mtu == other.ifru_mtu
+                        && self.ifru_phys == other.ifru_phys
+                        && self.ifru_media == other.ifru_media
+                        && self.ifru_data == other.ifru_data
+                        && self.ifru_cap == other.ifru_cap
+                        && self.ifru_fib == other.ifru_fib
+                        && self.ifru_vlan_pcp == other.ifru_vlan_pcp
                 }
             }
         }
-        #[cfg(libc_union)]
         impl Eq for __c_anonymous_ifr_ifru {}
-        #[cfg(libc_union)]
         impl ::fmt::Debug for __c_anonymous_ifr_ifru {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("ifr_ifru")
@@ -1980,7 +1938,6 @@ cfg_if! {
                     .finish()
             }
         }
-        #[cfg(libc_union)]
         impl ::hash::Hash for __c_anonymous_ifr_ifru {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
                 unsafe { self.ifru_addr.hash(state) };
@@ -2022,20 +1979,14 @@ cfg_if! {
             }
         }
 
-        #[cfg(libc_union)]
         impl Eq for __c_anonymous_ifc_ifcu {}
 
-        #[cfg(libc_union)]
         impl PartialEq for __c_anonymous_ifc_ifcu {
             fn eq(&self, other: &__c_anonymous_ifc_ifcu) -> bool {
-                unsafe {
-                    self.ifcu_buf == other.ifcu_buf &&
-                    self.ifcu_req == other.ifcu_req
-                }
+                unsafe { self.ifcu_buf == other.ifcu_buf && self.ifcu_req == other.ifcu_req }
             }
         }
 
-        #[cfg(libc_union)]
         impl ::fmt::Debug for __c_anonymous_ifc_ifcu {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("ifc_ifcu")
@@ -2045,7 +1996,6 @@ cfg_if! {
             }
         }
 
-        #[cfg(libc_union)]
         impl ::hash::Hash for __c_anonymous_ifc_ifcu {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
                 unsafe { self.ifcu_buf.hash(state) };
@@ -2084,11 +2034,11 @@ cfg_if! {
                 let self_ifrk_key: &[u8] = &self.ifrk_key;
                 let other_ifrk_key: &[u8] = &other.ifrk_key;
 
-                self.ifrk_name == other.ifrk_name &&
-                self.ifrk_func == other.ifrk_func &&
-                self.ifrk_spare0 == other.ifrk_spare0 &&
-                self.ifrk_keylen == other.ifrk_keylen &&
-                self_ifrk_key == other_ifrk_key
+                self.ifrk_name == other.ifrk_name
+                    && self.ifrk_func == other.ifrk_func
+                    && self.ifrk_spare0 == other.ifrk_spare0
+                    && self.ifrk_keylen == other.ifrk_keylen
+                    && self_ifrk_key == other_ifrk_key
             }
         }
         impl Eq for ifrsskey {}
@@ -2120,10 +2070,10 @@ cfg_if! {
                 let self_ifdr_msg: &[::c_char] = &self.ifdr_msg;
                 let other_ifdr_msg: &[::c_char] = &other.ifdr_msg;
 
-                self.ifdr_name == other.ifdr_name &&
-                self.ifdr_reason == other.ifdr_reason &&
-                self.ifdr_vendor == other.ifdr_vendor &&
-                self_ifdr_msg == other_ifdr_msg
+                self.ifdr_name == other.ifdr_name
+                    && self.ifdr_reason == other.ifdr_reason
+                    && self.ifdr_vendor == other.ifdr_vendor
+                    && self_ifdr_msg == other_ifdr_msg
             }
         }
         impl Eq for ifdownreason {}
@@ -2148,18 +2098,12 @@ cfg_if! {
             }
         }
 
-        #[cfg(libc_union)]
         impl PartialEq for __c_anonymous_ifi_epoch {
             fn eq(&self, other: &__c_anonymous_ifi_epoch) -> bool {
-                unsafe {
-                    self.tt == other.tt &&
-                    self.ph == other.ph
-                }
+                unsafe { self.tt == other.tt && self.ph == other.ph }
             }
         }
-        #[cfg(libc_union)]
         impl Eq for __c_anonymous_ifi_epoch {}
-        #[cfg(libc_union)]
         impl ::fmt::Debug for __c_anonymous_ifi_epoch {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("__c_anonymous_ifi_epoch")
@@ -2168,7 +2112,6 @@ cfg_if! {
                     .finish()
             }
         }
-        #[cfg(libc_union)]
         impl ::hash::Hash for __c_anonymous_ifi_epoch {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
                 unsafe {
@@ -2178,18 +2121,12 @@ cfg_if! {
             }
         }
 
-        #[cfg(libc_union)]
         impl PartialEq for __c_anonymous_ifi_lastchange {
             fn eq(&self, other: &__c_anonymous_ifi_lastchange) -> bool {
-                unsafe {
-                    self.tv == other.tv &&
-                    self.ph == other.ph
-                }
+                unsafe { self.tv == other.tv && self.ph == other.ph }
             }
         }
-        #[cfg(libc_union)]
         impl Eq for __c_anonymous_ifi_lastchange {}
-        #[cfg(libc_union)]
         impl ::fmt::Debug for __c_anonymous_ifi_lastchange {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("__c_anonymous_ifi_lastchange")
@@ -2198,7 +2135,6 @@ cfg_if! {
                     .finish()
             }
         }
-        #[cfg(libc_union)]
         impl ::hash::Hash for __c_anonymous_ifi_lastchange {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
                 unsafe {
@@ -2210,31 +2146,31 @@ cfg_if! {
 
         impl PartialEq for if_data {
             fn eq(&self, other: &if_data) -> bool {
-                self.ifi_type == other.ifi_type &&
-                self.ifi_physical == other.ifi_physical &&
-                self.ifi_addrlen == other.ifi_addrlen &&
-                self.ifi_hdrlen == other.ifi_hdrlen &&
-                self.ifi_link_state == other.ifi_link_state &&
-                self.ifi_vhid == other.ifi_vhid &&
-                self.ifi_datalen == other.ifi_datalen &&
-                self.ifi_mtu == other.ifi_mtu &&
-                self.ifi_metric == other.ifi_metric &&
-                self.ifi_baudrate == other.ifi_baudrate &&
-                self.ifi_ipackets == other.ifi_ipackets &&
-                self.ifi_ierrors == other.ifi_ierrors &&
-                self.ifi_opackets == other.ifi_opackets &&
-                self.ifi_oerrors == other.ifi_oerrors &&
-                self.ifi_collisions == other.ifi_collisions &&
-                self.ifi_ibytes == other.ifi_ibytes &&
-                self.ifi_obytes == other.ifi_obytes &&
-                self.ifi_imcasts == other.ifi_imcasts &&
-                self.ifi_omcasts == other.ifi_omcasts &&
-                self.ifi_iqdrops == other.ifi_iqdrops &&
-                self.ifi_oqdrops == other.ifi_oqdrops &&
-                self.ifi_noproto == other.ifi_noproto &&
-                self.ifi_hwassist == other.ifi_hwassist &&
-                self.__ifi_epoch == other.__ifi_epoch &&
-                self.__ifi_lastchange == other.__ifi_lastchange
+                self.ifi_type == other.ifi_type
+                    && self.ifi_physical == other.ifi_physical
+                    && self.ifi_addrlen == other.ifi_addrlen
+                    && self.ifi_hdrlen == other.ifi_hdrlen
+                    && self.ifi_link_state == other.ifi_link_state
+                    && self.ifi_vhid == other.ifi_vhid
+                    && self.ifi_datalen == other.ifi_datalen
+                    && self.ifi_mtu == other.ifi_mtu
+                    && self.ifi_metric == other.ifi_metric
+                    && self.ifi_baudrate == other.ifi_baudrate
+                    && self.ifi_ipackets == other.ifi_ipackets
+                    && self.ifi_ierrors == other.ifi_ierrors
+                    && self.ifi_opackets == other.ifi_opackets
+                    && self.ifi_oerrors == other.ifi_oerrors
+                    && self.ifi_collisions == other.ifi_collisions
+                    && self.ifi_ibytes == other.ifi_ibytes
+                    && self.ifi_obytes == other.ifi_obytes
+                    && self.ifi_imcasts == other.ifi_imcasts
+                    && self.ifi_omcasts == other.ifi_omcasts
+                    && self.ifi_iqdrops == other.ifi_iqdrops
+                    && self.ifi_oqdrops == other.ifi_oqdrops
+                    && self.ifi_noproto == other.ifi_noproto
+                    && self.ifi_hwassist == other.ifi_hwassist
+                    && self.__ifi_epoch == other.__ifi_epoch
+                    && self.__ifi_lastchange == other.__ifi_lastchange
             }
         }
         impl Eq for if_data {}
@@ -2301,296 +2237,360 @@ cfg_if! {
 
         impl PartialEq for sctphdr {
             fn eq(&self, other: &sctphdr) -> bool {
-                return {self.src_port} == {other.src_port} &&
-                {self.dest_port} == {other.dest_port} &&
-                {self.v_tag} == {other.v_tag} &&
-                {self.checksum} == {other.checksum}
+                return { self.src_port } == { other.src_port }
+                    && { self.dest_port } == { other.dest_port }
+                    && { self.v_tag } == { other.v_tag }
+                    && { self.checksum } == { other.checksum };
             }
         }
         impl Eq for sctphdr {}
         impl ::fmt::Debug for sctphdr {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctphdr")
-                    .field("src_port", &{self.src_port})
-                    .field("dest_port", &{self.dest_port})
-                    .field("v_tag", &{self.v_tag})
-                    .field("checksum", &{self.checksum})
+                    .field("src_port", &{ self.src_port })
+                    .field("dest_port", &{ self.dest_port })
+                    .field("v_tag", &{ self.v_tag })
+                    .field("checksum", &{ self.checksum })
                     .finish()
             }
         }
         impl ::hash::Hash for sctphdr {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.src_port}.hash(state);
-                {self.dest_port}.hash(state);
-                {self.v_tag}.hash(state);
-                {self.checksum}.hash(state);
+                { self.src_port }.hash(state);
+                { self.dest_port }.hash(state);
+                { self.v_tag }.hash(state);
+                { self.checksum }.hash(state);
             }
         }
 
         impl PartialEq for sctp_chunkhdr {
             fn eq(&self, other: &sctp_chunkhdr) -> bool {
-                return {self.chunk_type} == {other.chunk_type} &&
-                {self.chunk_flags} == {other.chunk_flags} &&
-                {self.chunk_length} == {other.chunk_length}
+                return { self.chunk_type } == { other.chunk_type }
+                    && { self.chunk_flags } == { other.chunk_flags }
+                    && { self.chunk_length } == { other.chunk_length };
             }
         }
         impl Eq for sctp_chunkhdr {}
         impl ::fmt::Debug for sctp_chunkhdr {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctp_chunkhdr")
-                    .field("chunk_type", &{self.chunk_type})
-                    .field("chunk_flags", &{self.chunk_flags})
-                    .field("chunk_length", &{self.chunk_length})
+                    .field("chunk_type", &{ self.chunk_type })
+                    .field("chunk_flags", &{ self.chunk_flags })
+                    .field("chunk_length", &{ self.chunk_length })
                     .finish()
             }
         }
         impl ::hash::Hash for sctp_chunkhdr {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.chunk_type}.hash(state);
-                {self.chunk_flags}.hash(state);
-                {self.chunk_length}.hash(state);
+                { self.chunk_type }.hash(state);
+                { self.chunk_flags }.hash(state);
+                { self.chunk_length }.hash(state);
             }
         }
 
         impl PartialEq for sctp_paramhdr {
             fn eq(&self, other: &sctp_paramhdr) -> bool {
-                return {self.param_type} == {other.param_type} &&
-                {self.param_length} == {other.param_length}
+                return { self.param_type } == { other.param_type } && { self.param_length } == {
+                    other.param_length
+                };
             }
         }
         impl Eq for sctp_paramhdr {}
         impl ::fmt::Debug for sctp_paramhdr {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctp_paramhdr")
-                    .field("param_type", &{self.param_type})
-                    .field("param_length", &{self.param_length})
+                    .field("param_type", &{ self.param_type })
+                    .field("param_length", &{ self.param_length })
                     .finish()
             }
         }
         impl ::hash::Hash for sctp_paramhdr {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.param_type}.hash(state);
-                {self.param_length}.hash(state);
+                { self.param_type }.hash(state);
+                { self.param_length }.hash(state);
             }
         }
 
         impl PartialEq for sctp_gen_error_cause {
             fn eq(&self, other: &sctp_gen_error_cause) -> bool {
-                return {self.code} == {other.code} &&
-                {self.length} == {other.length} &&
-                {self.info}.iter().zip({other.info}.iter()).all(|(a,b)| a == b)
+                return { self.code } == { other.code } && { self.length } == { other.length } && {
+                    self.info
+                }
+                .iter()
+                .zip({ other.info }.iter())
+                .all(|(a, b)| a == b);
             }
         }
         impl Eq for sctp_gen_error_cause {}
         impl ::fmt::Debug for sctp_gen_error_cause {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctp_gen_error_cause")
-                    .field("code", &{self.code})
-                    .field("length", &{self.length})
+                    .field("code", &{ self.code })
+                    .field("length", &{ self.length })
                     // FIXME: .field("info", &{self.info})
                     .finish()
             }
         }
         impl ::hash::Hash for sctp_gen_error_cause {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.code}.hash(state);
-                {self.length}.hash(state);
-                {self.info}.hash(state);
+                { self.code }.hash(state);
+                { self.length }.hash(state);
+                { self.info }.hash(state);
             }
         }
 
         impl PartialEq for sctp_error_cause {
             fn eq(&self, other: &sctp_error_cause) -> bool {
-                return {self.code} == {other.code} &&
-                {self.length} == {other.length}
+                return { self.code } == { other.code } && { self.length } == { other.length };
             }
         }
         impl Eq for sctp_error_cause {}
         impl ::fmt::Debug for sctp_error_cause {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctp_error_cause")
-                    .field("code", &{self.code})
-                    .field("length", &{self.length})
+                    .field("code", &{ self.code })
+                    .field("length", &{ self.length })
                     .finish()
             }
         }
         impl ::hash::Hash for sctp_error_cause {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.code}.hash(state);
-                {self.length}.hash(state);
+                { self.code }.hash(state);
+                { self.length }.hash(state);
             }
         }
 
         impl PartialEq for sctp_error_invalid_stream {
             fn eq(&self, other: &sctp_error_invalid_stream) -> bool {
-                return {self.cause} == {other.cause} &&
-                {self.stream_id} == {other.stream_id}
+                return { self.cause } == { other.cause } && { self.stream_id } == {
+                    other.stream_id
+                };
             }
         }
         impl Eq for sctp_error_invalid_stream {}
         impl ::fmt::Debug for sctp_error_invalid_stream {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctp_error_invalid_stream")
-                    .field("cause", &{self.cause})
-                    .field("stream_id", &{self.stream_id})
+                    .field("cause", &{ self.cause })
+                    .field("stream_id", &{ self.stream_id })
                     .finish()
             }
         }
         impl ::hash::Hash for sctp_error_invalid_stream {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.cause}.hash(state);
-                {self.stream_id}.hash(state);
+                { self.cause }.hash(state);
+                { self.stream_id }.hash(state);
             }
         }
 
         impl PartialEq for sctp_error_missing_param {
             fn eq(&self, other: &sctp_error_missing_param) -> bool {
-                return {self.cause} == {other.cause} &&
-                {self.num_missing_params} == {other.num_missing_params} &&
-                {self.tpe}.iter().zip({other.tpe}.iter()).all(|(a,b)| a == b)
+                return { self.cause } == { other.cause }
+                    && { self.num_missing_params } == { other.num_missing_params }
+                    && { self.tpe }
+                        .iter()
+                        .zip({ other.tpe }.iter())
+                        .all(|(a, b)| a == b);
             }
         }
         impl Eq for sctp_error_missing_param {}
         impl ::fmt::Debug for sctp_error_missing_param {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctp_error_missing_param")
-                    .field("cause", &{self.cause})
-                    .field("num_missing_params", &{self.num_missing_params})
+                    .field("cause", &{ self.cause })
+                    .field("num_missing_params", &{ self.num_missing_params })
                     // FIXME: .field("tpe", &{self.tpe})
                     .finish()
             }
         }
         impl ::hash::Hash for sctp_error_missing_param {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.cause}.hash(state);
-                {self.num_missing_params}.hash(state);
-                {self.tpe}.hash(state);
+                { self.cause }.hash(state);
+                { self.num_missing_params }.hash(state);
+                { self.tpe }.hash(state);
             }
         }
 
         impl PartialEq for sctp_error_stale_cookie {
             fn eq(&self, other: &sctp_error_stale_cookie) -> bool {
-                return {self.cause} == {other.cause} &&
-                {self.stale_time} == {other.stale_time}
+                return { self.cause } == { other.cause } && { self.stale_time } == {
+                    other.stale_time
+                };
             }
         }
         impl Eq for sctp_error_stale_cookie {}
         impl ::fmt::Debug for sctp_error_stale_cookie {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctp_error_stale_cookie")
-                    .field("cause", &{self.cause})
-                    .field("stale_time", &{self.stale_time})
+                    .field("cause", &{ self.cause })
+                    .field("stale_time", &{ self.stale_time })
                     .finish()
             }
         }
         impl ::hash::Hash for sctp_error_stale_cookie {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.cause}.hash(state);
-                {self.stale_time}.hash(state);
+                { self.cause }.hash(state);
+                { self.stale_time }.hash(state);
             }
         }
 
         impl PartialEq for sctp_error_out_of_resource {
             fn eq(&self, other: &sctp_error_out_of_resource) -> bool {
-                return {self.cause} == {other.cause}
+                return { self.cause } == { other.cause };
             }
         }
         impl Eq for sctp_error_out_of_resource {}
         impl ::fmt::Debug for sctp_error_out_of_resource {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctp_error_out_of_resource")
-                    .field("cause", &{self.cause})
+                    .field("cause", &{ self.cause })
                     .finish()
             }
         }
         impl ::hash::Hash for sctp_error_out_of_resource {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.cause}.hash(state);
+                { self.cause }.hash(state);
             }
         }
 
         impl PartialEq for sctp_error_unresolv_addr {
             fn eq(&self, other: &sctp_error_unresolv_addr) -> bool {
-                return {self.cause} == {other.cause}
+                return { self.cause } == { other.cause };
             }
         }
         impl Eq for sctp_error_unresolv_addr {}
         impl ::fmt::Debug for sctp_error_unresolv_addr {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctp_error_unresolv_addr")
-                    .field("cause", &{self.cause})
+                    .field("cause", &{ self.cause })
                     .finish()
             }
         }
         impl ::hash::Hash for sctp_error_unresolv_addr {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.cause}.hash(state);
+                { self.cause }.hash(state);
             }
         }
 
         impl PartialEq for sctp_error_unrecognized_chunk {
             fn eq(&self, other: &sctp_error_unrecognized_chunk) -> bool {
-                return {self.cause} == {other.cause} &&
-                {self.ch} == {other.ch}
+                return { self.cause } == { other.cause } && { self.ch } == { other.ch };
             }
         }
         impl Eq for sctp_error_unrecognized_chunk {}
         impl ::fmt::Debug for sctp_error_unrecognized_chunk {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctp_error_unrecognized_chunk")
-                    .field("cause", &{self.cause})
-                    .field("ch", &{self.ch})
+                    .field("cause", &{ self.cause })
+                    .field("ch", &{ self.ch })
                     .finish()
             }
         }
         impl ::hash::Hash for sctp_error_unrecognized_chunk {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.cause}.hash(state);
-                {self.ch}.hash(state);
+                { self.cause }.hash(state);
+                { self.ch }.hash(state);
             }
         }
 
         impl PartialEq for sctp_error_no_user_data {
             fn eq(&self, other: &sctp_error_no_user_data) -> bool {
-                return {self.cause} == {other.cause} &&
-                {self.tsn} == {other.tsn}
+                return { self.cause } == { other.cause } && { self.tsn } == { other.tsn };
             }
         }
         impl Eq for sctp_error_no_user_data {}
         impl ::fmt::Debug for sctp_error_no_user_data {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctp_error_no_user_data")
-                    .field("cause", &{self.cause})
-                    .field("tsn", &{self.tsn})
+                    .field("cause", &{ self.cause })
+                    .field("tsn", &{ self.tsn })
                     .finish()
             }
         }
         impl ::hash::Hash for sctp_error_no_user_data {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.cause}.hash(state);
-                {self.tsn}.hash(state);
+                { self.cause }.hash(state);
+                { self.tsn }.hash(state);
             }
         }
 
         impl PartialEq for sctp_error_auth_invalid_hmac {
             fn eq(&self, other: &sctp_error_auth_invalid_hmac) -> bool {
-                return {self.cause} == {other.cause} &&
-                {self.hmac_id} == {other.hmac_id}
+                return { self.cause } == { other.cause } && { self.hmac_id } == { other.hmac_id };
             }
         }
         impl Eq for sctp_error_auth_invalid_hmac {}
         impl ::fmt::Debug for sctp_error_auth_invalid_hmac {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("sctp_error_invalid_hmac")
-                    .field("cause", &{self.cause})
-                    .field("hmac_id", &{self.hmac_id})
+                    .field("cause", &{ self.cause })
+                    .field("hmac_id", &{ self.hmac_id })
                     .finish()
             }
         }
         impl ::hash::Hash for sctp_error_auth_invalid_hmac {
             fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
-                {self.cause}.hash(state);
-                {self.hmac_id}.hash(state);
+                { self.cause }.hash(state);
+                { self.hmac_id }.hash(state);
+            }
+        }
+
+        impl PartialEq for kinfo_file {
+            fn eq(&self, other: &kinfo_file) -> bool {
+                self.kf_structsize == other.kf_structsize
+                    && self.kf_type == other.kf_type
+                    && self.kf_fd == other.kf_fd
+                    && self.kf_ref_count == other.kf_ref_count
+                    && self.kf_flags == other.kf_flags
+                    && self.kf_offset == other.kf_offset
+                    && self.kf_status == other.kf_status
+                    && self.kf_cap_rights == other.kf_cap_rights
+                    && self
+                        .kf_path
+                        .iter()
+                        .zip(other.kf_path.iter())
+                        .all(|(a, b)| a == b)
+            }
+        }
+        impl Eq for kinfo_file {}
+        impl ::fmt::Debug for kinfo_file {
+            fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
+                f.debug_struct("kinfo_file")
+                    .field("kf_structsize", &self.kf_structsize)
+                    .field("kf_type", &self.kf_type)
+                    .field("kf_fd", &self.kf_fd)
+                    .field("kf_ref_count", &self.kf_ref_count)
+                    .field("kf_flags", &self.kf_flags)
+                    .field("kf_offset", &self.kf_offset)
+                    .field("kf_status", &self.kf_status)
+                    .field("kf_cap_rights", &self.kf_cap_rights)
+                    .field("kf_path", &&self.kf_path[..])
+                    .finish()
+            }
+        }
+        impl ::hash::Hash for kinfo_file {
+            fn hash<H: ::hash::Hasher>(&self, state: &mut H) {
+                self.kf_structsize.hash(state);
+                self.kf_type.hash(state);
+                self.kf_fd.hash(state);
+                self.kf_ref_count.hash(state);
+                self.kf_flags.hash(state);
+                self.kf_offset.hash(state);
+                self.kf_status.hash(state);
+                self.kf_cap_rights.hash(state);
+                self.kf_path.hash(state);
+            }
+        }
+
+        impl ::fmt::Debug for ucontext_t {
+            fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
+                f.debug_struct("ucontext_t")
+                    .field("uc_sigmask", &self.uc_sigmask)
+                    .field("uc_mcontext", &self.uc_mcontext)
+                    .field("uc_link", &self.uc_link)
+                    .field("uc_stack", &self.uc_stack)
+                    .field("uc_flags", &self.uc_flags)
+                    .finish()
             }
         }
     }
@@ -2617,6 +2617,129 @@ impl ::Clone for dot3Vendors {
 pub const LIO_VECTORED: ::c_int = 4;
 pub const LIO_WRITEV: ::c_int = 5;
 pub const LIO_READV: ::c_int = 6;
+
+// sys/caprights.h
+pub const CAP_RIGHTS_VERSION_00: i32 = 0;
+pub const CAP_RIGHTS_VERSION: i32 = CAP_RIGHTS_VERSION_00;
+
+// sys/capsicum.h
+macro_rules! cap_right {
+    ($idx:expr, $bit:expr) => {
+        ((1u64 << (57 + ($idx))) | ($bit))
+    };
+}
+pub const CAP_READ: u64 = cap_right!(0, 0x0000000000000001u64);
+pub const CAP_WRITE: u64 = cap_right!(0, 0x0000000000000002u64);
+pub const CAP_SEEK_TELL: u64 = cap_right!(0, 0x0000000000000004u64);
+pub const CAP_SEEK: u64 = CAP_SEEK_TELL | 0x0000000000000008u64;
+pub const CAP_PREAD: u64 = CAP_SEEK | CAP_READ;
+pub const CAP_PWRITE: u64 = CAP_SEEK | CAP_WRITE;
+pub const CAP_MMAP: u64 = cap_right!(0, 0x0000000000000010u64);
+pub const CAP_MMAP_R: u64 = CAP_MMAP | CAP_SEEK | CAP_READ;
+pub const CAP_MMAP_W: u64 = CAP_MMAP | CAP_SEEK | CAP_WRITE;
+pub const CAP_MMAP_X: u64 = CAP_MMAP | CAP_SEEK | 0x0000000000000020u64;
+pub const CAP_MMAP_RW: u64 = CAP_MMAP_R | CAP_MMAP_W;
+pub const CAP_MMAP_RX: u64 = CAP_MMAP_R | CAP_MMAP_X;
+pub const CAP_MMAP_WX: u64 = CAP_MMAP_W | CAP_MMAP_X;
+pub const CAP_MMAP_RWX: u64 = CAP_MMAP_R | CAP_MMAP_W | CAP_MMAP_X;
+pub const CAP_CREATE: u64 = cap_right!(0, 0x0000000000000040u64);
+pub const CAP_FEXECVE: u64 = cap_right!(0, 0x0000000000000080u64);
+pub const CAP_FSYNC: u64 = cap_right!(0, 0x0000000000000100u64);
+pub const CAP_FTRUNCATE: u64 = cap_right!(0, 0x0000000000000200u64);
+pub const CAP_LOOKUP: u64 = cap_right!(0, 0x0000000000000400u64);
+pub const CAP_FCHDIR: u64 = cap_right!(0, 0x0000000000000800u64);
+pub const CAP_FCHFLAGS: u64 = cap_right!(0, 0x0000000000001000u64);
+pub const CAP_CHFLAGSAT: u64 = CAP_FCHFLAGS | CAP_LOOKUP;
+pub const CAP_FCHMOD: u64 = cap_right!(0, 0x0000000000002000u64);
+pub const CAP_FCHMODAT: u64 = CAP_FCHMOD | CAP_LOOKUP;
+pub const CAP_FCHOWN: u64 = cap_right!(0, 0x0000000000004000u64);
+pub const CAP_FCHOWNAT: u64 = CAP_FCHOWN | CAP_LOOKUP;
+pub const CAP_FCNTL: u64 = cap_right!(0, 0x0000000000008000u64);
+pub const CAP_FLOCK: u64 = cap_right!(0, 0x0000000000010000u64);
+pub const CAP_FPATHCONF: u64 = cap_right!(0, 0x0000000000020000u64);
+pub const CAP_FSCK: u64 = cap_right!(0, 0x0000000000040000u64);
+pub const CAP_FSTAT: u64 = cap_right!(0, 0x0000000000080000u64);
+pub const CAP_FSTATAT: u64 = CAP_FSTAT | CAP_LOOKUP;
+pub const CAP_FSTATFS: u64 = cap_right!(0, 0x0000000000100000u64);
+pub const CAP_FUTIMES: u64 = cap_right!(0, 0x0000000000200000u64);
+pub const CAP_FUTIMESAT: u64 = CAP_FUTIMES | CAP_LOOKUP;
+// Note: this was named CAP_LINKAT prior to FreeBSD 11.0.
+pub const CAP_LINKAT_TARGET: u64 = CAP_LOOKUP | 0x0000000000400000u64;
+pub const CAP_MKDIRAT: u64 = CAP_LOOKUP | 0x0000000000800000u64;
+pub const CAP_MKFIFOAT: u64 = CAP_LOOKUP | 0x0000000001000000u64;
+pub const CAP_MKNODAT: u64 = CAP_LOOKUP | 0x0000000002000000u64;
+// Note: this was named CAP_RENAMEAT prior to FreeBSD 11.0.
+pub const CAP_RENAMEAT_SOURCE: u64 = CAP_LOOKUP | 0x0000000004000000u64;
+pub const CAP_SYMLINKAT: u64 = CAP_LOOKUP | 0x0000000008000000u64;
+pub const CAP_UNLINKAT: u64 = CAP_LOOKUP | 0x0000000010000000u64;
+pub const CAP_ACCEPT: u64 = cap_right!(0, 0x0000000020000000u64);
+pub const CAP_BIND: u64 = cap_right!(0, 0x0000000040000000u64);
+pub const CAP_CONNECT: u64 = cap_right!(0, 0x0000000080000000u64);
+pub const CAP_GETPEERNAME: u64 = cap_right!(0, 0x0000000100000000u64);
+pub const CAP_GETSOCKNAME: u64 = cap_right!(0, 0x0000000200000000u64);
+pub const CAP_GETSOCKOPT: u64 = cap_right!(0, 0x0000000400000000u64);
+pub const CAP_LISTEN: u64 = cap_right!(0, 0x0000000800000000u64);
+pub const CAP_PEELOFF: u64 = cap_right!(0, 0x0000001000000000u64);
+pub const CAP_RECV: u64 = CAP_READ;
+pub const CAP_SEND: u64 = CAP_WRITE;
+pub const CAP_SETSOCKOPT: u64 = cap_right!(0, 0x0000002000000000u64);
+pub const CAP_SHUTDOWN: u64 = cap_right!(0, 0x0000004000000000u64);
+pub const CAP_BINDAT: u64 = CAP_LOOKUP | 0x0000008000000000u64;
+pub const CAP_CONNECTAT: u64 = CAP_LOOKUP | 0x0000010000000000u64;
+pub const CAP_LINKAT_SOURCE: u64 = CAP_LOOKUP | 0x0000020000000000u64;
+pub const CAP_RENAMEAT_TARGET: u64 = CAP_LOOKUP | 0x0000040000000000u64;
+pub const CAP_SOCK_CLIENT: u64 = CAP_CONNECT
+    | CAP_GETPEERNAME
+    | CAP_GETSOCKNAME
+    | CAP_GETSOCKOPT
+    | CAP_PEELOFF
+    | CAP_RECV
+    | CAP_SEND
+    | CAP_SETSOCKOPT
+    | CAP_SHUTDOWN;
+pub const CAP_SOCK_SERVER: u64 = CAP_ACCEPT
+    | CAP_BIND
+    | CAP_GETPEERNAME
+    | CAP_GETSOCKNAME
+    | CAP_GETSOCKOPT
+    | CAP_LISTEN
+    | CAP_PEELOFF
+    | CAP_RECV
+    | CAP_SEND
+    | CAP_SETSOCKOPT
+    | CAP_SHUTDOWN;
+pub const CAP_ALL0: u64 = cap_right!(0, 0x000007FFFFFFFFFFu64);
+pub const CAP_UNUSED0_44: u64 = cap_right!(0, 0x0000080000000000u64);
+pub const CAP_UNUSED0_57: u64 = cap_right!(0, 0x0100000000000000u64);
+pub const CAP_MAC_GET: u64 = cap_right!(1, 0x0000000000000001u64);
+pub const CAP_MAC_SET: u64 = cap_right!(1, 0x0000000000000002u64);
+pub const CAP_SEM_GETVALUE: u64 = cap_right!(1, 0x0000000000000004u64);
+pub const CAP_SEM_POST: u64 = cap_right!(1, 0x0000000000000008u64);
+pub const CAP_SEM_WAIT: u64 = cap_right!(1, 0x0000000000000010u64);
+pub const CAP_EVENT: u64 = cap_right!(1, 0x0000000000000020u64);
+pub const CAP_KQUEUE_EVENT: u64 = cap_right!(1, 0x0000000000000040u64);
+pub const CAP_IOCTL: u64 = cap_right!(1, 0x0000000000000080u64);
+pub const CAP_TTYHOOK: u64 = cap_right!(1, 0x0000000000000100u64);
+pub const CAP_PDGETPID: u64 = cap_right!(1, 0x0000000000000200u64);
+pub const CAP_PDWAIT: u64 = cap_right!(1, 0x0000000000000400u64);
+pub const CAP_PDKILL: u64 = cap_right!(1, 0x0000000000000800u64);
+pub const CAP_EXTATTR_DELETE: u64 = cap_right!(1, 0x0000000000001000u64);
+pub const CAP_EXTATTR_GET: u64 = cap_right!(1, 0x0000000000002000u64);
+pub const CAP_EXTATTR_LIST: u64 = cap_right!(1, 0x0000000000004000u64);
+pub const CAP_EXTATTR_SET: u64 = cap_right!(1, 0x0000000000008000u64);
+pub const CAP_ACL_CHECK: u64 = cap_right!(1, 0x0000000000010000u64);
+pub const CAP_ACL_DELETE: u64 = cap_right!(1, 0x0000000000020000u64);
+pub const CAP_ACL_GET: u64 = cap_right!(1, 0x0000000000040000u64);
+pub const CAP_ACL_SET: u64 = cap_right!(1, 0x0000000000080000u64);
+pub const CAP_KQUEUE_CHANGE: u64 = cap_right!(1, 0x0000000000100000u64);
+pub const CAP_KQUEUE: u64 = CAP_KQUEUE_EVENT | CAP_KQUEUE_CHANGE;
+pub const CAP_ALL1: u64 = cap_right!(1, 0x00000000001FFFFFu64);
+pub const CAP_UNUSED1_22: u64 = cap_right!(1, 0x0000000000200000u64);
+pub const CAP_UNUSED1_57: u64 = cap_right!(1, 0x0100000000000000u64);
+pub const CAP_FCNTL_GETFL: u32 = 1 << 3;
+pub const CAP_FCNTL_SETFL: u32 = 1 << 4;
+pub const CAP_FCNTL_GETOWN: u32 = 1 << 5;
+pub const CAP_FCNTL_SETOWN: u32 = 1 << 6;
 
 // sys/devicestat.h
 pub const DEVSTAT_N_TRANS_FLAGS: ::c_int = 4;
@@ -2708,6 +2831,7 @@ pub const POSIX_FADV_DONTNEED: ::c_int = 4;
 pub const POSIX_FADV_NOREUSE: ::c_int = 5;
 
 pub const POLLINIGNEOF: ::c_short = 0x2000;
+pub const POLLRDHUP: ::c_short = 0x4000;
 
 pub const EVFILT_READ: i16 = -1;
 pub const EVFILT_WRITE: i16 = -2;
@@ -3002,9 +3126,22 @@ pub const H4DISC: ::c_int = 0x7;
 
 pub const VM_TOTAL: ::c_int = 1;
 
-pub const BIOCSETFNR: ::c_ulong = 0x80104282;
+cfg_if! {
+    if #[cfg(target_pointer_width = "64")] {
+        pub const BIOCSETFNR: ::c_ulong = 0x80104282;
+    } else {
+        pub const BIOCSETFNR: ::c_ulong = 0x80084282;
+    }
+}
 
-pub const FIODGNAME: ::c_ulong = 0x80106678;
+cfg_if! {
+    if #[cfg(target_pointer_width = "64")] {
+        pub const FIODGNAME: ::c_ulong = 0x80106678;
+    } else {
+        pub const FIODGNAME: ::c_ulong = 0x80086678;
+    }
+}
+
 pub const FIONWRITE: ::c_ulong = 0x40046677;
 pub const FIONSPACE: ::c_ulong = 0x40046676;
 pub const FIOSEEKDATA: ::c_ulong = 0xc0086661;
@@ -3657,6 +3794,7 @@ pub const TCP_INFO: ::c_int = 32;
 pub const TCP_CONGESTION: ::c_int = 64;
 pub const TCP_CCALGOOPT: ::c_int = 65;
 pub const TCP_MAXUNACKTIME: ::c_int = 68;
+#[deprecated(since = "0.2.160", note = "Removed in FreeBSD 15")]
 pub const TCP_MAXPEAKRATE: ::c_int = 69;
 pub const TCP_IDLE_REDUCE: ::c_int = 70;
 pub const TCP_REMOTE_UDP_ENCAPS_PORT: ::c_int = 71;
@@ -3672,6 +3810,8 @@ pub const TCP_KEEPINIT: ::c_int = 128;
 pub const TCP_FASTOPEN: ::c_int = 1025;
 pub const TCP_PCAP_OUT: ::c_int = 2048;
 pub const TCP_PCAP_IN: ::c_int = 4096;
+pub const TCP_FUNCTION_BLK: ::c_int = 8192;
+pub const TCP_FUNCTION_ALIAS: ::c_int = 8193;
 pub const TCP_FASTOPEN_PSK_LEN: ::c_int = 16;
 pub const TCP_FUNCTION_NAME_LEN_MAX: ::c_int = 32;
 
@@ -3838,6 +3978,7 @@ pub const RTP_PRIO_REALTIME: ::c_ushort = 2;
 pub const RTP_PRIO_NORMAL: ::c_ushort = 3;
 pub const RTP_PRIO_IDLE: ::c_ushort = 4;
 
+// DIFF(main): changed to `c_short` in f62eb023ab
 pub const POSIX_SPAWN_RESETIDS: ::c_int = 0x01;
 pub const POSIX_SPAWN_SETPGROUP: ::c_int = 0x02;
 pub const POSIX_SPAWN_SETSCHEDPARAM: ::c_int = 0x04;
@@ -4555,6 +4696,14 @@ pub const CPU_WHICH_CPUSET: ::c_int = 3;
 pub const CPU_WHICH_IRQ: ::c_int = 4;
 pub const CPU_WHICH_JAIL: ::c_int = 5;
 
+// net/route.h
+pub const RTF_LLDATA: ::c_int = 0x400;
+pub const RTF_FIXEDMTU: ::c_int = 0x80000;
+
+pub const RTM_VERSION: ::c_int = 5;
+
+pub const RTAX_MAX: ::c_int = 8;
+
 // sys/signal.h
 pub const SIGTHR: ::c_int = 32;
 pub const SIGLWP: ::c_int = SIGTHR;
@@ -4737,16 +4886,18 @@ pub const TFD_CLOEXEC: ::c_int = O_CLOEXEC;
 pub const TFD_TIMER_ABSTIME: ::c_int = 0x01;
 pub const TFD_TIMER_CANCEL_ON_SET: ::c_int = 0x02;
 
-cfg_if! {
-    if #[cfg(libc_const_extern_fn)] {
-        pub const fn MAP_ALIGNED(a: ::c_int) -> ::c_int {
-            a << 24
-        }
-    } else {
-        pub fn MAP_ALIGNED(a: ::c_int) -> ::c_int {
-            a << 24
-        }
-    }
+// sys/unistd.h
+
+pub const CLOSE_RANGE_CLOEXEC: ::c_uint = 1 << 2;
+
+pub const KCMP_FILE: ::c_int = 100;
+pub const KCMP_FILEOBJ: ::c_int = 101;
+pub const KCMP_FILES: ::c_int = 102;
+pub const KCMP_SIGHAND: ::c_int = 103;
+pub const KCMP_VM: ::c_int = 104;
+
+pub const fn MAP_ALIGNED(a: ::c_int) -> ::c_int {
+    a << 24
 }
 
 const_fn! {
@@ -4757,35 +4908,30 @@ const_fn! {
 
 f! {
     pub fn CMSG_DATA(cmsg: *const ::cmsghdr) -> *mut ::c_uchar {
-        (cmsg as *mut ::c_uchar)
-            .offset(_ALIGN(::mem::size_of::<::cmsghdr>()) as isize)
+        (cmsg as *mut ::c_uchar).offset(_ALIGN(::mem::size_of::<::cmsghdr>()) as isize)
     }
 
     pub {const} fn CMSG_LEN(length: ::c_uint) -> ::c_uint {
         _ALIGN(::mem::size_of::<::cmsghdr>()) as ::c_uint + length
     }
 
-    pub fn CMSG_NXTHDR(mhdr: *const ::msghdr, cmsg: *const ::cmsghdr)
-        -> *mut ::cmsghdr
-    {
+    pub fn CMSG_NXTHDR(mhdr: *const ::msghdr, cmsg: *const ::cmsghdr) -> *mut ::cmsghdr {
         if cmsg.is_null() {
             return ::CMSG_FIRSTHDR(mhdr);
         };
-        let next = cmsg as usize + _ALIGN((*cmsg).cmsg_len as usize)
+        let next = cmsg as usize
+            + _ALIGN((*cmsg).cmsg_len as usize)
             + _ALIGN(::mem::size_of::<::cmsghdr>());
-        let max = (*mhdr).msg_control as usize
-            + (*mhdr).msg_controllen as usize;
+        let max = (*mhdr).msg_control as usize + (*mhdr).msg_controllen as usize;
         if next > max {
             0 as *mut ::cmsghdr
         } else {
-            (cmsg as usize + _ALIGN((*cmsg).cmsg_len as usize))
-                as *mut ::cmsghdr
+            (cmsg as usize + _ALIGN((*cmsg).cmsg_len as usize)) as *mut ::cmsghdr
         }
     }
 
     pub {const} fn CMSG_SPACE(length: ::c_uint) -> ::c_uint {
-        (_ALIGN(::mem::size_of::<::cmsghdr>()) + _ALIGN(length as usize))
-            as ::c_uint
+        (_ALIGN(::mem::size_of::<::cmsghdr>()) + _ALIGN(length as usize)) as ::c_uint
     }
 
     pub fn MALLOCX_ALIGN(lg: ::c_uint) -> ::c_int {
@@ -4801,11 +4947,7 @@ f! {
     }
 
     pub fn SOCKCREDSIZE(ngrps: usize) -> usize {
-        let ngrps = if ngrps > 0 {
-            ngrps - 1
-        } else {
-            0
-        };
+        let ngrps = if ngrps > 0 { ngrps - 1 } else { 0 };
         ::mem::size_of::<sockcred>() + ::mem::size_of::<::gid_t>() * ngrps
     }
 
@@ -4852,16 +4994,12 @@ f! {
 
         for i in cpuset.__bits[..(cpuset_size / bitset_size)].iter() {
             s += i.count_ones();
-        };
+        }
         s as ::c_int
     }
 
     pub fn SOCKCRED2SIZE(ngrps: usize) -> usize {
-        let ngrps = if ngrps > 0 {
-            ngrps - 1
-        } else {
-            0
-        };
+        let ngrps = if ngrps > 0 { ngrps - 1 } else { 0 };
         ::mem::size_of::<sockcred2>() + ::mem::size_of::<::gid_t>() * ngrps
     }
 
@@ -4880,8 +5018,15 @@ safe_f! {
     }
 
     pub {const} fn INVALID_SINFO_FLAG(x: ::c_int) -> bool {
-        (x) & 0xfffffff0 & !(SCTP_EOF | SCTP_ABORT | SCTP_UNORDERED |
-        SCTP_ADDR_OVER | SCTP_SENDALL | SCTP_EOR | SCTP_SACK_IMMEDIATELY) != 0
+        (x) & 0xfffffff0
+            & !(SCTP_EOF
+                | SCTP_ABORT
+                | SCTP_UNORDERED
+                | SCTP_ADDR_OVER
+                | SCTP_SENDALL
+                | SCTP_EOR
+                | SCTP_SACK_IMMEDIATELY)
+            != 0
     }
 
     pub {const} fn PR_SCTP_POLICY(x: ::c_int) -> ::c_int {
@@ -5462,6 +5607,20 @@ extern "C" {
     ) -> ::c_int;
     pub fn closefrom(lowfd: ::c_int);
     pub fn close_range(lowfd: ::c_uint, highfd: ::c_uint, flags: ::c_int) -> ::c_int;
+
+    pub fn execvpe(
+        file: *const ::c_char,
+        argv: *const *const ::c_char,
+        envp: *const *const ::c_char,
+    ) -> ::c_int;
+
+    pub fn kcmp(
+        pid1: ::pid_t,
+        pid2: ::pid_t,
+        type_: ::c_int,
+        idx1: ::c_ulong,
+        idx2: ::c_ulong,
+    ) -> ::c_int;
 }
 
 #[link(name = "memstat")]

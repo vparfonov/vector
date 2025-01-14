@@ -58,7 +58,7 @@ use {
 #[inline]
 pub(crate) fn open(path: &CStr, flags: OFlags, mode: Mode) -> io::Result<OwnedFd> {
     // Always enable support for large files.
-    let flags = flags | OFlags::from_bits_retain(c::O_LARGEFILE);
+    let flags = flags | OFlags::LARGEFILE;
 
     #[cfg(any(target_arch = "aarch64", target_arch = "riscv64"))]
     {
@@ -78,7 +78,7 @@ pub(crate) fn openat(
     mode: Mode,
 ) -> io::Result<OwnedFd> {
     // Always enable support for large files.
-    let flags = flags | OFlags::from_bits_retain(c::O_LARGEFILE);
+    let flags = flags | OFlags::LARGEFILE;
 
     unsafe { ret_owned_fd(syscall_readonly!(__NR_openat, dirfd, path, flags, mode)) }
 }
@@ -358,7 +358,7 @@ pub(crate) fn fallocate(
 
 #[inline]
 pub(crate) fn fadvise(fd: BorrowedFd<'_>, pos: u64, len: u64, advice: Advice) -> io::Result<()> {
-    // On ARM, the arguments are reordered so that the len and pos argument
+    // On ARM, the arguments are reordered so that the `len` and `pos` argument
     // pairs are aligned. And ARM has a custom syscall code for this.
     #[cfg(target_arch = "arm")]
     unsafe {

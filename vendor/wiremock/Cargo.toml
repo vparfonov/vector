@@ -12,8 +12,13 @@
 [package]
 edition = "2018"
 name = "wiremock"
-version = "0.6.1"
+version = "0.6.2"
 authors = ["Luca Palmieri <rust@lpalmieri.com>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "HTTP mocking to test Rust applications."
 documentation = "https://docs.rs/wiremock/"
 readme = "README.md"
@@ -32,7 +37,28 @@ license = "MIT/Apache-2.0"
 repository = "https://github.com/LukeMathWalker/wiremock-rs"
 
 [lib]
+name = "wiremock"
 path = "src/lib.rs"
+
+[[test]]
+name = "mocks"
+path = "tests/mocks.rs"
+
+[[test]]
+name = "priority"
+path = "tests/priority.rs"
+
+[[test]]
+name = "request_header_matching"
+path = "tests/request_header_matching.rs"
+
+[[test]]
+name = "timeout"
+path = "tests/timeout.rs"
+
+[[test]]
+name = "tokio"
+path = "tests/tokio.rs"
 
 [dependencies.assert-json-diff]
 version = "2.0.1"
@@ -41,7 +67,7 @@ version = "2.0.1"
 version = "0.1"
 
 [dependencies.base64]
-version = "0.21.0"
+version = "0.22"
 
 [dependencies.deadpool]
 version = "0.10.0"
@@ -97,11 +123,11 @@ version = "2.2"
 version = "2.2.0"
 
 [dev-dependencies.async-std]
-version = "1.9.0"
+version = "1.13.0"
 features = ["attributes"]
 
 [dev-dependencies.reqwest]
-version = "0.11.3"
+version = "0.12.7"
 
 [dev-dependencies.surf]
 version = "2.3.2"

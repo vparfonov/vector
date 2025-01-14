@@ -80,12 +80,13 @@ Symbols:
 
 Functions  Expressions  Impls  Traits  Methods  Dependency
 
-0/0        0/0          0/0    0/0     0/0      🔒  temp-dir 0.1.13
+0/0        0/0          0/0    0/0     0/0      🔒  temp-dir 0.1.14
 
 0/0        0/0          0/0    0/0     0/0    
 
 ```
 # Changelog
+- v0.1.14 - `AsRef<Path>`
 - v0.1.13 - Update docs.
 - v0.1.12 - Work when the directory already exists.
 - v0.1.11

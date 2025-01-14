@@ -77,6 +77,7 @@ use crate::ssl::bio::BioMethod;
 use crate::ssl::callbacks::*;
 use crate::ssl::error::InnerError;
 use crate::stack::{Stack, StackRef, Stackable};
+use crate::util;
 use crate::util::{ForeignTypeExt, ForeignTypeRefExt};
 use crate::x509::store::{X509Store, X509StoreBuilderRef, X509StoreRef};
 #[cfg(any(ossl102, boringssl, libressl261))]
@@ -101,7 +102,6 @@ use std::ops::{Deref, DerefMut};
 use std::panic::resume_unwind;
 use std::path::Path;
 use std::ptr;
-use std::slice;
 use std::str;
 use std::sync::{Arc, Mutex};
 
@@ -708,7 +708,7 @@ pub fn select_next_proto<'a>(server: &[u8], client: &'a [u8]) -> Option<&'a [u8]
             client.len() as c_uint,
         );
         if r == ffi::OPENSSL_NPN_NEGOTIATED {
-            Some(slice::from_raw_parts(out as *const u8, outlen as usize))
+            Some(util::from_raw_parts(out as *const u8, outlen as usize))
         } else {
             None
         }
@@ -2203,7 +2203,7 @@ impl SslSessionRef {
             let mut len = 0;
             let p = ffi::SSL_SESSION_get_id(self.as_ptr(), &mut len);
             #[allow(clippy::unnecessary_cast)]
-            slice::from_raw_parts(p as *const u8, len as usize)
+            util::from_raw_parts(p as *const u8, len as usize)
         }
     }
 
@@ -2326,10 +2326,6 @@ impl Ssl {
     }
 
     /// Creates a new `Ssl`.
-    ///
-    /// This corresponds to [`SSL_new`].
-    ///
-    /// [`SSL_new`]: https://www.openssl.org/docs/manmaster/ssl/SSL_new.html
     #[corresponds(SSL_new)]
     pub fn new(ctx: &SslContextRef) -> Result<Ssl, ErrorStack> {
         let session_ctx_index = try_get_session_ctx_index()?;
@@ -2343,15 +2339,10 @@ impl Ssl {
     }
 
     /// Initiates a client-side TLS handshake.
-    ///
-    /// This corresponds to [`SSL_connect`].
-    ///
     /// # Warning
     ///
     /// OpenSSL's default configuration is insecure. It is highly recommended to use
     /// `SslConnector` rather than `Ssl` directly, as it manages that configuration.
-    ///
-    /// [`SSL_connect`]: https://www.openssl.org/docs/manmaster/man3/SSL_connect.html
     #[corresponds(SSL_connect)]
     #[allow(deprecated)]
     pub fn connect<S>(self, stream: S) -> Result<SslStream<S>, HandshakeError<S>>
@@ -2363,14 +2354,10 @@ impl Ssl {
 
     /// Initiates a server-side TLS handshake.
     ///
-    /// This corresponds to [`SSL_accept`].
-    ///
     /// # Warning
     ///
     /// OpenSSL's default configuration is insecure. It is highly recommended to use
     /// `SslAcceptor` rather than `Ssl` directly, as it manages that configuration.
-    ///
-    /// [`SSL_accept`]: https://www.openssl.org/docs/manmaster/man3/SSL_accept.html
     #[corresponds(SSL_accept)]
     #[allow(deprecated)]
     pub fn accept<S>(self, stream: S) -> Result<SslStream<S>, HandshakeError<S>>
@@ -2679,16 +2666,12 @@ impl SslRef {
             if data.is_null() {
                 None
             } else {
-                Some(slice::from_raw_parts(data, len as usize))
+                Some(util::from_raw_parts(data, len as usize))
             }
         }
     }
 
     /// Enables the DTLS extension "use_srtp" as defined in RFC5764.
-    ///
-    /// This corresponds to [`SSL_set_tlsext_use_srtp`].
-    ///
-    /// [`SSL_set_tlsext_use_srtp`]: https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_tlsext_use_srtp.html
     #[corresponds(SSL_set_tlsext_use_srtp)]
     pub fn set_tlsext_use_srtp(&mut self, protocols: &str) -> Result<(), ErrorStack> {
         unsafe {
@@ -2707,10 +2690,6 @@ impl SslRef {
     /// Gets all SRTP profiles that are enabled for handshake via set_tlsext_use_srtp
     ///
     /// DTLS extension "use_srtp" as defined in RFC5764 has to be enabled.
-    ///
-    /// This corresponds to [`SSL_get_srtp_profiles`].
-    ///
-    /// [`SSL_get_srtp_profiles`]: https://www.openssl.org/docs/man1.1.1/man3/SSL_CTX_set_tlsext_use_srtp.html
     #[corresponds(SSL_get_srtp_profiles)]
     pub fn srtp_profiles(&self) -> Option<&StackRef<SrtpProtectionProfile>> {
         unsafe {
@@ -2957,7 +2936,7 @@ impl SslRef {
             if len < 0 {
                 None
             } else {
-                Some(slice::from_raw_parts(p as *const u8, len as usize))
+                Some(util::from_raw_parts(p as *const u8, len as usize))
             }
         }
     }
@@ -3128,7 +3107,7 @@ impl SslRef {
             if len == 0 {
                 None
             } else {
-                Some(slice::from_raw_parts(ptr, len))
+                Some(util::from_raw_parts(ptr, len))
             }
         }
     }
@@ -3147,7 +3126,7 @@ impl SslRef {
             if len == 0 {
                 None
             } else {
-                Some(slice::from_raw_parts(ptr, len))
+                Some(util::from_raw_parts(ptr, len))
             }
         }
     }
@@ -3166,7 +3145,7 @@ impl SslRef {
             if len == 0 {
                 None
             } else {
-                Some(slice::from_raw_parts(ptr, len))
+                Some(util::from_raw_parts(ptr, len))
             }
         }
     }
@@ -3220,7 +3199,7 @@ impl SslRef {
             if len == 0 {
                 None
             } else {
-                Some(slice::from_raw_parts(ptr, len))
+                Some(util::from_raw_parts(ptr, len))
             }
         }
     }
@@ -3555,9 +3534,7 @@ where
 {
     /// Restarts the handshake process.
     ///
-    /// This corresponds to [`SSL_do_handshake`].
-    ///
-    /// [`SSL_do_handshake`]: https://www.openssl.org/docs/manmaster/man3/SSL_do_handshake.html
+    #[corresponds(SSL_do_handshake)]
     pub fn handshake(mut self) -> Result<SslStream<S>, HandshakeError<S>> {
         match self.stream.do_handshake() {
             Ok(()) => Ok(self.stream),
@@ -3793,7 +3770,7 @@ impl<S: Read + Write> SslStream<S> {
     pub fn ssl_read(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         // SAFETY: `ssl_read_uninit` does not de-initialize the buffer.
         unsafe {
-            self.ssl_read_uninit(slice::from_raw_parts_mut(
+            self.ssl_read_uninit(util::from_raw_parts_mut(
                 buf.as_mut_ptr().cast::<MaybeUninit<u8>>(),
                 buf.len(),
             ))
@@ -4026,7 +4003,7 @@ impl<S: Read + Write> Read for SslStream<S> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         // SAFETY: `read_uninit` does not de-initialize the buffer
         unsafe {
-            self.read_uninit(slice::from_raw_parts_mut(
+            self.read_uninit(util::from_raw_parts_mut(
                 buf.as_mut_ptr().cast::<MaybeUninit<u8>>(),
                 buf.len(),
             ))
@@ -4085,10 +4062,7 @@ where
     /// `accept`. If a HelloRetryRequest containing a fresh cookie was
     /// transmitted, `Ok(false)` is returned instead. If the handshake cannot
     /// proceed at all, `Err` is returned.
-    ///
-    /// This corresponds to [`SSL_stateless`]
-    ///
-    /// [`SSL_stateless`]: https://www.openssl.org/docs/manmaster/man3/SSL_stateless.html
+    #[corresponds(SSL_stateless)]
     #[cfg(ossl111)]
     pub fn stateless(&mut self) -> Result<bool, ErrorStack> {
         match unsafe { ffi::SSL_stateless(self.inner.ssl.as_ptr()) } {
@@ -4100,19 +4074,13 @@ where
     }
 
     /// Configure as an outgoing stream from a client.
-    ///
-    /// This corresponds to [`SSL_set_connect_state`].
-    ///
-    /// [`SSL_set_connect_state`]: https://www.openssl.org/docs/manmaster/man3/SSL_set_connect_state.html
+    #[corresponds(SSL_set_connect_state)]
     pub fn set_connect_state(&mut self) {
         unsafe { ffi::SSL_set_connect_state(self.inner.ssl.as_ptr()) }
     }
 
     /// Configure as an incoming stream to a server.
-    ///
-    /// This corresponds to [`SSL_set_accept_state`].
-    ///
-    /// [`SSL_set_accept_state`]: https://www.openssl.org/docs/manmaster/man3/SSL_set_accept_state.html
+    #[corresponds(SSL_set_accept_state)]
     pub fn set_accept_state(&mut self) {
         unsafe { ffi::SSL_set_accept_state(self.inner.ssl.as_ptr()) }
     }
@@ -4158,10 +4126,7 @@ where
     /// Initiates the handshake.
     ///
     /// This will fail if `set_accept_state` or `set_connect_state` was not called first.
-    ///
-    /// This corresponds to [`SSL_do_handshake`].
-    ///
-    /// [`SSL_do_handshake`]: https://www.openssl.org/docs/manmaster/man3/SSL_do_handshake.html
+    #[corresponds(SSL_do_handshake)]
     pub fn handshake(mut self) -> Result<SslStream<S>, HandshakeError<S>> {
         match self.inner.do_handshake() {
             Ok(()) => Ok(self.inner),
@@ -4189,10 +4154,7 @@ where
     /// Returns `Ok(0)` if all early data has been read.
     ///
     /// Requires OpenSSL 1.1.1 or LibreSSL 3.4.0 or newer.
-    ///
-    /// This corresponds to [`SSL_read_early_data`].
-    ///
-    /// [`SSL_read_early_data`]: https://www.openssl.org/docs/manmaster/man3/SSL_read_early_data.html
+    #[corresponds(SSL_read_early_data)]
     #[cfg(any(ossl111, libressl340))]
     pub fn read_early_data(&mut self, buf: &mut [u8]) -> Result<usize, Error> {
         self.inner.read_early_data(buf)
@@ -4204,10 +4166,7 @@ where
     /// `set_connect_state` first.
     ///
     /// Requires OpenSSL 1.1.1 or LibreSSL 3.4.0 or newer.
-    ///
-    /// This corresponds to [`SSL_write_early_data`].
-    ///
-    /// [`SSL_write_early_data`]: https://www.openssl.org/docs/manmaster/man3/SSL_write_early_data.html
+    #[corresponds(SSL_write_early_data)]
     #[cfg(any(ossl111, libressl340))]
     pub fn write_early_data(&mut self, buf: &[u8]) -> Result<usize, Error> {
         self.inner.write_early_data(buf)

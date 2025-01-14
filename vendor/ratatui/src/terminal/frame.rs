@@ -1,4 +1,8 @@
-use crate::prelude::*;
+use crate::{
+    buffer::Buffer,
+    layout::{Position, Rect},
+    widgets::{StatefulWidget, StatefulWidgetRef, Widget, WidgetRef},
+};
 
 /// A consistent view into the terminal state for rendering a single frame.
 ///
@@ -10,13 +14,14 @@ use crate::prelude::*;
 /// to the terminal. This avoids drawing redundant cells.
 ///
 /// [`Buffer`]: crate::buffer::Buffer
+/// [`Terminal::draw`]: crate::Terminal::draw
 #[derive(Debug, Hash)]
 pub struct Frame<'a> {
     /// Where should the cursor be after drawing this frame?
     ///
     /// If `None`, the cursor is hidden and its position is controlled by the backend. If `Some((x,
     /// y))`, the cursor is shown and placed at `(x, y)` after the call to `Terminal::draw()`.
-    pub(crate) cursor_position: Option<(u16, u16)>,
+    pub(crate) cursor_position: Option<Position>,
 
     /// The area of the viewport
     pub(crate) viewport_area: Rect,
@@ -31,6 +36,8 @@ pub struct Frame<'a> {
 /// `CompletedFrame` represents the state of the terminal after all changes performed in the last
 /// [`Terminal::draw`] call have been applied. Therefore, it is only valid until the next call to
 /// [`Terminal::draw`].
+///
+/// [`Terminal::draw`]: crate::Terminal::draw
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub struct CompletedFrame<'a> {
     /// The buffer that was used to draw the last frame.
@@ -42,13 +49,25 @@ pub struct CompletedFrame<'a> {
 }
 
 impl Frame<'_> {
-    /// The size of the current frame
+    /// The area of the current frame
     ///
     /// This is guaranteed not to change during rendering, so may be called multiple times.
     ///
     /// If your app listens for a resize event from the backend, it should ignore the values from
     /// the event for any calculations that are used to render the current frame and use this value
-    /// instead as this is the size of the buffer that is used to render the current frame.
+    /// instead as this is the area of the buffer that is used to render the current frame.
+    pub const fn area(&self) -> Rect {
+        self.viewport_area
+    }
+
+    /// The area of the current frame
+    ///
+    /// This is guaranteed not to change during rendering, so may be called multiple times.
+    ///
+    /// If your app listens for a resize event from the backend, it should ignore the values from
+    /// the event for any calculations that are used to render the current frame and use this value
+    /// instead as this is the area of the buffer that is used to render the current frame.
+    #[deprecated = "use .area() as it's the more correct name"]
     pub const fn size(&self) -> Rect {
         self.viewport_area
     }
@@ -61,10 +80,12 @@ impl Frame<'_> {
     /// # Example
     ///
     /// ```rust
-    /// # use ratatui::{backend::TestBackend, prelude::*, widgets::Block};
+    /// # use ratatui::{backend::TestBackend, Terminal};
     /// # let backend = TestBackend::new(5, 5);
     /// # let mut terminal = Terminal::new(backend).unwrap();
     /// # let mut frame = terminal.get_frame();
+    /// use ratatui::{layout::Rect, widgets::Block};
+    ///
     /// let block = Block::new();
     /// let area = Rect::new(0, 0, 5, 5);
     /// frame.render_widget(block, area);
@@ -84,17 +105,19 @@ impl Frame<'_> {
     ///
     /// ```rust
     /// # #[cfg(feature = "unstable-widget-ref")] {
-    /// # use ratatui::{backend::TestBackend, prelude::*, widgets::Block};
+    /// # use ratatui::{backend::TestBackend, Terminal};
     /// # let backend = TestBackend::new(5, 5);
     /// # let mut terminal = Terminal::new(backend).unwrap();
     /// # let mut frame = terminal.get_frame();
+    /// use ratatui::{layout::Rect, widgets::Block};
+    ///
     /// let block = Block::new();
     /// let area = Rect::new(0, 0, 5, 5);
     /// frame.render_widget_ref(block, area);
     /// # }
     /// ```
     #[allow(clippy::needless_pass_by_value)]
-    #[stability::unstable(feature = "widget-ref")]
+    #[instability::unstable(feature = "widget-ref")]
     pub fn render_widget_ref<W: WidgetRef>(&mut self, widget: W, area: Rect) {
         widget.render_ref(area, self.buffer);
     }
@@ -110,10 +133,15 @@ impl Frame<'_> {
     /// # Example
     ///
     /// ```rust
-    /// # use ratatui::{backend::TestBackend, prelude::*, widgets::*};
+    /// # use ratatui::{backend::TestBackend, Terminal};
     /// # let backend = TestBackend::new(5, 5);
     /// # let mut terminal = Terminal::new(backend).unwrap();
     /// # let mut frame = terminal.get_frame();
+    /// use ratatui::{
+    ///     layout::Rect,
+    ///     widgets::{List, ListItem, ListState},
+    /// };
+    ///
     /// let mut state = ListState::default().with_selected(Some(1));
     /// let list = List::new(vec![ListItem::new("Item 1"), ListItem::new("Item 2")]);
     /// let area = Rect::new(0, 0, 5, 5);
@@ -141,10 +169,15 @@ impl Frame<'_> {
     ///
     /// ```rust
     /// # #[cfg(feature = "unstable-widget-ref")] {
-    /// # use ratatui::{backend::TestBackend, prelude::*, widgets::*};
+    /// # use ratatui::{backend::TestBackend, Terminal};
     /// # let backend = TestBackend::new(5, 5);
     /// # let mut terminal = Terminal::new(backend).unwrap();
     /// # let mut frame = terminal.get_frame();
+    /// use ratatui::{
+    ///     layout::Rect,
+    ///     widgets::{List, ListItem, ListState},
+    /// };
+    ///
     /// let mut state = ListState::default().with_selected(Some(1));
     /// let list = List::new(vec![ListItem::new("Item 1"), ListItem::new("Item 2")]);
     /// let area = Rect::new(0, 0, 5, 5);
@@ -152,7 +185,7 @@ impl Frame<'_> {
     /// # }
     /// ```
     #[allow(clippy::needless_pass_by_value)]
-    #[stability::unstable(feature = "widget-ref")]
+    #[instability::unstable(feature = "widget-ref")]
     pub fn render_stateful_widget_ref<W>(&mut self, widget: W, area: Rect, state: &mut W::State)
     where
         W: StatefulWidgetRef,
@@ -163,11 +196,30 @@ impl Frame<'_> {
     /// After drawing this frame, make the cursor visible and put it at the specified (x, y)
     /// coordinates. If this method is not called, the cursor will be hidden.
     ///
-    /// Note that this will interfere with calls to `Terminal::hide_cursor()`,
-    /// `Terminal::show_cursor()`, and `Terminal::set_cursor()`. Pick one of the APIs and stick
-    /// with it.
+    /// Note that this will interfere with calls to [`Terminal::hide_cursor`],
+    /// [`Terminal::show_cursor`], and [`Terminal::set_cursor_position`]. Pick one of the APIs and
+    /// stick with it.
+    ///
+    /// [`Terminal::hide_cursor`]: crate::Terminal::hide_cursor
+    /// [`Terminal::show_cursor`]: crate::Terminal::show_cursor
+    /// [`Terminal::set_cursor_position`]: crate::Terminal::set_cursor_position
+    pub fn set_cursor_position<P: Into<Position>>(&mut self, position: P) {
+        self.cursor_position = Some(position.into());
+    }
+
+    /// After drawing this frame, make the cursor visible and put it at the specified (x, y)
+    /// coordinates. If this method is not called, the cursor will be hidden.
+    ///
+    /// Note that this will interfere with calls to [`Terminal::hide_cursor`],
+    /// [`Terminal::show_cursor`], and [`Terminal::set_cursor_position`]. Pick one of the APIs and
+    /// stick with it.
+    ///
+    /// [`Terminal::hide_cursor`]: crate::Terminal::hide_cursor
+    /// [`Terminal::show_cursor`]: crate::Terminal::show_cursor
+    /// [`Terminal::set_cursor_position`]: crate::Terminal::set_cursor_position
+    #[deprecated = "the method set_cursor_position indicates more clearly what about the cursor to set"]
     pub fn set_cursor(&mut self, x: u16, y: u16) {
-        self.cursor_position = Some((x, y));
+        self.set_cursor_position(Position { x, y });
     }
 
     /// Gets the buffer that this `Frame` draws into as a mutable reference.
@@ -192,7 +244,7 @@ impl Frame<'_> {
     /// # Examples
     ///
     /// ```rust
-    /// # use ratatui::{backend::TestBackend, prelude::*, widgets::*};
+    /// # use ratatui::{backend::TestBackend, Terminal};
     /// # let backend = TestBackend::new(5, 5);
     /// # let mut terminal = Terminal::new(backend).unwrap();
     /// # let mut frame = terminal.get_frame();

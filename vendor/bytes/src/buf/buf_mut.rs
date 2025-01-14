@@ -165,7 +165,7 @@ pub unsafe trait BufMut {
     ///
     /// # Implementer notes
     ///
-    /// This function should never panic. `chunk_mut` should return an empty
+    /// This function should never panic. `chunk_mut()` should return an empty
     /// slice **if and only if** `remaining_mut()` returns 0. In other words,
     /// `chunk_mut()` returning an empty slice implies that `remaining_mut()` will
     /// return 0 and `remaining_mut()` returning 0 implies that `chunk_mut()` will
@@ -1107,7 +1107,7 @@ pub unsafe trait BufMut {
         }
     }
 
-    /// Writes  an IEEE754 single-precision (4 bytes) floating point number to
+    /// Writes an IEEE754 single-precision (4 bytes) floating point number to
     /// `self` in big-endian byte order.
     ///
     /// The current position is advanced by 4.
@@ -1131,7 +1131,7 @@ pub unsafe trait BufMut {
         self.put_u32(n.to_bits());
     }
 
-    /// Writes  an IEEE754 single-precision (4 bytes) floating point number to
+    /// Writes an IEEE754 single-precision (4 bytes) floating point number to
     /// `self` in little-endian byte order.
     ///
     /// The current position is advanced by 4.
@@ -1183,7 +1183,7 @@ pub unsafe trait BufMut {
         self.put_u32_ne(n.to_bits());
     }
 
-    /// Writes  an IEEE754 double-precision (8 bytes) floating point number to
+    /// Writes an IEEE754 double-precision (8 bytes) floating point number to
     /// `self` in big-endian byte order.
     ///
     /// The current position is advanced by 8.
@@ -1207,7 +1207,7 @@ pub unsafe trait BufMut {
         self.put_u64(n.to_bits());
     }
 
-    /// Writes  an IEEE754 double-precision (8 bytes) floating point number to
+    /// Writes an IEEE754 double-precision (8 bytes) floating point number to
     /// `self` in little-endian byte order.
     ///
     /// The current position is advanced by 8.
@@ -1231,7 +1231,7 @@ pub unsafe trait BufMut {
         self.put_u64_le(n.to_bits());
     }
 
-    /// Writes  an IEEE754 double-precision (8 bytes) floating point number to
+    /// Writes an IEEE754 double-precision (8 bytes) floating point number to
     /// `self` in native-endian byte order.
     ///
     /// The current position is advanced by 8.

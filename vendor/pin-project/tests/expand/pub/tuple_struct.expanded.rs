@@ -12,6 +12,7 @@ pub struct TupleStruct<T, U>(#[pin] pub T, pub U);
 #[allow(clippy::redundant_pub_crate)]
 #[allow(clippy::type_repetition_in_bounds)]
 #[allow(unused_qualifications)]
+#[allow(clippy::needless_lifetimes)]
 #[allow(clippy::semicolon_if_nothing_returned)]
 #[allow(clippy::use_self)]
 #[allow(clippy::used_underscore_binding)]
@@ -83,12 +84,16 @@ const _: () = {
     }
     impl<'pin, T, U> _pin_project::__private::Unpin for TupleStruct<T, U>
     where
-        __TupleStruct<'pin, T, U>: _pin_project::__private::Unpin,
+        ::pin_project::__private::PinnedFieldsOf<
+            __TupleStruct<'pin, T, U>,
+        >: _pin_project::__private::Unpin,
     {}
     #[doc(hidden)]
     unsafe impl<'pin, T, U> _pin_project::UnsafeUnpin for TupleStruct<T, U>
     where
-        __TupleStruct<'pin, T, U>: _pin_project::__private::Unpin,
+        ::pin_project::__private::PinnedFieldsOf<
+            __TupleStruct<'pin, T, U>,
+        >: _pin_project::__private::Unpin,
     {}
     trait TupleStructMustNotImplDrop {}
     #[allow(clippy::drop_bounds, drop_bounds)]

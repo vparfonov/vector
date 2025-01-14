@@ -11,13 +11,19 @@
 
 [package]
 edition = "2021"
-rust-version = "1.71"
+rust-version = "1.79.0"
 name = "mlua"
-version = "0.9.9"
+version = "0.10.1"
 authors = [
     "Aleksandr Orlenko <zxteam@pm.me>",
     "kyren <catherine@kyju.org>",
 ]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
 High level bindings to Lua 5.4/5.3/5.2/5.1 (including LuaJIT) and Roblox Luau
 with async/await features and support of writing native Lua modules in Rust.
@@ -46,16 +52,19 @@ features = [
     "send",
     "serialize",
     "macros",
-    "parking_lot",
-    "unstable",
 ]
 rustdoc-args = [
     "--cfg",
     "docsrs",
 ]
 
+[lib]
+name = "mlua"
+path = "src/lib.rs"
+
 [[example]]
 name = "async_http_client"
+path = "examples/async_http_client.rs"
 required-features = [
     "async",
     "macros",
@@ -63,6 +72,7 @@ required-features = [
 
 [[example]]
 name = "async_http_reqwest"
+path = "examples/async_http_reqwest.rs"
 required-features = [
     "async",
     "serialize",
@@ -71,51 +81,163 @@ required-features = [
 
 [[example]]
 name = "async_http_server"
+path = "examples/async_http_server.rs"
 required-features = [
     "async",
     "macros",
+    "send",
 ]
 
 [[example]]
 name = "async_tcp_server"
+path = "examples/async_tcp_server.rs"
 required-features = [
     "async",
     "macros",
+    "send",
 ]
 
 [[example]]
 name = "guided_tour"
+path = "examples/guided_tour.rs"
 required-features = ["macros"]
 
 [[example]]
+name = "repl"
+path = "examples/repl.rs"
+
+[[example]]
 name = "serialize"
+path = "examples/serialize.rs"
 required-features = ["serialize"]
 
 [[example]]
 name = "userdata"
+path = "examples/userdata.rs"
 required-features = ["macros"]
+
+[[test]]
+name = "async"
+path = "tests/async.rs"
+
+[[test]]
+name = "buffer"
+path = "tests/buffer.rs"
+
+[[test]]
+name = "byte_string"
+path = "tests/byte_string.rs"
+
+[[test]]
+name = "chunk"
+path = "tests/chunk.rs"
+
+[[test]]
+name = "compile"
+path = "tests/compile.rs"
+
+[[test]]
+name = "conversion"
+path = "tests/conversion.rs"
+
+[[test]]
+name = "debug"
+path = "tests/debug.rs"
+
+[[test]]
+name = "error"
+path = "tests/error.rs"
+
+[[test]]
+name = "function"
+path = "tests/function.rs"
+
+[[test]]
+name = "hooks"
+path = "tests/hooks.rs"
+
+[[test]]
+name = "luau"
+path = "tests/luau.rs"
+
+[[test]]
+name = "memory"
+path = "tests/memory.rs"
+
+[[test]]
+name = "multi"
+path = "tests/multi.rs"
+
+[[test]]
+name = "scope"
+path = "tests/scope.rs"
+
+[[test]]
+name = "send"
+path = "tests/send.rs"
+
+[[test]]
+name = "serde"
+path = "tests/serde.rs"
+
+[[test]]
+name = "string"
+path = "tests/string.rs"
+
+[[test]]
+name = "table"
+path = "tests/table.rs"
+
+[[test]]
+name = "tests"
+path = "tests/tests.rs"
+
+[[test]]
+name = "thread"
+path = "tests/thread.rs"
+
+[[test]]
+name = "types"
+path = "tests/types.rs"
+
+[[test]]
+name = "userdata"
+path = "tests/userdata.rs"
+
+[[test]]
+name = "value"
+path = "tests/value.rs"
 
 [[bench]]
 name = "benchmark"
+path = "benches/benchmark.rs"
 harness = false
 required-features = ["async"]
 
 [[bench]]
 name = "serde"
+path = "benches/serde.rs"
 harness = false
 required-features = ["serialize"]
+
+[dependencies.anyhow]
+version = "1.0"
+optional = true
 
 [dependencies.bstr]
 version = "1.0"
 features = ["std"]
 default-features = false
 
+[dependencies.either]
+version = "1.0"
+
 [dependencies.erased-serde]
 version = "0.4"
 optional = true
 
 [dependencies.ffi]
-version = "0.6.1"
+version = "0.6.5"
 package = "mlua-sys"
 
 [dependencies.futures-util]
@@ -125,18 +247,15 @@ optional = true
 default-features = false
 
 [dependencies.mlua_derive]
-version = "=0.9.3"
+version = "=0.10.0"
 optional = true
 
 [dependencies.num-traits]
 version = "0.2.14"
 
-[dependencies.once_cell]
-version = "1.0"
-
 [dependencies.parking_lot]
 version = "0.12"
-optional = true
+features = ["arc_lock"]
 
 [dependencies.rustc-hash]
 version = "2.0"
@@ -148,9 +267,6 @@ optional = true
 [dependencies.serde-value]
 version = "0.7"
 optional = true
-
-[dev-dependencies.futures]
-version = "0.3.5"
 
 [dev-dependencies.http-body-util]
 version = "0.1.1"
@@ -196,7 +312,12 @@ features = [
 version = "1.0"
 
 [features]
+anyhow = [
+    "dep:anyhow",
+    "error-send",
+]
 async = ["dep:futures-util"]
+error-send = []
 lua51 = ["ffi/lua51"]
 lua52 = ["ffi/lua52"]
 lua53 = ["ffi/lua53"]
@@ -223,23 +344,26 @@ module = [
     "dep:mlua_derive",
     "ffi/module",
 ]
-send = []
+send = [
+    "parking_lot/send_guard",
+    "error-send",
+]
 serialize = [
     "dep:serde",
     "dep:erased-serde",
     "dep:serde-value",
 ]
-unstable = []
+userdata-wrappers = []
 vendored = ["ffi/vendored"]
 
-[target."cfg(not(target_arch = \"wasm32\"))".dev-dependencies.criterion]
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies.criterion]
 version = "0.5"
 features = ["async_tokio"]
 
-[target."cfg(not(target_arch = \"wasm32\"))".dev-dependencies.rustyline]
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies.rustyline]
 version = "14.0"
 
-[target."cfg(not(target_arch = \"wasm32\"))".dev-dependencies.tokio]
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies.tokio]
 version = "1.0"
 features = ["full"]
 
@@ -250,3 +374,4 @@ optional = true
 [lints.rust.unexpected_cfgs]
 level = "allow"
 priority = 0
+check-cfg = ["cfg(tarpaulin_include)"]

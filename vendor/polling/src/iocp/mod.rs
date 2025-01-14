@@ -3,7 +3,7 @@
 //! I/O Completion Ports is a completion-based API rather than a polling-based API, like
 //! epoll or kqueue. Therefore, we have to adapt the IOCP API to the crate's API.
 //!
-//! WinSock is powered by the Auxillary Function Driver (AFD) subsystem, which can be
+//! WinSock is powered by the Auxiliary Function Driver (AFD) subsystem, which can be
 //! accessed directly by using unstable `ntdll` functions. AFD exposes features that are not
 //! available through the normal WinSock interface, such as IOCTL_AFD_POLL. This function is
 //! similar to the exposed `WSAPoll` method. However, once the targeted socket is "ready",
@@ -13,7 +13,7 @@
 //! to the one Windows expects. When a device is added to the `Poller`, an IOCTL_AFD_POLL
 //! operation is started and queued to the IOCP. To modify a currently registered device
 //! (e.g. with `modify()` or `delete()`), the ongoing POLL is cancelled and then restarted
-//! with new parameters. Whn the POLL eventually completes, the packet is posted to the IOCP.
+//! with new parameters. When the POLL eventually completes, the packet is posted to the IOCP.
 //! From here it's a simple matter of using `GetQueuedCompletionStatusEx` to read the packets
 //! from the IOCP and react accordingly. Notifying the poller is trivial, because we can
 //! simply post a packet to the IOCP to wake it up.
@@ -121,17 +121,19 @@ impl Poller {
     pub(super) fn new() -> io::Result<Self> {
         // Make sure AFD is able to be used.
         if let Err(e) = afd::NtdllImports::force_load() {
-            return Err(crate::unsupported_error(format!(
-                "Failed to initialize unstable Windows functions: {}\nThis usually only happens for old Windows or Wine.",
-                e
-            )));
+            return Err(io::Error::new(
+                io::ErrorKind::Unsupported,
+                AfdError::new("failed to initialize unstable Windows functions", e),
+            ));
         }
 
         // Create and destroy a single AFD to test if we support it.
-        Afd::<Packet>::new().map_err(|e| crate::unsupported_error(format!(
-            "Failed to initialize \\Device\\Afd: {}\nThis usually only happens for old Windows or Wine.",
-            e,
-        )))?;
+        Afd::<Packet>::new().map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::Unsupported,
+                AfdError::new("failed to initialize \\Device\\Afd", e),
+            )
+        })?;
 
         let port = IoCompletionPort::new(0)?;
         tracing::trace!(handle = ?port, "new");
@@ -679,6 +681,18 @@ impl EventExtra {
     pub fn set_pri(&mut self, active: bool) {
         self.flags.set(AfdPollMask::RECEIVE_EXPEDITED, active);
     }
+
+    /// Check if TCP connect failed. Deprecated.
+    #[inline]
+    pub fn is_connect_failed(&self) -> Option<bool> {
+        Some(self.flags.intersects(AfdPollMask::CONNECT_FAIL))
+    }
+
+    /// Check if TCP connect failed.
+    #[inline]
+    pub fn is_err(&self) -> Option<bool> {
+        Some(self.flags.intersects(AfdPollMask::CONNECT_FAIL))
+    }
 }
 
 /// A packet used to wake up the poller with an event.
@@ -1152,7 +1166,7 @@ enum WaitableStatus {
     Idle,
 
     /// We are waiting on this handle to become signaled.
-    Waiting(WaitHandle),
+    Waiting(#[allow(dead_code)] WaitHandle),
 
     /// This handle has been cancelled.
     Cancelled,
@@ -1324,6 +1338,54 @@ fn dur2timeout(dur: Duration) -> u32 {
         })
         .and_then(|x| u32::try_from(x).ok())
         .unwrap_or(INFINITE)
+}
+
+/// An error type that wraps around failing to open AFD.
+struct AfdError {
+    /// String description of what happened.
+    description: &'static str,
+
+    /// The underlying system error.
+    system: io::Error,
+}
+
+impl AfdError {
+    #[inline]
+    fn new(description: &'static str, system: io::Error) -> Self {
+        Self {
+            description,
+            system,
+        }
+    }
+}
+
+impl fmt::Debug for AfdError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("AfdError")
+            .field("description", &self.description)
+            .field("system", &self.system)
+            .field("note", &"probably caused by old Windows or Wine")
+            .finish()
+    }
+}
+
+impl fmt::Display for AfdError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}: {}\nThis error is usually caused by running on old Windows or Wine",
+            self.description, &self.system
+        )
+    }
+}
+
+impl std::error::Error for AfdError {
+    #[inline]
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(&self.system)
+    }
 }
 
 struct CallOnDrop<F: FnMut()>(F);

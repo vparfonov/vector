@@ -6,6 +6,7 @@ use super::{
     Repr,
     MAX_SIZE,
 };
+use crate::UnwrapWithMsg;
 
 impl Repr {
     /// Converts a [`Buf`] of bytes to a [`Repr`], checking that the provided bytes are valid UTF-8
@@ -53,12 +54,12 @@ impl Repr {
                 // If we hit the edge case, reserve additional space to make the repr becomes heap
                 // allocated, which prevents us from writing this last byte inline
                 if last_byte >= 0b11000000 {
-                    repr.reserve(MAX_SIZE + 1);
+                    repr.reserve(MAX_SIZE + 1).unwrap_with_msg();
                 }
             }
 
             // reserve at least enough space to fit this chunk
-            repr.reserve(chunk_len);
+            repr.reserve(chunk_len).unwrap_with_msg();
 
             // SAFETY: The caller is responsible for making sure the provided buffer is UTF-8. This
             // invariant is documented in the public API
@@ -81,6 +82,7 @@ impl Repr {
 
 #[cfg(test)]
 mod test {
+    #[cfg(feature = "std")]
     use std::io::Cursor;
 
     use test_case::test_case;
@@ -156,7 +158,7 @@ mod test {
             51, 51, 0, 52, 55, 247, 204, 45, 44, 210, 132, 50, 206, 51,
         ];
         let (front, back) = data.split_at(data.len() / 2 + 1);
-        let mut queue = std::collections::VecDeque::with_capacity(data.len());
+        let mut queue = alloc::collections::VecDeque::with_capacity(data.len());
 
         // create a non-contiguous slice of memory in queue
         front.into_iter().copied().for_each(|x| queue.push_back(x));

@@ -13,7 +13,12 @@
 edition = "2021"
 rust-version = "1.60"
 name = "chrono-tz-build"
-version = "0.3.0"
+version = "0.4.0"
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "internal build script for chrono-tz"
 documentation = "https://docs.rs/chrono-tz-build"
 readme = "README.md"
@@ -27,15 +32,20 @@ categories = ["development-tools::build-utils"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/chronotope/chrono-tz"
 
+[lib]
+name = "chrono_tz_build"
+path = "src/lib.rs"
+
 [dependencies.parse-zoneinfo]
 version = "0.3"
 
-[dependencies.phf]
+[dependencies.phf_codegen]
 version = "0.11"
 default-features = false
 
-[dependencies.phf_codegen]
+[dependencies.phf_shared]
 version = "0.11"
+optional = true
 default-features = false
 
 [dependencies.regex]
@@ -51,7 +61,7 @@ default-features = false
 [features]
 case-insensitive = [
     "uncased",
-    "phf/uncased",
+    "phf_shared/uncased",
 ]
 filter-by-regex = ["regex"]
 regex = ["dep:regex"]

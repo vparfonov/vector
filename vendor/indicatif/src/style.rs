@@ -5,10 +5,10 @@ use std::mem;
 use std::time::Instant;
 
 use console::{measure_text_width, Style};
-#[cfg(target_arch = "wasm32")]
-use instant::Instant;
 #[cfg(feature = "unicode-segmentation")]
 use unicode_segmentation::UnicodeSegmentation;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 use crate::format::{
     BinaryBytes, DecimalBytes, FormattedDuration, HumanBytes, HumanCount, HumanDuration,
@@ -779,6 +779,8 @@ mod tests {
 
     use super::*;
     use crate::state::{AtomicPosition, ProgressState};
+
+    use console::set_colors_enabled;
     use std::sync::Mutex;
 
     #[test]
@@ -864,7 +866,6 @@ mod tests {
 
     #[test]
     fn test_expand_template_flags() {
-        use console::set_colors_enabled;
         set_colors_enabled(true);
 
         const WIDTH: u16 = 80;
@@ -925,6 +926,8 @@ mod tests {
 
     #[test]
     fn wide_element_style() {
+        set_colors_enabled(true);
+
         const CHARS: &str = "=>-";
         const WIDTH: u16 = 8;
         let pos = Arc::new(AtomicPosition::new());

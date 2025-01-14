@@ -1,5 +1,24 @@
 # Changelog
 
+## 3.14.0
+
+- Make the wasip2 target work (requires tempfile's "nightly" feature to be enabled). [#305](https://github.com/Stebalien/tempfile/pull/305).
+- Allow older windows-sys versions [#304](https://github.com/Stebalien/tempfile/pull/305).
+
+## 3.13.0
+
+- Add `with_suffix` constructors for easily creating new temporary files with a specific suffix (e.g., a specific file extension). Thanks to @Borgerr.
+- Update dependencies (fastrand & rustix).
+
+## 3.12.0
+
+- Add a `keep(keep: bool)` function to builder that suppresses delete-on-drop behavior (thanks to @RalfJung).
+- Update `windows-sys` from 0.52 to 0.59.
+
+## 3.11.0
+
+- Add the ability to override the default temporary directory. This API shouldn't be used in general, but there are some cases where it's unavoidable.
+
 ## 3.10.1
 
 - Handle potential integer overflows in 32-bit systems when seeking/truncating "spooled" temporary files past 4GiB (2³²).

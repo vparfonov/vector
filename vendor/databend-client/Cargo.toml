@@ -12,8 +12,13 @@
 [package]
 edition = "2021"
 name = "databend-client"
-version = "0.19.5"
-authors = ["Databend Authors <opensource@datafuselabs.com>"]
+version = "0.22.2"
+authors = ["Databend Authors <opensource@databend.com>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Databend Client for Rust"
 readme = "README.md"
 keywords = [
@@ -23,7 +28,15 @@ keywords = [
 ]
 categories = ["database"]
 license = "Apache-2.0"
-repository = "https://github.com/datafuselabs/bendsql"
+repository = "https://github.com/databendlabs/bendsql"
+
+[lib]
+name = "databend_client"
+path = "src/lib.rs"
+
+[[test]]
+name = "core"
+path = "tests/core/main.rs"
 
 [dependencies.async-trait]
 version = "0.1"
@@ -33,6 +46,9 @@ version = "0.4"
 
 [dependencies.once_cell]
 version = "1.18"
+
+[dependencies.parking_lot]
+version = "0.12.3"
 
 [dependencies.percent-encoding]
 version = "2.3"

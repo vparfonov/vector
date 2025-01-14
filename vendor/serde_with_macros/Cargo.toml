@@ -13,8 +13,9 @@
 edition = "2021"
 rust-version = "1.67"
 name = "serde_with_macros"
-version = "3.9.0"
+version = "3.11.0"
 authors = ["Jonas Bushart"]
+build = false
 include = [
     "src/**/*",
     "tests/**/*",
@@ -23,6 +24,10 @@ include = [
     "README.md",
     "CHANGELOG.md",
 ]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "proc-macro library for serde_with"
 documentation = "https://docs.rs/serde_with_macros/"
 readme = "README.md"
@@ -61,7 +66,33 @@ replace = "https://docs.rs/serde_with_macros/{{version}}/"
 search = 'https://docs\.rs/serde_with_macros/[\d.]+/'
 
 [lib]
+name = "serde_with_macros"
+path = "src/lib.rs"
 proc-macro = true
+
+[[test]]
+name = "apply"
+path = "tests/apply.rs"
+
+[[test]]
+name = "compiler-messages"
+path = "tests/compiler-messages.rs"
+
+[[test]]
+name = "serde_as_issue_267"
+path = "tests/serde_as_issue_267.rs"
+
+[[test]]
+name = "serde_as_issue_538"
+path = "tests/serde_as_issue_538.rs"
+
+[[test]]
+name = "skip_serializing_null"
+path = "tests/skip_serializing_null.rs"
+
+[[test]]
+name = "version_numbers"
+path = "tests/version_numbers.rs"
 
 [dependencies.darling]
 version = "0.20.0"
@@ -132,6 +163,10 @@ priority = -1
 [lints.rust.unexpected_cfgs]
 level = "warn"
 priority = 0
+check-cfg = [
+    "cfg(tarpaulin)",
+    "cfg(tarpaulin_include)",
+]
 
 [lints.rustdoc]
 missing_crate_level_docs = "warn"

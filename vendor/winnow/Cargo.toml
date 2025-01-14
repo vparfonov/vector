@@ -11,9 +11,10 @@
 
 [package]
 edition = "2021"
-rust-version = "1.64.0"
+rust-version = "1.65.0"
 name = "winnow"
-version = "0.6.5"
+version = "0.6.18"
+build = false
 include = [
     "build.rs",
     "src/**/*",
@@ -24,7 +25,10 @@ include = [
     "benches/**/*",
     "examples/**/*",
 ]
+autobins = false
 autoexamples = false
+autotests = false
+autobenches = false
 description = "A byte-oriented, zero-copy, parser combinators library"
 readme = "README.md"
 keywords = [
@@ -95,53 +99,68 @@ lto = true
 codegen-units = 1
 debug = 2
 
+[lib]
+name = "winnow"
+path = "src/lib.rs"
+
 [[example]]
 name = "arithmetic"
+path = "examples/arithmetic/main.rs"
 test = true
 required-features = ["alloc"]
 
 [[example]]
 name = "css"
+path = "examples/css/main.rs"
 test = true
 required-features = ["alloc"]
 
 [[example]]
 name = "custom_error"
+path = "examples/custom_error.rs"
 test = true
 required-features = ["alloc"]
 
 [[example]]
 name = "http"
+path = "examples/http/main.rs"
 required-features = ["alloc"]
 
 [[example]]
 name = "ini"
+path = "examples/ini/main.rs"
 test = true
 required-features = ["std"]
+
+[[example]]
+name = "iterator"
+path = "examples/iterator.rs"
 
 [[example]]
 name = "json"
-test = true
-required-features = ["std"]
-
-[[example]]
-name = "ndjson"
+path = "examples/json/main.rs"
 test = true
 required-features = ["std"]
 
 [[example]]
 name = "json_iterator"
+path = "examples/json_iterator.rs"
 required-features = ["std"]
 
 [[example]]
-name = "iterator"
+name = "ndjson"
+path = "examples/ndjson/main.rs"
+test = true
+required-features = ["std"]
 
 [[example]]
 name = "s_expression"
+path = "examples/s_expression/main.rs"
 required-features = ["alloc"]
 
 [[example]]
 name = "string"
+path = "examples/string/main.rs"
 required-features = ["alloc"]
 
 [[bench]]
@@ -152,22 +171,12 @@ required-features = ["alloc"]
 
 [[bench]]
 name = "contains_token"
+path = "benches/contains_token.rs"
 harness = false
 
 [[bench]]
 name = "find_slice"
-harness = false
-
-[[bench]]
-name = "iter"
-harness = false
-
-[[bench]]
-name = "next_slice"
-harness = false
-
-[[bench]]
-name = "number"
+path = "benches/find_slice.rs"
 harness = false
 
 [[bench]]
@@ -183,10 +192,25 @@ harness = false
 required-features = ["std"]
 
 [[bench]]
+name = "iter"
+path = "benches/iter.rs"
+harness = false
+
+[[bench]]
 name = "json"
 path = "examples/json/bench.rs"
 harness = false
 required-features = ["std"]
+
+[[bench]]
+name = "next_slice"
+path = "benches/next_slice.rs"
+harness = false
+
+[[bench]]
+name = "number"
+path = "benches/number.rs"
+harness = false
 
 [dependencies.anstream]
 version = "0.3.2"
@@ -209,6 +233,15 @@ default-features = false
 version = "0.2.6"
 optional = true
 
+[dev-dependencies.annotate-snippets]
+version = "0.11.3"
+
+[dev-dependencies.anyhow]
+version = "1.0.86"
+
+[dev-dependencies.automod]
+version = "1.0.14"
+
 [dev-dependencies.circular]
 version = "0.3.0"
 
@@ -217,9 +250,6 @@ version = "0.5.1"
 
 [dev-dependencies.doc-comment]
 version = "0.3"
-
-[dev-dependencies.escargot]
-version = "0.5.7"
 
 [dev-dependencies.lexopt]
 version = "0.3.0"
@@ -231,7 +261,7 @@ version = "1.2.0"
 version = "1.1.0"
 
 [dev-dependencies.snapbox]
-version = "0.4.11"
+version = "0.6.0"
 features = ["examples"]
 
 [dev-dependencies.term-transcript]
@@ -240,6 +270,7 @@ version = "0.2.0"
 [features]
 alloc = []
 debug = [
+    "std",
     "dep:anstream",
     "dep:anstyle",
     "dep:is-terminal",
@@ -258,3 +289,72 @@ unstable-doc = [
     "unstable-recover",
 ]
 unstable-recover = []
+
+[lints.clippy]
+bool_assert_comparison = "allow"
+branches_sharing_code = "allow"
+checked_conversions = "warn"
+collapsible_else_if = "allow"
+create_dir = "warn"
+dbg_macro = "warn"
+debug_assert_with_mut_call = "warn"
+doc_markdown = "warn"
+empty_enum = "warn"
+enum_glob_use = "warn"
+expl_impl_clone_on_copy = "warn"
+explicit_deref_methods = "warn"
+explicit_into_iter_loop = "warn"
+fallible_impl_from = "warn"
+filter_map_next = "warn"
+flat_map_option = "warn"
+float_cmp_const = "warn"
+fn_params_excessive_bools = "warn"
+from_iter_instead_of_collect = "warn"
+if_same_then_else = "allow"
+implicit_clone = "warn"
+imprecise_flops = "warn"
+inconsistent_struct_constructor = "warn"
+inefficient_to_string = "warn"
+infinite_loop = "warn"
+invalid_upcast_comparisons = "warn"
+large_digit_groups = "warn"
+large_stack_arrays = "warn"
+large_types_passed_by_value = "warn"
+let_and_return = "allow"
+linkedlist = "warn"
+lossy_float_literal = "warn"
+macro_use_imports = "warn"
+mem_forget = "warn"
+mutex_integer = "warn"
+needless_continue = "warn"
+needless_for_each = "warn"
+negative_feature_names = "warn"
+path_buf_push_overwrite = "warn"
+ptr_as_ptr = "warn"
+rc_mutex = "warn"
+redundant_feature_names = "warn"
+ref_option_ref = "warn"
+rest_pat_in_fully_bound_structs = "warn"
+same_functions_in_if_condition = "warn"
+semicolon_if_nothing_returned = "warn"
+str_to_string = "warn"
+string_add = "warn"
+string_add_assign = "warn"
+string_lit_as_bytes = "warn"
+string_to_string = "warn"
+todo = "warn"
+trait_duplication_in_bounds = "warn"
+uninlined_format_args = "warn"
+verbose_file_reads = "warn"
+wildcard_imports = "allow"
+zero_sized_map_values = "warn"
+
+[lints.rust]
+unreachable_pub = "warn"
+unsafe_op_in_unsafe_fn = "warn"
+unused_lifetimes = "warn"
+unused_macro_rules = "warn"
+
+[lints.rust.rust_2018_idioms]
+level = "warn"
+priority = -1

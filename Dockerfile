@@ -5,6 +5,7 @@ RUN INSTALL_PKGS=" \
       cmake \
       make \
       git \
+      perl \
       openssl-devel \
       llvm-toolset \
       cyrus-sasl \
@@ -17,7 +18,7 @@ RUN INSTALL_PKGS=" \
     dnf clean all
 
 ENV HOME=/root
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.78.0 -y
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.81.0 -y
 ENV CARGO_HOME=$HOME/.cargo
 ENV PATH=$CARGO_HOME/bin:$PATH
 

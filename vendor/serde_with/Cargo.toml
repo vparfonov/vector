@@ -13,11 +13,12 @@
 edition = "2021"
 rust-version = "1.67"
 name = "serde_with"
-version = "3.9.0"
+version = "3.11.0"
 authors = [
     "Jonas Bushart",
     "Marcin Kaźmierczak",
 ]
+build = false
 include = [
     "src/**/*",
     "tests/**/*",
@@ -25,6 +26,10 @@ include = [
     "README.md",
     "CHANGELOG.md",
 ]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Custom de/serialization functions for Rust's serde"
 documentation = "https://docs.rs/serde_with/"
 readme = "README.md"
@@ -73,6 +78,10 @@ file = "README.md"
 replace = "https://docs.rs/serde_with/{{version}}/"
 search = 'https://docs\.rs/serde_with/[\d.]+/'
 
+[lib]
+name = "serde_with"
+path = "src/lib.rs"
+
 [[test]]
 name = "base64"
 path = "tests/base64.rs"
@@ -90,18 +99,31 @@ required-features = [
 ]
 
 [[test]]
-name = "hex"
-path = "tests/hex.rs"
-required-features = [
-    "hex",
-    "macros",
-]
+name = "derives"
+path = "tests/derives/lib.rs"
+required-features = ["macros"]
 
 [[test]]
 name = "hashbrown_0_14"
 path = "tests/hashbrown_0_14.rs"
 required-features = [
     "hashbrown_0_14",
+    "macros",
+]
+
+[[test]]
+name = "hashbrown_0_15"
+path = "tests/hashbrown_0_15.rs"
+required-features = [
+    "hashbrown_0_15",
+    "macros",
+]
+
+[[test]]
+name = "hex"
+path = "tests/hex.rs"
+required-features = [
+    "hex",
     "macros",
 ]
 
@@ -130,6 +152,16 @@ required-features = [
 ]
 
 [[test]]
+name = "rust"
+path = "tests/rust.rs"
+required-features = ["alloc"]
+
+[[test]]
+name = "schemars_0_8"
+path = "tests/schemars_0_8.rs"
+required-features = ["schemars_0_8"]
+
+[[test]]
 name = "serde_as"
 path = "tests/serde_as/lib.rs"
 required-features = ["macros"]
@@ -143,24 +175,17 @@ required-features = [
 ]
 
 [[test]]
-name = "derives"
-path = "tests/derives/lib.rs"
-required-features = ["macros"]
+name = "utils"
+path = "tests/utils.rs"
+
+[[test]]
+name = "version_numbers"
+path = "tests/version_numbers.rs"
 
 [[test]]
 name = "with_prefix"
 path = "tests/with_prefix.rs"
 required-features = ["macros"]
-
-[[test]]
-name = "rust"
-path = "tests/rust.rs"
-required-features = ["alloc"]
-
-[[test]]
-name = "schemars_0_8"
-path = "tests/schemars_0_8.rs"
-required-features = ["schemars_0_8"]
 
 [dependencies.base64]
 version = "0.22.1"
@@ -184,6 +209,13 @@ optional = true
 
 [dependencies.hashbrown_0_14]
 version = "0.14.0"
+features = ["serde"]
+optional = true
+default-features = false
+package = "hashbrown"
+
+[dependencies.hashbrown_0_15]
+version = "0.15.0"
 features = ["serde"]
 optional = true
 default-features = false
@@ -227,7 +259,7 @@ optional = true
 default-features = false
 
 [dependencies.serde_with_macros]
-version = "=3.9.0"
+version = "=3.11.0"
 optional = true
 
 [dependencies.time_0_3]
@@ -257,7 +289,7 @@ version = "0.3.16"
 version = "1.4.0"
 
 [dev-dependencies.regex]
-version = "1.10.3"
+version = "1.11.0"
 features = ["std"]
 default-features = false
 
@@ -324,6 +356,10 @@ hashbrown_0_14 = [
     "dep:hashbrown_0_14",
     "alloc",
 ]
+hashbrown_0_15 = [
+    "dep:hashbrown_0_15",
+    "alloc",
+]
 hex = [
     "dep:hex",
     "alloc",
@@ -386,6 +422,10 @@ priority = -1
 [lints.rust.unexpected_cfgs]
 level = "warn"
 priority = 0
+check-cfg = [
+    "cfg(tarpaulin)",
+    "cfg(tarpaulin_include)",
+]
 
 [lints.rustdoc]
 missing_crate_level_docs = "warn"

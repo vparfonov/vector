@@ -29,23 +29,6 @@ pub fn is_ogg(buf: &[u8]) -> bool {
     buf.len() > 3 && buf[0] == 0x4F && buf[1] == 0x67 && buf[2] == 0x67 && buf[3] == 0x53
 }
 
-/// Returns whether a buffer is OGG Opus data.
-pub fn is_ogg_opus(buf: &[u8]) -> bool {
-    if !is_ogg(buf) {
-        return false;
-    }
-
-    buf.len() > 35
-        && buf[28] == 0x4F
-        && buf[29] == 0x70
-        && buf[30] == 0x75
-        && buf[31] == 0x73
-        && buf[32] == 0x48
-        && buf[33] == 0x65
-        && buf[34] == 0x61
-        && buf[35] == 0x64
-}
-
 /// Returns whether a buffer is FLAC data.
 pub fn is_flac(buf: &[u8]) -> bool {
     buf.len() > 3 && buf[0] == 0x66 && buf[1] == 0x4C && buf[2] == 0x61 && buf[3] == 0x43
@@ -78,29 +61,4 @@ pub fn is_amr(buf: &[u8]) -> bool {
 /// Returns whether a buffer is AAC data.
 pub fn is_aac(buf: &[u8]) -> bool {
     buf.len() > 1 && buf[0] == 0xFF && (buf[1] == 0xF1 || buf[1] == 0xF9)
-}
-
-/// Returns whether a buffer is AIFF data.
-pub fn is_aiff(buf: &[u8]) -> bool {
-    buf.len() > 11
-        && buf[0] == 0x46
-        && buf[1] == 0x4F
-        && buf[2] == 0x52
-        && buf[3] == 0x4D
-        && buf[8] == 0x41
-        && buf[9] == 0x49
-        && buf[10] == 0x46
-        && buf[11] == 0x46
-}
-
-/// Returns whether a buffer is DSF data.
-pub fn is_dsf(buf: &[u8]) -> bool {
-    // ref: https://dsd-guide.com/sites/default/files/white-papers/DSFFileFormatSpec_E.pdf
-    buf.len() > 4 && buf[0] == b'D' && buf[1] == b'S' && buf[2] == b'D' && buf[3] == b' '
-}
-
-/// Returns whether a buffer is APE (Monkey's Audio) data.
-pub fn is_ape(buf: &[u8]) -> bool {
-    // ref: https://github.com/fernandotcl/monkeys-audio/blob/master/src/MACLib/APEHeader.h
-    buf.len() > 4 && buf[0] == b'M' && buf[1] == b'A' && buf[2] == b'C' && buf[3] == b' '
 }

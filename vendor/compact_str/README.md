@@ -5,7 +5,7 @@
   <a href="https://crates.io/crates/compact_str">
     <img alt="version on crates.io" src="https://img.shields.io/crates/v/compact_str"/>
   </a>
-  <img alt="Minimum supported Rust Version: 1.57" src="https://img.shields.io/badge/MSRV-1.57-blueviolet">
+  <img alt="Minimum supported Rust Version: 1.60" src="https://img.shields.io/badge/MSRV-1.60-blueviolet">
   <a href="LICENSE">
     <img alt="mit license" src="https://img.shields.io/crates/l/compact_str"/>
   </a>
@@ -44,11 +44,13 @@ A `CompactString` specifically has the following properties:
   * `Clone` is `O(n)`
   * `From<String>` or `From<Box<str>>` re-uses underlying buffer
     * Eagerly inlines small strings
+  * `O(1)` creation from `&'static str` with `CompactString::const_new`
   * Heap based string grows at a rate of 1.5x
     * The std library `String` grows at a rate of 2x
   * Space optimized for `Option<_>`
     * `size_of::<CompactString>() == size_of::<Option<CompactString>>()`
   * Uses [branchless instructions](https://en.algorithmica.org/hpc/pipelining/branchless/) for string accesses
+  * Supports `no_std` environments
 
 ### Traits
 This crate exposes two traits, `ToCompactString` and `CompactStringExt`.
@@ -73,6 +75,8 @@ This crate exposes one macro `format_compact!` that can be used to create `Compa
 * `serde`, which implements [`Deserialize`](https://docs.rs/serde/1/serde/trait.Deserialize.html) and [`Serialize`](https://docs.rs/serde/1/serde/trait.Serialize.html) from the popular [`serde`](https://docs.rs/serde/1/serde/) crate, for `CompactString`
 * `bytes`, which provides two methods `from_utf8_buf<B: Buf>(buf: &mut B)` and `from_utf8_buf_unchecked<B: Buf>(buf: &mut B)`, which allows for the creation of a `CompactString` from a [`bytes::Buf`](https://docs.rs/bytes/1/bytes/trait.Buf.html)
 * `markup`, which implements [`Render`](https://docs.rs/markup/0.13/markup/trait.Render.html) trait, so `CompactString`s can be used in templates as HTML escaped strings
+* `diesel`, which allows using CompactStrings in [`diesel`](https://diesel.rs/) text columns
+* `sqlx-mysql` / `sqlx-postgres` / `sqlx-sqlite`, which allows using CompactStrings in [`sqlx`](https://github.com/launchbadge/sqlx) text columns
 * `arbitrary`, which implements the [`arbitrary::Arbitrary`](https://docs.rs/arbitrary/1/arbitrary/trait.Arbitrary.html) trait for fuzzing
 * `proptest`, which implements the [`proptest::arbitrary::Arbitrary`](https://docs.rs/proptest/1/proptest/arbitrary/trait.Arbitrary.html) trait for fuzzing
 * `quickcheck`, which implements the [`quickcheck::Arbitrary`](https://docs.rs/quickcheck/1/quickcheck/trait.Arbitrary.html) trait for fuzzing
@@ -118,11 +122,11 @@ and the overall memory layout of a `CompactString` is:
 
 <sub>Both variants are 24 bytes long</sub>
 
-For **heap** allocated strings we use a custom `HeapBuffer` which normally stores the capacity of the string on the stack, but also optionally allows us to store it on the heap. Since we use the last byte to track our discriminant, we only have 7 bytes to store the capacity, or 3 bytes on a 32-bit architecture. 7 bytes allows us to store a value up to `2^56`, aka 64 petabytes, while 3 bytes only allows us to store a value up to `2^24`, aka 16 megabytes. 
+For **heap** allocated strings we use a custom `HeapBuffer` which normally stores the capacity of the string on the stack, but also optionally allows us to store it on the heap. Since we use the last byte to track our discriminant, we only have 7 bytes to store the capacity, or 3 bytes on a 32-bit architecture. 7 bytes allows us to store a value up to `2^56`, aka 64 petabytes, while 3 bytes only allows us to store a value up to `2^24`, aka 16 megabytes.
 
-For 64-bit architectures we always inline the capacity, because we can safely assume our strings will never be larger than 64 petabytes, but on 32-bit architectures, when creating or growing a `CompactString`, if the text is larger than 16MB then we move the capacity onto the heap. 
+For 64-bit architectures we always inline the capacity, because we can safely assume our strings will never be larger than 64 petabytes, but on 32-bit architectures, when creating or growing a `CompactString`, if the text is larger than 16MB then we move the capacity onto the heap.
 
-We handle the capacity in this way for two reaons:
+We handle the capacity in this way for two reasons:
 1. Users shouldn't have to pay for what they don't use. Meaning, in the _majority_ of cases the capacity of the buffer could easily fit into 7 or 3 bytes, so the user shouldn't have to pay the memory cost of storing the capacity on the heap, if they don't need to.
 2. Allows us to convert `From<String>` in `O(1)` time, by taking the parts of a `String` (e.g. `ptr`, `len`, and `cap`) and using those to create a `CompactString`, without having to do any heap allocations. This is important when using `CompactString` in large codebases where you might have `CompactString` working alongside of `String`.
 
@@ -131,16 +135,16 @@ For **inline** strings we only have a 24 byte buffer on the stack. This might ma
 To do this, we utilize the fact that the last byte of our string could only ever have a value in the range `[0, 192)`. We know this because all strings in Rust are valid [UTF-8](https://en.wikipedia.org/wiki/UTF-8), and the only valid byte pattern for the last byte of a UTF-8 character (and thus the possible last byte of a string) is `0b0XXXXXXX` aka `[0, 128)` or `0b10XXXXXX` aka `[128, 192)`. This leaves all values in `[192, 255]` as unused in our last byte. Therefore, we can use values in the range of `[192, 215]` to represent a length in the range of `[0, 23]`, and if our last byte has a value `< 192`, we know that's a UTF-8 character, and can interpret the length of our string as `24`.
 
 Specifically, the last byte on the stack for a `CompactString` has the following uses:
-* `[0, 192)` - Is the last byte of a UTF-8 char, the `CompactString` is stored on the stack and implicitly has a length of `24`
+* `[0, 191]` - Is the last byte of a UTF-8 char, the `CompactString` is stored on the stack and implicitly has a length of `24`
 * `[192, 215]` - Denotes a length in the range of `[0, 23]`, this `CompactString` is stored on the stack.
-* `[215, 254)` - Unused
-* `254` - Denotes this `CompactString` is stored on the heap
-* `255` - Denotes the `None` variant for an `Option<CompactString>`
+* `216` - Denotes this `CompactString` is stored on the heap
+* `217` - Denotes this `CompactString` stores a `&'static str`.
+* `[218, 255]` - Unused, denotes e.g. the `None` variant for `Option<CompactString>`
 
 ### Testing
 Strings and unicode can be quite messy, even further, we're working with things at the bit level. `compact_str` has an _extensive_ test suite comprised of unit testing, property testing, and fuzz testing, to ensure our invariants are upheld. We test across all major OSes (Windows, macOS, and Linux), architectures (64-bit and 32-bit), and endian-ness (big endian and little endian).
 
-Fuzz testing is run with `libFuzzer`, `AFL++`, *and* `honggfuzz`, with `AFL++` running on both `x86_64` and `ARMv7` architectures. We test with [`miri`](https://github.com/rust-lang/miri) to catch cases of undefined behavior, and run all tests on every Rust compiler since `v1.57` to ensure support for our minimum supported Rust version (MSRV).
+Fuzz testing is run with `libFuzzer`, `AFL++`, *and* `honggfuzz`, with `AFL++` running on both `x86_64` and `ARMv7` architectures. We test with [`miri`](https://github.com/rust-lang/miri) to catch cases of undefined behavior, and run all tests on every Rust compiler since `v1.60` to ensure support for our minimum supported Rust version (MSRV).
 
 ### `unsafe` code
 `CompactString` uses a bit of unsafe code because we manually define what variant we are, so unlike an enum, the compiler can't guarantee what value is actually stored.

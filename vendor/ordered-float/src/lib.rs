@@ -70,14 +70,165 @@ fn canonicalize_signed_zero<T: FloatCore>(x: T) -> T {
 /// # use ordered_float::OrderedFloat;
 /// # use std::collections::HashSet;
 /// # use std::f32::NAN;
-///
 /// let mut s: HashSet<OrderedFloat<f32>> = HashSet::new();
 /// s.insert(OrderedFloat(NAN));
 /// assert!(s.contains(&OrderedFloat(NAN)));
 /// ```
-#[derive(Debug, Default, Clone, Copy)]
+///
+/// Some non-identical values are still considered equal by the [`PartialEq`] implementation,
+/// and will therefore also be considered equal by maps, sets, and the `==` operator:
+///
+/// * `-0.0` and `+0.0` are considered equal.
+///   This different sign may show up in printing, or when dividing by zero (the sign of the zero
+///   becomes the sign of the resulting infinity).
+/// * All NaN values are considered equal, even though they may have different
+///   [bits](https://doc.rust-lang.org/std/primitive.f64.html#method.to_bits), and therefore
+///   different [sign](https://doc.rust-lang.org/std/primitive.f64.html#method.is_sign_positive),
+///   signaling/quiet status, and NaN payload bits.
+///   
+/// Therefore, `OrderedFloat` may be unsuitable for use as a key in interning and memoization
+/// applications which require equal results from equal inputs, unless these cases make no
+/// difference or are canonicalized before insertion.
+///
+/// # Representation
+///
+/// `OrderedFloat` has `#[repr(transparent)]` and permits any value, so it is sound to use
+/// [transmute](core::mem::transmute) or pointer casts to convert between any type `T` and
+/// `OrderedFloat<T>`.
+/// However, consider using [`bytemuck`] as a safe alternative if possible.
+///
+#[cfg_attr(
+    not(feature = "bytemuck"),
+    doc = "[`bytemuck`]: https://docs.rs/bytemuck/1/"
+)]
+#[derive(Default, Clone, Copy)]
 #[repr(transparent)]
 pub struct OrderedFloat<T>(pub T);
+
+#[cfg(feature = "derive-visitor")]
+mod impl_derive_visitor {
+    use crate::OrderedFloat;
+    use derive_visitor::{Drive, DriveMut, Event, Visitor, VisitorMut};
+
+    impl<T: 'static> Drive for OrderedFloat<T> {
+        fn drive<V: Visitor>(&self, visitor: &mut V) {
+            visitor.visit(self, Event::Enter);
+            visitor.visit(self, Event::Exit);
+        }
+    }
+
+    impl<T: 'static> DriveMut for OrderedFloat<T> {
+        fn drive_mut<V: VisitorMut>(&mut self, visitor: &mut V) {
+            visitor.visit(self, Event::Enter);
+            visitor.visit(self, Event::Exit);
+        }
+    }
+
+    #[test]
+    pub fn test_derive_visitor() {
+        #[derive(Debug, Clone, PartialEq, Eq, Drive, DriveMut)]
+        pub enum Literal {
+            Null,
+            Float(OrderedFloat<f64>),
+        }
+
+        #[derive(Visitor, VisitorMut)]
+        #[visitor(Literal(enter))]
+        struct FloatExpr(bool);
+
+        impl FloatExpr {
+            fn enter_literal(&mut self, lit: &Literal) {
+                if let Literal::Float(_) = lit {
+                    self.0 = true;
+                }
+            }
+        }
+
+        assert!({
+            let mut visitor = FloatExpr(false);
+            Literal::Null.drive(&mut visitor);
+            !visitor.0
+        });
+
+        assert!({
+            let mut visitor = FloatExpr(false);
+            Literal::Null.drive_mut(&mut visitor);
+            !visitor.0
+        });
+
+        assert!({
+            let mut visitor = FloatExpr(false);
+            Literal::Float(OrderedFloat(0.0)).drive(&mut visitor);
+            visitor.0
+        });
+
+        assert!({
+            let mut visitor = FloatExpr(false);
+            Literal::Float(OrderedFloat(0.0)).drive_mut(&mut visitor);
+            visitor.0
+        });
+    }
+}
+
+#[cfg(feature = "num-cmp")]
+mod impl_num_cmp {
+    use super::OrderedFloat;
+    use core::cmp::Ordering;
+    use num_cmp::NumCmp;
+    use num_traits::float::FloatCore;
+
+    impl<T, U> NumCmp<U> for OrderedFloat<T>
+    where
+        T: FloatCore + NumCmp<U>,
+        U: Copy,
+    {
+        fn num_cmp(self, other: U) -> Option<Ordering> {
+            NumCmp::num_cmp(self.0, other)
+        }
+
+        fn num_eq(self, other: U) -> bool {
+            NumCmp::num_eq(self.0, other)
+        }
+
+        fn num_ne(self, other: U) -> bool {
+            NumCmp::num_ne(self.0, other)
+        }
+
+        fn num_lt(self, other: U) -> bool {
+            NumCmp::num_lt(self.0, other)
+        }
+
+        fn num_gt(self, other: U) -> bool {
+            NumCmp::num_gt(self.0, other)
+        }
+
+        fn num_le(self, other: U) -> bool {
+            NumCmp::num_le(self.0, other)
+        }
+
+        fn num_ge(self, other: U) -> bool {
+            NumCmp::num_ge(self.0, other)
+        }
+    }
+
+    #[test]
+    pub fn test_num_cmp() {
+        let f = OrderedFloat(1.0);
+
+        assert_eq!(NumCmp::num_cmp(f, 1.0), Some(Ordering::Equal));
+        assert_eq!(NumCmp::num_cmp(f, -1.0), Some(Ordering::Greater));
+        assert_eq!(NumCmp::num_cmp(f, 2.0), Some(Ordering::Less));
+
+        assert!(NumCmp::num_eq(f, 1));
+        assert!(NumCmp::num_ne(f, -1));
+        assert!(NumCmp::num_lt(f, 100));
+        assert!(NumCmp::num_gt(f, 0));
+        assert!(NumCmp::num_le(f, 1));
+        assert!(NumCmp::num_le(f, 2));
+        assert!(NumCmp::num_ge(f, 1));
+        assert!(NumCmp::num_ge(f, -1));
+    }
+}
 
 impl<T: FloatCore> OrderedFloat<T> {
     /// Get the value out.
@@ -193,6 +344,13 @@ impl<T: FloatCore> Hash for OrderedFloat<T> {
     }
 }
 
+impl<T: fmt::Debug> fmt::Debug for OrderedFloat<T> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
 impl<T: FloatCore + fmt::Display> fmt::Display for OrderedFloat<T> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -288,6 +446,16 @@ impl<T: FloatCore> Eq for OrderedFloat<T> {}
 macro_rules! impl_ordered_float_binop {
     ($imp:ident, $method:ident, $assign_imp:ident, $assign_method:ident) => {
         impl<T: $imp> $imp for OrderedFloat<T> {
+            type Output = OrderedFloat<T::Output>;
+
+            #[inline]
+            fn $method(self, other: Self) -> Self::Output {
+                OrderedFloat((self.0).$method(other.0))
+            }
+        }
+
+        // Work around for: https://github.com/reem/rust-ordered-float/issues/91
+        impl<'a, T: $imp + Copy> $imp<Self> for &'a OrderedFloat<T> {
             type Output = OrderedFloat<T::Output>;
 
             #[inline]
@@ -1073,12 +1241,17 @@ impl<T: FloatCore + Num> Num for OrderedFloat<T> {
 /// ```
 /// # use ordered_float::NotNan;
 /// # use std::collections::HashSet;
-///
 /// let mut s: HashSet<NotNan<f32>> = HashSet::new();
 /// let key = NotNan::new(1.0).unwrap();
 /// s.insert(key);
 /// assert!(s.contains(&key));
 /// ```
+///
+/// `-0.0` and `+0.0` are still considered equal. This different sign may show up in printing,
+/// or when dividing by zero (the sign of the zero becomes the sign of the resulting infinity).
+/// Therefore, `NotNan` may be unsuitable for use as a key in interning and memoization
+/// applications which require equal results from equal inputs, unless signed zeros make no
+/// difference or are canonicalized before insertion.
 ///
 /// Arithmetic on NotNan values will panic if it produces a NaN value:
 ///
@@ -1090,7 +1263,19 @@ impl<T: FloatCore + Num> Num for OrderedFloat<T> {
 /// // This will panic:
 /// let c = a + b;
 /// ```
-#[derive(PartialOrd, PartialEq, Debug, Default, Clone, Copy)]
+///
+/// # Representation
+///
+/// `NotNan` has `#[repr(transparent)]`, so it is sound to use
+/// [transmute](core::mem::transmute) or pointer casts to convert between any type `T` and
+/// `NotNan<T>`, as long as this does not create a NaN value.
+/// However, consider using [`bytemuck`] as a safe alternative if possible.
+///
+#[cfg_attr(
+    not(feature = "bytemuck"),
+    doc = "[`bytemuck`]: https://docs.rs/bytemuck/1/"
+)]
+#[derive(PartialOrd, PartialEq, Default, Clone, Copy)]
 #[repr(transparent)]
 pub struct NotNan<T>(T);
 
@@ -1174,6 +1359,13 @@ impl<T: FloatCore> Hash for NotNan<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         let bits = raw_double_bits(&canonicalize_signed_zero(self.0));
         bits.hash(state)
+    }
+}
+
+impl<T: fmt::Debug> fmt::Debug for NotNan<T> {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
@@ -2656,7 +2848,7 @@ mod impl_arbitrary {
 #[cfg(feature = "bytemuck")]
 mod impl_bytemuck {
     use super::{FloatCore, NotNan, OrderedFloat};
-    use bytemuck::{AnyBitPattern, CheckedBitPattern, NoUninit, Pod, Zeroable};
+    use bytemuck::{AnyBitPattern, CheckedBitPattern, NoUninit, Pod, TransparentWrapper, Zeroable};
 
     unsafe impl<T: Zeroable> Zeroable for OrderedFloat<T> {}
 
@@ -2677,6 +2869,10 @@ mod impl_bytemuck {
             !bits.is_nan()
         }
     }
+
+    // OrderedFloat allows any value of the contained type, so it is a TransparentWrapper.
+    // NotNan does not, so it is not.
+    unsafe impl<T> TransparentWrapper<T> for OrderedFloat<T> {}
 
     #[test]
     fn test_not_nan_bit_pattern() {

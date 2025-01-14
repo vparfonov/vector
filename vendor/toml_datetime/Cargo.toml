@@ -13,8 +13,9 @@
 edition = "2021"
 rust-version = "1.65"
 name = "toml_datetime"
-version = "0.6.6"
+version = "0.6.8"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
+build = false
 include = [
     "build.rs",
     "src/**/*",
@@ -26,6 +27,10 @@ include = [
     "examples/**/*",
     "tests/**/*",
 ]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A TOML-compatible datetime type"
 homepage = "https://github.com/toml-rs/toml"
 readme = "README.md"
@@ -84,6 +89,10 @@ replace = """
 [Unreleased]: https://github.com/toml-rs/toml/compare/{{tag_name}}...HEAD"""
 search = "<!-- next-url -->"
 
+[lib]
+name = "toml_datetime"
+path = "src/lib.rs"
+
 [dependencies.serde]
 version = "1.0.145"
 optional = true
@@ -115,7 +124,6 @@ inconsistent_struct_constructor = "warn"
 inefficient_to_string = "warn"
 infinite_loop = "warn"
 invalid_upcast_comparisons = "warn"
-items_after_statements = "warn"
 large_digit_groups = "warn"
 large_stack_arrays = "warn"
 large_types_passed_by_value = "warn"
@@ -123,7 +131,6 @@ let_and_return = "allow"
 linkedlist = "warn"
 lossy_float_literal = "warn"
 macro_use_imports = "warn"
-match_wildcard_for_single_variants = "warn"
 mem_forget = "warn"
 mutex_integer = "warn"
 needless_continue = "warn"
@@ -138,7 +145,6 @@ rest_pat_in_fully_bound_structs = "warn"
 same_functions_in_if_condition = "warn"
 self_named_module_files = "warn"
 semicolon_if_nothing_returned = "warn"
-single_match_else = "warn"
 str_to_string = "warn"
 string_add = "warn"
 string_add_assign = "warn"
@@ -151,9 +157,12 @@ wildcard_imports = "warn"
 zero_sized_map_values = "warn"
 
 [lints.rust]
-rust_2018_idioms = "warn"
 unreachable_pub = "warn"
 unsafe_op_in_unsafe_fn = "warn"
 unused_lifetimes = "warn"
 unused_macro_rules = "warn"
 unused_qualifications = "warn"
+
+[lints.rust.rust_2018_idioms]
+level = "warn"
+priority = -1

@@ -18,6 +18,11 @@ authors = [
     "Eliza Weisman <eliza@buoyant.io>",
     "Tokio Contributors <team@tokio.rs>",
 ]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
 Utilities for instrumenting `futures` with `tracing`.
 """
@@ -44,6 +49,14 @@ rustdoc-args = [
     "--cfg",
     "docsrs",
 ]
+
+[lib]
+name = "tracing_futures"
+path = "src/lib.rs"
+
+[[test]]
+name = "std_future"
+path = "tests/std_future.rs"
 
 [dependencies.futures]
 version = "0.3.0"

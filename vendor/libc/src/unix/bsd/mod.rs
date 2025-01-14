@@ -35,13 +35,15 @@ s! {
         pub pw_shell: *mut ::c_char,
         pub pw_expire: ::time_t,
 
-        #[cfg(not(any(target_os = "macos",
-                      target_os = "ios",
-                      target_os = "tvos",
-                      target_os = "watchos",
-                      target_os = "visionos",
-                      target_os = "netbsd",
-                      target_os = "openbsd")))]
+        #[cfg(not(any(
+            target_os = "macos",
+            target_os = "ios",
+            target_os = "tvos",
+            target_os = "watchos",
+            target_os = "visionos",
+            target_os = "netbsd",
+            target_os = "openbsd"
+        )))]
         pub pw_fields: ::c_int,
     }
 
@@ -54,16 +56,20 @@ s! {
         pub ifa_dstaddr: *mut ::sockaddr,
         pub ifa_data: *mut ::c_void,
         #[cfg(target_os = "netbsd")]
-        pub ifa_addrflags: ::c_uint
+        pub ifa_addrflags: ::c_uint,
     }
 
     pub struct fd_set {
-        #[cfg(all(target_pointer_width = "64",
-                  any(target_os = "freebsd", target_os = "dragonfly")))]
-        fds_bits: [i64; FD_SETSIZE / 64],
-        #[cfg(not(all(target_pointer_width = "64",
-                      any(target_os = "freebsd", target_os = "dragonfly"))))]
-        fds_bits: [i32; FD_SETSIZE / 32],
+        #[cfg(all(
+            target_pointer_width = "64",
+            any(target_os = "freebsd", target_os = "dragonfly")
+        ))]
+        fds_bits: [i64; FD_SETSIZE as usize / 64],
+        #[cfg(not(all(
+            target_pointer_width = "64",
+            any(target_os = "freebsd", target_os = "dragonfly")
+        )))]
+        fds_bits: [i32; FD_SETSIZE as usize / 32],
     }
 
     pub struct tm {
@@ -129,7 +135,7 @@ s_no_extra_traits! {
     pub struct sockaddr_un {
         pub sun_len: u8,
         pub sun_family: sa_family_t,
-        pub sun_path: [c_char; 104]
+        pub sun_path: [::c_char; 104],
     }
 
     pub struct utsname {
@@ -154,7 +160,6 @@ s_no_extra_traits! {
         #[cfg(target_os = "dragonfly")]
         pub machine: [::c_char; 32],
     }
-
 }
 
 cfg_if! {
@@ -164,10 +169,10 @@ cfg_if! {
                 self.sun_len == other.sun_len
                     && self.sun_family == other.sun_family
                     && self
-                    .sun_path
-                    .iter()
-                    .zip(other.sun_path.iter())
-                    .all(|(a,b)| a == b)
+                        .sun_path
+                        .iter()
+                        .zip(other.sun_path.iter())
+                        .all(|(a, b)| a == b)
             }
         }
 
@@ -178,7 +183,7 @@ cfg_if! {
                 f.debug_struct("sockaddr_un")
                     .field("sun_len", &self.sun_len)
                     .field("sun_family", &self.sun_family)
-                // FIXME: .field("sun_path", &self.sun_path)
+                    // FIXME: .field("sun_path", &self.sun_path)
                     .finish()
             }
         }
@@ -196,27 +201,27 @@ cfg_if! {
                 self.sysname
                     .iter()
                     .zip(other.sysname.iter())
-                    .all(|(a,b)| a == b)
+                    .all(|(a, b)| a == b)
                     && self
-                    .nodename
-                    .iter()
-                    .zip(other.nodename.iter())
-                    .all(|(a,b)| a == b)
+                        .nodename
+                        .iter()
+                        .zip(other.nodename.iter())
+                        .all(|(a, b)| a == b)
                     && self
-                    .release
-                    .iter()
-                    .zip(other.release.iter())
-                    .all(|(a,b)| a == b)
+                        .release
+                        .iter()
+                        .zip(other.release.iter())
+                        .all(|(a, b)| a == b)
                     && self
-                    .version
-                    .iter()
-                    .zip(other.version.iter())
-                    .all(|(a,b)| a == b)
+                        .version
+                        .iter()
+                        .zip(other.version.iter())
+                        .all(|(a, b)| a == b)
                     && self
-                    .machine
-                    .iter()
-                    .zip(other.machine.iter())
-                    .all(|(a,b)| a == b)
+                        .machine
+                        .iter()
+                        .zip(other.machine.iter())
+                        .all(|(a, b)| a == b)
             }
         }
 
@@ -225,11 +230,11 @@ cfg_if! {
         impl ::fmt::Debug for utsname {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("utsname")
-                // FIXME: .field("sysname", &self.sysname)
-                // FIXME: .field("nodename", &self.nodename)
-                // FIXME: .field("release", &self.release)
-                // FIXME: .field("version", &self.version)
-                // FIXME: .field("machine", &self.machine)
+                    // FIXME: .field("sysname", &self.sysname)
+                    // FIXME: .field("nodename", &self.nodename)
+                    // FIXME: .field("release", &self.release)
+                    // FIXME: .field("version", &self.version)
+                    // FIXME: .field("machine", &self.machine)
                     .finish()
             }
         }
@@ -311,6 +316,7 @@ pub const IPV6_MULTICAST_IF: ::c_int = 9;
 pub const IPV6_MULTICAST_HOPS: ::c_int = 10;
 pub const IPV6_MULTICAST_LOOP: ::c_int = 11;
 pub const IPV6_V6ONLY: ::c_int = 27;
+pub const IPV6_DONTFRAG: ::c_int = 62;
 
 pub const IPTOS_ECN_NOTECT: u8 = 0x00;
 pub const IPTOS_ECN_MASK: u8 = 0x03;
@@ -542,12 +548,55 @@ pub const ITIMER_REAL: ::c_int = 0;
 pub const ITIMER_VIRTUAL: ::c_int = 1;
 pub const ITIMER_PROF: ::c_int = 2;
 
+// net/route.h
+
+pub const RTF_UP: ::c_int = 0x1;
+pub const RTF_GATEWAY: ::c_int = 0x2;
+pub const RTF_HOST: ::c_int = 0x4;
+pub const RTF_REJECT: ::c_int = 0x8;
+pub const RTF_DYNAMIC: ::c_int = 0x10;
+pub const RTF_MODIFIED: ::c_int = 0x20;
+pub const RTF_DONE: ::c_int = 0x40;
+pub const RTF_STATIC: ::c_int = 0x800;
+pub const RTF_BLACKHOLE: ::c_int = 0x1000;
+pub const RTF_PROTO2: ::c_int = 0x4000;
+pub const RTF_PROTO1: ::c_int = 0x8000;
+
+// Message types
+pub const RTM_ADD: ::c_int = 0x1;
+pub const RTM_DELETE: ::c_int = 0x2;
+pub const RTM_CHANGE: ::c_int = 0x3;
+pub const RTM_GET: ::c_int = 0x4;
+pub const RTM_LOSING: ::c_int = 0x5;
+pub const RTM_REDIRECT: ::c_int = 0x6;
+pub const RTM_MISS: ::c_int = 0x7;
+
+// Bitmask values for rtm_addrs.
+pub const RTA_DST: ::c_int = 0x1;
+pub const RTA_GATEWAY: ::c_int = 0x2;
+pub const RTA_NETMASK: ::c_int = 0x4;
+pub const RTA_GENMASK: ::c_int = 0x8;
+pub const RTA_IFP: ::c_int = 0x10;
+pub const RTA_IFA: ::c_int = 0x20;
+pub const RTA_AUTHOR: ::c_int = 0x40;
+pub const RTA_BRD: ::c_int = 0x80;
+
+// Index offsets for sockaddr array for alternate internal encoding.
+pub const RTAX_DST: ::c_int = 0;
+pub const RTAX_GATEWAY: ::c_int = 1;
+pub const RTAX_NETMASK: ::c_int = 2;
+pub const RTAX_GENMASK: ::c_int = 3;
+pub const RTAX_IFP: ::c_int = 4;
+pub const RTAX_IFA: ::c_int = 5;
+pub const RTAX_AUTHOR: ::c_int = 6;
+pub const RTAX_BRD: ::c_int = 7;
+
 f! {
     pub fn CMSG_FIRSTHDR(mhdr: *const ::msghdr) -> *mut ::cmsghdr {
         if (*mhdr).msg_controllen as usize >= ::mem::size_of::<::cmsghdr>() {
             (*mhdr).msg_control as *mut ::cmsghdr
         } else {
-            0 as *mut ::cmsghdr
+            core::ptr::null_mut()
         }
     }
 
@@ -555,20 +604,20 @@ f! {
         let bits = ::mem::size_of_val(&(*set).fds_bits[0]) * 8;
         let fd = fd as usize;
         (*set).fds_bits[fd / bits] &= !(1 << (fd % bits));
-        return
+        return;
     }
 
     pub fn FD_ISSET(fd: ::c_int, set: *const fd_set) -> bool {
         let bits = ::mem::size_of_val(&(*set).fds_bits[0]) * 8;
         let fd = fd as usize;
-        return ((*set).fds_bits[fd / bits] & (1 << (fd % bits))) != 0
+        return ((*set).fds_bits[fd / bits] & (1 << (fd % bits))) != 0;
     }
 
     pub fn FD_SET(fd: ::c_int, set: *mut fd_set) -> () {
         let bits = ::mem::size_of_val(&(*set).fds_bits[0]) * 8;
         let fd = fd as usize;
         (*set).fds_bits[fd / bits] |= 1 << (fd % bits);
-        return
+        return;
     }
 
     pub fn FD_ZERO(set: *mut fd_set) -> () {
@@ -918,7 +967,13 @@ extern "C" {
 }
 
 cfg_if! {
-    if #[cfg(any(target_os = "macos", target_os = "ios", target_os = "tvos", target_os = "watchos", target_os = "visionos"))] {
+    if #[cfg(any(
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "tvos",
+        target_os = "watchos",
+        target_os = "visionos"
+    ))] {
         mod apple;
         pub use self::apple::*;
     } else if #[cfg(any(target_os = "openbsd", target_os = "netbsd"))] {

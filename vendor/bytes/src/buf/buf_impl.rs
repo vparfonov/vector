@@ -66,6 +66,12 @@ macro_rules! buf_get_impl {
     }};
 }
 
+// https://en.wikipedia.org/wiki/Sign_extension
+fn sign_extend(val: u64, nbytes: usize) -> i64 {
+    let shift = (8 - nbytes) * 8;
+    (val << shift) as i64 >> shift
+}
+
 /// Read bytes from a buffer.
 ///
 /// A buffer stores bytes in memory such that read operations are infallible.
@@ -141,9 +147,11 @@ pub trait Buf {
     ///
     /// # Implementer notes
     ///
-    /// This function should never panic. Once the end of the buffer is reached,
-    /// i.e., `Buf::remaining` returns 0, calls to `chunk()` should return an
-    /// empty slice.
+    /// This function should never panic. `chunk()` should return an empty
+    /// slice **if and only if** `remaining()` returns 0. In other words,
+    /// `chunk()` returning an empty slice implies that `remaining()` will
+    /// return 0 and `remaining()` returning 0 implies that `chunk()` will
+    /// return an empty slice.
     // The `chunk` method was previously called `bytes`. This alias makes the rename
     // more easily discoverable.
     #[cfg_attr(docsrs, doc(alias = "bytes"))]
@@ -921,7 +929,7 @@ pub trait Buf {
     /// This function panics if there is not enough remaining data in `self`, or
     /// if `nbytes` is greater than 8.
     fn get_int(&mut self, nbytes: usize) -> i64 {
-        buf_get_impl!(be => self, i64, nbytes);
+        sign_extend(self.get_uint(nbytes), nbytes)
     }
 
     /// Gets a signed n-byte integer from `self` in little-endian byte order.
@@ -942,7 +950,7 @@ pub trait Buf {
     /// This function panics if there is not enough remaining data in `self`, or
     /// if `nbytes` is greater than 8.
     fn get_int_le(&mut self, nbytes: usize) -> i64 {
-        buf_get_impl!(le => self, i64, nbytes);
+        sign_extend(self.get_uint_le(nbytes), nbytes)
     }
 
     /// Gets a signed n-byte integer from `self` in native-endian byte order.

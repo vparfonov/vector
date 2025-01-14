@@ -1,4 +1,4 @@
-//! Bindings to kqueue (macOS, iOS, tvOS, watchOS, FreeBSD, NetBSD, OpenBSD, DragonFly BSD).
+//! Bindings to kqueue (macOS, iOS, tvOS, watchOS, visionOS, FreeBSD, NetBSD, OpenBSD, DragonFly BSD).
 
 use std::collections::HashSet;
 use std::io;
@@ -371,6 +371,16 @@ impl EventExtra {
     pub fn is_pri(&self) -> bool {
         false
     }
+
+    #[inline]
+    pub fn is_connect_failed(&self) -> Option<bool> {
+        None
+    }
+
+    #[inline]
+    pub fn is_err(&self) -> Option<bool> {
+        None
+    }
 }
 
 pub(crate) fn mode_to_flags(mode: PollMode) -> kqueue::EventFlags {
@@ -387,10 +397,7 @@ pub(crate) fn mode_to_flags(mode: PollMode) -> kqueue::EventFlags {
 #[cfg(any(
     target_os = "freebsd",
     target_os = "dragonfly",
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "tvos",
-    target_os = "watchos",
+    target_vendor = "apple",
 ))]
 mod notify {
     use super::Poller;
@@ -470,10 +477,7 @@ mod notify {
 #[cfg(not(any(
     target_os = "freebsd",
     target_os = "dragonfly",
-    target_os = "macos",
-    target_os = "ios",
-    target_os = "tvos",
-    target_os = "watchos",
+    target_vendor = "apple",
 )))]
 mod notify {
     use super::Poller;

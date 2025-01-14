@@ -5,10 +5,10 @@
 //! blocking [`Read`] and [`Write`] traits.
 #![warn(missing_docs)]
 
-use futures_util::future;
 use openssl::error::ErrorStack;
 use openssl::ssl::{self, ErrorCode, ShutdownResult, Ssl, SslRef};
 use std::fmt;
+use std::future;
 use std::io::{self, Read, Write};
 use std::pin::Pin;
 use std::task::{Context, Poll};
@@ -144,6 +144,20 @@ where
     /// A convenience method wrapping [`poll_do_handshake`](Self::poll_do_handshake).
     pub async fn do_handshake(mut self: Pin<&mut Self>) -> Result<(), ssl::Error> {
         future::poll_fn(|cx| self.as_mut().poll_do_handshake(cx)).await
+    }
+
+    /// Like [`SslStream::ssl_peek`](ssl::SslStream::ssl_peek).
+    pub fn poll_peek(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut [u8],
+    ) -> Poll<Result<usize, ssl::Error>> {
+        self.with_context(cx, |s| cvt_ossl(s.ssl_peek(buf)))
+    }
+
+    /// A convenience method wrapping [`poll_peek`](Self::poll_peek).
+    pub async fn peek(mut self: Pin<&mut Self>, buf: &mut [u8]) -> Result<usize, ssl::Error> {
+        future::poll_fn(|cx| self.as_mut().poll_peek(cx, buf)).await
     }
 
     /// Like [`SslStream::read_early_data`](ssl::SslStream::read_early_data).

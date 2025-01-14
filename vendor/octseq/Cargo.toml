@@ -13,8 +13,13 @@
 edition = "2021"
 rust-version = "1.65"
 name = "octseq"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["NLnet Labs <rust-team@nlnetlabs.nl>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Abstractions for types representing octet sequences."
 homepage = "https://github.com/NLnetLabs/octets/"
 documentation = "https://docs.rs/octseq"
@@ -32,6 +37,10 @@ rustdoc-args = [
     "--cfg",
     "docsrs",
 ]
+
+[lib]
+name = "octseq"
+path = "src/lib.rs"
 
 [dependencies.bytes]
 version = "1"

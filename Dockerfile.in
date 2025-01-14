@@ -17,6 +17,7 @@ RUN INSTALL_PKGS=" \
       cmake \
       make \
       git \
+      perl \
       openssl-devel \
       llvm-toolset \
       cyrus-sasl \

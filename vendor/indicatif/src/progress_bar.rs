@@ -7,10 +7,10 @@ use std::time::Duration;
 use std::time::Instant;
 use std::{fmt, io, thread};
 
-#[cfg(target_arch = "wasm32")]
-use instant::Instant;
 #[cfg(test)]
 use once_cell::sync::Lazy;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 use crate::draw_target::ProgressDrawTarget;
 use crate::state::{AtomicPosition, BarState, ProgressFinish, Reset, TabExpandedString};
@@ -37,7 +37,7 @@ impl fmt::Debug for ProgressBar {
 impl ProgressBar {
     /// Creates a new progress bar with a given length
     ///
-    /// This progress bar by default draws directly to stderr, and refreshes a maximum of 15 times
+    /// This progress bar by default draws directly to stderr, and refreshes a maximum of 20 times
     /// a second. To change the refresh rate, [set] the [draw target] to one with a different refresh
     /// rate.
     ///
@@ -45,6 +45,18 @@ impl ProgressBar {
     /// [draw target]: ProgressDrawTarget
     pub fn new(len: u64) -> Self {
         Self::with_draw_target(Some(len), ProgressDrawTarget::stderr())
+    }
+
+    /// Creates a new progress bar without a specified length
+    ///
+    /// This progress bar by default draws directly to stderr, and refreshes a maximum of 20 times
+    /// a second. To change the refresh rate, [set] the [draw target] to one with a different refresh
+    /// rate.
+    ///
+    /// [set]: ProgressBar::set_draw_target
+    /// [draw target]: ProgressDrawTarget
+    pub fn no_length() -> Self {
+        Self::with_draw_target(None, ProgressDrawTarget::stderr())
     }
 
     /// Creates a completely hidden progress bar
@@ -261,6 +273,11 @@ impl ProgressBar {
         if self.pos.allow(now) {
             self.tick_inner(now);
         }
+    }
+
+    /// Sets the length of the progress bar to `None`
+    pub fn unset_length(&self) {
+        self.state().unset_length(Instant::now());
     }
 
     /// Sets the length of the progress bar

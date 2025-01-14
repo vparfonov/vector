@@ -11,18 +11,16 @@
 
 [package]
 edition = "2018"
+rust-version = "1.70.0"
 name = "supports-color"
-version = "2.1.0"
+version = "3.0.1"
 authors = ["Kat Marchán <kzm@zkat.tech>"]
 description = "Detects whether a terminal supports color, and gives details about that support."
 documentation = "https://docs.rs/supports-color"
 readme = "README.md"
-categories = ["terminal"]
+categories = ["command-line-interface"]
 license = "Apache-2.0"
 repository = "https://github.com/zkat/supports-color"
 
-[dependencies.is-terminal]
-version = "0.4.0"
-
 [dependencies.is_ci]
-version = "1.1.1"
+version = "1.2.0"

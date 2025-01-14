@@ -1,3 +1,5 @@
+//! Test Cases
+
 use crate::utils::{check_matches_schema, check_valid_json_schema};
 use expect_test::expect_file;
 use schemars::JsonSchema;
@@ -90,6 +92,22 @@ fn schemars_basic() {
 
     let expected = expect_file!["./schemars_0_8/schemars_basic.json"];
     expected.assert_eq(&schema);
+}
+
+#[test]
+fn schemars_other_cfg_attrs() {
+    #[serde_as]
+    #[derive(JsonSchema, Serialize)]
+    struct Test {
+        #[serde_as(as = "DisplayFromStr")]
+        #[cfg_attr(any(), arbitrary("some" |weird| syntax::<bool, 2>()))]
+        #[cfg_attr(any(), schemars(with = "i32"))]
+        custom: i32,
+    }
+
+    check_matches_schema::<Test>(&json!({
+        "custom": "23",
+    }));
 }
 
 #[test]

@@ -42,14 +42,38 @@ cfg_if! {
 pub type socklen_t = u32;
 pub type speed_t = u32;
 pub type suseconds_t = i32;
-pub type tcflag_t = ::c_uint;
+cfg_if! {
+    if #[cfg(target_os = "espidf")] {
+        pub type tcflag_t = u16;
+    } else {
+        pub type tcflag_t = ::c_uint;
+    }
+}
 pub type useconds_t = u32;
 
 cfg_if! {
-    if #[cfg(any(target_os = "horizon", all(target_os = "espidf", espidf_time64)))] {
+    if #[cfg(any(
+        target_os = "horizon",
+        all(target_os = "espidf", not(espidf_time32))
+    ))] {
         pub type time_t = ::c_longlong;
     } else {
         pub type time_t = i32;
+    }
+}
+
+cfg_if! {
+    if #[cfg(not(target_os = "horizon"))] {
+        s! {
+            pub struct hostent {
+                pub h_name: *mut ::c_char,
+                pub h_aliases: *mut *mut ::c_char,
+                pub h_addrtype: ::c_int,
+                pub h_length: ::c_int,
+                pub h_addr_list: *mut *mut ::c_char,
+                pub h_addr: *mut ::c_char,
+            }
+        }
     }
 }
 
@@ -70,7 +94,8 @@ s! {
 
         #[cfg(not(any(
             target_os = "espidf",
-            all(libc_cfg_target_vendor, target_arch = "powerpc", target_vendor = "nintendo"))))]
+            all(target_arch = "powerpc", target_vendor = "nintendo")
+        )))]
         pub ai_addr: *mut sockaddr,
 
         pub ai_next: *mut addrinfo,
@@ -87,16 +112,7 @@ s! {
     }
 
     pub struct in_addr {
-            pub s_addr: ::in_addr_t,
-    }
-
-    pub struct hostent {
-            pub h_name: *mut ::c_char,
-            pub h_aliases: *mut *mut ::c_char,
-            pub h_addrtype: ::c_int,
-            pub h_length: ::c_int,
-            pub h_addr_list: *mut *mut ::c_char,
-            pub h_addr: *mut ::c_char,
+        pub s_addr: ::in_addr_t,
     }
 
     pub struct pollfd {
@@ -159,7 +175,7 @@ s! {
     }
 
     pub struct sigaction {
-        pub sa_handler: extern fn(arg1: ::c_int),
+        pub sa_handler: extern "C" fn(arg1: ::c_int),
         pub sa_mask: sigset_t,
         pub sa_flags: ::c_int,
     }
@@ -170,11 +186,13 @@ s! {
         pub ss_size: usize,
     }
 
-    pub struct fd_set { // Unverified
-        fds_bits: [::c_ulong; FD_SETSIZE / ULONG_SIZE],
+    pub struct fd_set {
+        // Unverified
+        fds_bits: [::c_ulong; FD_SETSIZE as usize / ULONG_SIZE],
     }
 
-    pub struct passwd { // Unverified
+    pub struct passwd {
+        // Unverified
         pub pw_name: *mut ::c_char,
         pub pw_passwd: *mut ::c_char,
         pub pw_uid: ::uid_t,
@@ -184,61 +202,171 @@ s! {
         pub pw_shell: *mut ::c_char,
     }
 
-    pub struct termios { // Unverified
+    pub struct termios {
+        // Unverified
         pub c_iflag: ::tcflag_t,
         pub c_oflag: ::tcflag_t,
         pub c_cflag: ::tcflag_t,
         pub c_lflag: ::tcflag_t,
         pub c_line: ::cc_t,
         pub c_cc: [::cc_t; ::NCCS],
+        #[cfg(target_os = "espidf")]
+        pub c_ispeed: u32,
+        #[cfg(target_os = "espidf")]
+        pub c_ospeed: u32,
     }
 
-    pub struct sem_t { // Unverified
+    pub struct sem_t {
+        // Unverified
         __size: [::c_char; 16],
     }
 
-    pub struct Dl_info { // Unverified
+    pub struct Dl_info {
+        // Unverified
         pub dli_fname: *const ::c_char,
         pub dli_fbase: *mut ::c_void,
         pub dli_sname: *const ::c_char,
         pub dli_saddr: *mut ::c_void,
     }
 
-    pub struct utsname { // Unverified
+    pub struct utsname {
+        // Unverified
         pub sysname: [::c_char; 65],
         pub nodename: [::c_char; 65],
         pub release: [::c_char; 65],
         pub version: [::c_char; 65],
         pub machine: [::c_char; 65],
-        pub domainname: [::c_char; 65]
+        pub domainname: [::c_char; 65],
     }
 
-    pub struct cpu_set_t { // Unverified
+    pub struct cpu_set_t {
+        // Unverified
         bits: [u32; 32],
     }
 
-    pub struct pthread_attr_t { // Unverified
-        __size: [u8; __SIZEOF_PTHREAD_ATTR_T]
+    pub struct pthread_attr_t {
+        // Unverified
+        #[cfg(not(target_os = "espidf"))]
+        __size: [u8; __SIZEOF_PTHREAD_ATTR_T],
+        #[cfg(target_os = "espidf")]
+        pub is_initialized: i32,
+        #[cfg(target_os = "espidf")]
+        pub stackaddr: *mut crate::c_void,
+        #[cfg(target_os = "espidf")]
+        pub stacksize: i32,
+        #[cfg(target_os = "espidf")]
+        pub contentionscope: i32,
+        #[cfg(target_os = "espidf")]
+        pub inheritsched: i32,
+        #[cfg(target_os = "espidf")]
+        pub schedpolicy: i32,
+        #[cfg(target_os = "espidf")]
+        pub schedparam: i32,
+        #[cfg(target_os = "espidf")]
+        pub detachstate: i32,
     }
 
-    pub struct pthread_rwlockattr_t { // Unverified
-        __size: [u8; __SIZEOF_PTHREAD_RWLOCKATTR_T]
+    pub struct pthread_rwlockattr_t {
+        // Unverified
+        __size: [u8; __SIZEOF_PTHREAD_RWLOCKATTR_T],
+    }
+
+    #[cfg_attr(
+        all(
+            target_pointer_width = "32",
+            any(target_arch = "mips", target_arch = "arm", target_arch = "powerpc")
+        ),
+        repr(align(4))
+    )]
+    #[cfg_attr(
+        any(
+            target_pointer_width = "64",
+            not(any(target_arch = "mips", target_arch = "arm", target_arch = "powerpc"))
+        ),
+        repr(align(8))
+    )]
+    pub struct pthread_mutex_t {
+        // Unverified
+        size: [u8; ::__SIZEOF_PTHREAD_MUTEX_T],
+    }
+
+    #[cfg_attr(
+        all(
+            target_pointer_width = "32",
+            any(target_arch = "mips", target_arch = "arm", target_arch = "powerpc")
+        ),
+        repr(align(4))
+    )]
+    #[cfg_attr(
+        any(
+            target_pointer_width = "64",
+            not(any(target_arch = "mips", target_arch = "arm", target_arch = "powerpc"))
+        ),
+        repr(align(8))
+    )]
+    pub struct pthread_rwlock_t {
+        // Unverified
+        size: [u8; ::__SIZEOF_PTHREAD_RWLOCK_T],
+    }
+
+    #[cfg_attr(
+        any(
+            target_pointer_width = "32",
+            target_arch = "x86_64",
+            target_arch = "powerpc64",
+            target_arch = "mips64",
+            target_arch = "s390x",
+            target_arch = "sparc64"
+        ),
+        repr(align(4))
+    )]
+    #[cfg_attr(
+        not(any(
+            target_pointer_width = "32",
+            target_arch = "x86_64",
+            target_arch = "powerpc64",
+            target_arch = "mips64",
+            target_arch = "s390x",
+            target_arch = "sparc64"
+        )),
+        repr(align(8))
+    )]
+    pub struct pthread_mutexattr_t {
+        // Unverified
+        size: [u8; ::__SIZEOF_PTHREAD_MUTEXATTR_T],
+    }
+
+    #[repr(align(8))]
+    pub struct pthread_cond_t {
+        // Unverified
+        size: [u8; ::__SIZEOF_PTHREAD_COND_T],
+    }
+
+    #[repr(align(4))]
+    pub struct pthread_condattr_t {
+        // Unverified
+        size: [u8; ::__SIZEOF_PTHREAD_CONDATTR_T],
     }
 }
 
 // unverified constants
-align_const! {
-    pub const PTHREAD_MUTEX_INITIALIZER: pthread_mutex_t = pthread_mutex_t {
-        size: [__PTHREAD_INITIALIZER_BYTE; __SIZEOF_PTHREAD_MUTEX_T],
-    };
-    pub const PTHREAD_COND_INITIALIZER: pthread_cond_t = pthread_cond_t {
-        size: [__PTHREAD_INITIALIZER_BYTE; __SIZEOF_PTHREAD_COND_T],
-    };
-    pub const PTHREAD_RWLOCK_INITIALIZER: pthread_rwlock_t = pthread_rwlock_t {
-        size: [__PTHREAD_INITIALIZER_BYTE; __SIZEOF_PTHREAD_RWLOCK_T],
-    };
+pub const PTHREAD_MUTEX_INITIALIZER: pthread_mutex_t = pthread_mutex_t {
+    size: [__PTHREAD_INITIALIZER_BYTE; __SIZEOF_PTHREAD_MUTEX_T],
+};
+pub const PTHREAD_COND_INITIALIZER: pthread_cond_t = pthread_cond_t {
+    size: [__PTHREAD_INITIALIZER_BYTE; __SIZEOF_PTHREAD_COND_T],
+};
+pub const PTHREAD_RWLOCK_INITIALIZER: pthread_rwlock_t = pthread_rwlock_t {
+    size: [__PTHREAD_INITIALIZER_BYTE; __SIZEOF_PTHREAD_RWLOCK_T],
+};
+
+cfg_if! {
+    if #[cfg(target_os = "espidf")] {
+        pub const NCCS: usize = 11;
+    } else {
+        pub const NCCS: usize = 32;
+    }
 }
-pub const NCCS: usize = 32;
 
 cfg_if! {
     if #[cfg(target_os = "espidf")] {
@@ -261,6 +389,16 @@ cfg_if! {
         pub const __SIZEOF_PTHREAD_RWLOCK_T: usize = 4;
         pub const __SIZEOF_PTHREAD_RWLOCKATTR_T: usize = 4;
         pub const __SIZEOF_PTHREAD_BARRIER_T: usize = 4;
+    } else if #[cfg(target_os = "rtems")] {
+        const __PTHREAD_INITIALIZER_BYTE: u8 = 0x00;
+        pub const __SIZEOF_PTHREAD_ATTR_T: usize = 96;
+        pub const __SIZEOF_PTHREAD_MUTEX_T: usize = 64;
+        pub const __SIZEOF_PTHREAD_MUTEXATTR_T: usize = 24;
+        pub const __SIZEOF_PTHREAD_COND_T: usize = 28;
+        pub const __SIZEOF_PTHREAD_CONDATTR_T: usize = 24;
+        pub const __SIZEOF_PTHREAD_RWLOCK_T: usize = 32;
+        pub const __SIZEOF_PTHREAD_RWLOCKATTR_T: usize = 8;
+        pub const __SIZEOF_PTHREAD_BARRIER_T: usize = 32;
     } else {
         const __PTHREAD_INITIALIZER_BYTE: u8 = 0;
         pub const __SIZEOF_PTHREAD_ATTR_T: usize = 56;
@@ -407,7 +545,13 @@ pub const O_SYNC: ::c_int = 8192;
 pub const O_NONBLOCK: ::c_int = 16384;
 
 pub const O_ACCMODE: ::c_int = 3;
-pub const O_CLOEXEC: ::c_int = 0x80000;
+cfg_if! {
+    if #[cfg(target_os = "espidf")] {
+        pub const O_CLOEXEC: ::c_int = 0x40000;
+    } else {
+        pub const O_CLOEXEC: ::c_int = 0x80000;
+    }
+}
 
 pub const RTLD_LAZY: ::c_int = 0x1;
 
@@ -423,33 +567,39 @@ pub const FIOCLEX: ::c_ulong = 0x20006601;
 pub const FIONCLEX: ::c_ulong = 0x20006602;
 
 pub const S_BLKSIZE: ::mode_t = 1024;
-pub const S_IREAD: ::mode_t = 256;
-pub const S_IWRITE: ::mode_t = 128;
-pub const S_IEXEC: ::mode_t = 64;
-pub const S_ENFMT: ::mode_t = 1024;
-pub const S_IFMT: ::mode_t = 61440;
-pub const S_IFDIR: ::mode_t = 16384;
-pub const S_IFCHR: ::mode_t = 8192;
-pub const S_IFBLK: ::mode_t = 24576;
-pub const S_IFREG: ::mode_t = 32768;
-pub const S_IFLNK: ::mode_t = 40960;
-pub const S_IFSOCK: ::mode_t = 49152;
-pub const S_IFIFO: ::mode_t = 4096;
-pub const S_IRUSR: ::mode_t = 256;
-pub const S_IWUSR: ::mode_t = 128;
-pub const S_IXUSR: ::mode_t = 64;
-pub const S_IRGRP: ::mode_t = 32;
-pub const S_IWGRP: ::mode_t = 16;
-pub const S_IXGRP: ::mode_t = 8;
-pub const S_IROTH: ::mode_t = 4;
-pub const S_IWOTH: ::mode_t = 2;
-pub const S_IXOTH: ::mode_t = 1;
+pub const S_IREAD: ::mode_t = 0o0400;
+pub const S_IWRITE: ::mode_t = 0o0200;
+pub const S_IEXEC: ::mode_t = 0o0100;
+pub const S_ENFMT: ::mode_t = 0o2000;
+pub const S_IFMT: ::mode_t = 0o17_0000;
+pub const S_IFDIR: ::mode_t = 0o4_0000;
+pub const S_IFCHR: ::mode_t = 0o2_0000;
+pub const S_IFBLK: ::mode_t = 0o6_0000;
+pub const S_IFREG: ::mode_t = 0o10_0000;
+pub const S_IFLNK: ::mode_t = 0o12_0000;
+pub const S_IFSOCK: ::mode_t = 0o14_0000;
+pub const S_IFIFO: ::mode_t = 0o1_0000;
+pub const S_IRUSR: ::mode_t = 0o0400;
+pub const S_IWUSR: ::mode_t = 0o0200;
+pub const S_IXUSR: ::mode_t = 0o0100;
+pub const S_IRGRP: ::mode_t = 0o0040;
+pub const S_IWGRP: ::mode_t = 0o0020;
+pub const S_IXGRP: ::mode_t = 0o0010;
+pub const S_IROTH: ::mode_t = 0o0004;
+pub const S_IWOTH: ::mode_t = 0o0002;
+pub const S_IXOTH: ::mode_t = 0o0001;
 
 pub const SOL_TCP: ::c_int = 6;
 
 pub const PF_UNSPEC: ::c_int = 0;
 pub const PF_INET: ::c_int = 2;
-pub const PF_INET6: ::c_int = 23;
+cfg_if! {
+    if #[cfg(target_os = "espidf")] {
+        pub const PF_INET6: ::c_int = 10;
+    } else {
+        pub const PF_INET6: ::c_int = 23;
+    }
+}
 
 pub const AF_UNSPEC: ::c_int = 0;
 pub const AF_INET: ::c_int = 2;
@@ -534,6 +684,9 @@ cfg_if! {
     if #[cfg(target_os = "vita")] {
         pub const TCP_NODELAY: ::c_int = 1;
         pub const TCP_MAXSEG: ::c_int = 2;
+    } else if #[cfg(target_os = "espidf")] {
+        pub const TCP_NODELAY: ::c_int = 1;
+        pub const TCP_MAXSEG: ::c_int = 8194;
     } else {
         pub const TCP_NODELAY: ::c_int = 8193;
         pub const TCP_MAXSEG: ::c_int = 8194;
@@ -542,13 +695,23 @@ cfg_if! {
 
 pub const TCP_NOPUSH: ::c_int = 4;
 pub const TCP_NOOPT: ::c_int = 8;
-pub const TCP_KEEPIDLE: ::c_int = 256;
-pub const TCP_KEEPINTVL: ::c_int = 512;
-pub const TCP_KEEPCNT: ::c_int = 1024;
+cfg_if! {
+    if #[cfg(target_os = "espidf")] {
+        pub const TCP_KEEPIDLE: ::c_int = 3;
+        pub const TCP_KEEPINTVL: ::c_int = 4;
+        pub const TCP_KEEPCNT: ::c_int = 5;
+    } else {
+        pub const TCP_KEEPIDLE: ::c_int = 256;
+        pub const TCP_KEEPINTVL: ::c_int = 512;
+        pub const TCP_KEEPCNT: ::c_int = 1024;
+    }
+}
 
 cfg_if! {
     if #[cfg(target_os = "horizon")] {
         pub const IP_TOS: ::c_int = 7;
+    } else if #[cfg(target_os = "espidf")] {
+        pub const IP_TOS: ::c_int = 1;
     } else {
         pub const IP_TOS: ::c_int = 3;
     }
@@ -556,55 +719,106 @@ cfg_if! {
 cfg_if! {
     if #[cfg(target_os = "vita")] {
         pub const IP_TTL: ::c_int = 4;
+    } else if #[cfg(target_os = "espidf")] {
+        pub const IP_TTL: ::c_int = 2;
     } else {
         pub const IP_TTL: ::c_int = 8;
     }
 }
-pub const IP_MULTICAST_IF: ::c_int = 9;
-pub const IP_MULTICAST_TTL: ::c_int = 10;
-pub const IP_MULTICAST_LOOP: ::c_int = 11;
+
+cfg_if! {
+    if #[cfg(target_os = "espidf")] {
+        pub const IP_MULTICAST_IF: ::c_int = 6;
+        pub const IP_MULTICAST_TTL: ::c_int = 5;
+        pub const IP_MULTICAST_LOOP: ::c_int = 7;
+    } else {
+        pub const IP_MULTICAST_IF: ::c_int = 9;
+        pub const IP_MULTICAST_TTL: ::c_int = 10;
+        pub const IP_MULTICAST_LOOP: ::c_int = 11;
+    }
+}
+
 cfg_if! {
     if #[cfg(target_os = "vita")] {
         pub const IP_ADD_MEMBERSHIP: ::c_int = 12;
         pub const IP_DROP_MEMBERSHIP: ::c_int = 13;
+    } else if #[cfg(target_os = "espidf")] {
+        pub const IP_ADD_MEMBERSHIP: ::c_int = 3;
+        pub const IP_DROP_MEMBERSHIP: ::c_int = 4;
     } else {
         pub const IP_ADD_MEMBERSHIP: ::c_int = 11;
         pub const IP_DROP_MEMBERSHIP: ::c_int = 12;
     }
 }
 pub const IPV6_UNICAST_HOPS: ::c_int = 4;
-pub const IPV6_MULTICAST_IF: ::c_int = 9;
-pub const IPV6_MULTICAST_HOPS: ::c_int = 10;
-pub const IPV6_MULTICAST_LOOP: ::c_int = 11;
+cfg_if! {
+    if #[cfg(target_os = "espidf")] {
+        pub const IPV6_MULTICAST_IF: ::c_int = 768;
+        pub const IPV6_MULTICAST_HOPS: ::c_int = 769;
+        pub const IPV6_MULTICAST_LOOP: ::c_int = 770;
+    } else {
+        pub const IPV6_MULTICAST_IF: ::c_int = 9;
+        pub const IPV6_MULTICAST_HOPS: ::c_int = 10;
+        pub const IPV6_MULTICAST_LOOP: ::c_int = 11;
+    }
+}
 pub const IPV6_V6ONLY: ::c_int = 27;
 pub const IPV6_JOIN_GROUP: ::c_int = 12;
 pub const IPV6_LEAVE_GROUP: ::c_int = 13;
 pub const IPV6_ADD_MEMBERSHIP: ::c_int = 12;
 pub const IPV6_DROP_MEMBERSHIP: ::c_int = 13;
 
-pub const HOST_NOT_FOUND: ::c_int = 1;
-pub const NO_DATA: ::c_int = 2;
+cfg_if! {
+    if #[cfg(target_os = "espidf")] {
+        pub const HOST_NOT_FOUND: ::c_int = 210;
+        pub const NO_DATA: ::c_int = 211;
+        pub const NO_RECOVERY: ::c_int = 212;
+        pub const TRY_AGAIN: ::c_int = 213;
+    } else {
+        pub const HOST_NOT_FOUND: ::c_int = 1;
+        pub const NO_DATA: ::c_int = 2;
+        pub const NO_RECOVERY: ::c_int = 3;
+        pub const TRY_AGAIN: ::c_int = 4;
+    }
+}
 pub const NO_ADDRESS: ::c_int = 2;
-pub const NO_RECOVERY: ::c_int = 3;
-pub const TRY_AGAIN: ::c_int = 4;
 
 pub const AI_PASSIVE: ::c_int = 1;
 pub const AI_CANONNAME: ::c_int = 2;
 pub const AI_NUMERICHOST: ::c_int = 4;
-pub const AI_NUMERICSERV: ::c_int = 0;
-pub const AI_ADDRCONFIG: ::c_int = 0;
+cfg_if! {
+    if #[cfg(target_os = "espidf")] {
+        pub const AI_NUMERICSERV: ::c_int = 8;
+        pub const AI_ADDRCONFIG: ::c_int = 64;
+    } else {
+        pub const AI_NUMERICSERV: ::c_int = 0;
+        pub const AI_ADDRCONFIG: ::c_int = 0;
+    }
+}
 
 pub const NI_MAXHOST: ::c_int = 1025;
 pub const NI_MAXSERV: ::c_int = 32;
 pub const NI_NOFQDN: ::c_int = 1;
 pub const NI_NUMERICHOST: ::c_int = 2;
 pub const NI_NAMEREQD: ::c_int = 4;
-pub const NI_NUMERICSERV: ::c_int = 0;
-pub const NI_DGRAM: ::c_int = 0;
+cfg_if! {
+    if #[cfg(target_os = "espidf")] {
+        pub const NI_NUMERICSERV: ::c_int = 8;
+        pub const NI_DGRAM: ::c_int = 16;
+    } else {
+        pub const NI_NUMERICSERV: ::c_int = 0;
+        pub const NI_DGRAM: ::c_int = 0;
+    }
+}
 
 cfg_if! {
     // Defined in vita/mod.rs for "vita"
-    if #[cfg(not(target_os = "vita"))] {
+    if #[cfg(target_os = "espidf")] {
+        pub const EAI_FAMILY: ::c_int = 204;
+        pub const EAI_MEMORY: ::c_int = 203;
+        pub const EAI_NONAME: ::c_int = 200;
+        pub const EAI_SOCKTYPE: ::c_int = 10;
+    } else if #[cfg(not(target_os = "vita"))] {
         pub const EAI_FAMILY: ::c_int = -303;
         pub const EAI_MEMORY: ::c_int = -304;
         pub const EAI_NONAME: ::c_int = -305;
@@ -624,20 +838,20 @@ f! {
         let bits = ::mem::size_of_val(&(*set).fds_bits[0]) * 8;
         let fd = fd as usize;
         (*set).fds_bits[fd / bits] &= !(1 << (fd % bits));
-        return
+        return;
     }
 
     pub fn FD_ISSET(fd: ::c_int, set: *const fd_set) -> bool {
         let bits = ::mem::size_of_val(&(*set).fds_bits[0]) * 8;
         let fd = fd as usize;
-        return ((*set).fds_bits[fd / bits] & (1 << (fd % bits))) != 0
+        return ((*set).fds_bits[fd / bits] & (1 << (fd % bits))) != 0;
     }
 
     pub fn FD_SET(fd: ::c_int, set: *mut fd_set) -> () {
         let bits = ::mem::size_of_val(&(*set).fds_bits[0]) * 8;
         let fd = fd as usize;
         (*set).fds_bits[fd / bits] |= 1 << (fd % bits);
-        return
+        return;
     }
 
     pub fn FD_ZERO(set: *mut fd_set) -> () {
@@ -662,11 +876,7 @@ extern "C" {
     pub fn rand() -> ::c_int;
     pub fn srand(seed: ::c_uint);
 
-    #[cfg(not(all(
-        libc_cfg_target_vendor,
-        target_arch = "powerpc",
-        target_vendor = "nintendo"
-    )))]
+    #[cfg(not(all(target_arch = "powerpc", target_vendor = "nintendo")))]
     #[cfg_attr(target_os = "espidf", link_name = "lwip_bind")]
     pub fn bind(fd: ::c_int, addr: *const sockaddr, len: socklen_t) -> ::c_int;
     pub fn clock_settime(clock_id: ::clockid_t, tp: *const ::timespec) -> ::c_int;
@@ -675,11 +885,7 @@ extern "C" {
     #[cfg_attr(target_os = "espidf", link_name = "lwip_close")]
     pub fn closesocket(sockfd: ::c_int) -> ::c_int;
     pub fn ioctl(fd: ::c_int, request: ::c_ulong, ...) -> ::c_int;
-    #[cfg(not(all(
-        libc_cfg_target_vendor,
-        target_arch = "powerpc",
-        target_vendor = "nintendo"
-    )))]
+    #[cfg(not(all(target_arch = "powerpc", target_vendor = "nintendo")))]
     #[cfg_attr(target_os = "espidf", link_name = "lwip_recvfrom")]
     pub fn recvfrom(
         fd: ::c_int,
@@ -689,11 +895,7 @@ extern "C" {
         addr: *mut sockaddr,
         addr_len: *mut socklen_t,
     ) -> isize;
-    #[cfg(not(all(
-        libc_cfg_target_vendor,
-        target_arch = "powerpc",
-        target_vendor = "nintendo"
-    )))]
+    #[cfg(not(all(target_arch = "powerpc", target_vendor = "nintendo")))]
     pub fn getnameinfo(
         sa: *const sockaddr,
         salen: socklen_t,
@@ -704,11 +906,14 @@ extern "C" {
         flags: ::c_int,
     ) -> ::c_int;
     pub fn memalign(align: ::size_t, size: ::size_t) -> *mut ::c_void;
+
+    // DIFF(main): changed to `*const *mut` in e77f551de9
     pub fn fexecve(
         fd: ::c_int,
         argv: *const *const ::c_char,
         envp: *const *const ::c_char,
     ) -> ::c_int;
+
     pub fn gettimeofday(tp: *mut ::timeval, tz: *mut ::c_void) -> ::c_int;
     pub fn getgrgid_r(
         gid: ::gid_t,
@@ -787,12 +992,8 @@ cfg_if! {
 }
 
 cfg_if! {
-    if #[cfg(libc_align)] {
-        #[macro_use]
-        mod align;
-    } else {
-        #[macro_use]
-        mod no_align;
+    if #[cfg(target_os = "rtems")] {
+        mod rtems;
+        pub use self::rtems::*;
     }
 }
-expand_align!();

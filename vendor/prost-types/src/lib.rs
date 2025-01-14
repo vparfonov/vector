@@ -1,4 +1,4 @@
-#![doc(html_root_url = "https://docs.rs/prost-types/0.12.6")]
+#![doc(html_root_url = "https://docs.rs/prost-types/0.13.3")]
 
 //! Protocol Buffers well-known types.
 //!
@@ -6,6 +6,32 @@
 //! definitions, so code examples are not in Rust.
 //!
 //! See the [Protobuf reference][1] for more information about well-known types.
+//!
+//! ## Any
+//!
+//! The well-known [`Any`] type contains an arbitrary serialized message along with a URL that
+//! describes the type of the serialized message. Every message that also implements [`Name`]
+//! can be serialized to and deserialized from [`Any`].
+//!
+//! ### Serialization
+//!
+//! A message can be serialized using [`Any::from_msg`].
+//!
+//! ```rust
+//! let message = Timestamp::date(2000, 1, 1).unwrap();
+//! let any = Any::from_msg(&message).unwrap();
+//! ```
+//!
+//! ### Deserialization
+//!
+//! A message can be deserialized using [`Any::to_msg`].
+//!
+//! ```rust
+//! # let message = Timestamp::date(2000, 1, 1).unwrap();
+//! # let any = Any::from_msg(&message).unwrap();
+//! #
+//! let message = any.to_msg::<Timestamp>().unwrap();
+//! ```
 //!
 //! ## Feature Flags
 //! - `std`: Enable integration with standard library. Disable this feature for `no_std` support. This feature is enabled by default.
@@ -22,8 +48,6 @@ mod protobuf;
 
 use core::convert::TryFrom;
 use core::fmt;
-use core::i32;
-use core::i64;
 use core::str::FromStr;
 use core::time;
 
@@ -53,3 +77,5 @@ pub use timestamp::TimestampError;
 
 mod type_url;
 pub(crate) use type_url::{type_url_for, TypeUrl};
+
+mod conversions;

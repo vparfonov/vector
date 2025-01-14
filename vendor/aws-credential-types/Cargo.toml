@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "aws-credential-types"
-version = "1.2.0"
+version = "1.2.1"
 authors = ["AWS Rust SDK Team <aws-sdk-rust@amazon.com>"]
 description = "Types for AWS SDK credentials."
 readme = "README.md"
@@ -38,14 +38,14 @@ stable = true
 version = "1.2.1"
 
 [dependencies.aws-smithy-runtime-api]
-version = "1.4.0"
+version = "1.7.2"
 features = [
     "client",
     "http-auth",
 ]
 
 [dependencies.aws-smithy-types]
-version = "1.1.8"
+version = "1.2.4"
 
 [dependencies.zeroize]
 version = "1"

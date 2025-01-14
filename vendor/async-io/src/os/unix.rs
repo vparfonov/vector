@@ -1,6 +1,5 @@
 //! Functionality that is only available for `unix` platforms.
 
-#[cfg(not(async_io_no_io_safety))]
 use std::os::unix::io::BorrowedFd;
 
 /// Get a file descriptor that can be used to wait for readiness in an external runtime.
@@ -16,7 +15,7 @@ use std::os::unix::io::BorrowedFd;
 /// associated with `poll()`, this function will return `None`.
 ///
 /// There is presently no way to stop the "`async-io`" thread from being launched, so the reactor
-/// will still be continiously polled on that thread. This fact should be kept in mind by anyone
+/// will still be continuously polled on that thread. This fact should be kept in mind by anyone
 /// looking to integrate `async-io` into another runtime using this function.
 ///
 /// It is possible to use this function to call raw system calls on the underlying event source.
@@ -41,7 +40,6 @@ use std::os::unix::io::BorrowedFd;
 /// #     pub fn register(_: BorrowedFd<'_>) {}
 /// # }
 /// ```
-#[cfg(not(async_io_no_io_safety))]
 pub fn reactor_fd() -> Option<BorrowedFd<'static>> {
     cfg_if::cfg_if! {
         if #[cfg(all(
@@ -50,10 +48,7 @@ pub fn reactor_fd() -> Option<BorrowedFd<'static>> {
                 target_os = "android",
                 target_os = "illumos",
                 target_os = "solaris",
-                target_os = "macos",
-                target_os = "ios",
-                target_os = "tvos",
-                target_os = "watchos",
+                target_vendor = "apple",
                 target_os = "freebsd",
                 target_os = "netbsd",
                 target_os = "openbsd",

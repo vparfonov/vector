@@ -8,6 +8,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased] - ReleaseDate
 
+## [0.24.1] - 2024-11-26
+
+### Added
+
+- Added a section to the crate-level documentation about `Metadata` and how it's used.
+- Derived `Copy`, `PartialOrd` and `Ord` for `Metadata` to allow for cheap copies and the ability to compare levels for
+  filtering purposes.
+- Added `TryFrom<&str>` for `Level` to allow parsing levels from strings.
+- Updated the documentation for `Metadata` to better explain how it's used.
+
+## [0.24.0] - 2024-10-12
+
+### Added
+
+- Added `Debug` derive to numerous types. ([#504](https://github.com/metrics-rs/metrics/pull/504))
+- Blanket implementations of `Recorder` over smart pointer representations (i.e. `Arc<T> where T: Recorder`).
+  ([#512](https://github.com/metrics-rs/metrics/pull/512))
+- Added a new method, `record_many`, to `Histogram` and `HistogramFn`, for recording a single value multiple times. This
+  method is backwards compatible as `HistogramFn` provides a default implementation. ([#531](https://github.com/metrics-rs/metrics/pull/531))
+
+### Changed
+
+- Changed `Unit::Gigibytes` to `Gibibytes` to match the proper SI prefix.
+  ([#508](https://github.com/metrics-rs/metrics/pull/508))
+- Fixed a number of Clippy lints. ([#510](https://github.com/metrics-rs/metrics/pull/510))
+- Updated the documentation for `with_local_recorder` to better explain limitations.
+- `set_global_recorder` now requires that the recorder is `Sync`.
+  ([#511](https://github.com/metrics-rs/metrics/pull/511))
+- Bump MSRV to 1.71.1. ([#530](https://github.com/metrics-rs/metrics/pull/530))
+- `with_recorder` is no longer hidden in the docs. ([#532](https://github.com/metrics-rs/metrics/pull/532))
+
+## [0.23.0] - 2024-05-27
+
+### Added
+
+- Implement `IntoLabels` for `BTreeMap<String, String>`.
+  ([#470](https://github.com/metrics-rs/metrics/pull/470))
+- Implement `From<Cow<'a, T>>` for `std::borrow::Cow<'a, T>`.
+  ([#478](https://github.com/metrics-rs/metrics/pull/478))
+
+### Changed
+
+- Bump MSRV to 1.70.0.
+- `Counter`, `Gauge`, and `Histogram` are now marked with `#[must_use]`.
+  ([#475](https://github.com/metrics-rs/metrics/pull/475))
+- Updated crate-level documentation around how histograms work.
+  ([#477](https://github.com/metrics-rs/metrics/pull/477))
+- Allow for trailing comma in arguments for all describe macros.
+  ([#483](https://github.com/metrics-rs/metrics/pull/483))
+
 ## [0.22.3] - 2024-03-16
 
 ### Added

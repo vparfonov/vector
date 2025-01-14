@@ -18,6 +18,11 @@ authors = [
     "Eliza Weisman <eliza@buoyant.io>",
     "Tokio Contributors <team@tokio.rs>",
 ]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
 Application-level tracing for Rust.
 """
@@ -45,16 +50,79 @@ rustdoc-args = [
     "docsrs",
 ]
 
+[lib]
+name = "tracing"
+path = "src/lib.rs"
+
+[[test]]
+name = "collector"
+path = "tests/collector.rs"
+
+[[test]]
+name = "enabled"
+path = "tests/enabled.rs"
+
+[[test]]
+name = "event"
+path = "tests/event.rs"
+
+[[test]]
+name = "filter_caching_is_lexically_scoped"
+path = "tests/filter_caching_is_lexically_scoped.rs"
+
+[[test]]
+name = "filters_are_not_reevaluated_for_the_same_span"
+path = "tests/filters_are_not_reevaluated_for_the_same_span.rs"
+
+[[test]]
+name = "filters_are_reevaluated_for_different_call_sites"
+path = "tests/filters_are_reevaluated_for_different_call_sites.rs"
+
+[[test]]
+name = "filters_dont_leak"
+path = "tests/filters_dont_leak.rs"
+
+[[test]]
+name = "future_send"
+path = "tests/future_send.rs"
+
+[[test]]
+name = "macro_imports"
+path = "tests/macro_imports.rs"
+
+[[test]]
+name = "macros"
+path = "tests/macros.rs"
+
+[[test]]
+name = "max_level_hint"
+path = "tests/max_level_hint.rs"
+
+[[test]]
+name = "multiple_max_level_hints"
+path = "tests/multiple_max_level_hints.rs"
+
+[[test]]
+name = "no_collector"
+path = "tests/no_collector.rs"
+
+[[test]]
+name = "span"
+path = "tests/span.rs"
+
 [[bench]]
-name = "subscriber"
+name = "global_subscriber"
+path = "benches/global_subscriber.rs"
 harness = false
 
 [[bench]]
 name = "no_subscriber"
+path = "benches/no_subscriber.rs"
 harness = false
 
 [[bench]]
-name = "global_subscriber"
+name = "subscriber"
+path = "benches/subscriber.rs"
 harness = false
 
 [dependencies]
@@ -110,7 +178,7 @@ std = [
     "alloc",
 ]
 
-[target."cfg(target_arch = \"wasm32\")".dev-dependencies]
+[target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 wasm-bindgen-test = "^0.3"
 
 [badges.maintenance]

@@ -18,6 +18,7 @@ use crate::v1::value::ValueData;
 
 pub const GREPTIME_GRPC_DESC: &[u8] = tonic::include_file_descriptor_set!("greptime_grpc_desc");
 
+pub mod flow;
 pub mod index;
 pub mod meta;
 pub mod region;

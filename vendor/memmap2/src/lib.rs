@@ -302,6 +302,8 @@ impl MmapOptions {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// The number 21 corresponds to `MAP_HUGE_2MB`. See mmap(2) for more details.
     pub fn huge(&mut self, page_bits: Option<u8>) -> &mut Self {
         self.huge = Some(page_bits.unwrap_or(0));
         self
@@ -335,6 +337,10 @@ impl MmapOptions {
     }
 
     /// Creates a read-only memory map backed by a file.
+    ///
+    /// # Safety
+    ///
+    /// See the [type-level][MmapOptions] docs for why this function is unsafe.
     ///
     /// # Errors
     ///
@@ -371,6 +377,10 @@ impl MmapOptions {
 
     /// Creates a readable and executable memory map backed by a file.
     ///
+    /// # Safety
+    ///
+    /// See the [type-level][MmapOptions] docs for why this function is unsafe.
+    ///
     /// # Errors
     ///
     /// This method returns an error when the underlying system call fails, which can happen for a
@@ -383,6 +393,10 @@ impl MmapOptions {
     }
 
     /// Creates a writeable memory map backed by a file.
+    ///
+    /// # Safety
+    ///
+    /// See the [type-level][MmapOptions] docs for why this function is unsafe.
     ///
     /// # Errors
     ///
@@ -427,6 +441,10 @@ impl MmapOptions {
     /// Data written to the memory map will not be visible by other processes,
     /// and will not be carried through to the underlying file.
     ///
+    /// # Safety
+    ///
+    /// See the [type-level][MmapOptions] docs for why this function is unsafe.
+    ///
     /// # Errors
     ///
     /// This method returns an error when the underlying system call fails, which can happen for a
@@ -454,6 +472,10 @@ impl MmapOptions {
     }
 
     /// Creates a copy-on-write read-only memory map backed by a file.
+    ///
+    /// # Safety
+    ///
+    /// See the [type-level][MmapOptions] docs for why this function is unsafe.
     ///
     /// # Errors
     ///
@@ -559,6 +581,8 @@ impl MmapOptions {
 ///
 /// `Mmap` is [`Sync`] and [`Send`].
 ///
+/// See [`MmapMut`] for the mutable version.
+///
 /// ## Safety
 ///
 /// All file-backed memory map constructors are marked `unsafe` because of the potential for
@@ -582,8 +606,6 @@ impl MmapOptions {
 /// # }
 /// ```
 ///
-/// See [`MmapMut`] for the mutable version.
-///
 /// [`map()`]: Mmap::map()
 pub struct Mmap {
     inner: MmapInner,
@@ -593,6 +615,10 @@ impl Mmap {
     /// Creates a read-only memory map backed by a file.
     ///
     /// This is equivalent to calling `MmapOptions::new().map(file)`.
+    ///
+    /// # Safety
+    ///
+    /// See the [type-level][Mmap] docs for why this function is unsafe.
     ///
     /// # Errors
     ///
@@ -787,6 +813,9 @@ impl fmt::Debug for Mmap {
 ///
 /// This struct never hands out references to its interior, only raw pointers.
 /// This can be helpful when creating shared memory maps between untrusted processes.
+///
+/// For the safety concerns that arise when converting these raw pointers to references,
+/// see the [`Mmap`] safety documentation.
 pub struct MmapRaw {
     inner: MmapInner,
 }
@@ -1036,7 +1065,7 @@ impl From<MmapMut> for MmapRaw {
 /// Dereferencing and accessing the bytes of the buffer may result in page faults (e.g. swapping
 /// the mapped pages into physical memory) though the details of this are platform specific.
 ///
-/// `Mmap` is [`Sync`] and [`Send`].
+/// `MmapMut` is [`Sync`] and [`Send`].
 ///
 /// See [`Mmap`] for the immutable version.
 ///
@@ -1055,6 +1084,10 @@ impl MmapMut {
     /// Creates a writeable memory map backed by a file.
     ///
     /// This is equivalent to calling `MmapOptions::new().map_mut(file)`.
+    ///
+    /// # Safety
+    ///
+    /// See the [type-level][MmapMut] docs for why this function is unsafe.
     ///
     /// # Errors
     ///

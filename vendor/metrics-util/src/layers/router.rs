@@ -1,3 +1,5 @@
+use std::fmt;
+
 use metrics::{Counter, Gauge, Histogram, Key, KeyName, Metadata, Recorder, SharedString, Unit};
 use radix_trie::{Trie, TrieCommon};
 
@@ -15,6 +17,17 @@ pub struct Router {
     histogram_routes: Trie<String, usize>,
 }
 
+impl fmt::Debug for Router {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Router")
+            .field("global_mask", &self.global_mask)
+            .field("targets_len", &self.targets.len())
+            .field("counter_routes", &self.counter_routes)
+            .field("gauge_routes", &self.gauge_routes)
+            .field("histogram_routes", &self.histogram_routes)
+            .finish_non_exhaustive()
+    }
+}
 impl Router {
     fn route(
         &self,
@@ -85,6 +98,18 @@ pub struct RouterBuilder {
     counter_routes: Trie<String, usize>,
     gauge_routes: Trie<String, usize>,
     histogram_routes: Trie<String, usize>,
+}
+
+impl fmt::Debug for RouterBuilder {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("RouterBuilder")
+            .field("global_mask", &self.global_mask)
+            .field("targets_len", &self.targets.len())
+            .field("counter_routes", &self.counter_routes)
+            .field("gauge_routes", &self.gauge_routes)
+            .field("histogram_routes", &self.histogram_routes)
+            .finish_non_exhaustive()
+    }
 }
 
 impl RouterBuilder {
@@ -166,7 +191,7 @@ mod tests {
         predicate::{always, eq},
         Sequence,
     };
-    use std::borrow::Cow;
+    use std::{borrow::Cow, sync::Arc};
 
     use super::RouterBuilder;
     use crate::MetricKindMask;
@@ -175,6 +200,7 @@ mod tests {
     };
 
     mock! {
+        #[derive(Debug)]
         pub TestRecorder {
         }
 
@@ -193,9 +219,10 @@ mod tests {
         let _ = RouterBuilder::from_recorder(MockTestRecorder::new()).build();
 
         let mut builder = RouterBuilder::from_recorder(MockTestRecorder::new());
+        // ensure that &str, String, and Cow<str> are all are accepted by the builder
         builder
             .add_route(MetricKindMask::COUNTER, "foo", MockTestRecorder::new())
-            .add_route(MetricKindMask::GAUGE, "bar".to_owned(), MockTestRecorder::new())
+            .add_route(MetricKindMask::GAUGE, String::from("bar"), MockTestRecorder::new())
             .add_route(MetricKindMask::HISTOGRAM, Cow::Borrowed("baz"), MockTestRecorder::new())
             .add_route(MetricKindMask::ALL, "quux", MockTestRecorder::new());
         let _ = builder.build();
@@ -264,5 +291,50 @@ mod tests {
         let _ = recorder.register_counter(&override_counter, &METADATA);
         let _ = recorder.register_counter(&all_override, &METADATA);
         let _ = recorder.register_histogram(&all_override, &METADATA);
+    }
+
+    #[test]
+    fn test_same_recorder_multiple_routes() {
+        let default_counter: Key = "default".into();
+        let foo_counter: Key = "foo.counter".into();
+        let bar_counter: Key = "bar.counter".into();
+
+        let mut default_mock = MockTestRecorder::new();
+        let mut foo_bar_mock = MockTestRecorder::new();
+
+        let mut seq = Sequence::new();
+
+        static METADATA: metrics::Metadata =
+            metrics::Metadata::new(module_path!(), metrics::Level::INFO, Some(module_path!()));
+
+        foo_bar_mock
+            .expect_register_counter()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(eq(foo_counter.clone()), always())
+            .returning(|_, _| Counter::noop());
+        foo_bar_mock
+            .expect_register_counter()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(eq(bar_counter.clone()), always())
+            .returning(|_, _| Counter::noop());
+        default_mock
+            .expect_register_counter()
+            .times(1)
+            .in_sequence(&mut seq)
+            .with(eq(default_counter.clone()), always())
+            .returning(|_, _| Counter::noop());
+
+        let foo_bar_mock = Arc::new(foo_bar_mock);
+
+        let mut builder = RouterBuilder::from_recorder(default_mock);
+        builder.add_route(MetricKindMask::COUNTER, "foo", foo_bar_mock.clone());
+        builder.add_route(MetricKindMask::COUNTER, "bar", foo_bar_mock);
+        let recorder = builder.build();
+
+        let _ = recorder.register_counter(&foo_counter, &METADATA);
+        let _ = recorder.register_counter(&bar_counter, &METADATA);
+        let _ = recorder.register_counter(&default_counter, &METADATA);
     }
 }

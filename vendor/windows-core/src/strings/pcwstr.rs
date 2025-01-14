@@ -13,7 +13,7 @@ impl PCWSTR {
 
     /// Construct a null `PCWSTR`
     pub const fn null() -> Self {
-        Self(std::ptr::null())
+        Self(core::ptr::null())
     }
 
     /// Returns a raw pointer to the `PCWSTR`
@@ -26,14 +26,50 @@ impl PCWSTR {
         self.0.is_null()
     }
 
+    /// String length without the trailing 0
+    ///
+    /// # Safety
+    ///
+    /// The `PCWSTR`'s pointer needs to be valid for reads up until and including the next `\0`.
+    pub unsafe fn len(&self) -> usize {
+        #[cfg(windows)]
+        let len = {
+            extern "C" {
+                fn wcslen(s: *const u16) -> usize;
+            }
+            wcslen(self.0)
+        };
+
+        #[cfg(not(windows))]
+        let len = {
+            let mut len = 0;
+            let mut ptr = self.0;
+            while ptr.read() != 0 {
+                len += 1;
+                ptr = ptr.add(1);
+            }
+            len
+        };
+
+        len
+    }
+
+    /// Returns `true` if the string length is zero, and `false` otherwise.
+    ///
+    /// # Safety
+    ///
+    /// The `PCWSTR`'s pointer needs to be valid for reads up until and including the next `\0`.
+    pub unsafe fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// String data without the trailing 0
     ///
     /// # Safety
     ///
     /// The `PCWSTR`'s pointer needs to be valid for reads up until and including the next `\0`.
     pub unsafe fn as_wide(&self) -> &[u16] {
-        let len = super::wcslen(*self);
-        std::slice::from_raw_parts(self.0, len)
+        core::slice::from_raw_parts(self.0, self.len())
     }
 
     /// Copy the `PCWSTR` into a Rust `String`.
@@ -41,7 +77,7 @@ impl PCWSTR {
     /// # Safety
     ///
     /// See the safety information for `PCWSTR::as_wide`.
-    pub unsafe fn to_string(&self) -> std::result::Result<String, std::string::FromUtf16Error> {
+    pub unsafe fn to_string(&self) -> core::result::Result<String, alloc::string::FromUtf16Error> {
         String::from_utf16(self.as_wide())
     }
 
@@ -59,11 +95,7 @@ impl PCWSTR {
     /// # Safety
     ///
     /// See the safety information for `PCWSTR::as_wide`.
-    pub unsafe fn display(&self) -> impl std::fmt::Display + '_ {
-        Decode(move || std::char::decode_utf16(self.as_wide().iter().cloned()))
+    pub unsafe fn display(&self) -> impl core::fmt::Display + '_ {
+        Decode(move || core::char::decode_utf16(self.as_wide().iter().cloned()))
     }
-}
-
-impl TypeKind for PCWSTR {
-    type TypeKind = CopyType;
 }

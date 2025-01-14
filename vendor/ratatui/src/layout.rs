@@ -4,7 +4,6 @@ mod alignment;
 mod constraint;
 mod direction;
 mod flex;
-#[allow(clippy::module_inception)]
 mod layout;
 mod margin;
 mod position;
@@ -15,8 +14,8 @@ pub use alignment::Alignment;
 pub use constraint::Constraint;
 pub use direction::Direction;
 pub use flex::Flex;
-pub use layout::Layout;
+pub use layout::{Layout, Spacing};
 pub use margin::Margin;
 pub use position::Position;
-pub use rect::*;
+pub use rect::{Columns, Offset, Positions, Rect, Rows};
 pub use size::Size;

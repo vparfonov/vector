@@ -94,12 +94,12 @@ runtime][Tokio] is considered *experimental*. In order to use
   level].
 
   + If you're using the [`console_subscriber::init()`][init] or
-  [`console_subscriber::Builder`][builder] APIs, these targets are enabled
-  automatically.
+    [`console_subscriber::Builder`][builder] APIs, these targets are enabled
+    automatically.
 
   + If you are manually configuring the `tracing` subscriber using the
-  [`EnvFilter`] or [`Targets`] filters from [`tracing-subscriber`], add
-  `"tokio=trace,runtime=trace"` to your filter configuration.
+    [`EnvFilter`] or [`Targets`] filters from [`tracing-subscriber`], add
+    `"tokio=trace,runtime=trace"` to your filter configuration.
 
   + Also, ensure you have not enabled any of the [compile time filter
     features][compile_time_filters] in your `Cargo.toml`.
@@ -130,6 +130,9 @@ Other instrumentation is added in later Tokio releases:
 
 * [Tokio v1.21.0] or later is required to use newest `task::Builder::spawn*` APIs.
 
+* [Tokio v1.41.0] (as yet unreleased) or later is required for task future sizes and the related
+  tokio-console lints `auto-boxed-future` and `large-future`.
+
 [Tokio v1.0.0]: https://github.com/tokio-rs/tokio/releases/tag/tokio-1.0.0
 [Tokio v1.7.0]: https://github.com/tokio-rs/tokio/releases/tag/tokio-1.7.0
 [Tokio v1.12.0]:https://github.com/tokio-rs/tokio/releases/tag/tokio-1.12.0
@@ -147,6 +150,7 @@ Other instrumentation is added in later Tokio releases:
 [init]: https://docs.rs/console-subscriber/latest/console_subscriber/fn.init.html
 [compile_time_filters]: https://docs.rs/tracing/latest/tracing/level_filters/index.html#compile-time-filters
 [Tokio v1.21.0]: https://github.com/tokio-rs/tokio/releases/tag/tokio-1.21.0
+[Tokio v1.41.0]: https://github.com/tokio-rs/tokio/releases/tag/tokio-1.41.0
 
 ### Adding the Console Subscriber
 

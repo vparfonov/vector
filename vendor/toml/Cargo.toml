@@ -13,8 +13,9 @@
 edition = "2021"
 rust-version = "1.65"
 name = "toml"
-version = "0.8.15"
+version = "0.8.19"
 authors = ["Alex Crichton <alex@alexcrichton.com>"]
+build = false
 include = [
     "build.rs",
     "src/**/*",
@@ -26,6 +27,10 @@ include = [
     "examples/**/*",
     "tests/**/*",
 ]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
 A native Rust encoder and decoder of TOML-formatted files and streams. Provides
 implementations of the standard Serialize/Deserialize traits for TOML data to
@@ -88,8 +93,13 @@ replace = """
 [Unreleased]: https://github.com/toml-rs/toml/compare/{{tag_name}}...HEAD"""
 search = "<!-- next-url -->"
 
+[lib]
+name = "toml"
+path = "src/lib.rs"
+
 [[example]]
 name = "decode"
+path = "examples/decode.rs"
 required-features = [
     "parse",
     "display",
@@ -97,6 +107,7 @@ required-features = [
 
 [[example]]
 name = "enum_external"
+path = "examples/enum_external.rs"
 required-features = [
     "parse",
     "display",
@@ -104,18 +115,33 @@ required-features = [
 
 [[example]]
 name = "toml2json"
+path = "examples/toml2json.rs"
 required-features = [
     "parse",
     "display",
 ]
 
 [[test]]
+name = "decoder"
+path = "tests/decoder.rs"
+
+[[test]]
 name = "decoder_compliance"
+path = "tests/decoder_compliance.rs"
 harness = false
 
 [[test]]
+name = "encoder"
+path = "tests/encoder.rs"
+
+[[test]]
 name = "encoder_compliance"
+path = "tests/encoder_compliance.rs"
 harness = false
+
+[[test]]
+name = "testsuite"
+path = "tests/testsuite/main.rs"
 
 [dependencies.indexmap]
 version = "2.0.0"
@@ -125,15 +151,15 @@ optional = true
 version = "1.0.145"
 
 [dependencies.serde_spanned]
-version = "0.6.6"
+version = "0.6.7"
 features = ["serde"]
 
 [dependencies.toml_datetime]
-version = "0.6.6"
+version = "0.6.8"
 features = ["serde"]
 
 [dependencies.toml_edit]
-version = "0.22.16"
+version = "0.22.20"
 features = ["serde"]
 optional = true
 default-features = false
@@ -196,7 +222,6 @@ inconsistent_struct_constructor = "warn"
 inefficient_to_string = "warn"
 infinite_loop = "warn"
 invalid_upcast_comparisons = "warn"
-items_after_statements = "warn"
 large_digit_groups = "warn"
 large_stack_arrays = "warn"
 large_types_passed_by_value = "warn"
@@ -204,7 +229,6 @@ let_and_return = "allow"
 linkedlist = "warn"
 lossy_float_literal = "warn"
 macro_use_imports = "warn"
-match_wildcard_for_single_variants = "warn"
 mem_forget = "warn"
 mutex_integer = "warn"
 needless_continue = "warn"
@@ -219,7 +243,6 @@ rest_pat_in_fully_bound_structs = "warn"
 same_functions_in_if_condition = "warn"
 self_named_module_files = "warn"
 semicolon_if_nothing_returned = "warn"
-single_match_else = "warn"
 str_to_string = "warn"
 string_add = "warn"
 string_add_assign = "warn"
@@ -232,9 +255,12 @@ wildcard_imports = "warn"
 zero_sized_map_values = "warn"
 
 [lints.rust]
-rust_2018_idioms = "warn"
 unreachable_pub = "warn"
 unsafe_op_in_unsafe_fn = "warn"
 unused_lifetimes = "warn"
 unused_macro_rules = "warn"
 unused_qualifications = "warn"
+
+[lints.rust.rust_2018_idioms]
+level = "warn"
+priority = -1

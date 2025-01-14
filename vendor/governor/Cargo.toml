@@ -12,8 +12,12 @@
 [package]
 edition = "2018"
 name = "governor"
-version = "0.6.3"
+version = "0.7.0"
 authors = ["Andreas Fuchs <asf@boinkor.net>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
 autobenches = false
 description = "A rate-limiting implementation in Rust"
 homepage = "https://github.com/boinkor-net/governor"
@@ -34,27 +38,85 @@ categories = [
 license = "MIT"
 repository = "https://github.com/boinkor-net/governor.git"
 
+[package.metadata.docs.rs]
+rustdoc-args = [
+    "--cfg",
+    "docsrs",
+]
+
 [lib]
+name = "governor"
+path = "src/lib.rs"
 bench = false
+
+[[test]]
+name = "direct"
+path = "tests/direct.rs"
+
+[[test]]
+name = "future"
+path = "tests/future.rs"
+
+[[test]]
+name = "keyed"
+path = "tests/keyed.rs"
+
+[[test]]
+name = "keyed_dashmap"
+path = "tests/keyed_dashmap.rs"
+
+[[test]]
+name = "keyed_hashmap"
+path = "tests/keyed_hashmap.rs"
+
+[[test]]
+name = "memory_leaks"
+path = "tests/memory_leaks.rs"
+
+[[test]]
+name = "middleware"
+path = "tests/middleware.rs"
+
+[[test]]
+name = "proptests"
+path = "tests/proptests.rs"
+
+[[test]]
+name = "sinks"
+path = "tests/sinks.rs"
+
+[[test]]
+name = "streams"
+path = "tests/streams.rs"
 
 [[bench]]
 name = "governor_criterion_benches"
+path = "benches/governor_criterion_benches.rs"
 harness = false
 
 [dependencies.cfg-if]
 version = "1.0"
 
 [dependencies.dashmap]
-version = "5.1.0"
+version = "6.1.0"
 optional = true
 
-[dependencies.futures]
-version = "0.3.5"
+[dependencies.futures-sink]
+version = "0.3.31"
 optional = true
 
 [dependencies.futures-timer]
-version = "3.0.2"
+version = "3.0.3"
 optional = true
+
+[dependencies.futures-util]
+version = "0.3.31"
+features = [
+    "std",
+    "sink",
+]
+optional = true
+default-features = false
 
 [dependencies.no-std-compat]
 version = "0.4.1"
@@ -96,8 +158,8 @@ features = ["html_reports"]
 [dev-dependencies.crossbeam]
 version = "0.8.0"
 
-[dev-dependencies.futures]
-version = "0.3.5"
+[dev-dependencies.futures-executor]
+version = "0.3.31"
 
 [dev-dependencies.libc]
 version = "0.2.70"
@@ -121,8 +183,9 @@ quanta = ["dep:quanta"]
 std = [
     "no-std-compat/std",
     "nonzero_ext/std",
-    "futures-timer",
-    "futures",
+    "dep:futures-timer",
+    "dep:futures-util",
+    "dep:futures-sink",
     "dep:parking_lot",
 ]
 

@@ -12,7 +12,7 @@ use std::{
 use crate::{
     backend::{Backend, ClearType, WindowSize},
     buffer::Cell,
-    prelude::Rect,
+    layout::{Position, Size},
     style::{Color, Modifier, Style},
     termion::{self, color as tcolor, color::Color as _, style as tstyle},
 };
@@ -40,8 +40,9 @@ use crate::{
 /// use std::io::{stderr, stdout};
 ///
 /// use ratatui::{
-///     prelude::*,
+///     backend::TermionBackend,
 ///     termion::{raw::IntoRawMode, screen::IntoAlternateScreen},
+///     Terminal,
 /// };
 ///
 /// let writer = stdout().into_raw_mode()?.into_alternate_screen()?;
@@ -76,11 +77,18 @@ where
 {
     /// Creates a new Termion backend with the given writer.
     ///
+    /// Most applications will use either [`stdout`](std::io::stdout) or
+    /// [`stderr`](std::io::stderr) as writer. See the [FAQ] to determine which one to use.
+    ///
+    /// [FAQ]: https://ratatui.rs/faq/#should-i-use-stdout-or-stderr
+    ///
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use std::io::stdout;
-    /// # use ratatui::prelude::*;
+    /// use std::io::stdout;
+    ///
+    /// use ratatui::backend::TermionBackend;
+    ///
     /// let backend = TermionBackend::new(stdout());
     /// ```
     pub const fn new(writer: W) -> Self {
@@ -88,9 +96,9 @@ where
     }
 
     /// Gets the writer.
-    #[stability::unstable(
+    #[instability::unstable(
         feature = "backend-writer",
-        issue = "https://github.com/ratatui-org/ratatui/pull/991"
+        issue = "https://github.com/ratatui/ratatui/pull/991"
     )]
     pub const fn writer(&self) -> &W {
         &self.writer
@@ -99,9 +107,9 @@ where
     /// Gets the writer as a mutable reference.
     /// Note: writing to the writer may cause incorrect output after the write. This is due to the
     /// way that the Terminal implements diffing Buffers.
-    #[stability::unstable(
+    #[instability::unstable(
         feature = "backend-writer",
-        issue = "https://github.com/ratatui-org/ratatui/pull/991"
+        issue = "https://github.com/ratatui/ratatui/pull/991"
     )]
     pub fn writer_mut(&mut self) -> &mut W {
         &mut self.writer
@@ -157,11 +165,13 @@ where
         self.writer.flush()
     }
 
-    fn get_cursor(&mut self) -> io::Result<(u16, u16)> {
-        termion::cursor::DetectCursorPos::cursor_pos(&mut self.writer).map(|(x, y)| (x - 1, y - 1))
+    fn get_cursor_position(&mut self) -> io::Result<Position> {
+        termion::cursor::DetectCursorPos::cursor_pos(&mut self.writer)
+            .map(|(x, y)| Position { x: x - 1, y: y - 1 })
     }
 
-    fn set_cursor(&mut self, x: u16, y: u16) -> io::Result<()> {
+    fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> io::Result<()> {
+        let Position { x, y } = position.into();
         write!(self.writer, "{}", termion::cursor::Goto(x + 1, y + 1))?;
         self.writer.flush()
     }
@@ -176,13 +186,13 @@ where
         let mut fg = Color::Reset;
         let mut bg = Color::Reset;
         let mut modifier = Modifier::empty();
-        let mut last_pos: Option<(u16, u16)> = None;
+        let mut last_pos: Option<Position> = None;
         for (x, y, cell) in content {
             // Move the cursor if the previous location was not (x - 1, y)
-            if !matches!(last_pos, Some(p) if x == p.0 + 1 && y == p.1) {
+            if !matches!(last_pos, Some(p) if x == p.x + 1 && y == p.y) {
                 write!(string, "{}", termion::cursor::Goto(x + 1, y + 1)).unwrap();
             }
-            last_pos = Some((x, y));
+            last_pos = Some(Position { x, y });
             if cell.modifier != modifier {
                 write!(
                     string,
@@ -214,9 +224,9 @@ where
         )
     }
 
-    fn size(&self) -> io::Result<Rect> {
+    fn size(&self) -> io::Result<Size> {
         let terminal = termion::terminal_size()?;
-        Ok(Rect::new(0, 0, terminal.0, terminal.1))
+        Ok(Size::new(terminal.0, terminal.1))
     }
 
     fn window_size(&mut self) -> io::Result<WindowSize> {
@@ -227,6 +237,30 @@ where
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
+    }
+
+    #[cfg(feature = "scrolling-regions")]
+    fn scroll_region_up(&mut self, region: std::ops::Range<u16>, amount: u16) -> io::Result<()> {
+        write!(
+            self.writer,
+            "{}{}{}",
+            SetRegion(region.start.saturating_add(1), region.end),
+            termion::scroll::Up(amount),
+            ResetRegion,
+        )?;
+        self.writer.flush()
+    }
+
+    #[cfg(feature = "scrolling-regions")]
+    fn scroll_region_down(&mut self, region: std::ops::Range<u16>, amount: u16) -> io::Result<()> {
+        write!(
+            self.writer,
+            "{}{}{}",
+            SetRegion(region.start.saturating_add(1), region.end),
+            termion::scroll::Down(amount),
+            ResetRegion,
+        )?;
         self.writer.flush()
     }
 }
@@ -455,6 +489,26 @@ from_termion_for_modifier!(Blink, SLOW_BLINK);
 impl From<termion::style::Reset> for Modifier {
     fn from(_: termion::style::Reset) -> Self {
         Self::empty()
+    }
+}
+
+/// Set scrolling region.
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct SetRegion(pub u16, pub u16);
+
+impl fmt::Display for SetRegion {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "\x1B[{};{}r", self.0, self.1)
+    }
+}
+
+/// Reset scrolling region.
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub struct ResetRegion;
+
+impl fmt::Display for ResetRegion {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "\x1B[r")
     }
 }
 

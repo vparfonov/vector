@@ -14,6 +14,11 @@ edition = "2018"
 name = "heim-runtime"
 version = "0.1.0-rc.1"
 authors = ["svartalf <self@svartalf.info>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Runtime shims for heim crate"
 readme = "README.md"
 keywords = [
@@ -35,6 +40,18 @@ rustdoc-args = [
     "--cfg",
     "docsrs",
 ]
+
+[lib]
+name = "heim_runtime"
+path = "src/lib.rs"
+
+[[test]]
+name = "linux"
+path = "tests/linux.rs"
+
+[[test]]
+name = "version"
+path = "tests/version.rs"
 
 [dependencies]
 futures-timer = "^3.0"

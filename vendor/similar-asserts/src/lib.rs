@@ -11,6 +11,7 @@
 - [`assert_serde_eq!`]: diffs `Serialize` on assertion failure.
 "#
 )]
+//!
 //! ![](https://raw.githubusercontent.com/mitsuhiko/similar-asserts/main/assets/screenshot.png)
 //!
 //! # Usage
@@ -112,8 +113,8 @@ pub struct SimpleDiff<'a> {
     pub(crate) right_short: Cow<'a, str>,
     pub(crate) left_expanded: Option<Cow<'a, str>>,
     pub(crate) right_expanded: Option<Cow<'a, str>>,
-    pub(crate) left_label: &'static str,
-    pub(crate) right_label: &'static str,
+    pub(crate) left_label: &'a str,
+    pub(crate) right_label: &'a str,
 }
 
 impl<'a> SimpleDiff<'a> {
@@ -125,8 +126,8 @@ impl<'a> SimpleDiff<'a> {
     pub fn from_str(
         left: &'a str,
         right: &'a str,
-        left_label: &'static str,
-        right_label: &'static str,
+        left_label: &'a str,
+        right_label: &'a str,
     ) -> SimpleDiff<'a> {
         SimpleDiff {
             left_short: left.into(),
@@ -144,8 +145,8 @@ impl<'a> SimpleDiff<'a> {
         right_short: Option<Cow<'a, str>>,
         left_expanded: Option<Cow<'a, str>>,
         right_expanded: Option<Cow<'a, str>>,
-        left_label: &'static str,
-        right_label: &'static str,
+        left_label: &'a str,
+        right_label: &'a str,
     ) -> SimpleDiff<'a> {
         SimpleDiff {
             left_short: left_short.unwrap_or_else(|| "<unprintable object>".into()),
@@ -270,6 +271,7 @@ fn detect_newlines(s: &str) -> (bool, bool, bool) {
     (detected_cr, detected_crlf, detected_lf)
 }
 
+#[allow(clippy::match_like_matches_macro)]
 fn newlines_matter(left: &str, right: &str) -> bool {
     if trailing_newline(left) != trailing_newline(right) {
         return true;

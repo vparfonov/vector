@@ -1,21 +1,23 @@
 use crate::codec::compression::{
     CompressionEncoding, EnabledCompressionEncodings, SingleMessageCompressionOverride,
 };
+use crate::codec::EncodeBody;
+use crate::metadata::GRPC_CONTENT_TYPE;
 use crate::{
     body::BoxBody,
-    codec::{encode_server, Codec, Streaming},
+    codec::{Codec, Streaming},
     server::{ClientStreamingService, ServerStreamingService, StreamingService, UnaryService},
-    Code, Request, Status,
+    Request, Status,
 };
 use http_body::Body;
-use std::fmt;
+use std::{fmt, pin::pin};
 use tokio_stream::{Stream, StreamExt};
 
 macro_rules! t {
     ($result:expr) => {
         match $result {
             Ok(value) => value,
-            Err(status) => return status.to_http(),
+            Err(status) => return status.into_http(),
         }
     };
 }
@@ -187,7 +189,7 @@ where
     ) -> Self {
         let mut this = self;
 
-        for &encoding in CompressionEncoding::encodings() {
+        for &encoding in CompressionEncoding::ENCODINGS {
             if accept_encodings.is_enabled(encoding) {
                 this = this.accept_compressed(encoding);
             }
@@ -375,19 +377,17 @@ where
 
         let (parts, body) = request.into_parts();
 
-        let stream = Streaming::new_request(
+        let mut stream = pin!(Streaming::new_request(
             self.codec.decoder(),
             body,
             request_compression_encoding,
             self.max_decoding_message_size,
-        );
-
-        tokio::pin!(stream);
+        ));
 
         let message = stream
             .try_next()
             .await?
-            .ok_or_else(|| Status::new(Code::Internal, "Missing request message."))?;
+            .ok_or_else(|| Status::internal("Missing request message."))?;
 
         let mut req = Request::from_http_parts(parts, message);
 
@@ -430,18 +430,14 @@ where
     where
         B: Stream<Item = Result<T::Encode, Status>> + Send + 'static,
     {
-        let response = match response {
-            Ok(r) => r,
-            Err(status) => return status.to_http(),
-        };
+        let response = t!(response);
 
         let (mut parts, body) = response.into_http().into_parts();
 
         // Set the content type
-        parts.headers.insert(
-            http::header::CONTENT_TYPE,
-            http::header::HeaderValue::from_static("application/grpc"),
-        );
+        parts
+            .headers
+            .insert(http::header::CONTENT_TYPE, GRPC_CONTENT_TYPE);
 
         #[cfg(any(feature = "gzip", feature = "zstd"))]
         if let Some(encoding) = accept_encoding {
@@ -452,7 +448,7 @@ where
             );
         }
 
-        let body = encode_server(
+        let body = EncodeBody::new_server(
             self.codec.encoder(),
             body,
             accept_encoding,

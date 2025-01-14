@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, io, time::Duration};
 
 use mio::{unix::SourceFd, Events, Interest, Poll, Token};
-use signal_hook_mio::v0_8::Signals;
+use signal_hook_mio::v1_0::Signals;
 
 #[cfg(feature = "event-stream")]
 use crate::event::sys::Waker;
@@ -26,7 +26,7 @@ pub(crate) struct UnixInternalEventSource {
     events: Events,
     parser: Parser,
     tty_buffer: [u8; TTY_BUFFER_SIZE],
-    tty_fd: FileDesc,
+    tty_fd: FileDesc<'static>,
     signals: Signals,
     #[cfg(feature = "event-stream")]
     waker: Waker,
@@ -37,7 +37,7 @@ impl UnixInternalEventSource {
         UnixInternalEventSource::from_file_descriptor(tty_fd()?)
     }
 
-    pub(crate) fn from_file_descriptor(input_fd: FileDesc) -> io::Result<Self> {
+    pub(crate) fn from_file_descriptor(input_fd: FileDesc<'static>) -> io::Result<Self> {
         let poll = Poll::new()?;
         let registry = poll.registry();
 
@@ -93,7 +93,7 @@ impl EventSource for UnixInternalEventSource {
                 match token {
                     TTY_TOKEN => {
                         loop {
-                            match self.tty_fd.read(&mut self.tty_buffer, TTY_BUFFER_SIZE) {
+                            match self.tty_fd.read(&mut self.tty_buffer) {
                                 Ok(read_count) => {
                                     if read_count > 0 {
                                         self.parser.advance(
@@ -120,23 +120,18 @@ impl EventSource for UnixInternalEventSource {
                         }
                     }
                     SIGNAL_TOKEN => {
-                        for signal in self.signals.pending() {
-                            match signal {
-                                signal_hook::consts::SIGWINCH => {
-                                    // TODO Should we remove tput?
-                                    //
-                                    // This can take a really long time, because terminal::size can
-                                    // launch new process (tput) and then it parses its output. It's
-                                    // not a really long time from the absolute time point of view, but
-                                    // it's a really long time from the mio, async-std/tokio executor, ...
-                                    // point of view.
-                                    let new_size = crate::terminal::size()?;
-                                    return Ok(Some(InternalEvent::Event(Event::Resize(
-                                        new_size.0, new_size.1,
-                                    ))));
-                                }
-                                _ => unreachable!("Synchronize signal registration & handling"),
-                            };
+                        if self.signals.pending().next() == Some(signal_hook::consts::SIGWINCH) {
+                            // TODO Should we remove tput?
+                            //
+                            // This can take a really long time, because terminal::size can
+                            // launch new process (tput) and then it parses its output. It's
+                            // not a really long time from the absolute time point of view, but
+                            // it's a really long time from the mio, async-std/tokio executor, ...
+                            // point of view.
+                            let new_size = crate::terminal::size()?;
+                            return Ok(Some(InternalEvent::Event(Event::Resize(
+                                new_size.0, new_size.1,
+                            ))));
                         }
                     }
                     #[cfg(feature = "event-stream")]

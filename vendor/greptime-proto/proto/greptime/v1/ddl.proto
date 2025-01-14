@@ -33,7 +33,29 @@ message DdlRequest {
     AlterExpr alter = 3;
     DropTableExpr drop_table = 4;
     TruncateTableExpr truncate_table = 7;
+    CreateFlowTaskExpr create_flow_task = 8;
+    DropFlowTaskExpr drop_flow_task = 9;
   }
+}
+
+// Create a flow task to run the SQL when new data arrives.
+message CreateFlowTaskExpr {
+  string catalog_name = 1;
+  string task_name = 2;
+  repeated TableName source_table_names = 3;
+  TableName sink_table_name = 4;
+  bool or_replace = 5;
+  bool create_if_not_exists = 6;
+  string expire_when = 7;
+  string comment = 8;
+  string sql = 9;
+  map<string, string> task_options = 10;
+}
+
+// Remove a flow task.
+message DropFlowTaskExpr {
+  string catalog_name = 1;
+  string task_name = 2;
 }
 
 message CreateTableExpr {
@@ -58,6 +80,7 @@ message AlterExpr {
     AddColumns add_columns = 4;
     DropColumns drop_columns = 5;
     RenameTable rename_table = 6;
+    ChangeColumnTypes change_column_types = 7;
   }
 }
 
@@ -70,9 +93,10 @@ message DropTableExpr {
 }
 
 message CreateDatabaseExpr {
-  string database_name = 1;
-  bool create_if_not_exists = 2;
-  map<string, string> options = 3;
+  string catalog_name = 1;
+  string schema_name = 2;
+  bool create_if_not_exists = 3;
+  map<string, string> options = 4;
 }
 
 message TruncateTableExpr {
@@ -82,15 +106,29 @@ message TruncateTableExpr {
   TableId table_id = 4;
 }
 
+message DropDatabaseExpr {
+  string catalog_name = 1;
+  string schema_name = 2;
+  bool drop_if_exists = 3;
+}
+
 message AddColumns { repeated AddColumn add_columns = 1; }
 
 message DropColumns { repeated DropColumn drop_columns = 1; }
+
+message ChangeColumnTypes { repeated ChangeColumnType change_column_types = 1; }
 
 message RenameTable { string new_table_name = 1; }
 
 message AddColumn {
   ColumnDef column_def = 1;
   AddColumnLocation location = 3;
+}
+
+message ChangeColumnType {
+    string column_name = 1;
+    ColumnDataType target_type = 2;
+    ColumnDataTypeExtension target_type_extension = 3;
 }
 
 message DropColumn { string name = 1; }

@@ -1,10 +1,13 @@
+use core;
+
+use super::super::alloc;
 use super::super::alloc::{Allocator, SliceWrapper, SliceWrapperMut};
-use super::find_stride;
 use super::input_pair::{InputPair, InputReference, InputReferenceMut};
-use super::interface;
 pub use super::ir_interpret::{push_base, Context, IRInterpreter};
 use super::util::{floatX, FastLog2u16};
 use super::weights::{Weights, BLEND_FIXED_POINT_PRECISION};
+use super::{find_stride, interface};
+use crate::enc::combined_alloc::alloc_if;
 
 const DEFAULT_CM_SPEED_INDEX: usize = 8;
 const NUM_SPEEDS_TO_TRY: usize = 16;
@@ -304,22 +307,14 @@ impl<'a, Alloc: alloc::Allocator<u16> + alloc::Allocator<u32> + alloc::Allocator
             block_type: 0,
             cur_stride: 1,
             local_byte_offset: 0,
-            cm_priors: if cdf_detect {
-                <Alloc as Allocator<u16>>::alloc_cell(m16, CONTEXT_MAP_PRIOR_SIZE)
-            } else {
-                <Alloc as Allocator<u16>>::AllocatedMemory::default()
-            },
-            stride_priors: if cdf_detect {
-                <Alloc as Allocator<u16>>::alloc_cell(m16, STRIDE_PRIOR_SIZE)
-            } else {
-                <Alloc as Allocator<u16>>::AllocatedMemory::default()
-            },
+            cm_priors: alloc_if::<u16, _>(cdf_detect, m16, CONTEXT_MAP_PRIOR_SIZE),
+            stride_priors: alloc_if::<u16, _>(cdf_detect, m16, STRIDE_PRIOR_SIZE),
             _stride_pyramid_leaves: stride,
             weight: [
                 [Weights::new(); NUM_SPEEDS_TO_TRY],
                 [Weights::new(); NUM_SPEEDS_TO_TRY],
             ],
-            singleton_costs: [[[0.0 as floatX; NUM_SPEEDS_TO_TRY]; 2]; 3],
+            singleton_costs: [[[0.0; NUM_SPEEDS_TO_TRY]; 2]; 3],
         };
         if cdf_detect {
             init_cdfs(ret.cm_priors.slice_mut());
@@ -415,7 +410,7 @@ impl<'a, Alloc: alloc::Allocator<u16> + alloc::Allocator<u32> + alloc::Allocator
         } else {
             1
         };
-        let mut ret = [0.0 as floatX; 2];
+        let mut ret = [0.0; 2];
         for high in 0..2 {
             ret[high] = min_cost_value(&self.singleton_costs[cost_type_index][high][..]);
         }
@@ -537,7 +532,7 @@ impl<'a, Alloc: alloc::Allocator<u16> + alloc::Allocator<u32> + alloc::Allocator
     fn literal_context_map(&self) -> &[u8] {
         self.context_map.literal_context_map.slice()
     }
-    fn prediction_mode(&self) -> ::interface::LiteralPredictionModeNibble {
+    fn prediction_mode(&self) -> crate::interface::LiteralPredictionModeNibble {
         self.context_map.literal_prediction_mode()
     }
     fn update_cost(

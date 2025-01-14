@@ -3,7 +3,13 @@ use std::{borrow::Cow, fmt};
 use unicode_segmentation::UnicodeSegmentation;
 use unicode_width::UnicodeWidthStr;
 
-use crate::{prelude::*, style::Styled, text::StyledGrapheme};
+use crate::{
+    buffer::Buffer,
+    layout::Rect,
+    style::{Style, Styled},
+    text::{Line, StyledGrapheme},
+    widgets::{Widget, WidgetRef},
+};
 
 /// Represents a part of a line that is contiguous and where all characters share the same style.
 ///
@@ -36,7 +42,7 @@ use crate::{prelude::*, style::Styled, text::StyledGrapheme};
 /// any type convertible to [`Cow<str>`].
 ///
 /// ```rust
-/// use ratatui::prelude::*;
+/// use ratatui::text::Span;
 ///
 /// let span = Span::raw("test content");
 /// let span = Span::raw(String::from("test content"));
@@ -50,7 +56,10 @@ use crate::{prelude::*, style::Styled, text::StyledGrapheme};
 /// the [`Stylize`] trait.
 ///
 /// ```rust
-/// use ratatui::prelude::*;
+/// use ratatui::{
+///     style::{Style, Stylize},
+///     text::Span,
+/// };
 ///
 /// let span = Span::styled("test content", Style::new().green());
 /// let span = Span::styled(String::from("test content"), Style::new().green());
@@ -64,7 +73,7 @@ use crate::{prelude::*, style::Styled, text::StyledGrapheme};
 /// defined in the [`Stylize`] trait.
 ///
 /// ```rust
-/// use ratatui::prelude::*;
+/// use ratatui::{style::Stylize, text::Span};
 ///
 /// let span = Span::raw("test content").green().on_yellow().italic();
 /// let span = Span::raw(String::from("test content"))
@@ -78,22 +87,36 @@ use crate::{prelude::*, style::Styled, text::StyledGrapheme};
 /// wrapping and alignment for you.
 ///
 /// ```rust
-/// use ratatui::prelude::*;
+/// use ratatui::{style::Stylize, Frame};
 ///
 /// # fn render_frame(frame: &mut Frame) {
-/// frame.render_widget("test content".green().on_yellow().italic(), frame.size());
+/// frame.render_widget("test content".green().on_yellow().italic(), frame.area());
 /// # }
 /// ```
 /// [`Line`]: crate::text::Line
 /// [`Paragraph`]: crate::widgets::Paragraph
 /// [`Stylize`]: crate::style::Stylize
 /// [`Cow<str>`]: std::borrow::Cow
-#[derive(Debug, Default, Clone, Eq, PartialEq, Hash)]
+#[derive(Default, Clone, Eq, PartialEq, Hash)]
 pub struct Span<'a> {
-    /// The content of the span as a Clone-on-write string.
-    pub content: Cow<'a, str>,
     /// The style of the span.
     pub style: Style,
+    /// The content of the span as a Clone-on-write string.
+    pub content: Cow<'a, str>,
+}
+
+impl fmt::Debug for Span<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.content.is_empty() {
+            write!(f, "Span::default()")?;
+        } else {
+            write!(f, "Span::from({:?})", self.content)?;
+        }
+        if self.style != Style::default() {
+            self.style.fmt_stylize(f)?;
+        }
+        Ok(())
+    }
 }
 
 impl<'a> Span<'a> {
@@ -102,7 +125,8 @@ impl<'a> Span<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::text::Span;
+    ///
     /// Span::raw("test content");
     /// Span::raw(String::from("test content"));
     /// ```
@@ -127,11 +151,17 @@ impl<'a> Span<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::{
+    ///     style::{Style, Stylize},
+    ///     text::Span,
+    /// };
+    ///
     /// let style = Style::new().yellow().on_green().italic();
     /// Span::styled("test content", style);
     /// Span::styled(String::from("test content"), style);
     /// ```
+    ///
+    /// [`Color`]: crate::style::Color
     pub fn styled<T, S>(content: T, style: S) -> Self
     where
         T: Into<Cow<'a, str>>,
@@ -153,7 +183,8 @@ impl<'a> Span<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::text::Span;
+    ///
     /// let mut span = Span::default().content("content");
     /// ```
     #[must_use = "method moves the value of self and returns the modified value"]
@@ -178,9 +209,15 @@ impl<'a> Span<'a> {
     /// # Examples
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::{
+    ///     style::{Style, Stylize},
+    ///     text::Span,
+    /// };
+    ///
     /// let mut span = Span::default().style(Style::new().green());
     /// ```
+    ///
+    /// [`Color`]: crate::style::Color
     #[must_use = "method moves the value of self and returns the modified value"]
     pub fn style<S: Into<Style>>(mut self, style: S) -> Self {
         self.style = style.into();
@@ -197,11 +234,17 @@ impl<'a> Span<'a> {
     /// # Example
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::{
+    ///     style::{Style, Stylize},
+    ///     text::Span,
+    /// };
+    ///
     /// let span = Span::styled("test content", Style::new().green().italic())
     ///     .patch_style(Style::new().red().on_yellow().bold());
     /// assert_eq!(span.style, Style::new().red().on_yellow().italic().bold());
     /// ```
+    ///
+    /// [`Color`]: crate::style::Color
     #[must_use = "method moves the value of self and returns the modified value"]
     pub fn patch_style<S: Into<Style>>(mut self, style: S) -> Self {
         self.style = self.style.patch(style);
@@ -217,7 +260,11 @@ impl<'a> Span<'a> {
     /// # Example
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::{
+    ///     style::{Style, Stylize},
+    ///     text::Span,
+    /// };
+    ///
     /// let span = Span::styled(
     ///     "Test Content",
     ///     Style::new().dark_gray().on_yellow().italic(),
@@ -248,7 +295,10 @@ impl<'a> Span<'a> {
     /// ```rust
     /// use std::iter::Iterator;
     ///
-    /// use ratatui::{prelude::*, text::StyledGrapheme};
+    /// use ratatui::{
+    ///     style::{Style, Stylize},
+    ///     text::{Span, StyledGrapheme},
+    /// };
     ///
     /// let span = Span::styled("Test", Style::new().green().italic());
     /// let style = Style::new().red().on_yellow();
@@ -263,6 +313,8 @@ impl<'a> Span<'a> {
     ///     ],
     /// );
     /// ```
+    ///
+    /// [`Color`]: crate::style::Color
     pub fn styled_graphemes<S: Into<Style>>(
         &'a self,
         base_style: S,
@@ -280,7 +332,8 @@ impl<'a> Span<'a> {
     /// # Example
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::style::Stylize;
+    ///
     /// let line = "Test Content".green().italic().into_left_aligned_line();
     /// ```
     #[must_use = "method moves the value of self and returns the modified value"]
@@ -299,7 +352,8 @@ impl<'a> Span<'a> {
     /// # Example
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::style::Stylize;
+    ///
     /// let line = "Test Content".green().italic().into_centered_line();
     /// ```
     #[must_use = "method moves the value of self and returns the modified value"]
@@ -318,7 +372,8 @@ impl<'a> Span<'a> {
     /// # Example
     ///
     /// ```rust
-    /// # use ratatui::prelude::*;
+    /// use ratatui::style::Stylize;
+    ///
     /// let line = "Test Content".green().italic().into_right_aligned_line();
     /// ```
     #[must_use = "method moves the value of self and returns the modified value"]
@@ -342,6 +397,14 @@ where
     }
 }
 
+impl<'a> std::ops::Add<Self> for Span<'a> {
+    type Output = Line<'a>;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        Line::from_iter([self, rhs])
+    }
+}
+
 impl<'a> Styled for Span<'a> {
     type Item = Self;
 
@@ -362,33 +425,37 @@ impl Widget for Span<'_> {
 
 impl WidgetRef for Span<'_> {
     fn render_ref(&self, area: Rect, buf: &mut Buffer) {
-        let Rect { mut x, y, .. } = area.intersection(buf.area);
+        let area = area.intersection(buf.area);
+        if area.is_empty() {
+            return;
+        }
+        let Rect { mut x, y, .. } = area;
         for (i, grapheme) in self.styled_graphemes(Style::default()).enumerate() {
             let symbol_width = grapheme.symbol.width();
             let next_x = x.saturating_add(symbol_width as u16);
-            if next_x > area.intersection(buf.area).right() {
+            if next_x > area.right() {
                 break;
             }
 
             if i == 0 {
                 // the first grapheme is always set on the cell
-                buf.get_mut(x, y)
+                buf[(x, y)]
                     .set_symbol(grapheme.symbol)
                     .set_style(grapheme.style);
             } else if x == area.x {
                 // there is one or more zero-width graphemes in the first cell, so the first cell
                 // must be appended to.
-                buf.get_mut(x, y)
+                buf[(x, y)]
                     .append_symbol(grapheme.symbol)
                     .set_style(grapheme.style);
             } else if symbol_width == 0 {
                 // append zero-width graphemes to the previous cell
-                buf.get_mut(x - 1, y)
+                buf[(x - 1, y)]
                     .append_symbol(grapheme.symbol)
                     .set_style(grapheme.style);
             } else {
                 // just a normal grapheme (not first, not zero-width, not overflowing the area)
-                buf.get_mut(x, y)
+                buf[(x, y)]
                     .set_symbol(grapheme.symbol)
                     .set_style(grapheme.style);
             }
@@ -399,7 +466,7 @@ impl WidgetRef for Span<'_> {
             for x_hidden in (x + 1)..next_x {
                 // it may seem odd that the style of the hidden cells are not set to the style of
                 // the grapheme, but this is how the existing buffer.set_span() method works.
-                buf.get_mut(x_hidden, y).reset();
+                buf[(x_hidden, y)].reset();
             }
             x = next_x;
         }
@@ -431,16 +498,19 @@ impl<T: fmt::Display> ToSpan for T {
 
 impl fmt::Display for Span<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(&self.content, f)
+        for line in self.content.lines() {
+            fmt::Display::fmt(line, f)?;
+        }
+        Ok(())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use buffer::Cell;
-    use rstest::fixture;
+    use rstest::{fixture, rstest};
 
     use super::*;
+    use crate::{buffer::Cell, layout::Alignment, style::Stylize};
 
     #[fixture]
     fn small_buf() -> Buffer {
@@ -554,6 +624,8 @@ mod tests {
         assert_eq!(Span::raw("").width(), 0);
         assert_eq!(Span::raw("test").width(), 4);
         assert_eq!(Span::raw("test content").width(), 12);
+        // Needs reconsideration: https://github.com/ratatui/ratatui/issues/1271
+        assert_eq!(Span::raw("test\ncontent").width(), 12);
     }
 
     #[test]
@@ -567,11 +639,18 @@ mod tests {
         assert_eq!(stylized.content, Cow::Borrowed("test content"));
         assert_eq!(stylized.style, Style::new().green().on_yellow().bold());
     }
+
     #[test]
     fn display_span() {
         let span = Span::raw("test content");
         assert_eq!(format!("{span}"), "test content");
         assert_eq!(format!("{span:.4}"), "test");
+    }
+
+    #[test]
+    fn display_newline_span() {
+        let span = Span::raw("test\ncontent");
+        assert_eq!(format!("{span}"), "testcontent");
     }
 
     #[test]
@@ -621,8 +700,11 @@ mod tests {
         }
 
         #[rstest]
-        fn render_out_of_bounds(mut small_buf: Buffer) {
-            let out_of_bounds = Rect::new(20, 20, 10, 1);
+        #[case::x(20, 0)]
+        #[case::y(0, 20)]
+        #[case::both(20, 20)]
+        fn render_out_of_bounds(mut small_buf: Buffer, #[case] x: u16, #[case] y: u16) {
+            let out_of_bounds = Rect::new(x, y, 10, 1);
             Span::raw("Hello, World!").render(out_of_bounds, &mut small_buf);
             assert_eq!(small_buf, Buffer::empty(small_buf.area));
         }
@@ -749,9 +831,17 @@ mod tests {
                 [Cell::new("a"), Cell::new("b"), Cell::new("c\u{200B}")]
             );
         }
+
+        #[test]
+        fn render_with_newlines() {
+            let span = Span::raw("a\nb");
+            let mut buf = Buffer::empty(Rect::new(0, 0, 2, 1));
+            span.render(buf.area, &mut buf);
+            assert_eq!(buf.content(), [Cell::new("a"), Cell::new("b")]);
+        }
     }
 
-    /// Regression test for <https://github.com/ratatui-org/ratatui/issues/1160> One line contains
+    /// Regression test for <https://github.com/ratatui/ratatui/issues/1160> One line contains
     /// some Unicode Left-Right-Marks (U+200E)
     ///
     /// The issue was that a zero-width character at the end of the buffer causes the buffer bounds
@@ -772,5 +862,40 @@ mod tests {
                 Cell::new("o\u{200E}"),
             ]
         );
+    }
+
+    #[test]
+    fn add() {
+        assert_eq!(
+            Span::default() + Span::default(),
+            Line::from(vec![Span::default(), Span::default()])
+        );
+
+        assert_eq!(
+            Span::default() + Span::raw("test"),
+            Line::from(vec![Span::default(), Span::raw("test")])
+        );
+
+        assert_eq!(
+            Span::raw("test") + Span::default(),
+            Line::from(vec![Span::raw("test"), Span::default()])
+        );
+
+        assert_eq!(
+            Span::raw("test") + Span::raw("content"),
+            Line::from(vec![Span::raw("test"), Span::raw("content")])
+        );
+    }
+
+    #[rstest]
+    #[case::default(Span::default(), "Span::default()")]
+    #[case::raw(Span::raw("test"), r#"Span::from("test")"#)]
+    #[case::styled(Span::styled("test", Style::new().green()), r#"Span::from("test").green()"#)]
+    #[case::styled_italic(
+        Span::styled("test", Style::new().green().italic()),
+        r#"Span::from("test").green().italic()"#
+    )]
+    fn debug(#[case] span: Span, #[case] expected: &str) {
+        assert_eq!(format!("{span:?}"), expected);
     }
 }

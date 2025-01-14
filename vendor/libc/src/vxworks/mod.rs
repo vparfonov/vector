@@ -3,6 +3,8 @@
 use core::mem::size_of;
 use core::ptr::null_mut;
 
+use c_void;
+
 #[cfg_attr(feature = "extra_traits", derive(Debug))]
 pub enum DIR {}
 impl ::Copy for DIR {}
@@ -91,6 +93,7 @@ pub type SEM_ID_KERNEL = ::OBJ_HANDLE;
 pub type RTP_ID = ::OBJ_HANDLE;
 pub type SD_ID = ::OBJ_HANDLE;
 pub type CONDVAR_ID = ::OBJ_HANDLE;
+pub type STATUS = ::OBJ_HANDLE;
 
 // From vxTypes.h
 pub type _Vx_usr_arg_t = isize;
@@ -143,14 +146,14 @@ s! {
     }
 
     // b_pthread_cond_t.h
-    pub struct pthread_cond_t{
+    pub struct pthread_cond_t {
         pub condSemId: ::_Vx_SEM_ID,
         pub condValid: ::c_int,
         pub condInitted: ::c_int,
         pub condRefCount: ::c_int,
         pub condMutex: *mut ::pthread_mutex_t,
         pub condAttr: ::pthread_condattr_t,
-        pub condSemName: [::c_char; _PTHREAD_SHARED_SEM_NAME_MAX]
+        pub condSemName: [::c_char; _PTHREAD_SHARED_SEM_NAME_MAX],
     }
 
     // b_pthread_rwlockattr_t.h
@@ -163,12 +166,12 @@ s! {
 
     // b_pthread_rwlock_t.h
     pub struct pthread_rwlock_t {
-        pub rwlockSemId: :: _Vx_SEM_ID,
+        pub rwlockSemId: ::_Vx_SEM_ID,
         pub rwlockReadersRefCount: ::c_uint,
         pub rwlockValid: ::c_int,
         pub rwlockInitted: ::c_int,
         pub rwlockAttr: ::pthread_rwlockattr_t,
-        pub rwlockSemName: [::c_char; _PTHREAD_SHARED_SEM_NAME_MAX]
+        pub rwlockSemName: [::c_char; _PTHREAD_SHARED_SEM_NAME_MAX],
     }
 
     // b_struct_timeval.h
@@ -184,9 +187,9 @@ s! {
     }
 
     pub struct sockaddr {
-        pub sa_len    : ::c_uchar,
-        pub sa_family : sa_family_t,
-        pub sa_data   : [::c_char; 14],
+        pub sa_len: ::c_uchar,
+        pub sa_family: sa_family_t,
+        pub sa_data: [::c_char; 14],
     }
 
     pub struct iovec {
@@ -212,91 +215,90 @@ s! {
 
     // poll.h
     pub struct pollfd {
-        pub fd      : ::c_int,
-        pub events  : ::c_short,
-        pub revents : ::c_short,
+        pub fd: ::c_int,
+        pub events: ::c_short,
+        pub revents: ::c_short,
     }
 
     // resource.h
     pub struct rlimit {
-                           pub rlim_cur : ::rlim_t,
-                           pub rlim_max : ::rlim_t,
+        pub rlim_cur: ::rlim_t,
+        pub rlim_max: ::rlim_t,
     }
 
     // stat.h
     pub struct stat {
-                         pub st_dev       : ::dev_t,
-                         pub st_ino       : ::ino_t,
-                         pub st_mode      : ::mode_t,
-                         pub st_nlink     : ::nlink_t,
-                         pub st_uid       : ::uid_t,
-                         pub st_gid       : ::gid_t,
-                         pub st_rdev      : ::dev_t,
-                         pub st_size      : ::off_t,
-                         pub st_atime     : ::time_t,
-                         pub st_mtime     : ::time_t,
-                         pub st_ctime     : ::time_t,
-                         pub st_blksize   : ::blksize_t,
-                         pub st_blocks    : ::blkcnt_t,
-                         pub st_attrib    : ::c_uchar,
-                         pub st_reserved1 : ::c_int,
-                         pub st_reserved2 : ::c_int,
-                         pub st_reserved3 : ::c_int,
-                         pub st_reserved4 : ::c_int,
+        pub st_dev: ::dev_t,
+        pub st_ino: ::ino_t,
+        pub st_mode: ::mode_t,
+        pub st_nlink: ::nlink_t,
+        pub st_uid: ::uid_t,
+        pub st_gid: ::gid_t,
+        pub st_rdev: ::dev_t,
+        pub st_size: ::off_t,
+        pub st_atime: ::time_t,
+        pub st_mtime: ::time_t,
+        pub st_ctime: ::time_t,
+        pub st_blksize: ::blksize_t,
+        pub st_blocks: ::blkcnt_t,
+        pub st_attrib: ::c_uchar,
+        pub st_reserved1: ::c_int,
+        pub st_reserved2: ::c_int,
+        pub st_reserved3: ::c_int,
+        pub st_reserved4: ::c_int,
     }
 
     //b_struct__Timespec.h
     pub struct _Timespec {
-        pub tv_sec  : ::time_t,
-        pub tv_nsec : ::c_long,
+        pub tv_sec: ::time_t,
+        pub tv_nsec: ::c_long,
     }
 
     // b_struct__Sched_param.h
-    pub struct _Sched_param {
-        pub sched_priority: ::c_int, /* scheduling priority */
+    pub struct sched_param {
+        pub sched_priority: ::c_int,           /* scheduling priority */
         pub sched_ss_low_priority: ::c_int,    /* low scheduling priority */
         pub sched_ss_repl_period: ::_Timespec, /* replenishment period */
         pub sched_ss_init_budget: ::_Timespec, /* initial budget */
         pub sched_ss_max_repl: ::c_int,        /* max pending replenishment */
-
     }
 
     // b_pthread_attr_t.h
     pub struct pthread_attr_t {
-        pub threadAttrStatus          : ::c_int,
-        pub threadAttrStacksize       : ::size_t,
-        pub threadAttrStackaddr       : *mut ::c_void,
-        pub threadAttrGuardsize       : ::size_t,
-        pub threadAttrDetachstate     : ::c_int,
-        pub threadAttrContentionscope : ::c_int,
-        pub threadAttrInheritsched    : ::c_int,
-        pub threadAttrSchedpolicy     : ::c_int,
-        pub threadAttrName            : *mut ::c_char,
-        pub threadAttrOptions         : ::c_int,
-        pub threadAttrSchedparam      : ::_Sched_param,
+        pub threadAttrStatus: ::c_int,
+        pub threadAttrStacksize: ::size_t,
+        pub threadAttrStackaddr: *mut ::c_void,
+        pub threadAttrGuardsize: ::size_t,
+        pub threadAttrDetachstate: ::c_int,
+        pub threadAttrContentionscope: ::c_int,
+        pub threadAttrInheritsched: ::c_int,
+        pub threadAttrSchedpolicy: ::c_int,
+        pub threadAttrName: *mut ::c_char,
+        pub threadAttrOptions: ::c_int,
+        pub threadAttrSchedparam: ::sched_param,
     }
 
     // signal.h
 
     pub struct sigaction {
-        pub sa_u     : ::sa_u_t,
-        pub sa_mask  : ::sigset_t,
-        pub sa_flags : ::c_int,
+        pub sa_u: ::sa_u_t,
+        pub sa_mask: ::sigset_t,
+        pub sa_flags: ::c_int,
     }
 
     // b_stack_t.h
     pub struct stack_t {
-        pub ss_sp    : *mut ::c_void,
-        pub ss_size  : ::size_t,
-        pub ss_flags : ::c_int,
+        pub ss_sp: *mut ::c_void,
+        pub ss_size: ::size_t,
+        pub ss_flags: ::c_int,
     }
 
     // signal.h
     pub struct siginfo_t {
-        pub si_signo : ::c_int,
-        pub si_code  : ::c_int,
-        pub si_value : ::sigval,
-        pub si_errno : ::c_int,
+        pub si_signo: ::c_int,
+        pub si_code: ::c_int,
+        pub si_value: ::sigval,
+        pub si_errno: ::c_int,
         pub si_status: ::c_int,
         pub si_addr: *mut ::c_void,
         pub si_uid: ::uid_t,
@@ -306,16 +308,16 @@ s! {
     // pthread.h (krnl)
     // b_pthread_mutexattr_t.h (usr)
     pub struct pthread_mutexattr_t {
-        mutexAttrStatus      : ::c_int,
-        mutexAttrPshared     : ::c_int,
-        mutexAttrProtocol    : ::c_int,
-        mutexAttrPrioceiling : ::c_int,
-        mutexAttrType        : ::c_int,
+        mutexAttrStatus: ::c_int,
+        mutexAttrPshared: ::c_int,
+        mutexAttrProtocol: ::c_int,
+        mutexAttrPrioceiling: ::c_int,
+        mutexAttrType: ::c_int,
     }
 
     // pthread.h (krnl)
     // b_pthread_mutex_t.h (usr)
-    pub struct pthread_mutex_t  {
+    pub struct pthread_mutex_t {
         pub mutexSemId: ::_Vx_SEM_ID, /*_Vx_SEM_ID ..*/
         pub mutexValid: ::c_int,
         pub mutexInitted: ::c_int,
@@ -369,32 +371,32 @@ s! {
 
     // netdb.h
     pub struct addrinfo {
-        pub ai_flags    : ::c_int,
-        pub ai_family   : ::c_int,
-        pub ai_socktype : ::c_int,
-        pub ai_protocol : ::c_int,
-        pub ai_addrlen  : ::size_t,
+        pub ai_flags: ::c_int,
+        pub ai_family: ::c_int,
+        pub ai_socktype: ::c_int,
+        pub ai_protocol: ::c_int,
+        pub ai_addrlen: ::size_t,
         pub ai_canonname: *mut ::c_char,
-        pub ai_addr     : *mut ::sockaddr,
-        pub ai_next     : *mut ::addrinfo,
+        pub ai_addr: *mut ::sockaddr,
+        pub ai_next: *mut ::addrinfo,
     }
 
     // in.h
     pub struct sockaddr_in {
-        pub sin_len   : u8,
+        pub sin_len: u8,
         pub sin_family: u8,
-        pub sin_port  : u16,
-        pub sin_addr  : ::in_addr,
-        pub sin_zero  : [::c_char; 8],
+        pub sin_port: u16,
+        pub sin_addr: ::in_addr,
+        pub sin_zero: [::c_char; 8],
     }
 
     // in6.h
     pub struct sockaddr_in6 {
-        pub sin6_len     : u8,
-        pub sin6_family  : u8,
-        pub sin6_port    : u16,
+        pub sin6_len: u8,
+        pub sin6_family: u8,
+        pub sin6_port: u16,
         pub sin6_flowinfo: u32,
-        pub sin6_addr    : ::in6_addr,
+        pub sin6_addr: ::in6_addr,
         pub sin6_scope_id: u32,
     }
 
@@ -406,9 +408,9 @@ s! {
     }
 
     pub struct mq_attr {
-        pub mq_maxmsg:  ::c_long,
+        pub mq_maxmsg: ::c_long,
         pub mq_msgsize: ::c_long,
-        pub mq_flags:   ::c_long,
+        pub mq_flags: ::c_long,
         pub mq_curmsgs: ::c_long,
     }
 }
@@ -416,47 +418,46 @@ s! {
 s_no_extra_traits! {
     // dirent.h
     pub struct dirent {
-        pub d_ino  : ::ino_t,
-        pub d_name : [::c_char; _PARM_NAME_MAX as usize + 1],
+        pub d_ino: ::ino_t,
+        pub d_name: [::c_char; _PARM_NAME_MAX as usize + 1],
     }
 
     pub struct sockaddr_un {
         pub sun_len: u8,
         pub sun_family: sa_family_t,
-        pub sun_path: [::c_char; 104]
+        pub sun_path: [::c_char; 104],
     }
 
     // rtpLibCommon.h
     pub struct RTP_DESC {
-        pub status    : ::c_int,
-        pub options   : u32,
-        pub entrAddr  : *mut ::c_void,
+        pub status: ::c_int,
+        pub options: u32,
+        pub entrAddr: *mut ::c_void,
         pub initTaskId: ::TASK_ID,
-        pub parentId  : ::RTP_ID,
-        pub pathName  : [::c_char; VX_RTP_NAME_LENGTH as usize + 1],
-        pub taskCnt   : ::c_int,
-        pub textStart : *mut ::c_void,
-        pub textEnd   : *mut ::c_void,
+        pub parentId: ::RTP_ID,
+        pub pathName: [::c_char; VX_RTP_NAME_LENGTH as usize + 1],
+        pub taskCnt: ::c_int,
+        pub textStart: *mut ::c_void,
+        pub textEnd: *mut ::c_void,
     }
     // socket.h
     pub struct sockaddr_storage {
-        pub ss_len     : ::c_uchar,
-        pub ss_family  : ::sa_family_t,
-        pub __ss_pad1  : [::c_char; _SS_PAD1SIZE],
-        pub __ss_align : i32,
-        pub __ss_pad2  : [::c_char; _SS_PAD2SIZE],
+        pub ss_len: ::c_uchar,
+        pub ss_family: ::sa_family_t,
+        pub __ss_pad1: [::c_char; _SS_PAD1SIZE],
+        pub __ss_align: i32,
+        pub __ss_pad2: [::c_char; _SS_PAD2SIZE],
     }
 
     pub union sa_u_t {
-        pub sa_handler : ::Option<unsafe extern "C" fn(::c_int) -> !>,
-        pub sa_sigaction: ::Option<unsafe extern "C" fn(::c_int,
-                                                        *mut ::siginfo_t,
-                                                        *mut ::c_void) -> !>,
+        pub sa_handler: ::Option<unsafe extern "C" fn(::c_int) -> !>,
+        pub sa_sigaction:
+            ::Option<unsafe extern "C" fn(::c_int, *mut ::siginfo_t, *mut ::c_void) -> !>,
     }
 
     pub union sigval {
-        pub sival_int : ::c_int,
-        pub sival_ptr : *mut ::c_void,
+        pub sival_int: ::c_int,
+        pub sival_ptr: *mut ::c_void,
     }
 }
 
@@ -532,9 +533,7 @@ cfg_if! {
                         None => 0 as usize,
                     };
 
-                    f.debug_struct("sa_u_t")
-                        .field("sa_handler", &h)
-                        .finish()
+                    f.debug_struct("sa_u_t").field("sa_handler", &h).finish()
                 }
             }
         }
@@ -612,7 +611,21 @@ pub const PTHREAD_MUTEX_DEFAULT: ::c_int = PTHREAD_MUTEX_NORMAL;
 pub const PTHREAD_STACK_MIN: usize = 4096;
 pub const _PTHREAD_SHARED_SEM_NAME_MAX: usize = 30;
 
+//sched.h
+pub const SCHED_FIFO: ::c_int = 0x01;
+pub const SCHED_RR: ::c_int = 0x02;
+pub const SCHED_OTHER: ::c_int = 0x04;
+pub const SCHED_SPORADIC: ::c_int = 0x08;
+pub const PRIO_PROCESS: ::c_uint = 0;
+pub const SCHED_FIFO_HIGH_PRI: ::c_int = 255;
+pub const SCHED_FIFO_LOW_PRI: ::c_int = 0;
+pub const SCHED_RR_HIGH_PRI: ::c_int = 255;
+pub const SCHED_RR_LOW_PRI: ::c_int = 0;
+pub const SCHED_SPORADIC_HIGH_PRI: ::c_int = 255;
+pub const SCHED_SPORADIC_LOW_PRI: ::c_int = 0;
+
 // ERRNO STUFF
+pub const ERROR: ::c_int = -1;
 pub const OK: ::c_int = 0;
 pub const EPERM: ::c_int = 1; /* Not owner */
 pub const ENOENT: ::c_int = 2; /* No such file or directory */
@@ -720,6 +733,33 @@ pub const S_nfsLib_NFSERR_SERVERFAULT: ::c_int = EIO;
 pub const S_nfsLib_NFSERR_BADTYPE: ::c_int = M_nfsStat | nfsstat::NFSERR_BADTYPE as ::c_int;
 pub const S_nfsLib_NFSERR_JUKEBOX: ::c_int = M_nfsStat | nfsstat::NFSERR_JUKEBOX as ::c_int;
 
+// internal offset values for below constants
+const taskErrorBase: ::c_int = 0x00030000;
+const semErrorBase: ::c_int = 0x00160000;
+const objErrorBase: ::c_int = 0x003d0000;
+
+// taskLibCommon.h
+pub const S_taskLib_NAME_NOT_FOUND: ::c_int = taskErrorBase + 0x0065;
+pub const S_taskLib_TASK_HOOK_TABLE_FULL: ::c_int = taskErrorBase + 0x0066;
+pub const S_taskLib_TASK_HOOK_NOT_FOUND: ::c_int = taskErrorBase + 0x0067;
+pub const S_taskLib_ILLEGAL_PRIORITY: ::c_int = taskErrorBase + 0x0068;
+
+// FIXME: could also be useful for TASK_DESC type
+pub const VX_TASK_NAME_LENGTH: ::c_int = 31;
+
+// semLibCommon.h
+pub const S_semLib_INVALID_STATE: ::c_int = semErrorBase + 0x0065;
+pub const S_semLib_INVALID_OPTION: ::c_int = semErrorBase + 0x0066;
+pub const S_semLib_INVALID_QUEUE_TYPE: ::c_int = semErrorBase + 0x0067;
+pub const S_semLib_INVALID_OPERATION: ::c_int = semErrorBase + 0x0068;
+
+// objLibCommon.h
+pub const S_objLib_OBJ_ID_ERROR: ::c_int = objErrorBase + 0x0001;
+pub const S_objLib_OBJ_UNAVAILABLE: ::c_int = objErrorBase + 0x0002;
+pub const S_objLib_OBJ_DELETED: ::c_int = objErrorBase + 0x0003;
+pub const S_objLib_OBJ_TIMEOUT: ::c_int = objErrorBase + 0x0004;
+pub const S_objLib_OBJ_NO_METHOD: ::c_int = objErrorBase + 0x0005;
+
 // in.h
 pub const IPPROTO_IP: ::c_int = 0;
 pub const IPPROTO_IPV6: ::c_int = 41;
@@ -741,33 +781,35 @@ pub const IPV6_ADD_MEMBERSHIP: ::c_int = 12;
 pub const IPV6_DROP_MEMBERSHIP: ::c_int = 13;
 
 // STAT Stuff
-pub const S_IFMT: ::c_int = 0xf000;
-pub const S_IFIFO: ::c_int = 0x1000;
-pub const S_IFCHR: ::c_int = 0x2000;
-pub const S_IFDIR: ::c_int = 0x4000;
-pub const S_IFBLK: ::c_int = 0x6000;
-pub const S_IFREG: ::c_int = 0x8000;
-pub const S_IFLNK: ::c_int = 0xa000;
-pub const S_IFSHM: ::c_int = 0xb000;
-pub const S_IFSOCK: ::c_int = 0xc000;
-pub const S_ISUID: ::c_int = 0x0800;
-pub const S_ISGID: ::c_int = 0x0400;
-pub const S_ISTXT: ::c_int = 0x0200;
-pub const S_IRUSR: ::c_int = 0x0100;
-pub const S_IWUSR: ::c_int = 0x0080;
-pub const S_IXUSR: ::c_int = 0x0040;
-pub const S_IRWXU: ::c_int = 0x01c0;
-pub const S_IRGRP: ::c_int = 0x0020;
-pub const S_IWGRP: ::c_int = 0x0010;
-pub const S_IXGRP: ::c_int = 0x0008;
-pub const S_IRWXG: ::c_int = 0x0038;
-pub const S_IROTH: ::c_int = 0x0004;
-pub const S_IWOTH: ::c_int = 0x0002;
-pub const S_IXOTH: ::c_int = 0x0001;
-pub const S_IRWXO: ::c_int = 0x0007;
+pub const S_IFMT: ::c_int = 0o17_0000;
+pub const S_IFIFO: ::c_int = 0o1_0000;
+pub const S_IFCHR: ::c_int = 0o2_0000;
+pub const S_IFDIR: ::c_int = 0o4_0000;
+pub const S_IFBLK: ::c_int = 0o6_0000;
+pub const S_IFREG: ::c_int = 0o10_0000;
+pub const S_IFLNK: ::c_int = 0o12_0000;
+pub const S_IFSHM: ::c_int = 0o13_0000;
+pub const S_IFSOCK: ::c_int = 0o14_0000;
+pub const S_ISUID: ::c_int = 0o4000;
+pub const S_ISGID: ::c_int = 0o2000;
+pub const S_ISTXT: ::c_int = 0o1000;
+pub const S_ISVTX: ::c_int = 0o1000;
+pub const S_IRUSR: ::c_int = 0o0400;
+pub const S_IWUSR: ::c_int = 0o0200;
+pub const S_IXUSR: ::c_int = 0o0100;
+pub const S_IRWXU: ::c_int = 0o0700;
+pub const S_IRGRP: ::c_int = 0o0040;
+pub const S_IWGRP: ::c_int = 0o0020;
+pub const S_IXGRP: ::c_int = 0o0010;
+pub const S_IRWXG: ::c_int = 0o0070;
+pub const S_IROTH: ::c_int = 0o0004;
+pub const S_IWOTH: ::c_int = 0o0002;
+pub const S_IXOTH: ::c_int = 0o0001;
+pub const S_IRWXO: ::c_int = 0o0007;
 
 // socket.h
 pub const SOL_SOCKET: ::c_int = 0xffff;
+pub const SOMAXCONN: ::c_int = 128;
 
 pub const SO_DEBUG: ::c_int = 0x0001;
 pub const SO_REUSEADDR: ::c_int = 0x0004;
@@ -1055,22 +1097,20 @@ f! {
         len + ::mem::size_of::<usize>() - 1 & !(::mem::size_of::<usize>() - 1)
     }
 
-    pub fn CMSG_NXTHDR(mhdr: *const msghdr,
-                       cmsg: *const cmsghdr) -> *mut cmsghdr {
-        let next = cmsg as usize + CMSG_ALIGN((*cmsg).cmsg_len as usize)
+    pub fn CMSG_NXTHDR(mhdr: *const msghdr, cmsg: *const cmsghdr) -> *mut cmsghdr {
+        let next = cmsg as usize
+            + CMSG_ALIGN((*cmsg).cmsg_len as usize)
             + CMSG_ALIGN(::mem::size_of::<::cmsghdr>());
-        let max = (*mhdr).msg_control as usize
-            + (*mhdr).msg_controllen as usize;
+        let max = (*mhdr).msg_control as usize + (*mhdr).msg_controllen as usize;
         if next <= max {
-            (cmsg as usize + CMSG_ALIGN((*cmsg).cmsg_len as usize))
-                as *mut ::cmsghdr
+            (cmsg as usize + CMSG_ALIGN((*cmsg).cmsg_len as usize)) as *mut ::cmsghdr
         } else {
             0 as *mut ::cmsghdr
         }
     }
 
     pub fn CMSG_FIRSTHDR(mhdr: *const msghdr) -> *mut cmsghdr {
-        if (*mhdr).msg_controllen as usize > 0  {
+        if (*mhdr).msg_controllen as usize > 0 {
             (*mhdr).msg_control as *mut cmsghdr
         } else {
             0 as *mut cmsghdr
@@ -1078,13 +1118,11 @@ f! {
     }
 
     pub fn CMSG_DATA(cmsg: *const cmsghdr) -> *mut ::c_uchar {
-        (cmsg as *mut ::c_uchar)
-            .offset(CMSG_ALIGN(::mem::size_of::<::cmsghdr>()) as isize)
+        (cmsg as *mut ::c_uchar).offset(CMSG_ALIGN(::mem::size_of::<::cmsghdr>()) as isize)
     }
 
     pub {const} fn CMSG_SPACE(length: ::c_uint) -> ::c_uint {
-        (CMSG_ALIGN(length as usize) + CMSG_ALIGN(::mem::size_of::<cmsghdr>()))
-            as ::c_uint
+        (CMSG_ALIGN(length as usize) + CMSG_ALIGN(::mem::size_of::<cmsghdr>())) as ::c_uint
     }
 
     pub {const} fn CMSG_LEN(length: ::c_uint) -> ::c_uint {
@@ -1357,6 +1395,29 @@ extern "C" {
         value: *mut ::c_void,
     ) -> ::c_int;
 
+    //pthread.h
+    pub fn pthread_setschedparam(
+        native: ::pthread_t,
+        policy: ::c_int,
+        param: *const ::sched_param,
+    ) -> ::c_int;
+
+    //pthread.h
+    pub fn pthread_getschedparam(
+        native: ::pthread_t,
+        policy: *mut ::c_int,
+        param: *mut ::sched_param,
+    ) -> ::c_int;
+
+    //pthread.h
+    pub fn pthread_attr_setinheritsched(
+        attr: *mut ::pthread_attr_t,
+        inheritsched: ::c_int,
+    ) -> ::c_int;
+
+    //pthread.h
+    pub fn pthread_attr_setschedpolicy(attr: *mut ::pthread_attr_t, policy: ::c_int) -> ::c_int;
+
     // pthread.h
     pub fn pthread_attr_destroy(thread: *mut ::pthread_attr_t) -> ::c_int;
 
@@ -1369,6 +1430,7 @@ extern "C" {
         parent: ::Option<unsafe extern "C" fn()>,
         child: ::Option<unsafe extern "C" fn()>,
     ) -> ::c_int;
+
     // stat.h
     pub fn fstat(fildes: ::c_int, buf: *mut stat) -> ::c_int;
 
@@ -1723,6 +1785,31 @@ extern "C" {
     // dirent.h
     pub fn closedir(ptr: *mut ::DIR) -> ::c_int;
 
+    //sched.h
+    pub fn sched_get_priority_max(policy: ::c_int) -> ::c_int;
+
+    //sched.h
+    pub fn sched_get_priority_min(policy: ::c_int) -> ::c_int;
+
+    //sched.h
+    pub fn sched_setparam(pid: ::pid_t, param: *const ::sched_param) -> ::c_int;
+
+    //sched.h
+    pub fn sched_getparam(pid: ::pid_t, param: *mut ::sched_param) -> ::c_int;
+
+    //sched.h
+    pub fn sched_setscheduler(
+        pid: ::pid_t,
+        policy: ::c_int,
+        param: *const ::sched_param,
+    ) -> ::c_int;
+
+    //sched.h
+    pub fn sched_getscheduler(pid: ::pid_t) -> ::c_int;
+
+    //sched.h
+    pub fn sched_rr_get_interval(pid: ::pid_t, tp: *mut ::timespec) -> ::c_int;
+
     // sched.h
     pub fn sched_yield() -> ::c_int;
 
@@ -1781,6 +1868,10 @@ extern "C" {
     // taskLibCommon.h
     pub fn taskIdSelf() -> ::TASK_ID;
     pub fn taskDelay(ticks: ::_Vx_ticks_t) -> ::c_int;
+
+    // taskLib.h
+    pub fn taskNameSet(task_id: ::TASK_ID, task_name: *mut ::c_char) -> ::c_int;
+    pub fn taskNameGet(task_id: ::TASK_ID, buf_name: *mut ::c_char, bufsize: ::size_t) -> ::c_int;
 
     // rtpLibCommon.h
     pub fn rtpInfoGet(rtpId: ::RTP_ID, rtpStruct: *mut ::RTP_DESC) -> ::c_int;
@@ -1841,6 +1932,10 @@ extern "C" {
     ) -> ::c_int;
     pub fn mq_getattr(mqd: ::mqd_t, attr: *mut ::mq_attr) -> ::c_int;
     pub fn mq_setattr(mqd: ::mqd_t, newattr: *const ::mq_attr, oldattr: *mut ::mq_attr) -> ::c_int;
+
+    // vxCpuLib.h
+    pub fn vxCpuEnabledGet() -> ::cpuset_t; // Get set of running CPU's in the system
+    pub fn vxCpuConfiguredGet() -> ::cpuset_t; // Get set of Configured CPU's in the system
 }
 
 //Dummy functions, these don't really exist in VxWorks.
@@ -1903,33 +1998,13 @@ pub fn posix_memalign(memptr: *mut *mut ::c_void, align: ::size_t, size: ::size_
 }
 
 cfg_if! {
-    if #[cfg(libc_core_cvoid)] {
-        pub use ::ffi::c_void;
-    } else {
-        // Use repr(u8) as LLVM expects `void*` to be the same as `i8*` to help
-        // enable more optimization opportunities around it recognizing things
-        // like malloc/free.
-        #[repr(u8)]
-        #[allow(missing_copy_implementations)]
-        #[allow(missing_debug_implementations)]
-        pub enum c_void {
-            // Two dummy variants so the #[repr] attribute can be used.
-            #[doc(hidden)]
-            __variant1,
-            #[doc(hidden)]
-            __variant2,
-        }
-    }
-}
-
-cfg_if! {
     if #[cfg(target_arch = "aarch64")] {
         mod aarch64;
         pub use self::aarch64::*;
     } else if #[cfg(target_arch = "arm")] {
         mod arm;
         pub use self::arm::*;
-    }  else if #[cfg(target_arch = "x86")] {
+    } else if #[cfg(target_arch = "x86")] {
         mod x86;
         pub use self::x86::*;
     } else if #[cfg(target_arch = "x86_64")] {
@@ -1941,6 +2016,12 @@ cfg_if! {
     } else if #[cfg(target_arch = "powerpc64")] {
         mod powerpc64;
         pub use self::powerpc64::*;
+    } else if #[cfg(target_arch = "riscv32")] {
+        mod riscv32;
+        pub use self::riscv32::*;
+    } else if #[cfg(target_arch = "riscv64")] {
+        mod riscv64;
+        pub use self::riscv64::*;
     } else {
         // Unknown target_arch
     }

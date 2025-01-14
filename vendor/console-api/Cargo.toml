@@ -13,11 +13,16 @@
 edition = "2021"
 rust-version = "1.74.0"
 name = "console-api"
-version = "0.7.0"
+version = "0.8.1"
 authors = [
     "Eliza Weisman <eliza@buoyant.io>",
     "Tokio Contributors <team@tokio.rs>",
 ]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
 Protobuf wire format bindings for the Tokio console.
 """
@@ -45,17 +50,25 @@ rustdoc-args = [
     "docsrs",
 ]
 
+[lib]
+name = "console_api"
+path = "src/lib.rs"
+
+[[test]]
+name = "bootstrap"
+path = "tests/bootstrap.rs"
+
 [dependencies.futures-core]
 version = "0.3"
 
 [dependencies.prost]
-version = "0.12"
+version = "0.13.1"
 
 [dependencies.prost-types]
-version = "0.12"
+version = "0.13.1"
 
 [dependencies.tonic]
-version = "0.11"
+version = "0.12"
 features = [
     "prost",
     "codegen",
@@ -67,10 +80,10 @@ default-features = false
 version = "0.1.17"
 
 [dev-dependencies.prost-build]
-version = "0.12.0"
+version = "0.13.1"
 
 [dev-dependencies.tonic-build]
-version = "0.11"
+version = "0.12"
 features = [
     "prost",
     "transport",

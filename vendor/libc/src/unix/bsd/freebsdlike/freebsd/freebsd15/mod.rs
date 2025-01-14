@@ -2,7 +2,7 @@
 
 pub type nlink_t = u64;
 pub type dev_t = u64;
-pub type ino_t = ::c_ulong;
+pub type ino_t = u64;
 pub type shmatt_t = ::c_uint;
 pub type kpaddr_t = u64;
 pub type kssize_t = i64;
@@ -41,7 +41,10 @@ s! {
     }
 
     pub struct __c_anonymous_domainset {
-        _priv: [::uintptr_t; 4],
+        #[cfg(target_pointer_width = "64")]
+        _priv: [::c_ulong; 4],
+        #[cfg(target_pointer_width = "32")]
+        _priv: [::c_ulong; 8],
     }
 
     pub struct kinfo_proc {
@@ -228,6 +231,40 @@ s! {
         /// kthread flag.
         pub ki_tdflags: ::c_long,
     }
+
+    pub struct stat {
+        pub st_dev: ::dev_t,
+        pub st_ino: ::ino_t,
+        pub st_nlink: ::nlink_t,
+        pub st_mode: ::mode_t,
+        st_padding0: i16,
+        pub st_uid: ::uid_t,
+        pub st_gid: ::gid_t,
+        st_padding1: i32,
+        pub st_rdev: ::dev_t,
+        #[cfg(target_arch = "x86")]
+        st_atim_ext: i32,
+        pub st_atime: ::time_t,
+        pub st_atime_nsec: ::c_long,
+        #[cfg(target_arch = "x86")]
+        st_mtim_ext: i32,
+        pub st_mtime: ::time_t,
+        pub st_mtime_nsec: ::c_long,
+        #[cfg(target_arch = "x86")]
+        st_ctim_ext: i32,
+        pub st_ctime: ::time_t,
+        pub st_ctime_nsec: ::c_long,
+        #[cfg(target_arch = "x86")]
+        st_btim_ext: i32,
+        pub st_birthtime: ::time_t,
+        pub st_birthtime_nsec: ::c_long,
+        pub st_size: ::off_t,
+        pub st_blocks: ::blkcnt_t,
+        pub st_blksize: ::blksize_t,
+        pub st_flags: ::fflags_t,
+        pub st_gen: u64,
+        pub st_spare: [u64; 10],
+    }
 }
 
 s_no_extra_traits! {
@@ -302,15 +339,15 @@ cfg_if! {
                     && self.f_fsid == other.f_fsid
                     && self.f_fstypename == other.f_fstypename
                     && self
-                    .f_mntfromname
-                    .iter()
-                    .zip(other.f_mntfromname.iter())
-                    .all(|(a,b)| a == b)
+                        .f_mntfromname
+                        .iter()
+                        .zip(other.f_mntfromname.iter())
+                        .all(|(a, b)| a == b)
                     && self
-                    .f_mntonname
-                    .iter()
-                    .zip(other.f_mntonname.iter())
-                    .all(|(a,b)| a == b)
+                        .f_mntonname
+                        .iter()
+                        .zip(other.f_mntonname.iter())
+                        .all(|(a, b)| a == b)
             }
         }
         impl Eq for statfs {}
@@ -370,11 +407,10 @@ cfg_if! {
                     && self.d_reclen == other.d_reclen
                     && self.d_type == other.d_type
                     && self.d_namlen == other.d_namlen
-                    && self
-                    .d_name[..self.d_namlen as _]
-                    .iter()
-                    .zip(other.d_name.iter())
-                    .all(|(a,b)| a == b)
+                    && self.d_name[..self.d_namlen as _]
+                        .iter()
+                        .zip(other.d_name.iter())
+                        .all(|(a, b)| a == b)
             }
         }
         impl Eq for dirent {}
@@ -406,14 +442,14 @@ cfg_if! {
                 let self_vn_devname: &[::c_char] = &self.vn_devname;
                 let other_vn_devname: &[::c_char] = &other.vn_devname;
 
-                self.vn_fileid == other.vn_fileid &&
-                self.vn_size == other.vn_size &&
-                self.vn_dev == other.vn_dev &&
-                self.vn_fsid == other.vn_fsid &&
-                self.vn_mntdir == other.vn_mntdir &&
-                self.vn_type == other.vn_type &&
-                self.vn_mode == other.vn_mode &&
-                self_vn_devname == other_vn_devname
+                self.vn_fileid == other.vn_fileid
+                    && self.vn_size == other.vn_size
+                    && self.vn_dev == other.vn_dev
+                    && self.vn_fsid == other.vn_fsid
+                    && self.vn_mntdir == other.vn_mntdir
+                    && self.vn_type == other.vn_type
+                    && self.vn_mode == other.vn_mode
+                    && self_vn_devname == other_vn_devname
             }
         }
         impl Eq for vnstat {}
@@ -527,15 +563,6 @@ extern "C" {
 #[link(name = "kvm")]
 extern "C" {
     pub fn kvm_kerndisp(kd: *mut ::kvm_t) -> ::kssize_t;
-}
-
-cfg_if! {
-    if #[cfg(any(target_arch = "x86_64",
-                 target_arch = "aarch64",
-                 target_arch = "riscv64"))] {
-        mod b64;
-        pub use self::b64::*;
-    }
 }
 
 cfg_if! {

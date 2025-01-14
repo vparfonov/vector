@@ -15,6 +15,11 @@ rust-version = "1.49.0"
 name = "tracing-core"
 version = "0.2.0"
 authors = ["Tokio Contributors <team@tokio.rs>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
 Core primitives for application-level tracing.
 """
@@ -39,6 +44,22 @@ rustdoc-args = [
     "--cfg",
     "docsrs",
 ]
+
+[lib]
+name = "tracing_core"
+path = "src/lib.rs"
+
+[[test]]
+name = "dispatch"
+path = "tests/dispatch.rs"
+
+[[test]]
+name = "global_dispatch"
+path = "tests/global_dispatch.rs"
+
+[[test]]
+name = "macros"
+path = "tests/macros.rs"
 
 [dependencies.lazy_static]
 version = "1.0.2"

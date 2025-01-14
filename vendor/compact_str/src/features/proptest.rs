@@ -1,14 +1,10 @@
 //! Implements the [`proptest::arbitrary::Arbitrary`] trait for [`CompactString`]
 
-use proptest::arbitrary::{
-    Arbitrary,
-    StrategyFor,
-};
+use alloc::string::String;
+
+use proptest::arbitrary::StrategyFor;
 use proptest::prelude::*;
-use proptest::strategy::{
-    MapInto,
-    Strategy,
-};
+use proptest::strategy::MapInto;
 use proptest::string::StringParam;
 
 use crate::CompactString;
@@ -25,11 +21,13 @@ impl Arbitrary for CompactString {
 
 #[cfg(test)]
 mod test {
+    use alloc::string::String;
+
     use proptest::prelude::*;
 
     use crate::CompactString;
 
-    const MAX_SIZE: usize = std::mem::size_of::<String>();
+    const MAX_SIZE: usize = core::mem::size_of::<String>();
 
     proptest! {
         #[test]

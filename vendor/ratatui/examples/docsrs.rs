@@ -9,67 +9,60 @@
 //! See the [examples readme] for more information on finding examples that match the version of the
 //! library you are using.
 //!
-//! [Ratatui]: https://github.com/ratatui-org/ratatui
-//! [examples]: https://github.com/ratatui-org/ratatui/blob/main/examples
-//! [examples readme]: https://github.com/ratatui-org/ratatui/blob/main/examples/README.md
+//! [Ratatui]: https://github.com/ratatui/ratatui
+//! [examples]: https://github.com/ratatui/ratatui/blob/main/examples
+//! [examples readme]: https://github.com/ratatui/ratatui/blob/main/examples/README.md
 
-use std::io::{self, stdout};
-
+use color_eyre::Result;
 use ratatui::{
-    backend::CrosstermBackend,
-    crossterm::{
-        event::{self, Event, KeyCode},
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-        ExecutableCommand,
-    },
+    crossterm::event::{self, Event, KeyCode},
     layout::{Constraint, Layout},
     style::{Color, Modifier, Style, Stylize},
-    terminal::{Frame, Terminal},
     text::{Line, Span, Text},
     widgets::{Block, Borders, Paragraph},
+    DefaultTerminal, Frame,
 };
 
 /// Example code for lib.rs
 ///
 /// When cargo-rdme supports doc comments that import from code, this will be imported
 /// rather than copied to the lib.rs file.
-fn main() -> io::Result<()> {
-    let arg = std::env::args().nth(1).unwrap_or_default();
-    enable_raw_mode()?;
-    stdout().execute(EnterAlternateScreen)?;
-    let mut terminal = Terminal::new(CrosstermBackend::new(stdout()))?;
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    let first_arg = std::env::args().nth(1).unwrap_or_default();
+    let terminal = ratatui::init();
+    let app_result = run(terminal, &first_arg);
+    ratatui::restore();
+    app_result
+}
 
+fn run(mut terminal: DefaultTerminal, first_arg: &str) -> Result<()> {
     let mut should_quit = false;
     while !should_quit {
-        terminal.draw(match arg.as_str() {
+        terminal.draw(match first_arg {
             "layout" => layout,
             "styling" => styling,
             _ => hello_world,
         })?;
         should_quit = handle_events()?;
     }
-
-    disable_raw_mode()?;
-    stdout().execute(LeaveAlternateScreen)?;
     Ok(())
+}
+
+fn handle_events() -> std::io::Result<bool> {
+    if let Event::Key(key) = event::read()? {
+        if key.kind == event::KeyEventKind::Press && key.code == KeyCode::Char('q') {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn hello_world(frame: &mut Frame) {
     frame.render_widget(
         Paragraph::new("Hello World!").block(Block::bordered().title("Greeting")),
-        frame.size(),
+        frame.area(),
     );
-}
-
-fn handle_events() -> io::Result<bool> {
-    if event::poll(std::time::Duration::from_millis(50))? {
-        if let Event::Key(key) = event::read()? {
-            if key.kind == event::KeyEventKind::Press && key.code == KeyCode::Char('q') {
-                return Ok(true);
-            }
-        }
-    }
-    Ok(false)
 }
 
 fn layout(frame: &mut Frame) {
@@ -79,7 +72,7 @@ fn layout(frame: &mut Frame) {
         Constraint::Length(1),
     ]);
     let horizontal = Layout::horizontal([Constraint::Ratio(1, 2); 2]);
-    let [title_bar, main_area, status_bar] = vertical.areas(frame.size());
+    let [title_bar, main_area, status_bar] = vertical.areas(frame.area());
     let [left, right] = horizontal.areas(main_area);
 
     frame.render_widget(
@@ -102,7 +95,7 @@ fn styling(frame: &mut Frame) {
         Constraint::Length(1),
         Constraint::Min(0),
     ])
-    .split(frame.size());
+    .split(frame.area());
 
     let span1 = Span::raw("Hello ");
     let span2 = Span::styled(

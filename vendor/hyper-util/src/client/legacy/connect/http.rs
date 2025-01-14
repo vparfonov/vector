@@ -76,6 +76,7 @@ struct Config {
     reuse_address: bool,
     send_buffer_size: Option<usize>,
     recv_buffer_size: Option<usize>,
+    #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
     interface: Option<String>,
 }
 
@@ -108,18 +109,29 @@ impl TcpKeepaliveConfig {
         }
     }
 
-    #[cfg(not(any(target_os = "openbsd", target_os = "redox", target_os = "solaris")))]
+    #[cfg(not(any(
+        target_os = "aix",
+        target_os = "openbsd",
+        target_os = "redox",
+        target_os = "solaris"
+    )))]
     fn ka_with_interval(ka: TcpKeepalive, interval: Duration, dirty: &mut bool) -> TcpKeepalive {
         *dirty = true;
         ka.with_interval(interval)
     }
 
-    #[cfg(any(target_os = "openbsd", target_os = "redox", target_os = "solaris"))]
+    #[cfg(any(
+        target_os = "aix",
+        target_os = "openbsd",
+        target_os = "redox",
+        target_os = "solaris"
+    ))]
     fn ka_with_interval(ka: TcpKeepalive, _: Duration, _: &mut bool) -> TcpKeepalive {
         ka // no-op as keepalive interval is not supported on this platform
     }
 
     #[cfg(not(any(
+        target_os = "aix",
         target_os = "openbsd",
         target_os = "redox",
         target_os = "solaris",
@@ -131,6 +143,7 @@ impl TcpKeepaliveConfig {
     }
 
     #[cfg(any(
+        target_os = "aix",
         target_os = "openbsd",
         target_os = "redox",
         target_os = "solaris",
@@ -167,6 +180,7 @@ impl<R> HttpConnector<R> {
                 reuse_address: false,
                 send_buffer_size: None,
                 recv_buffer_size: None,
+                #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
                 interface: None,
             }),
             resolver,
@@ -419,7 +433,8 @@ where
                 .map_err(ConnectError::dns)?;
             let addrs = addrs
                 .map(|mut addr| {
-                    addr.set_port(port);
+                    set_port(&mut addr, port, dst.port().is_some());
+
                     addr
                 })
                 .collect();
@@ -438,12 +453,10 @@ where
     }
 }
 
-impl Connection for TokioIo<TcpStream> {
+impl Connection for TcpStream {
     fn connected(&self) -> Connected {
         let connected = Connected::new();
-        if let (Ok(remote_addr), Ok(local_addr)) =
-            (self.inner().peer_addr(), self.inner().local_addr())
-        {
+        if let (Ok(remote_addr), Ok(local_addr)) = (self.peer_addr(), self.local_addr()) {
             connected.extra(HttpInfo {
                 remote_addr,
                 local_addr,
@@ -451,6 +464,17 @@ impl Connection for TokioIo<TcpStream> {
         } else {
             connected
         }
+    }
+}
+
+// Implement `Connection` for generic `TokioIo<T>` so that external crates can
+// implement their own `HttpConnector` with `TokioIo<CustomTcpStream>`.
+impl<T> Connection for TokioIo<T>
+where
+    T: Connection,
+{
+    fn connected(&self) -> Connected {
+        self.inner().connected()
     }
 }
 
@@ -679,7 +703,6 @@ fn connect(
     // keepalive timeout, it would be nice to use that instead of socket2,
     // and avoid the unsafe `into_raw_fd`/`from_raw_fd` dance...
     use socket2::{Domain, Protocol, Socket, Type};
-    use std::convert::TryInto;
 
     let domain = Domain::for_address(*addr);
     let socket = Socket::new(domain, Type::STREAM, Some(Protocol::TCP))
@@ -739,13 +762,13 @@ fn connect(
     }
 
     if let Some(size) = config.send_buffer_size {
-        if let Err(e) = socket.set_send_buffer_size(size.try_into().unwrap_or(std::u32::MAX)) {
+        if let Err(e) = socket.set_send_buffer_size(size.try_into().unwrap_or(u32::MAX)) {
             warn!("tcp set_buffer_size error: {}", e);
         }
     }
 
     if let Some(size) = config.recv_buffer_size {
-        if let Err(e) = socket.set_recv_buffer_size(size.try_into().unwrap_or(std::u32::MAX)) {
+        if let Err(e) = socket.set_recv_buffer_size(size.try_into().unwrap_or(u32::MAX)) {
             warn!("tcp set_recv_buffer_size error: {}", e);
         }
     }
@@ -803,9 +826,19 @@ impl ConnectingTcp<'_> {
     }
 }
 
+/// Respect explicit ports in the URI, if none, either
+/// keep non `0` ports resolved from a custom dns resolver,
+/// or use the default port for the scheme.
+fn set_port(addr: &mut SocketAddr, host_port: u16, explicit: bool) {
+    if explicit || addr.port() == 0 {
+        addr.set_port(host_port)
+    };
+}
+
 #[cfg(test)]
 mod tests {
     use std::io;
+    use std::net::SocketAddr;
 
     use ::http::Uri;
 
@@ -813,6 +846,8 @@ mod tests {
 
     use super::super::sealed::{Connect, ConnectSvc};
     use super::{Config, ConnectError, HttpConnector};
+
+    use super::set_port;
 
     async fn connect<C>(
         connector: C,
@@ -1097,6 +1132,11 @@ mod tests {
                         enforce_http: false,
                         send_buffer_size: None,
                         recv_buffer_size: None,
+                        #[cfg(any(
+                            target_os = "android",
+                            target_os = "fuchsia",
+                            target_os = "linux"
+                        ))]
                         interface: None,
                     };
                     let connecting_tcp = ConnectingTcp::new(dns::SocketAddrs::new(addrs), &cfg);
@@ -1206,5 +1246,23 @@ mod tests {
         } else {
             panic!("test failed");
         }
+    }
+
+    #[test]
+    fn test_set_port() {
+        // Respect explicit ports no matter what the resolved port is.
+        let mut addr = SocketAddr::from(([0, 0, 0, 0], 6881));
+        set_port(&mut addr, 42, true);
+        assert_eq!(addr.port(), 42);
+
+        // Ignore default  host port, and use the socket port instead.
+        let mut addr = SocketAddr::from(([0, 0, 0, 0], 6881));
+        set_port(&mut addr, 443, false);
+        assert_eq!(addr.port(), 6881);
+
+        // Use the default port if the resolved port is `0`.
+        let mut addr = SocketAddr::from(([0, 0, 0, 0], 0));
+        set_port(&mut addr, 443, false);
+        assert_eq!(addr.port(), 443);
     }
 }

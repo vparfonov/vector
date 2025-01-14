@@ -1,20 +1,20 @@
 #![cfg(feature = "std")]
+
 use alloc::{Allocator, SliceWrapper};
 use core::marker::PhantomData;
 use core::mem;
-use enc::backward_references::UnionHasher;
-use enc::threading::{
+use std;
+// in-place thread create
+use std::sync::RwLock;
+use std::thread::JoinHandle;
+
+use crate::enc::backward_references::UnionHasher;
+use crate::enc::threading::{
     AnyBoxConstructor, BatchSpawnable, BatchSpawnableLite, BrotliEncoderThreadError, CompressMulti,
     CompressionThreadResult, InternalOwned, InternalSendAlloc, Joinable, Owned, OwnedRetriever,
     PoisonedThreadError, SendAlloc,
 };
-use enc::BrotliAlloc;
-use enc::BrotliEncoderParams;
-use std::thread::JoinHandle;
-
-// in-place thread create
-
-use std::sync::RwLock;
+use crate::enc::{BrotliAlloc, BrotliEncoderParams};
 
 pub struct MultiThreadedJoinable<T: Send + 'static, U: Send + 'static>(
     JoinHandle<T>,
@@ -31,6 +31,7 @@ impl<T: Send + 'static, U: Send + 'static + AnyBoxConstructor> Joinable<T, U>
         }
     }
 }
+
 pub struct MultiThreadedOwnedRetriever<U: Send + 'static>(RwLock<U>);
 
 impl<U: Send + 'static> OwnedRetriever<U> for MultiThreadedOwnedRetriever<U> {

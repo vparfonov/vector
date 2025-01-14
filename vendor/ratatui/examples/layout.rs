@@ -9,78 +9,50 @@
 //! See the [examples readme] for more information on finding examples that match the version of the
 //! library you are using.
 //!
-//! [Ratatui]: https://github.com/ratatui-org/ratatui
-//! [examples]: https://github.com/ratatui-org/ratatui/blob/main/examples
-//! [examples readme]: https://github.com/ratatui-org/ratatui/blob/main/examples/README.md
-
-use std::{error::Error, io};
+//! [Ratatui]: https://github.com/ratatui/ratatui
+//! [examples]: https://github.com/ratatui/ratatui/blob/main/examples
+//! [examples readme]: https://github.com/ratatui/ratatui/blob/main/examples/README.md
 
 use itertools::Itertools;
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
-    crossterm::{
-        event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
-        execute,
-        terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    },
+    crossterm::event::{self, Event, KeyCode, KeyEventKind},
     layout::{
-        Constraint,
-        Constraint::{Length, Max, Min, Percentage, Ratio},
+        Constraint::{self, Length, Max, Min, Percentage, Ratio},
         Layout, Rect,
     },
     style::{Color, Style, Stylize},
-    terminal::{Frame, Terminal},
     text::Line,
     widgets::{Block, Paragraph},
+    DefaultTerminal, Frame,
 };
 
-fn main() -> Result<(), Box<dyn Error>> {
-    // setup terminal
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    // create app and run it
-    let res = run_app(&mut terminal);
-
-    // restore terminal
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    if let Err(err) = res {
-        println!("{err:?}");
-    }
-
-    Ok(())
+fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+    let terminal = ratatui::init();
+    let app_result = run(terminal);
+    ratatui::restore();
+    app_result
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>) -> io::Result<()> {
+fn run(mut terminal: DefaultTerminal) -> color_eyre::Result<()> {
     loop {
-        terminal.draw(ui)?;
-
+        terminal.draw(draw)?;
         if let Event::Key(key) = event::read()? {
-            if key.code == KeyCode::Char('q') {
-                return Ok(());
+            if key.kind == KeyEventKind::Press && key.code == KeyCode::Char('q') {
+                break Ok(());
             }
         }
     }
 }
 
 #[allow(clippy::too_many_lines)]
-fn ui(frame: &mut Frame) {
+fn draw(frame: &mut Frame) {
     let vertical = Layout::vertical([
         Length(4),  // text
         Length(50), // examples
         Min(0),     // fills remaining space
     ]);
-    let [text_area, examples_area, _] = vertical.areas(frame.size());
+    let [text_area, examples_area, _] = vertical.areas(frame.area());
 
     // title
     frame.render_widget(
@@ -102,31 +74,28 @@ fn ui(frame: &mut Frame) {
         Min(0), // fills remaining space
     ])
     .split(examples_area);
-    let example_areas = example_rows
+    let example_areas = example_rows.iter().flat_map(|area| {
+        Layout::horizontal([
+            Length(14),
+            Length(14),
+            Length(14),
+            Length(14),
+            Length(14),
+            Min(0), // fills remaining space
+        ])
+        .split(*area)
         .iter()
-        .flat_map(|area| {
-            Layout::horizontal([
-                Length(14),
-                Length(14),
-                Length(14),
-                Length(14),
-                Length(14),
-                Min(0), // fills remaining space
-            ])
-            .split(*area)
-            .iter()
-            .copied()
-            .take(5) // ignore Min(0)
-            .collect_vec()
-        })
-        .collect_vec();
+        .copied()
+        .take(5) // ignore Min(0)
+        .collect_vec()
+    });
 
     // the examples are a cartesian product of the following constraints
     // e.g. Len/Len, Len/Min, Len/Max, Len/Perc, Len/Ratio, Min/Len, Min/Min, ...
     let examples = [
         (
             "Len",
-            vec![
+            [
                 Length(0),
                 Length(2),
                 Length(3),
@@ -135,17 +104,11 @@ fn ui(frame: &mut Frame) {
                 Length(15),
             ],
         ),
-        (
-            "Min",
-            vec![Min(0), Min(2), Min(3), Min(6), Min(10), Min(15)],
-        ),
-        (
-            "Max",
-            vec![Max(0), Max(2), Max(3), Max(6), Max(10), Max(15)],
-        ),
+        ("Min", [Min(0), Min(2), Min(3), Min(6), Min(10), Min(15)]),
+        ("Max", [Max(0), Max(2), Max(3), Max(6), Max(10), Max(15)]),
         (
             "Perc",
-            vec![
+            [
                 Percentage(0),
                 Percentage(25),
                 Percentage(50),
@@ -156,7 +119,7 @@ fn ui(frame: &mut Frame) {
         ),
         (
             "Ratio",
-            vec![
+            [
                 Ratio(0, 4),
                 Ratio(1, 4),
                 Ratio(2, 4),
@@ -167,24 +130,15 @@ fn ui(frame: &mut Frame) {
         ),
     ];
 
-    for (i, (a, b)) in examples
+    for ((a, b), area) in examples
         .iter()
         .cartesian_product(examples.iter())
-        .enumerate()
+        .zip(example_areas)
     {
         let (name_a, examples_a) = a;
         let (name_b, examples_b) = b;
-        let constraints = examples_a
-            .iter()
-            .copied()
-            .zip(examples_b.iter().copied())
-            .collect_vec();
-        render_example_combination(
-            frame,
-            example_areas[i],
-            &format!("{name_a}/{name_b}"),
-            constraints,
-        );
+        let constraints = examples_a.iter().copied().zip(examples_b.iter().copied());
+        render_example_combination(frame, area, &format!("{name_a}/{name_b}"), constraints);
     }
 }
 
@@ -193,7 +147,7 @@ fn render_example_combination(
     frame: &mut Frame,
     area: Rect,
     title: &str,
-    constraints: Vec<(Constraint, Constraint)>,
+    constraints: impl ExactSizeIterator<Item = (Constraint, Constraint)>,
 ) {
     let block = Block::bordered()
         .title(title.gray())
@@ -202,8 +156,8 @@ fn render_example_combination(
     let inner = block.inner(area);
     frame.render_widget(block, area);
     let layout = Layout::vertical(vec![Length(1); constraints.len() + 1]).split(inner);
-    for (i, (a, b)) in constraints.into_iter().enumerate() {
-        render_single_example(frame, layout[i], vec![a, b, Min(0)]);
+    for ((a, b), &area) in constraints.into_iter().zip(layout.iter()) {
+        render_single_example(frame, area, vec![a, b, Min(0)]);
     }
     // This is to make it easy to visually see the alignment of the examples
     // with the constraints.

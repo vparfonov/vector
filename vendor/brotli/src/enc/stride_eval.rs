@@ -1,3 +1,6 @@
+use core;
+
+use super::super::alloc;
 use super::super::alloc::{Allocator, SliceWrapper, SliceWrapperMut};
 use super::backward_references::BrotliEncoderParams;
 use super::input_pair::{InputPair, InputReference, InputReferenceMut};
@@ -5,6 +8,7 @@ use super::interface;
 use super::ir_interpret::{push_base, IRInterpreter};
 use super::prior_eval::DEFAULT_SPEED;
 use super::util::{floatX, FastLog2u16};
+use crate::enc::combined_alloc::{alloc_default, allocate};
 const NIBBLE_PRIOR_SIZE: usize = 16;
 pub const STRIDE_PRIOR_SIZE: usize = 256 * 256 * NIBBLE_PRIOR_SIZE * 2;
 
@@ -126,31 +130,31 @@ impl<'a, Alloc: alloc::Allocator<u16> + alloc::Allocator<u32> + alloc::Allocator
             stride_speed[1] = stride_speed[0];
         }
         let score = if do_alloc {
-            <Alloc as Allocator<floatX>>::alloc_cell(alloc, 8 * 4) // FIXME make this bigger than just 4
+            allocate::<floatX, _>(alloc, 8 * 4) // FIXME make this bigger than just 4
         } else {
-            <Alloc as Allocator<floatX>>::AllocatedMemory::default()
+            alloc_default::<floatX, Alloc>()
         };
         let stride_priors = if do_alloc {
             [
-                <Alloc as Allocator<u16>>::alloc_cell(alloc, STRIDE_PRIOR_SIZE),
-                <Alloc as Allocator<u16>>::alloc_cell(alloc, STRIDE_PRIOR_SIZE),
-                <Alloc as Allocator<u16>>::alloc_cell(alloc, STRIDE_PRIOR_SIZE),
-                <Alloc as Allocator<u16>>::alloc_cell(alloc, STRIDE_PRIOR_SIZE),
-                <Alloc as Allocator<u16>>::alloc_cell(alloc, STRIDE_PRIOR_SIZE),
-                <Alloc as Allocator<u16>>::alloc_cell(alloc, STRIDE_PRIOR_SIZE),
-                <Alloc as Allocator<u16>>::alloc_cell(alloc, STRIDE_PRIOR_SIZE),
-                <Alloc as Allocator<u16>>::alloc_cell(alloc, STRIDE_PRIOR_SIZE),
+                allocate::<u16, _>(alloc, STRIDE_PRIOR_SIZE),
+                allocate::<u16, _>(alloc, STRIDE_PRIOR_SIZE),
+                allocate::<u16, _>(alloc, STRIDE_PRIOR_SIZE),
+                allocate::<u16, _>(alloc, STRIDE_PRIOR_SIZE),
+                allocate::<u16, _>(alloc, STRIDE_PRIOR_SIZE),
+                allocate::<u16, _>(alloc, STRIDE_PRIOR_SIZE),
+                allocate::<u16, _>(alloc, STRIDE_PRIOR_SIZE),
+                allocate::<u16, _>(alloc, STRIDE_PRIOR_SIZE),
             ]
         } else {
             [
-                <Alloc as Allocator<u16>>::AllocatedMemory::default(),
-                <Alloc as Allocator<u16>>::AllocatedMemory::default(),
-                <Alloc as Allocator<u16>>::AllocatedMemory::default(),
-                <Alloc as Allocator<u16>>::AllocatedMemory::default(),
-                <Alloc as Allocator<u16>>::AllocatedMemory::default(),
-                <Alloc as Allocator<u16>>::AllocatedMemory::default(),
-                <Alloc as Allocator<u16>>::AllocatedMemory::default(),
-                <Alloc as Allocator<u16>>::AllocatedMemory::default(),
+                alloc_default::<u16, Alloc>(),
+                alloc_default::<u16, Alloc>(),
+                alloc_default::<u16, Alloc>(),
+                alloc_default::<u16, Alloc>(),
+                alloc_default::<u16, Alloc>(),
+                alloc_default::<u16, Alloc>(),
+                alloc_default::<u16, Alloc>(),
+                alloc_default::<u16, Alloc>(),
             ]
         };
         let mut ret = StrideEval::<Alloc> {
@@ -265,7 +269,7 @@ impl<'a, Alloc: alloc::Allocator<u16> + alloc::Allocator<u32> + alloc::Allocator
         self.cur_score_epoch += 1;
         if self.cur_score_epoch * 8 + 7 >= self.score.slice().len() {
             let new_len = self.score.slice().len() * 2;
-            let mut new_score = <Alloc as Allocator<floatX>>::alloc_cell(self.alloc, new_len);
+            let mut new_score = allocate::<floatX, _>(self.alloc, new_len);
             for (src, dst) in self.score.slice().iter().zip(
                 new_score
                     .slice_mut()
@@ -290,7 +294,7 @@ impl<'a, Alloc: alloc::Allocator<u16> + alloc::Allocator<u32> + alloc::Allocator
     fn literal_context_map(&self) -> &[u8] {
         self.context_map.literal_context_map.slice()
     }
-    fn prediction_mode(&self) -> ::interface::LiteralPredictionModeNibble {
+    fn prediction_mode(&self) -> crate::interface::LiteralPredictionModeNibble {
         self.context_map.literal_prediction_mode()
     }
     fn update_cost(

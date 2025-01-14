@@ -11,10 +11,15 @@
 
 [package]
 edition = "2021"
-rust-version = "1.78.0"
+rust-version = "1.68.2"
 name = "domain"
-version = "0.10.1"
+version = "0.10.3"
 authors = ["NLnet Labs <dns-team@nlnetlabs.nl>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A DNS library for Rust."
 homepage = "https://github.com/nlnetlabs/domain/"
 documentation = "https://docs.rs/domain"
@@ -38,19 +43,8 @@ name = "domain"
 path = "src/lib.rs"
 
 [[example]]
-name = "download-rust-lang"
-required-features = ["resolv"]
-
-[[example]]
-name = "lookup"
-required-features = ["resolv"]
-
-[[example]]
-name = "resolv-sync"
-required-features = ["resolv-sync"]
-
-[[example]]
 name = "client"
+path = "examples/client.rs"
 required-features = [
     "std",
     "rand",
@@ -58,37 +52,79 @@ required-features = [
 
 [[example]]
 name = "client-transports"
+path = "examples/client-transports.rs"
 required-features = [
     "net",
     "unstable-client-transport",
 ]
 
 [[example]]
-name = "server-transports"
+name = "download-rust-lang"
+path = "examples/download-rust-lang.rs"
+required-features = ["resolv"]
+
+[[example]]
+name = "ixfr-client"
+path = "examples/ixfr-client.rs"
 required-features = [
+    "zonefile",
     "net",
-    "unstable-server-transport",
+    "unstable-client-transport",
+    "unstable-zonetree",
+]
+
+[[example]]
+name = "lookup"
+path = "examples/lookup.rs"
+required-features = ["resolv"]
+
+[[example]]
+name = "query-zone"
+path = "examples/query-zone.rs"
+required-features = [
+    "zonefile",
+    "unstable-zonetree",
 ]
 
 [[example]]
 name = "read-zone"
+path = "examples/read-zone.rs"
 required-features = ["zonefile"]
 
 [[example]]
-name = "query-zone"
-required-features = [
-    "zonefile",
-    "unstable-zonetree",
-]
+name = "resolv-sync"
+path = "examples/resolv-sync.rs"
+required-features = ["resolv-sync"]
 
 [[example]]
 name = "serve-zone"
+path = "examples/serve-zone.rs"
 required-features = [
     "zonefile",
     "net",
     "unstable-server-transport",
     "unstable-zonetree",
 ]
+
+[[example]]
+name = "server-transports"
+path = "examples/server-transports.rs"
+required-features = [
+    "net",
+    "unstable-server-transport",
+]
+
+[[test]]
+name = "interop"
+path = "tests/interop.rs"
+
+[[test]]
+name = "net-client"
+path = "tests/net-client.rs"
+
+[[test]]
+name = "net-client-cache"
+path = "tests/net-client-cache.rs"
 
 [dependencies.arc-swap]
 version = "1.7.0"
@@ -103,10 +139,6 @@ default-features = false
 version = "0.4.35"
 optional = true
 default-features = false
-
-[dependencies.futures]
-version = "0.3.22"
-optional = true
 
 [dependencies.futures-util]
 version = "0.3"
@@ -127,11 +159,11 @@ features = ["future"]
 optional = true
 
 [dependencies.octseq]
-version = "0.5.1"
+version = "0.5.2"
 default-features = false
 
 [dependencies.parking_lot]
-version = "0.12.2"
+version = "0.12"
 optional = true
 
 [dependencies.proc-macro2]
@@ -144,6 +176,10 @@ optional = true
 
 [dependencies.ring]
 version = "0.17"
+optional = true
+
+[dependencies.rustversion]
+version = "1"
 optional = true
 
 [dependencies.serde]
@@ -180,6 +216,10 @@ version = "0.26"
 optional = true
 default-features = false
 
+[dependencies.tokio-stream]
+version = "0.1.1"
+optional = true
+
 [dependencies.tracing]
 version = "0.1.40"
 optional = true
@@ -191,6 +231,9 @@ optional = true
 
 [dev-dependencies.lazy_static]
 version = "1.4.0"
+
+[dev-dependencies.mock_instant]
+version = "0.5.1"
 
 [dev-dependencies.rstest]
 version = "0.19.0"
@@ -295,23 +338,37 @@ unstable-server-transport = [
     "chrono/clock",
     "libc",
     "net",
+    "siphasher",
     "tracing",
 ]
 unstable-stelline = [
     "tokio/test-util",
     "tracing",
     "tracing-subscriber",
+    "tsig",
+    "unstable-client-transport",
     "unstable-server-transport",
     "zonefile",
 ]
+unstable-validator = [
+    "validate",
+    "zonefile",
+    "unstable-client-transport",
+]
+unstable-xfr = ["net"]
 unstable-zonetree = [
-    "futures",
+    "futures-util",
     "parking_lot",
+    "rustversion",
     "serde",
+    "std",
     "tokio",
     "tracing",
+    "unstable-xfr",
+    "zonefile",
 ]
 validate = [
+    "bytes",
     "std",
     "ring",
 ]

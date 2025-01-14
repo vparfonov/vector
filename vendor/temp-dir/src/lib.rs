@@ -68,6 +68,7 @@
 //!
 //! # Cargo Geiger Safety Report
 //! # Changelog
+//! - v0.1.14 - `AsRef<Path>`
 //! - v0.1.13 - Update docs.
 //! - v0.1.12 - Work when the directory already exists.
 //! - v0.1.11
@@ -266,5 +267,10 @@ impl Drop for TempDir {
                 }
             }
         }
+    }
+}
+impl AsRef<Path> for TempDir {
+    fn as_ref(&self) -> &Path {
+        self.path()
     }
 }

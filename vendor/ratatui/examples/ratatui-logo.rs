@@ -9,80 +9,46 @@
 //! See the [examples readme] for more information on finding examples that match the version of the
 //! library you are using.
 //!
-//! [Ratatui]: https://github.com/ratatui-org/ratatui
-//! [examples]: https://github.com/ratatui-org/ratatui/blob/main/examples
-//! [examples readme]: https://github.com/ratatui-org/ratatui/blob/main/examples/README.md
+//! [Ratatui]: https://github.com/ratatui/ratatui
+//! [examples]: https://github.com/ratatui/ratatui/blob/main/examples
+//! [examples readme]: https://github.com/ratatui/ratatui/blob/main/examples/README.md
 
-use std::{
-    io::{self, stdout},
-    thread::sleep,
-    time::Duration,
-};
+use std::env::args;
 
-use indoc::indoc;
-use itertools::izip;
+use color_eyre::Result;
+use crossterm::event::{self, Event};
 use ratatui::{
-    backend::{Backend, CrosstermBackend},
-    crossterm::terminal::{disable_raw_mode, enable_raw_mode},
-    terminal::{Terminal, Viewport},
-    widgets::Paragraph,
-    TerminalOptions,
+    layout::{Constraint, Layout},
+    widgets::{RatatuiLogo, RatatuiLogoSize},
+    DefaultTerminal, TerminalOptions, Viewport,
 };
 
-/// A fun example of using half block characters to draw a logo
-#[allow(clippy::many_single_char_names)]
-fn logo() -> String {
-    let r = indoc! {"
-            ▄▄▄
-            █▄▄▀
-            █  █
-        "};
-    let a = indoc! {"
-             ▄▄
-            █▄▄█
-            █  █
-        "};
-    let t = indoc! {"
-            ▄▄▄
-             █
-             █
-        "};
-    let u = indoc! {"
-            ▄  ▄
-            █  █
-            ▀▄▄▀
-        "};
-    let i = indoc! {"
-            ▄
-            █
-            █
-        "};
-    izip!(r.lines(), a.lines(), t.lines(), u.lines(), i.lines())
-        .map(|(r, a, t, u, i)| format!("{r:5}{a:5}{t:4}{a:5}{t:4}{u:5}{i:5}"))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-fn main() -> io::Result<()> {
-    let mut terminal = init()?;
-    terminal.draw(|frame| {
-        frame.render_widget(Paragraph::new(logo()), frame.size());
-    })?;
-    sleep(Duration::from_secs(5));
-    restore()?;
-    println!();
-    Ok(())
-}
-
-fn init() -> io::Result<Terminal<impl Backend>> {
-    enable_raw_mode()?;
-    let options = TerminalOptions {
+fn main() -> Result<()> {
+    color_eyre::install()?;
+    let terminal = ratatui::init_with_options(TerminalOptions {
         viewport: Viewport::Inline(3),
+    });
+    let size = match args().nth(1).as_deref() {
+        Some("small") => RatatuiLogoSize::Small,
+        Some("tiny") => RatatuiLogoSize::Tiny,
+        _ => RatatuiLogoSize::default(),
     };
-    Terminal::with_options(CrosstermBackend::new(stdout()), options)
+    let result = run(terminal, size);
+    ratatui::restore();
+    println!();
+    result
 }
 
-fn restore() -> io::Result<()> {
-    disable_raw_mode()?;
-    Ok(())
+fn run(mut terminal: DefaultTerminal, size: RatatuiLogoSize) -> Result<()> {
+    loop {
+        terminal.draw(|frame| {
+            use Constraint::{Fill, Length};
+            let [top, bottom] = Layout::vertical([Length(1), Fill(1)]).areas(frame.area());
+            frame.render_widget("Powered by", top);
+            frame.render_widget(RatatuiLogo::new(size), bottom);
+        })?;
+        if matches!(event::read()?, Event::Key(_)) {
+            break Ok(());
+        }
+    }
 }

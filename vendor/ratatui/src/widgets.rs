@@ -31,6 +31,7 @@ mod chart;
 mod clear;
 mod gauge;
 mod list;
+mod logo;
 mod paragraph;
 mod reflow;
 mod scrollbar;
@@ -46,9 +47,10 @@ pub use self::{
     clear::Clear,
     gauge::{Gauge, LineGauge},
     list::{List, ListDirection, ListItem, ListState},
+    logo::{RatatuiLogo, Size as RatatuiLogoSize},
     paragraph::{Paragraph, Wrap},
     scrollbar::{ScrollDirection, Scrollbar, ScrollbarOrientation, ScrollbarState},
-    sparkline::{RenderDirection, Sparkline},
+    sparkline::{RenderDirection, Sparkline, SparklineBar},
     table::{Cell, HighlightSpacing, Row, Table, TableState},
     tabs::Tabs,
 };
@@ -60,14 +62,22 @@ use crate::{buffer::Buffer, layout::Rect, style::Style};
 /// during rendering. This meant that they were not meant to be stored but used as *commands* to
 /// draw common figures in the UI.
 ///
-/// Starting with Ratatui 0.26.0, we added a new [`WidgetRef`] trait and implemented this on all the
-/// internal widgets. This allows you to store a reference to a widget and render it later. It also
+/// Starting with Ratatui 0.26.0, all the internal widgets implement Widget for a reference to
+/// themselves. This allows you to store a reference to a widget and render it later. Widget crates
+/// should consider also doing this to allow for more flexibility in how widgets are used.
+///
+/// In Ratatui 0.26.0, we also added an unstable [`WidgetRef`] trait and implemented this on all the
+/// internal widgets. In addition to the above benefit of rendering references to widgets, this also
 /// allows you to render boxed widgets. This is useful when you want to store a collection of
 /// widgets with different types. You can then iterate over the collection and render each widget.
+/// See <https://github.com/ratatui/ratatui/issues/1287> for more information.
 ///
-/// The `Widget` trait can still be implemented, however, it is recommended to implement `WidgetRef`
-/// and add an implementation of `Widget` that calls `WidgetRef::render_ref`. This pattern should be
-/// used where backwards compatibility is required (all the internal widgets use this approach).
+/// In general where you expect a widget to immutably work on its data, we recommended to implement
+/// `Widget` for a reference to the widget (`impl Widget for &MyWidget`). If you need to store state
+/// between draw calls, implement `StatefulWidget` if you want the Widget to be immutable, or
+/// implement `Widget` for a mutable reference to the widget (`impl Widget for &mut MyWidget`) if
+/// you want the widget to be mutable. The mutable widget pattern is used infrequently in apps, but
+/// can be quite useful.
 ///
 /// A blanket implementation of `Widget` for `&W` where `W` implements `WidgetRef` is provided.
 /// Widget is also implemented for `&str` and `String` types.
@@ -75,19 +85,23 @@ use crate::{buffer::Buffer, layout::Rect, style::Style};
 /// # Examples
 ///
 /// ```rust,no_run
-/// use ratatui::{backend::TestBackend, prelude::*, widgets::*};
+/// use ratatui::{
+///     backend::TestBackend,
+///     widgets::{Clear, Widget},
+///     Terminal,
+/// };
 /// # let backend = TestBackend::new(5, 5);
 /// # let mut terminal = Terminal::new(backend).unwrap();
 ///
 /// terminal.draw(|frame| {
-///     frame.render_widget(Clear, frame.size());
+///     frame.render_widget(Clear, frame.area());
 /// });
 /// ```
 ///
 /// It's common to render widgets inside other widgets:
 ///
 /// ```rust
-/// use ratatui::{prelude::*, widgets::*};
+/// use ratatui::{buffer::Buffer, layout::Rect, text::Line, widgets::Widget};
 ///
 /// struct MyWidget;
 ///
@@ -125,7 +139,11 @@ pub trait Widget {
 /// ```rust,no_run
 /// use std::io;
 ///
-/// use ratatui::{backend::TestBackend, prelude::*, widgets::*};
+/// use ratatui::{
+///     backend::TestBackend,
+///     widgets::{List, ListItem, ListState, StatefulWidget, Widget},
+///     Terminal,
+/// };
 ///
 /// // Let's say we have some events to display.
 /// struct Events {
@@ -235,9 +253,9 @@ pub trait StatefulWidget {
 /// useful when you want to store a collection of widgets with different types. You can then iterate
 /// over the collection and render each widget.
 ///
-/// This trait was introduced in Ratatui 0.26.0 and is implemented for all the internal widgets.
-/// Implementors should prefer to implement this over the `Widget` trait and add an implementation
-/// of `Widget` that calls `WidgetRef::render_ref` where backwards compatibility is required.
+/// This trait was introduced in Ratatui 0.26.0 and is implemented for all the internal widgets. It
+/// is currently marked as unstable as we are still evaluating the API and may make changes in the
+/// future. See <https://github.com/ratatui/ratatui/issues/1287> for more information.
 ///
 /// A blanket implementation of `Widget` for `&W` where `W` implements `WidgetRef` is provided.
 ///
@@ -249,7 +267,12 @@ pub trait StatefulWidget {
 ///
 /// ```rust
 /// # #[cfg(feature = "unstable-widget-ref")] {
-/// use ratatui::{prelude::*, widgets::*};
+/// use ratatui::{
+///     buffer::Buffer,
+///     layout::Rect,
+///     text::Line,
+///     widgets::{Widget, WidgetRef},
+/// };
 ///
 /// struct Greeting;
 ///
@@ -297,7 +320,7 @@ pub trait StatefulWidget {
 /// # }
 /// # }
 /// ```
-#[stability::unstable(feature = "widget-ref")]
+#[instability::unstable(feature = "widget-ref")]
 pub trait WidgetRef {
     /// Draws the current state of the widget in the given buffer. That is the only method required
     /// to implement a custom widget.
@@ -324,7 +347,12 @@ impl<W: WidgetRef> Widget for &W {
 ///
 /// ```rust
 /// # #[cfg(feature = "unstable-widget-ref")] {
-/// use ratatui::{prelude::*, widgets::*};
+/// use ratatui::{
+///     buffer::Buffer,
+///     layout::Rect,
+///     text::Line,
+///     widgets::{Widget, WidgetRef},
+/// };
 ///
 /// struct Parent {
 ///     child: Option<Child>,
@@ -359,9 +387,9 @@ impl<W: WidgetRef> WidgetRef for Option<W> {
 /// to a stateful widget and render it later. It also allows you to render boxed stateful widgets.
 ///
 /// This trait was introduced in Ratatui 0.26.0 and is implemented for all the internal stateful
-/// widgets. Implementors should prefer to implement this over the `StatefulWidget` trait and add an
-/// implementation of `StatefulWidget` that calls `StatefulWidgetRef::render_ref` where backwards
-/// compatibility is required.
+/// widgets. It is currently marked as unstable as we are still evaluating the API and may make
+/// changes in the future. See <https://github.com/ratatui/ratatui/issues/1287> for more
+/// information.
 ///
 /// A blanket implementation of `StatefulWidget` for `&W` where `W` implements `StatefulWidgetRef`
 /// is provided.
@@ -373,7 +401,13 @@ impl<W: WidgetRef> WidgetRef for Option<W> {
 ///
 /// ```rust
 /// # #[cfg(feature = "unstable-widget-ref")] {
-/// use ratatui::{prelude::*, widgets::*};
+/// use ratatui::{
+///     buffer::Buffer,
+///     layout::Rect,
+///     style::Stylize,
+///     text::Line,
+///     widgets::{StatefulWidget, StatefulWidgetRef, Widget},
+/// };
 ///
 /// struct PersonalGreeting;
 ///
@@ -398,7 +432,7 @@ impl<W: WidgetRef> WidgetRef for Option<W> {
 /// }
 /// # }
 /// ```
-#[stability::unstable(feature = "widget-ref")]
+#[instability::unstable(feature = "widget-ref")]
 pub trait StatefulWidgetRef {
     /// State associated with the stateful widget.
     ///

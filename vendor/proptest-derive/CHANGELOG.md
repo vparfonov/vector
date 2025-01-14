@@ -1,9 +1,27 @@
 ## Unreleased
 
+## 0.5
+
+### Features
+
+- Add `boxed_union` feature which when turned on uses heap allocation for
+  `#[derive(Arbitrary)]` strategy synthesis preventing stack overflow for
+  exceptionally large structures.
+
+### Dependencies
+
+- Upgraded `syn` to 2.x
+- Upgraded `compiletest_rs` 0.10 to 0.11
+
+### Other Notes
+
+- Fixed various clippies and diagnostic issues
+
 ### 0.4.0
 
 ### Other Notes
 
+- Upgraded `compiletest_rs` from 0.9 to 0.10
 - Upgraded `syn`, `quote`, and `proc-macro2` to 1.0
 
 ## 0.3.0

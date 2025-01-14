@@ -4,6 +4,7 @@ use std::collections::HashSet;
 
 pub mod dedupe;
 pub mod reduce;
+#[cfg(feature = "transforms-impl-sample")]
 pub mod sample;
 
 #[cfg(feature = "transforms-aggregate")]
@@ -12,6 +13,8 @@ pub mod aggregate;
 pub mod aws_ec2_metadata;
 #[cfg(feature = "transforms-detect_exceptions")]
 pub mod detect_exceptions;
+#[cfg(feature = "transforms-exclusive-route")]
+mod exclusive_route;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
 #[cfg(feature = "transforms-log_to_metric")]

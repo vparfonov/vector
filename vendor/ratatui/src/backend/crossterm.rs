@@ -19,8 +19,7 @@ use crate::{
         },
         terminal::{self, Clear},
     },
-    layout::Size,
-    prelude::Rect,
+    layout::{Position, Size},
     style::{Color, Modifier, Style},
 };
 
@@ -45,15 +44,11 @@ use crate::{
 /// ```rust,no_run
 /// use std::io::{stderr, stdout};
 ///
-/// use ratatui::{
-///     crossterm::{
-///         terminal::{
-///             disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen,
-///         },
-///         ExecutableCommand,
-///     },
-///     prelude::*,
+/// use crossterm::{
+///     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+///     ExecutableCommand,
 /// };
+/// use ratatui::{backend::CrosstermBackend, Terminal};
 ///
 /// let mut backend = CrosstermBackend::new(stdout());
 /// // or
@@ -81,7 +76,7 @@ use crate::{
 /// [`Terminal`]: crate::terminal::Terminal
 /// [`backend`]: crate::backend
 /// [Crossterm]: https://crates.io/crates/crossterm
-/// [Examples]: https://github.com/ratatui-org/ratatui/tree/main/examples/README.md
+/// [Examples]: https://github.com/ratatui/ratatui/tree/main/examples/README.md
 #[derive(Debug, Default, Clone, Eq, PartialEq, Hash)]
 pub struct CrosstermBackend<W: Write> {
     /// The writer used to send commands to the terminal.
@@ -94,11 +89,18 @@ where
 {
     /// Creates a new `CrosstermBackend` with the given writer.
     ///
+    /// Most applications will use either [`stdout`](std::io::stdout) or
+    /// [`stderr`](std::io::stderr) as writer. See the [FAQ] to determine which one to use.
+    ///
+    /// [FAQ]: https://ratatui.rs/faq/#should-i-use-stdout-or-stderr
+    ///
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use std::io::stdout;
-    /// # use ratatui::prelude::*;
+    /// use std::io::stdout;
+    ///
+    /// use ratatui::backend::CrosstermBackend;
+    ///
     /// let backend = CrosstermBackend::new(stdout());
     /// ```
     pub const fn new(writer: W) -> Self {
@@ -106,9 +108,9 @@ where
     }
 
     /// Gets the writer.
-    #[stability::unstable(
+    #[instability::unstable(
         feature = "backend-writer",
-        issue = "https://github.com/ratatui-org/ratatui/pull/991"
+        issue = "https://github.com/ratatui/ratatui/pull/991"
     )]
     pub const fn writer(&self) -> &W {
         &self.writer
@@ -118,9 +120,9 @@ where
     ///
     /// Note: writing to the writer may cause incorrect output after the write. This is due to the
     /// way that the Terminal implements diffing Buffers.
-    #[stability::unstable(
+    #[instability::unstable(
         feature = "backend-writer",
-        issue = "https://github.com/ratatui-org/ratatui/pull/991"
+        issue = "https://github.com/ratatui/ratatui/pull/991"
     )]
     pub fn writer_mut(&mut self) -> &mut W {
         &mut self.writer
@@ -155,13 +157,13 @@ where
         #[cfg(feature = "underline-color")]
         let mut underline_color = Color::Reset;
         let mut modifier = Modifier::empty();
-        let mut last_pos: Option<(u16, u16)> = None;
+        let mut last_pos: Option<Position> = None;
         for (x, y, cell) in content {
             // Move the cursor if the previous location was not (x - 1, y)
-            if !matches!(last_pos, Some(p) if x == p.0 + 1 && y == p.1) {
+            if !matches!(last_pos, Some(p) if x == p.x + 1 && y == p.y) {
                 queue!(self.writer, MoveTo(x, y))?;
             }
-            last_pos = Some((x, y));
+            last_pos = Some(Position { x, y });
             if cell.modifier != modifier {
                 let diff = ModifierDiff {
                     from: modifier,
@@ -213,12 +215,14 @@ where
         execute!(self.writer, Show)
     }
 
-    fn get_cursor(&mut self) -> io::Result<(u16, u16)> {
+    fn get_cursor_position(&mut self) -> io::Result<Position> {
         crossterm::cursor::position()
+            .map(|(x, y)| Position { x, y })
             .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))
     }
 
-    fn set_cursor(&mut self, x: u16, y: u16) -> io::Result<()> {
+    fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> io::Result<()> {
+        let Position { x, y } = position.into();
         execute!(self.writer, MoveTo(x, y))
     }
 
@@ -246,9 +250,9 @@ where
         self.writer.flush()
     }
 
-    fn size(&self) -> io::Result<Rect> {
+    fn size(&self) -> io::Result<Size> {
         let (width, height) = terminal::size()?;
-        Ok(Rect::new(0, 0, width, height))
+        Ok(Size { width, height })
     }
 
     fn window_size(&mut self) -> io::Result<WindowSize> {
@@ -268,6 +272,32 @@ where
     }
 
     fn flush(&mut self) -> io::Result<()> {
+        self.writer.flush()
+    }
+
+    #[cfg(feature = "scrolling-regions")]
+    fn scroll_region_up(&mut self, region: std::ops::Range<u16>, amount: u16) -> io::Result<()> {
+        queue!(
+            self.writer,
+            ScrollUpInRegion {
+                first_row: region.start,
+                last_row: region.end.saturating_sub(1),
+                lines_to_scroll: amount,
+            }
+        )?;
+        self.writer.flush()
+    }
+
+    #[cfg(feature = "scrolling-regions")]
+    fn scroll_region_down(&mut self, region: std::ops::Range<u16>, amount: u16) -> io::Result<()> {
+        queue!(
+            self.writer,
+            ScrollDownInRegion {
+                first_row: region.start,
+                last_row: region.end.saturating_sub(1),
+                lines_to_scroll: amount,
+            }
+        )?;
         self.writer.flush()
     }
 }
@@ -478,6 +508,102 @@ impl From<ContentStyle> for Style {
             add_modifier: value.attributes.into(),
             sub_modifier,
         }
+    }
+}
+
+/// A command that scrolls the terminal screen a given number of rows up in a specific scrolling
+/// region.
+///
+/// This will hopefully be replaced by a struct in crossterm proper. There are two outstanding
+/// crossterm PRs that will address this:
+///   - [918](https://github.com/crossterm-rs/crossterm/pull/918)
+///   - [923](https://github.com/crossterm-rs/crossterm/pull/923)
+#[cfg(feature = "scrolling-regions")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ScrollUpInRegion {
+    /// The first row of the scrolling region.
+    pub first_row: u16,
+
+    /// The last row of the scrolling region.
+    pub last_row: u16,
+
+    /// The number of lines to scroll up by.
+    pub lines_to_scroll: u16,
+}
+
+#[cfg(feature = "scrolling-regions")]
+impl crate::crossterm::Command for ScrollUpInRegion {
+    fn write_ansi(&self, f: &mut impl std::fmt::Write) -> std::fmt::Result {
+        if self.lines_to_scroll != 0 {
+            // Set a scrolling region that contains just the desired lines.
+            write!(
+                f,
+                crate::crossterm::csi!("{};{}r"),
+                self.first_row.saturating_add(1),
+                self.last_row.saturating_add(1)
+            )?;
+            // Scroll the region by the desired count.
+            write!(f, crate::crossterm::csi!("{}S"), self.lines_to_scroll)?;
+            // Reset the scrolling region to be the whole screen.
+            write!(f, crate::crossterm::csi!("r"))?;
+        }
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    fn execute_winapi(&self) -> io::Result<()> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "ScrollUpInRegion command not supported for winapi",
+        ))
+    }
+}
+
+/// A command that scrolls the terminal screen a given number of rows down in a specific scrolling
+/// region.
+///
+/// This will hopefully be replaced by a struct in crossterm proper. There are two outstanding
+/// crossterm PRs that will address this:
+///   - [918](https://github.com/crossterm-rs/crossterm/pull/918)
+///   - [923](https://github.com/crossterm-rs/crossterm/pull/923)
+#[cfg(feature = "scrolling-regions")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ScrollDownInRegion {
+    /// The first row of the scrolling region.
+    pub first_row: u16,
+
+    /// The last row of the scrolling region.
+    pub last_row: u16,
+
+    /// The number of lines to scroll down by.
+    pub lines_to_scroll: u16,
+}
+
+#[cfg(feature = "scrolling-regions")]
+impl crate::crossterm::Command for ScrollDownInRegion {
+    fn write_ansi(&self, f: &mut impl std::fmt::Write) -> std::fmt::Result {
+        if self.lines_to_scroll != 0 {
+            // Set a scrolling region that contains just the desired lines.
+            write!(
+                f,
+                crate::crossterm::csi!("{};{}r"),
+                self.first_row.saturating_add(1),
+                self.last_row.saturating_add(1)
+            )?;
+            // Scroll the region by the desired count.
+            write!(f, crate::crossterm::csi!("{}T"), self.lines_to_scroll)?;
+            // Reset the scrolling region to be the whole screen.
+            write!(f, crate::crossterm::csi!("r"))?;
+        }
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    fn execute_winapi(&self) -> io::Result<()> {
+        Err(io::Error::new(
+            io::ErrorKind::Unsupported,
+            "ScrollDownInRegion command not supported for winapi",
+        ))
     }
 }
 

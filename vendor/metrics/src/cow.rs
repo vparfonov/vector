@@ -226,7 +226,7 @@ where
 
         // SAFETY: We only ever hold a pointer to a borrowed value of at least the lifetime of
         // `Self`, or an owned value which we have ownership of (albeit indirectly when using
-        // `Arc<T>`), so our pointer is always valid and live for derefencing.
+        // `Arc<T>`), so our pointer is always valid and live for dereferencing.
         unsafe { borrowed_ptr.as_ref().unwrap() }
     }
 }
@@ -324,6 +324,20 @@ impl<'a> From<std::borrow::Cow<'a, str>> for Cow<'a, str> {
     }
 }
 
+impl<'a, T: Cowable> From<Cow<'a, T>> for std::borrow::Cow<'a, T> {
+    #[inline]
+    fn from(value: Cow<'a, T>) -> Self {
+        match value.metadata.kind() {
+            Kind::Owned | Kind::Shared => Self::Owned(value.into_owned()),
+            Kind::Borrowed => {
+                // SAFETY: We know the contained data is borrowed from 'a, we're simply
+                // restoring the original immutable reference and returning a copy of it.
+                Self::Borrowed(unsafe { &*T::borrowed_from_parts(value.ptr, &value.metadata) })
+            }
+        }
+    }
+}
+
 impl From<String> for Cow<'_, str> {
     #[inline]
     fn from(s: String) -> Self {
@@ -398,7 +412,7 @@ unsafe impl<T: Cowable + Sync + ?Sized> Sync for Cow<'_, T> {}
 unsafe impl<T: Cowable + Send + ?Sized> Send for Cow<'_, T> {}
 
 #[repr(C)]
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Metadata(usize, usize);
 
 impl Metadata {

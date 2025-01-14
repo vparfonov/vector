@@ -12,8 +12,13 @@
 [package]
 edition = "2018"
 name = "proptest-derive"
-version = "0.4.0"
+version = "0.5.0"
 authors = ["Mazdak Farrokhzad <twingoow@gmail.com>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
 Custom-derive for the Arbitrary trait of proptest.
 """
@@ -32,10 +37,81 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/proptest-rs/proptest"
 
 [lib]
+name = "proptest_derive"
+path = "src/lib.rs"
 proc-macro = true
+
+[[test]]
+name = "assoc"
+path = "tests/assoc.rs"
+
+[[test]]
+name = "compiletest"
+path = "tests/compiletest.rs"
+
+[[test]]
+name = "enum"
+path = "tests/enum.rs"
+
+[[test]]
+name = "filter"
+path = "tests/filter.rs"
+
+[[test]]
+name = "misc"
+path = "tests/misc.rs"
+
+[[test]]
+name = "no_bound"
+path = "tests/no_bound.rs"
+
+[[test]]
+name = "params"
+path = "tests/params.rs"
+
+[[test]]
+name = "phantom"
+path = "tests/phantom.rs"
+
+[[test]]
+name = "regex"
+path = "tests/regex.rs"
+
+[[test]]
+name = "skip"
+path = "tests/skip.rs"
+
+[[test]]
+name = "strategy"
+path = "tests/strategy.rs"
+
+[[test]]
+name = "struct"
+path = "tests/struct.rs"
+
+[[test]]
+name = "uninhabited-pass"
+path = "tests/uninhabited-pass.rs"
+
+[[test]]
+name = "units"
+path = "tests/units.rs"
+
+[[test]]
+name = "value"
+path = "tests/value.rs"
+
+[[test]]
+name = "value_param"
+path = "tests/value_param.rs"
+
+[[test]]
+name = "weight"
+path = "tests/weight.rs"
 
 [[bench]]
 name = "large_enum"
+path = "benches/large_enum.rs"
 harness = false
 
 [dependencies.proc-macro2]
@@ -45,7 +121,7 @@ version = "1.0"
 version = "1.0"
 
 [dependencies.syn]
-version = "1.0.0"
+version = "2.0.48"
 features = [
     "visit",
     "extra-traits",
@@ -53,7 +129,7 @@ features = [
 ]
 
 [dev-dependencies.compiletest_rs]
-version = "0.9"
+version = "0.11"
 features = [
     "tmp",
     "stable",
@@ -64,3 +140,6 @@ version = "0.5"
 
 [dev-dependencies.proptest]
 version = "1.0.0"
+
+[features]
+boxed_union = []

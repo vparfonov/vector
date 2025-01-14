@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "compact_str"
-version = "0.7.1"
+version = "0.8.0"
 authors = ["Parker Timmerman <parker@parkertimmerman.com>"]
 description = "A memory efficient string type that transparently stores strings on the stack, when possible"
 homepage = "https://github.com/ParkMyCar/compact_str"
@@ -32,7 +32,6 @@ categories = [
 ]
 license = "MIT"
 repository = "https://github.com/ParkMyCar/compact_str"
-resolver = "1"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -46,15 +45,26 @@ version = "1"
 optional = true
 default-features = false
 
+[dependencies.borsh]
+version = "1"
+optional = true
+
 [dependencies.bytes]
 version = "1"
 optional = true
 
 [dependencies.castaway]
-version = "0.2"
+version = "0.2.3"
+features = ["alloc"]
+default-features = false
 
 [dependencies.cfg-if]
 version = "1"
+
+[dependencies.diesel]
+version = "2"
+optional = true
+default-features = false
 
 [dependencies.itoa]
 version = "1"
@@ -81,17 +91,30 @@ features = ["size_32"]
 optional = true
 default-features = false
 
+[dependencies.rustversion]
+version = "1"
+
 [dependencies.ryu]
 version = "1"
 
 [dependencies.serde]
 version = "1"
+features = [
+    "derive",
+    "alloc",
+]
 optional = true
+default-features = false
 
 [dependencies.smallvec]
 version = "1"
 features = ["union"]
 optional = true
+
+[dependencies.sqlx]
+version = "0.7"
+optional = true
+default-features = false
 
 [dependencies.static_assertions]
 version = "1"
@@ -100,7 +123,7 @@ version = "1"
 version = "1"
 
 [dev-dependencies.proptest]
-version = "1.0.*"
+version = "1"
 features = ["std"]
 default-features = false
 
@@ -112,7 +135,7 @@ default-features = false
 version = "1"
 
 [dev-dependencies.rayon]
-version = "1.6.0"
+version = "1"
 
 [dev-dependencies.rkyv]
 version = "0.7"
@@ -130,7 +153,37 @@ features = ["derive"]
 version = "1"
 
 [dev-dependencies.test-case]
-version = "2"
+version = "3"
 
 [dev-dependencies.test-strategy]
-version = "0.2"
+version = "0.3"
+
+[features]
+arbitrary = ["dep:arbitrary"]
+borsh = ["dep:borsh"]
+bytes = ["dep:bytes"]
+default = ["std"]
+diesel = ["dep:diesel"]
+markup = ["dep:markup"]
+proptest = ["dep:proptest"]
+quickcheck = ["dep:quickcheck"]
+rkyv = ["dep:rkyv"]
+serde = ["dep:serde"]
+smallvec = ["dep:smallvec"]
+sqlx = [
+    "dep:sqlx",
+    "std",
+]
+sqlx-mysql = [
+    "sqlx",
+    "sqlx/mysql",
+]
+sqlx-postgres = [
+    "sqlx",
+    "sqlx/postgres",
+]
+sqlx-sqlite = [
+    "sqlx",
+    "sqlx/sqlite",
+]
+std = []

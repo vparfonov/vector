@@ -13,13 +13,18 @@
 edition = "2021"
 rust-version = "1.63"
 name = "hyper"
-version = "1.2.0"
+version = "1.4.1"
 authors = ["Sean McArthur <sean@seanmonstar.com>"]
+build = false
 include = [
     "Cargo.toml",
     "LICENSE",
     "src/**/*",
 ]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A fast and correct HTTP library."
 homepage = "https://hyper.rs"
 documentation = "https://docs.rs/hyper"
@@ -45,8 +50,6 @@ features = [
 ]
 rustdoc-args = [
     "--cfg",
-    "docsrs",
-    "--cfg",
     "hyper_unstable_ffi",
     "--cfg",
     "hyper_unstable_tracing",
@@ -63,123 +66,12 @@ incremental = false
 codegen-units = 1
 incremental = false
 
-[[example]]
-name = "client"
-path = "examples/client.rs"
-required-features = ["full"]
-
-[[example]]
-name = "client_json"
-path = "examples/client_json.rs"
-required-features = ["full"]
-
-[[example]]
-name = "echo"
-path = "examples/echo.rs"
-required-features = ["full"]
-
-[[example]]
-name = "gateway"
-path = "examples/gateway.rs"
-required-features = ["full"]
-
-[[example]]
-name = "graceful_shutdown"
-path = "examples/graceful_shutdown.rs"
-required-features = ["full"]
-
-[[example]]
-name = "hello"
-path = "examples/hello.rs"
-required-features = ["full"]
-
-[[example]]
-name = "http_proxy"
-path = "examples/http_proxy.rs"
-required-features = ["full"]
-
-[[example]]
-name = "multi_server"
-path = "examples/multi_server.rs"
-required-features = ["full"]
-
-[[example]]
-name = "params"
-path = "examples/params.rs"
-required-features = ["full"]
-
-[[example]]
-name = "send_file"
-path = "examples/send_file.rs"
-required-features = ["full"]
-
-[[example]]
-name = "service_struct_impl"
-path = "examples/service_struct_impl.rs"
-required-features = ["full"]
-
-[[example]]
-name = "single_threaded"
-path = "examples/single_threaded.rs"
-required-features = ["full"]
-
-[[example]]
-name = "state"
-path = "examples/state.rs"
-required-features = ["full"]
-
-[[example]]
-name = "upgrades"
-path = "examples/upgrades.rs"
-required-features = ["full"]
-
-[[example]]
-name = "web_api"
-path = "examples/web_api.rs"
-required-features = ["full"]
-
-[[test]]
-name = "client"
-path = "tests/client.rs"
-required-features = ["full"]
-
-[[test]]
-name = "integration"
-path = "tests/integration.rs"
-required-features = ["full"]
-
-[[test]]
-name = "server"
-path = "tests/server.rs"
-required-features = ["full"]
-
-[[bench]]
-name = "body"
-path = "benches/body.rs"
-required-features = ["full"]
-
-[[bench]]
-name = "connect"
-path = "benches/connect.rs"
-required-features = ["full"]
-
-[[bench]]
-name = "end_to_end"
-path = "benches/end_to_end.rs"
-required-features = ["full"]
-
-[[bench]]
-name = "pipeline"
-path = "benches/pipeline.rs"
-required-features = ["full"]
-
-[[bench]]
-name = "server"
-path = "benches/server.rs"
-required-features = ["full"]
+[lib]
+name = "hyper"
+path = "src/lib.rs"
 
 [dependencies.bytes]
-version = "1"
+version = "1.2"
 
 [dependencies.futures-channel]
 version = "0.3"
@@ -255,7 +147,10 @@ features = ["sink"]
 
 [dev-dependencies.futures-util]
 version = "0.3"
-features = ["sink"]
+features = [
+    "alloc",
+    "sink",
+]
 default-features = false
 
 [dev-dependencies.http-body-util]
@@ -305,6 +200,7 @@ default = []
 ffi = [
     "dep:libc",
     "dep:http-body-util",
+    "futures-util?/alloc",
 ]
 full = [
     "client",
@@ -330,3 +226,11 @@ server = [
     "dep:smallvec",
 ]
 tracing = ["dep:tracing"]
+
+[lints.rust.unexpected_cfgs]
+level = "warn"
+priority = 0
+check-cfg = [
+    "cfg(hyper_unstable_tracing)",
+    "cfg(hyper_unstable_ffi)",
+]

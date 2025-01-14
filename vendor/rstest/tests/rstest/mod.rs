@@ -23,6 +23,8 @@ fn run_test(res: impl AsRef<Path>) -> (std::process::Output, String) {
 
 #[test]
 fn files() {
+    std::env::set_var("FILES_ENV_VAR", "files");
+
     let prj = prj("files.rs");
     let files_path = prj.path().join("files");
     let sub_folder = files_path.join("sub");
@@ -62,6 +64,32 @@ fn files() {
     let output = prj.run_tests().unwrap();
 
     TestResults::new()
+        .ok("env_vars::path_1_files_element_0_txt")
+        .ok("env_vars::path_2_files_element_1_txt")
+        .ok("env_vars::path_3_files_element_2_txt")
+        .ok("env_vars::path_4_files_element_3_txt")
+        .ok("env_vars::path_5_files_sub_sub_dir_file_txt")
+        .ok("env_vars_base_dir::path_1_element_0_txt")
+        .ok("env_vars_base_dir::path_2_element_1_txt")
+        .ok("env_vars_base_dir::path_3_element_2_txt")
+        .ok("env_vars_base_dir::path_4_element_3_txt")
+        .ok("env_vars_base_dir::path_5_sub_sub_dir_file_txt")
+        .ok("env_vars_unknown::path_1_files_element_0_txt")
+        .ok("env_vars_unknown::path_2_files_element_1_txt")
+        .ok("env_vars_unknown::path_3_files_element_2_txt")
+        .ok("env_vars_unknown::path_4_files_element_3_txt")
+        .ok("env_vars_unknown::path_5_files_sub_sub_dir_file_txt")
+        .ok("ignore_missing_env_vars::path_1_files_element_0_txt")
+        .ok("ignore_missing_env_vars::path_2_files_element_1_txt")
+        .ok("ignore_missing_env_vars::path_3_files_element_2_txt")
+        .ok("ignore_missing_env_vars::path_4_files_element_3_txt")
+        .ok("ignore_missing_env_vars::path_5_files_sub_sub_dir_file_txt")
+        .ok("module::pathbuf_need_not_be_in_scope::path_1_files__ignore_me_txt")
+        .ok("module::pathbuf_need_not_be_in_scope::path_2_files_element_0_txt")
+        .ok("module::pathbuf_need_not_be_in_scope::path_3_files_element_1_txt")
+        .ok("module::pathbuf_need_not_be_in_scope::path_4_files_element_2_txt")
+        .ok("module::pathbuf_need_not_be_in_scope::path_5_files_element_3_txt")
+        .ok("module::pathbuf_need_not_be_in_scope::path_6_files_sub_sub_dir_file_txt")
         .ok("start_with_name::path_1__UP_files_test_sub_folder_from_parent_folder_txt")
         .ok("start_with_name::path_2_files_element_0_txt")
         .ok("start_with_name::path_3_files_element_1_txt")
@@ -74,12 +102,6 @@ fn files() {
         .ok("start_with_name_with_include::path_4_files_element_2_txt")
         .ok("start_with_name_with_include::path_5_files_element_3_txt")
         .ok("start_with_name_with_include::path_6_files_sub_sub_dir_file_txt")
-        .ok("module::pathbuf_need_not_be_in_scope::path_1_files__ignore_me_txt")
-        .ok("module::pathbuf_need_not_be_in_scope::path_2_files_element_0_txt")
-        .ok("module::pathbuf_need_not_be_in_scope::path_3_files_element_1_txt")
-        .ok("module::pathbuf_need_not_be_in_scope::path_4_files_element_2_txt")
-        .ok("module::pathbuf_need_not_be_in_scope::path_5_files_element_3_txt")
-        .ok("module::pathbuf_need_not_be_in_scope::path_6_files_sub_sub_dir_file_txt")
         .assert(output);
 }
 
@@ -165,8 +187,8 @@ fn impl_input() {
 }
 
 #[test]
-fn use_mutable_fixture_in_parametric_argumnts() {
-    let (output, _) = run_test("use_mutable_fixture_in_parametric_argumnts.rs");
+fn use_mutable_fixture_in_parametric_arguments() {
+    let (output, _) = run_test("use_mutable_fixture_in_parametric_arguments.rs");
 
     TestResults::new()
         .with_contains(true)
@@ -974,6 +996,27 @@ fn happy_path() {
 }
 
 #[test]
+fn destruct() {
+    let (output, _) = run_test("destruct.rs");
+
+    TestResults::new()
+        .ok("cases_destruct::case_1_two_times_twenty_one::__destruct_3_1_T__new_42_1_")
+        .ok("cases_destruct::case_1_two_times_twenty_one::__destruct_3_2_T_a_3_b_14_")
+        .ok("cases_destruct::case_2_six_times_seven::__destruct_3_1_T__new_42_1_")
+        .ok("cases_destruct::case_2_six_times_seven::__destruct_3_2_T_a_3_b_14_")
+        .ok("cases_destruct_named_tuple::case_1_two_times_twenty_one::__destruct_3_1_S_42_1_")
+        .ok("cases_destruct_named_tuple::case_1_two_times_twenty_one::__destruct_3_2_S_3_14_")
+        .ok("cases_destruct_named_tuple::case_2_six_times_seven::__destruct_3_1_S_42_1_")
+        .ok("cases_destruct_named_tuple::case_2_six_times_seven::__destruct_3_2_S_3_14_")
+        .ok("cases_destruct_tuple::case_1_two_times_twenty_one::__destruct_3_1__42_1_")
+        .ok("cases_destruct_tuple::case_1_two_times_twenty_one::__destruct_3_2__3_14_")
+        .ok("cases_destruct_tuple::case_2_six_times_seven::__destruct_3_1__42_1_")
+        .ok("cases_destruct_tuple::case_2_six_times_seven::__destruct_3_2__3_14_")
+        .ok("swapped")
+        .assert(output);
+}
+
+#[test]
 fn rename() {
     let (output, _) = run_test("rename.rs");
 
@@ -1001,6 +1044,22 @@ fn ignore_underscore_args() {
         .ok("test::case_2::_ignore3_2")
         .ok("test::case_2::_ignore3_3")
         .ok("test::case_2::_ignore3_4")
+        .assert(output);
+}
+
+#[test]
+fn ignore_args_not_fixtures() {
+    let prj = prj("ignore_not_fixture_arg.rs");
+    prj.add_dependency(
+        "sqlx",
+        r#"{version="*", features=["sqlite","macros","runtime-tokio"]}"#,
+    );
+
+    let output = prj.run_tests().unwrap();
+
+    TestResults::new()
+        .with_contains(true)
+        .ok("test_db")
         .assert(output);
 }
 
@@ -1710,5 +1769,39 @@ mod should_show_correct_errors {
             "#
             .unindent()
         );
+    }
+
+    #[test]
+    fn try_to_destruct_implicit_fixture() {
+        let (output, name) = execute();
+
+        assert_in!(
+            output.stderr.str(),
+            format!(
+                r#"
+                error: To destruct a fixture you should provide a path to resolve it by '#[from(...)]' attribute.
+                   --> {name}/src/lib.rs:126:27
+                    |
+                126 | fn wrong_destruct_fixture(T(a, b): T, #[with(42)] T(c, d): T) {{}}
+                    |                           ^^^^^^^^^^"#,
+            )
+            .unindent()
+        );
+
+        assert_in!(
+            output.stderr.str(),
+            format!(
+                r#"
+                error: To destruct a fixture you should provide a path to resolve it by '#[from(...)]' attribute.
+                   --> {name}/src/lib.rs:126:51
+                    |
+                126 | fn wrong_destruct_fixture(T(a, b): T, #[with(42)] T(c, d): T) {{}}
+                    |                                                   ^^^^^^^^^^"#,
+            )
+            .unindent()
+        );
+
+        assert_not_in!(output.stderr.str(), "#[case] T(e, f): T");
+        assert_not_in!(output.stderr.str(), "#[values(T(1, 2))] T(g, h): T");
     }
 }

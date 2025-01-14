@@ -1,3 +1,4 @@
+use alloc::string::String;
 use core::fmt::{
     self,
     Write,
@@ -13,7 +14,11 @@ use super::repr::{
     IntoRepr,
     Repr,
 };
-use crate::CompactString;
+use crate::{
+    CompactString,
+    ToCompactStringError,
+    UnwrapWithMsg,
+};
 
 /// A trait for converting a value to a `CompactString`.
 ///
@@ -23,6 +28,11 @@ use crate::CompactString;
 /// implementation for free.
 pub trait ToCompactString {
     /// Converts the given value to a [`CompactString`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the system runs out of memory and it cannot hold the whole string,
+    /// or if [`Display::fmt()`][core::fmt::Display::fmt] returns an error.
     ///
     /// # Examples
     ///
@@ -37,7 +47,18 @@ pub trait ToCompactString {
     ///
     /// assert_eq!(i.to_compact_string(), five);
     /// ```
-    fn to_compact_string(&self) -> CompactString;
+    #[inline]
+    #[track_caller]
+    fn to_compact_string(&self) -> CompactString {
+        self.try_to_compact_string().unwrap_with_msg()
+    }
+
+    /// Fallible version of [`ToCompactString::to_compact_string()`]
+    ///
+    /// This method won't panic if the system is out-of-memory, but return a
+    /// [`ReserveError`][crate::ReserveError].
+    /// Otherwise it behaves the same as [`ToCompactString::to_compact_string()`].
+    fn try_to_compact_string(&self) -> Result<CompactString, ToCompactStringError>;
 }
 
 /// # Safety
@@ -67,50 +88,50 @@ unsafe impl LifetimeFree for Repr {}
 ///     * For floats we use [`ryu`] crate which sometimes provides different formatting than [`std`]
 impl<T: fmt::Display> ToCompactString for T {
     #[inline]
-    fn to_compact_string(&self) -> CompactString {
+    fn try_to_compact_string(&self) -> Result<CompactString, ToCompactStringError> {
         let repr = match_type!(self, {
-            &u8 as s => s.into_repr(),
-            &i8 as s => s.into_repr(),
-            &u16 as s => s.into_repr(),
-            &i16 as s => s.into_repr(),
-            &u32 as s => s.into_repr(),
-            &i32 as s => s.into_repr(),
-            &u64 as s => s.into_repr(),
-            &i64 as s => s.into_repr(),
-            &u128 as s => s.into_repr(),
-            &i128 as s => s.into_repr(),
-            &usize as s => s.into_repr(),
-            &isize as s => s.into_repr(),
-            &f32 as s => s.into_repr(),
-            &f64 as s => s.into_repr(),
-            &bool as s => s.into_repr(),
-            &char as s => s.into_repr(),
-            &String as s => Repr::new(s),
-            &CompactString as s => Repr::new(s),
-            &num::NonZeroU8 as s => s.into_repr(),
-            &num::NonZeroI8 as s => s.into_repr(),
-            &num::NonZeroU16 as s => s.into_repr(),
-            &num::NonZeroI16 as s => s.into_repr(),
-            &num::NonZeroU32 as s => s.into_repr(),
-            &num::NonZeroI32 as s => s.into_repr(),
-            &num::NonZeroU64 as s => s.into_repr(),
-            &num::NonZeroI64 as s => s.into_repr(),
-            &num::NonZeroUsize as s => s.into_repr(),
-            &num::NonZeroIsize as s => s.into_repr(),
-            &num::NonZeroU128 as s => s.into_repr(),
-            &num::NonZeroI128 as s => s.into_repr(),
+            &u8 as s => s.into_repr()?,
+            &i8 as s => s.into_repr()?,
+            &u16 as s => s.into_repr()?,
+            &i16 as s => s.into_repr()?,
+            &u32 as s => s.into_repr()?,
+            &i32 as s => s.into_repr()?,
+            &u64 as s => s.into_repr()?,
+            &i64 as s => s.into_repr()?,
+            &u128 as s => s.into_repr()?,
+            &i128 as s => s.into_repr()?,
+            &usize as s => s.into_repr()?,
+            &isize as s => s.into_repr()?,
+            &f32 as s => s.into_repr()?,
+            &f64 as s => s.into_repr()?,
+            &bool as s => s.into_repr()?,
+            &char as s => s.into_repr()?,
+            &String as s => Repr::new(s)?,
+            &CompactString as s => Repr::new(s)?,
+            &num::NonZeroU8 as s => s.into_repr()?,
+            &num::NonZeroI8 as s => s.into_repr()?,
+            &num::NonZeroU16 as s => s.into_repr()?,
+            &num::NonZeroI16 as s => s.into_repr()?,
+            &num::NonZeroU32 as s => s.into_repr()?,
+            &num::NonZeroI32 as s => s.into_repr()?,
+            &num::NonZeroU64 as s => s.into_repr()?,
+            &num::NonZeroI64 as s => s.into_repr()?,
+            &num::NonZeroUsize as s => s.into_repr()?,
+            &num::NonZeroIsize as s => s.into_repr()?,
+            &num::NonZeroU128 as s => s.into_repr()?,
+            &num::NonZeroI128 as s => s.into_repr()?,
             s => {
-                let mut c = CompactString::new_inline("");
-                write!(&mut c, "{}", s).expect("fmt::Display incorrectly implemented!");
-                return c;
+                let mut c = CompactString::const_new("");
+                write!(c, "{}", s)?;
+                return Ok(c);
             }
         });
 
-        CompactString(repr)
+        Ok(CompactString(repr))
     }
 }
 
-/// A trait that provides convience methods for creating a [`CompactString`] from a collection of
+/// A trait that provides convenience methods for creating a [`CompactString`] from a collection of
 /// items. It is implemented for all types that can be converted into an iterator, and that iterator
 /// yields types that can be converted into a `str`.
 ///
@@ -127,7 +148,7 @@ impl<T: fmt::Display> ToCompactString for T {
 /// let concat = words.concat_compact();
 /// assert_eq!(concat, "☀️🌕🌑☀️");
 ///
-/// // join the words, with a seperator
+/// // join the words, with a separator
 /// let join = words.join_compact(" ➡️ ");
 /// assert_eq!(join, "☀️ ➡️ 🌕 ➡️ 🌑 ➡️ ☀️");
 /// ```
@@ -145,7 +166,7 @@ pub trait CompactStringExt {
     /// ```
     fn concat_compact(&self) -> CompactString;
 
-    /// Joins all the items of a collection, placing a seperator between them, forming a
+    /// Joins all the items of a collection, placing a separator between them, forming a
     /// [`CompactString`]
     ///
     /// # Example
@@ -157,7 +178,7 @@ pub trait CompactStringExt {
     ///
     /// assert_eq!(compact, "apples, oranges, bananas");
     /// ```
-    fn join_compact<S: AsRef<str>>(&self, seperator: S) -> CompactString;
+    fn join_compact<S: AsRef<str>>(&self, separator: S) -> CompactString;
 }
 
 impl<I, C> CompactStringExt for C
@@ -167,17 +188,17 @@ where
 {
     fn concat_compact(&self) -> CompactString {
         self.into_iter()
-            .fold(CompactString::new_inline(""), |mut s, item| {
+            .fold(CompactString::const_new(""), |mut s, item| {
                 s.push_str(item.as_ref());
                 s
             })
     }
 
-    fn join_compact<S: AsRef<str>>(&self, seperator: S) -> CompactString {
-        let mut compact_string = CompactString::new_inline("");
+    fn join_compact<S: AsRef<str>>(&self, separator: S) -> CompactString {
+        let mut compact_string = CompactString::const_new("");
 
         let mut iter = self.into_iter().peekable();
-        let sep = seperator.as_ref();
+        let sep = separator.as_ref();
 
         while let Some(item) = iter.next() {
             compact_string.push_str(item.as_ref());
@@ -192,6 +213,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use alloc::string::{
+        String,
+        ToString,
+    };
+    use alloc::vec::Vec;
     use core::num;
 
     use proptest::prelude::*;
@@ -216,9 +242,9 @@ mod tests {
 
     #[proptest]
     #[cfg_attr(miri, ignore)]
-    fn proptest_join(items: Vec<String>, seperator: String) {
-        let c: CompactString = items.join_compact(&seperator);
-        let s: String = items.join(&seperator);
+    fn proptest_join(items: Vec<String>, separator: String) {
+        let c: CompactString = items.join_compact(&separator);
+        let s: String = items.join(&separator);
         assert_eq!(c, s);
     }
 

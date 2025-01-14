@@ -26,11 +26,24 @@ Please feel free to contribute new functionality! A roadmap can be found [here](
 
 ```toml
 [dependencies]
-ndarray = "0.15"
-ndarray-stats = "0.5.1"
+ndarray = "0.16"
+ndarray-stats = "0.6.0"
 ```
 
 ## Releases
+
+* **0.6.0**
+
+  * Breaking changes
+    * Minimum supported Rust version: `1.64.0`
+    * Updated to `ndarray:v0.16.0`
+    * Updated to `approx:v0.5.0`
+
+  * Updated to `ndarray-rand:v0.15.0`
+  * Updated to `indexmap:v2.4`
+  * Updated to `itertools:v0.13`
+
+  *Contributors*: [@bluss](https://github.com/bluss)
 
 * **0.5.1**
   * Fixed bug in implementation of `MaybeNaN::remove_nan_mut` for `f32` and
@@ -118,7 +131,7 @@ Please feel free to create issues and submit PRs.
 
 ## License
 
-Copyright 2018–2022 `ndarray-stats` developers
+Copyright 2018–2024 `ndarray-stats` developers
 
 Licensed under the [Apache License, Version 2.0](LICENSE-APACHE), or the [MIT
 license](LICENSE-MIT), at your option. You may not use this project except in

@@ -929,7 +929,7 @@ impl<'a, Octs: Octets + ?Sized> ParsedRecord<'a, Octs> {
         &self,
     ) -> Result<Option<Record<ParsedName<Octs::Range<'_>>, Data>>, ParseError>
     where
-        Data: ParseRecordData<'a, Octs> + ?Sized,
+        Data: ParseRecordData<'a, Octs>,
     {
         self.header
             .deref_owner()
@@ -1567,11 +1567,9 @@ impl<'a> core::iter::Sum<&'a Ttl> for Ttl {
     }
 }
 
-// No From impl because conversion is lossy
-#[allow(clippy::from_over_into)]
-impl Into<Duration> for Ttl {
-    fn into(self) -> Duration {
-        Duration::from_secs(u64::from(self.0))
+impl From<Ttl> for Duration {
+    fn from(value: Ttl) -> Self {
+        Duration::from_secs(u64::from(value.0))
     }
 }
 

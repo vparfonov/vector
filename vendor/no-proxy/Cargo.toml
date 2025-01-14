@@ -12,19 +12,29 @@
 [package]
 edition = "2018"
 name = "no-proxy"
-version = "0.3.4"
+version = "0.3.5"
 authors = ["Jérémie Drouet <jeremie.drouet@gmail.com>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Parses and evaluate no_proxy configuration"
 readme = "readme.md"
 license = "MIT"
 repository = "https://github.com/jdrouet/no-proxy"
 
+[lib]
+name = "no_proxy"
+path = "src/lib.rs"
+
 [dependencies.async-graphql]
-version = "^6.0"
+version = "^7.0"
 optional = true
+default-features = false
 
 [dependencies.cidr-utils]
-version = "^0.5"
+version = "^0.6"
 
 [dependencies.serde]
 version = "^1.0"

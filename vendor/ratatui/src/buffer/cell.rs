@@ -1,6 +1,6 @@
 use compact_str::CompactString;
 
-use crate::prelude::*;
+use crate::style::{Color, Modifier, Style};
 
 /// A buffer cell
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -13,7 +13,7 @@ pub struct Cell {
     /// This is a [`CompactString`] which is a wrapper around [`String`] that uses a small inline
     /// buffer for short strings.
     ///
-    /// See <https://github.com/ratatui-org/ratatui/pull/601> for more information.
+    /// See <https://github.com/ratatui/ratatui/pull/601> for more information.
     symbol: CompactString,
 
     /// The foreground color of the cell.
@@ -41,11 +41,11 @@ impl Cell {
     ///
     /// This works at compile time and puts the symbol onto the stack. Fails to build when the
     /// symbol doesnt fit onto the stack and requires to be placed on the heap. Use
-    /// `Self::default().set_symbol()` in that case. See [`CompactString::new_inline`] for more
+    /// `Self::default().set_symbol()` in that case. See [`CompactString::const_new`] for more
     /// details on this.
-    pub const fn new(symbol: &str) -> Self {
+    pub const fn new(symbol: &'static str) -> Self {
         Self {
-            symbol: CompactString::new_inline(symbol),
+            symbol: CompactString::const_new(symbol),
             fg: Color::Reset,
             bg: Color::Reset,
             #[cfg(feature = "underline-color")]
@@ -139,7 +139,7 @@ impl Cell {
 
     /// Resets the cell to the empty state.
     pub fn reset(&mut self) {
-        self.symbol = CompactString::new_inline(" ");
+        self.symbol = CompactString::const_new(" ");
         self.fg = Color::Reset;
         self.bg = Color::Reset;
         #[cfg(feature = "underline-color")]
@@ -157,6 +157,14 @@ impl Default for Cell {
     }
 }
 
+impl From<char> for Cell {
+    fn from(ch: char) -> Self {
+        let mut cell = Self::EMPTY;
+        cell.set_char(ch);
+        cell
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -167,7 +175,7 @@ mod tests {
         assert_eq!(
             cell,
             Cell {
-                symbol: CompactString::new_inline("あ"),
+                symbol: CompactString::const_new("あ"),
                 fg: Color::Reset,
                 bg: Color::Reset,
                 #[cfg(feature = "underline-color")]

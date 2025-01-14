@@ -1,8 +1,10 @@
 use crate::codec::compression::{CompressionEncoding, EnabledCompressionEncodings};
+use crate::codec::EncodeBody;
+use crate::metadata::GRPC_CONTENT_TYPE;
 use crate::{
     body::BoxBody,
     client::GrpcService,
-    codec::{encode_client, Codec, Decoder, Streaming},
+    codec::{Codec, Decoder, Streaming},
     request::SanitizeHeaders,
     Code, Request, Response, Status,
 };
@@ -11,7 +13,7 @@ use http::{
     uri::{PathAndQuery, Uri},
 };
 use http_body::Body;
-use std::{fmt, future};
+use std::{fmt, future, pin::pin};
 use tokio_stream::{Stream, StreamExt};
 
 /// A gRPC client dispatcher.
@@ -159,7 +161,7 @@ impl<T> Grpc<T> {
         self
     }
 
-    /// Limits the maximum size of an ecoded message.
+    /// Limits the maximum size of an encoded message.
     ///
     /// # Example
     ///
@@ -239,7 +241,7 @@ impl<T> Grpc<T> {
         let (mut parts, body, extensions) =
             self.streaming(request, path, codec).await?.into_parts();
 
-        tokio::pin!(body);
+        let mut body = pin!(body);
 
         let message = body
             .try_next()
@@ -248,7 +250,7 @@ impl<T> Grpc<T> {
                 status.metadata_mut().merge(parts.clone());
                 status
             })?
-            .ok_or_else(|| Status::new(Code::Internal, "Missing response message."))?;
+            .ok_or_else(|| Status::internal("Missing response message."))?;
 
         if let Some(trailers) = body.trailers().await? {
             parts.merge(trailers);
@@ -294,9 +296,9 @@ impl<T> Grpc<T> {
     {
         let request = request
             .map(|s| {
-                encode_client(
+                EncodeBody::new_client(
                     codec.encoder(),
-                    s,
+                    s.map(Ok),
                     self.config.send_compression_encodings,
                     self.config.max_encoding_message_size,
                 )
@@ -404,7 +406,7 @@ impl GrpcConfig {
         // Set the content type
         request
             .headers_mut()
-            .insert(CONTENT_TYPE, HeaderValue::from_static("application/grpc"));
+            .insert(CONTENT_TYPE, GRPC_CONTENT_TYPE);
 
         #[cfg(any(feature = "gzip", feature = "zstd"))]
         if let Some(encoding) = self.send_compression_encodings {

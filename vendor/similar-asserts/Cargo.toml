@@ -13,9 +13,14 @@
 edition = "2018"
 rust-version = "1.46.0"
 name = "similar-asserts"
-version = "1.5.0"
+version = "1.6.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
+build = false
 exclude = ["assets/*"]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "provides assert_eq! like macros with colorized diff output"
 readme = "README.md"
 keywords = [
@@ -29,9 +34,50 @@ repository = "https://github.com/mitsuhiko/similar-asserts"
 [package.metadata.docs.rs]
 all-features = true
 
+[lib]
+name = "similar_asserts"
+path = "src/lib.rs"
+
+[[example]]
+name = "basic"
+path = "examples/basic.rs"
+
+[[example]]
+name = "custom"
+path = "examples/custom.rs"
+
+[[example]]
+name = "extended"
+path = "examples/extended.rs"
+
+[[example]]
+name = "long"
+path = "examples/long.rs"
+
+[[example]]
+name = "newlines-matter"
+path = "examples/newlines-matter.rs"
+
+[[example]]
+name = "no-debug"
+path = "examples/no-debug.rs"
+
 [[example]]
 name = "serde"
+path = "examples/serde.rs"
 required-features = ["serde"]
+
+[[example]]
+name = "str"
+path = "examples/str.rs"
+
+[[example]]
+name = "string"
+path = "examples/string.rs"
+
+[[test]]
+name = "test_unsized"
+path = "tests/test_unsized.rs"
 
 [dependencies.console]
 version = "0.15.0"

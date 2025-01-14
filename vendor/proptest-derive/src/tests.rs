@@ -80,14 +80,14 @@ test! {
     } expands to {
         #[allow(non_upper_case_globals)]
         #[allow(clippy::arc_with_non_send_sync)]
-        const _IMPL_ARBITRARY_FOR_MyUnitStruct : () = {
+        const _: () = {
             extern crate proptest as _proptest;
         impl _proptest::arbitrary::Arbitrary for MyUnitStruct {
             type Parameters = ();
             type Strategy = fn() -> Self;
 
             fn arbitrary_with(_top: Self::Parameters) -> Self::Strategy {
-                || MyUnitStruct {}
+                (|| MyUnitStruct {}) as fn() -> _
             }
         }
         };
@@ -101,14 +101,14 @@ test! {
     } expands to {
         #[allow(non_upper_case_globals)]
         #[allow(clippy::arc_with_non_send_sync)]
-        const _IMPL_ARBITRARY_FOR_MyTupleUnitStruct : () = {
+        const _: () = {
             extern crate proptest as _proptest;
         impl _proptest::arbitrary::Arbitrary for MyTupleUnitStruct {
             type Parameters = ();
             type Strategy = fn() -> Self;
 
             fn arbitrary_with(_top: Self::Parameters) -> Self::Strategy {
-                || MyTupleUnitStruct {}
+                (|| MyTupleUnitStruct {}) as fn() -> _
             }
         }
         };
@@ -122,14 +122,14 @@ test! {
     } expands to {
         #[allow(non_upper_case_globals)]
         #[allow(clippy::arc_with_non_send_sync)]
-        const _IMPL_ARBITRARY_FOR_MyNamedUnitStruct : () = {
+        const _: () = {
             extern crate proptest as _proptest;
         impl _proptest::arbitrary::Arbitrary for MyNamedUnitStruct {
             type Parameters = ();
             type Strategy = fn() -> Self;
 
             fn arbitrary_with(_top: Self::Parameters) -> Self::Strategy {
-                || MyNamedUnitStruct {}
+                (|| MyNamedUnitStruct {}) as fn () -> _
             }
         }
         };

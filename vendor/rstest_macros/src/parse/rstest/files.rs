@@ -1,35 +1,119 @@
 use std::{env, path::PathBuf};
 
-use glob::glob;
-use quote::ToTokens;
-use regex::Regex;
-use relative_path::RelativePath;
-use syn::{parse_quote, visit_mut::VisitMut, Attribute, Expr, FnArg, Ident, ItemFn, LitStr};
-
 use crate::{
     error::ErrorsVec,
     parse::{
         extract_argument_attrs,
         vlist::{Value, ValueList},
     },
-    refident::MaybeIdent,
+    refident::{IntoPat, MaybeIdent},
     utils::attr_is,
 };
+use glob::glob;
+use quote::ToTokens;
+use regex::Regex;
+use relative_path::RelativePath;
+use syn::{parse_quote, visit_mut::VisitMut, Attribute, Expr, FnArg, Ident, ItemFn, LitStr};
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct FilesGlobReferences {
+    base_dir: Option<LitStrAttr>,
     glob: Vec<LitStrAttr>,
     exclude: Vec<Exclude>,
     ignore_dot_files: bool,
+    ignore_missing_env_vars: bool,
 }
 
 impl FilesGlobReferences {
+    /// Replace environment variables in a string.
+    fn replace_env_vars(
+        &self,
+        attr: &LitStrAttr,
+        env: impl EnvironmentResolver,
+    ) -> Result<String, syn::Error> {
+        let re = Regex::new(r"\$([a-zA-Z_][a-zA-Z0-9_]+)|\$\{([^}]+)}")
+            .expect("Could not build the regex");
+
+        let ignore_missing = self.ignore_missing_env_vars;
+
+        let path = attr.value();
+        let haystack = path.as_str();
+        let mut result = String::with_capacity(attr.value().len());
+        let mut last_match = 0;
+
+        for caps in re.captures_iter(haystack) {
+            let match_all = caps.get(0).expect("The regex should have matched");
+
+            // Match the name of the variable and its default value (if any).
+            let (var_name, default) = if let Some(m) = caps.get(1) {
+                // In the first case ($VAR), the default value is None.
+                (m.as_str(), None)
+            } else {
+                // In the second case we have to split the variable name and the default value
+                // if there's a `:-` separator.
+                let m = caps.get(2).expect("The regex should have matched");
+
+                let (var_name, default) =
+                    if let Some((var_name, default)) = m.as_str().split_once(":-") {
+                        (var_name, Some(default))
+                    } else {
+                        (m.as_str(), None)
+                    };
+
+                var_name
+                    .chars()
+                    .all(|c| c.is_alphanumeric() || c == '_')
+                    .then_some((var_name, default))
+                    .ok_or_else(|| {
+                        attr.error(&format!(
+                            "The variable \"{}\" name does not match [a-zA-Z0-9_]+",
+                            m.as_str()
+                        ))
+                    })?
+            };
+
+            let v = env.get(var_name);
+            let replacement = match (v.as_deref(), default) {
+                (Some(""), Some(default)) => default.to_string(),
+                (Some(val), _) => val.to_string(),
+                (None, Some(default)) => default.to_string(),
+                (None, _) if ignore_missing => String::new(),
+                (None, _) => {
+                    return Err(attr.error(&format!(
+                        "Could not find the environment variable {:?}",
+                        var_name
+                    )))
+                }
+            };
+
+            result.push_str(&haystack[last_match..match_all.start()]);
+            result.push_str(&replacement);
+            last_match = match_all.end();
+        }
+
+        result.push_str(&haystack[last_match..]);
+
+        Ok(result)
+    }
+
+    /// Return the base_dir attribute if set, with variables replaced.
+    fn base_dir(&self) -> Result<Option<PathBuf>, syn::Error> {
+        self.base_dir
+            .as_ref()
+            .map(|attr| {
+                self.replace_env_vars(attr, StdEnvironmentResolver)
+                    .map(PathBuf::from)
+            })
+            .transpose()
+    }
+
     /// Return the tuples attribute, path string if they are valid relative paths
     fn paths(&self, base_dir: &PathBuf) -> Result<Vec<(&LitStrAttr, String)>, syn::Error> {
         self.glob
             .iter()
             .map(|attr| {
-                RelativePath::from_path(&attr.value())
+                let path = self.replace_env_vars(attr, StdEnvironmentResolver)?;
+                RelativePath::from_path(&path)
                     .map_err(|e| attr.error(&format!("Invalid glob path: {e}")))
                     .map(|p| p.to_logical_path(base_dir))
                     .map(|p| (attr, p.to_string_lossy().into_owned()))
@@ -53,12 +137,24 @@ impl ToTokens for LitStrAttr {
 }
 
 impl FilesGlobReferences {
-    fn new(glob: Vec<LitStrAttr>, exclude: Vec<Exclude>, ignore_dot_files: bool) -> Self {
+    fn new(
+        glob: Vec<LitStrAttr>,
+        exclude: Vec<Exclude>,
+        ignore_dot_files: bool,
+        ignore_missing_env_vars: bool,
+    ) -> Self {
         Self {
             glob,
+            base_dir: None,
             exclude,
             ignore_dot_files,
+            ignore_missing_env_vars,
         }
+    }
+
+    fn with_base_dir_opt(mut self, base_dir: Option<LitStrAttr>) -> Self {
+        self.base_dir = base_dir;
+        self
     }
 
     fn is_valid(&self, p: &RelativePath) -> bool {
@@ -80,6 +176,23 @@ struct LitStrAttr {
 }
 
 impl LitStrAttr {
+    fn parse_meta_name_value(attr: &Attribute) -> Result<Self, syn::Error> {
+        let meta = attr.meta.require_name_value()?;
+        if let syn::Expr::Lit(expr) = &meta.value {
+            if let syn::Lit::Str(value) = expr.lit.clone() {
+                return Ok(Self {
+                    attr: attr.clone(),
+                    value,
+                });
+            }
+        }
+
+        Err(syn::Error::new_spanned(
+            attr,
+            "expected a string literal value",
+        ))
+    }
+
     fn value(&self) -> String {
         self.value.value()
     }
@@ -112,7 +225,7 @@ impl TryFrom<Attribute> for Exclude {
 
     fn try_from(attr: Attribute) -> Result<Self, Self::Error> {
         let attr: LitStrAttr = attr.try_into()?;
-        let r = regex::Regex::new(&attr.value()).map_err(|e| {
+        let r = Regex::new(&attr.value()).map_err(|e| {
             syn::Error::new_spanned(
                 &attr,
                 format!(r#""{}" Should be a valid regex: {e}"#, attr.value()),
@@ -124,7 +237,7 @@ impl TryFrom<Attribute> for Exclude {
 
 impl From<Vec<LitStrAttr>> for FilesGlobReferences {
     fn from(value: Vec<LitStrAttr>) -> Self {
-        Self::new(value, Default::default(), true)
+        Self::new(value, Default::default(), true, false)
     }
 }
 
@@ -168,7 +281,7 @@ impl ValueFilesExtractor {
         &mut self,
         node: &mut FnArg,
         is_valid_attr: fn(&syn::Attribute) -> bool,
-        build: fn(syn::Attribute, &Ident) -> syn::Result<B>,
+        build: impl Fn(syn::Attribute) -> syn::Result<B> + 'a,
     ) -> Vec<B> {
         self.collect_errors(
             extract_argument_attrs(node, is_valid_attr, build).collect::<Result<Vec<_>, _>>(),
@@ -176,26 +289,51 @@ impl ValueFilesExtractor {
     }
 
     fn extract_files(&mut self, node: &mut FnArg) -> Vec<LitStrAttr> {
-        self.extract_argument_attrs(node, |a| attr_is(a, "files"), |attr, _| attr.try_into())
+        self.extract_argument_attrs(node, |a| attr_is(a, "files"), |attr| attr.try_into())
     }
 
     fn extract_exclude(&mut self, node: &mut FnArg) -> Vec<Exclude> {
-        self.extract_argument_attrs(
-            node,
-            |a| attr_is(a, "exclude"),
-            |attr, _| Exclude::try_from(attr),
-        )
+        self.extract_argument_attrs(node, |a| attr_is(a, "exclude"), Exclude::try_from)
     }
 
     fn extract_include_dot_files(&mut self, node: &mut FnArg) -> Vec<Attribute> {
         self.extract_argument_attrs(
             node,
             |a| attr_is(a, "include_dot_files"),
-            |attr, _| {
+            |attr| {
                 attr.meta
                     .require_path_only()
                     .map_err(|_| attr.error("Use #[include_dot_files] to include dot files"))?;
                 Ok(attr)
+            },
+        )
+    }
+
+    fn extract_ignore_missing_env_vars(&mut self, node: &mut FnArg) -> Vec<Attribute> {
+        self.extract_argument_attrs(
+            node,
+            |a| attr_is(a, "ignore_missing_env_vars"),
+            |attr| {
+                attr.meta.require_path_only().map_err(|_| {
+                    attr.error(
+                        "Use #[ignore_missing_env_vars] to ignore missing environment variables",
+                    )
+                })?;
+                Ok(attr)
+            },
+        )
+    }
+
+    fn extract_base_dir(&mut self, node: &mut FnArg) -> Vec<LitStrAttr> {
+        self.extract_argument_attrs(
+            node,
+            |a| attr_is(a, "base_dir"),
+            |attr| {
+                LitStrAttr::parse_meta_name_value(&attr).map_err(|_| {
+                    attr.error(
+                        "Use #[base_dir = \"...\"] to define the base directory for the glob path",
+                    )
+                })
             },
         )
     }
@@ -217,10 +355,30 @@ impl VisitMut for ValueFilesExtractor {
                     .push(attr.error("Cannot use #[include_dot_files] more than once"))
             })
         }
+        let ignore_missing_env_vars = self.extract_ignore_missing_env_vars(node);
+        if !ignore_missing_env_vars.is_empty() {
+            ignore_missing_env_vars.iter().skip(1).for_each(|attr| {
+                self.errors
+                    .push(attr.error("Cannot use #[ignore_missing_env_vars] more than once"))
+            })
+        }
+        let base_dir = self.extract_base_dir(node);
+        if base_dir.len() > 1 {
+            base_dir.iter().skip(1).for_each(|attr| {
+                self.errors
+                    .push(attr.error(r#"Cannot use #[base_dir = "..."] more than once"#))
+            })
+        }
         if !files.is_empty() {
             self.files.push((
                 name,
-                FilesGlobReferences::new(files, excludes, include_dot_files.is_empty()),
+                FilesGlobReferences::new(
+                    files,
+                    excludes,
+                    include_dot_files.is_empty(),
+                    !ignore_missing_env_vars.is_empty(),
+                )
+                .with_base_dir_opt(base_dir.into_iter().next()),
             ))
         } else {
             excludes.into_iter().for_each(|e| {
@@ -232,6 +390,15 @@ impl VisitMut for ValueFilesExtractor {
             include_dot_files.into_iter().for_each(|attr| {
                 self.errors
                     .push(attr.error("You cannot use #[include_dot_files] without #[files(...)]"))
+            });
+            ignore_missing_env_vars.into_iter().for_each(|attr| {
+                self.errors.push(
+                    attr.error("You cannot use #[ignore_missing_env_vars] without #[files(...)]"),
+                )
+            });
+            base_dir.into_iter().for_each(|attr| {
+                self.errors
+                    .push(attr.error(r#"You cannot use #[base_dir = "..."] without #[files(...)]"#))
             });
         }
     }
@@ -250,6 +417,18 @@ trait BaseDir {
 struct DefaultBaseDir;
 
 impl BaseDir for DefaultBaseDir {}
+
+trait EnvironmentResolver {
+    fn get(&self, var: &str) -> Option<String>;
+}
+
+struct StdEnvironmentResolver;
+
+impl EnvironmentResolver for StdEnvironmentResolver {
+    fn get(&self, var: &str) -> Option<String> {
+        env::var(var).ok()
+    }
+}
 
 trait GlobResolver {
     fn glob(&self, pattern: &str) -> Result<Vec<PathBuf>, String> {
@@ -296,17 +475,32 @@ impl<'a> ValueListFromFiles<'a> {
         files
             .into_iter()
             .map(|(arg, refs)| {
-                self.file_list_values(refs)
-                    .map(|values| ValueList { arg, values })
+                self.file_list_values(refs).map(|values| ValueList {
+                    arg: arg.into_pat(),
+                    values,
+                })
             })
             .collect::<Result<Vec<ValueList>, _>>()
     }
 
     fn file_list_values(&self, refs: FilesGlobReferences) -> Result<Vec<Value>, syn::Error> {
-        let base_dir = self
+        let default_base_dir = self
             .base_dir
             .base_dir()
             .map_err(|msg| refs.glob[0].error(&msg))?;
+
+        let base_dir = match refs.base_dir()? {
+            Some(mut p) => {
+                if p.is_relative() {
+                    p = default_base_dir.join(p);
+                }
+                p.canonicalize().map_err(|e| {
+                    refs.glob[0].error(&format!("Cannot canonicalize base dir due {e}"))
+                })?
+            }
+            None => default_base_dir,
+        };
+
         let resolved_paths = refs.paths(&base_dir)?;
         let base_dir = base_dir
             .into_os_string()
@@ -402,8 +596,22 @@ mod should {
             .unwrap()
     }
 
+    fn name_value_attr(name: &str, value: impl AsRef<str>) -> LitStrAttr {
+        LitStrAttr::parse_meta_name_value(
+            &attrs(&format!(r#"#[{name} = "{}"]"#, value.as_ref()))
+                .into_iter()
+                .next()
+                .unwrap(),
+        )
+        .expect("Could not parse attribute")
+    }
+
     fn files_attr(lstr: impl AsRef<str>) -> LitStrAttr {
         lit_str_attr("files", lstr)
+    }
+
+    fn base_dir_attr(lstr: impl AsRef<str>) -> LitStrAttr {
+        name_value_attr("base_dir", lstr)
     }
 
     fn exclude_attr(lstr: impl AsRef<str>) -> LitStrAttr {
@@ -424,36 +632,43 @@ mod should {
         fn from(value: &str) -> Self {
             Self {
                 attr: exclude_attr(value),
-                r: regex::Regex::new(value).unwrap(),
+                r: Regex::new(value).unwrap(),
             }
         }
     }
 
     #[rstest]
-    #[case::simple(r#"fn f(#[files("some_glob")] a: PathBuf) {}"#, "fn f(a: PathBuf) {}", &[("a", &["some_glob"], &[], true)])]
+    #[case::simple(r#"fn f(#[files("some_glob")] a: PathBuf) {}"#, "fn f(a: PathBuf) {}", &[("a", None, &["some_glob"], &[], true, false)])]
     #[case::more_than_one(
         r#"fn f(#[files("first")] a: PathBuf, b: u32, #[files("third")] c: PathBuf) {}"#,
-        r#"fn f(a: PathBuf, 
-                b: u32, 
+        r#"fn f(a: PathBuf,
+                b: u32,
                 c: PathBuf) {}"#,
-        &[("a", &["first"], &[], true), ("c", &["third"], &[], true)],
+        &[("a", None, &["first"], &[], true, false), ("c", None, &["third"], &[], true, false)],
     )]
     #[case::more_globs_on_the_same_var(
         r#"fn f(#[files("first")] #[files("second")] a: PathBuf) {}"#,
         r#"fn f(a: PathBuf) {}"#,
-        &[("a", &["first", "second"], &[], true)],
+        &[("a", None, &["first", "second"], &[], true, false)],
     )]
-    #[case::exclude(r#"fn f(#[files("some_glob")] #[exclude("exclude")] a: PathBuf) {}"#, 
-    "fn f(a: PathBuf) {}", &[("a", &["some_glob"], &["exclude"], true)])]
-    #[case::exclude_more(r#"fn f(#[files("some_glob")] #[exclude("first")]  #[exclude("second")] a: PathBuf) {}"#, 
-    "fn f(a: PathBuf) {}", &[("a", &["some_glob"], &["first", "second"], true)])]
-    #[case::include_dot_files(r#"fn f(#[files("some_glob")] #[include_dot_files] a: PathBuf) {}"#, 
-    "fn f(a: PathBuf) {}", &[("a", &["some_glob"], &[], false)])]
-
+    #[case::exclude(r#"fn f(#[files("some_glob")] #[exclude("exclude")] a: PathBuf) {}"#,
+    "fn f(a: PathBuf) {}", &[("a", None, &["some_glob"], &["exclude"], true, false)])]
+    #[case::exclude_more(r#"fn f(#[files("some_glob")] #[exclude("first")]  #[exclude("second")] a: PathBuf) {}"#,
+    "fn f(a: PathBuf) {}", &[("a", None, &["some_glob"], &["first", "second"], true, false)])]
+    #[case::include_dot_files(r#"fn f(#[files("some_glob")] #[include_dot_files] a: PathBuf) {}"#,
+    "fn f(a: PathBuf) {}", &[("a", None, &["some_glob"], &[], false, false)])]
+    #[case::base_dir(r#"fn f(#[files("some_glob")] #[base_dir = "/base/"] a: PathBuf) {}"#,
+    "fn f(a: PathBuf) {}", &[("a", Some("/base/"), &["some_glob"], &[], true, false)])]
+    #[case::ignore_env_vars(r#"fn f(#[files("some_glob")] #[ignore_missing_env_vars] a: PathBuf) {}"#,
+    "fn f(a: PathBuf) {}", &[("a", None, &["some_glob"], &[], true, true)])]
+    #[case::ignore_env_vars_unknown(r#"fn f(#[files("some${SOME_VAR}_glob")] #[ignore_missing_env_vars] a: PathBuf) {}"#,
+    "fn f(a: PathBuf) {}", &[("a", None, &["some${SOME_VAR}_glob"], &[], true, true)])]
+    #[case::env_vars_default(r#"fn f(#[files("some${__UNKNOWN__:-default/value}_glob")] a: PathBuf) {}"#,
+    "fn f(a: PathBuf) {}", &[("a", None, &["some${__UNKNOWN__:-default/value}_glob"], &[], true, false)])]
     fn extract<'a, G: AsRef<[&'a str]>, E: AsRef<[&'a str]>>(
         #[case] item_fn: &str,
         #[case] expected: &str,
-        #[case] expected_files: &[(&str, G, E, bool)],
+        #[case] expected_files: &[(&str, Option<&str>, G, E, bool, bool)],
     ) {
         let mut item_fn: ItemFn = item_fn.ast();
         let expected: ItemFn = expected.ast();
@@ -465,14 +680,18 @@ mod should {
             files,
             expected_files
                 .into_iter()
-                .map(|(id, globs, ex, ignore)| (
-                    ident(id),
-                    FilesGlobReferences::new(
-                        globs.as_ref().iter().map(files_attr).collect(),
-                        ex.as_ref().iter().map(|&ex| ex.into()).collect(),
-                        *ignore
+                .map(|(id, base_dir, globs, ex, ignore, ignore_envvars)| {
+                    (
+                        ident(id),
+                        FilesGlobReferences::new(
+                            globs.as_ref().iter().map(files_attr).collect(),
+                            ex.as_ref().iter().map(|&ex| ex.into()).collect(),
+                            *ignore,
+                            *ignore_envvars,
+                        )
+                        .with_base_dir_opt(base_dir.map(base_dir_attr)),
                     )
-                ))
+                })
                 .collect::<Vec<_>>()
         );
     }
@@ -508,10 +727,57 @@ mod should {
         r#"fn f(#[files("some")] #[include_dot_files] #[include_dot_files] a: PathBuf) {}"#,
         "more than once"
     )]
+    #[case::ignore_missing_env_vars_without_files(
+        r#"fn f(#[ignore_missing_env_vars] a: PathBuf) {}"#,
+        "#[ignore_missing_env_vars] without #[files(...)]"
+    )]
+    #[case::ignore_missing_env_vars_more_than_once(
+        r#"fn f(#[files("some")] #[ignore_missing_env_vars] #[ignore_missing_env_vars] a: PathBuf) {}"#,
+        "more than once"
+    )]
+    #[case::override_base_dir_more_than_once(
+        r#"fn f(#[files("some")] #[base_dir = "/"] #[base_dir = "/"] a: PathBuf) {}"#,
+        "more than once"
+    )]
+    #[case::invalid_base_dir(
+        r#"fn f(#[files("some")] #[base_dir = 123] a: PathBuf) {}"#,
+        "base directory for the glob path"
+    )]
     fn raise_error(#[case] item_fn: &str, #[case] message: &str) {
         let mut item_fn: ItemFn = item_fn.ast();
 
         let err = extract_files(&mut item_fn).unwrap_err();
+
+        assert_in!(format!("{:?}", err), message);
+    }
+
+    #[rstest]
+    #[case::unknown_env_var(
+        r#"fn f(#[files("so${__UNKNOWN__}me")] a: PathBuf) {}"#,
+        "Could not find the environment variable \\\"__UNKNOWN__\\\""
+    )]
+    #[case::invalid_env_var(
+        r#"fn f(#[files("so${__INVALID%%__}me")] a: PathBuf) {}"#,
+        "The variable \\\"__INVALID%%__\\\" name does not match [a-zA-Z0-9_]+"
+    )]
+    #[case::base_dir_unknown_env_var(
+        r#"fn f(#[base_dir = "${__UNKNOWN__}"] #[files("some")] a: PathBuf) {}"#,
+        "Could not find the environment variable \\\"__UNKNOWN__\\\""
+    )]
+    fn raise_error_on_paths(#[case] item_fn: &str, #[case] message: &str) {
+        let mut item_fn: ItemFn = item_fn.ast();
+
+        let ok = extract_files(&mut item_fn).unwrap();
+        let err: syn::Error = ok
+            .into_iter()
+            .map(|(_id, refs)| {
+                let base_dir = refs.base_dir()?;
+                let x = refs.paths(base_dir.as_ref().unwrap_or(&PathBuf::from("/default")))?;
+                eprintln!("x {:?}", x);
+                Ok(())
+            })
+            .collect::<Result<(), _>>()
+            .unwrap_err();
 
         assert_in!(format!("{:?}", err), message);
     }
@@ -600,21 +866,21 @@ mod should {
     ), vec![], true, &["first", "second", "third"])]
     #[case::should_sort("/base", None, FakeResolver::from(["/base/second", "/base/first"].as_slice()), vec![], true, &["first", "second"])]
     #[case::exclude("/base", None, FakeResolver::from([
-        "/base/first", "/base/rem_1", "/base/other/rem_2", "/base/second"].as_slice()), 
+        "/base/first", "/base/rem_1", "/base/other/rem_2", "/base/second"].as_slice()),
         vec![Exclude::fake("no_mater", Some(Regex::new("rem_").unwrap()))], true, &["first", "second"])]
     #[case::exclude_more("/base", None, FakeResolver::from([
-        "/base/first", "/base/rem_1", "/base/other/rem_2", "/base/some/other", "/base/second"].as_slice()), 
+        "/base/first", "/base/rem_1", "/base/other/rem_2", "/base/some/other", "/base/second"].as_slice()),
         vec![
             Exclude::fake("no_mater", Some(Regex::new("rem_").unwrap())),
             Exclude::fake("no_mater", Some(Regex::new("some").unwrap())),
             ], true, &["first", "second"])]
     #[case::ignore_dot_files("/base", None, FakeResolver::from([
-        "/base/first", "/base/.ignore", "/base/.ignore_dir/a", "/base/second/.not", "/base/second/but_include", "/base/in/.out/other/ignored"].as_slice()), 
+        "/base/first", "/base/.ignore", "/base/.ignore_dir/a", "/base/second/.not", "/base/second/but_include", "/base/in/.out/other/ignored"].as_slice()),
         vec![], true, &["first", "second/but_include"])]
     #[case::include_dot_files("/base", None, FakeResolver::from([
-        "/base/first", "/base/.ignore", "/base/.ignore_dir/a", "/base/second/.not", "/base/second/but_include", "/base/in/.out/other/ignored"].as_slice()), 
+        "/base/first", "/base/.ignore", "/base/.ignore_dir/a", "/base/second/.not", "/base/second/but_include", "/base/in/.out/other/ignored"].as_slice()),
         vec![], false, &[".ignore", ".ignore_dir/a", "first", "in/.out/other/ignored", "second/.not", "second/but_include"])]
-    #[case::relative_path("/base/some/other/folders", None, 
+    #[case::relative_path("/base/some/other/folders", None,
         FakeResolver::from(["/base/first", "/base/second"].as_slice()), vec![], true, &["../../../first", "../../../second"])]
     fn generate_a_variable_with_the_glob_resolved_path(
         #[case] bdir: &str,
@@ -630,7 +896,7 @@ mod should {
         let values = ValueListFromFiles::new(FakeBaseDir::from(bdir), resolver)
             .to_value_list(vec![(
                 ident("a"),
-                FilesGlobReferences::new(paths, exclude, ignore_dot_files),
+                FilesGlobReferences::new(paths, exclude, ignore_dot_files, false),
             )])
             .unwrap();
 
@@ -687,7 +953,12 @@ mod should {
         ValueListFromFiles::new(ErrorBaseDir::default(), FakeResolver::default())
             .to_value_list(vec![(
                 ident("a"),
-                FilesGlobReferences::new(vec![files_attr("no_mater")], Default::default(), true),
+                FilesGlobReferences::new(
+                    vec![files_attr("no_mater")],
+                    Default::default(),
+                    true,
+                    false,
+                ),
             )])
             .unwrap();
     }
@@ -698,7 +969,12 @@ mod should {
         ValueListFromFiles::new(FakeBaseDir::default(), FakeResolver::default())
             .to_value_list(vec![(
                 ident("a"),
-                FilesGlobReferences::new(vec![files_attr("no_mater")], Default::default(), true),
+                FilesGlobReferences::new(
+                    vec![files_attr("no_mater")],
+                    Default::default(),
+                    true,
+                    false,
+                ),
             )])
             .unwrap();
     }
@@ -707,5 +983,47 @@ mod should {
     #[should_panic(expected = "glob failed")]
     fn default_glob_resolver_raise_error_if_invalid_glob_path() {
         DefaultGlobResolver.glob("/invalid/path/***").unwrap();
+    }
+
+    struct MapEnvironmentResolver(HashMap<String, String>);
+
+    impl EnvironmentResolver for MapEnvironmentResolver {
+        fn get(&self, var: &str) -> Option<String> {
+            self.0.get(var).cloned()
+        }
+    }
+
+    #[rstest]
+    #[case::works(&[("VALUE", "VVV")], false, "some${VALUE}_glob", Ok("someVVV_glob"))]
+    #[case::works_simple(&[("VALUE", "VVV")], false, "some/$VALUE/glob", Ok("some/VVV/glob"))]
+    #[case::unknown_err(&[], false, "some${__UNKNOWN__}_glob", Err("__UNKNOWN__"))]
+    #[case::ignore_unknown(&[], true, "some${__UNKNOWN__}_glob", Ok("some_glob"))]
+    #[case::invalid(&[], false, "some${__%$!@__}_glob", Err("__%$!@__"))]
+    #[case::default_unknown(&[], false, "some${__UNKNOWN__:-VVV}_glob", Ok("someVVV_glob"))]
+    #[case::default_empty(&[("EMPTY", "")], false, "some${EMPTY:-EEE}_glob", Ok("someEEE_glob"))]
+    fn replace_env_vars(
+        #[case] env_vars: &[(&str, &str)],
+        #[case] ignore_missing_env_vars: bool,
+        #[case] glob: &str,
+        #[case] expected: Result<&str, &str>,
+    ) {
+        let resolver = MapEnvironmentResolver(
+            env_vars
+                .iter()
+                .map(|(k, v)| (k.to_string(), v.to_string()))
+                .collect(),
+        );
+        let refs =
+            FilesGlobReferences::new(vec![], Default::default(), true, ignore_missing_env_vars);
+
+        let result = refs.replace_env_vars(&files_attr(glob), resolver);
+        match (&result, expected) {
+            (Ok(r), Ok(e)) => assert_eq!(r, e),
+            (Err(r), Err(e)) => assert_in!(format!("{:?}", r), e),
+            _ => panic!(
+                "Expected and result should be the same. Expected: {:?}, Result: {:?}",
+                expected, result
+            ),
+        }
     }
 }

@@ -1,8 +1,11 @@
-use crate::body::BoxBody;
 use crate::metadata::MetadataMap;
+use crate::{body::BoxBody, metadata::GRPC_CONTENT_TYPE};
 use base64::Engine as _;
 use bytes::Bytes;
-use http::header::{HeaderMap, HeaderValue};
+use http::{
+    header::{HeaderMap, HeaderValue},
+    HeaderName,
+};
 use percent_encoding::{percent_decode, percent_encode, AsciiSet, CONTROLS};
 use std::{borrow::Cow, error::Error, fmt, sync::Arc};
 use tracing::{debug, trace, warn};
@@ -17,10 +20,6 @@ const ENCODING_SET: &AsciiSet = &CONTROLS
     .add(b'?')
     .add(b'{')
     .add(b'}');
-
-const GRPC_STATUS_HEADER_CODE: &str = "grpc-status";
-const GRPC_STATUS_MESSAGE_HEADER: &str = "grpc-message";
-const GRPC_STATUS_DETAILS_HEADER: &str = "grpc-status-details-bin";
 
 /// A gRPC status describing the result of an RPC call.
 ///
@@ -305,7 +304,6 @@ impl Status {
         Status::new(Code::Unauthenticated, message)
     }
 
-    #[cfg_attr(not(feature = "transport"), allow(dead_code))]
     pub(crate) fn from_error_generic(
         err: impl Into<Box<dyn Error + Send + Sync + 'static>>,
     ) -> Status {
@@ -316,7 +314,6 @@ impl Status {
     ///
     /// Inspects the error source chain for recognizable errors, including statuses, HTTP2, and
     /// hyper, and attempts to maps them to a `Status`, or else returns an Unknown `Status`.
-    #[cfg_attr(not(feature = "transport"), allow(dead_code))]
     pub fn from_error(err: Box<dyn Error + Send + Sync + 'static>) -> Status {
         Status::try_from_error(err).unwrap_or_else(|err| {
             let mut status = Status::new(Code::Unknown, err.to_string());
@@ -342,7 +339,7 @@ impl Status {
             Err(err) => err,
         };
 
-        #[cfg(feature = "transport")]
+        #[cfg(feature = "server")]
         let err = match err.downcast::<h2::Error>() {
             Ok(h2) => {
                 return Ok(Status::from_h2_error(h2));
@@ -359,7 +356,7 @@ impl Status {
     }
 
     // FIXME: bubble this into `transport` and expose generic http2 reasons.
-    #[cfg(feature = "transport")]
+    #[cfg(feature = "server")]
     fn from_h2_error(err: Box<h2::Error>) -> Status {
         let code = Self::code_from_h2(&err);
 
@@ -368,7 +365,7 @@ impl Status {
         status
     }
 
-    #[cfg(feature = "transport")]
+    #[cfg(feature = "server")]
     fn code_from_h2(err: &h2::Error) -> Code {
         // See https://github.com/grpc/grpc/blob/3977c30/doc/PROTOCOL-HTTP2.md#errors
         match err.reason() {
@@ -388,7 +385,7 @@ impl Status {
         }
     }
 
-    #[cfg(feature = "transport")]
+    #[cfg(feature = "server")]
     fn to_h2_error(&self) -> h2::Error {
         // conservatively transform to h2 error codes...
         let reason = match self.code {
@@ -404,7 +401,7 @@ impl Status {
     ///
     /// Returns Some if there's a way to handle the error, or None if the information from this
     /// hyper error, but perhaps not its source, should be ignored.
-    #[cfg(feature = "transport")]
+    #[cfg(any(feature = "server", feature = "channel"))]
     fn from_hyper_error(err: &hyper::Error) -> Option<Status> {
         // is_timeout results from hyper's keep-alive logic
         // (https://docs.rs/hyper/0.14.11/src/hyper/error.rs.html#192-194).  Per the grpc spec
@@ -412,16 +409,15 @@ impl Status {
         // > status. Note that the frequency of PINGs is highly dependent on the network
         // > environment, implementations are free to adjust PING frequency based on network and
         // > application requirements, which is why it's mapped to unavailable here.
-        //
-        // Likewise, if we are unable to connect to the server, map this to UNAVAILABLE.  This is
-        // consistent with the behavior of a C++ gRPC client when the server is not running, and
-        // matches the spec of:
-        // > The service is currently unavailable. This is most likely a transient condition that
-        // > can be corrected if retried with a backoff.
-        if err.is_timeout() || err.is_connect() {
+        if err.is_timeout() {
             return Some(Status::unavailable(err.to_string()));
         }
 
+        if err.is_canceled() {
+            return Some(Status::cancelled(err.to_string()));
+        }
+
+        #[cfg(feature = "server")]
         if let Some(h2_err) = err.source().and_then(|e| e.downcast_ref::<h2::Error>()) {
             let code = Status::code_from_h2(h2_err);
             let status = Self::new(code, format!("h2 protocol error: {}", err));
@@ -442,10 +438,10 @@ impl Status {
 
     /// Extract a `Status` from a hyper `HeaderMap`.
     pub fn from_header_map(header_map: &HeaderMap) -> Option<Status> {
-        header_map.get(GRPC_STATUS_HEADER_CODE).map(|code| {
+        header_map.get(Self::GRPC_STATUS).map(|code| {
             let code = Code::from_bytes(code.as_ref());
             let error_message = header_map
-                .get(GRPC_STATUS_MESSAGE_HEADER)
+                .get(Self::GRPC_MESSAGE)
                 .map(|header| {
                     percent_decode(header.as_bytes())
                         .decode_utf8()
@@ -454,7 +450,7 @@ impl Status {
                 .unwrap_or_else(|| Ok(String::new()));
 
             let details = header_map
-                .get(GRPC_STATUS_DETAILS_HEADER)
+                .get(Self::GRPC_STATUS_DETAILS)
                 .map(|h| {
                     crate::util::base64::STANDARD
                         .decode(h.as_bytes())
@@ -464,9 +460,9 @@ impl Status {
                 .unwrap_or_default();
 
             let mut other_headers = header_map.clone();
-            other_headers.remove(GRPC_STATUS_HEADER_CODE);
-            other_headers.remove(GRPC_STATUS_MESSAGE_HEADER);
-            other_headers.remove(GRPC_STATUS_DETAILS_HEADER);
+            other_headers.remove(Self::GRPC_STATUS);
+            other_headers.remove(Self::GRPC_MESSAGE);
+            other_headers.remove(Self::GRPC_STATUS_DETAILS);
 
             match error_message {
                 Ok(message) => Status {
@@ -525,7 +521,7 @@ impl Status {
     pub fn add_header(&self, header_map: &mut HeaderMap) -> Result<(), Self> {
         header_map.extend(self.metadata.clone().into_sanitized_headers());
 
-        header_map.insert(GRPC_STATUS_HEADER_CODE, self.code.to_header_value());
+        header_map.insert(Self::GRPC_STATUS, self.code.to_header_value());
 
         if !self.message.is_empty() {
             let to_write = Bytes::copy_from_slice(
@@ -533,7 +529,7 @@ impl Status {
             );
 
             header_map.insert(
-                GRPC_STATUS_MESSAGE_HEADER,
+                Self::GRPC_MESSAGE,
                 HeaderValue::from_maybe_shared(to_write).map_err(invalid_header_value_byte)?,
             );
         }
@@ -542,7 +538,7 @@ impl Status {
             let details = crate::util::base64::STANDARD_NO_PAD.encode(&self.details[..]);
 
             header_map.insert(
-                GRPC_STATUS_DETAILS_HEADER,
+                Self::GRPC_STATUS_DETAILS,
                 HeaderValue::from_maybe_shared(details).map_err(invalid_header_value_byte)?,
             );
         }
@@ -582,20 +578,22 @@ impl Status {
         self
     }
 
-    #[allow(clippy::wrong_self_convention)]
     /// Build an `http::Response` from the given `Status`.
-    pub fn to_http(self) -> http::Response<BoxBody> {
-        let (mut parts, _body) = http::Response::new(()).into_parts();
-
-        parts.headers.insert(
-            http::header::CONTENT_TYPE,
-            http::header::HeaderValue::from_static("application/grpc"),
-        );
-
-        self.add_header(&mut parts.headers).unwrap();
-
-        http::Response::from_parts(parts, crate::body::empty_body())
+    pub fn into_http(self) -> http::Response<BoxBody> {
+        let mut response = http::Response::new(crate::body::empty_body());
+        response
+            .headers_mut()
+            .insert(http::header::CONTENT_TYPE, GRPC_CONTENT_TYPE);
+        self.add_header(response.headers_mut()).unwrap();
+        response
     }
+
+    #[doc(hidden)]
+    pub const GRPC_STATUS: HeaderName = HeaderName::from_static("grpc-status");
+    #[doc(hidden)]
+    pub const GRPC_MESSAGE: HeaderName = HeaderName::from_static("grpc-message");
+    #[doc(hidden)]
+    pub const GRPC_STATUS_DETAILS: HeaderName = HeaderName::from_static("grpc-status-details-bin");
 }
 
 fn find_status_in_source_chain(err: &(dyn Error + 'static)) -> Option<Status> {
@@ -614,12 +612,20 @@ fn find_status_in_source_chain(err: &(dyn Error + 'static)) -> Option<Status> {
             });
         }
 
-        #[cfg(feature = "transport")]
-        if let Some(timeout) = err.downcast_ref::<crate::transport::TimeoutExpired>() {
+        if let Some(timeout) = err.downcast_ref::<TimeoutExpired>() {
             return Some(Status::cancelled(timeout.to_string()));
         }
 
-        #[cfg(feature = "transport")]
+        // If we are unable to connect to the server, map this to UNAVAILABLE.  This is
+        // consistent with the behavior of a C++ gRPC client when the server is not running, and
+        // matches the spec of:
+        // > The service is currently unavailable. This is most likely a transient condition that
+        // > can be corrected if retried with a backoff.
+        if let Some(connect) = err.downcast_ref::<ConnectError>() {
+            return Some(Status::unavailable(connect.to_string()));
+        }
+
+        #[cfg(any(feature = "server", feature = "channel"))]
         if let Some(hyper) = err
             .downcast_ref::<hyper::Error>()
             .and_then(Status::from_hyper_error)
@@ -666,14 +672,14 @@ fn invalid_header_value_byte<Error: fmt::Display>(err: Error) -> Status {
     )
 }
 
-#[cfg(feature = "transport")]
+#[cfg(feature = "server")]
 impl From<h2::Error> for Status {
     fn from(err: h2::Error) -> Self {
         Status::from_h2_error(Box::new(err))
     }
 }
 
-#[cfg(feature = "transport")]
+#[cfg(feature = "server")]
 impl From<Status> for h2::Error {
     fn from(status: Status) -> Self {
         status.to_h2_error()
@@ -922,7 +928,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "transport")]
+    #[cfg(feature = "server")]
     fn from_error_h2() {
         use std::error::Error as _;
 
@@ -939,7 +945,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "transport")]
+    #[cfg(feature = "server")]
     fn to_h2_error() {
         let orig = Status::new(Code::Cancelled, "stop eet!");
         let err = orig.to_h2_error();
@@ -1002,10 +1008,47 @@ mod tests {
 
         let b64_details = crate::util::base64::STANDARD_NO_PAD.encode(DETAILS);
 
-        assert_eq!(header_map[super::GRPC_STATUS_DETAILS_HEADER], b64_details);
+        assert_eq!(header_map[Status::GRPC_STATUS_DETAILS], b64_details);
 
         let status = Status::from_header_map(&header_map).unwrap();
 
         assert_eq!(status.details(), DETAILS);
+    }
+}
+
+/// Error returned if a request didn't complete within the configured timeout.
+///
+/// Timeouts can be configured either with [`Endpoint::timeout`], [`Server::timeout`], or by
+/// setting the [`grpc-timeout` metadata value][spec].
+///
+/// [`Endpoint::timeout`]: crate::transport::server::Server::timeout
+/// [`Server::timeout`]: crate::transport::channel::Endpoint::timeout
+/// [spec]: https://github.com/grpc/grpc/blob/master/doc/PROTOCOL-HTTP2.md
+#[derive(Debug)]
+pub struct TimeoutExpired(pub ());
+
+impl fmt::Display for TimeoutExpired {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Timeout expired")
+    }
+}
+
+// std::error::Error only requires a type to impl Debug and Display
+impl std::error::Error for TimeoutExpired {}
+
+/// Wrapper type to indicate that an error occurs during the connection
+/// process, so that the appropriate gRPC Status can be inferred.
+#[derive(Debug)]
+pub struct ConnectError(pub Box<dyn std::error::Error + Send + Sync>);
+
+impl fmt::Display for ConnectError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
+}
+
+impl std::error::Error for ConnectError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.0.as_ref())
     }
 }

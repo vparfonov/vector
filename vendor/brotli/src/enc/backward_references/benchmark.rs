@@ -1,8 +1,12 @@
 #![cfg(feature = "benchmark")]
 #![cfg(feature = "std")]
+
 extern crate test;
-use super::*;
+
 use alloc_stdlib::StandardAlloc;
+
+use super::*;
+
 static RANDOM_THEN_UNICODE: &'static [u8] = include_bytes!("../../../testdata/random_then_unicode");
 static FINALIZE_DATA: &'static [u8] = &[
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
@@ -12,6 +16,7 @@ static FINALIZE_DATA: &'static [u8] = &[
 ];
 const TEST_LEN: usize = 256 * 1024;
 const DISTANCE_CACHE: &'static [i32] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]; // distance cache
+
 fn make_generic_hasher() -> AdvHasher<H5Sub, StandardAlloc> {
     let params_hasher = BrotliHasherParams {
         type_: 5,
@@ -24,16 +29,11 @@ fn make_generic_hasher() -> AdvHasher<H5Sub, StandardAlloc> {
     let block_size = 1u64 << params_hasher.block_bits;
     let bucket_size = 1u64 << params_hasher.bucket_bits;
     let mut alloc = StandardAlloc::default();
-    let buckets = <StandardAlloc as Allocator<u32>>::alloc_cell(
-        &mut alloc,
-        (bucket_size * block_size) as usize,
-    );
-    let num = <StandardAlloc as Allocator<u16>>::alloc_cell(&mut alloc, bucket_size as usize);
 
     AdvHasher::<H5Sub, StandardAlloc> {
-        buckets: buckets,
+        buckets: alloc.alloc_cell((bucket_size * block_size) as usize),
         h9_opts: H9Opts::new(&params_hasher),
-        num: num,
+        num: alloc.alloc_cell(bucket_size as usize),
         GetHasherCommon: Struct1 {
             params: params_hasher,
             is_prepared_: 1,
@@ -60,16 +60,11 @@ fn make_specialized_hasher() -> AdvHasher<HQ7Sub, StandardAlloc> {
     let block_size = 1u64 << params_hasher.block_bits;
     let bucket_size = 1u64 << params_hasher.bucket_bits;
     let mut alloc = StandardAlloc::default();
-    let buckets = <StandardAlloc as Allocator<u32>>::alloc_cell(
-        &mut alloc,
-        (bucket_size * block_size) as usize,
-    );
-    let num = <StandardAlloc as Allocator<u16>>::alloc_cell(&mut alloc, bucket_size as usize);
 
     AdvHasher::<HQ7Sub, StandardAlloc> {
-        buckets: buckets,
+        buckets: alloc.alloc_cell((bucket_size * block_size) as usize),
         h9_opts: H9Opts::new(&params_hasher),
-        num: num,
+        num: alloc.alloc_cell(bucket_size as usize),
         GetHasherCommon: Struct1 {
             params: params_hasher,
             is_prepared_: 1,
@@ -85,7 +80,7 @@ fn bench_256k_basic_generic(bench: &mut test::Bencher) {
     bench.iter(|| {
         let testdata = test::black_box(RANDOM_THEN_UNICODE.split_at(TEST_LEN + 8).0);
         for i in 0..TEST_LEN {
-            hasher.Store(testdata, !0usize, i);
+            hasher.Store(testdata, usize::MAX, i);
         }
         let mut output = super::HasherSearchResult {
             len: 0,
@@ -115,7 +110,7 @@ fn bench_256k_basic_specialized(bench: &mut test::Bencher) {
     bench.iter(|| {
         let testdata = test::black_box(RANDOM_THEN_UNICODE.split_at(TEST_LEN + 8).0);
         for i in 0..TEST_LEN {
-            hasher.Store(testdata, !0usize, i);
+            hasher.Store(testdata, usize::MAX, i);
         }
         let mut output = super::HasherSearchResult {
             len: 0,
@@ -144,7 +139,7 @@ fn bench_256k_opt_generic(bench: &mut test::Bencher) {
     let mut hasher = make_generic_hasher();
     bench.iter(|| {
         let testdata = test::black_box(RANDOM_THEN_UNICODE.split_at(TEST_LEN + 8).0);
-        hasher.BulkStoreRangeOptBatch(testdata, !0usize, 0, TEST_LEN);
+        hasher.BulkStoreRangeOptBatch(testdata, usize::MAX, 0, TEST_LEN);
         let mut output = super::HasherSearchResult {
             len: 0,
             len_x_code: 0,
@@ -172,7 +167,7 @@ fn bench_256k_opt_specialized(bench: &mut test::Bencher) {
     let mut hasher = make_specialized_hasher();
     bench.iter(|| {
         let testdata = test::black_box(RANDOM_THEN_UNICODE.split_at(TEST_LEN + 8).0);
-        hasher.BulkStoreRangeOptBatch(testdata, !0usize, 0, TEST_LEN);
+        hasher.BulkStoreRangeOptBatch(testdata, usize::MAX, 0, TEST_LEN);
         let mut output = super::HasherSearchResult {
             len: 0,
             len_x_code: 0,
@@ -200,7 +195,7 @@ fn bench_256k_mem_fetch_generic(bench: &mut test::Bencher) {
     let mut hasher = make_generic_hasher();
     bench.iter(|| {
         let testdata = test::black_box(RANDOM_THEN_UNICODE.split_at(TEST_LEN + 8).0);
-        hasher.BulkStoreRangeOptMemFetch(testdata, !0usize, 0, TEST_LEN);
+        hasher.BulkStoreRangeOptMemFetch(testdata, usize::MAX, 0, TEST_LEN);
         let mut output = super::HasherSearchResult {
             len: 0,
             len_x_code: 0,
@@ -228,7 +223,7 @@ fn bench_256k_mem_fetch_specialized(bench: &mut test::Bencher) {
     let mut hasher = make_specialized_hasher();
     bench.iter(|| {
         let testdata = test::black_box(RANDOM_THEN_UNICODE.split_at(TEST_LEN + 8).0);
-        hasher.BulkStoreRangeOptMemFetch(testdata, !0usize, 0, TEST_LEN);
+        hasher.BulkStoreRangeOptMemFetch(testdata, usize::MAX, 0, TEST_LEN);
         let mut output = super::HasherSearchResult {
             len: 0,
             len_x_code: 0,
@@ -256,7 +251,7 @@ fn bench_256k_mem_lazy_dupe_generic(bench: &mut test::Bencher) {
     let mut hasher = make_generic_hasher();
     bench.iter(|| {
         let testdata = test::black_box(RANDOM_THEN_UNICODE.split_at(TEST_LEN + 8).0);
-        hasher.BulkStoreRangeOptMemFetchLazyDupeUpdate(testdata, !0usize, 0, TEST_LEN);
+        hasher.BulkStoreRangeOptMemFetchLazyDupeUpdate(testdata, usize::MAX, 0, TEST_LEN);
         let mut output = super::HasherSearchResult {
             len: 0,
             len_x_code: 0,
@@ -283,7 +278,7 @@ fn bench_256k_mem_lazy_dupe_specialized(bench: &mut test::Bencher) {
     let mut hasher = make_specialized_hasher();
     bench.iter(|| {
         let testdata = test::black_box(RANDOM_THEN_UNICODE.split_at(TEST_LEN + 8).0);
-        hasher.BulkStoreRangeOptMemFetchLazyDupeUpdate(testdata, !0usize, 0, TEST_LEN);
+        hasher.BulkStoreRangeOptMemFetchLazyDupeUpdate(testdata, usize::MAX, 0, TEST_LEN);
         let mut output = super::HasherSearchResult {
             len: 0,
             len_x_code: 0,
@@ -311,7 +306,7 @@ fn bench_256k_mem_random_dupe_generic(bench: &mut test::Bencher) {
     let mut hasher = make_generic_hasher();
     bench.iter(|| {
         let testdata = test::black_box(RANDOM_THEN_UNICODE.split_at(TEST_LEN + 8).0);
-        hasher.BulkStoreRangeOptRandomDupeUpdate(testdata, !0usize, 0, TEST_LEN);
+        hasher.BulkStoreRangeOptRandomDupeUpdate(testdata, usize::MAX, 0, TEST_LEN);
         let mut output = super::HasherSearchResult {
             len: 0,
             len_x_code: 0,
@@ -339,7 +334,7 @@ fn bench_256k_mem_random_dupe_specialized(bench: &mut test::Bencher) {
     let mut hasher = make_specialized_hasher();
     bench.iter(|| {
         let testdata = test::black_box(RANDOM_THEN_UNICODE.split_at(TEST_LEN + 8).0);
-        hasher.BulkStoreRangeOptRandomDupeUpdate(testdata, !0usize, 0, TEST_LEN);
+        hasher.BulkStoreRangeOptRandomDupeUpdate(testdata, usize::MAX, 0, TEST_LEN);
         let mut output = super::HasherSearchResult {
             len: 0,
             len_x_code: 0,
@@ -367,7 +362,7 @@ fn bench_256k_cur_generic(bench: &mut test::Bencher) {
     let mut hasher = make_generic_hasher();
     bench.iter(|| {
         let testdata = test::black_box(RANDOM_THEN_UNICODE.split_at(TEST_LEN + 8).0);
-        hasher.BulkStoreRange(testdata, !0usize, 0, TEST_LEN);
+        hasher.BulkStoreRange(testdata, usize::MAX, 0, TEST_LEN);
         let mut output = super::HasherSearchResult {
             len: 0,
             len_x_code: 0,
@@ -395,7 +390,7 @@ fn bench_256k_cur_specialized(bench: &mut test::Bencher) {
     let mut hasher = make_specialized_hasher();
     bench.iter(|| {
         let testdata = test::black_box(RANDOM_THEN_UNICODE.split_at(TEST_LEN + 8).0);
-        hasher.BulkStoreRange(testdata, !0usize, 0, TEST_LEN);
+        hasher.BulkStoreRange(testdata, usize::MAX, 0, TEST_LEN);
         let mut output = super::HasherSearchResult {
             len: 0,
             len_x_code: 0,

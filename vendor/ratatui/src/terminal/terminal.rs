@@ -1,6 +1,11 @@
 use std::io;
 
-use crate::{backend::ClearType, prelude::*, CompletedFrame, TerminalOptions, Viewport};
+use crate::{
+    backend::{Backend, ClearType},
+    buffer::{Buffer, Cell},
+    layout::{Position, Rect, Size},
+    CompletedFrame, Frame, TerminalOptions, Viewport,
+};
 
 /// An interface to interact and draw [`Frame`]s on the user's terminal.
 ///
@@ -30,14 +35,13 @@ use crate::{backend::ClearType, prelude::*, CompletedFrame, TerminalOptions, Vie
 /// ```rust,no_run
 /// use std::io::stdout;
 ///
-/// use ratatui::{prelude::*, widgets::Paragraph};
+/// use ratatui::{backend::CrosstermBackend, widgets::Paragraph, Terminal};
 ///
 /// let backend = CrosstermBackend::new(stdout());
 /// let mut terminal = Terminal::new(backend)?;
 /// terminal.draw(|frame| {
-///     let area = frame.size();
+///     let area = frame.area();
 ///     frame.render_widget(Paragraph::new("Hello World!"), area);
-///     frame.set_cursor(0, 0);
 /// })?;
 /// # std::io::Result::Ok(())
 /// ```
@@ -66,11 +70,11 @@ where
     viewport: Viewport,
     /// Area of the viewport
     viewport_area: Rect,
-    /// Last known size of the terminal. Used to detect if the internal buffers have to be resized.
-    last_known_size: Rect,
+    /// Last known area of the terminal. Used to detect if the internal buffers have to be resized.
+    last_known_area: Rect,
     /// Last known position of the cursor. Used to find the new area when the viewport is inlined
     /// and the terminal resized.
-    last_known_cursor_pos: (u16, u16),
+    last_known_cursor_pos: Position,
     /// Number of frames rendered up until current time.
     frame_count: usize,
 }
@@ -105,8 +109,10 @@ where
     /// # Example
     ///
     /// ```rust,no_run
-    /// # use std::io::stdout;
-    /// # use ratatui::prelude::*;
+    /// use std::io::stdout;
+    ///
+    /// use ratatui::{backend::CrosstermBackend, Terminal};
+    ///
     /// let backend = CrosstermBackend::new(stdout());
     /// let terminal = Terminal::new(backend)?;
     /// # std::io::Result::Ok(())
@@ -125,22 +131,28 @@ where
     /// # Example
     ///
     /// ```rust
-    /// # use std::io::stdout;
-    /// # use ratatui::{prelude::*, backend::TestBackend, terminal::{Viewport, TerminalOptions}};
+    /// use std::io::stdout;
+    ///
+    /// use ratatui::{backend::CrosstermBackend, layout::Rect, Terminal, TerminalOptions, Viewport};
+    ///
     /// let backend = CrosstermBackend::new(stdout());
     /// let viewport = Viewport::Fixed(Rect::new(0, 0, 10, 10));
     /// let terminal = Terminal::with_options(backend, TerminalOptions { viewport })?;
     /// # std::io::Result::Ok(())
     /// ```
     pub fn with_options(mut backend: B, options: TerminalOptions) -> io::Result<Self> {
-        let size = match options.viewport {
-            Viewport::Fullscreen | Viewport::Inline(_) => backend.size()?,
+        let area = match options.viewport {
+            Viewport::Fullscreen | Viewport::Inline(_) => {
+                Rect::from((Position::ORIGIN, backend.size()?))
+            }
             Viewport::Fixed(area) => area,
         };
         let (viewport_area, cursor_pos) = match options.viewport {
-            Viewport::Fullscreen => (size, (0, 0)),
-            Viewport::Inline(height) => compute_inline_size(&mut backend, height, size, 0)?,
-            Viewport::Fixed(area) => (area, (area.left(), area.top())),
+            Viewport::Fullscreen => (area, Position::ORIGIN),
+            Viewport::Inline(height) => {
+                compute_inline_size(&mut backend, height, area.as_size(), 0)?
+            }
+            Viewport::Fixed(area) => (area, area.as_position()),
         };
         Ok(Self {
             backend,
@@ -149,7 +161,7 @@ where
             hidden_cursor: false,
             viewport: options.viewport,
             viewport_area,
-            last_known_size: size,
+            last_known_area: area,
             last_known_cursor_pos: cursor_pos,
             frame_count: 0,
         })
@@ -188,31 +200,36 @@ where
         let current_buffer = &self.buffers[self.current];
         let updates = previous_buffer.diff(current_buffer);
         if let Some((col, row, _)) = updates.last() {
-            self.last_known_cursor_pos = (*col, *row);
+            self.last_known_cursor_pos = Position { x: *col, y: *row };
         }
         self.backend.draw(updates.into_iter())
     }
 
-    /// Updates the Terminal so that internal buffers match the requested size.
+    /// Updates the Terminal so that internal buffers match the requested area.
     ///
-    /// Requested size will be saved so the size can remain consistent when rendering. This leads
-    /// to a full clear of the screen.
-    pub fn resize(&mut self, size: Rect) -> io::Result<()> {
+    /// Requested area will be saved to remain consistent when rendering. This leads to a full clear
+    /// of the screen.
+    pub fn resize(&mut self, area: Rect) -> io::Result<()> {
         let next_area = match self.viewport {
-            Viewport::Fullscreen => size,
             Viewport::Inline(height) => {
                 let offset_in_previous_viewport = self
                     .last_known_cursor_pos
-                    .1
+                    .y
                     .saturating_sub(self.viewport_area.top());
-                compute_inline_size(&mut self.backend, height, size, offset_in_previous_viewport)?.0
+                compute_inline_size(
+                    &mut self.backend,
+                    height,
+                    area.as_size(),
+                    offset_in_previous_viewport,
+                )?
+                .0
             }
-            Viewport::Fixed(area) => area,
+            Viewport::Fixed(_) | Viewport::Fullscreen => area,
         };
         self.set_viewport_area(next_area);
         self.clear()?;
 
-        self.last_known_size = size;
+        self.last_known_area = area;
         Ok(())
     }
 
@@ -226,47 +243,152 @@ where
     pub fn autoresize(&mut self) -> io::Result<()> {
         // fixed viewports do not get autoresized
         if matches!(self.viewport, Viewport::Fullscreen | Viewport::Inline(_)) {
-            let size = self.size()?;
-            if size != self.last_known_size {
-                self.resize(size)?;
+            let area = Rect::from((Position::ORIGIN, self.size()?));
+            if area != self.last_known_area {
+                self.resize(area)?;
             }
         };
         Ok(())
     }
 
-    /// Synchronizes terminal size, calls the rendering closure, flushes the current internal state
-    /// and prepares for the next draw call.
+    /// Draws a single frame to the terminal.
     ///
-    /// This is the main entry point for drawing to the terminal.
+    /// Returns a [`CompletedFrame`] if successful, otherwise a [`std::io::Error`].
     ///
-    /// The changes drawn to the frame are applied only to the current [`Buffer`]. After the closure
-    /// returns, the current buffer is compared to the previous buffer and only the changes are
-    /// applied to the terminal.
+    /// If the render callback passed to this method can fail, use [`try_draw`] instead.
+    ///
+    /// Applications should call `draw` or [`try_draw`] in a loop to continuously render the
+    /// terminal. These methods are the main entry points for drawing to the terminal.
+    ///
+    /// [`try_draw`]: Terminal::try_draw
+    ///
+    /// This method will:
+    ///
+    /// - autoresize the terminal if necessary
+    /// - call the render callback, passing it a [`Frame`] reference to render to
+    /// - flush the current internal state by copying the current buffer to the backend
+    /// - move the cursor to the last known position if it was set during the rendering closure
+    /// - return a [`CompletedFrame`] with the current buffer and the area of the terminal
+    ///
+    /// The [`CompletedFrame`] returned by this method can be useful for debugging or testing
+    /// purposes, but it is often not used in regular applicationss.
+    ///
+    /// The render callback should fully render the entire frame when called, including areas that
+    /// are unchanged from the previous frame. This is because each frame is compared to the
+    /// previous frame to determine what has changed, and only the changes are written to the
+    /// terminal. If the render callback does not fully render the frame, the terminal will not be
+    /// in a consistent state.
     ///
     /// # Examples
     ///
-    /// ```rust,no_run
-    /// # use std::io::stdout;
-    /// # use ratatui::{prelude::*, widgets::Paragraph};
-    /// let backend = CrosstermBackend::new(stdout());
-    /// let mut terminal = Terminal::new(backend)?;
+    /// ```
+    /// # let backend = ratatui::backend::TestBackend::new(10, 10);
+    /// # let mut terminal = ratatui::Terminal::new(backend)?;
+    /// use ratatui::{layout::Position, widgets::Paragraph};
+    ///
+    /// // with a closure
     /// terminal.draw(|frame| {
-    ///     let area = frame.size();
+    ///     let area = frame.area();
     ///     frame.render_widget(Paragraph::new("Hello World!"), area);
-    ///     frame.set_cursor(0, 0);
+    ///     frame.set_cursor_position(Position { x: 0, y: 0 });
     /// })?;
+    ///
+    /// // or with a function
+    /// terminal.draw(render)?;
+    ///
+    /// fn render(frame: &mut ratatui::Frame) {
+    ///     frame.render_widget(Paragraph::new("Hello World!"), frame.area());
+    /// }
     /// # std::io::Result::Ok(())
     /// ```
-    pub fn draw<F>(&mut self, f: F) -> io::Result<CompletedFrame>
+    pub fn draw<F>(&mut self, render_callback: F) -> io::Result<CompletedFrame>
     where
         F: FnOnce(&mut Frame),
+    {
+        self.try_draw(|frame| {
+            render_callback(frame);
+            io::Result::Ok(())
+        })
+    }
+
+    /// Tries to draw a single frame to the terminal.
+    ///
+    /// Returns [`Result::Ok`] containing a [`CompletedFrame`] if successful, otherwise
+    /// [`Result::Err`] containing the [`std::io::Error`] that caused the failure.
+    ///
+    /// This is the equivalent of [`Terminal::draw`] but the render callback is a function or
+    /// closure that returns a `Result` instead of nothing.
+    ///
+    /// Applications should call `try_draw` or [`draw`] in a loop to continuously render the
+    /// terminal. These methods are the main entry points for drawing to the terminal.
+    ///
+    /// [`draw`]: Terminal::draw
+    ///
+    /// This method will:
+    ///
+    /// - autoresize the terminal if necessary
+    /// - call the render callback, passing it a [`Frame`] reference to render to
+    /// - flush the current internal state by copying the current buffer to the backend
+    /// - move the cursor to the last known position if it was set during the rendering closure
+    /// - return a [`CompletedFrame`] with the current buffer and the area of the terminal
+    ///
+    /// The render callback passed to `try_draw` can return any [`Result`] with an error type that
+    /// can be converted into an [`std::io::Error`] using the [`Into`] trait. This makes it possible
+    /// to use the `?` operator to propagate errors that occur during rendering. If the render
+    /// callback returns an error, the error will be returned from `try_draw` as an
+    /// [`std::io::Error`] and the terminal will not be updated.
+    ///
+    /// The [`CompletedFrame`] returned by this method can be useful for debugging or testing
+    /// purposes, but it is often not used in regular applicationss.
+    ///
+    /// The render callback should fully render the entire frame when called, including areas that
+    /// are unchanged from the previous frame. This is because each frame is compared to the
+    /// previous frame to determine what has changed, and only the changes are written to the
+    /// terminal. If the render function does not fully render the frame, the terminal will not be
+    /// in a consistent state.
+    ///
+    /// # Examples
+    ///
+    /// ```should_panic
+    /// # use ratatui::layout::Position;;
+    /// # let backend = ratatui::backend::TestBackend::new(10, 10);
+    /// # let mut terminal = ratatui::Terminal::new(backend)?;
+    /// use std::io;
+    ///
+    /// use ratatui::widgets::Paragraph;
+    ///
+    /// // with a closure
+    /// terminal.try_draw(|frame| {
+    ///     let value: u8 = "not a number".parse().map_err(io::Error::other)?;
+    ///     let area = frame.area();
+    ///     frame.render_widget(Paragraph::new("Hello World!"), area);
+    ///     frame.set_cursor_position(Position { x: 0, y: 0 });
+    ///     io::Result::Ok(())
+    /// })?;
+    ///
+    /// // or with a function
+    /// terminal.try_draw(render)?;
+    ///
+    /// fn render(frame: &mut ratatui::Frame) -> io::Result<()> {
+    ///     let value: u8 = "not a number".parse().map_err(io::Error::other)?;
+    ///     frame.render_widget(Paragraph::new("Hello World!"), frame.area());
+    ///     Ok(())
+    /// }
+    /// # io::Result::Ok(())
+    /// ```
+    pub fn try_draw<F, E>(&mut self, render_callback: F) -> io::Result<CompletedFrame>
+    where
+        F: FnOnce(&mut Frame) -> Result<(), E>,
+        E: Into<io::Error>,
     {
         // Autoresize - otherwise we get glitches if shrinking or potential desync between widgets
         // and the terminal (if growing), which may OOB.
         self.autoresize()?;
 
         let mut frame = self.get_frame();
-        f(&mut frame);
+
+        render_callback(&mut frame).map_err(Into::into)?;
+
         // We can't change the cursor position right away because we have to flush the frame to
         // stdout first. But we also can't keep the frame around, since it holds a &mut to
         // Buffer. Thus, we're taking the important data out of the Frame and dropping it.
@@ -277,9 +399,9 @@ where
 
         match cursor_position {
             None => self.hide_cursor()?,
-            Some((x, y)) => {
+            Some(position) => {
                 self.show_cursor()?;
-                self.set_cursor(x, y)?;
+                self.set_cursor_position(position)?;
             }
         }
 
@@ -290,7 +412,7 @@ where
 
         let completed_frame = CompletedFrame {
             buffer: &self.buffers[1 - self.current],
-            area: self.last_known_size,
+            area: self.last_known_area,
             count: self.frame_count,
         };
 
@@ -318,14 +440,30 @@ where
     ///
     /// This is the position of the cursor after the last draw call and is returned as a tuple of
     /// `(x, y)` coordinates.
+    #[deprecated = "the method get_cursor_position indicates more clearly what about the cursor to get"]
     pub fn get_cursor(&mut self) -> io::Result<(u16, u16)> {
-        self.backend.get_cursor()
+        let Position { x, y } = self.get_cursor_position()?;
+        Ok((x, y))
     }
 
     /// Sets the cursor position.
+    #[deprecated = "the method set_cursor_position indicates more clearly what about the cursor to set"]
     pub fn set_cursor(&mut self, x: u16, y: u16) -> io::Result<()> {
-        self.backend.set_cursor(x, y)?;
-        self.last_known_cursor_pos = (x, y);
+        self.set_cursor_position(Position { x, y })
+    }
+
+    /// Gets the current cursor position.
+    ///
+    /// This is the position of the cursor after the last draw call.
+    pub fn get_cursor_position(&mut self) -> io::Result<Position> {
+        self.backend.get_cursor_position()
+    }
+
+    /// Sets the cursor position.
+    pub fn set_cursor_position<P: Into<Position>>(&mut self, position: P) -> io::Result<()> {
+        let position = position.into();
+        self.backend.set_cursor_position(position)?;
+        self.last_known_cursor_pos = position;
         Ok(())
     }
 
@@ -335,12 +473,13 @@ where
             Viewport::Fullscreen => self.backend.clear_region(ClearType::All)?,
             Viewport::Inline(_) => {
                 self.backend
-                    .set_cursor(self.viewport_area.left(), self.viewport_area.top())?;
+                    .set_cursor_position(self.viewport_area.as_position())?;
                 self.backend.clear_region(ClearType::AfterCursor)?;
             }
-            Viewport::Fixed(area) => {
-                for row in area.top()..area.bottom() {
-                    self.backend.set_cursor(0, row)?;
+            Viewport::Fixed(_) => {
+                let area = self.viewport_area;
+                for y in area.top()..area.bottom() {
+                    self.backend.set_cursor_position(Position { x: 0, y })?;
                     self.backend.clear_region(ClearType::AfterCursor)?;
                 }
             }
@@ -357,43 +496,75 @@ where
     }
 
     /// Queries the real size of the backend.
-    pub fn size(&self) -> io::Result<Rect> {
+    pub fn size(&self) -> io::Result<Size> {
         self.backend.size()
     }
 
     /// Insert some content before the current inline viewport. This has no effect when the
-    /// viewport is fullscreen.
+    /// viewport is not inline.
     ///
-    /// This function scrolls down the current viewport by the given height. The newly freed space
-    /// is then made available to the `draw_fn` closure through a writable `Buffer`.
+    /// The `draw_fn` closure will be called to draw into a writable `Buffer` that is `height`
+    /// lines tall. The content of that `Buffer` will then be inserted before the viewport.
+    ///
+    /// If the viewport isn't yet at the bottom of the screen, inserted lines will push it towards
+    /// the bottom. Once the viewport is at the bottom of the screen, inserted lines will scroll
+    /// the area of the screen above the viewport upwards.
     ///
     /// Before:
     /// ```ignore
-    /// +-------------------+
-    /// |                   |
-    /// |      viewport     |
-    /// |                   |
-    /// +-------------------+
+    /// +---------------------+
+    /// | pre-existing line 1 |
+    /// | pre-existing line 2 |
+    /// +---------------------+
+    /// |       viewport      |
+    /// +---------------------+
+    /// |                     |
+    /// |                     |
+    /// +---------------------+
     /// ```
     ///
-    /// After:
+    /// After inserting 2 lines:
     /// ```ignore
-    /// +-------------------+
-    /// |      buffer       |
-    /// +-------------------+
-    /// +-------------------+
-    /// |                   |
-    /// |      viewport     |
-    /// |                   |
-    /// +-------------------+
+    /// +---------------------+
+    /// | pre-existing line 1 |
+    /// | pre-existing line 2 |
+    /// |   inserted line 1   |
+    /// |   inserted line 2   |
+    /// +---------------------+
+    /// |       viewport      |
+    /// +---------------------+
+    /// +---------------------+
     /// ```
+    ///
+    /// After inserting 2 more lines:
+    /// ```ignore
+    /// +---------------------+
+    /// | pre-existing line 2 |
+    /// |   inserted line 1   |
+    /// |   inserted line 2   |
+    /// |   inserted line 3   |
+    /// |   inserted line 4   |
+    /// +---------------------+
+    /// |       viewport      |
+    /// +---------------------+
+    /// ```
+    ///
+    /// If more lines are inserted than there is space on the screen, then the top lines will go
+    /// directly into the terminal's scrollback buffer. At the limit, if the viewport takes up the
+    /// whole screen, all lines will be inserted directly into the scrollback buffer.
     ///
     /// # Examples
     ///
     /// ## Insert a single line before the current viewport
     ///
     /// ```rust
-    /// # use ratatui::{backend::TestBackend, prelude::*, widgets::*};
+    /// use ratatui::{
+    ///     backend::TestBackend,
+    ///     style::{Color, Style},
+    ///     text::{Line, Span},
+    ///     widgets::{Paragraph, Widget},
+    ///     Terminal,
+    /// };
     /// # let backend = TestBackend::new(10, 10);
     /// # let mut terminal = Terminal::new(backend).unwrap();
     /// terminal.insert_before(1, |buf| {
@@ -409,55 +580,243 @@ where
     where
         F: FnOnce(&mut Buffer),
     {
-        if !matches!(self.viewport, Viewport::Inline(_)) {
-            return Ok(());
+        match self.viewport {
+            #[cfg(feature = "scrolling-regions")]
+            Viewport::Inline(_) => self.insert_before_scrolling_regions(height, draw_fn),
+            #[cfg(not(feature = "scrolling-regions"))]
+            Viewport::Inline(_) => self.insert_before_no_scrolling_regions(height, draw_fn),
+            _ => Ok(()),
         }
+    }
 
-        // Clear the viewport off the screen
-        self.clear()?;
-
-        // Move the viewport by height, but don't move it past the bottom of the terminal
-        let viewport_at_bottom = self.last_known_size.bottom() - self.viewport_area.height;
-        self.set_viewport_area(Rect {
-            y: self
-                .viewport_area
-                .y
-                .saturating_add(height)
-                .min(viewport_at_bottom),
-            ..self.viewport_area
-        });
-
-        // Draw contents into buffer
+    /// Implement `Self::insert_before` using standard backend capabilities.
+    #[cfg(not(feature = "scrolling-regions"))]
+    fn insert_before_no_scrolling_regions(
+        &mut self,
+        height: u16,
+        draw_fn: impl FnOnce(&mut Buffer),
+    ) -> io::Result<()> {
+        // The approach of this function is to first render all of the lines to insert into a
+        // temporary buffer, and then to loop drawing chunks from the buffer to the screen. drawing
+        // this buffer onto the screen.
         let area = Rect {
-            x: self.viewport_area.left(),
+            x: 0,
             y: 0,
             width: self.viewport_area.width,
             height,
         };
         let mut buffer = Buffer::empty(area);
         draw_fn(&mut buffer);
+        let mut buffer = buffer.content.as_slice();
 
-        // Split buffer into screen-sized chunks and draw
-        let max_chunk_size = (self.viewport_area.top() * area.width).into();
-        for buffer_content_chunk in buffer.content.chunks(max_chunk_size) {
-            let chunk_size = buffer_content_chunk.len() as u16 / area.width;
+        // Use i32 variables so we don't have worry about overflowed u16s when adding, or about
+        // negative results when subtracting.
+        let mut drawn_height: i32 = self.viewport_area.top().into();
+        let mut buffer_height: i32 = height.into();
+        let viewport_height: i32 = self.viewport_area.height.into();
+        let screen_height: i32 = self.last_known_area.height.into();
 
-            self.backend
-                .append_lines(self.viewport_area.height.saturating_sub(1) + chunk_size)?;
-
-            let iter = buffer_content_chunk.iter().enumerate().map(|(i, c)| {
-                let (x, y) = buffer.pos_of(i);
-                (
-                    x,
-                    self.viewport_area.top().saturating_sub(chunk_size) + y,
-                    c,
-                )
-            });
-            self.backend.draw(iter)?;
-            self.backend.flush()?;
-            self.set_cursor(self.viewport_area.left(), self.viewport_area.top())?;
+        // The algorithm here is to loop, drawing large chunks of text (up to a screen-full at a
+        // time), until the remainder of the buffer plus the viewport fits on the screen. We choose
+        // this loop condition because it guarantees that we can write the remainder of the buffer
+        // with just one call to Self::draw_lines().
+        while buffer_height + viewport_height > screen_height {
+            // We will draw as much of the buffer as possible on this iteration in order to make
+            // forward progress. So we have:
+            //
+            //     to_draw = min(buffer_height, screen_height)
+            //
+            // We may need to scroll the screen up to make room to draw. We choose the minimal
+            // possible scroll amount so we don't end up with the viewport sitting in the middle of
+            // the screen when this function is done. The amount to scroll by is:
+            //
+            //     scroll_up = max(0, drawn_height + to_draw - screen_height)
+            //
+            // We want `scroll_up` to be enough so that, after drawing, we have used the whole
+            // screen (drawn_height - scroll_up + to_draw = screen_height). However, there might
+            // already be enough room on the screen to draw without scrolling (drawn_height +
+            // to_draw <= screen_height). In this case, we just don't scroll at all.
+            let to_draw = buffer_height.min(screen_height);
+            let scroll_up = 0.max(drawn_height + to_draw - screen_height);
+            self.scroll_up(scroll_up as u16)?;
+            buffer = self.draw_lines((drawn_height - scroll_up) as u16, to_draw as u16, buffer)?;
+            drawn_height += to_draw - scroll_up;
+            buffer_height -= to_draw;
         }
 
+        // There is now enough room on the screen for the remaining buffer plus the viewport,
+        // though we may still need to scroll up some of the existing text first. It's possible
+        // that by this point we've drained the buffer, but we may still need to scroll up to make
+        // room for the viewport.
+        //
+        // We want to scroll up the exact amount that will leave us completely filling the screen.
+        // However, it's possible that the viewport didn't start on the bottom of the screen and
+        // the added lines weren't enough to push it all the way to the bottom. We deal with this
+        // case by just ensuring that our scroll amount is non-negative.
+        //
+        // We want:
+        //   screen_height = drawn_height - scroll_up + buffer_height + viewport_height
+        // Or, equivalently:
+        //   scroll_up = drawn_height + buffer_height + viewport_height - screen_height
+        let scroll_up = 0.max(drawn_height + buffer_height + viewport_height - screen_height);
+        self.scroll_up(scroll_up as u16)?;
+        self.draw_lines(
+            (drawn_height - scroll_up) as u16,
+            buffer_height as u16,
+            buffer,
+        )?;
+        drawn_height += buffer_height - scroll_up;
+
+        self.set_viewport_area(Rect {
+            y: drawn_height as u16,
+            ..self.viewport_area
+        });
+
+        // Clear the viewport off the screen. We didn't clear earlier for two reasons. First, it
+        // wasn't necessary because the buffer we drew out of isn't sparse, so it overwrote
+        // whatever was on the screen. Second, there is a weird bug with tmux where a full screen
+        // clear plus immediate scrolling causes some garbage to go into the scrollback.
+        self.clear()?;
+
+        Ok(())
+    }
+
+    /// Implement `Self::insert_before` using scrolling regions.
+    ///
+    /// If a terminal supports scrolling regions, it means that we can define a subset of rows of
+    /// the screen, and then tell the terminal to scroll up or down just within that region. The
+    /// rows outside of the region are not affected.
+    ///
+    /// This function utilizes this feature to avoid having to redraw the viewport. This is done
+    /// either by splitting the screen at the top of the viewport, and then creating a gap by
+    /// either scrolling the viewport down, or scrolling the area above it up. The lines to insert
+    /// are then drawn into the gap created.
+    #[cfg(feature = "scrolling-regions")]
+    fn insert_before_scrolling_regions(
+        &mut self,
+        mut height: u16,
+        draw_fn: impl FnOnce(&mut Buffer),
+    ) -> io::Result<()> {
+        // The approach of this function is to first render all of the lines to insert into a
+        // temporary buffer, and then to loop drawing chunks from the buffer to the screen. drawing
+        // this buffer onto the screen.
+        let area = Rect {
+            x: 0,
+            y: 0,
+            width: self.viewport_area.width,
+            height,
+        };
+        let mut buffer = Buffer::empty(area);
+        draw_fn(&mut buffer);
+        let mut buffer = buffer.content.as_slice();
+
+        // Handle the special case where the viewport takes up the whole screen.
+        if self.viewport_area.height == self.last_known_area.height {
+            // "Borrow" the top line of the viewport. Draw over it, then immediately scroll it into
+            // scrollback. Do this repeatedly until the whole buffer has been put into scrollback.
+            let mut first = true;
+            while !buffer.is_empty() {
+                buffer = if first {
+                    self.draw_lines(0, 1, buffer)?
+                } else {
+                    self.draw_lines_over_cleared(0, 1, buffer)?
+                };
+                first = false;
+                self.backend.scroll_region_up(0..1, 1)?;
+            }
+
+            // Redraw the top line of the viewport.
+            let width = self.viewport_area.width as usize;
+            let top_line = self.buffers[1 - self.current].content[0..width].to_vec();
+            self.draw_lines_over_cleared(0, 1, &top_line)?;
+            return Ok(());
+        }
+
+        // Handle the case where the viewport isn't yet at the bottom of the screen.
+        {
+            let viewport_top = self.viewport_area.top();
+            let viewport_bottom = self.viewport_area.bottom();
+            let screen_bottom = self.last_known_area.bottom();
+            if viewport_bottom < screen_bottom {
+                let to_draw = height.min(screen_bottom - viewport_bottom);
+                self.backend
+                    .scroll_region_down(viewport_top..viewport_bottom + to_draw, to_draw)?;
+                buffer = self.draw_lines_over_cleared(viewport_top, to_draw, buffer)?;
+                self.set_viewport_area(Rect {
+                    y: viewport_top + to_draw,
+                    ..self.viewport_area
+                });
+                height -= to_draw;
+            }
+        }
+
+        let viewport_top = self.viewport_area.top();
+        while height > 0 {
+            let to_draw = height.min(viewport_top);
+            self.backend.scroll_region_up(0..viewport_top, to_draw)?;
+            buffer = self.draw_lines_over_cleared(viewport_top - to_draw, to_draw, buffer)?;
+            height -= to_draw;
+        }
+
+        Ok(())
+    }
+
+    /// Draw lines at the given vertical offset. The slice of cells must contain enough cells
+    /// for the requested lines. A slice of the unused cells are returned.
+    fn draw_lines<'a>(
+        &mut self,
+        y_offset: u16,
+        lines_to_draw: u16,
+        cells: &'a [Cell],
+    ) -> io::Result<&'a [Cell]> {
+        let width: usize = self.last_known_area.width.into();
+        let (to_draw, remainder) = cells.split_at(width * lines_to_draw as usize);
+        if lines_to_draw > 0 {
+            let iter = to_draw
+                .iter()
+                .enumerate()
+                .map(|(i, c)| ((i % width) as u16, y_offset + (i / width) as u16, c));
+            self.backend.draw(iter)?;
+            self.backend.flush()?;
+        }
+        Ok(remainder)
+    }
+
+    /// Draw lines at the given vertical offset, assuming that the lines they are replacing on the
+    /// screen are cleared. The slice of cells must contain enough cells for the requested lines. A
+    /// slice of the unused cells are returned.
+    #[cfg(feature = "scrolling-regions")]
+    fn draw_lines_over_cleared<'a>(
+        &mut self,
+        y_offset: u16,
+        lines_to_draw: u16,
+        cells: &'a [Cell],
+    ) -> io::Result<&'a [Cell]> {
+        let width: usize = self.last_known_area.width.into();
+        let (to_draw, remainder) = cells.split_at(width * lines_to_draw as usize);
+        if lines_to_draw > 0 {
+            let area = Rect::new(0, y_offset, width as u16, y_offset + lines_to_draw);
+            let old = Buffer::empty(area);
+            let new = Buffer {
+                area,
+                content: to_draw.to_vec(),
+            };
+            self.backend.draw(old.diff(&new).into_iter())?;
+            self.backend.flush()?;
+        }
+        Ok(remainder)
+    }
+
+    /// Scroll the whole screen up by the given number of lines.
+    #[cfg(not(feature = "scrolling-regions"))]
+    fn scroll_up(&mut self, lines_to_scroll: u16) -> io::Result<()> {
+        if lines_to_scroll > 0 {
+            self.set_cursor_position(Position::new(
+                0,
+                self.last_known_area.height.saturating_sub(1),
+            ))?;
+            self.backend.append_lines(lines_to_scroll)?;
+        }
         Ok(())
     }
 }
@@ -465,11 +824,11 @@ where
 fn compute_inline_size<B: Backend>(
     backend: &mut B,
     height: u16,
-    size: Rect,
+    size: Size,
     offset_in_previous_viewport: u16,
-) -> io::Result<(Rect, (u16, u16))> {
-    let pos = backend.get_cursor()?;
-    let mut row = pos.1;
+) -> io::Result<(Rect, Position)> {
+    let pos = backend.get_cursor_position()?;
+    let mut row = pos.y;
 
     let max_height = size.height.min(height);
 

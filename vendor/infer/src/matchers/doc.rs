@@ -1,47 +1,77 @@
-use core::convert::TryInto;
+use std::convert::TryInto;
 
-use super::compare_bytes;
-
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Eq, PartialEq)]
 enum DocType {
-    DOC,
+    // DOC,
     DOCX,
-    XLS,
+    // XLS,
     XLSX,
-    PPT,
+    // PPT,
     PPTX,
-    OOXML,
+    OOXLM,
 }
 
 /// Returns whether a buffer is Microsoft Word Document (DOC) data.
 pub fn is_doc(buf: &[u8]) -> bool {
-    ole2(buf) == Some(DocType::DOC)
+    buf.len() > 7
+        && buf[0] == 0xD0
+        && buf[1] == 0xCF
+        && buf[2] == 0x11
+        && buf[3] == 0xE0
+        && buf[4] == 0xA1
+        && buf[5] == 0xB1
+        && buf[6] == 0x1A
+        && buf[7] == 0xE1
 }
 
 /// Returns whether a buffer is Microsoft Word Open XML Format Document (DOCX) data.
 pub fn is_docx(buf: &[u8]) -> bool {
-    msooxml(buf) == Some(DocType::DOCX)
+    match msooxml(buf) {
+        Some(typ) => typ == DocType::DOCX,
+        None => false,
+    }
 }
 
 /// Returns whether a buffer is Microsoft Excel 97-2003 Worksheet (XLS) data.
 pub fn is_xls(buf: &[u8]) -> bool {
-    ole2(buf) == Some(DocType::XLS)
+    buf.len() > 7
+        && buf[0] == 0xD0
+        && buf[1] == 0xCF
+        && buf[2] == 0x11
+        && buf[3] == 0xE0
+        && buf[4] == 0xA1
+        && buf[5] == 0xB1
+        && buf[6] == 0x1A
+        && buf[7] == 0xE1
 }
 
 /// Returns whether a buffer is Microsoft Excel Open XML Format Spreadsheet (XLSX) data.
 pub fn is_xlsx(buf: &[u8]) -> bool {
-    msooxml(buf) == Some(DocType::XLSX)
+    match msooxml(buf) {
+        Some(typ) => typ == DocType::XLSX,
+        None => false,
+    }
 }
 
 /// Returns whether a buffer is Microsoft PowerPoint 97-2003 Presentation (PPT) data.
 pub fn is_ppt(buf: &[u8]) -> bool {
-    ole2(buf) == Some(DocType::PPT)
+    buf.len() > 7
+        && buf[0] == 0xD0
+        && buf[1] == 0xCF
+        && buf[2] == 0x11
+        && buf[3] == 0xE0
+        && buf[4] == 0xA1
+        && buf[5] == 0xB1
+        && buf[6] == 0x1A
+        && buf[7] == 0xE1
 }
 
 /// Returns whether a buffer is Microsoft PowerPoint Open XML Presentation (PPTX) data.
 pub fn is_pptx(buf: &[u8]) -> bool {
-    msooxml(buf) == Some(DocType::PPTX)
+    match msooxml(buf) {
+        Some(typ) => typ == DocType::PPTX,
+        None => false,
+    }
 }
 
 fn msooxml(buf: &[u8]) -> Option<DocType> {
@@ -59,7 +89,6 @@ fn msooxml(buf: &[u8]) -> Option<DocType> {
 
     if !compare_bytes(buf, b"[Content_Types].xml", 0x1E)
         && !compare_bytes(buf, b"_rels/.rels", 0x1E)
-        && !compare_bytes(buf, b"docProps", 0x1E)
     {
         return None;
     }
@@ -67,12 +96,7 @@ fn msooxml(buf: &[u8]) -> Option<DocType> {
     // skip to the second local file header
     // since some documents include a 520-byte extra field following the file
     // header, we need to scan for the next header
-    let mut start_offset = match u32::from_le_bytes(buf[18..22].try_into().unwrap()).checked_add(49)
-    {
-        Some(int) => int as usize,
-        None => return None,
-    };
-
+    let mut start_offset = (u32::from_le_bytes(buf[18..22].try_into().unwrap()) + 49) as usize;
     let idx = search(buf, start_offset, 6000)?;
 
     // now skip to the *third* local file header; again, we need to scan due to a
@@ -91,7 +115,7 @@ fn msooxml(buf: &[u8]) -> Option<DocType> {
     let idx = search(buf, start_offset, 6000);
     match idx {
         Some(idx) => start_offset += idx + 4 + 26,
-        None => return Some(DocType::OOXML),
+        None => return Some(DocType::OOXLM),
     };
 
     let typo = check_msooml(buf, start_offset);
@@ -99,35 +123,25 @@ fn msooxml(buf: &[u8]) -> Option<DocType> {
         return typo;
     }
 
-    Some(DocType::OOXML)
+    Some(DocType::OOXLM)
 }
 
-#[cfg(feature = "std")]
-fn ole2(buf: &[u8]) -> Option<DocType> {
-    use std::io::Cursor;
+fn compare_bytes(slice: &[u8], sub_slice: &[u8], start_offset: usize) -> bool {
+    let sl = sub_slice.len();
 
-    if !compare_bytes(buf, &[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1], 0) {
-        return None;
+    if start_offset + sl > slice.len() {
+        return false;
     }
-    if let Ok(file) = cfb::CompoundFile::open(Cursor::new(buf)) {
-        return match file.root_entry().clsid().to_string().as_str() {
-            "00020810-0000-0000-c000-000000000046" | "00020820-0000-0000-c000-000000000046" => {
-                Some(DocType::XLS)
-            }
-            "00020906-0000-0000-c000-000000000046" => Some(DocType::DOC),
-            "64818d10-4f9b-11cf-86ea-00aa00b929e8" => Some(DocType::PPT),
-            _ => None,
-        };
-    }
-    None
-}
 
-#[cfg(not(feature = "std"))]
-fn ole2(buf: &[u8]) -> Option<DocType> {
-    if !compare_bytes(buf, &[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1], 0) {
-        return None;
+    for (i, v) in slice.iter().skip(start_offset).take(sl).enumerate() {
+        let v2 = sub_slice[i];
+
+        if *v != v2 {
+            return false;
+        }
     }
-    Some(DocType::DOC)
+
+    true
 }
 
 fn check_msooml(buf: &[u8], offset: usize) -> Option<DocType> {

@@ -19,7 +19,9 @@ macro_rules! encoder {
                 ///
                 $($inherent_methods)*
             )*
+        }
 
+        impl<$inner> $name<$inner> {
             /// Acquires a reference to the underlying writer that this encoder is wrapping.
             pub fn get_ref(&self) -> &$inner {
                 self.inner.get_ref()
@@ -73,6 +75,29 @@ macro_rules! encoder {
                 cx: &mut std::task::Context<'_>,
             ) -> std::task::Poll<std::io::Result<()>> {
                 self.project().inner.poll_shutdown(cx)
+            }
+        }
+
+        impl<$inner: tokio::io::AsyncRead> tokio::io::AsyncRead for $name<$inner> {
+            fn poll_read(
+                self: std::pin::Pin<&mut Self>,
+                cx: &mut std::task::Context<'_>,
+                buf: &mut tokio::io::ReadBuf<'_>,
+            ) -> std::task::Poll<std::io::Result<()>> {
+                self.get_pin_mut().poll_read(cx, buf)
+            }
+        }
+
+        impl<$inner: tokio::io::AsyncBufRead> tokio::io::AsyncBufRead for $name<$inner> {
+            fn poll_fill_buf(
+                self: std::pin::Pin<&mut Self>,
+                cx: &mut std::task::Context<'_>
+            ) -> std::task::Poll<std::io::Result<&[u8]>> {
+                self.get_pin_mut().poll_fill_buf(cx)
+            }
+
+            fn consume(self: std::pin::Pin<&mut Self>, amt: usize) {
+                self.get_pin_mut().consume(amt)
             }
         }
 

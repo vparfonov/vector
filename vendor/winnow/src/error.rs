@@ -60,7 +60,6 @@ pub type PResult<O, E = ContextError> = Result<O, ErrMode<E>>;
 /// **Note:** This is only possible for `Stream` that are [partial][`crate::stream::StreamIsPartial`],
 /// like [`Partial`][crate::Partial].
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-#[cfg_attr(nightly, warn(rustdoc::missing_doc_code_examples))]
 pub enum Needed {
     /// Needs more data, but we do not know how much
     Unknown,
@@ -94,7 +93,6 @@ impl Needed {
 
 /// Add parse error state to [`ParserError`]s
 #[derive(Debug, Clone, PartialEq)]
-#[cfg_attr(nightly, warn(rustdoc::missing_doc_code_examples))]
 pub enum ErrMode<E> {
     /// There was not enough data to determine the appropriate action
     ///
@@ -255,10 +253,10 @@ where
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ErrMode::Incomplete(Needed::Size(u)) => write!(f, "Parsing requires {} bytes/chars", u),
+            ErrMode::Incomplete(Needed::Size(u)) => write!(f, "Parsing requires {u} bytes/chars"),
             ErrMode::Incomplete(Needed::Unknown) => write!(f, "Parsing requires more data"),
-            ErrMode::Cut(c) => write!(f, "Parsing Failure: {:?}", c),
-            ErrMode::Backtrack(c) => write!(f, "Parsing Error: {:?}", c),
+            ErrMode::Cut(c) => write!(f, "Parsing Failure: {c:?}"),
+            ErrMode::Backtrack(c) => write!(f, "Parsing Error: {c:?}"),
         }
     }
 }
@@ -278,7 +276,7 @@ pub trait ParserError<I: Stream>: Sized {
         I: crate::lib::std::fmt::Debug,
     {
         #[cfg(debug_assertions)]
-        panic!("assert `{}` failed at {:#?}", _message, input);
+        panic!("assert `{_message}` failed at {input:#?}");
         #[cfg(not(debug_assertions))]
         Self::from_error_kind(input, ErrorKind::Assert)
     }
@@ -320,6 +318,7 @@ pub trait AddContext<I: Stream, C = &'static str>: Sized {
 
 /// Capture context from when an error was recovered
 #[cfg(feature = "unstable-recover")]
+#[cfg(feature = "std")]
 pub trait FromRecoverableError<I: Stream, E> {
     /// Capture context from when an error was recovered
     fn from_recoverable_error(
@@ -410,6 +409,7 @@ impl<I: Stream + Clone> ParserError<I> for InputError<I> {
 impl<I: Stream + Clone, C> AddContext<I, C> for InputError<I> {}
 
 #[cfg(feature = "unstable-recover")]
+#[cfg(feature = "std")]
 impl<I: Clone + Stream> FromRecoverableError<I, Self> for InputError<I> {
     #[inline]
     fn from_recoverable_error(
@@ -488,6 +488,7 @@ impl<I: Stream> ParserError<I> for () {
 impl<I: Stream, C> AddContext<I, C> for () {}
 
 #[cfg(feature = "unstable-recover")]
+#[cfg(feature = "std")]
 impl<I: Stream> FromRecoverableError<I, Self> for () {
     #[inline]
     fn from_recoverable_error(
@@ -600,6 +601,7 @@ impl<C, I: Stream> AddContext<I, C> for ContextError<C> {
 }
 
 #[cfg(feature = "unstable-recover")]
+#[cfg(feature = "std")]
 impl<I: Stream, C> FromRecoverableError<I, Self> for ContextError<C> {
     #[inline]
     fn from_recoverable_error(
@@ -679,7 +681,7 @@ impl crate::lib::std::fmt::Display for ContextError<StrContext> {
             if let Some(expression) = expression {
                 newline = true;
 
-                write!(f, "invalid {}", expression)?;
+                write!(f, "invalid {expression}")?;
             }
 
             if !expected.is_empty() {
@@ -693,7 +695,7 @@ impl crate::lib::std::fmt::Display for ContextError<StrContext> {
                     if i != 0 {
                         write!(f, ", ")?;
                     }
-                    write!(f, "{}", expected)?;
+                    write!(f, "{expected}")?;
                 }
             }
             #[cfg(feature = "std")]
@@ -702,12 +704,19 @@ impl crate::lib::std::fmt::Display for ContextError<StrContext> {
                     if newline {
                         writeln!(f)?;
                     }
-                    write!(f, "{}", cause)?;
+                    write!(f, "{cause}")?;
                 }
             }
         }
 
         Ok(())
+    }
+}
+
+impl<C> ErrorConvert<ContextError<C>> for ContextError<C> {
+    #[inline]
+    fn convert(self) -> ContextError<C> {
+        self
     }
 }
 
@@ -764,9 +773,9 @@ impl crate::lib::std::fmt::Display for StrContextValue {
             Self::CharLiteral(c) if c.is_ascii_control() => {
                 write!(f, "`{}`", c.escape_debug())
             }
-            Self::CharLiteral(c) => write!(f, "`{}`", c),
-            Self::StringLiteral(c) => write!(f, "`{}`", c),
-            Self::Description(c) => write!(f, "{}", c),
+            Self::CharLiteral(c) => write!(f, "`{c}`"),
+            Self::StringLiteral(c) => write!(f, "`{c}`"),
+            Self::Description(c) => write!(f, "{c}"),
         }
     }
 }
@@ -1137,7 +1146,7 @@ impl<I, E> FromExternalError<I, E> for ErrorKind {
 /// The Display implementation allows the `std::error::Error` implementation
 impl fmt::Display for ErrorKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "error {:?}", self)
+        write!(f, "error {self:?}")
     }
 }
 
@@ -1213,7 +1222,7 @@ where
                 .nth(line_idx)
                 .expect("valid line number");
 
-            writeln!(f, "parse error at line {}, column {}", line_num, col_num)?;
+            writeln!(f, "parse error at line {line_num}, column {col_num}")?;
             //   |
             for _ in 0..gutter {
                 write!(f, " ")?;
@@ -1221,7 +1230,7 @@ where
             writeln!(f, " |")?;
 
             // 1 | 00:32:00.a999999
-            write!(f, "{} | ", line_num)?;
+            write!(f, "{line_num} | ")?;
             writeln!(f, "{}", String::from_utf8_lossy(content))?;
 
             //   |          ^

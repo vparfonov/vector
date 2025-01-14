@@ -13,9 +13,14 @@
 edition = "2018"
 rust-version = "1.63"
 name = "async-signal"
-version = "0.2.5"
+version = "0.2.10"
 authors = ["John Nunley <dev@notgull.net>"]
+build = false
 exclude = ["/.*"]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Async signal handling"
 readme = "README.md"
 keywords = [
@@ -28,10 +33,25 @@ categories = [
     "asynchronous",
     "concurrency",
     "os",
-    "signal-handling",
 ]
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/smol-rs/async-signal"
+
+[lib]
+name = "async_signal"
+path = "src/lib.rs"
+
+[[example]]
+name = "print"
+path = "examples/print.rs"
+
+[[test]]
+name = "sigint"
+path = "tests/sigint.rs"
+
+[[test]]
+name = "unix_signals"
+path = "tests/unix_signals.rs"
 
 [dependencies.cfg-if]
 version = "1.0.0"
@@ -46,7 +66,7 @@ version = "2.0.0"
 version = "2.0.1"
 
 [dev-dependencies.futures-lite]
-version = "1.12.0"
+version = "2.3.0"
 
 [dev-dependencies.signal-hook]
 version = "0.3.14"
@@ -72,7 +92,7 @@ version = "1.4.0"
 version = "0.2.139"
 
 [target."cfg(windows)".dependencies.async-lock]
-version = "2.7.0"
+version = "3.3.0"
 
 [target."cfg(windows)".dependencies.atomic-waker]
 version = "1.1.1"
@@ -81,7 +101,7 @@ version = "1.1.1"
 version = "0.4.8"
 
 [target."cfg(windows)".dependencies.windows-sys]
-version = "0.48"
+version = "0.59"
 features = [
     "Win32_Foundation",
     "Win32_System_Console",

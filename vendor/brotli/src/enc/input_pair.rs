@@ -1,7 +1,8 @@
-use super::super::alloc::SliceWrapper;
-use super::super::alloc::SliceWrapperMut;
-use super::interface::Freezable;
+use core;
 use core::cmp::min;
+
+use super::super::alloc::{SliceWrapper, SliceWrapperMut};
+use super::interface::Freezable;
 #[derive(Copy, Clone, Default, Debug)]
 pub struct InputReference<'a> {
     pub data: &'a [u8],

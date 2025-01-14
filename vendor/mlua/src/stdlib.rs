@@ -8,12 +8,7 @@ impl StdLib {
     /// [`coroutine`](https://www.lua.org/manual/5.4/manual.html#6.2) library
     ///
     /// Requires `feature = "lua54/lua53/lua52/luau"`
-    #[cfg(any(
-        feature = "lua54",
-        feature = "lua53",
-        feature = "lua52",
-        feature = "luau"
-    ))]
+    #[cfg(any(feature = "lua54", feature = "lua53", feature = "lua52", feature = "luau"))]
     pub const COROUTINE: StdLib = StdLib(1);
 
     /// [`table`](https://www.lua.org/manual/5.4/manual.html#6.6) library
@@ -48,17 +43,22 @@ impl StdLib {
     /// [`package`](https://www.lua.org/manual/5.4/manual.html#6.3) library
     pub const PACKAGE: StdLib = StdLib(1 << 8);
 
-    /// [`buffer`](https://luau-lang.org/library#buffer-library) library
+    /// [`buffer`](https://luau.org/library#buffer-library) library
     #[cfg(any(feature = "luau", doc))]
     #[cfg_attr(docsrs, doc(cfg(feature = "luau")))]
     pub const BUFFER: StdLib = StdLib(1 << 9);
+
+    /// [`vector`](https://luau.org/library#vector-library) library
+    #[cfg(any(feature = "luau", doc))]
+    #[cfg_attr(docsrs, doc(cfg(feature = "luau")))]
+    pub const VECTOR: StdLib = StdLib(1 << 10);
 
     /// [`jit`](http://luajit.org/ext_jit.html) library
     ///
     /// Requires `feature = "luajit"`
     #[cfg(any(feature = "luajit", doc))]
     #[cfg_attr(docsrs, doc(cfg(feature = "luajit")))]
-    pub const JIT: StdLib = StdLib(1 << 9);
+    pub const JIT: StdLib = StdLib(1 << 11);
 
     /// (**unsafe**) [`ffi`](http://luajit.org/ext_ffi.html) library
     ///

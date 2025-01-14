@@ -20,7 +20,8 @@ public final class Server {
 
     /**
      * <pre>
-     * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
      * </pre>
      *
      * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -28,7 +29,8 @@ public final class Server {
     int getTracingContextCount();
     /**
      * <pre>
-     * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
      * </pre>
      *
      * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -43,7 +45,8 @@ public final class Server {
     getTracingContext();
     /**
      * <pre>
-     * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
      * </pre>
      *
      * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -52,7 +55,8 @@ public final class Server {
     getTracingContextMap();
     /**
      * <pre>
-     * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
      * </pre>
      *
      * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -65,7 +69,8 @@ java.lang.String getTracingContextOrDefault(
 java.lang.String defaultValue);
     /**
      * <pre>
-     * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
      * </pre>
      *
      * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -93,6 +98,26 @@ java.lang.String defaultValue);
      */
     com.google.protobuf.ByteString
         getDbnameBytes();
+
+    /**
+     * <pre>
+     * The `timezone` for the request
+     * </pre>
+     *
+     * <code>string timezone = 4;</code>
+     * @return The timezone.
+     */
+    java.lang.String getTimezone();
+    /**
+     * <pre>
+     * The `timezone` for the request
+     * </pre>
+     *
+     * <code>string timezone = 4;</code>
+     * @return The bytes for timezone.
+     */
+    com.google.protobuf.ByteString
+        getTimezoneBytes();
   }
   /**
    * Protobuf type {@code greptime.v1.region.RegionRequestHeader}
@@ -108,6 +133,7 @@ java.lang.String defaultValue);
     }
     private RegionRequestHeader() {
       dbname_ = "";
+      timezone_ = "";
     }
 
     @java.lang.Override
@@ -145,6 +171,12 @@ java.lang.String defaultValue);
               java.lang.String s = input.readStringRequireUtf8();
 
               dbname_ = s;
+              break;
+            }
+            case 34: {
+              java.lang.String s = input.readStringRequireUtf8();
+
+              timezone_ = s;
               break;
             }
             case 42: {
@@ -234,7 +266,8 @@ java.lang.String defaultValue);
     }
     /**
      * <pre>
-     * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
      * </pre>
      *
      * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -256,7 +289,8 @@ java.lang.String defaultValue);
     }
     /**
      * <pre>
-     * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
      * </pre>
      *
      * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -268,7 +302,8 @@ java.lang.String defaultValue);
     }
     /**
      * <pre>
-     * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
      * </pre>
      *
      * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -285,7 +320,8 @@ java.lang.String defaultValue);
     }
     /**
      * <pre>
-     * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+     * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+     * https://www.w3.org/TR/trace-context/#header-name
      * </pre>
      *
      * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -349,6 +385,52 @@ java.lang.String defaultValue);
       }
     }
 
+    public static final int TIMEZONE_FIELD_NUMBER = 4;
+    private volatile java.lang.Object timezone_;
+    /**
+     * <pre>
+     * The `timezone` for the request
+     * </pre>
+     *
+     * <code>string timezone = 4;</code>
+     * @return The timezone.
+     */
+    @java.lang.Override
+    public java.lang.String getTimezone() {
+      java.lang.Object ref = timezone_;
+      if (ref instanceof java.lang.String) {
+        return (java.lang.String) ref;
+      } else {
+        com.google.protobuf.ByteString bs = 
+            (com.google.protobuf.ByteString) ref;
+        java.lang.String s = bs.toStringUtf8();
+        timezone_ = s;
+        return s;
+      }
+    }
+    /**
+     * <pre>
+     * The `timezone` for the request
+     * </pre>
+     *
+     * <code>string timezone = 4;</code>
+     * @return The bytes for timezone.
+     */
+    @java.lang.Override
+    public com.google.protobuf.ByteString
+        getTimezoneBytes() {
+      java.lang.Object ref = timezone_;
+      if (ref instanceof java.lang.String) {
+        com.google.protobuf.ByteString b = 
+            com.google.protobuf.ByteString.copyFromUtf8(
+                (java.lang.String) ref);
+        timezone_ = b;
+        return b;
+      } else {
+        return (com.google.protobuf.ByteString) ref;
+      }
+    }
+
     private byte memoizedIsInitialized = -1;
     @java.lang.Override
     public final boolean isInitialized() {
@@ -365,6 +447,9 @@ java.lang.String defaultValue);
                         throws java.io.IOException {
       if (!com.google.protobuf.GeneratedMessageV3.isStringEmpty(dbname_)) {
         com.google.protobuf.GeneratedMessageV3.writeString(output, 3, dbname_);
+      }
+      if (!com.google.protobuf.GeneratedMessageV3.isStringEmpty(timezone_)) {
+        com.google.protobuf.GeneratedMessageV3.writeString(output, 4, timezone_);
       }
       com.google.protobuf.GeneratedMessageV3
         .serializeStringMapTo(
@@ -383,6 +468,9 @@ java.lang.String defaultValue);
       size = 0;
       if (!com.google.protobuf.GeneratedMessageV3.isStringEmpty(dbname_)) {
         size += com.google.protobuf.GeneratedMessageV3.computeStringSize(3, dbname_);
+      }
+      if (!com.google.protobuf.GeneratedMessageV3.isStringEmpty(timezone_)) {
+        size += com.google.protobuf.GeneratedMessageV3.computeStringSize(4, timezone_);
       }
       for (java.util.Map.Entry<java.lang.String, java.lang.String> entry
            : internalGetTracingContext().getMap().entrySet()) {
@@ -413,6 +501,8 @@ java.lang.String defaultValue);
           other.internalGetTracingContext())) return false;
       if (!getDbname()
           .equals(other.getDbname())) return false;
+      if (!getTimezone()
+          .equals(other.getTimezone())) return false;
       if (!unknownFields.equals(other.unknownFields)) return false;
       return true;
     }
@@ -430,6 +520,8 @@ java.lang.String defaultValue);
       }
       hash = (37 * hash) + DBNAME_FIELD_NUMBER;
       hash = (53 * hash) + getDbname().hashCode();
+      hash = (37 * hash) + TIMEZONE_FIELD_NUMBER;
+      hash = (53 * hash) + getTimezone().hashCode();
       hash = (29 * hash) + unknownFields.hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -588,6 +680,8 @@ java.lang.String defaultValue);
         internalGetMutableTracingContext().clear();
         dbname_ = "";
 
+        timezone_ = "";
+
         return this;
       }
 
@@ -618,6 +712,7 @@ java.lang.String defaultValue);
         result.tracingContext_ = internalGetTracingContext();
         result.tracingContext_.makeImmutable();
         result.dbname_ = dbname_;
+        result.timezone_ = timezone_;
         onBuilt();
         return result;
       }
@@ -670,6 +765,10 @@ java.lang.String defaultValue);
             other.internalGetTracingContext());
         if (!other.getDbname().isEmpty()) {
           dbname_ = other.dbname_;
+          onChanged();
+        }
+        if (!other.getTimezone().isEmpty()) {
+          timezone_ = other.timezone_;
           onChanged();
         }
         this.mergeUnknownFields(other.unknownFields);
@@ -730,7 +829,8 @@ java.lang.String defaultValue);
       }
       /**
        * <pre>
-       * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
        * </pre>
        *
        * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -752,7 +852,8 @@ java.lang.String defaultValue);
       }
       /**
        * <pre>
-       * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
        * </pre>
        *
        * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -764,7 +865,8 @@ java.lang.String defaultValue);
       }
       /**
        * <pre>
-       * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
        * </pre>
        *
        * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -781,7 +883,8 @@ java.lang.String defaultValue);
       }
       /**
        * <pre>
-       * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
        * </pre>
        *
        * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -806,7 +909,8 @@ java.lang.String defaultValue);
       }
       /**
        * <pre>
-       * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
        * </pre>
        *
        * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -829,7 +933,8 @@ java.lang.String defaultValue);
       }
       /**
        * <pre>
-       * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
        * </pre>
        *
        * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -848,7 +953,8 @@ java.lang.String defaultValue);
       }
       /**
        * <pre>
-       * Encoded trace_id &amp; span_id, follow the w3c Trace Context https://www.w3.org/TR/trace-context/#header-name
+       * Encoded trace_id &amp; span_id, follow the w3c Trace Context
+       * https://www.w3.org/TR/trace-context/#header-name
        * </pre>
        *
        * <code>map&lt;string, string&gt; tracing_context = 5;</code>
@@ -953,6 +1059,102 @@ java.lang.String defaultValue);
   checkByteStringIsUtf8(value);
         
         dbname_ = value;
+        onChanged();
+        return this;
+      }
+
+      private java.lang.Object timezone_ = "";
+      /**
+       * <pre>
+       * The `timezone` for the request
+       * </pre>
+       *
+       * <code>string timezone = 4;</code>
+       * @return The timezone.
+       */
+      public java.lang.String getTimezone() {
+        java.lang.Object ref = timezone_;
+        if (!(ref instanceof java.lang.String)) {
+          com.google.protobuf.ByteString bs =
+              (com.google.protobuf.ByteString) ref;
+          java.lang.String s = bs.toStringUtf8();
+          timezone_ = s;
+          return s;
+        } else {
+          return (java.lang.String) ref;
+        }
+      }
+      /**
+       * <pre>
+       * The `timezone` for the request
+       * </pre>
+       *
+       * <code>string timezone = 4;</code>
+       * @return The bytes for timezone.
+       */
+      public com.google.protobuf.ByteString
+          getTimezoneBytes() {
+        java.lang.Object ref = timezone_;
+        if (ref instanceof String) {
+          com.google.protobuf.ByteString b = 
+              com.google.protobuf.ByteString.copyFromUtf8(
+                  (java.lang.String) ref);
+          timezone_ = b;
+          return b;
+        } else {
+          return (com.google.protobuf.ByteString) ref;
+        }
+      }
+      /**
+       * <pre>
+       * The `timezone` for the request
+       * </pre>
+       *
+       * <code>string timezone = 4;</code>
+       * @param value The timezone to set.
+       * @return This builder for chaining.
+       */
+      public Builder setTimezone(
+          java.lang.String value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  
+        timezone_ = value;
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * The `timezone` for the request
+       * </pre>
+       *
+       * <code>string timezone = 4;</code>
+       * @return This builder for chaining.
+       */
+      public Builder clearTimezone() {
+        
+        timezone_ = getDefaultInstance().getTimezone();
+        onChanged();
+        return this;
+      }
+      /**
+       * <pre>
+       * The `timezone` for the request
+       * </pre>
+       *
+       * <code>string timezone = 4;</code>
+       * @param value The bytes for timezone to set.
+       * @return This builder for chaining.
+       */
+      public Builder setTimezoneBytes(
+          com.google.protobuf.ByteString value) {
+        if (value == null) {
+    throw new NullPointerException();
+  }
+  checkByteStringIsUtf8(value);
+        
+        timezone_ = value;
         onChanged();
         return this;
       }
@@ -1178,6 +1380,51 @@ java.lang.String defaultValue);
      */
     io.greptime.v1.region.Server.TruncateRequestOrBuilder getTruncateOrBuilder();
 
+    /**
+     * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+     * @return Whether the creates field is set.
+     */
+    boolean hasCreates();
+    /**
+     * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+     * @return The creates.
+     */
+    io.greptime.v1.region.Server.CreateRequests getCreates();
+    /**
+     * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+     */
+    io.greptime.v1.region.Server.CreateRequestsOrBuilder getCreatesOrBuilder();
+
+    /**
+     * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+     * @return Whether the drops field is set.
+     */
+    boolean hasDrops();
+    /**
+     * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+     * @return The drops.
+     */
+    io.greptime.v1.region.Server.DropRequests getDrops();
+    /**
+     * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+     */
+    io.greptime.v1.region.Server.DropRequestsOrBuilder getDropsOrBuilder();
+
+    /**
+     * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+     * @return Whether the alters field is set.
+     */
+    boolean hasAlters();
+    /**
+     * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+     * @return The alters.
+     */
+    io.greptime.v1.region.Server.AlterRequests getAlters();
+    /**
+     * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+     */
+    io.greptime.v1.region.Server.AlterRequestsOrBuilder getAltersOrBuilder();
+
     public io.greptime.v1.region.Server.RegionRequest.BodyCase getBodyCase();
   }
   /**
@@ -1378,6 +1625,48 @@ java.lang.String defaultValue);
               bodyCase_ = 12;
               break;
             }
+            case 106: {
+              io.greptime.v1.region.Server.CreateRequests.Builder subBuilder = null;
+              if (bodyCase_ == 13) {
+                subBuilder = ((io.greptime.v1.region.Server.CreateRequests) body_).toBuilder();
+              }
+              body_ =
+                  input.readMessage(io.greptime.v1.region.Server.CreateRequests.parser(), extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom((io.greptime.v1.region.Server.CreateRequests) body_);
+                body_ = subBuilder.buildPartial();
+              }
+              bodyCase_ = 13;
+              break;
+            }
+            case 114: {
+              io.greptime.v1.region.Server.DropRequests.Builder subBuilder = null;
+              if (bodyCase_ == 14) {
+                subBuilder = ((io.greptime.v1.region.Server.DropRequests) body_).toBuilder();
+              }
+              body_ =
+                  input.readMessage(io.greptime.v1.region.Server.DropRequests.parser(), extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom((io.greptime.v1.region.Server.DropRequests) body_);
+                body_ = subBuilder.buildPartial();
+              }
+              bodyCase_ = 14;
+              break;
+            }
+            case 122: {
+              io.greptime.v1.region.Server.AlterRequests.Builder subBuilder = null;
+              if (bodyCase_ == 15) {
+                subBuilder = ((io.greptime.v1.region.Server.AlterRequests) body_).toBuilder();
+              }
+              body_ =
+                  input.readMessage(io.greptime.v1.region.Server.AlterRequests.parser(), extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom((io.greptime.v1.region.Server.AlterRequests) body_);
+                body_ = subBuilder.buildPartial();
+              }
+              bodyCase_ = 15;
+              break;
+            }
             default: {
               if (!parseUnknownField(
                   input, unknownFields, extensionRegistry, tag)) {
@@ -1427,6 +1716,9 @@ java.lang.String defaultValue);
       FLUSH(10),
       COMPACT(11),
       TRUNCATE(12),
+      CREATES(13),
+      DROPS(14),
+      ALTERS(15),
       BODY_NOT_SET(0);
       private final int value;
       private BodyCase(int value) {
@@ -1454,6 +1746,9 @@ java.lang.String defaultValue);
           case 10: return FLUSH;
           case 11: return COMPACT;
           case 12: return TRUNCATE;
+          case 13: return CREATES;
+          case 14: return DROPS;
+          case 15: return ALTERS;
           case 0: return BODY_NOT_SET;
           default: return null;
         }
@@ -1805,6 +2100,99 @@ java.lang.String defaultValue);
       return io.greptime.v1.region.Server.TruncateRequest.getDefaultInstance();
     }
 
+    public static final int CREATES_FIELD_NUMBER = 13;
+    /**
+     * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+     * @return Whether the creates field is set.
+     */
+    @java.lang.Override
+    public boolean hasCreates() {
+      return bodyCase_ == 13;
+    }
+    /**
+     * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+     * @return The creates.
+     */
+    @java.lang.Override
+    public io.greptime.v1.region.Server.CreateRequests getCreates() {
+      if (bodyCase_ == 13) {
+         return (io.greptime.v1.region.Server.CreateRequests) body_;
+      }
+      return io.greptime.v1.region.Server.CreateRequests.getDefaultInstance();
+    }
+    /**
+     * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.region.Server.CreateRequestsOrBuilder getCreatesOrBuilder() {
+      if (bodyCase_ == 13) {
+         return (io.greptime.v1.region.Server.CreateRequests) body_;
+      }
+      return io.greptime.v1.region.Server.CreateRequests.getDefaultInstance();
+    }
+
+    public static final int DROPS_FIELD_NUMBER = 14;
+    /**
+     * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+     * @return Whether the drops field is set.
+     */
+    @java.lang.Override
+    public boolean hasDrops() {
+      return bodyCase_ == 14;
+    }
+    /**
+     * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+     * @return The drops.
+     */
+    @java.lang.Override
+    public io.greptime.v1.region.Server.DropRequests getDrops() {
+      if (bodyCase_ == 14) {
+         return (io.greptime.v1.region.Server.DropRequests) body_;
+      }
+      return io.greptime.v1.region.Server.DropRequests.getDefaultInstance();
+    }
+    /**
+     * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.region.Server.DropRequestsOrBuilder getDropsOrBuilder() {
+      if (bodyCase_ == 14) {
+         return (io.greptime.v1.region.Server.DropRequests) body_;
+      }
+      return io.greptime.v1.region.Server.DropRequests.getDefaultInstance();
+    }
+
+    public static final int ALTERS_FIELD_NUMBER = 15;
+    /**
+     * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+     * @return Whether the alters field is set.
+     */
+    @java.lang.Override
+    public boolean hasAlters() {
+      return bodyCase_ == 15;
+    }
+    /**
+     * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+     * @return The alters.
+     */
+    @java.lang.Override
+    public io.greptime.v1.region.Server.AlterRequests getAlters() {
+      if (bodyCase_ == 15) {
+         return (io.greptime.v1.region.Server.AlterRequests) body_;
+      }
+      return io.greptime.v1.region.Server.AlterRequests.getDefaultInstance();
+    }
+    /**
+     * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.region.Server.AlterRequestsOrBuilder getAltersOrBuilder() {
+      if (bodyCase_ == 15) {
+         return (io.greptime.v1.region.Server.AlterRequests) body_;
+      }
+      return io.greptime.v1.region.Server.AlterRequests.getDefaultInstance();
+    }
+
     private byte memoizedIsInitialized = -1;
     @java.lang.Override
     public final boolean isInitialized() {
@@ -1851,6 +2239,15 @@ java.lang.String defaultValue);
       }
       if (bodyCase_ == 12) {
         output.writeMessage(12, (io.greptime.v1.region.Server.TruncateRequest) body_);
+      }
+      if (bodyCase_ == 13) {
+        output.writeMessage(13, (io.greptime.v1.region.Server.CreateRequests) body_);
+      }
+      if (bodyCase_ == 14) {
+        output.writeMessage(14, (io.greptime.v1.region.Server.DropRequests) body_);
+      }
+      if (bodyCase_ == 15) {
+        output.writeMessage(15, (io.greptime.v1.region.Server.AlterRequests) body_);
       }
       unknownFields.writeTo(output);
     }
@@ -1904,6 +2301,18 @@ java.lang.String defaultValue);
       if (bodyCase_ == 12) {
         size += com.google.protobuf.CodedOutputStream
           .computeMessageSize(12, (io.greptime.v1.region.Server.TruncateRequest) body_);
+      }
+      if (bodyCase_ == 13) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(13, (io.greptime.v1.region.Server.CreateRequests) body_);
+      }
+      if (bodyCase_ == 14) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(14, (io.greptime.v1.region.Server.DropRequests) body_);
+      }
+      if (bodyCase_ == 15) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(15, (io.greptime.v1.region.Server.AlterRequests) body_);
       }
       size += unknownFields.getSerializedSize();
       memoizedSize = size;
@@ -1967,6 +2376,18 @@ java.lang.String defaultValue);
           if (!getTruncate()
               .equals(other.getTruncate())) return false;
           break;
+        case 13:
+          if (!getCreates()
+              .equals(other.getCreates())) return false;
+          break;
+        case 14:
+          if (!getDrops()
+              .equals(other.getDrops())) return false;
+          break;
+        case 15:
+          if (!getAlters()
+              .equals(other.getAlters())) return false;
+          break;
         case 0:
         default:
       }
@@ -2025,6 +2446,18 @@ java.lang.String defaultValue);
         case 12:
           hash = (37 * hash) + TRUNCATE_FIELD_NUMBER;
           hash = (53 * hash) + getTruncate().hashCode();
+          break;
+        case 13:
+          hash = (37 * hash) + CREATES_FIELD_NUMBER;
+          hash = (53 * hash) + getCreates().hashCode();
+          break;
+        case 14:
+          hash = (37 * hash) + DROPS_FIELD_NUMBER;
+          hash = (53 * hash) + getDrops().hashCode();
+          break;
+        case 15:
+          hash = (37 * hash) + ALTERS_FIELD_NUMBER;
+          hash = (53 * hash) + getAlters().hashCode();
           break;
         case 0:
         default:
@@ -2271,6 +2704,27 @@ java.lang.String defaultValue);
             result.body_ = truncateBuilder_.build();
           }
         }
+        if (bodyCase_ == 13) {
+          if (createsBuilder_ == null) {
+            result.body_ = body_;
+          } else {
+            result.body_ = createsBuilder_.build();
+          }
+        }
+        if (bodyCase_ == 14) {
+          if (dropsBuilder_ == null) {
+            result.body_ = body_;
+          } else {
+            result.body_ = dropsBuilder_.build();
+          }
+        }
+        if (bodyCase_ == 15) {
+          if (altersBuilder_ == null) {
+            result.body_ = body_;
+          } else {
+            result.body_ = altersBuilder_.build();
+          }
+        }
         result.bodyCase_ = bodyCase_;
         onBuilt();
         return result;
@@ -2362,6 +2816,18 @@ java.lang.String defaultValue);
           }
           case TRUNCATE: {
             mergeTruncate(other.getTruncate());
+            break;
+          }
+          case CREATES: {
+            mergeCreates(other.getCreates());
+            break;
+          }
+          case DROPS: {
+            mergeDrops(other.getDrops());
+            break;
+          }
+          case ALTERS: {
+            mergeAlters(other.getAlters());
             break;
           }
           case BODY_NOT_SET: {
@@ -3950,6 +4416,432 @@ java.lang.String defaultValue);
         onChanged();;
         return truncateBuilder_;
       }
+
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.region.Server.CreateRequests, io.greptime.v1.region.Server.CreateRequests.Builder, io.greptime.v1.region.Server.CreateRequestsOrBuilder> createsBuilder_;
+      /**
+       * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+       * @return Whether the creates field is set.
+       */
+      @java.lang.Override
+      public boolean hasCreates() {
+        return bodyCase_ == 13;
+      }
+      /**
+       * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+       * @return The creates.
+       */
+      @java.lang.Override
+      public io.greptime.v1.region.Server.CreateRequests getCreates() {
+        if (createsBuilder_ == null) {
+          if (bodyCase_ == 13) {
+            return (io.greptime.v1.region.Server.CreateRequests) body_;
+          }
+          return io.greptime.v1.region.Server.CreateRequests.getDefaultInstance();
+        } else {
+          if (bodyCase_ == 13) {
+            return createsBuilder_.getMessage();
+          }
+          return io.greptime.v1.region.Server.CreateRequests.getDefaultInstance();
+        }
+      }
+      /**
+       * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+       */
+      public Builder setCreates(io.greptime.v1.region.Server.CreateRequests value) {
+        if (createsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          body_ = value;
+          onChanged();
+        } else {
+          createsBuilder_.setMessage(value);
+        }
+        bodyCase_ = 13;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+       */
+      public Builder setCreates(
+          io.greptime.v1.region.Server.CreateRequests.Builder builderForValue) {
+        if (createsBuilder_ == null) {
+          body_ = builderForValue.build();
+          onChanged();
+        } else {
+          createsBuilder_.setMessage(builderForValue.build());
+        }
+        bodyCase_ = 13;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+       */
+      public Builder mergeCreates(io.greptime.v1.region.Server.CreateRequests value) {
+        if (createsBuilder_ == null) {
+          if (bodyCase_ == 13 &&
+              body_ != io.greptime.v1.region.Server.CreateRequests.getDefaultInstance()) {
+            body_ = io.greptime.v1.region.Server.CreateRequests.newBuilder((io.greptime.v1.region.Server.CreateRequests) body_)
+                .mergeFrom(value).buildPartial();
+          } else {
+            body_ = value;
+          }
+          onChanged();
+        } else {
+          if (bodyCase_ == 13) {
+            createsBuilder_.mergeFrom(value);
+          } else {
+            createsBuilder_.setMessage(value);
+          }
+        }
+        bodyCase_ = 13;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+       */
+      public Builder clearCreates() {
+        if (createsBuilder_ == null) {
+          if (bodyCase_ == 13) {
+            bodyCase_ = 0;
+            body_ = null;
+            onChanged();
+          }
+        } else {
+          if (bodyCase_ == 13) {
+            bodyCase_ = 0;
+            body_ = null;
+          }
+          createsBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+       */
+      public io.greptime.v1.region.Server.CreateRequests.Builder getCreatesBuilder() {
+        return getCreatesFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+       */
+      @java.lang.Override
+      public io.greptime.v1.region.Server.CreateRequestsOrBuilder getCreatesOrBuilder() {
+        if ((bodyCase_ == 13) && (createsBuilder_ != null)) {
+          return createsBuilder_.getMessageOrBuilder();
+        } else {
+          if (bodyCase_ == 13) {
+            return (io.greptime.v1.region.Server.CreateRequests) body_;
+          }
+          return io.greptime.v1.region.Server.CreateRequests.getDefaultInstance();
+        }
+      }
+      /**
+       * <code>.greptime.v1.region.CreateRequests creates = 13;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.region.Server.CreateRequests, io.greptime.v1.region.Server.CreateRequests.Builder, io.greptime.v1.region.Server.CreateRequestsOrBuilder> 
+          getCreatesFieldBuilder() {
+        if (createsBuilder_ == null) {
+          if (!(bodyCase_ == 13)) {
+            body_ = io.greptime.v1.region.Server.CreateRequests.getDefaultInstance();
+          }
+          createsBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+              io.greptime.v1.region.Server.CreateRequests, io.greptime.v1.region.Server.CreateRequests.Builder, io.greptime.v1.region.Server.CreateRequestsOrBuilder>(
+                  (io.greptime.v1.region.Server.CreateRequests) body_,
+                  getParentForChildren(),
+                  isClean());
+          body_ = null;
+        }
+        bodyCase_ = 13;
+        onChanged();;
+        return createsBuilder_;
+      }
+
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.region.Server.DropRequests, io.greptime.v1.region.Server.DropRequests.Builder, io.greptime.v1.region.Server.DropRequestsOrBuilder> dropsBuilder_;
+      /**
+       * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+       * @return Whether the drops field is set.
+       */
+      @java.lang.Override
+      public boolean hasDrops() {
+        return bodyCase_ == 14;
+      }
+      /**
+       * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+       * @return The drops.
+       */
+      @java.lang.Override
+      public io.greptime.v1.region.Server.DropRequests getDrops() {
+        if (dropsBuilder_ == null) {
+          if (bodyCase_ == 14) {
+            return (io.greptime.v1.region.Server.DropRequests) body_;
+          }
+          return io.greptime.v1.region.Server.DropRequests.getDefaultInstance();
+        } else {
+          if (bodyCase_ == 14) {
+            return dropsBuilder_.getMessage();
+          }
+          return io.greptime.v1.region.Server.DropRequests.getDefaultInstance();
+        }
+      }
+      /**
+       * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+       */
+      public Builder setDrops(io.greptime.v1.region.Server.DropRequests value) {
+        if (dropsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          body_ = value;
+          onChanged();
+        } else {
+          dropsBuilder_.setMessage(value);
+        }
+        bodyCase_ = 14;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+       */
+      public Builder setDrops(
+          io.greptime.v1.region.Server.DropRequests.Builder builderForValue) {
+        if (dropsBuilder_ == null) {
+          body_ = builderForValue.build();
+          onChanged();
+        } else {
+          dropsBuilder_.setMessage(builderForValue.build());
+        }
+        bodyCase_ = 14;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+       */
+      public Builder mergeDrops(io.greptime.v1.region.Server.DropRequests value) {
+        if (dropsBuilder_ == null) {
+          if (bodyCase_ == 14 &&
+              body_ != io.greptime.v1.region.Server.DropRequests.getDefaultInstance()) {
+            body_ = io.greptime.v1.region.Server.DropRequests.newBuilder((io.greptime.v1.region.Server.DropRequests) body_)
+                .mergeFrom(value).buildPartial();
+          } else {
+            body_ = value;
+          }
+          onChanged();
+        } else {
+          if (bodyCase_ == 14) {
+            dropsBuilder_.mergeFrom(value);
+          } else {
+            dropsBuilder_.setMessage(value);
+          }
+        }
+        bodyCase_ = 14;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+       */
+      public Builder clearDrops() {
+        if (dropsBuilder_ == null) {
+          if (bodyCase_ == 14) {
+            bodyCase_ = 0;
+            body_ = null;
+            onChanged();
+          }
+        } else {
+          if (bodyCase_ == 14) {
+            bodyCase_ = 0;
+            body_ = null;
+          }
+          dropsBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+       */
+      public io.greptime.v1.region.Server.DropRequests.Builder getDropsBuilder() {
+        return getDropsFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+       */
+      @java.lang.Override
+      public io.greptime.v1.region.Server.DropRequestsOrBuilder getDropsOrBuilder() {
+        if ((bodyCase_ == 14) && (dropsBuilder_ != null)) {
+          return dropsBuilder_.getMessageOrBuilder();
+        } else {
+          if (bodyCase_ == 14) {
+            return (io.greptime.v1.region.Server.DropRequests) body_;
+          }
+          return io.greptime.v1.region.Server.DropRequests.getDefaultInstance();
+        }
+      }
+      /**
+       * <code>.greptime.v1.region.DropRequests drops = 14;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.region.Server.DropRequests, io.greptime.v1.region.Server.DropRequests.Builder, io.greptime.v1.region.Server.DropRequestsOrBuilder> 
+          getDropsFieldBuilder() {
+        if (dropsBuilder_ == null) {
+          if (!(bodyCase_ == 14)) {
+            body_ = io.greptime.v1.region.Server.DropRequests.getDefaultInstance();
+          }
+          dropsBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+              io.greptime.v1.region.Server.DropRequests, io.greptime.v1.region.Server.DropRequests.Builder, io.greptime.v1.region.Server.DropRequestsOrBuilder>(
+                  (io.greptime.v1.region.Server.DropRequests) body_,
+                  getParentForChildren(),
+                  isClean());
+          body_ = null;
+        }
+        bodyCase_ = 14;
+        onChanged();;
+        return dropsBuilder_;
+      }
+
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.region.Server.AlterRequests, io.greptime.v1.region.Server.AlterRequests.Builder, io.greptime.v1.region.Server.AlterRequestsOrBuilder> altersBuilder_;
+      /**
+       * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+       * @return Whether the alters field is set.
+       */
+      @java.lang.Override
+      public boolean hasAlters() {
+        return bodyCase_ == 15;
+      }
+      /**
+       * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+       * @return The alters.
+       */
+      @java.lang.Override
+      public io.greptime.v1.region.Server.AlterRequests getAlters() {
+        if (altersBuilder_ == null) {
+          if (bodyCase_ == 15) {
+            return (io.greptime.v1.region.Server.AlterRequests) body_;
+          }
+          return io.greptime.v1.region.Server.AlterRequests.getDefaultInstance();
+        } else {
+          if (bodyCase_ == 15) {
+            return altersBuilder_.getMessage();
+          }
+          return io.greptime.v1.region.Server.AlterRequests.getDefaultInstance();
+        }
+      }
+      /**
+       * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+       */
+      public Builder setAlters(io.greptime.v1.region.Server.AlterRequests value) {
+        if (altersBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          body_ = value;
+          onChanged();
+        } else {
+          altersBuilder_.setMessage(value);
+        }
+        bodyCase_ = 15;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+       */
+      public Builder setAlters(
+          io.greptime.v1.region.Server.AlterRequests.Builder builderForValue) {
+        if (altersBuilder_ == null) {
+          body_ = builderForValue.build();
+          onChanged();
+        } else {
+          altersBuilder_.setMessage(builderForValue.build());
+        }
+        bodyCase_ = 15;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+       */
+      public Builder mergeAlters(io.greptime.v1.region.Server.AlterRequests value) {
+        if (altersBuilder_ == null) {
+          if (bodyCase_ == 15 &&
+              body_ != io.greptime.v1.region.Server.AlterRequests.getDefaultInstance()) {
+            body_ = io.greptime.v1.region.Server.AlterRequests.newBuilder((io.greptime.v1.region.Server.AlterRequests) body_)
+                .mergeFrom(value).buildPartial();
+          } else {
+            body_ = value;
+          }
+          onChanged();
+        } else {
+          if (bodyCase_ == 15) {
+            altersBuilder_.mergeFrom(value);
+          } else {
+            altersBuilder_.setMessage(value);
+          }
+        }
+        bodyCase_ = 15;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+       */
+      public Builder clearAlters() {
+        if (altersBuilder_ == null) {
+          if (bodyCase_ == 15) {
+            bodyCase_ = 0;
+            body_ = null;
+            onChanged();
+          }
+        } else {
+          if (bodyCase_ == 15) {
+            bodyCase_ = 0;
+            body_ = null;
+          }
+          altersBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+       */
+      public io.greptime.v1.region.Server.AlterRequests.Builder getAltersBuilder() {
+        return getAltersFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+       */
+      @java.lang.Override
+      public io.greptime.v1.region.Server.AlterRequestsOrBuilder getAltersOrBuilder() {
+        if ((bodyCase_ == 15) && (altersBuilder_ != null)) {
+          return altersBuilder_.getMessageOrBuilder();
+        } else {
+          if (bodyCase_ == 15) {
+            return (io.greptime.v1.region.Server.AlterRequests) body_;
+          }
+          return io.greptime.v1.region.Server.AlterRequests.getDefaultInstance();
+        }
+      }
+      /**
+       * <code>.greptime.v1.region.AlterRequests alters = 15;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.region.Server.AlterRequests, io.greptime.v1.region.Server.AlterRequests.Builder, io.greptime.v1.region.Server.AlterRequestsOrBuilder> 
+          getAltersFieldBuilder() {
+        if (altersBuilder_ == null) {
+          if (!(bodyCase_ == 15)) {
+            body_ = io.greptime.v1.region.Server.AlterRequests.getDefaultInstance();
+          }
+          altersBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+              io.greptime.v1.region.Server.AlterRequests, io.greptime.v1.region.Server.AlterRequests.Builder, io.greptime.v1.region.Server.AlterRequestsOrBuilder>(
+                  (io.greptime.v1.region.Server.AlterRequests) body_,
+                  getParentForChildren(),
+                  isClean());
+          body_ = null;
+        }
+        bodyCase_ = 15;
+        onChanged();;
+        return altersBuilder_;
+      }
       @java.lang.Override
       public final Builder setUnknownFields(
           final com.google.protobuf.UnknownFieldSet unknownFields) {
@@ -4027,6 +4919,42 @@ java.lang.String defaultValue);
      * @return The affectedRows.
      */
     long getAffectedRows();
+
+    /**
+     * <code>map&lt;string, bytes&gt; extension = 3;</code>
+     */
+    int getExtensionCount();
+    /**
+     * <code>map&lt;string, bytes&gt; extension = 3;</code>
+     */
+    boolean containsExtension(
+        java.lang.String key);
+    /**
+     * Use {@link #getExtensionMap()} instead.
+     */
+    @java.lang.Deprecated
+    java.util.Map<java.lang.String, com.google.protobuf.ByteString>
+    getExtension();
+    /**
+     * <code>map&lt;string, bytes&gt; extension = 3;</code>
+     */
+    java.util.Map<java.lang.String, com.google.protobuf.ByteString>
+    getExtensionMap();
+    /**
+     * <code>map&lt;string, bytes&gt; extension = 3;</code>
+     */
+
+    /* nullable */
+com.google.protobuf.ByteString getExtensionOrDefault(
+        java.lang.String key,
+        /* nullable */
+com.google.protobuf.ByteString defaultValue);
+    /**
+     * <code>map&lt;string, bytes&gt; extension = 3;</code>
+     */
+
+    com.google.protobuf.ByteString getExtensionOrThrow(
+        java.lang.String key);
   }
   /**
    * Protobuf type {@code greptime.v1.region.RegionResponse}
@@ -4063,6 +4991,7 @@ java.lang.String defaultValue);
       if (extensionRegistry == null) {
         throw new java.lang.NullPointerException();
       }
+      int mutable_bitField0_ = 0;
       com.google.protobuf.UnknownFieldSet.Builder unknownFields =
           com.google.protobuf.UnknownFieldSet.newBuilder();
       try {
@@ -4091,6 +5020,19 @@ java.lang.String defaultValue);
               affectedRows_ = input.readUInt64();
               break;
             }
+            case 26: {
+              if (!((mutable_bitField0_ & 0x00000001) != 0)) {
+                extension_ = com.google.protobuf.MapField.newMapField(
+                    ExtensionDefaultEntryHolder.defaultEntry);
+                mutable_bitField0_ |= 0x00000001;
+              }
+              com.google.protobuf.MapEntry<java.lang.String, com.google.protobuf.ByteString>
+              extension__ = input.readMessage(
+                  ExtensionDefaultEntryHolder.defaultEntry.getParserForType(), extensionRegistry);
+              extension_.getMutableMap().put(
+                  extension__.getKey(), extension__.getValue());
+              break;
+            }
             default: {
               if (!parseUnknownField(
                   input, unknownFields, extensionRegistry, tag)) {
@@ -4117,6 +5059,18 @@ java.lang.String defaultValue);
       return io.greptime.v1.region.Server.internal_static_greptime_v1_region_RegionResponse_descriptor;
     }
 
+    @SuppressWarnings({"rawtypes"})
+    @java.lang.Override
+    protected com.google.protobuf.MapField internalGetMapField(
+        int number) {
+      switch (number) {
+        case 3:
+          return internalGetExtension();
+        default:
+          throw new RuntimeException(
+              "Invalid map field number: " + number);
+      }
+    }
     @java.lang.Override
     protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
         internalGetFieldAccessorTable() {
@@ -4162,6 +5116,87 @@ java.lang.String defaultValue);
       return affectedRows_;
     }
 
+    public static final int EXTENSION_FIELD_NUMBER = 3;
+    private static final class ExtensionDefaultEntryHolder {
+      static final com.google.protobuf.MapEntry<
+          java.lang.String, com.google.protobuf.ByteString> defaultEntry =
+              com.google.protobuf.MapEntry
+              .<java.lang.String, com.google.protobuf.ByteString>newDefaultInstance(
+                  io.greptime.v1.region.Server.internal_static_greptime_v1_region_RegionResponse_ExtensionEntry_descriptor, 
+                  com.google.protobuf.WireFormat.FieldType.STRING,
+                  "",
+                  com.google.protobuf.WireFormat.FieldType.BYTES,
+                  com.google.protobuf.ByteString.EMPTY);
+    }
+    private com.google.protobuf.MapField<
+        java.lang.String, com.google.protobuf.ByteString> extension_;
+    private com.google.protobuf.MapField<java.lang.String, com.google.protobuf.ByteString>
+    internalGetExtension() {
+      if (extension_ == null) {
+        return com.google.protobuf.MapField.emptyMapField(
+            ExtensionDefaultEntryHolder.defaultEntry);
+      }
+      return extension_;
+    }
+
+    public int getExtensionCount() {
+      return internalGetExtension().getMap().size();
+    }
+    /**
+     * <code>map&lt;string, bytes&gt; extension = 3;</code>
+     */
+
+    @java.lang.Override
+    public boolean containsExtension(
+        java.lang.String key) {
+      if (key == null) { throw new NullPointerException("map key"); }
+      return internalGetExtension().getMap().containsKey(key);
+    }
+    /**
+     * Use {@link #getExtensionMap()} instead.
+     */
+    @java.lang.Override
+    @java.lang.Deprecated
+    public java.util.Map<java.lang.String, com.google.protobuf.ByteString> getExtension() {
+      return getExtensionMap();
+    }
+    /**
+     * <code>map&lt;string, bytes&gt; extension = 3;</code>
+     */
+    @java.lang.Override
+
+    public java.util.Map<java.lang.String, com.google.protobuf.ByteString> getExtensionMap() {
+      return internalGetExtension().getMap();
+    }
+    /**
+     * <code>map&lt;string, bytes&gt; extension = 3;</code>
+     */
+    @java.lang.Override
+
+    public com.google.protobuf.ByteString getExtensionOrDefault(
+        java.lang.String key,
+        com.google.protobuf.ByteString defaultValue) {
+      if (key == null) { throw new NullPointerException("map key"); }
+      java.util.Map<java.lang.String, com.google.protobuf.ByteString> map =
+          internalGetExtension().getMap();
+      return map.containsKey(key) ? map.get(key) : defaultValue;
+    }
+    /**
+     * <code>map&lt;string, bytes&gt; extension = 3;</code>
+     */
+    @java.lang.Override
+
+    public com.google.protobuf.ByteString getExtensionOrThrow(
+        java.lang.String key) {
+      if (key == null) { throw new NullPointerException("map key"); }
+      java.util.Map<java.lang.String, com.google.protobuf.ByteString> map =
+          internalGetExtension().getMap();
+      if (!map.containsKey(key)) {
+        throw new java.lang.IllegalArgumentException();
+      }
+      return map.get(key);
+    }
+
     private byte memoizedIsInitialized = -1;
     @java.lang.Override
     public final boolean isInitialized() {
@@ -4182,6 +5217,12 @@ java.lang.String defaultValue);
       if (affectedRows_ != 0L) {
         output.writeUInt64(2, affectedRows_);
       }
+      com.google.protobuf.GeneratedMessageV3
+        .serializeStringMapTo(
+          output,
+          internalGetExtension(),
+          ExtensionDefaultEntryHolder.defaultEntry,
+          3);
       unknownFields.writeTo(output);
     }
 
@@ -4198,6 +5239,16 @@ java.lang.String defaultValue);
       if (affectedRows_ != 0L) {
         size += com.google.protobuf.CodedOutputStream
           .computeUInt64Size(2, affectedRows_);
+      }
+      for (java.util.Map.Entry<java.lang.String, com.google.protobuf.ByteString> entry
+           : internalGetExtension().getMap().entrySet()) {
+        com.google.protobuf.MapEntry<java.lang.String, com.google.protobuf.ByteString>
+        extension__ = ExtensionDefaultEntryHolder.defaultEntry.newBuilderForType()
+            .setKey(entry.getKey())
+            .setValue(entry.getValue())
+            .build();
+        size += com.google.protobuf.CodedOutputStream
+            .computeMessageSize(3, extension__);
       }
       size += unknownFields.getSerializedSize();
       memoizedSize = size;
@@ -4221,6 +5272,8 @@ java.lang.String defaultValue);
       }
       if (getAffectedRows()
           != other.getAffectedRows()) return false;
+      if (!internalGetExtension().equals(
+          other.internalGetExtension())) return false;
       if (!unknownFields.equals(other.unknownFields)) return false;
       return true;
     }
@@ -4239,6 +5292,10 @@ java.lang.String defaultValue);
       hash = (37 * hash) + AFFECTED_ROWS_FIELD_NUMBER;
       hash = (53 * hash) + com.google.protobuf.Internal.hashLong(
           getAffectedRows());
+      if (!internalGetExtension().getMap().isEmpty()) {
+        hash = (37 * hash) + EXTENSION_FIELD_NUMBER;
+        hash = (53 * hash) + internalGetExtension().hashCode();
+      }
       hash = (29 * hash) + unknownFields.hashCode();
       memoizedHashCode = hash;
       return hash;
@@ -4346,6 +5403,28 @@ java.lang.String defaultValue);
         return io.greptime.v1.region.Server.internal_static_greptime_v1_region_RegionResponse_descriptor;
       }
 
+      @SuppressWarnings({"rawtypes"})
+      protected com.google.protobuf.MapField internalGetMapField(
+          int number) {
+        switch (number) {
+          case 3:
+            return internalGetExtension();
+          default:
+            throw new RuntimeException(
+                "Invalid map field number: " + number);
+        }
+      }
+      @SuppressWarnings({"rawtypes"})
+      protected com.google.protobuf.MapField internalGetMutableMapField(
+          int number) {
+        switch (number) {
+          case 3:
+            return internalGetMutableExtension();
+          default:
+            throw new RuntimeException(
+                "Invalid map field number: " + number);
+        }
+      }
       @java.lang.Override
       protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
           internalGetFieldAccessorTable() {
@@ -4380,6 +5459,7 @@ java.lang.String defaultValue);
         }
         affectedRows_ = 0L;
 
+        internalGetMutableExtension().clear();
         return this;
       }
 
@@ -4406,12 +5486,15 @@ java.lang.String defaultValue);
       @java.lang.Override
       public io.greptime.v1.region.Server.RegionResponse buildPartial() {
         io.greptime.v1.region.Server.RegionResponse result = new io.greptime.v1.region.Server.RegionResponse(this);
+        int from_bitField0_ = bitField0_;
         if (headerBuilder_ == null) {
           result.header_ = header_;
         } else {
           result.header_ = headerBuilder_.build();
         }
         result.affectedRows_ = affectedRows_;
+        result.extension_ = internalGetExtension();
+        result.extension_.makeImmutable();
         onBuilt();
         return result;
       }
@@ -4466,6 +5549,8 @@ java.lang.String defaultValue);
         if (other.getAffectedRows() != 0L) {
           setAffectedRows(other.getAffectedRows());
         }
+        internalGetMutableExtension().mergeFrom(
+            other.internalGetExtension());
         this.mergeUnknownFields(other.unknownFields);
         onChanged();
         return this;
@@ -4494,6 +5579,7 @@ java.lang.String defaultValue);
         }
         return this;
       }
+      private int bitField0_;
 
       private io.greptime.v1.Common.ResponseHeader header_;
       private com.google.protobuf.SingleFieldBuilderV3<
@@ -4642,6 +5728,137 @@ java.lang.String defaultValue);
         
         affectedRows_ = 0L;
         onChanged();
+        return this;
+      }
+
+      private com.google.protobuf.MapField<
+          java.lang.String, com.google.protobuf.ByteString> extension_;
+      private com.google.protobuf.MapField<java.lang.String, com.google.protobuf.ByteString>
+      internalGetExtension() {
+        if (extension_ == null) {
+          return com.google.protobuf.MapField.emptyMapField(
+              ExtensionDefaultEntryHolder.defaultEntry);
+        }
+        return extension_;
+      }
+      private com.google.protobuf.MapField<java.lang.String, com.google.protobuf.ByteString>
+      internalGetMutableExtension() {
+        onChanged();;
+        if (extension_ == null) {
+          extension_ = com.google.protobuf.MapField.newMapField(
+              ExtensionDefaultEntryHolder.defaultEntry);
+        }
+        if (!extension_.isMutable()) {
+          extension_ = extension_.copy();
+        }
+        return extension_;
+      }
+
+      public int getExtensionCount() {
+        return internalGetExtension().getMap().size();
+      }
+      /**
+       * <code>map&lt;string, bytes&gt; extension = 3;</code>
+       */
+
+      @java.lang.Override
+      public boolean containsExtension(
+          java.lang.String key) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        return internalGetExtension().getMap().containsKey(key);
+      }
+      /**
+       * Use {@link #getExtensionMap()} instead.
+       */
+      @java.lang.Override
+      @java.lang.Deprecated
+      public java.util.Map<java.lang.String, com.google.protobuf.ByteString> getExtension() {
+        return getExtensionMap();
+      }
+      /**
+       * <code>map&lt;string, bytes&gt; extension = 3;</code>
+       */
+      @java.lang.Override
+
+      public java.util.Map<java.lang.String, com.google.protobuf.ByteString> getExtensionMap() {
+        return internalGetExtension().getMap();
+      }
+      /**
+       * <code>map&lt;string, bytes&gt; extension = 3;</code>
+       */
+      @java.lang.Override
+
+      public com.google.protobuf.ByteString getExtensionOrDefault(
+          java.lang.String key,
+          com.google.protobuf.ByteString defaultValue) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        java.util.Map<java.lang.String, com.google.protobuf.ByteString> map =
+            internalGetExtension().getMap();
+        return map.containsKey(key) ? map.get(key) : defaultValue;
+      }
+      /**
+       * <code>map&lt;string, bytes&gt; extension = 3;</code>
+       */
+      @java.lang.Override
+
+      public com.google.protobuf.ByteString getExtensionOrThrow(
+          java.lang.String key) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        java.util.Map<java.lang.String, com.google.protobuf.ByteString> map =
+            internalGetExtension().getMap();
+        if (!map.containsKey(key)) {
+          throw new java.lang.IllegalArgumentException();
+        }
+        return map.get(key);
+      }
+
+      public Builder clearExtension() {
+        internalGetMutableExtension().getMutableMap()
+            .clear();
+        return this;
+      }
+      /**
+       * <code>map&lt;string, bytes&gt; extension = 3;</code>
+       */
+
+      public Builder removeExtension(
+          java.lang.String key) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        internalGetMutableExtension().getMutableMap()
+            .remove(key);
+        return this;
+      }
+      /**
+       * Use alternate mutation accessors instead.
+       */
+      @java.lang.Deprecated
+      public java.util.Map<java.lang.String, com.google.protobuf.ByteString>
+      getMutableExtension() {
+        return internalGetMutableExtension().getMutableMap();
+      }
+      /**
+       * <code>map&lt;string, bytes&gt; extension = 3;</code>
+       */
+      public Builder putExtension(
+          java.lang.String key,
+          com.google.protobuf.ByteString value) {
+        if (key == null) { throw new NullPointerException("map key"); }
+        if (value == null) {
+  throw new NullPointerException("map value");
+}
+
+        internalGetMutableExtension().getMutableMap()
+            .put(key, value);
+        return this;
+      }
+      /**
+       * <code>map&lt;string, bytes&gt; extension = 3;</code>
+       */
+
+      public Builder putAllExtension(
+          java.util.Map<java.lang.String, com.google.protobuf.ByteString> values) {
+        internalGetMutableExtension().getMutableMap()
+            .putAll(values);
         return this;
       }
       @java.lang.Override
@@ -8463,6 +9680,813 @@ java.lang.String defaultValue);
 
   }
 
+  public interface CreateRequestsOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:greptime.v1.region.CreateRequests)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+     */
+    java.util.List<io.greptime.v1.region.Server.CreateRequest> 
+        getRequestsList();
+    /**
+     * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+     */
+    io.greptime.v1.region.Server.CreateRequest getRequests(int index);
+    /**
+     * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+     */
+    int getRequestsCount();
+    /**
+     * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+     */
+    java.util.List<? extends io.greptime.v1.region.Server.CreateRequestOrBuilder> 
+        getRequestsOrBuilderList();
+    /**
+     * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+     */
+    io.greptime.v1.region.Server.CreateRequestOrBuilder getRequestsOrBuilder(
+        int index);
+  }
+  /**
+   * <pre>
+   * Create a batch of regions at once, usually used to create multiple logical
+   * regions at once. Different engines can choose whether to support this
+   * request. Metric Engine needs it.
+   * </pre>
+   *
+   * Protobuf type {@code greptime.v1.region.CreateRequests}
+   */
+  public static final class CreateRequests extends
+      com.google.protobuf.GeneratedMessageV3 implements
+      // @@protoc_insertion_point(message_implements:greptime.v1.region.CreateRequests)
+      CreateRequestsOrBuilder {
+  private static final long serialVersionUID = 0L;
+    // Use CreateRequests.newBuilder() to construct.
+    private CreateRequests(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+      super(builder);
+    }
+    private CreateRequests() {
+      requests_ = java.util.Collections.emptyList();
+    }
+
+    @java.lang.Override
+    @SuppressWarnings({"unused"})
+    protected java.lang.Object newInstance(
+        UnusedPrivateParameter unused) {
+      return new CreateRequests();
+    }
+
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+    getUnknownFields() {
+      return this.unknownFields;
+    }
+    private CreateRequests(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      this();
+      if (extensionRegistry == null) {
+        throw new java.lang.NullPointerException();
+      }
+      int mutable_bitField0_ = 0;
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            case 10: {
+              if (!((mutable_bitField0_ & 0x00000001) != 0)) {
+                requests_ = new java.util.ArrayList<io.greptime.v1.region.Server.CreateRequest>();
+                mutable_bitField0_ |= 0x00000001;
+              }
+              requests_.add(
+                  input.readMessage(io.greptime.v1.region.Server.CreateRequest.parser(), extensionRegistry));
+              break;
+            }
+            default: {
+              if (!parseUnknownField(
+                  input, unknownFields, extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (com.google.protobuf.UninitializedMessageException e) {
+        throw e.asInvalidProtocolBufferException().setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e).setUnfinishedMessage(this);
+      } finally {
+        if (((mutable_bitField0_ & 0x00000001) != 0)) {
+          requests_ = java.util.Collections.unmodifiableList(requests_);
+        }
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return io.greptime.v1.region.Server.internal_static_greptime_v1_region_CreateRequests_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return io.greptime.v1.region.Server.internal_static_greptime_v1_region_CreateRequests_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              io.greptime.v1.region.Server.CreateRequests.class, io.greptime.v1.region.Server.CreateRequests.Builder.class);
+    }
+
+    public static final int REQUESTS_FIELD_NUMBER = 1;
+    private java.util.List<io.greptime.v1.region.Server.CreateRequest> requests_;
+    /**
+     * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public java.util.List<io.greptime.v1.region.Server.CreateRequest> getRequestsList() {
+      return requests_;
+    }
+    /**
+     * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public java.util.List<? extends io.greptime.v1.region.Server.CreateRequestOrBuilder> 
+        getRequestsOrBuilderList() {
+      return requests_;
+    }
+    /**
+     * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public int getRequestsCount() {
+      return requests_.size();
+    }
+    /**
+     * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.region.Server.CreateRequest getRequests(int index) {
+      return requests_.get(index);
+    }
+    /**
+     * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.region.Server.CreateRequestOrBuilder getRequestsOrBuilder(
+        int index) {
+      return requests_.get(index);
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      for (int i = 0; i < requests_.size(); i++) {
+        output.writeMessage(1, requests_.get(i));
+      }
+      unknownFields.writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      for (int i = 0; i < requests_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, requests_.get(i));
+      }
+      size += unknownFields.getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof io.greptime.v1.region.Server.CreateRequests)) {
+        return super.equals(obj);
+      }
+      io.greptime.v1.region.Server.CreateRequests other = (io.greptime.v1.region.Server.CreateRequests) obj;
+
+      if (!getRequestsList()
+          .equals(other.getRequestsList())) return false;
+      if (!unknownFields.equals(other.unknownFields)) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      if (getRequestsCount() > 0) {
+        hash = (37 * hash) + REQUESTS_FIELD_NUMBER;
+        hash = (53 * hash) + getRequestsList().hashCode();
+      }
+      hash = (29 * hash) + unknownFields.hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static io.greptime.v1.region.Server.CreateRequests parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.region.Server.CreateRequests parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.CreateRequests parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.region.Server.CreateRequests parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.CreateRequests parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.region.Server.CreateRequests parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.CreateRequests parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.region.Server.CreateRequests parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.CreateRequests parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.region.Server.CreateRequests parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.CreateRequests parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.region.Server.CreateRequests parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(io.greptime.v1.region.Server.CreateRequests prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * <pre>
+     * Create a batch of regions at once, usually used to create multiple logical
+     * regions at once. Different engines can choose whether to support this
+     * request. Metric Engine needs it.
+     * </pre>
+     *
+     * Protobuf type {@code greptime.v1.region.CreateRequests}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:greptime.v1.region.CreateRequests)
+        io.greptime.v1.region.Server.CreateRequestsOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return io.greptime.v1.region.Server.internal_static_greptime_v1_region_CreateRequests_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return io.greptime.v1.region.Server.internal_static_greptime_v1_region_CreateRequests_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                io.greptime.v1.region.Server.CreateRequests.class, io.greptime.v1.region.Server.CreateRequests.Builder.class);
+      }
+
+      // Construct using io.greptime.v1.region.Server.CreateRequests.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessageV3
+                .alwaysUseFieldBuilders) {
+          getRequestsFieldBuilder();
+        }
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        if (requestsBuilder_ == null) {
+          requests_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+        } else {
+          requestsBuilder_.clear();
+        }
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return io.greptime.v1.region.Server.internal_static_greptime_v1_region_CreateRequests_descriptor;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.region.Server.CreateRequests getDefaultInstanceForType() {
+        return io.greptime.v1.region.Server.CreateRequests.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.region.Server.CreateRequests build() {
+        io.greptime.v1.region.Server.CreateRequests result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.region.Server.CreateRequests buildPartial() {
+        io.greptime.v1.region.Server.CreateRequests result = new io.greptime.v1.region.Server.CreateRequests(this);
+        int from_bitField0_ = bitField0_;
+        if (requestsBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) != 0)) {
+            requests_ = java.util.Collections.unmodifiableList(requests_);
+            bitField0_ = (bitField0_ & ~0x00000001);
+          }
+          result.requests_ = requests_;
+        } else {
+          result.requests_ = requestsBuilder_.build();
+        }
+        onBuilt();
+        return result;
+      }
+
+      @java.lang.Override
+      public Builder clone() {
+        return super.clone();
+      }
+      @java.lang.Override
+      public Builder setField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.setField(field, value);
+      }
+      @java.lang.Override
+      public Builder clearField(
+          com.google.protobuf.Descriptors.FieldDescriptor field) {
+        return super.clearField(field);
+      }
+      @java.lang.Override
+      public Builder clearOneof(
+          com.google.protobuf.Descriptors.OneofDescriptor oneof) {
+        return super.clearOneof(oneof);
+      }
+      @java.lang.Override
+      public Builder setRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          int index, java.lang.Object value) {
+        return super.setRepeatedField(field, index, value);
+      }
+      @java.lang.Override
+      public Builder addRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.addRepeatedField(field, value);
+      }
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof io.greptime.v1.region.Server.CreateRequests) {
+          return mergeFrom((io.greptime.v1.region.Server.CreateRequests)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(io.greptime.v1.region.Server.CreateRequests other) {
+        if (other == io.greptime.v1.region.Server.CreateRequests.getDefaultInstance()) return this;
+        if (requestsBuilder_ == null) {
+          if (!other.requests_.isEmpty()) {
+            if (requests_.isEmpty()) {
+              requests_ = other.requests_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+            } else {
+              ensureRequestsIsMutable();
+              requests_.addAll(other.requests_);
+            }
+            onChanged();
+          }
+        } else {
+          if (!other.requests_.isEmpty()) {
+            if (requestsBuilder_.isEmpty()) {
+              requestsBuilder_.dispose();
+              requestsBuilder_ = null;
+              requests_ = other.requests_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+              requestsBuilder_ = 
+                com.google.protobuf.GeneratedMessageV3.alwaysUseFieldBuilders ?
+                   getRequestsFieldBuilder() : null;
+            } else {
+              requestsBuilder_.addAllMessages(other.requests_);
+            }
+          }
+        }
+        this.mergeUnknownFields(other.unknownFields);
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        io.greptime.v1.region.Server.CreateRequests parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (io.greptime.v1.region.Server.CreateRequests) e.getUnfinishedMessage();
+          throw e.unwrapIOException();
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+      private int bitField0_;
+
+      private java.util.List<io.greptime.v1.region.Server.CreateRequest> requests_ =
+        java.util.Collections.emptyList();
+      private void ensureRequestsIsMutable() {
+        if (!((bitField0_ & 0x00000001) != 0)) {
+          requests_ = new java.util.ArrayList<io.greptime.v1.region.Server.CreateRequest>(requests_);
+          bitField0_ |= 0x00000001;
+         }
+      }
+
+      private com.google.protobuf.RepeatedFieldBuilderV3<
+          io.greptime.v1.region.Server.CreateRequest, io.greptime.v1.region.Server.CreateRequest.Builder, io.greptime.v1.region.Server.CreateRequestOrBuilder> requestsBuilder_;
+
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public java.util.List<io.greptime.v1.region.Server.CreateRequest> getRequestsList() {
+        if (requestsBuilder_ == null) {
+          return java.util.Collections.unmodifiableList(requests_);
+        } else {
+          return requestsBuilder_.getMessageList();
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public int getRequestsCount() {
+        if (requestsBuilder_ == null) {
+          return requests_.size();
+        } else {
+          return requestsBuilder_.getCount();
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.CreateRequest getRequests(int index) {
+        if (requestsBuilder_ == null) {
+          return requests_.get(index);
+        } else {
+          return requestsBuilder_.getMessage(index);
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public Builder setRequests(
+          int index, io.greptime.v1.region.Server.CreateRequest value) {
+        if (requestsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureRequestsIsMutable();
+          requests_.set(index, value);
+          onChanged();
+        } else {
+          requestsBuilder_.setMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public Builder setRequests(
+          int index, io.greptime.v1.region.Server.CreateRequest.Builder builderForValue) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          requests_.set(index, builderForValue.build());
+          onChanged();
+        } else {
+          requestsBuilder_.setMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public Builder addRequests(io.greptime.v1.region.Server.CreateRequest value) {
+        if (requestsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureRequestsIsMutable();
+          requests_.add(value);
+          onChanged();
+        } else {
+          requestsBuilder_.addMessage(value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public Builder addRequests(
+          int index, io.greptime.v1.region.Server.CreateRequest value) {
+        if (requestsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureRequestsIsMutable();
+          requests_.add(index, value);
+          onChanged();
+        } else {
+          requestsBuilder_.addMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public Builder addRequests(
+          io.greptime.v1.region.Server.CreateRequest.Builder builderForValue) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          requests_.add(builderForValue.build());
+          onChanged();
+        } else {
+          requestsBuilder_.addMessage(builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public Builder addRequests(
+          int index, io.greptime.v1.region.Server.CreateRequest.Builder builderForValue) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          requests_.add(index, builderForValue.build());
+          onChanged();
+        } else {
+          requestsBuilder_.addMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public Builder addAllRequests(
+          java.lang.Iterable<? extends io.greptime.v1.region.Server.CreateRequest> values) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, requests_);
+          onChanged();
+        } else {
+          requestsBuilder_.addAllMessages(values);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public Builder clearRequests() {
+        if (requestsBuilder_ == null) {
+          requests_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+          onChanged();
+        } else {
+          requestsBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public Builder removeRequests(int index) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          requests_.remove(index);
+          onChanged();
+        } else {
+          requestsBuilder_.remove(index);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.CreateRequest.Builder getRequestsBuilder(
+          int index) {
+        return getRequestsFieldBuilder().getBuilder(index);
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.CreateRequestOrBuilder getRequestsOrBuilder(
+          int index) {
+        if (requestsBuilder_ == null) {
+          return requests_.get(index);  } else {
+          return requestsBuilder_.getMessageOrBuilder(index);
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public java.util.List<? extends io.greptime.v1.region.Server.CreateRequestOrBuilder> 
+           getRequestsOrBuilderList() {
+        if (requestsBuilder_ != null) {
+          return requestsBuilder_.getMessageOrBuilderList();
+        } else {
+          return java.util.Collections.unmodifiableList(requests_);
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.CreateRequest.Builder addRequestsBuilder() {
+        return getRequestsFieldBuilder().addBuilder(
+            io.greptime.v1.region.Server.CreateRequest.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.CreateRequest.Builder addRequestsBuilder(
+          int index) {
+        return getRequestsFieldBuilder().addBuilder(
+            index, io.greptime.v1.region.Server.CreateRequest.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .greptime.v1.region.CreateRequest requests = 1;</code>
+       */
+      public java.util.List<io.greptime.v1.region.Server.CreateRequest.Builder> 
+           getRequestsBuilderList() {
+        return getRequestsFieldBuilder().getBuilderList();
+      }
+      private com.google.protobuf.RepeatedFieldBuilderV3<
+          io.greptime.v1.region.Server.CreateRequest, io.greptime.v1.region.Server.CreateRequest.Builder, io.greptime.v1.region.Server.CreateRequestOrBuilder> 
+          getRequestsFieldBuilder() {
+        if (requestsBuilder_ == null) {
+          requestsBuilder_ = new com.google.protobuf.RepeatedFieldBuilderV3<
+              io.greptime.v1.region.Server.CreateRequest, io.greptime.v1.region.Server.CreateRequest.Builder, io.greptime.v1.region.Server.CreateRequestOrBuilder>(
+                  requests_,
+                  ((bitField0_ & 0x00000001) != 0),
+                  getParentForChildren(),
+                  isClean());
+          requests_ = null;
+        }
+        return requestsBuilder_;
+      }
+      @java.lang.Override
+      public final Builder setUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.setUnknownFields(unknownFields);
+      }
+
+      @java.lang.Override
+      public final Builder mergeUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.mergeUnknownFields(unknownFields);
+      }
+
+
+      // @@protoc_insertion_point(builder_scope:greptime.v1.region.CreateRequests)
+    }
+
+    // @@protoc_insertion_point(class_scope:greptime.v1.region.CreateRequests)
+    private static final io.greptime.v1.region.Server.CreateRequests DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new io.greptime.v1.region.Server.CreateRequests();
+    }
+
+    public static io.greptime.v1.region.Server.CreateRequests getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<CreateRequests>
+        PARSER = new com.google.protobuf.AbstractParser<CreateRequests>() {
+      @java.lang.Override
+      public CreateRequests parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new CreateRequests(input, extensionRegistry);
+      }
+    };
+
+    public static com.google.protobuf.Parser<CreateRequests> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<CreateRequests> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public io.greptime.v1.region.Server.CreateRequests getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
   public interface CreateRequestOrBuilder extends
       // @@protoc_insertion_point(interface_extends:greptime.v1.region.CreateRequest)
       com.google.protobuf.MessageOrBuilder {
@@ -10440,6 +12464,809 @@ java.lang.String defaultValue);
 
     @java.lang.Override
     public io.greptime.v1.region.Server.CreateRequest getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
+  public interface DropRequestsOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:greptime.v1.region.DropRequests)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+     */
+    java.util.List<io.greptime.v1.region.Server.DropRequest> 
+        getRequestsList();
+    /**
+     * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+     */
+    io.greptime.v1.region.Server.DropRequest getRequests(int index);
+    /**
+     * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+     */
+    int getRequestsCount();
+    /**
+     * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+     */
+    java.util.List<? extends io.greptime.v1.region.Server.DropRequestOrBuilder> 
+        getRequestsOrBuilderList();
+    /**
+     * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+     */
+    io.greptime.v1.region.Server.DropRequestOrBuilder getRequestsOrBuilder(
+        int index);
+  }
+  /**
+   * <pre>
+   * Same as CreateRequests, but for dropping regions.
+   * </pre>
+   *
+   * Protobuf type {@code greptime.v1.region.DropRequests}
+   */
+  public static final class DropRequests extends
+      com.google.protobuf.GeneratedMessageV3 implements
+      // @@protoc_insertion_point(message_implements:greptime.v1.region.DropRequests)
+      DropRequestsOrBuilder {
+  private static final long serialVersionUID = 0L;
+    // Use DropRequests.newBuilder() to construct.
+    private DropRequests(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+      super(builder);
+    }
+    private DropRequests() {
+      requests_ = java.util.Collections.emptyList();
+    }
+
+    @java.lang.Override
+    @SuppressWarnings({"unused"})
+    protected java.lang.Object newInstance(
+        UnusedPrivateParameter unused) {
+      return new DropRequests();
+    }
+
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+    getUnknownFields() {
+      return this.unknownFields;
+    }
+    private DropRequests(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      this();
+      if (extensionRegistry == null) {
+        throw new java.lang.NullPointerException();
+      }
+      int mutable_bitField0_ = 0;
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            case 10: {
+              if (!((mutable_bitField0_ & 0x00000001) != 0)) {
+                requests_ = new java.util.ArrayList<io.greptime.v1.region.Server.DropRequest>();
+                mutable_bitField0_ |= 0x00000001;
+              }
+              requests_.add(
+                  input.readMessage(io.greptime.v1.region.Server.DropRequest.parser(), extensionRegistry));
+              break;
+            }
+            default: {
+              if (!parseUnknownField(
+                  input, unknownFields, extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (com.google.protobuf.UninitializedMessageException e) {
+        throw e.asInvalidProtocolBufferException().setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e).setUnfinishedMessage(this);
+      } finally {
+        if (((mutable_bitField0_ & 0x00000001) != 0)) {
+          requests_ = java.util.Collections.unmodifiableList(requests_);
+        }
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return io.greptime.v1.region.Server.internal_static_greptime_v1_region_DropRequests_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return io.greptime.v1.region.Server.internal_static_greptime_v1_region_DropRequests_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              io.greptime.v1.region.Server.DropRequests.class, io.greptime.v1.region.Server.DropRequests.Builder.class);
+    }
+
+    public static final int REQUESTS_FIELD_NUMBER = 1;
+    private java.util.List<io.greptime.v1.region.Server.DropRequest> requests_;
+    /**
+     * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public java.util.List<io.greptime.v1.region.Server.DropRequest> getRequestsList() {
+      return requests_;
+    }
+    /**
+     * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public java.util.List<? extends io.greptime.v1.region.Server.DropRequestOrBuilder> 
+        getRequestsOrBuilderList() {
+      return requests_;
+    }
+    /**
+     * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public int getRequestsCount() {
+      return requests_.size();
+    }
+    /**
+     * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.region.Server.DropRequest getRequests(int index) {
+      return requests_.get(index);
+    }
+    /**
+     * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.region.Server.DropRequestOrBuilder getRequestsOrBuilder(
+        int index) {
+      return requests_.get(index);
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      for (int i = 0; i < requests_.size(); i++) {
+        output.writeMessage(1, requests_.get(i));
+      }
+      unknownFields.writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      for (int i = 0; i < requests_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, requests_.get(i));
+      }
+      size += unknownFields.getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof io.greptime.v1.region.Server.DropRequests)) {
+        return super.equals(obj);
+      }
+      io.greptime.v1.region.Server.DropRequests other = (io.greptime.v1.region.Server.DropRequests) obj;
+
+      if (!getRequestsList()
+          .equals(other.getRequestsList())) return false;
+      if (!unknownFields.equals(other.unknownFields)) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      if (getRequestsCount() > 0) {
+        hash = (37 * hash) + REQUESTS_FIELD_NUMBER;
+        hash = (53 * hash) + getRequestsList().hashCode();
+      }
+      hash = (29 * hash) + unknownFields.hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static io.greptime.v1.region.Server.DropRequests parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.region.Server.DropRequests parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.DropRequests parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.region.Server.DropRequests parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.DropRequests parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.region.Server.DropRequests parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.DropRequests parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.region.Server.DropRequests parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.DropRequests parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.region.Server.DropRequests parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.DropRequests parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.region.Server.DropRequests parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(io.greptime.v1.region.Server.DropRequests prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * <pre>
+     * Same as CreateRequests, but for dropping regions.
+     * </pre>
+     *
+     * Protobuf type {@code greptime.v1.region.DropRequests}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:greptime.v1.region.DropRequests)
+        io.greptime.v1.region.Server.DropRequestsOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return io.greptime.v1.region.Server.internal_static_greptime_v1_region_DropRequests_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return io.greptime.v1.region.Server.internal_static_greptime_v1_region_DropRequests_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                io.greptime.v1.region.Server.DropRequests.class, io.greptime.v1.region.Server.DropRequests.Builder.class);
+      }
+
+      // Construct using io.greptime.v1.region.Server.DropRequests.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessageV3
+                .alwaysUseFieldBuilders) {
+          getRequestsFieldBuilder();
+        }
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        if (requestsBuilder_ == null) {
+          requests_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+        } else {
+          requestsBuilder_.clear();
+        }
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return io.greptime.v1.region.Server.internal_static_greptime_v1_region_DropRequests_descriptor;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.region.Server.DropRequests getDefaultInstanceForType() {
+        return io.greptime.v1.region.Server.DropRequests.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.region.Server.DropRequests build() {
+        io.greptime.v1.region.Server.DropRequests result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.region.Server.DropRequests buildPartial() {
+        io.greptime.v1.region.Server.DropRequests result = new io.greptime.v1.region.Server.DropRequests(this);
+        int from_bitField0_ = bitField0_;
+        if (requestsBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) != 0)) {
+            requests_ = java.util.Collections.unmodifiableList(requests_);
+            bitField0_ = (bitField0_ & ~0x00000001);
+          }
+          result.requests_ = requests_;
+        } else {
+          result.requests_ = requestsBuilder_.build();
+        }
+        onBuilt();
+        return result;
+      }
+
+      @java.lang.Override
+      public Builder clone() {
+        return super.clone();
+      }
+      @java.lang.Override
+      public Builder setField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.setField(field, value);
+      }
+      @java.lang.Override
+      public Builder clearField(
+          com.google.protobuf.Descriptors.FieldDescriptor field) {
+        return super.clearField(field);
+      }
+      @java.lang.Override
+      public Builder clearOneof(
+          com.google.protobuf.Descriptors.OneofDescriptor oneof) {
+        return super.clearOneof(oneof);
+      }
+      @java.lang.Override
+      public Builder setRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          int index, java.lang.Object value) {
+        return super.setRepeatedField(field, index, value);
+      }
+      @java.lang.Override
+      public Builder addRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.addRepeatedField(field, value);
+      }
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof io.greptime.v1.region.Server.DropRequests) {
+          return mergeFrom((io.greptime.v1.region.Server.DropRequests)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(io.greptime.v1.region.Server.DropRequests other) {
+        if (other == io.greptime.v1.region.Server.DropRequests.getDefaultInstance()) return this;
+        if (requestsBuilder_ == null) {
+          if (!other.requests_.isEmpty()) {
+            if (requests_.isEmpty()) {
+              requests_ = other.requests_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+            } else {
+              ensureRequestsIsMutable();
+              requests_.addAll(other.requests_);
+            }
+            onChanged();
+          }
+        } else {
+          if (!other.requests_.isEmpty()) {
+            if (requestsBuilder_.isEmpty()) {
+              requestsBuilder_.dispose();
+              requestsBuilder_ = null;
+              requests_ = other.requests_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+              requestsBuilder_ = 
+                com.google.protobuf.GeneratedMessageV3.alwaysUseFieldBuilders ?
+                   getRequestsFieldBuilder() : null;
+            } else {
+              requestsBuilder_.addAllMessages(other.requests_);
+            }
+          }
+        }
+        this.mergeUnknownFields(other.unknownFields);
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        io.greptime.v1.region.Server.DropRequests parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (io.greptime.v1.region.Server.DropRequests) e.getUnfinishedMessage();
+          throw e.unwrapIOException();
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+      private int bitField0_;
+
+      private java.util.List<io.greptime.v1.region.Server.DropRequest> requests_ =
+        java.util.Collections.emptyList();
+      private void ensureRequestsIsMutable() {
+        if (!((bitField0_ & 0x00000001) != 0)) {
+          requests_ = new java.util.ArrayList<io.greptime.v1.region.Server.DropRequest>(requests_);
+          bitField0_ |= 0x00000001;
+         }
+      }
+
+      private com.google.protobuf.RepeatedFieldBuilderV3<
+          io.greptime.v1.region.Server.DropRequest, io.greptime.v1.region.Server.DropRequest.Builder, io.greptime.v1.region.Server.DropRequestOrBuilder> requestsBuilder_;
+
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public java.util.List<io.greptime.v1.region.Server.DropRequest> getRequestsList() {
+        if (requestsBuilder_ == null) {
+          return java.util.Collections.unmodifiableList(requests_);
+        } else {
+          return requestsBuilder_.getMessageList();
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public int getRequestsCount() {
+        if (requestsBuilder_ == null) {
+          return requests_.size();
+        } else {
+          return requestsBuilder_.getCount();
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.DropRequest getRequests(int index) {
+        if (requestsBuilder_ == null) {
+          return requests_.get(index);
+        } else {
+          return requestsBuilder_.getMessage(index);
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public Builder setRequests(
+          int index, io.greptime.v1.region.Server.DropRequest value) {
+        if (requestsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureRequestsIsMutable();
+          requests_.set(index, value);
+          onChanged();
+        } else {
+          requestsBuilder_.setMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public Builder setRequests(
+          int index, io.greptime.v1.region.Server.DropRequest.Builder builderForValue) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          requests_.set(index, builderForValue.build());
+          onChanged();
+        } else {
+          requestsBuilder_.setMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public Builder addRequests(io.greptime.v1.region.Server.DropRequest value) {
+        if (requestsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureRequestsIsMutable();
+          requests_.add(value);
+          onChanged();
+        } else {
+          requestsBuilder_.addMessage(value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public Builder addRequests(
+          int index, io.greptime.v1.region.Server.DropRequest value) {
+        if (requestsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureRequestsIsMutable();
+          requests_.add(index, value);
+          onChanged();
+        } else {
+          requestsBuilder_.addMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public Builder addRequests(
+          io.greptime.v1.region.Server.DropRequest.Builder builderForValue) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          requests_.add(builderForValue.build());
+          onChanged();
+        } else {
+          requestsBuilder_.addMessage(builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public Builder addRequests(
+          int index, io.greptime.v1.region.Server.DropRequest.Builder builderForValue) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          requests_.add(index, builderForValue.build());
+          onChanged();
+        } else {
+          requestsBuilder_.addMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public Builder addAllRequests(
+          java.lang.Iterable<? extends io.greptime.v1.region.Server.DropRequest> values) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, requests_);
+          onChanged();
+        } else {
+          requestsBuilder_.addAllMessages(values);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public Builder clearRequests() {
+        if (requestsBuilder_ == null) {
+          requests_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+          onChanged();
+        } else {
+          requestsBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public Builder removeRequests(int index) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          requests_.remove(index);
+          onChanged();
+        } else {
+          requestsBuilder_.remove(index);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.DropRequest.Builder getRequestsBuilder(
+          int index) {
+        return getRequestsFieldBuilder().getBuilder(index);
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.DropRequestOrBuilder getRequestsOrBuilder(
+          int index) {
+        if (requestsBuilder_ == null) {
+          return requests_.get(index);  } else {
+          return requestsBuilder_.getMessageOrBuilder(index);
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public java.util.List<? extends io.greptime.v1.region.Server.DropRequestOrBuilder> 
+           getRequestsOrBuilderList() {
+        if (requestsBuilder_ != null) {
+          return requestsBuilder_.getMessageOrBuilderList();
+        } else {
+          return java.util.Collections.unmodifiableList(requests_);
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.DropRequest.Builder addRequestsBuilder() {
+        return getRequestsFieldBuilder().addBuilder(
+            io.greptime.v1.region.Server.DropRequest.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.DropRequest.Builder addRequestsBuilder(
+          int index) {
+        return getRequestsFieldBuilder().addBuilder(
+            index, io.greptime.v1.region.Server.DropRequest.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .greptime.v1.region.DropRequest requests = 1;</code>
+       */
+      public java.util.List<io.greptime.v1.region.Server.DropRequest.Builder> 
+           getRequestsBuilderList() {
+        return getRequestsFieldBuilder().getBuilderList();
+      }
+      private com.google.protobuf.RepeatedFieldBuilderV3<
+          io.greptime.v1.region.Server.DropRequest, io.greptime.v1.region.Server.DropRequest.Builder, io.greptime.v1.region.Server.DropRequestOrBuilder> 
+          getRequestsFieldBuilder() {
+        if (requestsBuilder_ == null) {
+          requestsBuilder_ = new com.google.protobuf.RepeatedFieldBuilderV3<
+              io.greptime.v1.region.Server.DropRequest, io.greptime.v1.region.Server.DropRequest.Builder, io.greptime.v1.region.Server.DropRequestOrBuilder>(
+                  requests_,
+                  ((bitField0_ & 0x00000001) != 0),
+                  getParentForChildren(),
+                  isClean());
+          requests_ = null;
+        }
+        return requestsBuilder_;
+      }
+      @java.lang.Override
+      public final Builder setUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.setUnknownFields(unknownFields);
+      }
+
+      @java.lang.Override
+      public final Builder mergeUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.mergeUnknownFields(unknownFields);
+      }
+
+
+      // @@protoc_insertion_point(builder_scope:greptime.v1.region.DropRequests)
+    }
+
+    // @@protoc_insertion_point(class_scope:greptime.v1.region.DropRequests)
+    private static final io.greptime.v1.region.Server.DropRequests DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new io.greptime.v1.region.Server.DropRequests();
+    }
+
+    public static io.greptime.v1.region.Server.DropRequests getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<DropRequests>
+        PARSER = new com.google.protobuf.AbstractParser<DropRequests>() {
+      @java.lang.Override
+      public DropRequests parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new DropRequests(input, extensionRegistry);
+      }
+    };
+
+    public static com.google.protobuf.Parser<DropRequests> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<DropRequests> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public io.greptime.v1.region.Server.DropRequests getDefaultInstanceForType() {
       return DEFAULT_INSTANCE;
     }
 
@@ -12679,6 +15506,801 @@ java.lang.String defaultValue);
 
   }
 
+  public interface AlterRequestsOrBuilder extends
+      // @@protoc_insertion_point(interface_extends:greptime.v1.region.AlterRequests)
+      com.google.protobuf.MessageOrBuilder {
+
+    /**
+     * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+     */
+    java.util.List<io.greptime.v1.region.Server.AlterRequest> 
+        getRequestsList();
+    /**
+     * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+     */
+    io.greptime.v1.region.Server.AlterRequest getRequests(int index);
+    /**
+     * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+     */
+    int getRequestsCount();
+    /**
+     * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+     */
+    java.util.List<? extends io.greptime.v1.region.Server.AlterRequestOrBuilder> 
+        getRequestsOrBuilderList();
+    /**
+     * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+     */
+    io.greptime.v1.region.Server.AlterRequestOrBuilder getRequestsOrBuilder(
+        int index);
+  }
+  /**
+   * Protobuf type {@code greptime.v1.region.AlterRequests}
+   */
+  public static final class AlterRequests extends
+      com.google.protobuf.GeneratedMessageV3 implements
+      // @@protoc_insertion_point(message_implements:greptime.v1.region.AlterRequests)
+      AlterRequestsOrBuilder {
+  private static final long serialVersionUID = 0L;
+    // Use AlterRequests.newBuilder() to construct.
+    private AlterRequests(com.google.protobuf.GeneratedMessageV3.Builder<?> builder) {
+      super(builder);
+    }
+    private AlterRequests() {
+      requests_ = java.util.Collections.emptyList();
+    }
+
+    @java.lang.Override
+    @SuppressWarnings({"unused"})
+    protected java.lang.Object newInstance(
+        UnusedPrivateParameter unused) {
+      return new AlterRequests();
+    }
+
+    @java.lang.Override
+    public final com.google.protobuf.UnknownFieldSet
+    getUnknownFields() {
+      return this.unknownFields;
+    }
+    private AlterRequests(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      this();
+      if (extensionRegistry == null) {
+        throw new java.lang.NullPointerException();
+      }
+      int mutable_bitField0_ = 0;
+      com.google.protobuf.UnknownFieldSet.Builder unknownFields =
+          com.google.protobuf.UnknownFieldSet.newBuilder();
+      try {
+        boolean done = false;
+        while (!done) {
+          int tag = input.readTag();
+          switch (tag) {
+            case 0:
+              done = true;
+              break;
+            case 10: {
+              if (!((mutable_bitField0_ & 0x00000001) != 0)) {
+                requests_ = new java.util.ArrayList<io.greptime.v1.region.Server.AlterRequest>();
+                mutable_bitField0_ |= 0x00000001;
+              }
+              requests_.add(
+                  input.readMessage(io.greptime.v1.region.Server.AlterRequest.parser(), extensionRegistry));
+              break;
+            }
+            default: {
+              if (!parseUnknownField(
+                  input, unknownFields, extensionRegistry, tag)) {
+                done = true;
+              }
+              break;
+            }
+          }
+        }
+      } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+        throw e.setUnfinishedMessage(this);
+      } catch (com.google.protobuf.UninitializedMessageException e) {
+        throw e.asInvalidProtocolBufferException().setUnfinishedMessage(this);
+      } catch (java.io.IOException e) {
+        throw new com.google.protobuf.InvalidProtocolBufferException(
+            e).setUnfinishedMessage(this);
+      } finally {
+        if (((mutable_bitField0_ & 0x00000001) != 0)) {
+          requests_ = java.util.Collections.unmodifiableList(requests_);
+        }
+        this.unknownFields = unknownFields.build();
+        makeExtensionsImmutable();
+      }
+    }
+    public static final com.google.protobuf.Descriptors.Descriptor
+        getDescriptor() {
+      return io.greptime.v1.region.Server.internal_static_greptime_v1_region_AlterRequests_descriptor;
+    }
+
+    @java.lang.Override
+    protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+        internalGetFieldAccessorTable() {
+      return io.greptime.v1.region.Server.internal_static_greptime_v1_region_AlterRequests_fieldAccessorTable
+          .ensureFieldAccessorsInitialized(
+              io.greptime.v1.region.Server.AlterRequests.class, io.greptime.v1.region.Server.AlterRequests.Builder.class);
+    }
+
+    public static final int REQUESTS_FIELD_NUMBER = 1;
+    private java.util.List<io.greptime.v1.region.Server.AlterRequest> requests_;
+    /**
+     * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public java.util.List<io.greptime.v1.region.Server.AlterRequest> getRequestsList() {
+      return requests_;
+    }
+    /**
+     * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public java.util.List<? extends io.greptime.v1.region.Server.AlterRequestOrBuilder> 
+        getRequestsOrBuilderList() {
+      return requests_;
+    }
+    /**
+     * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public int getRequestsCount() {
+      return requests_.size();
+    }
+    /**
+     * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.region.Server.AlterRequest getRequests(int index) {
+      return requests_.get(index);
+    }
+    /**
+     * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.region.Server.AlterRequestOrBuilder getRequestsOrBuilder(
+        int index) {
+      return requests_.get(index);
+    }
+
+    private byte memoizedIsInitialized = -1;
+    @java.lang.Override
+    public final boolean isInitialized() {
+      byte isInitialized = memoizedIsInitialized;
+      if (isInitialized == 1) return true;
+      if (isInitialized == 0) return false;
+
+      memoizedIsInitialized = 1;
+      return true;
+    }
+
+    @java.lang.Override
+    public void writeTo(com.google.protobuf.CodedOutputStream output)
+                        throws java.io.IOException {
+      for (int i = 0; i < requests_.size(); i++) {
+        output.writeMessage(1, requests_.get(i));
+      }
+      unknownFields.writeTo(output);
+    }
+
+    @java.lang.Override
+    public int getSerializedSize() {
+      int size = memoizedSize;
+      if (size != -1) return size;
+
+      size = 0;
+      for (int i = 0; i < requests_.size(); i++) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(1, requests_.get(i));
+      }
+      size += unknownFields.getSerializedSize();
+      memoizedSize = size;
+      return size;
+    }
+
+    @java.lang.Override
+    public boolean equals(final java.lang.Object obj) {
+      if (obj == this) {
+       return true;
+      }
+      if (!(obj instanceof io.greptime.v1.region.Server.AlterRequests)) {
+        return super.equals(obj);
+      }
+      io.greptime.v1.region.Server.AlterRequests other = (io.greptime.v1.region.Server.AlterRequests) obj;
+
+      if (!getRequestsList()
+          .equals(other.getRequestsList())) return false;
+      if (!unknownFields.equals(other.unknownFields)) return false;
+      return true;
+    }
+
+    @java.lang.Override
+    public int hashCode() {
+      if (memoizedHashCode != 0) {
+        return memoizedHashCode;
+      }
+      int hash = 41;
+      hash = (19 * hash) + getDescriptor().hashCode();
+      if (getRequestsCount() > 0) {
+        hash = (37 * hash) + REQUESTS_FIELD_NUMBER;
+        hash = (53 * hash) + getRequestsList().hashCode();
+      }
+      hash = (29 * hash) + unknownFields.hashCode();
+      memoizedHashCode = hash;
+      return hash;
+    }
+
+    public static io.greptime.v1.region.Server.AlterRequests parseFrom(
+        java.nio.ByteBuffer data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.region.Server.AlterRequests parseFrom(
+        java.nio.ByteBuffer data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.AlterRequests parseFrom(
+        com.google.protobuf.ByteString data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.region.Server.AlterRequests parseFrom(
+        com.google.protobuf.ByteString data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.AlterRequests parseFrom(byte[] data)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data);
+    }
+    public static io.greptime.v1.region.Server.AlterRequests parseFrom(
+        byte[] data,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws com.google.protobuf.InvalidProtocolBufferException {
+      return PARSER.parseFrom(data, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.AlterRequests parseFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.region.Server.AlterRequests parseFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.AlterRequests parseDelimitedFrom(java.io.InputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.region.Server.AlterRequests parseDelimitedFrom(
+        java.io.InputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseDelimitedWithIOException(PARSER, input, extensionRegistry);
+    }
+    public static io.greptime.v1.region.Server.AlterRequests parseFrom(
+        com.google.protobuf.CodedInputStream input)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input);
+    }
+    public static io.greptime.v1.region.Server.AlterRequests parseFrom(
+        com.google.protobuf.CodedInputStream input,
+        com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+        throws java.io.IOException {
+      return com.google.protobuf.GeneratedMessageV3
+          .parseWithIOException(PARSER, input, extensionRegistry);
+    }
+
+    @java.lang.Override
+    public Builder newBuilderForType() { return newBuilder(); }
+    public static Builder newBuilder() {
+      return DEFAULT_INSTANCE.toBuilder();
+    }
+    public static Builder newBuilder(io.greptime.v1.region.Server.AlterRequests prototype) {
+      return DEFAULT_INSTANCE.toBuilder().mergeFrom(prototype);
+    }
+    @java.lang.Override
+    public Builder toBuilder() {
+      return this == DEFAULT_INSTANCE
+          ? new Builder() : new Builder().mergeFrom(this);
+    }
+
+    @java.lang.Override
+    protected Builder newBuilderForType(
+        com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+      Builder builder = new Builder(parent);
+      return builder;
+    }
+    /**
+     * Protobuf type {@code greptime.v1.region.AlterRequests}
+     */
+    public static final class Builder extends
+        com.google.protobuf.GeneratedMessageV3.Builder<Builder> implements
+        // @@protoc_insertion_point(builder_implements:greptime.v1.region.AlterRequests)
+        io.greptime.v1.region.Server.AlterRequestsOrBuilder {
+      public static final com.google.protobuf.Descriptors.Descriptor
+          getDescriptor() {
+        return io.greptime.v1.region.Server.internal_static_greptime_v1_region_AlterRequests_descriptor;
+      }
+
+      @java.lang.Override
+      protected com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+          internalGetFieldAccessorTable() {
+        return io.greptime.v1.region.Server.internal_static_greptime_v1_region_AlterRequests_fieldAccessorTable
+            .ensureFieldAccessorsInitialized(
+                io.greptime.v1.region.Server.AlterRequests.class, io.greptime.v1.region.Server.AlterRequests.Builder.class);
+      }
+
+      // Construct using io.greptime.v1.region.Server.AlterRequests.newBuilder()
+      private Builder() {
+        maybeForceBuilderInitialization();
+      }
+
+      private Builder(
+          com.google.protobuf.GeneratedMessageV3.BuilderParent parent) {
+        super(parent);
+        maybeForceBuilderInitialization();
+      }
+      private void maybeForceBuilderInitialization() {
+        if (com.google.protobuf.GeneratedMessageV3
+                .alwaysUseFieldBuilders) {
+          getRequestsFieldBuilder();
+        }
+      }
+      @java.lang.Override
+      public Builder clear() {
+        super.clear();
+        if (requestsBuilder_ == null) {
+          requests_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+        } else {
+          requestsBuilder_.clear();
+        }
+        return this;
+      }
+
+      @java.lang.Override
+      public com.google.protobuf.Descriptors.Descriptor
+          getDescriptorForType() {
+        return io.greptime.v1.region.Server.internal_static_greptime_v1_region_AlterRequests_descriptor;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.region.Server.AlterRequests getDefaultInstanceForType() {
+        return io.greptime.v1.region.Server.AlterRequests.getDefaultInstance();
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.region.Server.AlterRequests build() {
+        io.greptime.v1.region.Server.AlterRequests result = buildPartial();
+        if (!result.isInitialized()) {
+          throw newUninitializedMessageException(result);
+        }
+        return result;
+      }
+
+      @java.lang.Override
+      public io.greptime.v1.region.Server.AlterRequests buildPartial() {
+        io.greptime.v1.region.Server.AlterRequests result = new io.greptime.v1.region.Server.AlterRequests(this);
+        int from_bitField0_ = bitField0_;
+        if (requestsBuilder_ == null) {
+          if (((bitField0_ & 0x00000001) != 0)) {
+            requests_ = java.util.Collections.unmodifiableList(requests_);
+            bitField0_ = (bitField0_ & ~0x00000001);
+          }
+          result.requests_ = requests_;
+        } else {
+          result.requests_ = requestsBuilder_.build();
+        }
+        onBuilt();
+        return result;
+      }
+
+      @java.lang.Override
+      public Builder clone() {
+        return super.clone();
+      }
+      @java.lang.Override
+      public Builder setField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.setField(field, value);
+      }
+      @java.lang.Override
+      public Builder clearField(
+          com.google.protobuf.Descriptors.FieldDescriptor field) {
+        return super.clearField(field);
+      }
+      @java.lang.Override
+      public Builder clearOneof(
+          com.google.protobuf.Descriptors.OneofDescriptor oneof) {
+        return super.clearOneof(oneof);
+      }
+      @java.lang.Override
+      public Builder setRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          int index, java.lang.Object value) {
+        return super.setRepeatedField(field, index, value);
+      }
+      @java.lang.Override
+      public Builder addRepeatedField(
+          com.google.protobuf.Descriptors.FieldDescriptor field,
+          java.lang.Object value) {
+        return super.addRepeatedField(field, value);
+      }
+      @java.lang.Override
+      public Builder mergeFrom(com.google.protobuf.Message other) {
+        if (other instanceof io.greptime.v1.region.Server.AlterRequests) {
+          return mergeFrom((io.greptime.v1.region.Server.AlterRequests)other);
+        } else {
+          super.mergeFrom(other);
+          return this;
+        }
+      }
+
+      public Builder mergeFrom(io.greptime.v1.region.Server.AlterRequests other) {
+        if (other == io.greptime.v1.region.Server.AlterRequests.getDefaultInstance()) return this;
+        if (requestsBuilder_ == null) {
+          if (!other.requests_.isEmpty()) {
+            if (requests_.isEmpty()) {
+              requests_ = other.requests_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+            } else {
+              ensureRequestsIsMutable();
+              requests_.addAll(other.requests_);
+            }
+            onChanged();
+          }
+        } else {
+          if (!other.requests_.isEmpty()) {
+            if (requestsBuilder_.isEmpty()) {
+              requestsBuilder_.dispose();
+              requestsBuilder_ = null;
+              requests_ = other.requests_;
+              bitField0_ = (bitField0_ & ~0x00000001);
+              requestsBuilder_ = 
+                com.google.protobuf.GeneratedMessageV3.alwaysUseFieldBuilders ?
+                   getRequestsFieldBuilder() : null;
+            } else {
+              requestsBuilder_.addAllMessages(other.requests_);
+            }
+          }
+        }
+        this.mergeUnknownFields(other.unknownFields);
+        onChanged();
+        return this;
+      }
+
+      @java.lang.Override
+      public final boolean isInitialized() {
+        return true;
+      }
+
+      @java.lang.Override
+      public Builder mergeFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws java.io.IOException {
+        io.greptime.v1.region.Server.AlterRequests parsedMessage = null;
+        try {
+          parsedMessage = PARSER.parsePartialFrom(input, extensionRegistry);
+        } catch (com.google.protobuf.InvalidProtocolBufferException e) {
+          parsedMessage = (io.greptime.v1.region.Server.AlterRequests) e.getUnfinishedMessage();
+          throw e.unwrapIOException();
+        } finally {
+          if (parsedMessage != null) {
+            mergeFrom(parsedMessage);
+          }
+        }
+        return this;
+      }
+      private int bitField0_;
+
+      private java.util.List<io.greptime.v1.region.Server.AlterRequest> requests_ =
+        java.util.Collections.emptyList();
+      private void ensureRequestsIsMutable() {
+        if (!((bitField0_ & 0x00000001) != 0)) {
+          requests_ = new java.util.ArrayList<io.greptime.v1.region.Server.AlterRequest>(requests_);
+          bitField0_ |= 0x00000001;
+         }
+      }
+
+      private com.google.protobuf.RepeatedFieldBuilderV3<
+          io.greptime.v1.region.Server.AlterRequest, io.greptime.v1.region.Server.AlterRequest.Builder, io.greptime.v1.region.Server.AlterRequestOrBuilder> requestsBuilder_;
+
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public java.util.List<io.greptime.v1.region.Server.AlterRequest> getRequestsList() {
+        if (requestsBuilder_ == null) {
+          return java.util.Collections.unmodifiableList(requests_);
+        } else {
+          return requestsBuilder_.getMessageList();
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public int getRequestsCount() {
+        if (requestsBuilder_ == null) {
+          return requests_.size();
+        } else {
+          return requestsBuilder_.getCount();
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.AlterRequest getRequests(int index) {
+        if (requestsBuilder_ == null) {
+          return requests_.get(index);
+        } else {
+          return requestsBuilder_.getMessage(index);
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public Builder setRequests(
+          int index, io.greptime.v1.region.Server.AlterRequest value) {
+        if (requestsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureRequestsIsMutable();
+          requests_.set(index, value);
+          onChanged();
+        } else {
+          requestsBuilder_.setMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public Builder setRequests(
+          int index, io.greptime.v1.region.Server.AlterRequest.Builder builderForValue) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          requests_.set(index, builderForValue.build());
+          onChanged();
+        } else {
+          requestsBuilder_.setMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public Builder addRequests(io.greptime.v1.region.Server.AlterRequest value) {
+        if (requestsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureRequestsIsMutable();
+          requests_.add(value);
+          onChanged();
+        } else {
+          requestsBuilder_.addMessage(value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public Builder addRequests(
+          int index, io.greptime.v1.region.Server.AlterRequest value) {
+        if (requestsBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          ensureRequestsIsMutable();
+          requests_.add(index, value);
+          onChanged();
+        } else {
+          requestsBuilder_.addMessage(index, value);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public Builder addRequests(
+          io.greptime.v1.region.Server.AlterRequest.Builder builderForValue) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          requests_.add(builderForValue.build());
+          onChanged();
+        } else {
+          requestsBuilder_.addMessage(builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public Builder addRequests(
+          int index, io.greptime.v1.region.Server.AlterRequest.Builder builderForValue) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          requests_.add(index, builderForValue.build());
+          onChanged();
+        } else {
+          requestsBuilder_.addMessage(index, builderForValue.build());
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public Builder addAllRequests(
+          java.lang.Iterable<? extends io.greptime.v1.region.Server.AlterRequest> values) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          com.google.protobuf.AbstractMessageLite.Builder.addAll(
+              values, requests_);
+          onChanged();
+        } else {
+          requestsBuilder_.addAllMessages(values);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public Builder clearRequests() {
+        if (requestsBuilder_ == null) {
+          requests_ = java.util.Collections.emptyList();
+          bitField0_ = (bitField0_ & ~0x00000001);
+          onChanged();
+        } else {
+          requestsBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public Builder removeRequests(int index) {
+        if (requestsBuilder_ == null) {
+          ensureRequestsIsMutable();
+          requests_.remove(index);
+          onChanged();
+        } else {
+          requestsBuilder_.remove(index);
+        }
+        return this;
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.AlterRequest.Builder getRequestsBuilder(
+          int index) {
+        return getRequestsFieldBuilder().getBuilder(index);
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.AlterRequestOrBuilder getRequestsOrBuilder(
+          int index) {
+        if (requestsBuilder_ == null) {
+          return requests_.get(index);  } else {
+          return requestsBuilder_.getMessageOrBuilder(index);
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public java.util.List<? extends io.greptime.v1.region.Server.AlterRequestOrBuilder> 
+           getRequestsOrBuilderList() {
+        if (requestsBuilder_ != null) {
+          return requestsBuilder_.getMessageOrBuilderList();
+        } else {
+          return java.util.Collections.unmodifiableList(requests_);
+        }
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.AlterRequest.Builder addRequestsBuilder() {
+        return getRequestsFieldBuilder().addBuilder(
+            io.greptime.v1.region.Server.AlterRequest.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public io.greptime.v1.region.Server.AlterRequest.Builder addRequestsBuilder(
+          int index) {
+        return getRequestsFieldBuilder().addBuilder(
+            index, io.greptime.v1.region.Server.AlterRequest.getDefaultInstance());
+      }
+      /**
+       * <code>repeated .greptime.v1.region.AlterRequest requests = 1;</code>
+       */
+      public java.util.List<io.greptime.v1.region.Server.AlterRequest.Builder> 
+           getRequestsBuilderList() {
+        return getRequestsFieldBuilder().getBuilderList();
+      }
+      private com.google.protobuf.RepeatedFieldBuilderV3<
+          io.greptime.v1.region.Server.AlterRequest, io.greptime.v1.region.Server.AlterRequest.Builder, io.greptime.v1.region.Server.AlterRequestOrBuilder> 
+          getRequestsFieldBuilder() {
+        if (requestsBuilder_ == null) {
+          requestsBuilder_ = new com.google.protobuf.RepeatedFieldBuilderV3<
+              io.greptime.v1.region.Server.AlterRequest, io.greptime.v1.region.Server.AlterRequest.Builder, io.greptime.v1.region.Server.AlterRequestOrBuilder>(
+                  requests_,
+                  ((bitField0_ & 0x00000001) != 0),
+                  getParentForChildren(),
+                  isClean());
+          requests_ = null;
+        }
+        return requestsBuilder_;
+      }
+      @java.lang.Override
+      public final Builder setUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.setUnknownFields(unknownFields);
+      }
+
+      @java.lang.Override
+      public final Builder mergeUnknownFields(
+          final com.google.protobuf.UnknownFieldSet unknownFields) {
+        return super.mergeUnknownFields(unknownFields);
+      }
+
+
+      // @@protoc_insertion_point(builder_scope:greptime.v1.region.AlterRequests)
+    }
+
+    // @@protoc_insertion_point(class_scope:greptime.v1.region.AlterRequests)
+    private static final io.greptime.v1.region.Server.AlterRequests DEFAULT_INSTANCE;
+    static {
+      DEFAULT_INSTANCE = new io.greptime.v1.region.Server.AlterRequests();
+    }
+
+    public static io.greptime.v1.region.Server.AlterRequests getDefaultInstance() {
+      return DEFAULT_INSTANCE;
+    }
+
+    private static final com.google.protobuf.Parser<AlterRequests>
+        PARSER = new com.google.protobuf.AbstractParser<AlterRequests>() {
+      @java.lang.Override
+      public AlterRequests parsePartialFrom(
+          com.google.protobuf.CodedInputStream input,
+          com.google.protobuf.ExtensionRegistryLite extensionRegistry)
+          throws com.google.protobuf.InvalidProtocolBufferException {
+        return new AlterRequests(input, extensionRegistry);
+      }
+    };
+
+    public static com.google.protobuf.Parser<AlterRequests> parser() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public com.google.protobuf.Parser<AlterRequests> getParserForType() {
+      return PARSER;
+    }
+
+    @java.lang.Override
+    public io.greptime.v1.region.Server.AlterRequests getDefaultInstanceForType() {
+      return DEFAULT_INSTANCE;
+    }
+
+  }
+
   public interface AlterRequestOrBuilder extends
       // @@protoc_insertion_point(interface_extends:greptime.v1.region.AlterRequest)
       com.google.protobuf.MessageOrBuilder {
@@ -12718,6 +16340,21 @@ java.lang.String defaultValue);
      * <code>.greptime.v1.region.DropColumns drop_columns = 3;</code>
      */
     io.greptime.v1.region.Server.DropColumnsOrBuilder getDropColumnsOrBuilder();
+
+    /**
+     * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+     * @return Whether the changeColumnTypes field is set.
+     */
+    boolean hasChangeColumnTypes();
+    /**
+     * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+     * @return The changeColumnTypes.
+     */
+    io.greptime.v1.Ddl.ChangeColumnTypes getChangeColumnTypes();
+    /**
+     * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+     */
+    io.greptime.v1.Ddl.ChangeColumnTypesOrBuilder getChangeColumnTypesOrBuilder();
 
     /**
      * <pre>
@@ -12814,6 +16451,20 @@ java.lang.String defaultValue);
               schemaVersion_ = input.readUInt64();
               break;
             }
+            case 42: {
+              io.greptime.v1.Ddl.ChangeColumnTypes.Builder subBuilder = null;
+              if (kindCase_ == 5) {
+                subBuilder = ((io.greptime.v1.Ddl.ChangeColumnTypes) kind_).toBuilder();
+              }
+              kind_ =
+                  input.readMessage(io.greptime.v1.Ddl.ChangeColumnTypes.parser(), extensionRegistry);
+              if (subBuilder != null) {
+                subBuilder.mergeFrom((io.greptime.v1.Ddl.ChangeColumnTypes) kind_);
+                kind_ = subBuilder.buildPartial();
+              }
+              kindCase_ = 5;
+              break;
+            }
             default: {
               if (!parseUnknownField(
                   input, unknownFields, extensionRegistry, tag)) {
@@ -12855,6 +16506,7 @@ java.lang.String defaultValue);
             com.google.protobuf.AbstractMessage.InternalOneOfEnum {
       ADD_COLUMNS(2),
       DROP_COLUMNS(3),
+      CHANGE_COLUMN_TYPES(5),
       KIND_NOT_SET(0);
       private final int value;
       private KindCase(int value) {
@@ -12874,6 +16526,7 @@ java.lang.String defaultValue);
         switch (value) {
           case 2: return ADD_COLUMNS;
           case 3: return DROP_COLUMNS;
+          case 5: return CHANGE_COLUMN_TYPES;
           case 0: return KIND_NOT_SET;
           default: return null;
         }
@@ -12962,6 +16615,37 @@ java.lang.String defaultValue);
       return io.greptime.v1.region.Server.DropColumns.getDefaultInstance();
     }
 
+    public static final int CHANGE_COLUMN_TYPES_FIELD_NUMBER = 5;
+    /**
+     * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+     * @return Whether the changeColumnTypes field is set.
+     */
+    @java.lang.Override
+    public boolean hasChangeColumnTypes() {
+      return kindCase_ == 5;
+    }
+    /**
+     * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+     * @return The changeColumnTypes.
+     */
+    @java.lang.Override
+    public io.greptime.v1.Ddl.ChangeColumnTypes getChangeColumnTypes() {
+      if (kindCase_ == 5) {
+         return (io.greptime.v1.Ddl.ChangeColumnTypes) kind_;
+      }
+      return io.greptime.v1.Ddl.ChangeColumnTypes.getDefaultInstance();
+    }
+    /**
+     * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+     */
+    @java.lang.Override
+    public io.greptime.v1.Ddl.ChangeColumnTypesOrBuilder getChangeColumnTypesOrBuilder() {
+      if (kindCase_ == 5) {
+         return (io.greptime.v1.Ddl.ChangeColumnTypes) kind_;
+      }
+      return io.greptime.v1.Ddl.ChangeColumnTypes.getDefaultInstance();
+    }
+
     public static final int SCHEMA_VERSION_FIELD_NUMBER = 4;
     private long schemaVersion_;
     /**
@@ -13003,6 +16687,9 @@ java.lang.String defaultValue);
       if (schemaVersion_ != 0L) {
         output.writeUInt64(4, schemaVersion_);
       }
+      if (kindCase_ == 5) {
+        output.writeMessage(5, (io.greptime.v1.Ddl.ChangeColumnTypes) kind_);
+      }
       unknownFields.writeTo(output);
     }
 
@@ -13027,6 +16714,10 @@ java.lang.String defaultValue);
       if (schemaVersion_ != 0L) {
         size += com.google.protobuf.CodedOutputStream
           .computeUInt64Size(4, schemaVersion_);
+      }
+      if (kindCase_ == 5) {
+        size += com.google.protobuf.CodedOutputStream
+          .computeMessageSize(5, (io.greptime.v1.Ddl.ChangeColumnTypes) kind_);
       }
       size += unknownFields.getSerializedSize();
       memoizedSize = size;
@@ -13057,6 +16748,10 @@ java.lang.String defaultValue);
           if (!getDropColumns()
               .equals(other.getDropColumns())) return false;
           break;
+        case 5:
+          if (!getChangeColumnTypes()
+              .equals(other.getChangeColumnTypes())) return false;
+          break;
         case 0:
         default:
       }
@@ -13085,6 +16780,10 @@ java.lang.String defaultValue);
         case 3:
           hash = (37 * hash) + DROP_COLUMNS_FIELD_NUMBER;
           hash = (53 * hash) + getDropColumns().hashCode();
+          break;
+        case 5:
+          hash = (37 * hash) + CHANGE_COLUMN_TYPES_FIELD_NUMBER;
+          hash = (53 * hash) + getChangeColumnTypes().hashCode();
           break;
         case 0:
         default:
@@ -13269,6 +16968,13 @@ java.lang.String defaultValue);
             result.kind_ = dropColumnsBuilder_.build();
           }
         }
+        if (kindCase_ == 5) {
+          if (changeColumnTypesBuilder_ == null) {
+            result.kind_ = kind_;
+          } else {
+            result.kind_ = changeColumnTypesBuilder_.build();
+          }
+        }
         result.schemaVersion_ = schemaVersion_;
         result.kindCase_ = kindCase_;
         onBuilt();
@@ -13332,6 +17038,10 @@ java.lang.String defaultValue);
           }
           case DROP_COLUMNS: {
             mergeDropColumns(other.getDropColumns());
+            break;
+          }
+          case CHANGE_COLUMN_TYPES: {
+            mergeChangeColumnTypes(other.getChangeColumnTypes());
             break;
           }
           case KIND_NOT_SET: {
@@ -13695,6 +17405,148 @@ java.lang.String defaultValue);
         kindCase_ = 3;
         onChanged();;
         return dropColumnsBuilder_;
+      }
+
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.Ddl.ChangeColumnTypes, io.greptime.v1.Ddl.ChangeColumnTypes.Builder, io.greptime.v1.Ddl.ChangeColumnTypesOrBuilder> changeColumnTypesBuilder_;
+      /**
+       * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+       * @return Whether the changeColumnTypes field is set.
+       */
+      @java.lang.Override
+      public boolean hasChangeColumnTypes() {
+        return kindCase_ == 5;
+      }
+      /**
+       * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+       * @return The changeColumnTypes.
+       */
+      @java.lang.Override
+      public io.greptime.v1.Ddl.ChangeColumnTypes getChangeColumnTypes() {
+        if (changeColumnTypesBuilder_ == null) {
+          if (kindCase_ == 5) {
+            return (io.greptime.v1.Ddl.ChangeColumnTypes) kind_;
+          }
+          return io.greptime.v1.Ddl.ChangeColumnTypes.getDefaultInstance();
+        } else {
+          if (kindCase_ == 5) {
+            return changeColumnTypesBuilder_.getMessage();
+          }
+          return io.greptime.v1.Ddl.ChangeColumnTypes.getDefaultInstance();
+        }
+      }
+      /**
+       * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+       */
+      public Builder setChangeColumnTypes(io.greptime.v1.Ddl.ChangeColumnTypes value) {
+        if (changeColumnTypesBuilder_ == null) {
+          if (value == null) {
+            throw new NullPointerException();
+          }
+          kind_ = value;
+          onChanged();
+        } else {
+          changeColumnTypesBuilder_.setMessage(value);
+        }
+        kindCase_ = 5;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+       */
+      public Builder setChangeColumnTypes(
+          io.greptime.v1.Ddl.ChangeColumnTypes.Builder builderForValue) {
+        if (changeColumnTypesBuilder_ == null) {
+          kind_ = builderForValue.build();
+          onChanged();
+        } else {
+          changeColumnTypesBuilder_.setMessage(builderForValue.build());
+        }
+        kindCase_ = 5;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+       */
+      public Builder mergeChangeColumnTypes(io.greptime.v1.Ddl.ChangeColumnTypes value) {
+        if (changeColumnTypesBuilder_ == null) {
+          if (kindCase_ == 5 &&
+              kind_ != io.greptime.v1.Ddl.ChangeColumnTypes.getDefaultInstance()) {
+            kind_ = io.greptime.v1.Ddl.ChangeColumnTypes.newBuilder((io.greptime.v1.Ddl.ChangeColumnTypes) kind_)
+                .mergeFrom(value).buildPartial();
+          } else {
+            kind_ = value;
+          }
+          onChanged();
+        } else {
+          if (kindCase_ == 5) {
+            changeColumnTypesBuilder_.mergeFrom(value);
+          } else {
+            changeColumnTypesBuilder_.setMessage(value);
+          }
+        }
+        kindCase_ = 5;
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+       */
+      public Builder clearChangeColumnTypes() {
+        if (changeColumnTypesBuilder_ == null) {
+          if (kindCase_ == 5) {
+            kindCase_ = 0;
+            kind_ = null;
+            onChanged();
+          }
+        } else {
+          if (kindCase_ == 5) {
+            kindCase_ = 0;
+            kind_ = null;
+          }
+          changeColumnTypesBuilder_.clear();
+        }
+        return this;
+      }
+      /**
+       * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+       */
+      public io.greptime.v1.Ddl.ChangeColumnTypes.Builder getChangeColumnTypesBuilder() {
+        return getChangeColumnTypesFieldBuilder().getBuilder();
+      }
+      /**
+       * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+       */
+      @java.lang.Override
+      public io.greptime.v1.Ddl.ChangeColumnTypesOrBuilder getChangeColumnTypesOrBuilder() {
+        if ((kindCase_ == 5) && (changeColumnTypesBuilder_ != null)) {
+          return changeColumnTypesBuilder_.getMessageOrBuilder();
+        } else {
+          if (kindCase_ == 5) {
+            return (io.greptime.v1.Ddl.ChangeColumnTypes) kind_;
+          }
+          return io.greptime.v1.Ddl.ChangeColumnTypes.getDefaultInstance();
+        }
+      }
+      /**
+       * <code>.greptime.v1.ChangeColumnTypes change_column_types = 5;</code>
+       */
+      private com.google.protobuf.SingleFieldBuilderV3<
+          io.greptime.v1.Ddl.ChangeColumnTypes, io.greptime.v1.Ddl.ChangeColumnTypes.Builder, io.greptime.v1.Ddl.ChangeColumnTypesOrBuilder> 
+          getChangeColumnTypesFieldBuilder() {
+        if (changeColumnTypesBuilder_ == null) {
+          if (!(kindCase_ == 5)) {
+            kind_ = io.greptime.v1.Ddl.ChangeColumnTypes.getDefaultInstance();
+          }
+          changeColumnTypesBuilder_ = new com.google.protobuf.SingleFieldBuilderV3<
+              io.greptime.v1.Ddl.ChangeColumnTypes, io.greptime.v1.Ddl.ChangeColumnTypes.Builder, io.greptime.v1.Ddl.ChangeColumnTypesOrBuilder>(
+                  (io.greptime.v1.Ddl.ChangeColumnTypes) kind_,
+                  getParentForChildren(),
+                  isClean());
+          kind_ = null;
+        }
+        kindCase_ = 5;
+        onChanged();;
+        return changeColumnTypesBuilder_;
       }
 
       private long schemaVersion_ ;
@@ -18979,6 +22831,11 @@ java.lang.String defaultValue);
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_greptime_v1_region_RegionResponse_fieldAccessorTable;
   private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_greptime_v1_region_RegionResponse_ExtensionEntry_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_greptime_v1_region_RegionResponse_ExtensionEntry_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
     internal_static_greptime_v1_region_InsertRequests_descriptor;
   private static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
@@ -19004,6 +22861,11 @@ java.lang.String defaultValue);
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_greptime_v1_region_QueryRequest_fieldAccessorTable;
   private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_greptime_v1_region_CreateRequests_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_greptime_v1_region_CreateRequests_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
     internal_static_greptime_v1_region_CreateRequest_descriptor;
   private static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
@@ -19013,6 +22875,11 @@ java.lang.String defaultValue);
   private static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_greptime_v1_region_CreateRequest_OptionsEntry_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_greptime_v1_region_DropRequests_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_greptime_v1_region_DropRequests_fieldAccessorTable;
   private static final com.google.protobuf.Descriptors.Descriptor
     internal_static_greptime_v1_region_DropRequest_descriptor;
   private static final 
@@ -19033,6 +22900,11 @@ java.lang.String defaultValue);
   private static final 
     com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
       internal_static_greptime_v1_region_CloseRequest_fieldAccessorTable;
+  private static final com.google.protobuf.Descriptors.Descriptor
+    internal_static_greptime_v1_region_AlterRequests_descriptor;
+  private static final 
+    com.google.protobuf.GeneratedMessageV3.FieldAccessorTable
+      internal_static_greptime_v1_region_AlterRequests_fieldAccessorTable;
   private static final com.google.protobuf.Descriptors.Descriptor
     internal_static_greptime_v1_region_AlterRequest_descriptor;
   private static final 
@@ -19090,72 +22962,86 @@ java.lang.String defaultValue);
       "\n\037greptime/v1/region/server.proto\022\022grept" +
       "ime.v1.region\032\030greptime/v1/common.proto\032" +
       "\025greptime/v1/row.proto\032\025greptime/v1/ddl." +
-      "proto\"\262\001\n\023RegionRequestHeader\022T\n\017tracing" +
+      "proto\"\304\001\n\023RegionRequestHeader\022T\n\017tracing" +
       "_context\030\005 \003(\0132;.greptime.v1.region.Regi" +
       "onRequestHeader.TracingContextEntry\022\016\n\006d" +
-      "bname\030\003 \001(\t\0325\n\023TracingContextEntry\022\013\n\003ke" +
-      "y\030\001 \001(\t\022\r\n\005value\030\002 \001(\t:\0028\001\"\336\004\n\rRegionReq" +
-      "uest\0227\n\006header\030\001 \001(\0132\'.greptime.v1.regio" +
-      "n.RegionRequestHeader\0225\n\007inserts\030\003 \001(\0132\"" +
-      ".greptime.v1.region.InsertRequestsH\000\0225\n\007" +
-      "deletes\030\004 \001(\0132\".greptime.v1.region.Delet" +
-      "eRequestsH\000\0223\n\006create\030\005 \001(\0132!.greptime.v" +
-      "1.region.CreateRequestH\000\022/\n\004drop\030\006 \001(\0132\037" +
-      ".greptime.v1.region.DropRequestH\000\022/\n\004ope" +
-      "n\030\007 \001(\0132\037.greptime.v1.region.OpenRequest" +
-      "H\000\0221\n\005close\030\010 \001(\0132 .greptime.v1.region.C" +
-      "loseRequestH\000\0221\n\005alter\030\t \001(\0132 .greptime." +
-      "v1.region.AlterRequestH\000\0221\n\005flush\030\n \001(\0132" +
-      " .greptime.v1.region.FlushRequestH\000\0225\n\007c" +
-      "ompact\030\013 \001(\0132\".greptime.v1.region.Compac" +
-      "tRequestH\000\0227\n\010truncate\030\014 \001(\0132#.greptime." +
-      "v1.region.TruncateRequestH\000B\006\n\004body\"T\n\016R" +
-      "egionResponse\022+\n\006header\030\001 \001(\0132\033.greptime" +
-      ".v1.ResponseHeader\022\025\n\raffected_rows\030\002 \001(" +
-      "\004\"E\n\016InsertRequests\0223\n\010requests\030\001 \003(\0132!." +
-      "greptime.v1.region.InsertRequest\"E\n\016Dele" +
-      "teRequests\0223\n\010requests\030\001 \003(\0132!.greptime." +
-      "v1.region.DeleteRequest\"C\n\rInsertRequest" +
-      "\022\021\n\tregion_id\030\001 \001(\004\022\037\n\004rows\030\002 \001(\0132\021.grep" +
-      "time.v1.Rows\"C\n\rDeleteRequest\022\021\n\tregion_" +
-      "id\030\001 \001(\004\022\037\n\004rows\030\002 \001(\0132\021.greptime.v1.Row" +
-      "s\"h\n\014QueryRequest\0227\n\006header\030\001 \001(\0132\'.grep" +
-      "time.v1.region.RegionRequestHeader\022\021\n\tre" +
-      "gion_id\030\002 \001(\004\022\014\n\004plan\030\003 \001(\014\"\200\002\n\rCreateRe" +
-      "quest\022\021\n\tregion_id\030\001 \001(\004\022\016\n\006engine\030\002 \001(\t" +
-      "\0228\n\013column_defs\030\003 \003(\0132#.greptime.v1.regi" +
-      "on.RegionColumnDef\022\023\n\013primary_key\030\004 \003(\r\022" +
-      "\014\n\004path\030\005 \001(\t\022?\n\007options\030\006 \003(\0132..greptim" +
-      "e.v1.region.CreateRequest.OptionsEntry\032." +
-      "\n\014OptionsEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001" +
-      "(\t:\0028\001\" \n\013DropRequest\022\021\n\tregion_id\030\001 \001(\004" +
-      "\"\255\001\n\013OpenRequest\022\021\n\tregion_id\030\001 \001(\004\022\016\n\006e" +
-      "ngine\030\002 \001(\t\022\014\n\004path\030\003 \001(\t\022=\n\007options\030\004 \003" +
-      "(\0132,.greptime.v1.region.OpenRequest.Opti" +
-      "onsEntry\032.\n\014OptionsEntry\022\013\n\003key\030\001 \001(\t\022\r\n" +
-      "\005value\030\002 \001(\t:\0028\001\"!\n\014CloseRequest\022\021\n\tregi" +
-      "on_id\030\001 \001(\004\"\261\001\n\014AlterRequest\022\021\n\tregion_i" +
-      "d\030\001 \001(\004\0225\n\013add_columns\030\002 \001(\0132\036.greptime." +
-      "v1.region.AddColumnsH\000\0227\n\014drop_columns\030\003" +
-      " \001(\0132\037.greptime.v1.region.DropColumnsH\000\022" +
-      "\026\n\016schema_version\030\004 \001(\004B\006\n\004kind\"@\n\nAddCo" +
-      "lumns\0222\n\013add_columns\030\001 \003(\0132\035.greptime.v1" +
-      ".region.AddColumn\"C\n\013DropColumns\0224\n\014drop" +
-      "_columns\030\001 \003(\0132\036.greptime.v1.region.Drop" +
-      "Column\"v\n\tAddColumn\0227\n\ncolumn_def\030\001 \001(\0132" +
-      "#.greptime.v1.region.RegionColumnDef\0220\n\010" +
-      "location\030\003 \001(\0132\036.greptime.v1.AddColumnLo" +
-      "cation\"\032\n\nDropColumn\022\014\n\004name\030\001 \001(\t\"!\n\014Fl" +
-      "ushRequest\022\021\n\tregion_id\030\001 \001(\004\"#\n\016Compact" +
-      "Request\022\021\n\tregion_id\030\001 \001(\004\"$\n\017TruncateRe" +
-      "quest\022\021\n\tregion_id\030\001 \001(\004\"P\n\017RegionColumn" +
-      "Def\022*\n\ncolumn_def\030\001 \001(\0132\026.greptime.v1.Co" +
-      "lumnDef\022\021\n\tcolumn_id\030\002 \001(\r2Y\n\006Region\022O\n\006" +
-      "Handle\022!.greptime.v1.region.RegionReques" +
-      "t\032\".greptime.v1.region.RegionResponseB]\n" +
-      "\025io.greptime.v1.regionB\006ServerZ<github.c" +
-      "om/GreptimeTeam/greptime-proto/go/grepti" +
-      "me/v1/regionb\006proto3"
+      "bname\030\003 \001(\t\022\020\n\010timezone\030\004 \001(\t\0325\n\023Tracing" +
+      "ContextEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005value\030\002 \001(\t" +
+      ":\0028\001\"\375\005\n\rRegionRequest\0227\n\006header\030\001 \001(\0132\'" +
+      ".greptime.v1.region.RegionRequestHeader\022" +
+      "5\n\007inserts\030\003 \001(\0132\".greptime.v1.region.In" +
+      "sertRequestsH\000\0225\n\007deletes\030\004 \001(\0132\".grepti" +
+      "me.v1.region.DeleteRequestsH\000\0223\n\006create\030" +
+      "\005 \001(\0132!.greptime.v1.region.CreateRequest" +
+      "H\000\022/\n\004drop\030\006 \001(\0132\037.greptime.v1.region.Dr" +
+      "opRequestH\000\022/\n\004open\030\007 \001(\0132\037.greptime.v1." +
+      "region.OpenRequestH\000\0221\n\005close\030\010 \001(\0132 .gr" +
+      "eptime.v1.region.CloseRequestH\000\0221\n\005alter" +
+      "\030\t \001(\0132 .greptime.v1.region.AlterRequest" +
+      "H\000\0221\n\005flush\030\n \001(\0132 .greptime.v1.region.F" +
+      "lushRequestH\000\0225\n\007compact\030\013 \001(\0132\".greptim" +
+      "e.v1.region.CompactRequestH\000\0227\n\010truncate" +
+      "\030\014 \001(\0132#.greptime.v1.region.TruncateRequ" +
+      "estH\000\0225\n\007creates\030\r \001(\0132\".greptime.v1.reg" +
+      "ion.CreateRequestsH\000\0221\n\005drops\030\016 \001(\0132 .gr" +
+      "eptime.v1.region.DropRequestsH\000\0223\n\006alter" +
+      "s\030\017 \001(\0132!.greptime.v1.region.AlterReques" +
+      "tsH\000B\006\n\004body\"\314\001\n\016RegionResponse\022+\n\006heade" +
+      "r\030\001 \001(\0132\033.greptime.v1.ResponseHeader\022\025\n\r" +
+      "affected_rows\030\002 \001(\004\022D\n\textension\030\003 \003(\01321" +
+      ".greptime.v1.region.RegionResponse.Exten" +
+      "sionEntry\0320\n\016ExtensionEntry\022\013\n\003key\030\001 \001(\t" +
+      "\022\r\n\005value\030\002 \001(\014:\0028\001\"E\n\016InsertRequests\0223\n" +
+      "\010requests\030\001 \003(\0132!.greptime.v1.region.Ins" +
+      "ertRequest\"E\n\016DeleteRequests\0223\n\010requests" +
+      "\030\001 \003(\0132!.greptime.v1.region.DeleteReques" +
+      "t\"C\n\rInsertRequest\022\021\n\tregion_id\030\001 \001(\004\022\037\n" +
+      "\004rows\030\002 \001(\0132\021.greptime.v1.Rows\"C\n\rDelete" +
+      "Request\022\021\n\tregion_id\030\001 \001(\004\022\037\n\004rows\030\002 \001(\013" +
+      "2\021.greptime.v1.Rows\"h\n\014QueryRequest\0227\n\006h" +
+      "eader\030\001 \001(\0132\'.greptime.v1.region.RegionR" +
+      "equestHeader\022\021\n\tregion_id\030\002 \001(\004\022\014\n\004plan\030" +
+      "\003 \001(\014\"E\n\016CreateRequests\0223\n\010requests\030\001 \003(" +
+      "\0132!.greptime.v1.region.CreateRequest\"\200\002\n" +
+      "\rCreateRequest\022\021\n\tregion_id\030\001 \001(\004\022\016\n\006eng" +
+      "ine\030\002 \001(\t\0228\n\013column_defs\030\003 \003(\0132#.greptim" +
+      "e.v1.region.RegionColumnDef\022\023\n\013primary_k" +
+      "ey\030\004 \003(\r\022\014\n\004path\030\005 \001(\t\022?\n\007options\030\006 \003(\0132" +
+      "..greptime.v1.region.CreateRequest.Optio" +
+      "nsEntry\032.\n\014OptionsEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005" +
+      "value\030\002 \001(\t:\0028\001\"A\n\014DropRequests\0221\n\010reque" +
+      "sts\030\001 \003(\0132\037.greptime.v1.region.DropReque" +
+      "st\" \n\013DropRequest\022\021\n\tregion_id\030\001 \001(\004\"\255\001\n" +
+      "\013OpenRequest\022\021\n\tregion_id\030\001 \001(\004\022\016\n\006engin" +
+      "e\030\002 \001(\t\022\014\n\004path\030\003 \001(\t\022=\n\007options\030\004 \003(\0132," +
+      ".greptime.v1.region.OpenRequest.OptionsE" +
+      "ntry\032.\n\014OptionsEntry\022\013\n\003key\030\001 \001(\t\022\r\n\005val" +
+      "ue\030\002 \001(\t:\0028\001\"!\n\014CloseRequest\022\021\n\tregion_i" +
+      "d\030\001 \001(\004\"C\n\rAlterRequests\0222\n\010requests\030\001 \003" +
+      "(\0132 .greptime.v1.region.AlterRequest\"\360\001\n" +
+      "\014AlterRequest\022\021\n\tregion_id\030\001 \001(\004\0225\n\013add_" +
+      "columns\030\002 \001(\0132\036.greptime.v1.region.AddCo" +
+      "lumnsH\000\0227\n\014drop_columns\030\003 \001(\0132\037.greptime" +
+      ".v1.region.DropColumnsH\000\022=\n\023change_colum" +
+      "n_types\030\005 \001(\0132\036.greptime.v1.ChangeColumn" +
+      "TypesH\000\022\026\n\016schema_version\030\004 \001(\004B\006\n\004kind\"" +
+      "@\n\nAddColumns\0222\n\013add_columns\030\001 \003(\0132\035.gre" +
+      "ptime.v1.region.AddColumn\"C\n\013DropColumns" +
+      "\0224\n\014drop_columns\030\001 \003(\0132\036.greptime.v1.reg" +
+      "ion.DropColumn\"v\n\tAddColumn\0227\n\ncolumn_de" +
+      "f\030\001 \001(\0132#.greptime.v1.region.RegionColum" +
+      "nDef\0220\n\010location\030\003 \001(\0132\036.greptime.v1.Add" +
+      "ColumnLocation\"\032\n\nDropColumn\022\014\n\004name\030\001 \001" +
+      "(\t\"!\n\014FlushRequest\022\021\n\tregion_id\030\001 \001(\004\"#\n" +
+      "\016CompactRequest\022\021\n\tregion_id\030\001 \001(\004\"$\n\017Tr" +
+      "uncateRequest\022\021\n\tregion_id\030\001 \001(\004\"P\n\017Regi" +
+      "onColumnDef\022*\n\ncolumn_def\030\001 \001(\0132\026.grepti" +
+      "me.v1.ColumnDef\022\021\n\tcolumn_id\030\002 \001(\r2Y\n\006Re" +
+      "gion\022O\n\006Handle\022!.greptime.v1.region.Regi" +
+      "onRequest\032\".greptime.v1.region.RegionRes" +
+      "ponseB]\n\025io.greptime.v1.regionB\006ServerZ<" +
+      "github.com/GreptimeTeam/greptime-proto/g" +
+      "o/greptime/v1/regionb\006proto3"
     };
     descriptor = com.google.protobuf.Descriptors.FileDescriptor
       .internalBuildGeneratedFileFrom(descriptorData,
@@ -19169,7 +23055,7 @@ java.lang.String defaultValue);
     internal_static_greptime_v1_region_RegionRequestHeader_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_RegionRequestHeader_descriptor,
-        new java.lang.String[] { "TracingContext", "Dbname", });
+        new java.lang.String[] { "TracingContext", "Dbname", "Timezone", });
     internal_static_greptime_v1_region_RegionRequestHeader_TracingContextEntry_descriptor =
       internal_static_greptime_v1_region_RegionRequestHeader_descriptor.getNestedTypes().get(0);
     internal_static_greptime_v1_region_RegionRequestHeader_TracingContextEntry_fieldAccessorTable = new
@@ -19181,13 +23067,19 @@ java.lang.String defaultValue);
     internal_static_greptime_v1_region_RegionRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_RegionRequest_descriptor,
-        new java.lang.String[] { "Header", "Inserts", "Deletes", "Create", "Drop", "Open", "Close", "Alter", "Flush", "Compact", "Truncate", "Body", });
+        new java.lang.String[] { "Header", "Inserts", "Deletes", "Create", "Drop", "Open", "Close", "Alter", "Flush", "Compact", "Truncate", "Creates", "Drops", "Alters", "Body", });
     internal_static_greptime_v1_region_RegionResponse_descriptor =
       getDescriptor().getMessageTypes().get(2);
     internal_static_greptime_v1_region_RegionResponse_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_RegionResponse_descriptor,
-        new java.lang.String[] { "Header", "AffectedRows", });
+        new java.lang.String[] { "Header", "AffectedRows", "Extension", });
+    internal_static_greptime_v1_region_RegionResponse_ExtensionEntry_descriptor =
+      internal_static_greptime_v1_region_RegionResponse_descriptor.getNestedTypes().get(0);
+    internal_static_greptime_v1_region_RegionResponse_ExtensionEntry_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_greptime_v1_region_RegionResponse_ExtensionEntry_descriptor,
+        new java.lang.String[] { "Key", "Value", });
     internal_static_greptime_v1_region_InsertRequests_descriptor =
       getDescriptor().getMessageTypes().get(3);
     internal_static_greptime_v1_region_InsertRequests_fieldAccessorTable = new
@@ -19218,8 +23110,14 @@ java.lang.String defaultValue);
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_QueryRequest_descriptor,
         new java.lang.String[] { "Header", "RegionId", "Plan", });
-    internal_static_greptime_v1_region_CreateRequest_descriptor =
+    internal_static_greptime_v1_region_CreateRequests_descriptor =
       getDescriptor().getMessageTypes().get(8);
+    internal_static_greptime_v1_region_CreateRequests_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_greptime_v1_region_CreateRequests_descriptor,
+        new java.lang.String[] { "Requests", });
+    internal_static_greptime_v1_region_CreateRequest_descriptor =
+      getDescriptor().getMessageTypes().get(9);
     internal_static_greptime_v1_region_CreateRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_CreateRequest_descriptor,
@@ -19230,14 +23128,20 @@ java.lang.String defaultValue);
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_CreateRequest_OptionsEntry_descriptor,
         new java.lang.String[] { "Key", "Value", });
+    internal_static_greptime_v1_region_DropRequests_descriptor =
+      getDescriptor().getMessageTypes().get(10);
+    internal_static_greptime_v1_region_DropRequests_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_greptime_v1_region_DropRequests_descriptor,
+        new java.lang.String[] { "Requests", });
     internal_static_greptime_v1_region_DropRequest_descriptor =
-      getDescriptor().getMessageTypes().get(9);
+      getDescriptor().getMessageTypes().get(11);
     internal_static_greptime_v1_region_DropRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_DropRequest_descriptor,
         new java.lang.String[] { "RegionId", });
     internal_static_greptime_v1_region_OpenRequest_descriptor =
-      getDescriptor().getMessageTypes().get(10);
+      getDescriptor().getMessageTypes().get(12);
     internal_static_greptime_v1_region_OpenRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_OpenRequest_descriptor,
@@ -19249,61 +23153,67 @@ java.lang.String defaultValue);
         internal_static_greptime_v1_region_OpenRequest_OptionsEntry_descriptor,
         new java.lang.String[] { "Key", "Value", });
     internal_static_greptime_v1_region_CloseRequest_descriptor =
-      getDescriptor().getMessageTypes().get(11);
+      getDescriptor().getMessageTypes().get(13);
     internal_static_greptime_v1_region_CloseRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_CloseRequest_descriptor,
         new java.lang.String[] { "RegionId", });
+    internal_static_greptime_v1_region_AlterRequests_descriptor =
+      getDescriptor().getMessageTypes().get(14);
+    internal_static_greptime_v1_region_AlterRequests_fieldAccessorTable = new
+      com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
+        internal_static_greptime_v1_region_AlterRequests_descriptor,
+        new java.lang.String[] { "Requests", });
     internal_static_greptime_v1_region_AlterRequest_descriptor =
-      getDescriptor().getMessageTypes().get(12);
+      getDescriptor().getMessageTypes().get(15);
     internal_static_greptime_v1_region_AlterRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_AlterRequest_descriptor,
-        new java.lang.String[] { "RegionId", "AddColumns", "DropColumns", "SchemaVersion", "Kind", });
+        new java.lang.String[] { "RegionId", "AddColumns", "DropColumns", "ChangeColumnTypes", "SchemaVersion", "Kind", });
     internal_static_greptime_v1_region_AddColumns_descriptor =
-      getDescriptor().getMessageTypes().get(13);
+      getDescriptor().getMessageTypes().get(16);
     internal_static_greptime_v1_region_AddColumns_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_AddColumns_descriptor,
         new java.lang.String[] { "AddColumns", });
     internal_static_greptime_v1_region_DropColumns_descriptor =
-      getDescriptor().getMessageTypes().get(14);
+      getDescriptor().getMessageTypes().get(17);
     internal_static_greptime_v1_region_DropColumns_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_DropColumns_descriptor,
         new java.lang.String[] { "DropColumns", });
     internal_static_greptime_v1_region_AddColumn_descriptor =
-      getDescriptor().getMessageTypes().get(15);
+      getDescriptor().getMessageTypes().get(18);
     internal_static_greptime_v1_region_AddColumn_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_AddColumn_descriptor,
         new java.lang.String[] { "ColumnDef", "Location", });
     internal_static_greptime_v1_region_DropColumn_descriptor =
-      getDescriptor().getMessageTypes().get(16);
+      getDescriptor().getMessageTypes().get(19);
     internal_static_greptime_v1_region_DropColumn_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_DropColumn_descriptor,
         new java.lang.String[] { "Name", });
     internal_static_greptime_v1_region_FlushRequest_descriptor =
-      getDescriptor().getMessageTypes().get(17);
+      getDescriptor().getMessageTypes().get(20);
     internal_static_greptime_v1_region_FlushRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_FlushRequest_descriptor,
         new java.lang.String[] { "RegionId", });
     internal_static_greptime_v1_region_CompactRequest_descriptor =
-      getDescriptor().getMessageTypes().get(18);
+      getDescriptor().getMessageTypes().get(21);
     internal_static_greptime_v1_region_CompactRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_CompactRequest_descriptor,
         new java.lang.String[] { "RegionId", });
     internal_static_greptime_v1_region_TruncateRequest_descriptor =
-      getDescriptor().getMessageTypes().get(19);
+      getDescriptor().getMessageTypes().get(22);
     internal_static_greptime_v1_region_TruncateRequest_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_TruncateRequest_descriptor,
         new java.lang.String[] { "RegionId", });
     internal_static_greptime_v1_region_RegionColumnDef_descriptor =
-      getDescriptor().getMessageTypes().get(20);
+      getDescriptor().getMessageTypes().get(23);
     internal_static_greptime_v1_region_RegionColumnDef_fieldAccessorTable = new
       com.google.protobuf.GeneratedMessageV3.FieldAccessorTable(
         internal_static_greptime_v1_region_RegionColumnDef_descriptor,

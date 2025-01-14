@@ -1,0 +1,14 @@
+name: Release
+run-name: Publish packages by @${{ github.actor }}
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  release:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo publish --token ${{ secrets.CRATES_TOKEN }}

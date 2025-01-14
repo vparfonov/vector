@@ -67,7 +67,7 @@ export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
 # Set version
-export VERSION ?= "v0.33.0-rh"
+export VERSION ?= "v0.43.1-rh"
 
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
@@ -649,10 +649,6 @@ release-push: ## Push new Vector version
 .PHONY: release-s3
 release-s3: ## Release artifacts to S3
 	@cargo vdev release s3
-
-.PHONY: sync-install
-sync-install: ## Sync the install.sh script for access via sh.vector.dev
-	@aws s3 cp distribution/install.sh s3://sh.vector.dev --sse --acl public-read
 
 .PHONY: sha256sum
 sha256sum: ## Generate SHA256 checksums of CI artifacts

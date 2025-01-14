@@ -15,6 +15,7 @@ rust-version = "1.56"
 name = "nix"
 version = "0.26.2"
 authors = ["The nix-rust Project Developers"]
+build = false
 include = [
     "src/**/*",
     "test/**/*",
@@ -22,6 +23,10 @@ include = [
     "README.md",
     "CHANGELOG.md",
 ]
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Rust friendly bindings to *nix APIs"
 readme = "README.md"
 categories = ["os::unix-apis"]
@@ -46,6 +51,10 @@ targets = [
     "x86_64-unknown-redox",
     "x86_64-unknown-illumos",
 ]
+
+[lib]
+name = "nix"
+path = "src/lib.rs"
 
 [[test]]
 name = "test"
@@ -160,12 +169,12 @@ zerocopy = [
     "uio",
 ]
 
-[target."cfg(any(target_os = \"android\", target_os = \"linux\"))".dev-dependencies]
+[target.'cfg(any(target_os = "android", target_os = "linux"))'.dev-dependencies]
 caps = "0.5.3"
 
-[target."cfg(not(target_os = \"redox\"))".dependencies.memoffset]
+[target.'cfg(not(target_os = "redox"))'.dependencies.memoffset]
 version = "0.7"
 optional = true
 
-[target."cfg(target_os = \"freebsd\")".dev-dependencies]
+[target.'cfg(target_os = "freebsd")'.dev-dependencies]
 sysctl = "0.4"

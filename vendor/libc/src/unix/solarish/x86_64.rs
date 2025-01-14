@@ -1,3 +1,9 @@
+cfg_if! {
+    if #[cfg(target_os = "solaris")] {
+        use unix::solarish::solaris;
+    }
+}
+
 pub type greg_t = ::c_long;
 
 pub type Elf64_Addr = ::c_ulong;
@@ -46,11 +52,14 @@ s! {
         pub dlpi_phnum: ::Elf64_Half,
         pub dlpi_adds: ::c_ulonglong,
         pub dlpi_subs: ::c_ulonglong,
+        #[cfg(target_os = "solaris")]
+        pub dlpi_tls_modid: ::c_ulong,
+        #[cfg(target_os = "solaris")]
+        pub dlpi_tls_data: *mut ::c_void,
     }
 }
 
 s_no_extra_traits! {
-    #[cfg(libc_union)]
     pub union __c_anonymous_fp_reg_set {
         pub fpchip_state: __c_anonymous_fpchip_state,
         pub f_fpregs: [[u32; 13]; 10],
@@ -71,35 +80,41 @@ s_no_extra_traits! {
         pub uc_sigmask: ::sigset_t,
         pub uc_stack: ::stack_t,
         pub uc_mcontext: mcontext_t,
-        pub uc_filler: [::c_long; 5],
+        #[cfg(target_os = "illumos")]
+        pub uc_brand_data: [*mut ::c_void; 3],
+        #[cfg(target_os = "illumos")]
+        pub uc_xsave: ::c_long,
+        #[cfg(target_os = "illumos")]
+        pub uc_filler: ::c_long,
+        #[cfg(target_os = "solaris")]
+        pub uc_xrs: solaris::xrs_t,
+        #[cfg(target_os = "solaris")]
+        pub uc_filler: [::c_long; 3],
     }
 }
 
 cfg_if! {
     if #[cfg(feature = "extra_traits")] {
-        #[cfg(libc_union)]
         impl PartialEq for __c_anonymous_fp_reg_set {
             fn eq(&self, other: &__c_anonymous_fp_reg_set) -> bool {
                 unsafe {
-                self.fpchip_state == other.fpchip_state ||
-                    self.
-                    f_fpregs.
-                    iter().
-                    zip(other.f_fpregs.iter()).
-                    all(|(a, b)| a == b)
+                    self.fpchip_state == other.fpchip_state
+                        || self
+                            .f_fpregs
+                            .iter()
+                            .zip(other.f_fpregs.iter())
+                            .all(|(a, b)| a == b)
                 }
             }
         }
-        #[cfg(libc_union)]
         impl Eq for __c_anonymous_fp_reg_set {}
-        #[cfg(libc_union)]
         impl ::fmt::Debug for __c_anonymous_fp_reg_set {
             fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 unsafe {
-                f.debug_struct("__c_anonymous_fp_reg_set")
-                    .field("fpchip_state", &{self.fpchip_state})
-                    .field("f_fpregs", &{self.f_fpregs})
-                    .finish()
+                    f.debug_struct("__c_anonymous_fp_reg_set")
+                        .field("fpchip_state", &{ self.fpchip_state })
+                        .field("f_fpregs", &{ self.f_fpregs })
+                        .finish()
                 }
             }
         }
@@ -110,7 +125,7 @@ cfg_if! {
         }
         impl Eq for fpregset_t {}
         impl ::fmt::Debug for fpregset_t {
-            fn fmt(&self, f:&mut ::fmt::Formatter) -> ::fmt::Result {
+            fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("fpregset_t")
                     .field("fp_reg_set", &self.fp_reg_set)
                     .finish()
@@ -118,13 +133,12 @@ cfg_if! {
         }
         impl PartialEq for mcontext_t {
             fn eq(&self, other: &mcontext_t) -> bool {
-                self.gregs == other.gregs &&
-                    self.fpregs == other.fpregs
+                self.gregs == other.gregs && self.fpregs == other.fpregs
             }
         }
         impl Eq for mcontext_t {}
         impl ::fmt::Debug for mcontext_t {
-            fn fmt(&self, f:&mut ::fmt::Formatter) -> ::fmt::Result {
+            fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("mcontext_t")
                     .field("gregs", &self.gregs)
                     .field("fpregs", &self.fpregs)
@@ -143,7 +157,7 @@ cfg_if! {
         }
         impl Eq for ucontext_t {}
         impl ::fmt::Debug for ucontext_t {
-            fn fmt(&self, f:&mut ::fmt::Formatter) -> ::fmt::Result {
+            fn fmt(&self, f: &mut ::fmt::Formatter) -> ::fmt::Result {
                 f.debug_struct("ucontext_t")
                     .field("uc_flags", &self.uc_flags)
                     .field("uc_link", &self.uc_link)
@@ -154,7 +168,6 @@ cfg_if! {
                     .finish()
             }
         }
-
     }
 }
 

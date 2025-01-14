@@ -14,6 +14,11 @@ edition = "2018"
 name = "heim"
 version = "0.1.0-rc.1"
 authors = ["svartalf <self@svartalf.info>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Cross-platform framework for system information"
 readme = "README.md"
 keywords = [
@@ -37,6 +42,14 @@ rustdoc-args = [
     "--cfg",
     "docsrs",
 ]
+
+[lib]
+name = "heim"
+path = "src/lib.rs"
+
+[[test]]
+name = "version"
+path = "tests/version.rs"
 
 [dependencies.heim-common]
 version = "0.1.0-rc.1"

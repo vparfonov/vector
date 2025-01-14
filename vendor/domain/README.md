@@ -13,16 +13,39 @@ Currently, these blocks include:
 
 * basic data structures and functionality for creating and parsing DNS
   data and messages,
+* a simple Tokio-based stub resolver,
 * experimental support for DNS client and server transports,
-* support for signing and verifying messages using the TSIG mechanism,
-* experimental support for reading data from DNS zone files,
+* experimental support for reading data from DNS zone files, storing them
+  in memory and answering queries,
+* experimental support for zone transfer, including support for TSIG,
 * experimental and as yet incomplete support for DNSSEC signing and
-  validation,
-* a simple Tokio-based stub resolver.
+  validation.
 
-If you have ideas, requests, or proposals for future features, please
-don’t hesitate to open Github issues.
+The library is currently under
+[heavy development](https://blog.nlnetlabs.nl/domain-dns-building-blocks-for-rust-application-developers/)
+and additional building blocks and features are being added.
 
+
+## Minimal Supported Rust Versions
+
+We are trying to maintain a decent balance between being able to use older
+compiler versions and using new features that improve safety and usability
+of the crate.
+
+### Minimum version: 1.68.2
+
+The `rust-version` given in `Cargo.toml` is the oldest version that can
+be used to compile the crate with the minimal versions of all dependencies
+selected.
+
+You can run `cargo +nightly update -Z minimal-versions` to ask Cargo to
+select these minimal versions for all dependencies.
+
+### Current version: 1.76.0
+
+This is the minimum Rust version required to build with latest version of
+all dependencies at time of release. `Cargo.lock` contains these versions
+for reference.
 
 ## Licensing
 

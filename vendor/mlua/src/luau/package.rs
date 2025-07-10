@@ -20,7 +20,7 @@ use {libloading::Library, rustc_hash::FxHashMap};
 //
 
 #[cfg(unix)]
-const TARGET_MLUA_LUAU_ABI_VERSION: u32 = 2;
+const TARGET_MLUA_LUAU_ABI_VERSION: u32 = 3;
 
 #[cfg(all(unix, feature = "module"))]
 #[no_mangle]
@@ -130,10 +130,10 @@ unsafe extern "C-unwind" fn lua_require(state: *mut ffi::lua_State) -> c_int {
     for i in 1.. {
         if ffi::lua_rawgeti(state, -1, i) == ffi::LUA_TNIL {
             // no more loaders?
-            if (*err_buf).is_empty() {
+            if (&*err_buf).is_empty() {
                 ffi::luaL_error(state, cstr!("module '%s' not found"), name);
             } else {
-                let bytes = (*err_buf).as_bytes();
+                let bytes = (&*err_buf).as_bytes();
                 let extra = ffi::lua_pushlstring(state, bytes.as_ptr() as *const _, bytes.len());
                 ffi::luaL_error(state, cstr!("module '%s' not found:%s"), name, extra);
             }

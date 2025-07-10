@@ -30,7 +30,7 @@ where
     .serialize(serializer)
 }
 
-impl<'a> Serialize for SerializeWrapper<'a, DynamicMessage> {
+impl Serialize for SerializeWrapper<'_, DynamicMessage> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -54,62 +54,36 @@ fn serialize_dynamic_message_fields<S>(
 where
     S: SerializeMap,
 {
-    if options.skip_default_fields {
-        for field in value.fields.iter(&value.desc) {
-            let (name, value, ref kind) = match field {
-                ValueAndDescriptor::Field(value, ref field_desc) => {
-                    let name = if options.use_proto_field_name {
-                        field_desc.name()
-                    } else {
-                        field_desc.json_name()
-                    };
-                    (name, value, field_desc.kind())
-                }
-                ValueAndDescriptor::Extension(value, ref extension_desc) => {
-                    (extension_desc.json_name(), value, extension_desc.kind())
-                }
-                ValueAndDescriptor::Unknown(_) => continue,
-            };
+    let fields = value
+        .fields
+        .iter(&value.desc, !options.skip_default_fields, false);
 
-            map.serialize_entry(
-                name,
-                &SerializeWrapper {
-                    value: &ValueAndKind {
-                        value: value.as_ref(),
-                        kind,
-                    },
-                    options,
-                },
-            )?;
-        }
-    } else {
-        for field in value.fields.iter_include_default(&value.desc) {
-            let (name, value, ref kind) = match field {
-                ValueAndDescriptor::Field(value, ref field_desc) => {
-                    let name = if options.use_proto_field_name {
-                        field_desc.name()
-                    } else {
-                        field_desc.json_name()
-                    };
-                    (name, value, field_desc.kind())
-                }
-                ValueAndDescriptor::Extension(value, ref extension_desc) => {
-                    (extension_desc.json_name(), value, extension_desc.kind())
-                }
-                ValueAndDescriptor::Unknown(_) => continue,
-            };
+    for field in fields {
+        let (name, value, ref kind) = match field {
+            ValueAndDescriptor::Field(value, ref field_desc) => {
+                let name = if options.use_proto_field_name {
+                    field_desc.name()
+                } else {
+                    field_desc.json_name()
+                };
+                (name, value, field_desc.kind())
+            }
+            ValueAndDescriptor::Extension(value, ref extension_desc) => {
+                (extension_desc.json_name(), value, extension_desc.kind())
+            }
+            ValueAndDescriptor::Unknown(_) => continue,
+        };
 
-            map.serialize_entry(
-                name,
-                &SerializeWrapper {
-                    value: &ValueAndKind {
-                        value: value.as_ref(),
-                        kind,
-                    },
-                    options,
+        map.serialize_entry(
+            name,
+            &SerializeWrapper {
+                value: &ValueAndKind {
+                    value: value.as_ref(),
+                    kind,
                 },
-            )?;
-        }
+                options,
+            },
+        )?;
     }
 
     Ok(())
@@ -237,7 +211,7 @@ impl<'a> Serialize for SerializeWrapper<'a, ValueAndKind<'a>> {
     }
 }
 
-impl<'a> Serialize for SerializeWrapper<'a, MapKey> {
+impl Serialize for SerializeWrapper<'_, MapKey> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,

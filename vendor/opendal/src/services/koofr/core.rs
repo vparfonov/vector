@@ -20,6 +20,7 @@ use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;
 
+use bytes::Buf;
 use bytes::Bytes;
 use http::header;
 use http::request;
@@ -37,6 +38,7 @@ use crate::*;
 
 #[derive(Clone)]
 pub struct KoofrCore {
+    pub info: Arc<AccessorInfo>,
     /// The root of this core.
     pub root: String,
     /// The endpoint of this backend.
@@ -51,8 +53,6 @@ pub struct KoofrCore {
 
     // Koofr mount_id.
     pub mount_id: OnceCell<String>,
-
-    pub client: HttpClient,
 }
 
 impl Debug for KoofrCore {
@@ -67,8 +67,8 @@ impl Debug for KoofrCore {
 
 impl KoofrCore {
     #[inline]
-    pub async fn send(&self, req: Request<AsyncBody>) -> Result<Response<IncomingAsyncBody>> {
-        self.client.send(req).await
+    pub async fn send(&self, req: Request<Buffer>) -> Result<Response<Buffer>> {
+        self.info.http_client().send(req).await
     }
 
     pub async fn get_mount_id(&self) -> Result<&String> {
@@ -78,22 +78,20 @@ impl KoofrCore {
 
                 let req = self.sign(req).await?;
 
-                let req = req
-                    .body(AsyncBody::Empty)
-                    .map_err(new_request_build_error)?;
+                let req = req.body(Buffer::new()).map_err(new_request_build_error)?;
 
                 let resp = self.send(req).await?;
 
                 let status = resp.status();
 
                 if status != StatusCode::OK {
-                    return Err(parse_error(resp).await?);
+                    return Err(parse_error(resp));
                 }
 
-                let bs = resp.into_body().bytes().await?;
+                let bs = resp.into_body();
 
                 let resp: MountsResponse =
-                    serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+                    serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
 
                 for mount in resp.mounts {
                     if mount.is_primary {
@@ -126,20 +124,20 @@ impl KoofrCore {
 
         let auth_req = Request::post(url)
             .header(header::CONTENT_TYPE, "application/json")
-            .body(AsyncBody::Bytes(Bytes::from(bs)))
+            .body(Buffer::from(Bytes::from(bs)))
             .map_err(new_request_build_error)?;
 
-        let resp = self.client.send(auth_req).await?;
+        let resp = self.info.http_client().send(auth_req).await?;
 
         let status = resp.status();
 
         if status != StatusCode::OK {
-            return Err(parse_error(resp).await?);
+            return Err(parse_error(resp));
         }
 
-        let bs = resp.into_body().bytes().await?;
+        let bs = resp.into_body();
         let resp: TokenResponse =
-            serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+            serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
 
         signer.token = resp.token;
 
@@ -201,10 +199,11 @@ impl KoofrCore {
 
                 let req = req
                     .header(header::CONTENT_TYPE, "application/json")
-                    .body(AsyncBody::Bytes(Bytes::from(bs)))
+                    .extension(Operation::CreateDir)
+                    .body(Buffer::from(Bytes::from(bs)))
                     .map_err(new_request_build_error)?;
 
-                let resp = self.client.send(req).await?;
+                let resp = self.info.http_client().send(req).await?;
 
                 let status = resp.status();
 
@@ -212,15 +211,15 @@ impl KoofrCore {
                     // When the directory already exists, Koofr returns 400 Bad Request.
                     // We should treat it as success.
                     StatusCode::OK | StatusCode::CREATED | StatusCode::BAD_REQUEST => Ok(()),
-                    _ => Err(parse_error(resp).await?),
+                    _ => Err(parse_error(resp)),
                 }
             }
             StatusCode::OK => Ok(()),
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    pub async fn info(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn info(&self, path: &str) -> Result<Response<Buffer>> {
         let mount_id = self.get_mount_id().await?;
 
         let url = format!(
@@ -235,13 +234,14 @@ impl KoofrCore {
         let req = self.sign(req).await?;
 
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Stat)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn get(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn get(&self, path: &str, range: BytesRange) -> Result<Response<HttpBody>> {
         let path = build_rooted_abs_path(&self.root, path);
 
         let mount_id = self.get_mount_id().await?;
@@ -253,18 +253,19 @@ impl KoofrCore {
             percent_encode_path(&path)
         );
 
-        let req = Request::get(url);
+        let req = Request::get(url).header(header::RANGE, range.to_header());
 
         let req = self.sign(req).await?;
 
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Read)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
-        self.send(req).await
+        self.info.http_client().fetch(req).await
     }
 
-    pub async fn put(&self, path: &str, bs: Bytes) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn put(&self, path: &str, bs: Buffer) -> Result<Response<Buffer>> {
         let path = build_rooted_abs_path(&self.root, path);
 
         let filename = get_basename(&path);
@@ -295,12 +296,14 @@ impl KoofrCore {
 
         let req = self.sign(req).await?;
 
+        let req = req.extension(Operation::Write);
+
         let req = multipart.apply(req)?;
 
         self.send(req).await
     }
 
-    pub async fn remove(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn remove(&self, path: &str) -> Result<Response<Buffer>> {
         let path = build_rooted_abs_path(&self.root, path);
 
         let mount_id = self.get_mount_id().await?;
@@ -317,13 +320,14 @@ impl KoofrCore {
         let req = self.sign(req).await?;
 
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Delete)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn copy(&self, from: &str, to: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn copy(&self, from: &str, to: &str) -> Result<Response<Buffer>> {
         let from = build_rooted_abs_path(&self.root, from);
         let to = build_rooted_abs_path(&self.root, to);
 
@@ -349,13 +353,14 @@ impl KoofrCore {
 
         let req = req
             .header(header::CONTENT_TYPE, "application/json")
-            .body(AsyncBody::Bytes(Bytes::from(bs)))
+            .extension(Operation::Copy)
+            .body(Buffer::from(Bytes::from(bs)))
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn move_object(&self, from: &str, to: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn move_object(&self, from: &str, to: &str) -> Result<Response<Buffer>> {
         let from = build_rooted_abs_path(&self.root, from);
         let to = build_rooted_abs_path(&self.root, to);
 
@@ -381,13 +386,14 @@ impl KoofrCore {
 
         let req = req
             .header(header::CONTENT_TYPE, "application/json")
-            .body(AsyncBody::Bytes(Bytes::from(bs)))
+            .extension(Operation::Rename)
+            .body(Buffer::from(Bytes::from(bs)))
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn list(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn list(&self, path: &str) -> Result<Response<Buffer>> {
         let path = build_rooted_abs_path(&self.root, path);
 
         let mount_id = self.get_mount_id().await?;
@@ -404,7 +410,8 @@ impl KoofrCore {
         let req = self.sign(req).await?;
 
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::List)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.send(req).await

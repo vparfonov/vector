@@ -17,10 +17,10 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use http::StatusCode;
 use uuid::Uuid;
 
+use super::core::constants::X_MS_VERSION_ID;
 use super::core::AzblobCore;
 use super::error::parse_error;
 use crate::raw::*;
@@ -41,10 +41,28 @@ impl AzblobWriter {
     pub fn new(core: Arc<AzblobCore>, op: OpWrite, path: String) -> Self {
         AzblobWriter { core, op, path }
     }
+
+    // skip extracting `content-md5` here, as it pertains to the content of the request rather than
+    // the content of the block itself for the `append` and `complete put block list` operations.
+    fn parse_metadata(headers: &http::HeaderMap) -> Result<Metadata> {
+        let mut metadata = Metadata::default();
+
+        if let Some(last_modified) = parse_last_modified(headers)? {
+            metadata.set_last_modified(last_modified);
+        }
+        let etag = parse_etag(headers)?;
+        if let Some(etag) = etag {
+            metadata.set_etag(etag);
+        }
+        let version_id = parse_header_to_str(headers, X_MS_VERSION_ID)?;
+        if let Some(version_id) = version_id {
+            metadata.set_version(version_id);
+        }
+
+        Ok(metadata)
+    }
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl oio::AppendWrite for AzblobWriter {
     async fn offset(&self) -> Result<u64> {
         let resp = self
@@ -68,13 +86,10 @@ impl oio::AppendWrite for AzblobWriter {
                 Ok(parse_content_length(headers)?.unwrap_or_default())
             }
             StatusCode::NOT_FOUND => {
-                let mut req = self
+                let resp = self
                     .core
-                    .azblob_init_appendable_blob_request(&self.path, &self.op)?;
-
-                self.core.sign(&mut req).await?;
-
-                let resp = self.core.client.send(req).await?;
+                    .azblob_init_appendable_blob(&self.path, &self.op)
+                    .await?;
 
                 let status = resp.status();
                 match status {
@@ -82,59 +97,51 @@ impl oio::AppendWrite for AzblobWriter {
                         // do nothing
                     }
                     _ => {
-                        return Err(parse_error(resp).await?);
+                        return Err(parse_error(resp));
                     }
                 }
                 Ok(0)
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    async fn append(&self, offset: u64, size: u64, body: AsyncBody) -> Result<()> {
-        let mut req = self
+    async fn append(&self, offset: u64, size: u64, body: Buffer) -> Result<Metadata> {
+        let resp = self
             .core
-            .azblob_append_blob_request(&self.path, offset, size, body)?;
+            .azblob_append_blob(&self.path, offset, size, body)
+            .await?;
 
-        self.core.sign(&mut req).await?;
-
-        let resp = self.core.send(req).await?;
-
+        let meta = AzblobWriter::parse_metadata(resp.headers())?;
         let status = resp.status();
         match status {
-            StatusCode::CREATED => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::CREATED => Ok(meta),
+            _ => Err(parse_error(resp)),
         }
     }
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-#[async_trait]
 impl oio::BlockWrite for AzblobWriter {
-    async fn write_once(&self, size: u64, body: AsyncBody) -> Result<()> {
-        let mut req: http::Request<AsyncBody> =
-            self.core
-                .azblob_put_blob_request(&self.path, Some(size), &self.op, body)?;
-        self.core.sign(&mut req).await?;
-
-        let resp = self.core.send(req).await?;
+    async fn write_once(&self, size: u64, body: Buffer) -> Result<Metadata> {
+        let resp = self
+            .core
+            .azblob_put_blob(&self.path, Some(size), &self.op, body)
+            .await?;
 
         let status = resp.status();
 
+        let mut meta = AzblobWriter::parse_metadata(resp.headers())?;
+        let md5 = parse_content_md5(resp.headers())?;
+        if let Some(md5) = md5 {
+            meta.set_content_md5(md5);
+        }
         match status {
-            StatusCode::CREATED | StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::CREATED | StatusCode::OK => Ok(meta),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    async fn write_block(&self, block_id: Uuid, size: u64, body: AsyncBody) -> Result<()> {
+    async fn write_block(&self, block_id: Uuid, size: u64, body: Buffer) -> Result<()> {
         let resp = self
             .core
             .azblob_put_block(&self.path, block_id, Some(size), &self.op, body)
@@ -142,27 +149,22 @@ impl oio::BlockWrite for AzblobWriter {
 
         let status = resp.status();
         match status {
-            StatusCode::CREATED | StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::CREATED | StatusCode::OK => Ok(()),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    async fn complete_block(&self, block_ids: Vec<Uuid>) -> Result<()> {
+    async fn complete_block(&self, block_ids: Vec<Uuid>) -> Result<Metadata> {
         let resp = self
             .core
             .azblob_complete_put_block_list(&self.path, block_ids, &self.op)
             .await?;
 
+        let meta = AzblobWriter::parse_metadata(resp.headers())?;
         let status = resp.status();
         match status {
-            StatusCode::CREATED | StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::CREATED | StatusCode::OK => Ok(meta),
+            _ => Err(parse_error(resp)),
         }
     }
 

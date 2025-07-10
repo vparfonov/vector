@@ -12,7 +12,7 @@
 [package]
 edition = "2018"
 name = "lz4"
-version = "1.24.0"
+version = "1.28.1"
 authors = [
     "Jens Heyens <jens.heyens@ewetel.net>",
     "Artem V. Navrotskiy <bozaro@buzzsoft.ru>",
@@ -29,14 +29,8 @@ name = "lz4"
 test = false
 doc = false
 
-[dependencies.libc]
-version = "0.2"
-
 [dependencies.lz4-sys]
-version = "1.9.4"
-
-[dev-dependencies.docmatic]
-version = "0.1"
+version = "1.11.1+lz4-1.10.0"
 
 [dev-dependencies.rand]
 version = ">=0.7, <=0.8"

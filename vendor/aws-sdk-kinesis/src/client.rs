@@ -235,8 +235,6 @@ mod list_stream_consumers;
 
 mod list_streams;
 
-mod list_tags_for_resource;
-
 mod list_tags_for_stream;
 
 mod merge_shards;
@@ -258,10 +256,6 @@ mod start_stream_encryption;
 mod stop_stream_encryption;
 
 mod subscribe_to_shard;
-
-mod tag_resource;
-
-mod untag_resource;
 
 mod update_shard_count;
 

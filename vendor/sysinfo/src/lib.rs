@@ -71,14 +71,16 @@ cfg_if! {
 #[cfg(feature = "component")]
 pub use crate::common::component::{Component, Components};
 #[cfg(feature = "disk")]
-pub use crate::common::disk::{Disk, DiskKind, Disks};
+pub use crate::common::disk::{Disk, DiskKind, DiskRefreshKind, Disks};
 #[cfg(feature = "network")]
-pub use crate::common::network::{IpNetwork, MacAddr, NetworkData, Networks};
+pub use crate::common::network::{
+    IpNetwork, IpNetworkFromStrError, MacAddr, MacAddrFromStrError, NetworkData, Networks,
+};
 #[cfg(feature = "system")]
 pub use crate::common::system::{
-    get_current_pid, CGroupLimits, Cpu, CpuRefreshKind, DiskUsage, LoadAvg, MemoryRefreshKind, Pid,
-    Process, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, RefreshKind, Signal, System,
-    ThreadKind, UpdateKind,
+    get_current_pid, CGroupLimits, Cpu, CpuRefreshKind, LoadAvg, MemoryRefreshKind, Pid, Process,
+    ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, RefreshKind, Signal, System, ThreadKind,
+    UpdateKind,
 };
 #[cfg(feature = "user")]
 pub use crate::common::user::{Group, Groups, User, Users};
@@ -86,6 +88,9 @@ pub use crate::common::user::{Group, Groups, User, Users};
 pub use crate::common::{Gid, Uid};
 #[cfg(feature = "system")]
 pub use crate::sys::{MINIMUM_CPU_UPDATE_INTERVAL, SUPPORTED_SIGNALS};
+
+#[cfg(any(feature = "system", feature = "disk"))]
+pub use crate::common::DiskUsage;
 
 #[cfg(feature = "user")]
 pub(crate) use crate::common::user::GroupInner;
@@ -112,6 +117,16 @@ mod debug;
 #[cfg(feature = "serde")]
 mod serde;
 pub(crate) mod utils;
+
+// Make formattable by rustfmt.
+#[cfg(any())]
+mod network;
+#[cfg(any())]
+mod unix;
+#[cfg(any())]
+mod unknown;
+#[cfg(any())]
+mod windows;
 
 /// This function is only used on Linux targets, when the `system` feature is enabled. In other
 /// cases, it does nothing and returns `false`.
@@ -269,7 +284,7 @@ mod test {
     fn check_uid_gid() {
         let mut users = Users::new();
         assert!(users.list().is_empty());
-        users.refresh_list();
+        users.refresh();
         let user_list = users.list();
         assert!(user_list.len() >= MIN_USERS);
 
@@ -292,10 +307,10 @@ mod test {
             #[cfg(feature = "system")]
             {
                 // And now check that our `get_user_by_id` method works.
-                let s = System::new_with_specifics(
-                    RefreshKind::new()
-                        .with_processes(ProcessRefreshKind::new().with_user(UpdateKind::Always)),
-                );
+                let s =
+                    System::new_with_specifics(RefreshKind::nothing().with_processes(
+                        ProcessRefreshKind::nothing().with_user(UpdateKind::Always),
+                    ));
                 assert!(s
                     .processes()
                     .iter()
@@ -305,15 +320,15 @@ mod test {
         }
     }
 
-    #[cfg(feature = "system")]
+    #[cfg(all(feature = "system", feature = "user"))]
     #[test]
     fn check_all_process_uids_resolvable() {
         // On linux, some user IDs don't have an associated user (no idea why though).
         // If `getent` doesn't find them, we can assume it's a dark secret from the linux land.
         if IS_SUPPORTED_SYSTEM && cfg!(not(target_os = "linux")) {
             let s = System::new_with_specifics(
-                RefreshKind::new()
-                    .with_processes(ProcessRefreshKind::new().with_user(UpdateKind::Always)),
+                RefreshKind::nothing()
+                    .with_processes(ProcessRefreshKind::nothing().with_user(UpdateKind::Always)),
             );
             let users = Users::new_with_refreshed_list();
 

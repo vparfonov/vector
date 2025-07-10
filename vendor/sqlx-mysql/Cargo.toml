@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "sqlx-mysql"
-version = "0.8.5"
+version = "0.8.6"
 authors = [
     "Ryan Leckey <leckey.ryan@gmail.com>",
     "Austin Bonander <austin.bonander@gmail.com>",
@@ -164,7 +164,7 @@ default-features = false
 version = "1.7.0"
 
 [dependencies.sqlx-core]
-version = "=0.8.5"
+version = "=0.8.6"
 
 [dependencies.stringprep]
 version = "0.1.2"
@@ -194,7 +194,7 @@ version = "1.2.1"
 default-features = false
 
 [dev-dependencies.sqlx]
-version = "=0.8.5"
+version = "=0.8.6"
 features = ["mysql"]
 default-features = false
 

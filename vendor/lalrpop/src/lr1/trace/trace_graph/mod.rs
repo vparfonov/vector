@@ -111,7 +111,7 @@ impl<'grammar> TraceGraph<'grammar> {
     }
 }
 
-impl From<NonterminalString> for TraceGraphNode<'_> {
+impl<'grammar> From<NonterminalString> for TraceGraphNode<'grammar> {
     fn from(val: NonterminalString) -> Self {
         TraceGraphNode::Nonterminal(val)
     }
@@ -140,13 +140,13 @@ struct TraceGraphEdge<'grammar> {
     ),
 }
 
-impl Debug for TraceGraphEdge<'_> {
+impl<'grammar> Debug for TraceGraphEdge<'grammar> {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), Error> {
         write!(fmt, "({:?} -{:?}-> {:?})", self.from, self.label, self.to)
     }
 }
 
-impl Debug for TraceGraph<'_> {
+impl<'grammar> Debug for TraceGraph<'grammar> {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), Error> {
         let mut s = fmt.debug_list();
         for (node, &index) in &self.indices {
@@ -396,7 +396,7 @@ impl<'graph, 'grammar> PathEnumerator<'graph, 'grammar> {
     }
 }
 
-impl Iterator for PathEnumerator<'_, '_> {
+impl<'graph, 'grammar> Iterator for PathEnumerator<'graph, 'grammar> {
     type Item = Example;
 
     fn next(&mut self) -> Option<Example> {
@@ -437,7 +437,7 @@ impl<'graph, 'grammar> FilteredPathEnumerator<'graph, 'grammar> {
     }
 }
 
-impl Iterator for FilteredPathEnumerator<'_, '_> {
+impl<'graph, 'grammar> Iterator for FilteredPathEnumerator<'graph, 'grammar> {
     type Item = Example;
 
     fn next(&mut self) -> Option<Example> {

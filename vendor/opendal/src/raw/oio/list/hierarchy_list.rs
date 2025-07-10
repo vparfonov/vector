@@ -16,9 +16,6 @@
 // under the License.
 
 use std::collections::HashSet;
-use std::task::ready;
-use std::task::Context;
-use std::task::Poll;
 
 use crate::raw::*;
 use crate::*;
@@ -72,11 +69,6 @@ impl<P> HierarchyLister<P> {
             return false;
         }
 
-        // Dir itself should not be returned in hierarchy page.
-        if e.path() == self.path {
-            return false;
-        }
-
         // Don't return already visited path.
         if self.visited.contains(e.path()) {
             return false;
@@ -125,18 +117,18 @@ impl<P> HierarchyLister<P> {
 }
 
 impl<P: oio::List> oio::List for HierarchyLister<P> {
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<oio::Entry>>> {
+    async fn next(&mut self) -> Result<Option<oio::Entry>> {
         loop {
-            let mut entry = match ready!(self.lister.poll_next(cx))? {
+            let mut entry = match self.lister.next().await? {
                 Some(entry) => entry,
-                None => return Poll::Ready(Ok(None)),
+                None => return Ok(None),
             };
 
             if self.recursive {
-                return Poll::Ready(Ok(Some(entry)));
+                return Ok(Some(entry));
             }
             if self.keep_entry(&mut entry) {
-                return Poll::Ready(Ok(Some(entry)));
+                return Ok(Some(entry));
             }
         }
     }

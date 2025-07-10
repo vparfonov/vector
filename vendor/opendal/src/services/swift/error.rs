@@ -23,9 +23,7 @@ use quick_xml::de;
 use serde::Deserialize;
 
 use crate::raw::*;
-use crate::Error;
-use crate::ErrorKind;
-use crate::Result;
+use crate::*;
 
 #[allow(dead_code)]
 #[derive(Debug, Deserialize)]
@@ -34,9 +32,9 @@ struct ErrorResponse {
     p: String,
 }
 
-pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
+pub(super) fn parse_error(resp: Response<Buffer>) -> Error {
     let (parts, body) = resp.into_parts();
-    let bs = body.bytes().await?;
+    let bs = body.to_bytes();
 
     let (kind, retryable) = match parts.status {
         StatusCode::NOT_FOUND => (ErrorKind::NotFound, false),
@@ -51,7 +49,7 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
 
     let message = parse_error_response(&bs);
 
-    let mut err = Error::new(kind, &message);
+    let mut err = Error::new(kind, message);
 
     err = with_error_response_context(err, parts);
 
@@ -59,14 +57,14 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
         err = err.set_temporary();
     }
 
-    Ok(err)
+    err
 }
 
 fn parse_error_response(resp: &Bytes) -> String {
-    return match de::from_reader::<_, ErrorResponse>(resp.clone().reader()) {
+    match de::from_reader::<_, ErrorResponse>(resp.clone().reader()) {
         Ok(swift_err) => swift_err.p,
         Err(_) => String::from_utf8_lossy(resp).into_owned(),
-    };
+    }
 }
 
 #[cfg(test)]

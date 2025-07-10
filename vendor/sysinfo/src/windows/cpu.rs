@@ -9,14 +9,14 @@ use std::mem;
 use std::ops::DerefMut;
 use std::sync::{Mutex, OnceLock};
 
-use windows::core::{s, PCSTR, PCWSTR};
+use windows::core::{s, PCSTR, PCWSTR, PSTR};
 use windows::Win32::Foundation::{
-    CloseHandle, BOOLEAN, ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS, FALSE, HANDLE,
+    CloseHandle, BOOLEAN, ERROR_INSUFFICIENT_BUFFER, ERROR_SUCCESS, FALSE, HANDLE, TRUE,
 };
 use windows::Win32::System::Performance::{
     PdhAddEnglishCounterA, PdhAddEnglishCounterW, PdhCloseQuery, PdhCollectQueryData,
-    PdhCollectQueryDataEx, PdhGetFormattedCounterValue, PdhOpenQueryA, PdhRemoveCounter,
-    PDH_FMT_COUNTERVALUE, PDH_FMT_DOUBLE,
+    PdhCollectQueryDataEx, PdhEnumObjectsA, PdhGetFormattedCounterValue, PdhOpenQueryA,
+    PdhRemoveCounter, PDH_FMT_COUNTERVALUE, PDH_FMT_DOUBLE, PERF_DETAIL_NOVICE,
 };
 use windows::Win32::System::Power::{
     CallNtPowerInformation, ProcessorInformation, PROCESSOR_POWER_INFORMATION,
@@ -166,9 +166,19 @@ pub(crate) struct Query {
 }
 
 impl Query {
-    pub fn new() -> Option<Query> {
+    pub fn new(force_reload: bool) -> Option<Query> {
         let mut query = 0;
         unsafe {
+            if force_reload {
+                PdhEnumObjectsA(
+                    PCSTR::null(),
+                    PCSTR::null(),
+                    PSTR::null(),
+                    &mut 0,
+                    PERF_DETAIL_NOVICE,
+                    TRUE,
+                );
+            }
             if PdhOpenQueryA(PCSTR::null(), 0, &mut query) == ERROR_SUCCESS.0 {
                 let q = InternalQuery {
                     query: HANDLE(query),
@@ -247,7 +257,6 @@ impl Query {
 pub(crate) struct CpusWrapper {
     pub(crate) global: CpuUsage,
     cpus: Vec<Cpu>,
-    got_cpu_frequency: bool,
 }
 
 impl CpusWrapper {
@@ -258,7 +267,6 @@ impl CpusWrapper {
                 key_used: None,
             },
             cpus: Vec::new(),
-            got_cpu_frequency: false,
         }
     }
 
@@ -273,12 +281,11 @@ impl CpusWrapper {
     fn init_if_needed(&mut self, refresh_kind: CpuRefreshKind) {
         if self.cpus.is_empty() {
             self.cpus = init_cpus(refresh_kind);
-            self.got_cpu_frequency = refresh_kind.frequency();
         }
     }
 
     pub fn len(&mut self) -> usize {
-        self.init_if_needed(CpuRefreshKind::new());
+        self.init_if_needed(CpuRefreshKind::nothing());
         self.cpus.len()
     }
 
@@ -288,15 +295,11 @@ impl CpusWrapper {
     }
 
     pub fn get_frequencies(&mut self) {
-        if self.got_cpu_frequency {
-            return;
-        }
         let frequencies = get_frequencies(self.cpus.len());
 
         for (cpu, frequency) in self.cpus.iter_mut().zip(frequencies) {
             cpu.inner.set_frequency(frequency);
         }
-        self.got_cpu_frequency = true;
     }
 }
 

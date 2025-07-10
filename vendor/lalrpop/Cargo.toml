@@ -13,11 +13,10 @@
 edition = "2021"
 rust-version = "1.70"
 name = "lalrpop"
-version = "0.22.1"
+version = "0.22.0"
 authors = ["Niko Matsakis <niko@alum.mit.edu>"]
 build = false
 exclude = ["build.rs"]
-autolib = false
 autobins = false
 autoexamples = false
 autotests = false
@@ -62,16 +61,16 @@ version = "0.14"
 default-features = false
 
 [dependencies.itertools]
-version = "0.14"
+version = "0.13"
 features = ["use_std"]
 default-features = false
 
 [dependencies.lalrpop-util]
-version = "0.22.1"
+version = "0.22.0"
 default-features = false
 
 [dependencies.petgraph]
-version = "0.7"
+version = "0.6"
 default-features = false
 
 [dependencies.pico-args]
@@ -113,9 +112,6 @@ default-features = false
 
 [dev-dependencies.rand]
 version = "0.8"
-
-[dev-dependencies.rand_chacha]
-version = "0.3.1"
 
 [features]
 default = [

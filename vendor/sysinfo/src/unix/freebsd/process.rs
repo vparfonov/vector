@@ -5,10 +5,10 @@ use crate::{DiskUsage, Gid, Pid, Process, ProcessRefreshKind, ProcessStatus, Sig
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::path::{Path, PathBuf};
+use std::process::ExitStatus;
 
-use libc::kill;
-
-use super::utils::{get_sys_value_str, WrapMap};
+use super::ffi::filedesc;
+use super::utils::{get_sys_value_by_name, get_sys_value_str, WrapMap};
 
 #[doc(hidden)]
 impl From<libc::c_char> for ProcessStatus {
@@ -65,6 +65,11 @@ pub(crate) struct ProcessInner {
     old_read_bytes: u64,
     written_bytes: u64,
     old_written_bytes: u64,
+    accumulated_cpu_time: u64,
+    exists: bool,
+    // On FreeBSD, we can only get this information from `kinfo_proc`, so instead of going through
+    // all open processes again, better store the value...
+    open_files: Option<u32>,
 }
 
 impl ProcessInner {
@@ -129,6 +134,10 @@ impl ProcessInner {
         self.cpu_usage
     }
 
+    pub(crate) fn accumulated_cpu_time(&self) -> u64 {
+        self.accumulated_cpu_time
+    }
+
     pub(crate) fn disk_usage(&self) -> DiskUsage {
         DiskUsage {
             written_bytes: self.written_bytes.saturating_sub(self.old_written_bytes),
@@ -154,18 +163,8 @@ impl ProcessInner {
         Some(self.effective_group_id)
     }
 
-    pub(crate) fn wait(&self) {
-        let mut status = 0;
-        // attempt waiting
-        unsafe {
-            if retry_eintr!(libc::waitpid(self.pid.0, &mut status, 0)) < 0 {
-                // attempt failed (non-child process) so loop until process ends
-                let duration = std::time::Duration::from_millis(10);
-                while kill(self.pid.0, 0) == 0 {
-                    std::thread::sleep(duration);
-                }
-            }
-        }
+    pub(crate) fn wait(&self) -> Option<ExitStatus> {
+        crate::unix::utils::wait_process(self.pid)
     }
 
     pub(crate) fn session_id(&self) -> Option<Pid> {
@@ -180,11 +179,41 @@ impl ProcessInner {
     }
 
     pub(crate) fn switch_updated(&mut self) -> bool {
-         std::mem::replace(&mut self.updated, false)
+        std::mem::replace(&mut self.updated, false)
+    }
+
+    pub(crate) fn set_nonexistent(&mut self) {
+        self.exists = false;
+    }
+
+    pub(crate) fn exists(&self) -> bool {
+        self.exists
+    }
+
+    pub(crate) fn open_files(&self) -> Option<u32> {
+        self.open_files
+    }
+
+    pub(crate) fn open_files_limit(&self) -> Option<u32> {
+        let mut value = 0u32;
+        unsafe {
+            if get_sys_value_by_name(b"kern.maxfilesperproc\0", &mut value) {
+                Some(value)
+            } else {
+                None
+            }
+        }
     }
 }
 
+#[inline]
+fn get_accumulated_cpu_time(kproc: &libc::kinfo_proc) -> u64 {
+    // from FreeBSD source /bin/ps/print.c
+    kproc.ki_runtime / 1_000
+}
+
 pub(crate) unsafe fn get_process_data(
+    kd: super::system::PtrWrap<()>,
     kproc: &libc::kinfo_proc,
     wrap: &WrapMap,
     page_size: isize,
@@ -225,6 +254,38 @@ pub(crate) unsafe fn get_process_data(
     // let run_time = (kproc.ki_runtime + 5_000) / 10_000;
 
     let start_time = kproc.ki_start.tv_sec as u64;
+    let mut open_files = None;
+    let kd = kd.0 as *mut libc::kvm_t;
+    if !kd.is_null() && !kproc.ki_fd.is_null() {
+        let mut ki_fd = std::mem::MaybeUninit::<filedesc>::uninit();
+        let size = std::mem::size_of::<filedesc>();
+        // `ki_fd` pointer is not actually a pointer to accessible but to kernel memory.
+        // So to retrieve the value, we need to get the memory from the kernel using `kvm_read2`.
+        let write_size = libc::kvm_read2(
+            kd,
+            kproc.ki_fd as _,
+            ki_fd.as_mut_ptr() as *mut _,
+            size as _,
+        );
+        if write_size == size as _ {
+            let ki_fd = ki_fd.assume_init();
+            if !ki_fd.fd_files.is_null() {
+                let mut fd_files = std::mem::MaybeUninit::<super::ffi::fdescenttbl>::uninit();
+                let size = std::mem::size_of::<super::ffi::fdescenttbl>();
+                // Kernel memory here as well...
+                let write_size = libc::kvm_read2(
+                    kd,
+                    ki_fd.fd_files as _,
+                    fd_files.as_mut_ptr() as *mut _,
+                    size as _,
+                );
+                if write_size == size as _ {
+                    let fd_files = fd_files.assume_init();
+                    open_files = Some(fd_files.fdt_nfiles as _);
+                }
+            }
+        }
+    }
 
     if let Some(proc_) = (*wrap.0.get()).get_mut(&Pid(kproc.ki_pid)) {
         let proc_ = &mut proc_.inner;
@@ -247,6 +308,11 @@ pub(crate) unsafe fn get_process_data(
                 proc_.old_written_bytes = proc_.written_bytes;
                 proc_.written_bytes = kproc.ki_rusage.ru_oublock as _;
             }
+            if refresh_kind.cpu() {
+                proc_.accumulated_cpu_time = get_accumulated_cpu_time(kproc);
+            }
+
+            proc_.open_files = open_files;
 
             return Ok(None);
         }
@@ -297,7 +363,14 @@ pub(crate) unsafe fn get_process_data(
             old_read_bytes: 0,
             written_bytes: kproc.ki_rusage.ru_oublock as _,
             old_written_bytes: 0,
+            accumulated_cpu_time: if refresh_kind.cpu() {
+                get_accumulated_cpu_time(kproc)
+            } else {
+                0
+            },
             updated: true,
+            exists: true,
+            open_files,
         },
     }))
 }

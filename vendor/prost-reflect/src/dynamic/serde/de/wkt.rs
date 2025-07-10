@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     collections::{BTreeMap, HashMap},
     fmt,
+    marker::PhantomData,
 };
 
 use prost::Message;
@@ -11,8 +12,8 @@ use serde::de::{
 };
 
 use crate::{
-    descriptor::{GOOGLE_APIS_DOMAIN, GOOGLE_PROD_DOMAIN},
     dynamic::{
+        get_type_url_message_name,
         serde::{
             case::camel_case_to_snake_case, check_duration, check_timestamp, is_well_known_type,
             DeserializeOptions,
@@ -34,7 +35,7 @@ pub struct GoogleProtobufStructVisitor;
 pub struct GoogleProtobufValueVisitor;
 pub struct GoogleProtobufEmptyVisitor;
 
-impl<'a, 'de> Visitor<'de> for GoogleProtobufAnyVisitor<'a> {
+impl<'de> Visitor<'de> for GoogleProtobufAnyVisitor<'_> {
     type Value = prost_types::Any;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -47,91 +48,64 @@ impl<'a, 'de> Visitor<'de> for GoogleProtobufAnyVisitor<'a> {
     {
         let mut buffered_entries = HashMap::new();
 
-        let type_url = loop {
-            match map.next_key::<Cow<str>>()? {
-                Some(key) if key == "@type" => {
-                    break map.next_value::<String>()?;
+        let type_url = find_field(
+            &mut map,
+            &mut buffered_entries,
+            "@type",
+            PhantomData::<String>,
+        )?;
+
+        let message_name = get_type_url_message_name(&type_url).map_err(Error::custom)?;
+        let message_desc = self
+            .0
+            .get_message_by_name(message_name)
+            .ok_or_else(|| Error::custom(format!("message '{}' not found", message_name)))?;
+
+        let payload_message = if is_well_known_type(message_name) {
+            let payload_message = match buffered_entries.remove("value") {
+                Some(value) => {
+                    deserialize_message(&message_desc, value, self.1).map_err(Error::custom)?
                 }
-                Some(key) => {
-                    let value: serde_value::Value = map.next_value()?;
-                    buffered_entries.insert(key, value);
-                }
-                None => return Err(Error::custom("expected '@type' field")),
-            }
-        };
-
-        if let Some(message_name) = type_url
-            .strip_prefix(GOOGLE_APIS_DOMAIN)
-            .or_else(|| type_url.strip_prefix(GOOGLE_PROD_DOMAIN))
-        {
-            let message_desc = self
-                .0
-                .get_message_by_name(message_name)
-                .ok_or_else(|| Error::custom(format!("message '{}' not found", message_name)))?;
-
-            let payload_message = if is_well_known_type(message_name) {
-                let payload_message = match buffered_entries.remove("value") {
-                    Some(value) => {
-                        deserialize_message(&message_desc, value, self.1).map_err(Error::custom)?
-                    }
-                    None => loop {
-                        match map.next_key::<Cow<str>>()? {
-                            Some(key) if key == "value" => {
-                                break map.next_value_seed(MessageSeed(&message_desc, self.1))?
-                            }
-                            Some(key) => {
-                                if self.1.deny_unknown_fields {
-                                    return Err(Error::custom(format!(
-                                        "unrecognized field name '{}'",
-                                        key
-                                    )));
-                                } else {
-                                    let _ = map.next_value::<IgnoredAny>()?;
-                                }
-                            }
-                            None => return Err(Error::custom("expected '@type' field")),
-                        }
-                    },
-                };
-
-                if self.1.deny_unknown_fields {
-                    if let Some(key) = buffered_entries.keys().next() {
-                        return Err(Error::custom(format!("unrecognized field name '{}'", key)));
-                    }
-                    if let Some(key) = map.next_key::<Cow<str>>()? {
-                        return Err(Error::custom(format!("unrecognized field name '{}'", key)));
-                    }
-                } else {
-                    drop(buffered_entries);
-                    while map.next_entry::<IgnoredAny, IgnoredAny>()?.is_some() {}
-                }
-
-                payload_message
-            } else {
-                let mut payload_message = DynamicMessage::new(message_desc);
-
-                buffered_entries
-                    .into_deserializer()
-                    .deserialize_map(MessageVisitorInner(&mut payload_message, self.1))
-                    .map_err(Error::custom)?;
-
-                MessageVisitorInner(&mut payload_message, self.1).visit_map(map)?;
-
-                payload_message
+                None => find_field(
+                    &mut map,
+                    &mut buffered_entries,
+                    "value",
+                    MessageSeed(&message_desc, self.1),
+                )?,
             };
 
-            let value = payload_message.encode_to_vec();
-            Ok(prost_types::Any { type_url, value })
+            if self.1.deny_unknown_fields {
+                if let Some(key) = buffered_entries.keys().next() {
+                    return Err(Error::custom(format!("unrecognized field name '{}'", key)));
+                }
+                if let Some(key) = map.next_key::<Cow<str>>()? {
+                    return Err(Error::custom(format!("unrecognized field name '{}'", key)));
+                }
+            } else {
+                drop(buffered_entries);
+                while map.next_entry::<IgnoredAny, IgnoredAny>()?.is_some() {}
+            }
+
+            payload_message
         } else {
-            Err(Error::custom(format!(
-                "unsupported type url '{}'",
-                type_url
-            )))
-        }
+            let mut payload_message = DynamicMessage::new(message_desc);
+
+            buffered_entries
+                .into_deserializer()
+                .deserialize_map(MessageVisitorInner(&mut payload_message, self.1))
+                .map_err(Error::custom)?;
+
+            MessageVisitorInner(&mut payload_message, self.1).visit_map(map)?;
+
+            payload_message
+        };
+
+        let value = payload_message.encode_to_vec();
+        Ok(prost_types::Any { type_url, value })
     }
 }
 
-impl<'de> Visitor<'de> for GoogleProtobufNullVisitor {
+impl Visitor<'_> for GoogleProtobufNullVisitor {
     type Value = i32;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -158,7 +132,7 @@ impl<'de> Visitor<'de> for GoogleProtobufNullVisitor {
     }
 }
 
-impl<'de> Visitor<'de> for GoogleProtobufTimestampVisitor {
+impl Visitor<'_> for GoogleProtobufTimestampVisitor {
     type Value = prost_types::Timestamp;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -179,7 +153,7 @@ impl<'de> Visitor<'de> for GoogleProtobufTimestampVisitor {
     }
 }
 
-impl<'de> Visitor<'de> for GoogleProtobufDurationVisitor {
+impl Visitor<'_> for GoogleProtobufDurationVisitor {
     type Value = prost_types::Duration;
 
     fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -198,7 +172,7 @@ impl<'de> Visitor<'de> for GoogleProtobufDurationVisitor {
     }
 }
 
-impl<'de> Visitor<'de> for GoogleProtobufFieldMaskVisitor {
+impl Visitor<'_> for GoogleProtobufFieldMaskVisitor {
     type Value = prost_types::FieldMask;
 
     fn visit_str<E>(self, v: &str) -> Result<Self::Value, E>
@@ -390,6 +364,27 @@ impl<'de> Visitor<'de> for GoogleProtobufEmptyVisitor {
     }
 }
 
+fn find_field<'de, A, D>(
+    map: &mut A,
+    buffered_entries: &mut HashMap<Cow<str>, serde_value::Value>,
+    expected: &str,
+    value_seed: D,
+) -> Result<D::Value, A::Error>
+where
+    A: MapAccess<'de>,
+    D: DeserializeSeed<'de>,
+{
+    loop {
+        match map.next_key::<Cow<str>>()? {
+            Some(key) if key == expected => return map.next_value_seed(value_seed),
+            Some(key) => {
+                buffered_entries.insert(key, map.next_value()?);
+            }
+            None => return Err(Error::custom(format!("expected '{expected}' field"))),
+        }
+    }
+}
+
 /// Validates the string is a valid RFC3339 timestamp, requiring upper-case
 /// 'T' and 'Z' characters as recommended by the conformance tests.
 fn validate_strict_rfc3339(v: &str) -> Result<(), String> {
@@ -469,42 +464,47 @@ fn validate_strict_rfc3339(v: &str) -> Result<(), String> {
     Ok(())
 }
 
-#[test]
-fn test_validate_strict_rfc3339() {
-    macro_rules! case {
-        ($s:expr => Ok) => {
-            assert_eq!(validate_strict_rfc3339($s), Ok(()))
-        };
-        ($s:expr => Err($e:expr)) => {
-            assert_eq!(validate_strict_rfc3339($s).unwrap_err().to_string(), $e)
-        };
-    }
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    case!("1972-06-30T23:59:60Z" => Ok);
-    case!("2019-03-26T14:00:00.9Z" => Ok);
-    case!("2019-03-26T14:00:00.4999Z" => Ok);
-    case!("2019-03-26T14:00:00.4999+10:00" => Ok);
-    case!("2019-03-26t14:00Z" => Err("invalid rfc3339 timestamp: expected 'T' but found 't'"));
-    case!("2019-03-26T14:00z" => Err("invalid rfc3339 timestamp: invalid time"));
-    case!("2019-03-26T14:00:00,999Z" => Err("invalid rfc3339 timestamp: expected 'Z', '+' or '-' but found ','"));
-    case!("2019-03-26T10:00-04" => Err("invalid rfc3339 timestamp: invalid time"));
-    case!("2019-03-26T14:00.9Z" => Err("invalid rfc3339 timestamp: invalid time"));
-    case!("20190326T1400Z" => Err("invalid rfc3339 timestamp: invalid date"));
-    case!("2019-02-30" => Err("invalid rfc3339 timestamp: expected 'T' but found end of string"));
-    case!("2019-03-25T24:01Z" => Err("invalid rfc3339 timestamp: invalid time"));
-    case!("2019-03-26T14:00+24:00" => Err("invalid rfc3339 timestamp: invalid time"));
-    case!("2019-03-26Z" => Err("invalid rfc3339 timestamp: expected 'T' but found 'Z'"));
-    case!("2019-03-26+01:00" => Err("invalid rfc3339 timestamp: expected 'T' but found '+'"));
-    case!("2019-03-26-04:00" => Err("invalid rfc3339 timestamp: expected 'T' but found '-'"));
-    case!("2019-03-26T10:00-0400" => Err("invalid rfc3339 timestamp: invalid time"));
-    case!("+0002019-03-26T14:00Z" => Err("invalid rfc3339 timestamp: invalid date"));
-    case!("+2019-03-26T14:00Z" => Err("invalid rfc3339 timestamp: invalid date"));
-    case!("002019-03-26T14:00Z" => Err("invalid rfc3339 timestamp: invalid date"));
-    case!("019-03-26T14:00Z" => Err("invalid rfc3339 timestamp: invalid date"));
-    case!("2019-03-26T10:00Q" => Err("invalid rfc3339 timestamp: invalid time"));
-    case!("2019-03-26T10:00T" => Err("invalid rfc3339 timestamp: invalid time"));
-    case!("2019-03-26Q" => Err("invalid rfc3339 timestamp: expected 'T' but found 'Q'"));
-    case!("2019-03-26T" => Err("invalid rfc3339 timestamp: invalid time"));
-    case!("2019-03-26 14:00Z" => Err("invalid rfc3339 timestamp: expected 'T' but found ' '"));
-    case!("2019-03-26T14:00:00." => Err("invalid rfc3339 timestamp: empty fractional seconds"));
+    #[test]
+    fn test_validate_strict_rfc3339() {
+        macro_rules! case {
+            ($s:expr => Ok) => {
+                assert_eq!(validate_strict_rfc3339($s), Ok(()))
+            };
+            ($s:expr => Err($e:expr)) => {
+                assert_eq!(validate_strict_rfc3339($s).unwrap_err().to_string(), $e)
+            };
+        }
+
+        case!("1972-06-30T23:59:60Z" => Ok);
+        case!("2019-03-26T14:00:00.9Z" => Ok);
+        case!("2019-03-26T14:00:00.4999Z" => Ok);
+        case!("2019-03-26T14:00:00.4999+10:00" => Ok);
+        case!("2019-03-26t14:00Z" => Err("invalid rfc3339 timestamp: expected 'T' but found 't'"));
+        case!("2019-03-26T14:00z" => Err("invalid rfc3339 timestamp: invalid time"));
+        case!("2019-03-26T14:00:00,999Z" => Err("invalid rfc3339 timestamp: expected 'Z', '+' or '-' but found ','"));
+        case!("2019-03-26T10:00-04" => Err("invalid rfc3339 timestamp: invalid time"));
+        case!("2019-03-26T14:00.9Z" => Err("invalid rfc3339 timestamp: invalid time"));
+        case!("20190326T1400Z" => Err("invalid rfc3339 timestamp: invalid date"));
+        case!("2019-02-30" => Err("invalid rfc3339 timestamp: expected 'T' but found end of string"));
+        case!("2019-03-25T24:01Z" => Err("invalid rfc3339 timestamp: invalid time"));
+        case!("2019-03-26T14:00+24:00" => Err("invalid rfc3339 timestamp: invalid time"));
+        case!("2019-03-26Z" => Err("invalid rfc3339 timestamp: expected 'T' but found 'Z'"));
+        case!("2019-03-26+01:00" => Err("invalid rfc3339 timestamp: expected 'T' but found '+'"));
+        case!("2019-03-26-04:00" => Err("invalid rfc3339 timestamp: expected 'T' but found '-'"));
+        case!("2019-03-26T10:00-0400" => Err("invalid rfc3339 timestamp: invalid time"));
+        case!("+0002019-03-26T14:00Z" => Err("invalid rfc3339 timestamp: invalid date"));
+        case!("+2019-03-26T14:00Z" => Err("invalid rfc3339 timestamp: invalid date"));
+        case!("002019-03-26T14:00Z" => Err("invalid rfc3339 timestamp: invalid date"));
+        case!("019-03-26T14:00Z" => Err("invalid rfc3339 timestamp: invalid date"));
+        case!("2019-03-26T10:00Q" => Err("invalid rfc3339 timestamp: invalid time"));
+        case!("2019-03-26T10:00T" => Err("invalid rfc3339 timestamp: invalid time"));
+        case!("2019-03-26Q" => Err("invalid rfc3339 timestamp: expected 'T' but found 'Q'"));
+        case!("2019-03-26T" => Err("invalid rfc3339 timestamp: invalid time"));
+        case!("2019-03-26 14:00Z" => Err("invalid rfc3339 timestamp: expected 'T' but found ' '"));
+        case!("2019-03-26T14:00:00." => Err("invalid rfc3339 timestamp: empty fractional seconds"));
+    }
 }

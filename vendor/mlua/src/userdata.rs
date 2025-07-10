@@ -26,9 +26,13 @@ use {
 
 // Re-export for convenience
 pub(crate) use cell::UserDataStorage;
-pub use cell::{UserDataRef, UserDataRefMut};
+pub use r#ref::{UserDataRef, UserDataRefMut};
 pub use registry::UserDataRegistry;
 pub(crate) use registry::{RawUserDataRegistry, UserDataProxy};
+pub(crate) use util::{
+    borrow_userdata_scoped, borrow_userdata_scoped_mut, collect_userdata, init_userdata_metatable,
+    TypeIdHints,
+};
 
 /// Kinds of metamethods that can be overridden.
 ///
@@ -622,7 +626,9 @@ impl AnyUserData {
     /// Checks whether the type of this userdata is `T`.
     #[inline]
     pub fn is<T: 'static>(&self) -> bool {
-        self.inspect::<T, _, _>(|_| Ok(())).is_ok()
+        let type_id = self.type_id();
+        // We do not use wrapped types here, rather prefer to check the "real" type of the userdata
+        matches!(type_id, Some(type_id) if type_id == TypeId::of::<T>())
     }
 
     /// Borrow this userdata immutably if it is of type `T`.
@@ -637,7 +643,8 @@ impl AnyUserData {
     /// [`DataTypeMismatch`]: crate::Error::UserDataTypeMismatch
     #[inline]
     pub fn borrow<T: 'static>(&self) -> Result<UserDataRef<T>> {
-        self.inspect(|ud| ud.try_borrow_owned())
+        let lua = self.0.lua.lock();
+        unsafe { UserDataRef::borrow_from_stack(&lua, lua.ref_thread(), self.0.index) }
     }
 
     /// Borrow this userdata immutably if it is of type `T`, passing the borrowed value
@@ -645,7 +652,10 @@ impl AnyUserData {
     ///
     /// This method is the only way to borrow scoped userdata (created inside [`Lua::scope`]).
     pub fn borrow_scoped<T: 'static, R>(&self, f: impl FnOnce(&T) -> R) -> Result<R> {
-        self.inspect(|ud| ud.try_borrow_scoped(|ud| f(ud)))
+        let lua = self.0.lua.lock();
+        let type_id = lua.get_userdata_ref_type_id(&self.0)?;
+        let type_hints = TypeIdHints::new::<T>();
+        unsafe { borrow_userdata_scoped(lua.ref_thread(), self.0.index, type_id, type_hints, f) }
     }
 
     /// Borrow this userdata mutably if it is of type `T`.
@@ -660,7 +670,8 @@ impl AnyUserData {
     /// [`UserDataTypeMismatch`]: crate::Error::UserDataTypeMismatch
     #[inline]
     pub fn borrow_mut<T: 'static>(&self) -> Result<UserDataRefMut<T>> {
-        self.inspect(|ud| ud.try_borrow_owned_mut())
+        let lua = self.0.lua.lock();
+        unsafe { UserDataRefMut::borrow_from_stack(&lua, lua.ref_thread(), self.0.index) }
     }
 
     /// Borrow this userdata mutably if it is of type `T`, passing the borrowed value
@@ -668,7 +679,10 @@ impl AnyUserData {
     ///
     /// This method is the only way to borrow scoped userdata (created inside [`Lua::scope`]).
     pub fn borrow_mut_scoped<T: 'static, R>(&self, f: impl FnOnce(&mut T) -> R) -> Result<R> {
-        self.inspect(|ud| ud.try_borrow_scoped_mut(|ud| f(ud)))
+        let lua = self.0.lua.lock();
+        let type_id = lua.get_userdata_ref_type_id(&self.0)?;
+        let type_hints = TypeIdHints::new::<T>();
+        unsafe { borrow_userdata_scoped_mut(lua.ref_thread(), self.0.index, type_id, type_hints, f) }
     }
 
     /// Takes the value out of this userdata.
@@ -687,9 +701,11 @@ impl AnyUserData {
             let type_id = lua.push_userdata_ref(&self.0)?;
             match type_id {
                 Some(type_id) if type_id == TypeId::of::<T>() => {
-                    // Try to borrow userdata exclusively
-                    let _ = (*get_userdata::<UserDataStorage<T>>(state, -1)).try_borrow_mut()?;
-                    take_userdata::<UserDataStorage<T>>(state).into_inner()
+                    if (*get_userdata::<UserDataStorage<T>>(state, -1)).has_exclusive_access() {
+                        take_userdata::<UserDataStorage<T>>(state).into_inner()
+                    } else {
+                        Err(Error::UserDataBorrowMutError)
+                    }
                 }
                 _ => Err(Error::UserDataTypeMismatch),
             }
@@ -910,6 +926,15 @@ impl AnyUserData {
         self.0.to_pointer()
     }
 
+    /// Returns [`TypeId`] of this userdata if it is registered and `'static`.
+    ///
+    /// This method is not available for scoped userdata.
+    #[inline]
+    pub fn type_id(&self) -> Option<TypeId> {
+        let lua = self.0.lua.lock();
+        lua.get_userdata_ref_type_id(&self.0).ok().flatten()
+    }
+
     /// Returns a type name of this `UserData` (from a metatable field).
     pub(crate) fn type_name(&self) -> Result<Option<StdString>> {
         let lua = self.0.lua.lock();
@@ -964,24 +989,6 @@ impl AnyUserData {
             Ok::<_, Error>((*ud).is_serializable())
         };
         is_serializable().unwrap_or(false)
-    }
-
-    pub(crate) fn inspect<T, F, R>(&self, func: F) -> Result<R>
-    where
-        T: 'static,
-        F: FnOnce(&UserDataStorage<T>) -> Result<R>,
-    {
-        let lua = self.0.lua.lock();
-        unsafe {
-            let type_id = lua.get_userdata_ref_type_id(&self.0)?;
-            match type_id {
-                Some(type_id) if type_id == TypeId::of::<T>() => {
-                    let ud = get_userdata::<UserDataStorage<T>>(lua.ref_thread(), self.0.index);
-                    func(&*ud)
-                }
-                _ => Err(Error::UserDataTypeMismatch),
-            }
-        }
     }
 }
 
@@ -1106,6 +1113,7 @@ where
 mod cell;
 mod lock;
 mod object;
+mod r#ref;
 mod registry;
 mod util;
 

@@ -17,7 +17,6 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use http::StatusCode;
 
 use super::core::KoofrCore;
@@ -38,23 +37,17 @@ impl KoofrWriter {
     }
 }
 
-#[async_trait]
 impl oio::OneShotWrite for KoofrWriter {
-    async fn write_once(&self, bs: &dyn oio::WriteBuf) -> Result<()> {
+    async fn write_once(&self, bs: Buffer) -> Result<Metadata> {
         self.core.ensure_dir_exists(&self.path).await?;
-
-        let bs = bs.bytes(bs.remaining());
 
         let resp = self.core.put(&self.path, bs).await?;
 
         let status = resp.status();
 
         match status {
-            StatusCode::OK | StatusCode::CREATED => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::OK | StatusCode::CREATED => Ok(Metadata::default()),
+            _ => Err(parse_error(resp)),
         }
     }
 }

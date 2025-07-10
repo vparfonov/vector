@@ -13,24 +13,83 @@
 edition = "2021"
 rust-version = "1.56"
 name = "grok"
-version = "2.0.0"
-authors = ["Michael Nitschinger <michael@nitschinger.at>"]
+version = "2.1.0"
+authors = [
+    "Matt Mastracci <matthew@mastracci.com>",
+    "Michael Nitschinger <michael@nitschinger.at>",
+]
 build = "build.rs"
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = """
-A rust implementation of the popular java & ruby grok library
+A Rust implementation of the popular Java & Ruby grok library
 which allows easy text and log file processing with composable 
 patterns.
 """
-homepage = "https://github.com/daschl/grok"
-documentation = "https://docs.rs/grok"
+homepage = "https://github.com/mmastrac/grok"
+documentation = "https://docs.rs/grok2"
 readme = "README.md"
 categories = ["text-processing"]
 license = "Apache-2.0"
-repository = "https://github.com/daschl/grok"
-resolver = "2"
+repository = "https://github.com/mmastrac/grok"
+
+[features]
+default = ["onig"]
+fancy-regex = ["dep:fancy-regex"]
+onig = []
+pcre2 = ["dep:pcre2"]
+regex = ["dep:regex"]
+
+[lib]
+name = "grok"
+path = "src/lib.rs"
+
+[[example]]
+name = "simple"
+path = "examples/simple.rs"
+
+[[bench]]
+name = "apache"
+path = "benches/apache.rs"
+
+[[bench]]
+name = "log"
+path = "benches/log.rs"
+
+[[bench]]
+name = "simple"
+path = "benches/simple.rs"
+
+[dependencies.fancy-regex]
+version = "0.14"
+features = [
+    "std",
+    "unicode",
+    "perf",
+]
+optional = true
+default-features = false
 
 [dependencies.onig]
-version = "6.3"
+version = "6.5"
+default-features = false
+
+[dependencies.pcre2]
+version = "0.2.9"
+optional = true
+
+[dependencies.regex]
+version = "1"
+features = [
+    "std",
+    "unicode",
+    "perf",
+    "perf-dfa-full",
+]
+optional = true
 default-features = false
 
 [build-dependencies.glob]

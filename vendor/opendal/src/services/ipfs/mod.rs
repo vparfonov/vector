@@ -15,8 +15,17 @@
 // specific language governing permissions and limitations
 // under the License.
 
-mod backend;
-pub use backend::IpfsBuilder as Ipfs;
-
+#[cfg(feature = "services-ipfs")]
 mod error;
+#[cfg(feature = "services-ipfs")]
 mod ipld;
+
+#[cfg(feature = "services-ipfs")]
+mod backend;
+#[cfg(feature = "services-ipfs")]
+pub use backend::IpfsBuilder as Ipfs;
+#[cfg(feature = "services-ipfs")]
+mod core;
+
+mod config;
+pub use config::IpfsConfig;

@@ -21,14 +21,14 @@ impl<'a, G> Frozen<'a, G> {
 
 /// Deref allows transparent access to all shared reference (read-only)
 /// functionality in the underlying graph.
-impl<G> Deref for Frozen<'_, G> {
+impl<'a, G> Deref for Frozen<'a, G> {
     type Target = G;
     fn deref(&self) -> &G {
         self.0
     }
 }
 
-impl<G, I> Index<I> for Frozen<'_, G>
+impl<'a, G, I> Index<I> for Frozen<'a, G>
 where
     G: Index<I>,
 {
@@ -38,7 +38,7 @@ where
     }
 }
 
-impl<G, I> IndexMut<I> for Frozen<'_, G>
+impl<'a, G, I> IndexMut<I> for Frozen<'a, G>
 where
     G: IndexMut<I>,
 {
@@ -47,7 +47,7 @@ where
     }
 }
 
-impl<N, E, Ty, Ix> Frozen<'_, Graph<N, E, Ty, Ix>>
+impl<'a, N, E, Ty, Ix> Frozen<'a, Graph<N, E, Ty, Ix>>
 where
     Ty: EdgeType,
     Ix: IndexType,
@@ -80,7 +80,7 @@ macro_rules! access0 {
     };
 }
 
-impl<G> GraphBase for Frozen<'_, G>
+impl<'a, G> GraphBase for Frozen<'a, G>
 where
     G: GraphBase,
 {

@@ -1,7 +1,7 @@
 //! Generate valid parse trees.
 
 use crate::grammar::repr::*;
-use rand::prelude::*;
+use rand::{self, Rng};
 use std::iter::Iterator;
 
 #[derive(PartialEq, Eq)]
@@ -10,35 +10,31 @@ pub enum ParseTree {
     Terminal(TerminalString),
 }
 
-pub fn random_parse_tree(
-    grammar: &Grammar,
-    symbol: NonterminalString,
-    rng: &mut rand_chacha::ChaCha8Rng,
-) -> ParseTree {
-    let mut generator = Generator {
+pub fn random_parse_tree(grammar: &Grammar, symbol: NonterminalString) -> ParseTree {
+    let mut gen = Generator {
         grammar,
-        rng,
+        rng: rand::thread_rng(),
         depth: 0,
     };
     loop {
         // sometimes, the random walk overflows the stack, so we have a max, and if
         // it is exceeded, we just try again
-        if let Some(result) = generator.nonterminal(symbol.clone()) {
+        if let Some(result) = gen.nonterminal(symbol.clone()) {
             return result;
         }
-        generator.depth = 0;
+        gen.depth = 0;
     }
 }
 
-struct Generator<'grammar, 'rng> {
+struct Generator<'grammar> {
     grammar: &'grammar Grammar,
-    rng: &'rng mut rand_chacha::ChaCha8Rng,
+    rng: rand::rngs::ThreadRng,
     depth: u32,
 }
 
 const MAX_DEPTH: u32 = 7000;
 
-impl Generator<'_, '_> {
+impl<'grammar> Generator<'grammar> {
     fn nonterminal(&mut self, nt: NonterminalString) -> Option<ParseTree> {
         if self.depth > MAX_DEPTH {
             return None;

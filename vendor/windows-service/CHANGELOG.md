@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 
 
+## [0.8.0] - 2025-02-19
+### Added
+- Add missing ServiceAccess flags `READ_CONTROL`, `WRITE_DAC` and `WRITE_OWNER`. 
+
+### Changed
+- Upgrade `windows-sys` dependency to 0.59 and bump the MSRV to 1.60.0.
+
+
 ## [0.7.0] - 2024-04-12
 ### Added
 - Breaking: Add support for user-defined control codes in services.

@@ -1,7 +1,8 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
 use crate::{
-    Cpu, CpuRefreshKind, LoadAvg, MemoryRefreshKind, Pid, Process, ProcessesToUpdate, ProcessInner, ProcessRefreshKind,
+    Cpu, CpuRefreshKind, LoadAvg, MemoryRefreshKind, Pid, Process, ProcessInner,
+    ProcessRefreshKind, ProcessesToUpdate,
 };
 
 use std::cell::UnsafeCell;
@@ -10,7 +11,8 @@ use std::ffi::CStr;
 use std::mem::MaybeUninit;
 use std::path::{Path, PathBuf};
 use std::ptr::NonNull;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicPtr, AtomicUsize, Ordering};
+use std::sync::OnceLock;
 use std::time::{Duration, SystemTime};
 
 use crate::sys::cpu::{physical_core_count, CpusWrapper};
@@ -147,10 +149,6 @@ impl SystemInner {
         &self.cpus.cpus
     }
 
-    pub(crate) fn physical_core_count(&self) -> Option<usize> {
-        physical_core_count()
-    }
-
     pub(crate) fn total_memory(&self) -> u64 {
         self.mem_total
     }
@@ -225,7 +223,7 @@ impl SystemInner {
     pub(crate) fn long_os_version() -> Option<String> {
         let mut os_release: [c_int; 2] = [0; 2];
         unsafe {
-            init_mib(b"kern.osrelease\0", &mut os_release);
+            init_mib(b"kern.version\0", &mut os_release);
             get_system_info(&os_release, None)
         }
     }
@@ -239,15 +237,26 @@ impl SystemInner {
     }
 
     pub(crate) fn kernel_version() -> Option<String> {
-        let mut kern_version: [c_int; 2] = [0; 2];
         unsafe {
-            init_mib(b"kern.version\0", &mut kern_version);
-            get_system_info(&kern_version, None)
+            let mut kern_version: libc::c_int = 0;
+            if get_sys_value_by_name(b"kern.osrevision\0", &mut kern_version) {
+                Some(kern_version.to_string())
+            } else {
+                None
+            }
         }
     }
 
     pub(crate) fn distribution_id() -> String {
         std::env::consts::OS.to_owned()
+    }
+
+    pub(crate) fn distribution_id_like() -> Vec<String> {
+        Vec::new()
+    }
+
+    pub(crate) fn kernel_name() -> Option<&'static str> {
+        Some("FreeBSD")
     }
 
     pub(crate) fn cpu_arch() -> Option<String> {
@@ -267,7 +276,17 @@ impl SystemInner {
             }
         }
     }
+
+    pub(crate) fn physical_core_count() -> Option<usize> {
+        physical_core_count()
+    }
 }
+
+#[derive(Clone, Copy)]
+pub(crate) struct PtrWrap<T: Copy>(pub *mut T);
+
+unsafe impl<T: Copy> Send for PtrWrap<T> {}
+unsafe impl<T: Copy> Sync for PtrWrap<T> {}
 
 impl SystemInner {
     unsafe fn refresh_procs(
@@ -275,13 +294,14 @@ impl SystemInner {
         processes_to_update: ProcessesToUpdate<'_>,
         refresh_kind: ProcessRefreshKind,
     ) -> usize {
+        let (op, arg) = match processes_to_update {
+            ProcessesToUpdate::Some(&[]) => return 0,
+            ProcessesToUpdate::Some(&[pid]) => (libc::KERN_PROC_PID, pid.as_u32() as c_int),
+            _ => (libc::KERN_PROC_PROC, 0),
+        };
+
         let mut count = 0;
-        let kvm_procs = libc::kvm_getprocs(
-            self.system_info.kd.as_ptr(),
-            libc::KERN_PROC_PROC,
-            0,
-            &mut count,
-        );
+        let kvm_procs = libc::kvm_getprocs(self.system_info.kd.as_ptr(), op, arg, &mut count);
         if count < 1 {
             sysinfo_debug!("kvm_getprocs returned nothing...");
             return 0;
@@ -327,11 +347,17 @@ impl SystemInner {
             let now = get_now();
             let proc_list = utils::WrapMap(UnsafeCell::new(&mut self.process_list));
 
+            // We cast into `*mut ()` because `c_void` isn't `Copy`...
+            //
+            // And we need `PtrWrap` because pointers aren't `Send` and `Sync`.
+            let kd = PtrWrap(kd() as *mut ());
+
             IterTrait::filter_map(crate::utils::into_iter(kvm_procs), |kproc| {
                 if !filter_callback(kproc, filter) {
                     return None;
                 }
                 let ret = super::process::get_process_data(
+                    kd,
                     kproc,
                     &proc_list,
                     page_size,
@@ -441,6 +467,21 @@ impl Zfs {
             None
         }
     }
+}
+
+fn kd() -> *mut libc::kvm_t {
+    static KD: OnceLock<AtomicPtr<libc::kvm_t>> = OnceLock::new();
+
+    KD.get_or_init(|| unsafe {
+        AtomicPtr::new(libc::kvm_open(
+            std::ptr::null(),
+            std::ptr::null(),
+            std::ptr::null(),
+            libc::O_RDONLY,
+            std::ptr::null_mut(),
+        ))
+    })
+    .load(Ordering::Relaxed)
 }
 
 /// This struct is used to get system information more easily.

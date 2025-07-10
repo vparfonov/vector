@@ -10,7 +10,6 @@ This service can be used to:
 - [ ] copy
 - [ ] rename
 - [ ] ~~list~~
-- [ ] scan
 - [ ] ~~presign~~
 - [ ] blocking
 
@@ -28,7 +27,7 @@ You can refer to [`MemcachedBuilder`]'s docs for more information
 
 ### Via Builder
 
-```rust
+```rust,no_run
 use anyhow::Result;
 use opendal::services::Memcached;
 use opendal::Operator;
@@ -36,12 +35,11 @@ use opendal::Operator;
 #[tokio::main]
 async fn main() -> Result<()> {
     // create memcached backend builder
-    let mut builder = Memcached::default();
-
-    builder.endpoint("tcp://127.0.0.1:11211");
-    // if you enable authentication, set username and password for authentication
-    // builder.username("admin");
-    // builder.password("password");
+    let mut builder = Memcached::default()
+        .endpoint("tcp://127.0.0.1:11211");
+        // if you enable authentication, set username and password for authentication
+        // builder.username("admin")
+        // builder.password("password");
 
     let op: Operator = Operator::new(builder)?.finish();
     Ok(())

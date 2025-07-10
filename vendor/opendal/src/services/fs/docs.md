@@ -11,7 +11,6 @@ This service can be used to:
 - [x] copy
 - [x] rename
 - [x] list
-- [ ] ~~scan~~
 - [ ] ~~presign~~
 - [x] blocking
 
@@ -26,7 +25,7 @@ You can refer to [`FsBuilder`]'s docs for more information
 ### Via Builder
 
 
-```rust
+```rust,no_run
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -36,11 +35,11 @@ use opendal::Operator;
 #[tokio::main]
 async fn main() -> Result<()> {
     // Create fs backend builder.
-    let mut builder = Fs::default();
-    // Set the root for fs, all operations will happen under this root.
-    //
-    // NOTE: the root must be absolute path.
-    builder.root("/tmp");
+    let mut builder = Fs::default()
+        // Set the root for fs, all operations will happen under this root.
+        //
+        // NOTE: the root must be absolute path.
+        .root("/tmp");
 
     // `Accessor` provides the low level APIs, we will use `Operator` normally.
     let op: Operator = Operator::new(builder)?.finish();

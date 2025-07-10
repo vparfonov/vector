@@ -11,7 +11,7 @@ thread_local! {
 
 struct ExpectedDebug<'a>(&'a str);
 
-impl Debug for ExpectedDebug<'_> {
+impl<'a> Debug for ExpectedDebug<'a> {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> Result<(), Error> {
         // Ignore trailing commas in multiline Debug representation.
         // Needed to work around rust-lang/rust#59076.

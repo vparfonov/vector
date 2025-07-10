@@ -46,7 +46,7 @@ impl ComponentFFI {
 
 // Used to get CPU information, not supported on iOS, or inside the default macOS sandbox.
 pub(crate) struct ComponentsInner {
-    components: Vec<Component>,
+    pub(crate) components: Vec<Component>,
     connection: Option<IoService>,
 }
 
@@ -77,31 +77,36 @@ impl ComponentsInner {
         &mut self.components
     }
 
-    pub(crate) fn refresh_list(&mut self) {
-        if let Some(ref connection) = self.connection {
-            let connection = connection.inner();
-            self.components.clear();
-            // getting CPU critical temperature
-            let critical_temp =
-                get_temperature(connection, &['T' as i8, 'C' as i8, '0' as i8, 'D' as i8, 0]);
+    pub(crate) fn refresh(&mut self) {
+        let Some(ref connection) = self.connection else {
+            sysinfo_debug!("No connection to IoService, skipping components refresh");
+            return;
+        };
+        let connection = connection.inner();
+        // getting CPU critical temperature
+        let critical_temp =
+            get_temperature(connection, &['T' as i8, 'C' as i8, '0' as i8, 'D' as i8, 0]);
 
-            for (id, v) in COMPONENTS_TEMPERATURE_IDS.iter() {
-                if let Some(c) =
-                    ComponentInner::new((*id).to_owned(), None, critical_temp, v, connection)
-                {
-                    self.components.push(Component { inner: c });
-                }
+        for (id, v) in COMPONENTS_TEMPERATURE_IDS.iter() {
+            if let Some(c) = self.components.iter_mut().find(|c| c.inner.label == *id) {
+                c.refresh();
+                c.inner.updated = true;
+            } else if let Some(c) =
+                ComponentInner::new((*id).to_owned(), None, critical_temp, v, connection)
+            {
+                self.components.push(Component { inner: c });
             }
         }
     }
 }
 
 pub(crate) struct ComponentInner {
-    temperature: f32,
+    temperature: Option<f32>,
     max: f32,
     critical: Option<f32>,
     label: String,
     ffi_part: ComponentFFI,
+    pub(crate) updated: bool,
 }
 
 impl ComponentInner {
@@ -115,20 +120,21 @@ impl ComponentInner {
     ) -> Option<Self> {
         let ffi_part = ComponentFFI::new(key, connection)?;
         ffi_part.temperature().map(|temperature| Self {
-            temperature,
+            temperature: Some(temperature),
             label,
             max: max.unwrap_or(temperature),
             critical,
             ffi_part,
+            updated: true,
         })
     }
 
-    pub(crate) fn temperature(&self) -> f32 {
+    pub(crate) fn temperature(&self) -> Option<f32> {
         self.temperature
     }
 
-    pub(crate) fn max(&self) -> f32 {
-        self.max
+    pub(crate) fn max(&self) -> Option<f32> {
+        Some(self.max)
     }
 
     pub(crate) fn critical(&self) -> Option<f32> {
@@ -140,10 +146,10 @@ impl ComponentInner {
     }
 
     pub(crate) fn refresh(&mut self) {
-        if let Some(temp) = self.ffi_part.temperature() {
-            self.temperature = temp;
-            if self.temperature > self.max {
-                self.max = self.temperature;
+        self.temperature = self.ffi_part.temperature();
+        if let Some(temperature) = self.temperature {
+            if temperature > self.max {
+                self.max = temperature;
             }
         }
     }
@@ -290,11 +296,12 @@ impl IoService {
         let mut iterator: ffi::io_iterator_t = 0;
 
         unsafe {
-            let matching_dictionary = ffi::IOServiceMatching(b"AppleSMC\0".as_ptr() as *const i8);
-            if matching_dictionary.is_null() {
+            let Some(matching_dictionary) =
+                ffi::IOServiceMatching(b"AppleSMC\0".as_ptr() as *const i8)
+            else {
                 sysinfo_debug!("IOServiceMatching call failed, `AppleSMC` not found");
                 return None;
-            }
+            };
             let result = ffi::IOServiceGetMatchingServices(
                 ffi::kIOMasterPortDefault,
                 matching_dictionary,

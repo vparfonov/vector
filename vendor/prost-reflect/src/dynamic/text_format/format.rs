@@ -3,10 +3,9 @@ use std::fmt::{self, Write};
 use prost::Message;
 
 use crate::{
-    descriptor::{GOOGLE_APIS_DOMAIN, GOOGLE_PROD_DOMAIN},
     dynamic::{
         fields::ValueAndDescriptor,
-        fmt_string,
+        fmt_string, get_type_url_message_name,
         text_format::FormatOptions,
         unknown::{UnknownField, UnknownFieldSet, UnknownFieldValue},
     },
@@ -42,7 +41,12 @@ where
             }
         }
 
-        let fields = message.fields.iter(&message.desc);
+        let fields = message.fields.iter(
+            &message.desc,
+            !self.options.skip_default_fields,
+            self.options.print_message_fields_in_index_order,
+        );
+
         if self.options.skip_unknown_fields {
             self.fmt_delimited(
                 fields.filter(|f| !matches!(f, ValueAndDescriptor::Unknown(..))),
@@ -85,7 +89,13 @@ where
                 write!(self.f, "{}", value)
             }
             Value::Message(message) => {
-                if message.fields.iter(&message.desc).all(|f| {
+                let mut fields = message.fields.iter(
+                    &message.desc,
+                    !self.options.skip_default_fields,
+                    self.options.print_message_fields_in_index_order,
+                );
+
+                if fields.all(|f| {
                     self.options.skip_unknown_fields && matches!(f, ValueAndDescriptor::Unknown(..))
                 }) {
                     self.f.write_str("{}")
@@ -292,10 +302,7 @@ fn as_any(message: &DynamicMessage) -> Option<(String, DynamicMessage)> {
     }
 
     let any = message.transcode_to::<prost_types::Any>().ok()?;
-    let message_name = any
-        .type_url
-        .strip_prefix(GOOGLE_APIS_DOMAIN)
-        .or_else(|| any.type_url.strip_prefix(GOOGLE_PROD_DOMAIN))?;
+    let message_name = get_type_url_message_name(&any.type_url).ok()?;
 
     let desc = message
         .desc
@@ -309,6 +316,7 @@ fn as_any(message: &DynamicMessage) -> Option<(String, DynamicMessage)> {
 #[cfg(feature = "text-format")]
 mod tests {
     use super::*;
+    use crate::ReflectMessage;
 
     fn fmt_unknown(value: &UnknownFieldSet) -> String {
         let mut string = String::new();
@@ -417,5 +425,17 @@ mod tests {
   2: 10
 }"#
         );
+    }
+
+    #[test]
+    fn fmt_include_default() {
+        let timestamp: prost_types::Timestamp = Default::default();
+        let message = timestamp.transcode_to_dynamic();
+
+        let mut string = String::new();
+        Writer::new(FormatOptions::new().skip_default_fields(false), &mut string)
+            .fmt_message(&message)
+            .unwrap();
+        assert_eq!(string, "seconds:0,nanos:0");
     }
 }

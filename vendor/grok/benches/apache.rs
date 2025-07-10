@@ -1,6 +1,5 @@
 #![feature(test)]
 
-extern crate grok;
 extern crate test;
 
 use grok::Grok;

@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "sqlx-sqlite"
-version = "0.8.5"
+version = "0.8.6"
 authors = [
     "Ryan Leckey <leckey.ryan@gmail.com>",
     "Austin Bonander <austin.bonander@gmail.com>",
@@ -23,6 +23,16 @@ description = "SQLite driver implementation for SQLx. Not for direct use; see th
 documentation = "https://docs.rs/sqlx"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/launchbadge/sqlx"
+
+[package.metadata.docs.rs]
+features = [
+    "bundled",
+    "any",
+    "json",
+    "chrono",
+    "time",
+    "uuid",
+]
 
 [dependencies.atoi]
 version = "2.0"
@@ -96,7 +106,7 @@ optional = true
 version = "0.7"
 
 [dependencies.sqlx-core]
-version = "=0.8.5"
+version = "=0.8.6"
 
 [dependencies.thiserror]
 version = "2.0.0"
@@ -122,7 +132,7 @@ version = "1.1.2"
 optional = true
 
 [dev-dependencies.sqlx]
-version = "=0.8.5"
+version = "=0.8.6"
 features = [
     "macros",
     "runtime-tokio",

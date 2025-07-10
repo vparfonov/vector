@@ -1,5 +1,5 @@
 /*
- * Copyright 2014-2023 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2014-2025 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -12,6 +12,7 @@
 #include <openssl/ct.h>
 #include "../ssl_local.h"
 #include "internal/cryptlib.h"
+#include "internal/ssl_unwrap.h"
 #include "statem_local.h"
 
 typedef struct {
@@ -158,7 +159,7 @@ int custom_ext_parse(SSL_CONNECTION *s, unsigned int context,
     if (meth->parse_cb == NULL)
         return 1;
 
-    if (meth->parse_cb(SSL_CONNECTION_GET_SSL(s), ext_type, context, ext_data,
+    if (meth->parse_cb(SSL_CONNECTION_GET_USER_SSL(s), ext_type, context, ext_data,
                        ext_size, x, chainidx, &al, meth->parse_arg) <= 0) {
         SSLfatal(s, al, SSL_R_BAD_EXTENSION);
         return 0;
@@ -207,7 +208,7 @@ int custom_ext_add(SSL_CONNECTION *s, int context, WPACKET *pkt, X509 *x,
             continue;
 
         if (meth->add_cb != NULL) {
-            int cb_retval = meth->add_cb(SSL_CONNECTION_GET_SSL(s),
+            int cb_retval = meth->add_cb(SSL_CONNECTION_GET_USER_SSL(s),
                                          meth->ext_type, context, &out,
                                          &outlen, x, chainidx, &al,
                                          meth->add_arg);
@@ -226,8 +227,8 @@ int custom_ext_add(SSL_CONNECTION *s, int context, WPACKET *pkt, X509 *x,
                 || (outlen > 0 && !WPACKET_memcpy(pkt, out, outlen))
                 || !WPACKET_close(pkt)) {
             if (meth->free_cb != NULL)
-                meth->free_cb(SSL_CONNECTION_GET_SSL(s), meth->ext_type, context,
-                              out, meth->add_arg);
+                meth->free_cb(SSL_CONNECTION_GET_USER_SSL(s), meth->ext_type,
+                              context, out, meth->add_arg);
             if (!for_comp)
                 SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
             return 0;
@@ -238,7 +239,7 @@ int custom_ext_add(SSL_CONNECTION *s, int context, WPACKET *pkt, X509 *x,
              */
             if (!ossl_assert((meth->ext_flags & SSL_EXT_FLAG_SENT) == 0)) {
                 if (meth->free_cb != NULL)
-                    meth->free_cb(SSL_CONNECTION_GET_SSL(s), meth->ext_type,
+                    meth->free_cb(SSL_CONNECTION_GET_USER_SSL(s), meth->ext_type,
                                   context, out, meth->add_arg);
                 if (!for_comp)
                     SSLfatal(s, SSL_AD_INTERNAL_ERROR, ERR_R_INTERNAL_ERROR);
@@ -252,8 +253,8 @@ int custom_ext_add(SSL_CONNECTION *s, int context, WPACKET *pkt, X509 *x,
             meth->ext_flags |= SSL_EXT_FLAG_SENT;
         }
         if (meth->free_cb != NULL)
-            meth->free_cb(SSL_CONNECTION_GET_SSL(s), meth->ext_type, context,
-                          out, meth->add_arg);
+            meth->free_cb(SSL_CONNECTION_GET_USER_SSL(s), meth->ext_type,
+                          context, out, meth->add_arg);
     }
     return 1;
 }

@@ -10,7 +10,6 @@ This service can be used to:
 - [x] copy
 - [x] rename
 - [ ] ~~list~~
-- [ ] scan
 - [ ] ~~presign~~
 - [ ] blocking
 
@@ -27,15 +26,15 @@ You can refer to [`FoundationdbBuilder`]'s docs for more information
 
 ### Via Builder
 
-```rust
+```rust,no_run
 use anyhow::Result;
 use opendal::services::Foundationdb;
 use opendal::Operator;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut builder = Foundationdb::default();
-    builder.config_path("/etc/foundationdb/foundationdb.conf");
+    let mut builder = Foundationdb::default()
+        .config_path("/etc/foundationdb/foundationdb.conf");
 
     let op: Operator = Operator::new(builder)?.finish();
     Ok(())

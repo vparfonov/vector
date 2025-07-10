@@ -11,10 +11,16 @@
 
 [package]
 edition = "2021"
-rust-version = "1.58.0"
+rust-version = "1.60.0"
 name = "windows-service"
-version = "0.7.0"
+version = "0.8.0"
 authors = ["Mullvad VPN"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A crate that provides facilities for management and implementation of windows services"
 readme = "README.md"
 keywords = [
@@ -32,6 +38,38 @@ repository = "https://github.com/mullvad/windows-service-rs"
 [package.metadata.docs.rs]
 default-target = "x86_64-pc-windows-msvc"
 
+[lib]
+name = "windows_service"
+path = "src/lib.rs"
+
+[[example]]
+name = "install_service"
+path = "examples/install_service.rs"
+
+[[example]]
+name = "notify_service"
+path = "examples/notify_service.rs"
+
+[[example]]
+name = "pause_continue"
+path = "examples/pause_continue.rs"
+
+[[example]]
+name = "ping_service"
+path = "examples/ping_service.rs"
+
+[[example]]
+name = "service_config"
+path = "examples/service_config.rs"
+
+[[example]]
+name = "service_failure_actions"
+path = "examples/service_failure_actions.rs"
+
+[[example]]
+name = "uninstall_service"
+path = "examples/uninstall_service.rs"
+
 [target."cfg(windows)".dependencies.bitflags]
 version = "2.3"
 
@@ -39,10 +77,9 @@ version = "2.3"
 version = "1"
 
 [target."cfg(windows)".dependencies.windows-sys]
-version = "0.52.0"
+version = "0.59.0"
 features = [
     "Win32_Foundation",
-    "Win32_Security",
     "Win32_Storage_FileSystem",
     "Win32_System_Power",
     "Win32_System_RemoteDesktop",

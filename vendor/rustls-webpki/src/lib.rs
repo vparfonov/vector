@@ -26,8 +26,8 @@
 //! | `ring` | Enable use of the *ring* crate for cryptography. |
 //! | `aws_lc_rs` | Enable use of the aws-lc-rs crate for cryptography. |
 
-#![cfg_attr(not(feature = "std"), no_std)]
-#![warn(unreachable_pub)]
+#![no_std]
+#![warn(elided_lifetimes_in_paths, unreachable_pub, clippy::use_self)]
 #![deny(missing_docs, clippy::as_conversions)]
 #![allow(
     clippy::len_without_is_empty,
@@ -39,6 +39,9 @@
 )]
 // Enable documentation for all features on docs.rs
 #![cfg_attr(docsrs, feature(doc_cfg, doc_auto_cfg))]
+
+#[cfg(any(feature = "std", test))]
+extern crate std;
 
 #[cfg(any(test, feature = "alloc"))]
 #[cfg_attr(test, macro_use)]
@@ -54,6 +57,7 @@ mod end_entity;
 mod error;
 #[cfg(feature = "ring")]
 mod ring_algs;
+mod rpk_entity;
 mod signed_data;
 mod subject_name;
 mod time;
@@ -69,11 +73,13 @@ pub(crate) mod test_utils;
 pub use {
     cert::Cert,
     crl::{
-        BorrowedCertRevocationList, BorrowedRevokedCert, CertRevocationList, RevocationCheckDepth,
-        RevocationOptions, RevocationOptionsBuilder, RevocationReason, UnknownStatusPolicy,
+        BorrowedCertRevocationList, BorrowedRevokedCert, CertRevocationList, ExpirationPolicy,
+        RevocationCheckDepth, RevocationOptions, RevocationOptionsBuilder, RevocationReason,
+        UnknownStatusPolicy,
     },
     end_entity::EndEntityCert,
     error::{DerTypeId, Error},
+    rpk_entity::RawPublicKeyEntity,
     signed_data::alg_id,
     trust_anchor::anchor_from_trusted_cert,
     verify_cert::KeyUsage,
@@ -105,10 +111,10 @@ pub mod ring {
 pub mod aws_lc_rs {
     pub use super::aws_lc_rs_algs::{
         ECDSA_P256_SHA256, ECDSA_P256_SHA384, ECDSA_P384_SHA256, ECDSA_P384_SHA384,
-        ECDSA_P521_SHA512, ED25519, RSA_PKCS1_2048_8192_SHA256, RSA_PKCS1_2048_8192_SHA384,
-        RSA_PKCS1_2048_8192_SHA512, RSA_PKCS1_3072_8192_SHA384,
-        RSA_PSS_2048_8192_SHA256_LEGACY_KEY, RSA_PSS_2048_8192_SHA384_LEGACY_KEY,
-        RSA_PSS_2048_8192_SHA512_LEGACY_KEY,
+        ECDSA_P521_SHA256, ECDSA_P521_SHA384, ECDSA_P521_SHA512, ED25519,
+        RSA_PKCS1_2048_8192_SHA256, RSA_PKCS1_2048_8192_SHA384, RSA_PKCS1_2048_8192_SHA512,
+        RSA_PKCS1_3072_8192_SHA384, RSA_PSS_2048_8192_SHA256_LEGACY_KEY,
+        RSA_PSS_2048_8192_SHA384_LEGACY_KEY, RSA_PSS_2048_8192_SHA512_LEGACY_KEY,
     };
 }
 
@@ -148,6 +154,10 @@ pub static ALL_VERIFICATION_ALGS: &[&dyn types::SignatureVerificationAlgorithm] 
     aws_lc_rs::ECDSA_P384_SHA256,
     #[cfg(feature = "aws_lc_rs")]
     aws_lc_rs::ECDSA_P384_SHA384,
+    #[cfg(feature = "aws_lc_rs")]
+    aws_lc_rs::ECDSA_P521_SHA256,
+    #[cfg(feature = "aws_lc_rs")]
+    aws_lc_rs::ECDSA_P521_SHA384,
     #[cfg(feature = "aws_lc_rs")]
     aws_lc_rs::ECDSA_P521_SHA512,
     #[cfg(feature = "aws_lc_rs")]

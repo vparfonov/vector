@@ -204,14 +204,6 @@ impl<'a> DnsName<'a> {
             Err(_) => Err(s),
         }
     }
-
-    /// Produces a borrowed [`DnsName`] from a borrowed [`str`].
-    pub const fn try_from_str(s: &str) -> Result<DnsName<'_>, InvalidDnsNameError> {
-        match validate(s.as_bytes()) {
-            Ok(_) => Ok(DnsName(DnsNameInner::Borrowed(s))),
-            Err(err) => Err(err),
-        }
-    }
 }
 
 #[cfg(feature = "alloc")]
@@ -227,7 +219,8 @@ impl<'a> TryFrom<&'a str> for DnsName<'a> {
     type Error = InvalidDnsNameError;
 
     fn try_from(value: &'a str) -> Result<Self, Self::Error> {
-        DnsName::try_from_str(value)
+        validate(value.as_bytes())?;
+        Ok(Self(DnsNameInner::Borrowed(value)))
     }
 }
 
@@ -307,7 +300,7 @@ impl fmt::Display for InvalidDnsNameError {
 #[cfg(feature = "std")]
 impl StdError for InvalidDnsNameError {}
 
-const fn validate(input: &[u8]) -> Result<(), InvalidDnsNameError> {
+fn validate(input: &[u8]) -> Result<(), InvalidDnsNameError> {
     enum State {
         Start,
         Next,
@@ -330,19 +323,17 @@ const fn validate(input: &[u8]) -> Result<(), InvalidDnsNameError> {
         return Err(InvalidDnsNameError);
     }
 
-    let mut idx = 0;
-    while idx < input.len() {
-        let ch = input[idx];
+    for ch in input {
         state = match (state, ch) {
             (Start | Next | NextAfterNumericOnly | Hyphen { .. }, b'.') => {
-                return Err(InvalidDnsNameError);
+                return Err(InvalidDnsNameError)
             }
             (Subsequent { .. }, b'.') => Next,
             (NumericOnly { .. }, b'.') => NextAfterNumericOnly,
             (Subsequent { len } | NumericOnly { len } | Hyphen { len }, _)
                 if len >= MAX_LABEL_LENGTH =>
             {
-                return Err(InvalidDnsNameError);
+                return Err(InvalidDnsNameError)
             }
             (Start | Next | NextAfterNumericOnly, b'0'..=b'9') => NumericOnly { len: 1 },
             (NumericOnly { len }, b'0'..=b'9') => NumericOnly { len: len + 1 },
@@ -358,7 +349,6 @@ const fn validate(input: &[u8]) -> Result<(), InvalidDnsNameError> {
             ) => Subsequent { len: len + 1 },
             _ => return Err(InvalidDnsNameError),
         };
-        idx += 1;
     }
 
     if matches!(
@@ -837,14 +827,8 @@ mod tests {
         ("a123b.com", true),
         ("numeric-only-middle-label.4.com", true),
         ("1000-sans.badssl.com", true),
-        (
-            "twohundredandfiftythreecharacters.twohundredandfiftythreecharacters.twohundredandfiftythreecharacters.twohundredandfiftythreecharacters.twohundredandfiftythreecharacters.twohundredandfiftythreecharacters.twohundredandfiftythreecharacters.twohundredandfi",
-            true,
-        ),
-        (
-            "twohundredandfiftyfourcharacters.twohundredandfiftyfourcharacters.twohundredandfiftyfourcharacters.twohundredandfiftyfourcharacters.twohundredandfiftyfourcharacters.twohundredandfiftyfourcharacters.twohundredandfiftyfourcharacters.twohundredandfiftyfourc",
-            false,
-        ),
+        ("twohundredandfiftythreecharacters.twohundredandfiftythreecharacters.twohundredandfiftythreecharacters.twohundredandfiftythreecharacters.twohundredandfiftythreecharacters.twohundredandfiftythreecharacters.twohundredandfiftythreecharacters.twohundredandfi", true),
+        ("twohundredandfiftyfourcharacters.twohundredandfiftyfourcharacters.twohundredandfiftyfourcharacters.twohundredandfiftyfourcharacters.twohundredandfiftyfourcharacters.twohundredandfiftyfourcharacters.twohundredandfiftyfourcharacters.twohundredandfiftyfourc", false),
     ];
 
     #[cfg(feature = "alloc")]

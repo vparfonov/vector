@@ -10,7 +10,6 @@ This service can be used to:
 - [ ] ~~copy~~
 - [ ] ~~rename~~
 - [ ] ~~list~~
-- [ ] ~~scan~~
 - [ ] ~~presign~~
 - [ ] blocking
 
@@ -30,7 +29,7 @@ You can refer to [`HttpBuilder`]'s docs for more information
 
 ### Via Builder
 
-```rust
+```rust,no_run
 use anyhow::Result;
 use opendal::services::Http;
 use opendal::Operator;
@@ -38,9 +37,7 @@ use opendal::Operator;
 #[tokio::main]
 async fn main() -> Result<()> {
     // create http backend builder
-    let mut builder = Http::default();
-
-    builder.endpoint("127.0.0.1");
+    let mut builder = Http::default().endpoint("127.0.0.1");
 
     let op: Operator = Operator::new(builder)?.finish();
     Ok(())

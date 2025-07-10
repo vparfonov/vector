@@ -3,7 +3,10 @@
 use crate::sys::cpu::{get_physical_core_count, CpusWrapper};
 use crate::sys::process::{compute_cpu_usage, refresh_procs};
 use crate::sys::utils::{get_all_utf8_data, to_u64};
-use crate::{Cpu, CpuRefreshKind, LoadAvg, MemoryRefreshKind, Pid, Process, ProcessesToUpdate, ProcessRefreshKind};
+use crate::{
+    Cpu, CpuRefreshKind, LoadAvg, MemoryRefreshKind, Pid, Process, ProcessRefreshKind,
+    ProcessesToUpdate,
+};
 
 use libc::{self, c_char, sysconf, _SC_CLK_TCK, _SC_HOST_NAME_MAX, _SC_PAGESIZE};
 
@@ -177,7 +180,8 @@ impl SystemInner {
         if !refresh_kind.cpu() {
             return;
         }
-        self.cpus.refresh_if_needed(true, CpuRefreshKind::new().with_cpu_usage());
+        self.cpus
+            .refresh_if_needed(true, CpuRefreshKind::nothing().with_cpu_usage());
 
         if self.cpus.is_empty() {
             sysinfo_debug!("cannot compute processes CPU usage: no CPU found...");
@@ -276,10 +280,7 @@ impl SystemInner {
             processes_to_update,
             refresh_kind,
         );
-        if matches!(processes_to_update, ProcessesToUpdate::All) {
-            self.update_procs_cpu(refresh_kind);
-            self.cpus.set_need_cpus_update();
-        }
+        self.update_procs_cpu(refresh_kind);
         nb_updated
     }
 
@@ -305,10 +306,6 @@ impl SystemInner {
 
     pub(crate) fn cpus(&self) -> &[Cpu] {
         &self.cpus.cpus
-    }
-
-    pub(crate) fn physical_core_count(&self) -> Option<usize> {
-        get_physical_core_count()
     }
 
     pub(crate) fn total_memory(&self) -> u64 {
@@ -388,19 +385,47 @@ impl SystemInner {
         get_system_info_android(InfoType::Name)
     }
 
+    #[cfg(not(target_os = "android"))]
     pub(crate) fn long_os_version() -> Option<String> {
-        #[cfg(target_os = "android")]
-        let system_name = "Android";
+        let mut long_name = "Linux".to_owned();
 
-        #[cfg(not(target_os = "android"))]
-        let system_name = "Linux";
+        let distro_name = Self::name();
+        let distro_version = Self::os_version();
+        if let Some(distro_version) = &distro_version {
+            // "Linux (Ubuntu 24.04)"
+            long_name.push_str(" (");
+            long_name.push_str(distro_name.as_deref().unwrap_or("unknown"));
+            long_name.push(' ');
+            long_name.push_str(distro_version);
+            long_name.push(')');
+        } else if let Some(distro_name) = &distro_name {
+            // "Linux (Ubuntu)"
+            long_name.push_str(" (");
+            long_name.push_str(distro_name);
+            long_name.push(')');
+        }
 
-        Some(format!(
-            "{} {} {}",
-            system_name,
-            Self::os_version().unwrap_or_default(),
-            Self::name().unwrap_or_default()
-        ))
+        Some(long_name)
+    }
+
+    #[cfg(target_os = "android")]
+    pub(crate) fn long_os_version() -> Option<String> {
+        let mut long_name = "Android".to_owned();
+
+        if let Some(os_version) = Self::os_version() {
+            long_name.push(' ');
+            long_name.push_str(&os_version);
+        }
+
+        // Android's name() is extracted from the system property "ro.product.model"
+        // which is documented as "The end-user-visible name for the end product."
+        // So this produces a long_os_version like "Android 15 on Pixel 9 Pro".
+        if let Some(product_name) = Self::name() {
+            long_name.push_str(" on ");
+            long_name.push_str(&product_name);
+        }
+
+        Some(long_name)
     }
 
     pub(crate) fn host_name() -> Option<String> {
@@ -474,6 +499,33 @@ impl SystemInner {
             .unwrap_or_else(|| std::env::consts::OS.to_owned())
     }
 
+    #[cfg(not(target_os = "android"))]
+    pub(crate) fn distribution_id_like() -> Vec<String> {
+        system_info_as_list(get_system_info_linux(
+            InfoType::DistributionIDLike,
+            Path::new("/etc/os-release"),
+            Path::new(""),
+        ))
+    }
+
+    #[cfg(target_os = "android")]
+    pub(crate) fn distribution_id_like() -> Vec<String> {
+        // Currently get_system_info_android doesn't support InfoType::DistributionIDLike and always
+        // returns None. This call is done anyway for consistency with non-Android implementation
+        // and to suppress dead-code warning for DistributionIDLike on Android.
+        system_info_as_list(get_system_info_android(InfoType::DistributionIDLike))
+    }
+
+    #[cfg(not(target_os = "android"))]
+    pub(crate) fn kernel_name() -> Option<&'static str> {
+        Some("Linux")
+    }
+
+    #[cfg(target_os = "android")]
+    pub(crate) fn kernel_name() -> Option<&'static str> {
+        Some("Android kernel")
+    }
+
     pub(crate) fn cpu_arch() -> Option<String> {
         let mut raw = std::mem::MaybeUninit::<libc::utsname>::uninit();
 
@@ -495,6 +547,10 @@ impl SystemInner {
         }
     }
 
+    pub(crate) fn physical_core_count() -> Option<usize> {
+        get_physical_core_count()
+    }
+
     pub(crate) fn refresh_cpu_list(&mut self, refresh_kind: CpuRefreshKind) {
         self.cpus = CpusWrapper::new();
         self.refresh_cpu_specifics(refresh_kind);
@@ -502,9 +558,15 @@ impl SystemInner {
 }
 
 fn read_u64(filename: &str) -> Option<u64> {
-    get_all_utf8_data(filename, 16_635)
+    let result = get_all_utf8_data(filename, 16_635)
         .ok()
-        .and_then(|d| u64::from_str(d.trim()).ok())
+        .and_then(|d| u64::from_str(d.trim()).ok());
+
+    if result.is_none() {
+        sysinfo_debug!("Failed to read u64 in filename {}", filename);
+    }
+
+    result
 }
 
 fn read_table<F>(filename: &str, colsep: char, mut f: F)
@@ -528,19 +590,17 @@ where
 
 fn read_table_key(filename: &str, target_key: &str, colsep: char) -> Option<u64> {
     if let Ok(content) = get_all_utf8_data(filename, 16_635) {
-        return content
-            .split('\n')
-            .find_map(|line| {
-                let mut split = line.split(colsep);
-                let key = split.next()?;
-                if key != target_key {
-                    return None;
-                }
+        return content.split('\n').find_map(|line| {
+            let mut split = line.split(colsep);
+            let key = split.next()?;
+            if key != target_key {
+                return None;
+            }
 
-                let value = split.next()?;
-                let value0 = value.trim_start().split(' ').next()?;
-                u64::from_str(value0).ok()
-            });
+            let value = split.next()?;
+            let value0 = value.trim_start().split(' ').next()?;
+            u64::from_str(value0).ok()
+        });
     }
 
     None
@@ -555,14 +615,15 @@ impl crate::CGroupLimits {
         if let (Some(mem_cur), Some(mem_max), Some(mem_rss)) = (
             // cgroups v2
             read_u64("/sys/fs/cgroup/memory.current"),
-            read_u64("/sys/fs/cgroup/memory.max"),
-            read_table_key("/sys/fs/cgroup/memory.stat", "anon", ' ')
+            // memory.max contains `max` when no limit is set.
+            read_u64("/sys/fs/cgroup/memory.max").or(Some(u64::MAX)),
+            read_table_key("/sys/fs/cgroup/memory.stat", "anon", ' '),
         ) {
             let mut limits = Self {
                 total_memory: sys.mem_total,
                 free_memory: sys.mem_free,
                 free_swap: sys.swap_free,
-                rss: mem_rss
+                rss: mem_rss,
             };
 
             limits.total_memory = min(mem_max, sys.mem_total);
@@ -577,13 +638,13 @@ impl crate::CGroupLimits {
             // cgroups v1
             read_u64("/sys/fs/cgroup/memory/memory.usage_in_bytes"),
             read_u64("/sys/fs/cgroup/memory/memory.limit_in_bytes"),
-            read_table_key("/sys/fs/cgroup/memory/memory.stat", "total_rss", ' ')
+            read_table_key("/sys/fs/cgroup/memory/memory.stat", "total_rss", ' '),
         ) {
             let mut limits = Self {
                 total_memory: sys.mem_total,
                 free_memory: sys.mem_free,
                 free_swap: sys.swap_free,
-                rss: mem_rss
+                rss: mem_rss,
             };
 
             limits.total_memory = min(mem_max, sys.mem_total);
@@ -606,6 +667,9 @@ enum InfoType {
     /// Machine-parseable ID of a distribution, see
     /// https://www.freedesktop.org/software/systemd/man/os-release.html#ID=
     DistributionID,
+    /// Machine-parseable ID_LIKE of related distributions, see
+    /// <https://www.freedesktop.org/software/systemd/man/latest/os-release.html#ID_LIKE=>
+    DistributionIDLike,
 }
 
 #[cfg(not(target_os = "android"))]
@@ -619,6 +683,7 @@ fn get_system_info_linux(info: InfoType, path: &Path, fallback_path: &Path) -> O
             InfoType::Name => "NAME=",
             InfoType::OsVersion => "VERSION_ID=",
             InfoType::DistributionID => "ID=",
+            InfoType::DistributionIDLike => "ID_LIKE=",
         };
 
         for line in buf.lines() {
@@ -647,6 +712,10 @@ fn get_system_info_linux(info: InfoType, path: &Path, fallback_path: &Path) -> O
             // lsb-release is inconsistent with os-release and unsupported.
             return None;
         }
+        InfoType::DistributionIDLike => {
+            // lsb-release doesn't support ID_LIKE.
+            return None;
+        }
     };
     for line in buf.lines() {
         if let Some(stripped) = line.strip_prefix(info_str) {
@@ -656,6 +725,16 @@ fn get_system_info_linux(info: InfoType, path: &Path, fallback_path: &Path) -> O
     None
 }
 
+/// Returns a system info value as a list of strings.
+/// Absence of a value is treated as an empty list.
+fn system_info_as_list(sysinfo: Option<String>) -> Vec<String> {
+    match sysinfo {
+        Some(value) => value.split_ascii_whitespace().map(String::from).collect(),
+        // For list fields absence of a field is equivalent to an empty list.
+        None => Vec::new(),
+    }
+}
+
 #[cfg(target_os = "android")]
 fn get_system_info_android(info: InfoType) -> Option<String> {
     // https://android.googlesource.com/platform/frameworks/base/+/refs/heads/master/core/java/android/os/Build.java#58
@@ -663,6 +742,10 @@ fn get_system_info_android(info: InfoType) -> Option<String> {
         InfoType::Name => b"ro.product.model\0",
         InfoType::OsVersion => b"ro.build.version.release\0",
         InfoType::DistributionID => {
+            // Not supported.
+            return None;
+        }
+        InfoType::DistributionIDLike => {
             // Not supported.
             return None;
         }
@@ -692,9 +775,10 @@ mod test {
     use super::get_system_info_android;
     #[cfg(not(target_os = "android"))]
     use super::get_system_info_linux;
-    use super::InfoType;
     use super::read_table;
     use super::read_table_key;
+    use super::system_info_as_list;
+    use super::InfoType;
     use std::collections::HashMap;
     use std::io::Write;
     use tempfile::NamedTempFile;
@@ -796,6 +880,7 @@ mod test {
         assert!(get_system_info_android(InfoType::OsVersion).is_some());
         assert!(get_system_info_android(InfoType::Name).is_some());
         assert!(get_system_info_android(InfoType::DistributionID).is_none());
+        assert!(get_system_info_android(InfoType::DistributionIDLike).is_none());
     }
 
     #[test]
@@ -846,6 +931,10 @@ DISTRIB_DESCRIPTION="Ubuntu 20.10"
             get_system_info_linux(InfoType::DistributionID, &tmp1, Path::new("")),
             Some("ubuntu".to_owned())
         );
+        assert_eq!(
+            get_system_info_linux(InfoType::DistributionIDLike, &tmp1, Path::new("")),
+            Some("debian".to_owned())
+        );
 
         // Check for the "fallback" path: "/etc/lsb-release"
         assert_eq!(
@@ -859,6 +948,41 @@ DISTRIB_DESCRIPTION="Ubuntu 20.10"
         assert_eq!(
             get_system_info_linux(InfoType::DistributionID, Path::new(""), &tmp2),
             None
+        );
+        assert_eq!(
+            get_system_info_linux(InfoType::DistributionIDLike, Path::new(""), &tmp2),
+            None
+        );
+    }
+
+    #[test]
+    fn test_system_info_as_list() {
+        // No value.
+        assert_eq!(system_info_as_list(None), Vec::<String>::new());
+        // Empty value.
+        assert_eq!(
+            system_info_as_list(Some("".to_string())),
+            Vec::<String>::new(),
+        );
+        // Whitespaces only.
+        assert_eq!(
+            system_info_as_list(Some(" ".to_string())),
+            Vec::<String>::new(),
+        );
+        // Single value.
+        assert_eq!(
+            system_info_as_list(Some("debian".to_string())),
+            vec!["debian".to_string()],
+        );
+        // Multiple values.
+        assert_eq!(
+            system_info_as_list(Some("rhel fedora".to_string())),
+            vec!["rhel".to_string(), "fedora".to_string()],
+        );
+        // Multiple spaces.
+        assert_eq!(
+            system_info_as_list(Some("rhel        fedora".to_string())),
+            vec!["rhel".to_string(), "fedora".to_string()],
         );
     }
 }

@@ -15,23 +15,22 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::fmt::Debug;
-
 use http::header;
 use http::Request;
 use http::Response;
 use serde::Deserialize;
+use std::fmt::Debug;
+use std::sync::Arc;
 
 use crate::raw::*;
 use crate::*;
 
 pub struct SwiftCore {
+    pub info: Arc<AccessorInfo>,
     pub root: String,
     pub endpoint: String,
-    pub account: String,
     pub container: String,
     pub token: String,
-    pub client: HttpClient,
 }
 
 impl Debug for SwiftCore {
@@ -39,21 +38,19 @@ impl Debug for SwiftCore {
         f.debug_struct("SwiftCore")
             .field("root", &self.root)
             .field("endpoint", &self.endpoint)
-            .field("account", &self.account)
             .field("container", &self.container)
             .finish_non_exhaustive()
     }
 }
 
 impl SwiftCore {
-    pub async fn swift_delete(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn swift_delete(&self, path: &str) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         let url = format!(
-            "{}/v1/{}/{}/{}",
-            self.endpoint,
-            self.account,
-            self.container,
+            "{}/{}/{}",
+            &self.endpoint,
+            &self.container,
             percent_encode_path(&p)
         );
 
@@ -61,11 +58,14 @@ impl SwiftCore {
 
         req = req.header("X-Auth-Token", &self.token);
 
-        let body = AsyncBody::Empty;
+        let body = Buffer::new();
 
-        let req = req.body(body).map_err(new_request_build_error)?;
+        let req = req
+            .extension(Operation::Delete)
+            .body(body)
+            .map_err(new_request_build_error)?;
 
-        self.client.send(req).await
+        self.info.http_client().send(req).await
     }
 
     pub async fn swift_list(
@@ -74,76 +74,84 @@ impl SwiftCore {
         delimiter: &str,
         limit: Option<usize>,
         marker: &str,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    ) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         // The delimiter is used to disable recursive listing.
         // Swift returns a 200 status code when there is no such pseudo directory in prefix.
-        let mut url = format!(
-            "{}/v1/{}/{}/?prefix={}&delimiter={}&format=json",
-            self.endpoint,
-            self.account,
-            self.container,
-            percent_encode_path(&p),
-            delimiter
-        );
+        let mut url = QueryPairsWriter::new(&format!("{}/{}/", &self.endpoint, &self.container,))
+            .push("prefix", &percent_encode_path(&p))
+            .push("delimiter", delimiter)
+            .push("format", "json");
 
         if let Some(limit) = limit {
-            url += &format!("&limit={}", limit);
+            url = url.push("limit", &limit.to_string());
         }
         if !marker.is_empty() {
-            url += &format!("&marker={}", marker);
+            url = url.push("marker", marker);
         }
 
-        let mut req = Request::get(&url);
+        let mut req = Request::get(url.finish());
 
         req = req.header("X-Auth-Token", &self.token);
 
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::List)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
-        self.client.send(req).await
+        self.info.http_client().send(req).await
     }
 
     pub async fn swift_create_object(
         &self,
         path: &str,
         length: u64,
-        body: AsyncBody,
-    ) -> Result<Response<IncomingAsyncBody>> {
+        args: &OpWrite,
+        body: Buffer,
+    ) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path);
-
         let url = format!(
-            "{}/v1/{}/{}/{}",
-            self.endpoint,
-            self.account,
-            self.container,
+            "{}/{}/{}",
+            &self.endpoint,
+            &self.container,
             percent_encode_path(&p)
         );
 
         let mut req = Request::put(&url);
 
+        // Set user metadata headers.
+        if let Some(user_metadata) = args.user_metadata() {
+            for (k, v) in user_metadata {
+                req = req.header(format!("X-Object-Meta-{}", k), v);
+            }
+        }
+
         req = req.header("X-Auth-Token", &self.token);
         req = req.header(header::CONTENT_LENGTH, length);
 
-        let req = req.body(body).map_err(new_request_build_error)?;
+        let req = req
+            .extension(Operation::Write)
+            .body(body)
+            .map_err(new_request_build_error)?;
 
-        self.client.send(req).await
+        self.info.http_client().send(req).await
     }
 
-    pub async fn swift_read(&self, path: &str, arg: OpRead) -> Result<Response<IncomingAsyncBody>> {
-        let range = arg.range();
-
+    pub async fn swift_read(
+        &self,
+        path: &str,
+        range: BytesRange,
+        _arg: &OpRead,
+    ) -> Result<Response<HttpBody>> {
         let p = build_abs_path(&self.root, path)
             .trim_end_matches('/')
             .to_string();
 
         let url = format!(
-            "{}/v1/{}/{}/{}",
-            self.endpoint,
-            self.account,
-            self.container,
+            "{}/{}/{}",
+            &self.endpoint,
+            &self.container,
             percent_encode_path(&p)
         );
 
@@ -152,21 +160,18 @@ impl SwiftCore {
         req = req.header("X-Auth-Token", &self.token);
 
         if !range.is_full() {
-            req = req.header("Range", &range.to_header());
+            req = req.header(header::RANGE, range.to_header());
         }
 
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Read)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
-        self.client.send(req).await
+        self.info.http_client().fetch(req).await
     }
 
-    pub async fn swift_copy(
-        &self,
-        src_p: &str,
-        dst_p: &str,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn swift_copy(&self, src_p: &str, dst_p: &str) -> Result<Response<Buffer>> {
         // NOTE: current implementation is limited to same container and root
 
         let src_p = format!(
@@ -180,10 +185,9 @@ impl SwiftCore {
             .to_string();
 
         let url = format!(
-            "{}/v1/{}/{}/{}",
-            self.endpoint,
-            self.account,
-            self.container,
+            "{}/{}/{}",
+            &self.endpoint,
+            &self.container,
             percent_encode_path(&dst_p)
         );
 
@@ -197,20 +201,22 @@ impl SwiftCore {
         // if use PUT method, we need to set the content-length to 0.
         req = req.header("Content-Length", "0");
 
-        let body = AsyncBody::Empty;
+        let body = Buffer::new();
 
-        let req = req.body(body).map_err(new_request_build_error)?;
+        let req = req
+            .extension(Operation::Copy)
+            .body(body)
+            .map_err(new_request_build_error)?;
 
-        self.client.send(req).await
+        self.info.http_client().send(req).await
     }
 
-    pub async fn swift_get_metadata(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn swift_get_metadata(&self, path: &str) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         let url = format!(
-            "{}/v1/{}/{}/{}",
+            "{}/{}/{}",
             &self.endpoint,
-            &self.account,
             &self.container,
             percent_encode_path(&p)
         );
@@ -220,10 +226,11 @@ impl SwiftCore {
         req = req.header("X-Auth-Token", &self.token);
 
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Stat)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
-        self.client.send(req).await
+        self.info.http_client().send(req).await
     }
 }
 
@@ -237,8 +244,8 @@ pub enum ListOpResponse {
         bytes: u64,
         hash: String,
         name: String,
-        content_type: String,
         last_modified: String,
+        content_type: Option<String>,
     },
 }
 
@@ -278,10 +285,8 @@ mod tests {
                 bytes: 147,
                 hash: "5e6b5b70b0426b1cc1968003e1afa5ad".to_string(),
                 name: "test.txt".to_string(),
-                content_type:
-                    "multipart/form-data;boundary=------------------------25004a866ee9c0cb"
-                        .to_string(),
                 last_modified: "2023-11-01T03:00:23.147480".to_string(),
+                content_type: Some("text/plain".to_string()),
             }
         );
 

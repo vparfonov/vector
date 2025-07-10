@@ -15,38 +15,48 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::fmt;
+use std::fmt::Debug;
+use std::fmt::Formatter;
+use std::sync::Arc;
+use std::time::Duration;
+
 use base64::prelude::BASE64_STANDARD;
 use base64::Engine;
 use bytes::Bytes;
+use constants::X_MS_META_PREFIX;
 use http::header::HeaderName;
 use http::header::CONTENT_LENGTH;
 use http::header::CONTENT_TYPE;
 use http::header::IF_MATCH;
+use http::header::IF_MODIFIED_SINCE;
 use http::header::IF_NONE_MATCH;
+use http::header::IF_UNMODIFIED_SINCE;
 use http::HeaderValue;
 use http::Request;
 use http::Response;
 use reqsign::AzureStorageCredential;
 use reqsign::AzureStorageLoader;
 use reqsign::AzureStorageSigner;
-use serde::{Deserialize, Serialize};
-use std::fmt;
-use std::fmt::Debug;
-use std::fmt::Formatter;
-use std::fmt::Write;
-use std::time::Duration;
+use serde::Deserialize;
+use serde::Serialize;
 use uuid::Uuid;
 
 use crate::raw::*;
 use crate::*;
 
-mod constants {
+pub mod constants {
+    // Indicates the Blob Storage version that was used to execute the request
     pub const X_MS_VERSION: &str = "x-ms-version";
 
     pub const X_MS_BLOB_TYPE: &str = "x-ms-blob-type";
     pub const X_MS_COPY_SOURCE: &str = "x-ms-copy-source";
     pub const X_MS_BLOB_CACHE_CONTROL: &str = "x-ms-blob-cache-control";
     pub const X_MS_BLOB_CONDITION_APPENDPOS: &str = "x-ms-blob-condition-appendpos";
+    pub const X_MS_META_PREFIX: &str = "x-ms-meta-";
+
+    // indicates the version of the blob, and it can be used in subsequent requests to access the blob.
+    pub const X_MS_VERSION_ID: &str = "x-ms-version-id";
 
     // Server-side encryption with customer-provided headers
     pub const X_MS_ENCRYPTION_KEY: &str = "x-ms-encryption-key";
@@ -55,16 +65,15 @@ mod constants {
 }
 
 pub struct AzblobCore {
+    pub info: Arc<AccessorInfo>,
     pub container: String,
     pub root: String,
     pub endpoint: String,
     pub encryption_key: Option<HeaderValue>,
     pub encryption_key_sha256: Option<HeaderValue>,
     pub encryption_algorithm: Option<HeaderValue>,
-    pub client: HttpClient,
     pub loader: AzureStorageLoader,
     pub signer: AzureStorageSigner,
-    pub batch_max_operations: usize,
 }
 
 impl Debug for AzblobCore {
@@ -124,8 +133,8 @@ impl AzblobCore {
     }
 
     #[inline]
-    pub async fn send(&self, req: Request<AsyncBody>) -> Result<Response<IncomingAsyncBody>> {
-        self.client.send(req).await
+    pub async fn send(&self, req: Request<Buffer>) -> Result<Response<Buffer>> {
+        self.info.http_client().send(req).await
     }
 
     pub fn insert_sse_headers(&self, mut req: http::request::Builder) -> http::request::Builder {
@@ -161,26 +170,28 @@ impl AzblobCore {
 }
 
 impl AzblobCore {
-    pub fn azblob_get_blob_request(&self, path: &str, args: &OpRead) -> Result<Request<AsyncBody>> {
-        let p = build_abs_path(&self.root, path);
-
-        let mut url = format!(
+    fn build_path_url(&self, path: &str) -> String {
+        format!(
             "{}/{}/{}",
             self.endpoint,
             self.container,
-            percent_encode_path(&p)
-        );
+            percent_encode_path(&build_abs_path(&self.root, path))
+        )
+    }
 
-        let mut query_args = Vec::new();
+    pub fn azblob_get_blob_request(
+        &self,
+        path: &str,
+        range: BytesRange,
+        args: &OpRead,
+    ) -> Result<Request<Buffer>> {
+        let mut url = self.build_path_url(path);
+
         if let Some(override_content_disposition) = args.override_content_disposition() {
-            query_args.push(format!(
-                "rscd={}",
+            url.push_str(&format!(
+                "?rscd={}",
                 percent_encode_path(override_content_disposition)
-            ))
-        }
-
-        if !query_args.is_empty() {
-            url.push_str(&format!("?{}", query_args.join("&")));
+            ));
         }
 
         let mut req = Request::get(&url);
@@ -188,18 +199,7 @@ impl AzblobCore {
         // Set SSE headers.
         req = self.insert_sse_headers(req);
 
-        let range = args.range();
         if !range.is_full() {
-            // azblob doesn't support read with suffix range.
-            //
-            // ref: https://learn.microsoft.com/en-us/rest/api/storageservices/specifying-the-range-header-for-blob-service-operations
-            if range.offset().is_none() && range.size().is_some() {
-                return Err(Error::new(
-                    ErrorKind::Unsupported,
-                    "azblob doesn't support read with suffix range",
-                ));
-            }
-
             req = req.header(http::header::RANGE, range.to_header());
         }
 
@@ -211,8 +211,23 @@ impl AzblobCore {
             req = req.header(IF_MATCH, if_match);
         }
 
+        if let Some(if_modified_since) = args.if_modified_since() {
+            req = req.header(
+                IF_MODIFIED_SINCE,
+                format_datetime_into_http_date(if_modified_since),
+            );
+        }
+
+        if let Some(if_unmodified_since) = args.if_unmodified_since() {
+            req = req.header(
+                IF_UNMODIFIED_SINCE,
+                format_datetime_into_http_date(if_unmodified_since),
+            );
+        }
+
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Read)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         Ok(req)
@@ -221,13 +236,14 @@ impl AzblobCore {
     pub async fn azblob_get_blob(
         &self,
         path: &str,
+        range: BytesRange,
         args: &OpRead,
-    ) -> Result<Response<IncomingAsyncBody>> {
-        let mut req = self.azblob_get_blob_request(path, args)?;
+    ) -> Result<Response<HttpBody>> {
+        let mut req = self.azblob_get_blob_request(path, range, args)?;
 
         self.sign(&mut req).await?;
 
-        self.send(req).await
+        self.info.http_client().fetch(req).await
     }
 
     pub fn azblob_put_blob_request(
@@ -235,25 +251,15 @@ impl AzblobCore {
         path: &str,
         size: Option<u64>,
         args: &OpWrite,
-        body: AsyncBody,
-    ) -> Result<Request<AsyncBody>> {
-        let p = build_abs_path(&self.root, path);
+        body: Buffer,
+    ) -> Result<Request<Buffer>> {
+        let mut req = Request::put(self.build_path_url(path));
 
-        let url = format!(
-            "{}/{}/{}",
-            self.endpoint,
-            self.container,
-            percent_encode_path(&p)
+        req = req.header(
+            HeaderName::from_static(constants::X_MS_BLOB_TYPE),
+            "BlockBlob",
         );
 
-        let mut req = Request::put(&url);
-
-        // Set SSE headers.
-        req = self.insert_sse_headers(req);
-
-        if let Some(cache_control) = args.cache_control() {
-            req = req.header(constants::X_MS_BLOB_CACHE_CONTROL, cache_control);
-        }
         if let Some(size) = size {
             req = req.header(CONTENT_LENGTH, size)
         }
@@ -262,15 +268,48 @@ impl AzblobCore {
             req = req.header(CONTENT_TYPE, ty)
         }
 
-        req = req.header(
-            HeaderName::from_static(constants::X_MS_BLOB_TYPE),
-            "BlockBlob",
-        );
+        // Specify the wildcard character (*) to perform the operation only if
+        // the resource does not exist, and fail the operation if it does exist.
+        if args.if_not_exists() {
+            req = req.header(IF_NONE_MATCH, "*");
+        }
 
-        // Set body
-        let req = req.body(body).map_err(new_request_build_error)?;
+        if let Some(v) = args.if_none_match() {
+            req = req.header(IF_NONE_MATCH, v);
+        }
+
+        if let Some(cache_control) = args.cache_control() {
+            req = req.header(constants::X_MS_BLOB_CACHE_CONTROL, cache_control);
+        }
+
+        // Set SSE headers.
+        req = self.insert_sse_headers(req);
+
+        if let Some(user_metadata) = args.user_metadata() {
+            for (key, value) in user_metadata {
+                req = req.header(format!("{X_MS_META_PREFIX}{key}"), value)
+            }
+        }
+
+        let req = req
+            .extension(Operation::Write)
+            .body(body)
+            .map_err(new_request_build_error)?;
 
         Ok(req)
+    }
+
+    pub async fn azblob_put_blob(
+        &self,
+        path: &str,
+        size: Option<u64>,
+        args: &OpWrite,
+        body: Buffer,
+    ) -> Result<Response<Buffer>> {
+        let mut req = self.azblob_put_blob_request(path, size, args, body)?;
+
+        self.sign(&mut req).await?;
+        self.send(req).await
     }
 
     /// For appendable object, it could be created by `put` an empty blob
@@ -290,21 +329,12 @@ impl AzblobCore {
     /// # Reference
     ///
     /// https://learn.microsoft.com/en-us/rest/api/storageservices/put-blob
-    pub fn azblob_init_appendable_blob_request(
+    fn azblob_init_appendable_blob_request(
         &self,
         path: &str,
         args: &OpWrite,
-    ) -> Result<Request<AsyncBody>> {
-        let p = build_abs_path(&self.root, path);
-
-        let url = format!(
-            "{}/{}/{}",
-            self.endpoint,
-            self.container,
-            percent_encode_path(&p)
-        );
-
-        let mut req = Request::put(&url);
+    ) -> Result<Request<Buffer>> {
+        let mut req = Request::put(self.build_path_url(path));
 
         // Set SSE headers.
         req = self.insert_sse_headers(req);
@@ -326,10 +356,22 @@ impl AzblobCore {
         }
 
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Write)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         Ok(req)
+    }
+
+    pub async fn azblob_init_appendable_blob(
+        &self,
+        path: &str,
+        args: &OpWrite,
+    ) -> Result<Response<Buffer>> {
+        let mut req = self.azblob_init_appendable_blob_request(path, args)?;
+
+        self.sign(&mut req).await?;
+        self.send(req).await
     }
 
     /// Append content to an appendable blob.
@@ -343,34 +385,41 @@ impl AzblobCore {
     /// # Reference
     ///
     /// https://learn.microsoft.com/en-us/rest/api/storageservices/append-block
-    pub fn azblob_append_blob_request(
+    fn azblob_append_blob_request(
         &self,
         path: &str,
         position: u64,
         size: u64,
-        body: AsyncBody,
-    ) -> Result<Request<AsyncBody>> {
-        let p = build_abs_path(&self.root, path);
+        body: Buffer,
+    ) -> Result<Request<Buffer>> {
+        let url = format!("{}?comp=appendblock", &self.build_path_url(path));
 
-        let url = format!(
-            "{}/{}/{}?comp=appendblock",
-            self.endpoint,
-            self.container,
-            percent_encode_path(&p)
-        );
-
-        let mut req = Request::put(&url);
+        let mut req = Request::put(&url)
+            .header(CONTENT_LENGTH, size)
+            .header(constants::X_MS_BLOB_CONDITION_APPENDPOS, position);
 
         // Set SSE headers.
         req = self.insert_sse_headers(req);
 
-        req = req.header(CONTENT_LENGTH, size);
-
-        req = req.header(constants::X_MS_BLOB_CONDITION_APPENDPOS, position);
-
-        let req = req.body(body).map_err(new_request_build_error)?;
+        let req = req
+            .extension(Operation::Write)
+            .body(body)
+            .map_err(new_request_build_error)?;
 
         Ok(req)
+    }
+
+    pub async fn azblob_append_blob(
+        &self,
+        path: &str,
+        position: u64,
+        size: u64,
+        body: Buffer,
+    ) -> Result<Response<Buffer>> {
+        let mut req = self.azblob_append_blob_request(path, position, size, body)?;
+
+        self.sign(&mut req).await?;
+        self.send(req).await
     }
 
     pub fn azblob_put_block_request(
@@ -379,21 +428,18 @@ impl AzblobCore {
         block_id: Uuid,
         size: Option<u64>,
         args: &OpWrite,
-        body: AsyncBody,
-    ) -> Result<Request<AsyncBody>> {
+        body: Buffer,
+    ) -> Result<Request<Buffer>> {
         // To be written as part of a blob, a block must have been successfully written to the server in an earlier Put Block operation.
         // refer to https://learn.microsoft.com/en-us/rest/api/storageservices/put-block?tabs=microsoft-entra-id
-        let p = build_abs_path(&self.root, path);
+        let url = QueryPairsWriter::new(&self.build_path_url(path))
+            .push("comp", "block")
+            .push(
+                "blockid",
+                &percent_encode_path(&BASE64_STANDARD.encode(block_id.as_bytes())),
+            )
+            .finish();
 
-        let encoded_block_id: String =
-            percent_encode_path(&BASE64_STANDARD.encode(block_id.as_bytes()));
-        let url = format!(
-            "{}/{}/{}?comp=block&blockid={}",
-            self.endpoint,
-            self.container,
-            percent_encode_path(&p),
-            encoded_block_id,
-        );
         let mut req = Request::put(&url);
         // Set SSE headers.
         req = self.insert_sse_headers(req);
@@ -408,8 +454,11 @@ impl AzblobCore {
         if let Some(ty) = args.content_type() {
             req = req.header(CONTENT_TYPE, ty)
         }
-        // Set body
-        let req = req.body(body).map_err(new_request_build_error)?;
+
+        let req = req
+            .extension(Operation::Write)
+            .body(body)
+            .map_err(new_request_build_error)?;
 
         Ok(req)
     }
@@ -420,27 +469,21 @@ impl AzblobCore {
         block_id: Uuid,
         size: Option<u64>,
         args: &OpWrite,
-        body: AsyncBody,
-    ) -> Result<Response<IncomingAsyncBody>> {
+        body: Buffer,
+    ) -> Result<Response<Buffer>> {
         let mut req = self.azblob_put_block_request(path, block_id, size, args, body)?;
 
         self.sign(&mut req).await?;
         self.send(req).await
     }
 
-    pub async fn azblob_complete_put_block_list_request(
+    fn azblob_complete_put_block_list_request(
         &self,
         path: &str,
         block_ids: Vec<Uuid>,
         args: &OpWrite,
-    ) -> Result<Request<AsyncBody>> {
-        let p = build_abs_path(&self.root, path);
-        let url = format!(
-            "{}/{}/{}?comp=blocklist",
-            self.endpoint,
-            self.container,
-            percent_encode_path(&p),
-        );
+    ) -> Result<Request<Buffer>> {
+        let url = format!("{}?comp=blocklist", &self.build_path_url(path));
 
         let req = Request::put(&url);
 
@@ -459,12 +502,13 @@ impl AzblobCore {
                 })
                 .collect(),
         })
-        .map_err(new_xml_deserialize_error)?;
+        .map_err(new_xml_serialize_error)?;
 
         req = req.header(CONTENT_LENGTH, content.len());
 
         let req = req
-            .body(AsyncBody::Bytes(Bytes::from(content)))
+            .extension(Operation::Write)
+            .body(Buffer::from(Bytes::from(content)))
             .map_err(new_request_build_error)?;
 
         Ok(req)
@@ -475,31 +519,16 @@ impl AzblobCore {
         path: &str,
         block_ids: Vec<Uuid>,
         args: &OpWrite,
-    ) -> Result<Response<IncomingAsyncBody>> {
-        let mut req = self
-            .azblob_complete_put_block_list_request(path, block_ids, args)
-            .await?;
+    ) -> Result<Response<Buffer>> {
+        let mut req = self.azblob_complete_put_block_list_request(path, block_ids, args)?;
 
         self.sign(&mut req).await?;
 
         self.send(req).await
     }
 
-    pub fn azblob_head_blob_request(
-        &self,
-        path: &str,
-        args: &OpStat,
-    ) -> Result<Request<AsyncBody>> {
-        let p = build_abs_path(&self.root, path);
-
-        let url = format!(
-            "{}/{}/{}",
-            self.endpoint,
-            self.container,
-            percent_encode_path(&p)
-        );
-
-        let mut req = Request::head(&url);
+    pub fn azblob_head_blob_request(&self, path: &str, args: &OpStat) -> Result<Request<Buffer>> {
+        let mut req = Request::head(self.build_path_url(path));
 
         // Set SSE headers.
         req = self.insert_sse_headers(req);
@@ -513,7 +542,8 @@ impl AzblobCore {
         }
 
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Stat)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         Ok(req)
@@ -523,62 +553,37 @@ impl AzblobCore {
         &self,
         path: &str,
         args: &OpStat,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    ) -> Result<Response<Buffer>> {
         let mut req = self.azblob_head_blob_request(path, args)?;
 
         self.sign(&mut req).await?;
         self.send(req).await
     }
 
-    pub fn azblob_delete_blob_request(&self, path: &str) -> Result<Request<AsyncBody>> {
-        let p = build_abs_path(&self.root, path);
-
-        let url = format!(
-            "{}/{}/{}",
-            self.endpoint,
-            self.container,
-            percent_encode_path(&p)
-        );
-
-        let req = Request::delete(&url);
-
-        req.header(CONTENT_LENGTH, 0)
-            .body(AsyncBody::Empty)
+    fn azblob_delete_blob_request(&self, path: &str) -> Result<Request<Buffer>> {
+        Request::delete(self.build_path_url(path))
+            .header(CONTENT_LENGTH, 0)
+            .extension(Operation::Delete)
+            .body(Buffer::new())
             .map_err(new_request_build_error)
     }
 
-    pub async fn azblob_delete_blob(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn azblob_delete_blob(&self, path: &str) -> Result<Response<Buffer>> {
         let mut req = self.azblob_delete_blob_request(path)?;
 
         self.sign(&mut req).await?;
         self.send(req).await
     }
 
-    pub async fn azblob_copy_blob(
-        &self,
-        from: &str,
-        to: &str,
-    ) -> Result<Response<IncomingAsyncBody>> {
-        let source = build_abs_path(&self.root, from);
-        let target = build_abs_path(&self.root, to);
-
-        let source = format!(
-            "{}/{}/{}",
-            self.endpoint,
-            self.container,
-            percent_encode_path(&source)
-        );
-        let target = format!(
-            "{}/{}/{}",
-            self.endpoint,
-            self.container,
-            percent_encode_path(&target)
-        );
+    pub async fn azblob_copy_blob(&self, from: &str, to: &str) -> Result<Response<Buffer>> {
+        let source = self.build_path_url(from);
+        let target = self.build_path_url(to);
 
         let mut req = Request::put(&target)
             .header(constants::X_MS_COPY_SOURCE, source)
             .header(CONTENT_LENGTH, 0)
-            .body(AsyncBody::Empty)
+            .extension(Operation::Copy)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.sign(&mut req).await?;
@@ -591,39 +596,35 @@ impl AzblobCore {
         next_marker: &str,
         delimiter: &str,
         limit: Option<usize>,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    ) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path);
+        let mut url = QueryPairsWriter::new(&format!("{}/{}", self.endpoint, self.container))
+            .push("restype", "container")
+            .push("comp", "list");
 
-        let mut url = format!(
-            "{}/{}?restype=container&comp=list",
-            self.endpoint, self.container
-        );
         if !p.is_empty() {
-            write!(url, "&prefix={}", percent_encode_path(&p))
-                .expect("write into string must succeed");
+            url = url.push("prefix", &percent_encode_path(&p));
         }
         if let Some(limit) = limit {
-            write!(url, "&maxresults={limit}").expect("write into string must succeed");
+            url = url.push("maxresults", &limit.to_string());
         }
         if !delimiter.is_empty() {
-            write!(url, "&delimiter={delimiter}").expect("write into string must succeed");
+            url = url.push("delimiter", delimiter);
         }
         if !next_marker.is_empty() {
-            write!(url, "&marker={next_marker}").expect("write into string must succeed");
+            url = url.push("marker", next_marker);
         }
 
-        let mut req = Request::get(&url)
-            .body(AsyncBody::Empty)
+        let mut req = Request::get(url.finish())
+            .extension(Operation::List)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.sign(&mut req).await?;
         self.send(req).await
     }
 
-    pub async fn azblob_batch_delete(
-        &self,
-        paths: &[String],
-    ) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn azblob_batch_delete(&self, paths: &[String]) -> Result<Response<Buffer>> {
         let url = format!(
             "{}/{}?restype=container&comp=batch",
             self.endpoint, self.container

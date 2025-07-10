@@ -10,9 +10,9 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
+edition = "2024"
 name = "async-graphql-value"
-version = "7.0.16"
+version = "7.0.17"
 authors = [
     "sunli <scott_s829@163.com>",
     "Koxiaet",
@@ -38,6 +38,7 @@ categories = [
 ]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/async-graphql/async-graphql"
+resolver = "2"
 
 [features]
 raw_value = ["serde_json/raw_value"]

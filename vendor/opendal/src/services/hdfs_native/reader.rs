@@ -15,46 +15,48 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::io::SeekFrom;
-use std::task::Context;
-use std::task::Poll;
-
 use bytes::Bytes;
+use futures::StreamExt;
 use hdfs_native::file::FileReader;
+use hdfs_native::HdfsError;
 
-use crate::raw::oio::Read;
+use crate::raw::*;
+use crate::services::hdfs_native::error::parse_hdfs_error;
 use crate::*;
 
 pub struct HdfsNativeReader {
-    _f: FileReader,
+    read: usize,
+    size: usize,
+    stream: futures::stream::BoxStream<'static, Result<Bytes, HdfsError>>,
 }
+
+unsafe impl Sync for HdfsNativeReader {}
 
 impl HdfsNativeReader {
-    pub fn new(f: FileReader) -> Self {
-        HdfsNativeReader { _f: f }
+    pub fn new(f: FileReader, offset: usize, size: usize) -> Self {
+        let size = size.min(f.file_length() - offset);
+        HdfsNativeReader {
+            read: 0,
+            size,
+            stream: Box::pin(f.read_range_stream(offset, size)),
+        }
     }
 }
 
-impl Read for HdfsNativeReader {
-    fn poll_read(&mut self, _cx: &mut Context<'_>, _buf: &mut [u8]) -> Poll<Result<usize>> {
-        todo!()
-    }
+impl oio::Read for HdfsNativeReader {
+    async fn read(&mut self) -> Result<Buffer> {
+        if self.read >= self.size {
+            return Ok(Buffer::new());
+        }
 
-    fn poll_seek(&mut self, cx: &mut Context<'_>, pos: SeekFrom) -> Poll<Result<u64>> {
-        let (_, _) = (cx, pos);
+        if let Some(bytes) = self.stream.as_mut().next().await {
+            let bytes = bytes.map_err(parse_hdfs_error)?;
+            let buf = Buffer::from(bytes);
+            self.read += buf.len();
 
-        Poll::Ready(Err(Error::new(
-            ErrorKind::Unsupported,
-            "HdfsNativeReader doesn't support seeking",
-        )))
-    }
-
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Bytes>>> {
-        let _ = cx;
-
-        Poll::Ready(Some(Err(Error::new(
-            ErrorKind::Unsupported,
-            "HdfsNativeReader doesn't support iterating",
-        ))))
+            Ok(buf)
+        } else {
+            Ok(Buffer::new())
+        }
     }
 }

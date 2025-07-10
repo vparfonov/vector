@@ -143,10 +143,6 @@ pub use crate::types::_scope::Scope;
 
 pub use crate::types::_policy_type::PolicyType;
 
-pub use crate::types::_log_group_summary::LogGroupSummary;
-
-pub use crate::types::_log_group_class::LogGroupClass;
-
 pub use crate::types::_anomaly_detector::AnomalyDetector;
 
 pub use crate::types::_anomaly_detector_status::AnomalyDetectorStatus;
@@ -216,6 +212,8 @@ pub use crate::types::_log_stream::LogStream;
 pub use crate::types::_order_by::OrderBy;
 
 pub use crate::types::_log_group::LogGroup;
+
+pub use crate::types::_log_group_class::LogGroupClass;
 
 pub use crate::types::_inherited_property::InheritedProperty;
 
@@ -334,8 +332,6 @@ mod _log_group;
 mod _log_group_class;
 
 mod _log_group_field;
-
-mod _log_group_summary;
 
 mod _log_stream;
 

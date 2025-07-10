@@ -81,6 +81,7 @@ impl std::error::Error for Error {
 #[derive(Debug)]
 pub enum ConnectionError {
     Io(io::Error),
+    SlowDown,
     Disconnected,
     PulsarError(Option<crate::message::proto::ServerError>, Option<String>),
     Unexpected(String),
@@ -96,7 +97,7 @@ pub enum ConnectionError {
     ))]
     Tls(rustls::Error),
     #[cfg(any(feature = "tokio-rustls-runtime", feature = "async-std-rustls-runtime"))]
-    DnsName(rustls::client::InvalidDnsNameError),
+    DnsName(rustls::pki_types::InvalidDnsNameError),
     Authentication(AuthenticationError),
     NotFound,
     Canceled,
@@ -141,9 +142,9 @@ impl From<rustls::Error> for ConnectionError {
 }
 
 #[cfg(any(feature = "tokio-rustls-runtime", feature = "async-std-rustls-runtime"))]
-impl From<rustls::client::InvalidDnsNameError> for ConnectionError {
+impl From<rustls::pki_types::InvalidDnsNameError> for ConnectionError {
     #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
-    fn from(err: rustls::client::InvalidDnsNameError) -> Self {
+    fn from(err: rustls::pki_types::InvalidDnsNameError) -> Self {
         ConnectionError::DnsName(err)
     }
 }
@@ -155,11 +156,29 @@ impl From<AuthenticationError> for ConnectionError {
     }
 }
 
+impl<T> From<async_channel::SendError<T>> for ConnectionError {
+    #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
+    fn from(_err: async_channel::SendError<T>) -> Self {
+        ConnectionError::Disconnected
+    }
+}
+
+impl<T> From<async_channel::TrySendError<T>> for ConnectionError {
+    #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
+    fn from(err: async_channel::TrySendError<T>) -> Self {
+        match err {
+            async_channel::TrySendError::Full(_) => ConnectionError::SlowDown,
+            async_channel::TrySendError::Closed(_) => ConnectionError::Disconnected,
+        }
+    }
+}
+
 impl fmt::Display for ConnectionError {
     #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             ConnectionError::Io(e) => write!(f, "{e}"),
+            ConnectionError::SlowDown => write!(f, "SlowDown"),
             ConnectionError::Disconnected => write!(f, "Disconnected"),
             ConnectionError::PulsarError(e, s) => {
                 write!(f, "Server error ({:?}): {}", e, s.as_deref().unwrap_or(""))

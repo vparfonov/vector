@@ -142,21 +142,7 @@ pub extern "C" fn sysinfo_disks_refresh(disks: CDisks) {
         let mut disks: Box<Disks> = Box::from_raw(disks as *mut Disks);
         {
             let disks: &mut Disks = disks.borrow_mut();
-            disks.refresh();
-        }
-        let _ = Box::into_raw(disks);
-    }
-}
-
-/// Equivalent of [`Disks::refresh_list()`][crate::Disks#method.refresh_list].
-#[no_mangle]
-pub extern "C" fn sysinfo_disks_refresh_list(disks: CDisks) {
-    assert!(!disks.is_null());
-    unsafe {
-        let mut disks: Box<Disks> = Box::from_raw(disks as *mut Disks);
-        {
-            let disks: &mut Disks = disks.borrow_mut();
-            disks.refresh_list();
+            disks.refresh(true);
         }
         let _ = Box::into_raw(disks);
     }
@@ -248,20 +234,6 @@ pub extern "C" fn sysinfo_networks_destroy(networks: CNetworks) {
     }
 }
 
-/// Equivalent of [`Networks::refresh_list()`][crate::Networks#method.refresh_list].
-#[no_mangle]
-pub extern "C" fn sysinfo_networks_refresh_list(networks: CNetworks) {
-    assert!(!networks.is_null());
-    unsafe {
-        let mut networks: Box<Networks> = Box::from_raw(networks as *mut Networks);
-        {
-            let networks: &mut Networks = networks.borrow_mut();
-            networks.refresh_list();
-        }
-        let _ = Box::into_raw(networks);
-    }
-}
-
 /// Equivalent of [`Networks::refresh()`][crate::Networks#method.refresh].
 #[no_mangle]
 pub extern "C" fn sysinfo_networks_refresh(networks: CNetworks) {
@@ -270,7 +242,7 @@ pub extern "C" fn sysinfo_networks_refresh(networks: CNetworks) {
         let mut networks: Box<Networks> = Box::from_raw(networks as *mut Networks);
         {
             let networks: &mut Networks = networks.borrow_mut();
-            networks.refresh();
+            networks.refresh(true);
         }
         let _ = Box::into_raw(networks);
     }
@@ -559,18 +531,6 @@ pub extern "C" fn sysinfo_cpu_brand(system: CSystem) -> RString {
     }
 }
 
-/// Equivalent of [`system::physical_core_count()`].
-#[no_mangle]
-pub extern "C" fn sysinfo_cpu_physical_cores(system: CSystem) -> u32 {
-    assert!(!system.is_null());
-    unsafe {
-        let system: Box<System> = Box::from_raw(system as *mut System);
-        let count = system.physical_core_count().unwrap_or(0);
-        let _ = Box::into_raw(system);
-        count as u32
-    }
-}
-
 /// Equivalent of [`cpu::frequency()`].
 #[no_mangle]
 pub extern "C" fn sysinfo_cpu_frequency(system: CSystem) -> u64 {
@@ -635,4 +595,10 @@ pub extern "C" fn sysinfo_system_long_version() -> RString {
     } else {
         std::ptr::null()
     }
+}
+
+/// Equivalent of [`system::physical_core_count()`].
+#[no_mangle]
+pub extern "C" fn sysinfo_cpu_physical_cores() -> u32 {
+    System::physical_core_count().unwrap_or(0) as u32
 }

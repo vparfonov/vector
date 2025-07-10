@@ -3,26 +3,49 @@
 # When uploading crates to the registry Cargo will automatically
 # "normalize" Cargo.toml files for maximal compatibility
 # with all versions of Cargo and also rewrite `path` dependencies
-# to registry (e.g., crates.io) dependencies
+# to registry (e.g., crates.io) dependencies.
 #
-# If you believe there's an error in this file please file an
-# issue against the rust-lang/cargo repository. If you're
-# editing this file be aware that the upstream Cargo.toml
-# will likely look very different (and much more reasonable)
+# If you are reading this file be aware that the original Cargo.toml
+# will likely look very different (and much more reasonable).
+# See Cargo.toml.orig for the original contents.
 
 [package]
 edition = "2018"
 name = "hash_hasher"
-version = "2.0.3"
-authors = ["Fraser Hutchison <fraser.hutchison@maidsafe.net>"]
+version = "2.0.4"
+authors = ["Fraser Hutchison <fraser@astria.org>"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "A hasher which is designed to work with already-hashed or hash-like data."
+documentation = "https://docs.rs/hash_hasher"
 readme = "README.md"
-keywords = ["hashmap", "hashset", "hasher", "hash"]
+keywords = [
+    "hashmap",
+    "hashset",
+    "hasher",
+    "hash",
+]
 categories = ["data-structures"]
 license = "Apache-2.0 OR MIT"
 repository = "https://github.com/Fraser999/Hash-Hasher.git"
+
+[badges.maintenance]
+status = "passively-maintained"
+
+[lib]
+name = "hash_hasher"
+path = "src/lib.rs"
+
+[[bench]]
+name = "lib"
+path = "benches/lib.rs"
+
 [dev-dependencies.fnv]
-version = "1"
+version = "1.0.7"
 
 [dev-dependencies.rand]
-version = "0.7"
+version = "0.9.1"

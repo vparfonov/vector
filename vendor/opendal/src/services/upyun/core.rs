@@ -15,9 +15,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::fmt::Debug;
-use std::fmt::Formatter;
-
 use base64::Engine;
 use hmac::Hmac;
 use hmac::Mac;
@@ -28,6 +25,9 @@ use http::Response;
 use md5::Digest;
 use serde::Deserialize;
 use sha1::Sha1;
+use std::fmt::Debug;
+use std::fmt::Formatter;
+use std::sync::Arc;
 
 use self::constants::*;
 use crate::raw::*;
@@ -55,19 +55,16 @@ pub(super) mod constants {
 
 #[derive(Clone)]
 pub struct UpyunCore {
+    pub info: Arc<AccessorInfo>,
     /// The root of this core.
     pub root: String,
     /// The endpoint of this backend.
     pub operator: String,
-    /// The password id of this backend.
-    pub password: String,
     /// The bucket of this backend.
     pub bucket: String,
 
     /// signer of this backend.
     pub signer: UpyunSigner,
-
-    pub client: HttpClient,
 }
 
 impl Debug for UpyunCore {
@@ -82,11 +79,11 @@ impl Debug for UpyunCore {
 
 impl UpyunCore {
     #[inline]
-    pub async fn send(&self, req: Request<AsyncBody>) -> Result<Response<IncomingAsyncBody>> {
-        self.client.send(req).await
+    pub async fn send(&self, req: Request<Buffer>) -> Result<Response<Buffer>> {
+        self.info.http_client().send(req).await
     }
 
-    pub async fn sign(&self, req: &mut Request<AsyncBody>) -> Result<()> {
+    pub fn sign(&self, req: &mut Request<Buffer>) -> Result<()> {
         // get rfc1123 date
         let date = chrono::Utc::now()
             .format("%a, %d %b %Y %H:%M:%S GMT")
@@ -104,7 +101,7 @@ impl UpyunCore {
 }
 
 impl UpyunCore {
-    pub async fn download_file(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn download_file(&self, path: &str, range: BytesRange) -> Result<Response<HttpBody>> {
         let path = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -116,15 +113,17 @@ impl UpyunCore {
         let req = Request::get(url);
 
         let mut req = req
-            .body(AsyncBody::Empty)
+            .header(header::RANGE, range.to_header())
+            .extension(Operation::Read)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
-        self.sign(&mut req).await?;
+        self.sign(&mut req)?;
 
-        self.send(req).await
+        self.info.http_client().fetch(req).await
     }
 
-    pub async fn info(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn info(&self, path: &str) -> Result<Response<Buffer>> {
         let path = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -136,21 +135,22 @@ impl UpyunCore {
         let req = Request::head(url);
 
         let mut req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Stat)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
-        self.sign(&mut req).await?;
+        self.sign(&mut req)?;
 
         self.send(req).await
     }
 
-    pub async fn upload(
+    pub fn upload(
         &self,
         path: &str,
         size: Option<u64>,
         args: &OpWrite,
-        body: AsyncBody,
-    ) -> Result<Request<AsyncBody>> {
+        body: Buffer,
+    ) -> Result<Request<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -177,15 +177,17 @@ impl UpyunCore {
             req = req.header(X_UPYUN_CACHE_CONTROL, cache_control)
         }
 
+        let req = req.extension(Operation::Write);
+
         // Set body
         let mut req = req.body(body).map_err(new_request_build_error)?;
 
-        self.sign(&mut req).await?;
+        self.sign(&mut req)?;
 
         Ok(req)
     }
 
-    pub async fn delete(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn delete(&self, path: &str) -> Result<Response<Buffer>> {
         let path = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -196,16 +198,16 @@ impl UpyunCore {
 
         let req = Request::delete(url);
 
-        let mut req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
+        let req = req.extension(Operation::Delete);
 
-        self.sign(&mut req).await?;
+        let mut req = req.body(Buffer::new()).map_err(new_request_build_error)?;
+
+        self.sign(&mut req)?;
 
         self.send(req).await
     }
 
-    pub async fn copy(&self, from: &str, to: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn copy(&self, from: &str, to: &str) -> Result<Response<Buffer>> {
         let from = format!("/{}/{}", self.bucket, build_abs_path(&self.root, from));
         let to = build_abs_path(&self.root, to);
 
@@ -223,17 +225,17 @@ impl UpyunCore {
 
         req = req.header(X_UPYUN_METADATA_DIRECTIVE, "copy");
 
-        // Set body
-        let mut req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
+        let req = req.extension(Operation::Copy);
 
-        self.sign(&mut req).await?;
+        // Set body
+        let mut req = req.body(Buffer::new()).map_err(new_request_build_error)?;
+
+        self.sign(&mut req)?;
 
         self.send(req).await
     }
 
-    pub async fn move_object(&self, from: &str, to: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn move_object(&self, from: &str, to: &str) -> Result<Response<Buffer>> {
         let from = format!("/{}/{}", self.bucket, build_abs_path(&self.root, from));
         let to = build_abs_path(&self.root, to);
 
@@ -251,17 +253,17 @@ impl UpyunCore {
 
         req = req.header(X_UPYUN_METADATA_DIRECTIVE, "copy");
 
-        // Set body
-        let mut req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
+        let req = req.extension(Operation::Rename);
 
-        self.sign(&mut req).await?;
+        // Set body
+        let mut req = req.body(Buffer::new()).map_err(new_request_build_error)?;
+
+        self.sign(&mut req)?;
 
         self.send(req).await
     }
 
-    pub async fn create_dir(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn create_dir(&self, path: &str) -> Result<Response<Buffer>> {
         let path = build_abs_path(&self.root, path);
         let path = path[..path.len() - 1].to_string();
 
@@ -277,11 +279,11 @@ impl UpyunCore {
 
         req = req.header(X_UPYUN_FOLDER, "true");
 
-        let mut req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
+        let req = req.extension(Operation::CreateDir);
 
-        self.sign(&mut req).await?;
+        let mut req = req.body(Buffer::new()).map_err(new_request_build_error)?;
+
+        self.sign(&mut req)?;
 
         self.send(req).await
     }
@@ -290,7 +292,7 @@ impl UpyunCore {
         &self,
         path: &str,
         args: &OpWrite,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    ) -> Result<Response<Buffer>> {
         let path = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -317,23 +319,23 @@ impl UpyunCore {
             req = req.header(X_UPYUN_CACHE_CONTROL, cache_control)
         }
 
-        let mut req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
+        let req = req.extension(Operation::Write);
 
-        self.sign(&mut req).await?;
+        let mut req = req.body(Buffer::new()).map_err(new_request_build_error)?;
+
+        self.sign(&mut req)?;
 
         self.send(req).await
     }
 
-    pub async fn upload_part(
+    pub fn upload_part(
         &self,
         path: &str,
         upload_id: &str,
         part_number: usize,
         size: u64,
-        body: AsyncBody,
-    ) -> Result<Request<AsyncBody>> {
+        body: Buffer,
+    ) -> Result<Request<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -352,10 +354,12 @@ impl UpyunCore {
 
         req = req.header(X_UPYUN_PART_ID, part_number);
 
+        let req = req.extension(Operation::Write);
+
         // Set body
         let mut req = req.body(body).map_err(new_request_build_error)?;
 
-        self.sign(&mut req).await?;
+        self.sign(&mut req)?;
 
         Ok(req)
     }
@@ -364,7 +368,7 @@ impl UpyunCore {
         &self,
         path: &str,
         upload_id: &str,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    ) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -379,11 +383,11 @@ impl UpyunCore {
 
         req = req.header(X_UPYUN_MULTI_UUID, upload_id);
 
-        let mut req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
+        let req = req.extension(Operation::Write);
 
-        self.sign(&mut req).await?;
+        let mut req = req.body(Buffer::new()).map_err(new_request_build_error)?;
+
+        self.sign(&mut req)?;
 
         self.send(req).await
     }
@@ -393,7 +397,7 @@ impl UpyunCore {
         path: &str,
         iter: &str,
         limit: Option<usize>,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    ) -> Result<Response<Buffer>> {
         let path = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -417,12 +421,12 @@ impl UpyunCore {
             req = req.header(X_UPYUN_LIST_LIMIT, limit);
         }
 
-        // Set body
-        let mut req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
+        let req = req.extension(Operation::List);
 
-        self.sign(&mut req).await?;
+        // Set body
+        let mut req = req.body(Buffer::new()).map_err(new_request_build_error)?;
+
+        self.sign(&mut req)?;
 
         self.send(req).await
     }

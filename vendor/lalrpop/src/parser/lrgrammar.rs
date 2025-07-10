@@ -1,4 +1,4 @@
-// auto-generated: "lalrpop 0.22.1"
+// auto-generated: "lalrpop 0.22.0"
 // sha3: f47daa431ba103316047ba86b3c78f39a981940447c550b2a48c2bd30fd64fc7
 use string_cache::DefaultAtom as Atom;
 use crate::grammar::parse_tree::*;
@@ -16,7 +16,7 @@ use self::___lalrpop_util::state_machine as ___state_machine;
 extern crate alloc;
 
 #[rustfmt::skip]
-#[allow(explicit_outlives_requirements, non_snake_case, non_camel_case_types, unused_mut, unused_variables, unused_imports, unused_parens, clippy::needless_lifetimes, clippy::type_complexity, clippy::needless_return, clippy::too_many_arguments, clippy::match_single_binding)]
+#[allow(explicit_outlives_requirements, non_snake_case, non_camel_case_types, unused_mut, unused_variables, unused_imports, unused_parens, clippy::needless_lifetimes, clippy::type_complexity, clippy::needless_return, clippy::too_many_arguments, clippy::never_loop, clippy::match_single_binding, clippy::needless_raw_string_hashes)]
 mod ___parse___Top {
 
 use string_cache::DefaultAtom as Atom;
@@ -3029,7 +3029,6 @@ _ => 65,
 _ => 0,
 }
 }
-#[allow(clippy::needless_raw_string_hashes)]
 const ___TERMINAL: &[&str] = &[
 r###""enum""###,
 r###""extern""###,
@@ -39349,7 +39348,7 @@ ___5,
 }
 
 #[allow(clippy::type_complexity, dead_code)]
-pub trait ___ToTriple<'input, >
+pub  trait ___ToTriple<'input, >
 {
 fn to_triple(self) -> Result<(usize,Tok<'input>,usize), ___lalrpop_util::ParseError<usize, Tok<'input>, tok::Error>>;
 }

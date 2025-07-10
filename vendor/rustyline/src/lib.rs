@@ -17,7 +17,7 @@
 //! # Ok::<(), rustyline::error::ReadlineError>(())
 //! ```
 #![warn(missing_docs)]
-#![cfg_attr(docsrs, feature(doc_cfg))]
+#![cfg_attr(docsrs, feature(doc_auto_cfg))]
 
 #[cfg(feature = "custom-bindings")]
 mod binding;
@@ -47,9 +47,7 @@ use std::result;
 
 use log::debug;
 #[cfg(feature = "derive")]
-#[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use rustyline_derive::{Completer, Helper, Highlighter, Hinter, Validator};
-use unicode_width::UnicodeWidthStr;
 
 use crate::tty::{Buffer, RawMode, RawReader, Renderer, Term, Terminal};
 
@@ -66,6 +64,8 @@ pub use crate::keymap::{Anchor, At, CharSearch, Cmd, InputMode, Movement, Repeat
 use crate::keymap::{Bindings, InputState, Refresher};
 pub use crate::keys::{KeyCode, KeyEvent, Modifiers};
 use crate::kill_ring::KillRing;
+pub use crate::layout::GraphemeClusterMode;
+use crate::layout::Unit;
 pub use crate::tty::ExternalPrinter;
 pub use crate::undo::Changeset;
 use crate::validate::Validator;
@@ -162,11 +162,14 @@ fn complete_line<H: Helper>(
         } else {
             return Ok(None);
         }
-        // we can't complete any further, wait for second tab
-        let mut cmd = s.next_cmd(input_state, rdr, true, true)?;
-        // if any character other than tab, pass it to the main loop
-        if cmd != Cmd::Complete {
-            return Ok(Some(cmd));
+        let mut cmd = Cmd::Complete;
+        if !config.completion_show_all_if_ambiguous() {
+            // we can't complete any further, wait for second tab
+            cmd = s.next_cmd(input_state, rdr, true, true)?;
+            // if any character other than tab, pass it to the main loop
+            if cmd != Cmd::Complete {
+                return Ok(Some(cmd));
+            }
         }
         // move cursor to EOL to avoid overwriting the command line
         let save_pos = s.line.pos();
@@ -292,15 +295,16 @@ fn page_completions<C: Candidate, H: Helper>(
         cols,
         candidates
             .iter()
-            .map(|s| s.display().width())
+            .map(|c| s.layout.width(c.display()))
             .max()
             .unwrap()
             + min_col_pad,
     );
     let num_cols = cols / max_width;
+    let nbc = u16::try_from(candidates.len()).unwrap();
 
     let mut pause_row = s.out.get_rows() - 1;
-    let num_rows = candidates.len().div_ceil(num_cols);
+    let num_rows = nbc.div_ceil(num_cols);
     let mut ab = String::new();
     for row in 0..num_rows {
         if row == pause_row {
@@ -334,15 +338,15 @@ fn page_completions<C: Candidate, H: Helper>(
         ab.clear();
         for col in 0..num_cols {
             let i = (col * num_rows) + row;
-            if i < candidates.len() {
-                let candidate = &candidates[i].display();
-                let width = candidate.width();
+            if i < nbc {
+                let candidate = &candidates[i as usize].display();
+                let width = s.layout.width(candidate);
                 if let Some(highlighter) = s.highlighter() {
                     ab.push_str(&highlighter.highlight_candidate(candidate, CompletionType::List));
                 } else {
                     ab.push_str(candidate);
                 }
-                if ((col + 1) * num_rows) + row < candidates.len() {
+                if ((col + 1) * num_rows) + row < nbc {
                     for _ in width..max_width {
                         ab.push(' ');
                     }
@@ -609,14 +613,7 @@ impl<H: Helper> Editor<H, DefaultHistory> {
 impl<H: Helper, I: History> Editor<H, I> {
     /// Create an editor with a custom history impl.
     pub fn with_history(config: Config, history: I) -> Result<Self> {
-        let term = Terminal::new(
-            config.color_mode(),
-            config.behavior(),
-            config.tab_stop(),
-            config.bell_style(),
-            config.enable_bracketed_paste(),
-            config.enable_signals(),
-        )?;
+        let term = Terminal::new(config)?;
         Ok(Self {
             term,
             buffer: None,
@@ -630,6 +627,9 @@ impl<H: Helper, I: History> Editor<H, I> {
 
     /// This method will read a line from STDIN and will display a `prompt`.
     ///
+    /// `prompt` should not be styled (in case the terminal doesn't support
+    /// ANSI) directly: use [`Highlighter::highlight_prompt`] instead.
+    ///
     /// It uses terminal-style interaction if `stdin` is connected to a
     /// terminal.
     /// Otherwise (e.g., if `stdin` is a pipe or the terminal is not supported),
@@ -638,8 +638,8 @@ impl<H: Helper, I: History> Editor<H, I> {
         self.readline_with(prompt, None)
     }
 
-    /// This function behaves in the exact same manner as `readline`, except
-    /// that it pre-populates the input area.
+    /// This function behaves in the exact same manner as [`Editor::readline`],
+    /// except that it pre-populates the input area.
     ///
     /// The text that resides in the input area is given as a 2-tuple.
     /// The string on the left of the tuple is what will appear to the left of
@@ -708,7 +708,7 @@ impl<H: Helper, I: History> Editor<H, I> {
             .create_reader(self.buffer.take(), &self.config, term_key_map);
         if self.term.is_output_tty() && self.config.check_cursor_position() {
             if let Err(e) = s.move_cursor_at_leftmost(&mut rdr) {
-                if let ReadlineError::WindowResized = e {
+                if let ReadlineError::Signal(error::Signal::Resize) = e {
                     s.out.update_size();
                 } else {
                     return Err(e);
@@ -748,6 +748,7 @@ impl<H: Helper, I: History> Editor<H, I> {
 
             #[cfg(unix)]
             if cmd == Cmd::Suspend {
+                debug!(target: "rustyline", "SIGTSTP");
                 original_mode.disable_raw_mode()?;
                 tty::suspend()?;
                 let _ = self.term.enable_raw_mode()?; // TODO original_mode may have changed
@@ -776,7 +777,7 @@ impl<H: Helper, I: History> Editor<H, I> {
                 cmd,
                 Cmd::AcceptLine | Cmd::Newline | Cmd::AcceptOrInsertLine { .. }
             ) {
-                self.term.cursor = s.layout.cursor.col;
+                self.term.cursor = s.layout.cursor.col as usize;
             }
 
             // Execute things can be done solely on a state object
@@ -850,7 +851,6 @@ impl<H: Helper, I: History> Editor<H, I> {
 
     /// Bind a sequence to a command.
     #[cfg(feature = "custom-bindings")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "custom-bindings")))]
     pub fn bind_sequence<E: Into<Event>, R: Into<EventHandler>>(
         &mut self,
         key_seq: E,
@@ -862,7 +862,6 @@ impl<H: Helper, I: History> Editor<H, I> {
 
     /// Remove a binding for the given sequence.
     #[cfg(feature = "custom-bindings")]
-    #[cfg_attr(docsrs, doc(cfg(feature = "custom-bindings")))]
     pub fn unbind_sequence<E: Into<Event>>(&mut self, key_seq: E) -> Option<EventHandler> {
         self.custom_bindings
             .remove(&Event::normalize(key_seq.into()))
@@ -894,7 +893,7 @@ impl<H: Helper, I: History> Editor<H, I> {
 
     /// If output stream is a tty, this function returns its width and height as
     /// a number of characters.
-    pub fn dimensions(&mut self) -> Option<(usize, usize)> {
+    pub fn dimensions(&mut self) -> Option<(Unit, Unit)> {
         if self.term.is_output_tty() {
             let out = self.term.create_writer();
             Some((out.get_columns(), out.get_rows()))

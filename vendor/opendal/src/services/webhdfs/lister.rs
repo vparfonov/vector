@@ -15,40 +15,45 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use async_trait::async_trait;
+use std::sync::Arc;
+
+use bytes::Buf;
 use http::StatusCode;
 
-use super::backend::WebhdfsBackend;
+use super::core::WebhdfsCore;
 use super::error::parse_error;
 use super::message::*;
 use crate::raw::*;
 use crate::*;
 
 pub struct WebhdfsLister {
-    backend: WebhdfsBackend,
+    core: Arc<WebhdfsCore>,
     path: String,
 }
 
 impl WebhdfsLister {
-    pub fn new(backend: WebhdfsBackend, path: &str) -> Self {
+    pub fn new(core: Arc<WebhdfsCore>, path: &str) -> Self {
         Self {
-            backend,
+            core,
             path: path.to_string(),
         }
     }
 }
 
-#[async_trait]
 impl oio::PageList for WebhdfsLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
-        let file_status = if self.backend.disable_list_batch {
-            let resp = self.backend.webhdfs_list_status_request(&self.path).await?;
+        let file_status = if self.core.disable_list_batch {
+            let resp = self.core.webhdfs_list_status(&self.path).await?;
             match resp.status() {
                 StatusCode::OK => {
                     ctx.done = true;
+                    ctx.entries.push_back(oio::Entry::new(
+                        format!("{}/", self.path).as_str(),
+                        Metadata::new(EntryMode::DIR),
+                    ));
 
-                    let bs = resp.into_body().bytes().await?;
-                    serde_json::from_slice::<FileStatusesWrapper>(&bs)
+                    let bs = resp.into_body();
+                    serde_json::from_reader::<_, FileStatusesWrapper>(bs.reader())
                         .map_err(new_json_deserialize_error)?
                         .file_statuses
                         .file_status
@@ -57,25 +62,31 @@ impl oio::PageList for WebhdfsLister {
                     ctx.done = true;
                     return Ok(());
                 }
-                _ => return Err(parse_error(resp).await?),
+                _ => return Err(parse_error(resp)),
             }
         } else {
             let resp = self
-                .backend
-                .webhdfs_list_status_batch_request(&self.path, &ctx.token)
+                .core
+                .webhdfs_list_status_batch(&self.path, &ctx.token)
                 .await?;
             match resp.status() {
                 StatusCode::OK => {
-                    let bs = resp.into_body().bytes().await?;
-                    let directory_listing = serde_json::from_slice::<DirectoryListingWrapper>(&bs)
-                        .map_err(new_json_deserialize_error)?
-                        .directory_listing;
+                    let bs = resp.into_body();
+                    let res: DirectoryListingWrapper =
+                        serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
+                    let directory_listing = res.directory_listing;
                     let file_statuses = directory_listing.partial_listing.file_statuses.file_status;
 
                     if directory_listing.remaining_entries == 0 {
+                        ctx.entries.push_back(oio::Entry::new(
+                            format!("{}/", self.path).as_str(),
+                            Metadata::new(EntryMode::DIR),
+                        ));
+
                         ctx.done = true;
                     } else if !file_statuses.is_empty() {
-                        ctx.token = file_statuses.last().unwrap().path_suffix.clone();
+                        ctx.token
+                            .clone_from(&file_statuses.last().unwrap().path_suffix);
                     }
 
                     file_statuses
@@ -84,7 +95,7 @@ impl oio::PageList for WebhdfsLister {
                     ctx.done = true;
                     return Ok(());
                 }
-                _ => return Err(parse_error(resp).await?),
+                _ => return Err(parse_error(resp)),
             }
         };
 

@@ -83,7 +83,6 @@ use std::time::SystemTime;
 #[cfg(all(target_family = "wasm", target_os = "unknown", feature = "web"))]
 use web_time::SystemTime;
 
-pub mod alg_id;
 mod base64;
 mod server_name;
 
@@ -95,7 +94,6 @@ mod server_name;
 #[cfg(feature = "alloc")]
 pub mod pem;
 
-pub use alg_id::AlgorithmIdentifier;
 pub use server_name::{
     AddrParseError, DnsName, InvalidDnsNameError, IpAddr, Ipv4Addr, Ipv6Addr, ServerName,
 };
@@ -129,17 +127,6 @@ pub enum PrivateKeyDer<'a> {
     Sec1(PrivateSec1KeyDer<'a>),
     /// A PKCS#8 private key
     Pkcs8(PrivatePkcs8KeyDer<'a>),
-}
-
-#[cfg(feature = "alloc")]
-impl zeroize::Zeroize for PrivateKeyDer<'static> {
-    fn zeroize(&mut self) {
-        match self {
-            Self::Pkcs1(key) => key.zeroize(),
-            Self::Sec1(key) => key.zeroize(),
-            Self::Pkcs8(key) => key.zeroize(),
-        }
-    }
 }
 
 impl PrivateKeyDer<'_> {
@@ -325,13 +312,6 @@ impl PrivatePkcs1KeyDer<'_> {
 }
 
 #[cfg(feature = "alloc")]
-impl zeroize::Zeroize for PrivatePkcs1KeyDer<'static> {
-    fn zeroize(&mut self) {
-        self.0.0.zeroize()
-    }
-}
-
-#[cfg(feature = "alloc")]
 impl PemObjectFilter for PrivatePkcs1KeyDer<'static> {
     const KIND: SectionKind = SectionKind::RsaPrivateKey;
 }
@@ -388,13 +368,6 @@ impl PrivateSec1KeyDer<'_> {
     /// Yield the DER-encoded bytes of the private key
     pub fn secret_sec1_der(&self) -> &[u8] {
         self.0.as_ref()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl zeroize::Zeroize for PrivateSec1KeyDer<'static> {
-    fn zeroize(&mut self) {
-        self.0.0.zeroize()
     }
 }
 
@@ -456,13 +429,6 @@ impl PrivatePkcs8KeyDer<'_> {
     /// Yield the DER-encoded bytes of the private key
     pub fn secret_pkcs8_der(&self) -> &[u8] {
         self.0.as_ref()
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl zeroize::Zeroize for PrivatePkcs8KeyDer<'static> {
-    fn zeroize(&mut self) {
-        self.0.0.zeroize()
     }
 }
 
@@ -714,7 +680,7 @@ impl CertificateDer<'_> {
     /// Converts this certificate into its owned variant, unfreezing borrowed content (if any)
     #[cfg(feature = "alloc")]
     pub fn into_owned(self) -> CertificateDer<'static> {
-        CertificateDer(Der(self.0.0.into_owned()))
+        CertificateDer(Der(self.0 .0.into_owned()))
     }
 }
 
@@ -777,7 +743,7 @@ impl SubjectPublicKeyInfoDer<'_> {
     /// Converts this SubjectPublicKeyInfo into its owned variant, unfreezing borrowed content (if any)
     #[cfg(feature = "alloc")]
     pub fn into_owned(self) -> SubjectPublicKeyInfoDer<'static> {
-        SubjectPublicKeyInfoDer(Der(self.0.0.into_owned()))
+        SubjectPublicKeyInfoDer(Der(self.0 .0.into_owned()))
     }
 }
 
@@ -933,6 +899,65 @@ pub trait SignatureVerificationAlgorithm: Send + Sync + fmt::Debug {
 #[derive(Debug, Copy, Clone)]
 pub struct InvalidSignature;
 
+/// A DER encoding of the PKIX AlgorithmIdentifier type:
+///
+/// ```ASN.1
+/// AlgorithmIdentifier  ::=  SEQUENCE  {
+///     algorithm               OBJECT IDENTIFIER,
+///     parameters              ANY DEFINED BY algorithm OPTIONAL  }
+///                                -- contains a value of the type
+///                                -- registered for use with the
+///                                -- algorithm object identifier value
+/// ```
+/// (from <https://www.rfc-editor.org/rfc/rfc5280#section-4.1.1.2>)
+///
+/// The outer sequence encoding is *not included*, so this is the DER encoding
+/// of an OID for `algorithm` plus the `parameters` value.
+///
+/// For example, this is the `rsaEncryption` algorithm:
+///
+/// ```
+/// let rsa_encryption = rustls_pki_types::AlgorithmIdentifier::from_slice(
+///     &[
+///         // algorithm: 1.2.840.113549.1.1.1
+///         0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01,
+///         // parameters: NULL
+///         0x05, 0x00
+///     ]
+/// );
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct AlgorithmIdentifier(&'static [u8]);
+
+impl AlgorithmIdentifier {
+    /// Makes a new `AlgorithmIdentifier` from a static octet slice.
+    ///
+    /// This does not validate the contents of the slice.
+    pub const fn from_slice(bytes: &'static [u8]) -> Self {
+        Self(bytes)
+    }
+}
+
+impl AsRef<[u8]> for AlgorithmIdentifier {
+    fn as_ref(&self) -> &[u8] {
+        self.0
+    }
+}
+
+impl fmt::Debug for AlgorithmIdentifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        hex(f, self.0)
+    }
+}
+
+impl Deref for AlgorithmIdentifier {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
 /// A timestamp, tracking the number of non-leap seconds since the Unix epoch.
 ///
 /// The Unix epoch is defined January 1, 1970 00:00:00 UTC.
@@ -1031,16 +1056,6 @@ impl BytesInner<'_> {
             Self::Owned(vec) => vec,
             Self::Borrowed(slice) => slice.to_vec(),
         })
-    }
-}
-
-#[cfg(feature = "alloc")]
-impl zeroize::Zeroize for BytesInner<'static> {
-    fn zeroize(&mut self) {
-        match self {
-            BytesInner::Owned(vec) => vec.zeroize(),
-            BytesInner::Borrowed(_) => (),
-        }
     }
 }
 

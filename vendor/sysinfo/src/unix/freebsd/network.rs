@@ -29,19 +29,21 @@ impl NetworksInner {
         &self.interfaces
     }
 
-    pub(crate) fn refresh_list(&mut self) {
+    pub(crate) fn refresh(&mut self, remove_not_listed_interfaces: bool) {
         unsafe {
             self.refresh_interfaces(true);
         }
-        // Remove interfaces which are gone.
-        self.interfaces.retain(|_, n| n.inner.updated);
-        refresh_networks_addresses(&mut self.interfaces);
-    }
-
-    pub(crate) fn refresh(&mut self) {
-        unsafe {
-            self.refresh_interfaces(false);
+        if remove_not_listed_interfaces {
+            // Remove interfaces which are gone.
+            self.interfaces.retain(|_, i| {
+                if !i.inner.updated {
+                    return false;
+                }
+                i.inner.updated = false;
+                true
+            });
         }
+        refresh_networks_addresses(&mut self.interfaces);
     }
 
     unsafe fn refresh_interfaces(&mut self, refresh_all: bool) {
@@ -80,6 +82,7 @@ impl NetworksInner {
             }
             if let Some(name) = utils::c_buf_to_utf8_string(&data.ifmd_name) {
                 let data = &data.ifmd_data;
+                let mtu = data.ifi_mtu as u64;
                 match self.interfaces.entry(name) {
                     hash_map::Entry::Occupied(mut e) => {
                         let interface = e.get_mut();
@@ -91,6 +94,9 @@ impl NetworksInner {
                         old_and_new!(interface, ifi_opackets, old_ifi_opackets, data);
                         old_and_new!(interface, ifi_ierrors, old_ifi_ierrors, data);
                         old_and_new!(interface, ifi_oerrors, old_ifi_oerrors, data);
+                        if interface.mtu != mtu {
+                            interface.mtu = mtu;
+                        }
                         interface.updated = true;
                     }
                     hash_map::Entry::Vacant(e) => {
@@ -115,6 +121,7 @@ impl NetworksInner {
                                 updated: true,
                                 mac_addr: MacAddr::UNSPECIFIED,
                                 ip_networks: vec![],
+                                mtu,
                             },
                         });
                     }
@@ -151,6 +158,8 @@ pub(crate) struct NetworkDataInner {
     pub(crate) mac_addr: MacAddr,
     /// IP networks
     pub(crate) ip_networks: Vec<IpNetwork>,
+    /// Interface Maximum Transfer Unit (MTU)
+    mtu: u64,
 }
 
 impl NetworkDataInner {
@@ -208,5 +217,9 @@ impl NetworkDataInner {
 
     pub(crate) fn ip_networks(&self) -> &[IpNetwork] {
         &self.ip_networks
+    }
+
+    pub(crate) fn mtu(&self) -> u64 {
+        self.mtu
     }
 }

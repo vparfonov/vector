@@ -7,7 +7,7 @@ use super::Tracer;
 #[cfg(test)]
 mod test;
 
-impl<'grammar> Tracer<'_, 'grammar> {
+impl<'trace, 'grammar> Tracer<'trace, 'grammar> {
     pub fn backtrace_reduce(
         mut self,
         item_state: StateIndex,

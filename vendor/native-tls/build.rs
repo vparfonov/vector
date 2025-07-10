@@ -1,3 +1,4 @@
+#![allow(clippy::unusual_byte_groupings)]
 use std::env;
 
 fn main() {
@@ -16,4 +17,6 @@ fn main() {
             println!("cargo:rustc-cfg=have_min_max_version");
         }
     }
+
+    println!("cargo::rustc-check-cfg=cfg(have_min_max_version)")
 }

@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.63"
 name = "term"
-version = "1.0.2"
+version = "1.0.1"
 authors = [
     "The Rust Project Developers",
     "Steven Allen",
@@ -34,9 +34,6 @@ categories = ["command-line-interface"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/Stebalien/term"
 
-[features]
-default = []
-
 [lib]
 name = "term"
 path = "src/lib.rs"
@@ -48,8 +45,11 @@ path = "tests/terminfo.rs"
 [dependencies.home]
 version = "0.5.5"
 
+[features]
+default = []
+
 [target."cfg(windows)".dependencies.windows-sys]
-version = "0.59.0"
+version = "0.52.0"
 features = [
     "Win32_Storage",
     "Win32_Foundation",

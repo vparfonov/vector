@@ -15,7 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use tokio::io::{self, AsyncReadExt, AsyncWriteExt, BufReader};
+use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
+use tokio::io::BufReader;
+use tokio::io::{self};
 use tokio::net::TcpStream;
 
 use crate::raw::*;
@@ -71,7 +74,7 @@ impl PacketHeader {
         Ok(())
     }
 
-    pub async fn read(reader: &mut TcpStream) -> std::result::Result<PacketHeader, io::Error> {
+    pub async fn read(reader: &mut TcpStream) -> Result<PacketHeader, io::Error> {
         let header = PacketHeader {
             magic: reader.read_u8().await?,
             opcode: reader.read_u8().await?,

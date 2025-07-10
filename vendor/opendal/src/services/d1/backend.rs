@@ -15,54 +15,29 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 
-use async_trait::async_trait;
 use http::header;
 use http::Request;
 use http::StatusCode;
-use serde::Deserialize;
 use serde_json::Value;
 
 use super::error::parse_error;
 use super::model::D1Response;
 use crate::raw::adapters::kv;
 use crate::raw::*;
+use crate::services::D1Config;
 use crate::ErrorKind;
 use crate::*;
 
-/// Config for [Cloudflare D1](https://developers.cloudflare.com/d1) backend support.
-#[derive(Default, Deserialize)]
-#[serde(default)]
-#[non_exhaustive]
-pub struct D1Config {
-    /// Set the token of cloudflare api.
-    pub token: Option<String>,
-    /// Set the account id of cloudflare api.
-    pub account_id: Option<String>,
-    /// Set the database id of cloudflare api.
-    pub database_id: Option<String>,
-
-    /// Set the working directory of OpenDAL.
-    pub root: Option<String>,
-    /// Set the table of D1 Database.
-    pub table: Option<String>,
-    /// Set the key field of D1 Database.
-    pub key_field: Option<String>,
-    /// Set the value field of D1 Database.
-    pub value_field: Option<String>,
-}
-
-impl Debug for D1Config {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut ds = f.debug_struct("D1Config");
-        ds.field("root", &self.root);
-        ds.field("table", &self.table);
-        ds.field("key_field", &self.key_field);
-        ds.field("value_field", &self.value_field);
-        ds.finish_non_exhaustive()
+impl Configurator for D1Config {
+    type Builder = D1Builder;
+    fn into_builder(self) -> Self::Builder {
+        D1Builder {
+            config: self,
+            http_client: None,
+        }
     }
 }
 
@@ -86,7 +61,7 @@ impl D1Builder {
     /// Set api token for the cloudflare d1 service.
     ///
     /// create a api token from [here](https://dash.cloudflare.com/profile/api-tokens)
-    pub fn token(&mut self, token: &str) -> &mut Self {
+    pub fn token(mut self, token: &str) -> Self {
         if !token.is_empty() {
             self.config.token = Some(token.to_string());
         }
@@ -97,7 +72,7 @@ impl D1Builder {
     ///
     /// get the account identifier from Workers & Pages -> Overview -> Account ID
     /// If not specified, it will return an error when building.
-    pub fn account_id(&mut self, account_id: &str) -> &mut Self {
+    pub fn account_id(mut self, account_id: &str) -> Self {
         if !account_id.is_empty() {
             self.config.account_id = Some(account_id.to_string());
         }
@@ -108,7 +83,7 @@ impl D1Builder {
     ///
     /// get the database identifier from Workers & Pages -> D1 -> [Your Database] -> Database ID
     /// If not specified, it will return an error when building.
-    pub fn database_id(&mut self, database_id: &str) -> &mut Self {
+    pub fn database_id(mut self, database_id: &str) -> Self {
         if !database_id.is_empty() {
             self.config.database_id = Some(database_id.to_string());
         }
@@ -118,17 +93,20 @@ impl D1Builder {
     /// set the working directory, all operations will be performed under it.
     ///
     /// default: "/"
-    pub fn root(&mut self, root: &str) -> &mut Self {
-        if !root.is_empty() {
-            self.config.root = Some(root.to_owned());
-        }
+    pub fn root(mut self, root: &str) -> Self {
+        self.config.root = if root.is_empty() {
+            None
+        } else {
+            Some(root.to_string())
+        };
+
         self
     }
 
     /// Set the table name of the d1 service to read/write.
     ///
     /// If not specified, it will return an error when building.
-    pub fn table(&mut self, table: &str) -> &mut Self {
+    pub fn table(mut self, table: &str) -> Self {
         if !table.is_empty() {
             self.config.table = Some(table.to_owned());
         }
@@ -138,7 +116,7 @@ impl D1Builder {
     /// Set the key field name of the d1 service to read/write.
     ///
     /// Default to `key` if not specified.
-    pub fn key_field(&mut self, key_field: &str) -> &mut Self {
+    pub fn key_field(mut self, key_field: &str) -> Self {
         if !key_field.is_empty() {
             self.config.key_field = Some(key_field.to_string());
         }
@@ -148,7 +126,7 @@ impl D1Builder {
     /// Set the value field name of the d1 service to read/write.
     ///
     /// Default to `value` if not specified.
-    pub fn value_field(&mut self, value_field: &str) -> &mut Self {
+    pub fn value_field(mut self, value_field: &str) -> Self {
         if !value_field.is_empty() {
             self.config.value_field = Some(value_field.to_string());
         }
@@ -158,24 +136,17 @@ impl D1Builder {
 
 impl Builder for D1Builder {
     const SCHEME: Scheme = Scheme::D1;
-    type Accessor = D1Backend;
+    type Config = D1Config;
 
-    fn from_map(map: HashMap<String, String>) -> Self {
-        Self {
-            config: D1Config::deserialize(ConfigDeserializer::new(map))
-                .expect("config deserialize must succeed"),
-            ..Default::default()
-        }
-    }
-
-    fn build(&mut self) -> Result<Self::Accessor> {
+    fn build(self) -> Result<impl Access> {
         let mut authorization = None;
-        let config = &self.config;
-        if let Some(token) = &config.token {
-            authorization = Some(format_authorization_by_bearer(token)?)
+        let config = self.config;
+
+        if let Some(token) = config.token {
+            authorization = Some(format_authorization_by_bearer(&token)?)
         }
 
-        let Some(account_id) = config.account_id.clone() else {
+        let Some(account_id) = config.account_id else {
             return Err(Error::new(
                 ErrorKind::ConfigInvalid,
                 "account_id is required",
@@ -189,7 +160,7 @@ impl Builder for D1Builder {
             ));
         };
 
-        let client = if let Some(client) = self.http_client.take() {
+        let client = if let Some(client) = self.http_client {
             client
         } else {
             HttpClient::new().map_err(|err| {
@@ -228,7 +199,7 @@ impl Builder for D1Builder {
             key_field,
             value_field,
         })
-        .with_root(&root))
+        .with_normalized_root(root))
     }
 }
 
@@ -257,7 +228,7 @@ impl Debug for Adapter {
 }
 
 impl Adapter {
-    fn create_d1_query_request(&self, sql: &str, params: Vec<Value>) -> Result<Request<AsyncBody>> {
+    fn create_d1_query_request(&self, sql: &str, params: Vec<Value>) -> Result<Request<Buffer>> {
         let p = format!(
             "/accounts/{}/d1/database/{}/query",
             self.account_id, self.database_id
@@ -280,15 +251,16 @@ impl Adapter {
         });
 
         let body = serde_json::to_vec(&json).map_err(new_json_serialize_error)?;
-        req.body(AsyncBody::Bytes(body.into()))
+        req.body(Buffer::from(body))
             .map_err(new_request_build_error)
     }
 }
 
-#[async_trait]
 impl kv::Adapter for Adapter {
-    fn metadata(&self) -> kv::Metadata {
-        kv::Metadata::new(
+    type Scanner = ();
+
+    fn info(&self) -> kv::Info {
+        kv::Info::new(
             Scheme::D1,
             &self.table,
             Capability {
@@ -297,12 +269,13 @@ impl kv::Adapter for Adapter {
                 // Cloudflare D1 supports 1MB as max in write_total.
                 // refer to https://developers.cloudflare.com/d1/platform/limits/
                 write_total_max_size: Some(1000 * 1000),
+                shared: true,
                 ..Default::default()
             },
         )
     }
 
-    async fn get(&self, path: &str) -> Result<Option<Vec<u8>>> {
+    async fn get(&self, path: &str) -> Result<Option<Buffer>> {
         let query = format!(
             "SELECT {} FROM {} WHERE {} = ? LIMIT 1",
             self.value_field, self.table, self.key_field
@@ -313,15 +286,16 @@ impl kv::Adapter for Adapter {
         let status = resp.status();
         match status {
             StatusCode::OK | StatusCode::PARTIAL_CONTENT => {
-                let body = resp.into_body().bytes().await?;
-                let d1_response = D1Response::parse(&body)?;
+                let body = resp.into_body();
+                let bs = body.to_bytes();
+                let d1_response = D1Response::parse(&bs)?;
                 Ok(d1_response.get_result(&self.value_field))
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    async fn set(&self, path: &str, value: &[u8]) -> Result<()> {
+    async fn set(&self, path: &str, value: Buffer) -> Result<()> {
         let table = &self.table;
         let key_field = &self.key_field;
         let value_field = &self.value_field;
@@ -332,14 +306,14 @@ impl kv::Adapter for Adapter {
                     DO UPDATE SET {value_field} = EXCLUDED.{value_field}",
         );
 
-        let params = vec![path.into(), value.into()];
+        let params = vec![path.into(), value.to_vec().into()];
         let req = self.create_d1_query_request(&query, params)?;
 
         let resp = self.client.send(req).await?;
         let status = resp.status();
         match status {
             StatusCode::OK | StatusCode::PARTIAL_CONTENT => Ok(()),
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -351,7 +325,7 @@ impl kv::Adapter for Adapter {
         let status = resp.status();
         match status {
             StatusCode::OK | StatusCode::PARTIAL_CONTENT => Ok(()),
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 }

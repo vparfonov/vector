@@ -15,10 +15,8 @@ pub struct Empty<D> {
 
 impl<D> Empty<D> {
     /// Create a new `Empty`.
-    pub const fn new() -> Self {
-        Self {
-            _marker: PhantomData,
-        }
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -51,7 +49,9 @@ impl<D> fmt::Debug for Empty<D> {
 
 impl<D> Default for Empty<D> {
     fn default() -> Self {
-        Self::new()
+        Self {
+            _marker: PhantomData,
+        }
     }
 }
 

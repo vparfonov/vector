@@ -130,8 +130,8 @@ pub fn decode_key(buf: &mut impl Buf) -> Result<(u32, WireType), DecodeError> {
 /// Returns the width of an encoded Protobuf field key with the given tag.
 /// The returned width will be between 1 and 5 bytes (inclusive).
 #[inline]
-pub fn key_len(tag: u32) -> usize {
-    encoded_len_varint(u64::from(tag << 3))
+pub const fn key_len(tag: u32) -> usize {
+    encoded_len_varint((tag << 3) as u64)
 }
 
 /// Helper function which abstracts reading a length delimiter prefix followed
@@ -583,7 +583,7 @@ pub mod string {
         // in the buf implementation, a drop guard is used.
         unsafe {
             struct DropGuard<'a>(&'a mut Vec<u8>);
-            impl<'a> Drop for DropGuard<'a> {
+            impl Drop for DropGuard<'_> {
                 #[inline]
                 fn drop(&mut self) {
                     self.0.clear();

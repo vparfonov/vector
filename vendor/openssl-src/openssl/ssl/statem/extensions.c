@@ -1,5 +1,5 @@
 /*
- * Copyright 2016-2024 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 2016-2025 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
@@ -15,6 +15,7 @@
 #include <string.h>
 #include "internal/nelem.h"
 #include "internal/cryptlib.h"
+#include "internal/ssl_unwrap.h"
 #include "../ssl_local.h"
 #include "statem_local.h"
 
@@ -693,7 +694,7 @@ int tls_collect_extensions(SSL_CONNECTION *s, PACKET *packet,
             thisex->type = type;
             thisex->received_order = i++;
             if (s->ext.debug_cb)
-                s->ext.debug_cb(SSL_CONNECTION_GET_SSL(s), !s->server,
+                s->ext.debug_cb(SSL_CONNECTION_GET_USER_SSL(s), !s->server,
                                 thisex->type, PACKET_data(&thisex->data),
                                 PACKET_remaining(&thisex->data),
                                 s->ext.debug_arg);
@@ -991,6 +992,7 @@ static int final_server_name(SSL_CONNECTION *s, unsigned int context, int sent)
     int ret = SSL_TLSEXT_ERR_NOACK;
     int altmp = SSL_AD_UNRECOGNIZED_NAME;
     SSL *ssl = SSL_CONNECTION_GET_SSL(s);
+    SSL *ussl = SSL_CONNECTION_GET_USER_SSL(s);
     SSL_CTX *sctx = SSL_CONNECTION_GET_CTX(s);
     int was_ticket = (SSL_get_options(ssl) & SSL_OP_NO_TICKET) == 0;
 
@@ -1000,11 +1002,11 @@ static int final_server_name(SSL_CONNECTION *s, unsigned int context, int sent)
     }
 
     if (sctx->ext.servername_cb != NULL)
-        ret = sctx->ext.servername_cb(ssl, &altmp,
+        ret = sctx->ext.servername_cb(ussl, &altmp,
                                       sctx->ext.servername_arg);
     else if (s->session_ctx->ext.servername_cb != NULL)
-        ret = s->session_ctx->ext.servername_cb(ssl, &altmp,
-                                       s->session_ctx->ext.servername_arg);
+        ret = s->session_ctx->ext.servername_cb(ussl, &altmp,
+                                                s->session_ctx->ext.servername_arg);
 
     /*
      * For servers, propagate the SNI hostname from the temporary
@@ -1447,36 +1449,12 @@ static int final_key_share(SSL_CONNECTION *s, unsigned int context, int sent)
             /* No suitable key_share */
             if (s->hello_retry_request == SSL_HRR_NONE && sent
                     && (!s->hit
-                        || (s->ext.psk_kex_mode & TLSEXT_KEX_MODE_FLAG_KE_DHE)
-                           != 0)) {
-                const uint16_t *pgroups, *clntgroups;
-                size_t num_groups, clnt_num_groups, i;
-                unsigned int group_id = 0;
+                        || (s->ext.psk_kex_mode & TLSEXT_KEX_MODE_FLAG_KE_DHE) != 0)) {
 
-                /* Check if a shared group exists */
-
-                /* Get the clients list of supported groups. */
-                tls1_get_peer_groups(s, &clntgroups, &clnt_num_groups);
-                tls1_get_supported_groups(s, &pgroups, &num_groups);
-
-                /*
-                 * Find the first group we allow that is also in client's list
-                 */
-                for (i = 0; i < num_groups; i++) {
-                    group_id = pgroups[i];
-
-                    if (check_in_list(s, group_id, clntgroups, clnt_num_groups,
-                                      1)
-                            && tls_group_allowed(s, group_id,
-                                                 SSL_SECOP_CURVE_SUPPORTED)
-                            && tls_valid_group(s, group_id, TLS1_3_VERSION,
-                                               TLS1_3_VERSION, 0, NULL))
-                        break;
-                }
-
-                if (i < num_groups) {
+                /* Did we detect group overlap in tls_parse_ctos_key_share ? */
+                if (s->s3.group_id_candidate != 0) {
                     /* A shared group exists so send a HelloRetryRequest */
-                    s->s3.group_id = group_id;
+                    s->s3.group_id = s->s3.group_id_candidate;
                     s->hello_retry_request = SSL_HRR_PENDING;
                     return 1;
                 }
@@ -1739,8 +1717,8 @@ static int final_early_data(SSL_CONNECTION *s, unsigned int context, int sent)
             || !s->ext.early_data_ok
             || s->hello_retry_request != SSL_HRR_NONE
             || (s->allow_early_data_cb != NULL
-                && !s->allow_early_data_cb(SSL_CONNECTION_GET_SSL(s),
-                                         s->allow_early_data_cb_data))) {
+                && !s->allow_early_data_cb(SSL_CONNECTION_GET_USER_SSL(s),
+                                           s->allow_early_data_cb_data))) {
         s->ext.early_data = SSL_EARLY_DATA_REJECTED;
     } else {
         s->ext.early_data = SSL_EARLY_DATA_ACCEPTED;

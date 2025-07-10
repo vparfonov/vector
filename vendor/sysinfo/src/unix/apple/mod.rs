@@ -10,7 +10,7 @@ cfg_if! {
     if #[cfg(all(target_os = "macos", any(feature = "disk", feature = "system", feature = "component")))] {
         pub(crate) mod macos;
         pub(crate) use self::macos as inner;
-    } else if #[cfg(all(target_os = "ios", any(feature = "disk", feature = "system", feature = "component")))] {
+    } else if #[cfg(all(target_os = "ios", any(feature = "system", feature = "component")))] {
         pub(crate) mod ios;
         pub(crate) use self::ios as inner;
     }
@@ -57,3 +57,25 @@ cfg_if! {
 
 #[doc = include_str!("../../../md_doc/is_supported.md")]
 pub const IS_SUPPORTED_SYSTEM: bool = true;
+
+// Make formattable by rustfmt.
+#[cfg(any())]
+mod component;
+#[cfg(any())]
+mod cpu;
+#[cfg(any())]
+mod disk;
+#[cfg(any())]
+mod groups;
+#[cfg(any())]
+mod ios;
+#[cfg(any())]
+mod macos;
+#[cfg(any())]
+mod network;
+#[cfg(any())]
+mod process;
+#[cfg(any())]
+mod system;
+#[cfg(any())]
+mod users;

@@ -6,7 +6,6 @@
 use super::EncoderState::*;
 use super::{EncodeResult, Encoder, EncoderError, ENCODER_SAM};
 use crate::enums::RegType;
-use crate::transaction::Transaction;
 use crate::RegValue;
 use serde::ser::*;
 use std::fmt;
@@ -18,7 +17,7 @@ impl Error for EncoderError {
     }
 }
 
-impl<'a, Tr: AsRef<Transaction>> Serializer for &'a mut Encoder<Tr> {
+impl<'a> Serializer for &'a mut Encoder {
     type Ok = ();
     type Error = EncoderError;
 
@@ -26,8 +25,8 @@ impl<'a, Tr: AsRef<Transaction>> Serializer for &'a mut Encoder<Tr> {
     type SerializeTuple = TupleEncoder;
     type SerializeTupleStruct = TupleStructEncoder;
     type SerializeTupleVariant = TupleVariantEncoder;
-    type SerializeMap = StructMapEncoder<'a, Tr>;
-    type SerializeStruct = StructMapEncoder<'a, Tr>;
+    type SerializeMap = StructMapEncoder<'a>;
+    type SerializeStruct = StructMapEncoder<'a>;
     type SerializeStructVariant = StructVariantEncoder;
 
     fn serialize_bool(self, value: bool) -> EncodeResult<Self::Ok> {
@@ -188,7 +187,7 @@ impl<'a, Tr: AsRef<Transaction>> Serializer for &'a mut Encoder<Tr> {
                 // nested structure
                 match self.keys[self.keys.len() - 1].create_subkey_transacted_with_flags(
                     s,
-                    self.tr.as_ref(),
+                    &self.tr,
                     ENCODER_SAM,
                 ) {
                     Ok((subkey, _disp)) => {
@@ -463,12 +462,12 @@ impl serde::Serializer for MapKeySerializer {
     }
 }
 
-pub struct StructMapEncoder<'a, Tr: AsRef<Transaction>> {
-    enc: &'a mut Encoder<Tr>,
+pub struct StructMapEncoder<'a> {
+    enc: &'a mut Encoder,
     is_root: bool,
 }
 
-impl<'a, Tr: AsRef<Transaction>> SerializeStruct for StructMapEncoder<'a, Tr> {
+impl<'a> SerializeStruct for StructMapEncoder<'a> {
     type Ok = ();
     type Error = EncoderError;
 
@@ -489,7 +488,7 @@ impl<'a, Tr: AsRef<Transaction>> SerializeStruct for StructMapEncoder<'a, Tr> {
     }
 }
 
-impl<'a, Tr: AsRef<Transaction>> SerializeMap for StructMapEncoder<'a, Tr> {
+impl<'a> SerializeMap for StructMapEncoder<'a> {
     type Ok = ();
     type Error = EncoderError;
 

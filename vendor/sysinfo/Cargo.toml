@@ -13,10 +13,11 @@
 edition = "2021"
 rust-version = "1.74"
 name = "sysinfo"
-version = "0.32.1"
+version = "0.34.2"
 authors = ["Guillaume Gomez <guillaume1.gomez@gmail.com>"]
 build = false
 exclude = ["/test-unknown"]
+autolib = false
 autobins = false
 autoexamples = false
 autotests = false
@@ -46,6 +47,91 @@ targets = [
     "x86_64-unknown-freebsd",
 ]
 
+[features]
+apple-app-store = ["apple-sandbox"]
+apple-sandbox = []
+c-interface = ["default"]
+component = [
+    "windows/Win32_Foundation",
+    "windows/Win32_Security",
+    "windows/Win32_System_Com",
+    "windows/Win32_System_Rpc",
+    "windows/Win32_System_Variant",
+    "windows/Win32_System_Wmi",
+    "objc2-core-foundation/CFArray",
+    "objc2-core-foundation/CFBase",
+    "objc2-core-foundation/CFDictionary",
+    "objc2-core-foundation/CFNumber",
+    "objc2-core-foundation/CFString",
+]
+debug = ["libc/extra_traits"]
+default = [
+    "component",
+    "disk",
+    "network",
+    "system",
+    "user",
+]
+disk = [
+    "windows/Win32_Foundation",
+    "windows/Win32_Storage_FileSystem",
+    "windows/Win32_Security",
+    "windows/Win32_System_IO",
+    "windows/Win32_System_Ioctl",
+    "windows/Win32_System_SystemServices",
+    "windows/Win32_System_WindowsProgramming",
+    "objc2-core-foundation/CFArray",
+    "objc2-core-foundation/CFBase",
+    "objc2-core-foundation/CFDictionary",
+    "objc2-core-foundation/CFError",
+    "objc2-core-foundation/CFNumber",
+    "objc2-core-foundation/CFString",
+    "objc2-core-foundation/CFURL",
+]
+linux-netdevs = []
+linux-tmpfs = []
+multithread = ["dep:rayon"]
+network = [
+    "windows/Win32_Foundation",
+    "windows/Win32_NetworkManagement_IpHelper",
+    "windows/Win32_NetworkManagement_Ndis",
+    "windows/Win32_Networking_WinSock",
+]
+system = [
+    "windows/Win32_Foundation",
+    "windows/Win32_System_Diagnostics_ToolHelp",
+    "windows/Wdk_System_SystemInformation",
+    "windows/Wdk_System_SystemServices",
+    "windows/Wdk_System_Threading",
+    "windows/Win32_Security_Authorization",
+    "windows/Win32_System_Diagnostics_Debug",
+    "windows/Win32_System_Kernel",
+    "windows/Win32_System_Memory",
+    "windows/Win32_System_Performance",
+    "windows/Win32_System_Power",
+    "windows/Win32_System_ProcessStatus",
+    "windows/Win32_System_Registry",
+    "windows/Win32_System_RemoteDesktop",
+    "windows/Win32_System_SystemInformation",
+    "windows/Win32_System_SystemServices",
+    "windows/Win32_System_Threading",
+    "windows/Win32_UI_Shell",
+    "dep:ntapi",
+    "dep:memchr",
+    "objc2-core-foundation/CFBase",
+    "objc2-core-foundation/CFData",
+    "objc2-core-foundation/CFDictionary",
+    "objc2-core-foundation/CFString",
+]
+unknown-ci = []
+user = [
+    "windows/Win32_Foundation",
+    "windows/Win32_NetworkManagement_NetManagement",
+    "windows/Win32_Security",
+    "windows/Win32_Security_Authentication_Identity",
+    "windows/Win32_Security_Authorization",
+]
+
 [lib]
 name = "sysinfo"
 path = "src/lib.rs"
@@ -53,6 +139,7 @@ path = "src/lib.rs"
 [[example]]
 name = "simple"
 path = "examples/simple.rs"
+doc-scrape-examples = true
 required-features = ["default"]
 
 [[test]]
@@ -64,8 +151,8 @@ name = "cpu"
 path = "tests/cpu.rs"
 
 [[test]]
-name = "disk_list"
-path = "tests/disk_list.rs"
+name = "disk"
+path = "tests/disk.rs"
 
 [[test]]
 name = "extras"
@@ -87,6 +174,10 @@ path = "tests/send_sync.rs"
 name = "system"
 path = "tests/system.rs"
 
+[[test]]
+name = "users"
+path = "tests/users.rs"
+
 [[bench]]
 name = "basic"
 path = "benches/basic.rs"
@@ -101,91 +192,32 @@ optional = true
 
 [dependencies.serde]
 version = "^1.0.190"
+features = ["derive"]
 optional = true
 
 [dev-dependencies.bstr]
 version = "1.9.0"
 
+[dev-dependencies.itertools]
+version = "0.13.0"
+
 [dev-dependencies.serde_json]
 version = "1.0"
 
-[features]
-apple-app-store = ["apple-sandbox"]
-apple-sandbox = []
-c-interface = ["default"]
-component = [
-    "windows/Win32_Foundation",
-    "windows/Win32_Security",
-    "windows/Win32_System_Com",
-    "windows/Win32_System_Rpc",
-    "windows/Win32_System_Variant",
-    "windows/Win32_System_Wmi",
-]
-debug = ["libc/extra_traits"]
-default = [
-    "component",
-    "disk",
-    "network",
-    "system",
-    "user",
-    "multithread",
-]
-disk = [
-    "windows/Win32_Foundation",
-    "windows/Win32_Storage_FileSystem",
-    "windows/Win32_Security",
-    "windows/Win32_System_IO",
-    "windows/Win32_System_Ioctl",
-    "windows/Win32_System_SystemServices",
-    "windows/Win32_System_WindowsProgramming",
-]
-linux-netdevs = []
-linux-tmpfs = []
-multithread = ["dep:rayon"]
-network = [
-    "windows/Win32_Foundation",
-    "windows/Win32_NetworkManagement_IpHelper",
-    "windows/Win32_NetworkManagement_Ndis",
-    "windows/Win32_Networking_WinSock",
-]
-system = [
-    "windows/Win32_Foundation",
-    "windows/Wdk_System_SystemInformation",
-    "windows/Wdk_System_SystemServices",
-    "windows/Wdk_System_Threading",
-    "windows/Win32_Security_Authorization",
-    "windows/Win32_System_Diagnostics_Debug",
-    "windows/Win32_System_Kernel",
-    "windows/Win32_System_Memory",
-    "windows/Win32_System_Performance",
-    "windows/Win32_System_Power",
-    "windows/Win32_System_ProcessStatus",
-    "windows/Win32_System_Registry",
-    "windows/Win32_System_RemoteDesktop",
-    "windows/Win32_System_SystemInformation",
-    "windows/Win32_System_SystemServices",
-    "windows/Win32_System_Threading",
-    "windows/Win32_UI_Shell",
-    "dep:ntapi",
-    "dep:memchr",
-]
-unknown-ci = []
-user = [
-    "windows/Win32_Foundation",
-    "windows/Win32_NetworkManagement_NetManagement",
-    "windows/Win32_Security",
-    "windows/Win32_Security_Authentication_Identity",
-    "windows/Win32_Security_Authorization",
-]
+[dev-dependencies.tempfile]
+version = "3.9"
 
 [target.'cfg(all(target_os = "linux", not(target_os = "android")))'.dev-dependencies.tempfile]
 version = "3.9"
 
-[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies.core-foundation-sys]
-version = "0.8"
+[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies.objc2-core-foundation]
+version = "0.3.0"
+features = ["std"]
+optional = true
+default-features = false
 
 [target.'cfg(not(any(target_os = "unknown", target_arch = "wasm32")))'.dependencies.libc]
-version = "^0.2.165"
+version = "^0.2.171"
 
 [target."cfg(windows)".dependencies.ntapi]
 version = "0.4"

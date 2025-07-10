@@ -24,9 +24,7 @@ use quick_xml::de;
 use serde::Deserialize;
 
 use crate::raw::*;
-use crate::Error;
-use crate::ErrorKind;
-use crate::Result;
+use crate::*;
 
 /// AzblobError is the error returned by azure blob service.
 #[derive(Default, Deserialize)]
@@ -61,14 +59,14 @@ impl Debug for AzblobError {
 }
 
 /// Parse error response into Error.
-pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
+pub(super) fn parse_error(resp: Response<Buffer>) -> Error {
     let (parts, body) = resp.into_parts();
-    let bs = body.bytes().await?;
+    let bs = body.to_bytes();
 
     let (kind, retryable) = match parts.status {
         StatusCode::NOT_FOUND => (ErrorKind::NotFound, false),
         StatusCode::FORBIDDEN => (ErrorKind::PermissionDenied, false),
-        StatusCode::PRECONDITION_FAILED | StatusCode::NOT_MODIFIED => {
+        StatusCode::PRECONDITION_FAILED | StatusCode::NOT_MODIFIED | StatusCode::CONFLICT => {
             (ErrorKind::ConditionNotMatch, false)
         }
         StatusCode::INTERNAL_SERVER_ERROR
@@ -78,7 +76,8 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
         _ => (ErrorKind::Unexpected, false),
     };
 
-    let mut message = match de::from_reader::<_, AzblobError>(bs.clone().reader()) {
+    let bs_content = bs.chunk();
+    let mut message = match de::from_reader::<_, AzblobError>(bs_content.reader()) {
         Ok(azblob_err) => format!("{azblob_err:?}"),
         Err(_) => String::from_utf8_lossy(&bs).into_owned(),
     };
@@ -106,7 +105,7 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
         err = err.set_temporary();
     }
 
-    Ok(err)
+    err
 }
 
 #[cfg(test)]

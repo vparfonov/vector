@@ -10,7 +10,6 @@ This service can be used to:
 - [x] copy
 - [x] rename
 - [x] list
-- [x] scan
 - [ ] presign
 - [ ] blocking
 
@@ -25,7 +24,7 @@ You can refer to [`YandexDiskBuilder`]'s docs for more information
 
 ### Via Builder
 
-```rust
+```rust,no_run
 use anyhow::Result;
 use opendal::services::YandexDisk;
 use opendal::Operator;
@@ -33,12 +32,11 @@ use opendal::Operator;
 #[tokio::main]
 async fn main() -> Result<()> {
     // create backend builder
-    let mut builder = YandexDisk::default();
-
-    // set the storage bucket for OpenDAL
-    builder.root("/");
-    // set the access_token for OpenDAL
-    builder.access_token("test");
+    let mut builder = YandexDisk::default()
+        // set the storage bucket for OpenDAL
+        .root("/")
+        // set the access_token for OpenDAL
+        .access_token("test");
 
     let op: Operator = Operator::new(builder)?.finish();
 

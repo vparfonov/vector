@@ -20,6 +20,14 @@ option java_package = "io.greptime.v1";
 option java_outer_classname = "Common";
 option go_package = "github.com/GreptimeTeam/greptime-proto/go/greptime/v1";
 
+message QueryContext {
+  string current_catalog = 1;
+  string current_schema = 2;
+  string timezone = 4;
+  map<string, string> extensions = 5;
+  uint32 channel = 6;
+}
+
 message RequestHeader {
   // The `catalog` that is selected to be used in this request.
   string catalog = 1;
@@ -68,6 +76,8 @@ message AffectedRows { uint32 value = 1; }
 
 message Metrics { bytes metrics = 1; }
 
+message ExpireAfter { int64 value = 1; }
+
 message FlightMetadata {
   AffectedRows affected_rows = 1;
   Metrics metrics = 2;
@@ -107,6 +117,7 @@ enum ColumnDataType {
   INTERVAL_DAY_TIME = 24;
   INTERVAL_MONTH_DAY_NANO = 25;
   DECIMAL128 = 30;
+  JSON = 31;
 }
 
 message IntervalMonthDayNano {
@@ -123,10 +134,42 @@ message Decimal128 {
 
 // Type extension for some complex types
 message ColumnDataTypeExtension {
-  oneof type_ext { DecimalTypeExtension decimal_type = 1; }
+  oneof type_ext {
+    DecimalTypeExtension decimal_type = 1;
+    // Marks the binary column in proto is actually a JSON column.
+    JsonTypeExtension json_type = 2;
+  }
 }
 
 message DecimalTypeExtension {
   int32 precision = 1;
   int32 scale = 2;
+}
+
+enum JsonTypeExtension {
+  JSON_BINARY = 0;
+}
+
+// Additional options for the column.
+message ColumnOptions {
+  // Supported keys:
+  //   "fulltext":
+  //      A JSON encoded string containing full-text search options for the column.
+  //
+  //      The fulltext options JSON structure:
+  //      {
+  //        "enable": bool,          // Indicates whether full-text search is
+  //                                 // enabled for the column.
+  //
+  //        "analyzer": string,      // The language-specific text analyzer to
+  //                                 // use for indexing and searching text.
+  //                                 // Supported values: ["English" (Default), "Chinese"].
+  //
+  //        "case-sensitive": bool   // Indicates whether the text should be treated
+  //                                 // as case-sensitive during full-text search.
+  //      }
+  //
+  //      Example:
+  //      "fulltext": "{\"enable\": true, \"analyzer\": \"English\", \"case-sensitive\": false}"
+  map<string, string> options = 1;
 }

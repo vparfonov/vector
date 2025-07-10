@@ -35,7 +35,7 @@ static int dh_cms_set_peerkey(EVP_PKEY_CTX *pctx,
     if (OBJ_obj2nid(aoid) != NID_dhpublicnumber)
         goto err;
     /* Only absent parameters allowed in RFC XXXX */
-    if (atype != V_ASN1_UNDEF && atype == V_ASN1_NULL)
+    if (atype != V_ASN1_UNDEF && atype != V_ASN1_NULL)
         goto err;
 
     pk = EVP_PKEY_CTX_get0_pkey(pctx);
@@ -65,7 +65,7 @@ static int dh_cms_set_peerkey(EVP_PKEY_CTX *pctx,
     pkpeer = EVP_PKEY_new();
     if (pkpeer == NULL
             || !EVP_PKEY_copy_parameters(pkpeer, pk)
-            || !EVP_PKEY_set1_encoded_public_key(pkpeer, buf, plen))
+            || EVP_PKEY_set1_encoded_public_key(pkpeer, buf, plen) <= 0)
         goto err;
 
     if (EVP_PKEY_derive_set_peer(pctx, pkpeer) > 0)

@@ -23,14 +23,12 @@ use serde_json::de;
 use super::backend::CfKvError;
 use super::backend::CfKvResponse;
 use crate::raw::*;
-use crate::Error;
-use crate::ErrorKind;
-use crate::Result;
+use crate::*;
 
 /// Parse error response into Error.
-pub(crate) async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
+pub(super) fn parse_error(resp: Response<Buffer>) -> Error {
     let (parts, body) = resp.into_parts();
-    let bs = body.bytes().await?;
+    let bs = body.to_bytes();
 
     let (mut kind, mut retryable) = match parts.status {
         StatusCode::NOT_FOUND => (ErrorKind::NotFound, false),
@@ -53,7 +51,7 @@ pub(crate) async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Err
         (kind, retryable) = parse_cfkv_error_code(err.errors).unwrap_or((kind, retryable));
     }
 
-    let mut err = Error::new(kind, &message);
+    let mut err = Error::new(kind, message);
 
     err = with_error_response_context(err, parts);
 
@@ -61,10 +59,10 @@ pub(crate) async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Err
         err = err.set_temporary();
     }
 
-    Ok(err)
+    err
 }
 
-pub(crate) fn parse_cfkv_error_code(errors: Vec<CfKvError>) -> Option<(ErrorKind, bool)> {
+pub(super) fn parse_cfkv_error_code(errors: Vec<CfKvError>) -> Option<(ErrorKind, bool)> {
     if errors.is_empty() {
         return None;
     }

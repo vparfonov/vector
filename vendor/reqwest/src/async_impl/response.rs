@@ -35,7 +35,7 @@ pub struct Response {
 
 impl Response {
     pub(super) fn new(
-        res: hyper::Response<hyper::body::Incoming>,
+        res: hyper::Response<ResponseBody>,
         url: Url,
         accepts: Accepts,
         total_timeout: Option<Pin<Box<Sleep>>>,
@@ -432,7 +432,7 @@ impl Response {
 impl fmt::Debug for Response {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Response")
-            .field("url", self.url())
+            .field("url", &self.url().as_str())
             .field("status", &self.status())
             .field("headers", self.headers())
             .finish()
@@ -442,12 +442,12 @@ impl fmt::Debug for Response {
 /// A `Response` can be piped as the `Body` of another request.
 impl From<Response> for Body {
     fn from(r: Response) -> Body {
-        Body::streaming(r.res.into_body())
+        Body::wrap(r.res.into_body())
     }
 }
 
 // I'm not sure this conversion is that useful... People should be encouraged
-// to use `http::Resposne`, not `reqwest::Response`.
+// to use `http::Response`, not `reqwest::Response`.
 impl<T: Into<Body>> From<http::Response<T>> for Response {
     fn from(r: http::Response<T>) -> Response {
         use crate::response::ResponseUrl;
@@ -477,7 +477,7 @@ impl<T: Into<Body>> From<http::Response<T>> for Response {
 impl From<Response> for http::Response<Body> {
     fn from(r: Response) -> http::Response<Body> {
         let (parts, body) = r.res.into_parts();
-        let body = Body::streaming(body);
+        let body = Body::wrap(body);
         http::Response::from_parts(parts, body)
     }
 }

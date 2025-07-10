@@ -25,7 +25,7 @@ pub struct Config {
     cloneable: ::aws_smithy_types::config_bag::CloneableLayer,
     pub(crate) runtime_components: crate::config::RuntimeComponentsBuilder,
     pub(crate) runtime_plugins: ::std::vec::Vec<crate::config::SharedRuntimePlugin>,
-    pub(crate) behavior_version: ::std::option::Option<crate::config::BehaviorVersion>,
+    behavior_version: ::std::option::Option<crate::config::BehaviorVersion>,
 }
 impl Config {
     ///
@@ -1116,11 +1116,7 @@ pub(crate) struct ServiceRuntimePlugin {
 
 impl ServiceRuntimePlugin {
     pub fn new(_service_config: crate::config::Config) -> Self {
-        let config = {
-            let mut cfg = ::aws_smithy_types::config_bag::Layer::new("SWBPortalService");
-            cfg.store_put(::aws_smithy_runtime::client::orchestrator::AuthSchemeAndEndpointOrchestrationV2);
-            ::std::option::Option::Some(cfg.freeze())
-        };
+        let config = { None };
         let mut runtime_components = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("ServiceRuntimePlugin");
         runtime_components.set_endpoint_resolver(Some({
             use crate::config::endpoint::ResolveEndpoint;
@@ -1271,7 +1267,7 @@ pub use ::aws_types::app_name::AppName;
 #[allow(dead_code)]
 fn service_config_key<'a>(env: &'a str, profile: &'a str) -> aws_types::service_config::ServiceConfigKey<'a> {
     ::aws_types::service_config::ServiceConfigKey::builder()
-        .service_id("SSO")
+        .service_id("sso")
         .env(env)
         .profile(profile)
         .build()

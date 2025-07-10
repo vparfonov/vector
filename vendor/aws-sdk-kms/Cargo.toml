@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.82.0"
+rust-version = "1.81.0"
 name = "aws-sdk-kms"
-version = "1.69.0"
+version = "1.65.0"
 authors = [
     "AWS Rust SDK Team <aws-sdk-rust@amazon.com>",
     "Russell Cohen <rcoh@amazon.com>",
@@ -33,7 +33,7 @@ all-features = true
 targets = ["x86_64-unknown-linux-gnu"]
 
 [package.metadata.smithy]
-codegen-version = "4fa77c045fb4d4472df2a5e7e7d2933eb105af20"
+codegen-version = "df9b06f6c5262b2cabd7477d362d9b2efd11a6cd"
 
 [lib]
 name = "aws_sdk_kms"
@@ -60,36 +60,36 @@ name = "traits"
 path = "tests/traits.rs"
 
 [dependencies.aws-credential-types]
-version = "1.2.3"
+version = "1.2.2"
 
 [dependencies.aws-runtime]
-version = "1.5.7"
+version = "1.5.6"
 
 [dependencies.aws-smithy-async]
 version = "1.2.5"
 
 [dependencies.aws-smithy-http]
-version = "0.62.1"
+version = "0.62.0"
 
 [dependencies.aws-smithy-json]
 version = "0.61.3"
 
 [dependencies.aws-smithy-runtime]
-version = "1.8.3"
+version = "1.8.1"
 features = ["client"]
 
 [dependencies.aws-smithy-runtime-api]
-version = "1.8.0"
+version = "1.7.4"
 features = [
     "client",
     "http-02x",
 ]
 
 [dependencies.aws-smithy-types]
-version = "1.3.1"
+version = "1.3.0"
 
 [dependencies.aws-types]
-version = "1.3.7"
+version = "1.3.6"
 
 [dependencies.bytes]
 version = "1.4.0"
@@ -100,6 +100,9 @@ version = "2.0.0"
 [dependencies.http]
 version = "0.2.9"
 
+[dependencies.once_cell]
+version = "1.16"
+
 [dependencies.regex-lite]
 version = "0.1.5"
 
@@ -107,14 +110,14 @@ version = "0.1.5"
 version = "0.1"
 
 [dev-dependencies.aws-config]
-version = "1.6.3"
+version = "1.6.1"
 
 [dev-dependencies.aws-credential-types]
-version = "1.2.3"
+version = "1.2.2"
 features = ["test-util"]
 
 [dev-dependencies.aws-runtime]
-version = "1.5.7"
+version = "1.5.6"
 features = ["test-util"]
 
 [dev-dependencies.aws-smithy-async]
@@ -122,7 +125,7 @@ version = "1.2.5"
 features = ["test-util"]
 
 [dev-dependencies.aws-smithy-http-client]
-version = "1.0.2"
+version = "1.0.1"
 features = [
     "test-util",
     "wire-mock",
@@ -132,15 +135,15 @@ features = [
 version = "0.63.1"
 
 [dev-dependencies.aws-smithy-runtime]
-version = "1.8.3"
+version = "1.8.1"
 features = ["test-util"]
 
 [dev-dependencies.aws-smithy-runtime-api]
-version = "1.8.0"
+version = "1.7.4"
 features = ["test-util"]
 
 [dev-dependencies.aws-smithy-types]
-version = "1.3.1"
+version = "1.3.0"
 features = ["test-util"]
 
 [dev-dependencies.futures-util]

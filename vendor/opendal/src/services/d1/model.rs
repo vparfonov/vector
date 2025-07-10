@@ -23,6 +23,7 @@ use serde::Serialize;
 use serde_json::Map;
 use serde_json::Value;
 
+use crate::Buffer;
 use crate::Error;
 
 /// response data from d1
@@ -31,7 +32,6 @@ pub struct D1Response {
     pub result: Vec<D1Result>,
     pub success: bool,
     pub errors: Vec<D1Error>,
-    pub messages: Vec<D1Message>,
 }
 
 impl D1Response {
@@ -39,20 +39,20 @@ impl D1Response {
         let response: D1Response = serde_json::from_slice(bs).map_err(|e| {
             Error::new(
                 crate::ErrorKind::Unexpected,
-                &format!("failed to parse error response: {}", e),
+                format!("failed to parse error response: {}", e),
             )
         })?;
 
         if !response.success {
             return Err(Error::new(
                 crate::ErrorKind::Unexpected,
-                &String::from_utf8_lossy(bs),
+                String::from_utf8_lossy(bs),
             ));
         }
         Ok(response)
     }
 
-    pub fn get_result(&self, key: &str) -> Option<Vec<u8>> {
+    pub fn get_result(&self, key: &str) -> Option<Buffer> {
         if self.result.is_empty() || self.result[0].results.is_empty() {
             return None;
         }
@@ -67,7 +67,7 @@ impl D1Response {
                         v.push(n.as_u64().unwrap() as u8);
                     }
                 }
-                Some(v)
+                Some(Buffer::from(v))
             }
             _ => None,
         }
@@ -76,31 +76,11 @@ impl D1Response {
 
 #[derive(Deserialize, Debug)]
 pub struct D1Result {
-    pub meta: Meta,
     pub results: Vec<Map<String, Value>>,
-    pub success: bool,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct Meta {
-    pub served_by: String,
-    pub duration: f64,
-    pub changes: i32,
-    pub last_row_id: i32,
-    pub changed_db: bool,
-    pub size_after: i32,
-    pub rows_read: i32,
-    pub rows_written: i32,
 }
 
 #[derive(Clone, Deserialize, Debug, Serialize)]
 pub struct D1Error {
-    pub message: String,
-    pub code: i32,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct D1Message {
     pub message: String,
     pub code: i32,
 }

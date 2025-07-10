@@ -13,8 +13,14 @@
 edition = "2021"
 rust-version = "1.60.0"
 name = "pem"
-version = "3.0.2"
+version = "3.0.5"
 authors = ["Jonathan Creekmore <jonathan@thecreekmores.org>"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Parse and encode PEM-encoded data."
 homepage = "https://github.com/jcreekmore/pem-rs.git"
 documentation = "https://docs.rs/pem/"
@@ -27,14 +33,18 @@ keywords = [
 categories = ["cryptography"]
 license = "MIT"
 repository = "https://github.com/jcreekmore/pem-rs.git"
-resolver = "2"
+
+[lib]
+name = "pem"
+path = "src/lib.rs"
 
 [[bench]]
 name = "pem_benchmark"
+path = "benches/pem_benchmark.rs"
 harness = false
 
 [dependencies.base64]
-version = "0.21.0"
+version = "0.22.0"
 features = ["alloc"]
 default-features = false
 

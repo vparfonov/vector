@@ -143,6 +143,7 @@ fn print_help() {
         &mut io::stdout(),
         "pid                : Display this example's PID"
     );
+
     writeln!(&mut io::stdout(), "quit               : Exit the program");
 }
 
@@ -158,22 +159,22 @@ fn interpret_input(
         "help" => print_help(),
         "refresh_disks" => {
             writeln!(&mut io::stdout(), "Refreshing disk list...");
-            disks.refresh_list();
+            disks.refresh(true);
             writeln!(&mut io::stdout(), "Done.");
         }
         "refresh_users" => {
             writeln!(&mut io::stdout(), "Refreshing user list...");
-            users.refresh_list();
+            users.refresh();
             writeln!(&mut io::stdout(), "Done.");
         }
         "refresh_networks" => {
             writeln!(&mut io::stdout(), "Refreshing network list...");
-            networks.refresh_list();
+            networks.refresh(true);
             writeln!(&mut io::stdout(), "Done.");
         }
         "refresh_components" => {
             writeln!(&mut io::stdout(), "Refreshing component list...");
-            components.refresh_list();
+            components.refresh(true);
             writeln!(&mut io::stdout(), "Done.");
         }
         "refresh_cpu" => {
@@ -195,7 +196,7 @@ fn interpret_input(
             writeln!(
                 &mut io::stdout(),
                 "number of physical cores: {}",
-                sys.physical_core_count()
+                System::physical_core_count()
                     .map(|c| c.to_string())
                     .unwrap_or_else(|| "Unknown".to_owned()),
             );
@@ -274,7 +275,7 @@ fn interpret_input(
             writeln!(&mut io::stdout(), "fifteen minutes: {}%", load_avg.fifteen);
         }
         e if e.starts_with("show ") => {
-            let tmp: Vec<&str> = e.split(' ').collect();
+            let tmp: Vec<&str> = e.split(' ').filter(|s| !s.is_empty()).collect();
 
             if tmp.len() != 2 {
                 writeln!(
@@ -284,9 +285,19 @@ fn interpret_input(
                 writeln!(&mut io::stdout(), "example: show 1254");
             } else if let Ok(pid) = Pid::from_str(tmp[1]) {
                 match sys.process(pid) {
-                    Some(p) => writeln!(&mut io::stdout(), "{:?}", *p),
-                    None => writeln!(&mut io::stdout(), "pid \"{pid:?}\" not found"),
-                };
+                    Some(p) => {
+                        writeln!(&mut io::stdout(), "{:?}", *p);
+                        writeln!(
+                            &mut io::stdout(),
+                            "Files open/limit: {:?}/{:?}",
+                            p.open_files(),
+                            p.open_files_limit(),
+                        );
+                    }
+                    None => {
+                        writeln!(&mut io::stdout(), "pid \"{pid:?}\" not found");
+                    }
+                }
             } else {
                 let proc_name = tmp[1];
                 for proc_ in sys.processes_by_name(proc_name.as_ref()) {
@@ -438,12 +449,14 @@ fn interpret_input(
                  System kernel version:    {}\n\
                  System OS version:        {}\n\
                  System OS (long) version: {}\n\
-                 System host name:         {}",
+                 System host name:         {}\n\
+		 System kernel:            {}",
                 System::name().unwrap_or_else(|| "<unknown>".to_owned()),
                 System::kernel_version().unwrap_or_else(|| "<unknown>".to_owned()),
                 System::os_version().unwrap_or_else(|| "<unknown>".to_owned()),
                 System::long_os_version().unwrap_or_else(|| "<unknown>".to_owned()),
                 System::host_name().unwrap_or_else(|| "<unknown>".to_owned()),
+                System::kernel_long_version(),
             );
         }
         e => {

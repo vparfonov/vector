@@ -19,7 +19,6 @@ pub type BOOL = i32;
 pub type BSTR = *const u16;
 pub const ERROR_INVALID_DATA: WIN32_ERROR = 13u32;
 pub const ERROR_NO_UNICODE_TRANSLATION: WIN32_ERROR = 1113u32;
-pub const E_INVALIDARG: HRESULT = 0x80070057_u32 as _;
 pub const E_UNEXPECTED: HRESULT = 0x8000FFFF_u32 as _;
 pub const FORMAT_MESSAGE_ALLOCATE_BUFFER: FORMAT_MESSAGE_OPTIONS = 256u32;
 pub const FORMAT_MESSAGE_FROM_HMODULE: FORMAT_MESSAGE_OPTIONS = 2048u32;
@@ -44,9 +43,9 @@ impl GUID {
         }
     }
 }
-pub type HANDLE = isize;
+pub type HANDLE = *mut core::ffi::c_void;
 pub type HEAP_FLAGS = u32;
-pub type HMODULE = isize;
+pub type HMODULE = *mut core::ffi::c_void;
 pub type HRESULT = i32;
 pub const IID_IErrorInfo: GUID = GUID::from_u128(0x1cf2b120_547d_101b_8e65_08002b2bd119);
 #[repr(C)]

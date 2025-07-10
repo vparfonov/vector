@@ -20,7 +20,7 @@ use core::{
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 #[cfg(feature = "zerocopy")]
-use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
+use zerocopy::{AsBytes, FromBytes};
 
 pub(crate) mod arch;
 
@@ -39,14 +39,10 @@ pub(crate) mod arch;
     feature = "rkyv",
     derive(rkyv::Archive, rkyv::Serialize, rkyv::Deserialize)
 )]
-#[cfg_attr(feature = "rkyv", rkyv(resolver = F16Resolver))]
+#[cfg_attr(feature = "rkyv", archive(resolver = "F16Resolver"))]
 #[cfg_attr(feature = "bytemuck", derive(Zeroable, Pod))]
-#[cfg_attr(
-    feature = "zerocopy",
-    derive(FromBytes, Immutable, IntoBytes, KnownLayout)
-)]
+#[cfg_attr(feature = "zerocopy", derive(AsBytes, FromBytes))]
 #[cfg_attr(kani, derive(kani::Arbitrary))]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct f16(u16);
 
 impl f16 {
@@ -117,7 +113,7 @@ impl f16 {
         f16(arch::f64_to_f16_fallback(value))
     }
 
-    /// Converts a [`struct@f16`] into the underlying bit representation.
+    /// Converts a [`f16`] into the underlying bit representation.
     #[inline]
     #[must_use]
     pub const fn to_bits(self) -> u16 {
@@ -233,7 +229,7 @@ impl f16 {
         f16::from_bits(u16::from_ne_bytes(bytes))
     }
 
-    /// Converts a [`struct@f16`] value into a `f32` value.
+    /// Converts a [`f16`] value into a `f32` value.
     ///
     /// This conversion is lossless as all 16-bit floating point values can be represented exactly
     /// in 32-bit floating point.
@@ -243,7 +239,7 @@ impl f16 {
         arch::f16_to_f32(self.0)
     }
 
-    /// Converts a [`struct@f16`] value into a `f32` value.
+    /// Converts a [`f16`] value into a `f32` value.
     ///
     /// This function is identical to [`to_f32`][Self::to_f32] except it never uses hardware
     /// intrinsics, which allows it to be `const`. [`to_f32`][Self::to_f32] should be preferred
@@ -257,7 +253,7 @@ impl f16 {
         arch::f16_to_f32_fallback(self.0)
     }
 
-    /// Converts a [`struct@f16`] value into a `f64` value.
+    /// Converts a [`f16`] value into a `f64` value.
     ///
     /// This conversion is lossless as all 16-bit floating point values can be represented exactly
     /// in 64-bit floating point.
@@ -267,7 +263,7 @@ impl f16 {
         arch::f16_to_f64(self.0)
     }
 
-    /// Converts a [`struct@f16`] value into a `f64` value.
+    /// Converts a [`f16`] value into a `f64` value.
     ///
     /// This function is identical to [`to_f64`][Self::to_f64] except it never uses hardware
     /// intrinsics, which allows it to be `const`. [`to_f64`][Self::to_f64] should be preferred
@@ -663,7 +659,7 @@ impl f16 {
 
     /// Alternate serialize adapter for serializing as a float.
     ///
-    /// By default, [`struct@f16`] serializes as a newtype of [`u16`]. This is an alternate serialize
+    /// By default, [`f16`] serializes as a newtype of [`u16`]. This is an alternate serialize
     /// implementation that serializes as an [`f32`] value. It is designed for use with
     /// `serialize_with` serde attributes. Deserialization from `f32` values is already supported by
     /// the default deserialize implementation.
@@ -689,7 +685,7 @@ impl f16 {
 
     /// Alternate serialize adapter for serializing as a string.
     ///
-    /// By default, [`struct@f16`] serializes as a newtype of [`u16`]. This is an alternate serialize
+    /// By default, [`f16`] serializes as a newtype of [`u16`]. This is an alternate serialize
     /// implementation that serializes as a string value. It is designed for use with
     /// `serialize_with` serde attributes. Deserialization from string values is already supported
     /// by the default deserialize implementation.
@@ -716,87 +712,87 @@ impl f16 {
         serializer.serialize_str(&self.to_string())
     }
 
-    /// Approximate number of [`struct@f16`] significant digits in base 10
+    /// Approximate number of [`f16`] significant digits in base 10
     pub const DIGITS: u32 = 3;
-    /// [`struct@f16`]
+    /// [`f16`]
     /// [machine epsilon](https://en.wikipedia.org/wiki/Machine_epsilon) value
     ///
     /// This is the difference between 1.0 and the next largest representable number.
     pub const EPSILON: f16 = f16(0x1400u16);
-    /// [`struct@f16`] positive Infinity (+∞)
+    /// [`f16`] positive Infinity (+∞)
     pub const INFINITY: f16 = f16(0x7C00u16);
-    /// Number of [`struct@f16`] significant digits in base 2
+    /// Number of [`f16`] significant digits in base 2
     pub const MANTISSA_DIGITS: u32 = 11;
-    /// Largest finite [`struct@f16`] value
+    /// Largest finite [`f16`] value
     pub const MAX: f16 = f16(0x7BFF);
-    /// Maximum possible [`struct@f16`] power of 10 exponent
+    /// Maximum possible [`f16`] power of 10 exponent
     pub const MAX_10_EXP: i32 = 4;
-    /// Maximum possible [`struct@f16`] power of 2 exponent
+    /// Maximum possible [`f16`] power of 2 exponent
     pub const MAX_EXP: i32 = 16;
-    /// Smallest finite [`struct@f16`] value
+    /// Smallest finite [`f16`] value
     pub const MIN: f16 = f16(0xFBFF);
-    /// Minimum possible normal [`struct@f16`] power of 10 exponent
+    /// Minimum possible normal [`f16`] power of 10 exponent
     pub const MIN_10_EXP: i32 = -4;
-    /// One greater than the minimum possible normal [`struct@f16`] power of 2 exponent
+    /// One greater than the minimum possible normal [`f16`] power of 2 exponent
     pub const MIN_EXP: i32 = -13;
-    /// Smallest positive normal [`struct@f16`] value
+    /// Smallest positive normal [`f16`] value
     pub const MIN_POSITIVE: f16 = f16(0x0400u16);
-    /// [`struct@f16`] Not a Number (NaN)
+    /// [`f16`] Not a Number (NaN)
     pub const NAN: f16 = f16(0x7E00u16);
-    /// [`struct@f16`] negative infinity (-∞)
+    /// [`f16`] negative infinity (-∞)
     pub const NEG_INFINITY: f16 = f16(0xFC00u16);
-    /// The radix or base of the internal representation of [`struct@f16`]
+    /// The radix or base of the internal representation of [`f16`]
     pub const RADIX: u32 = 2;
 
-    /// Minimum positive subnormal [`struct@f16`] value
+    /// Minimum positive subnormal [`f16`] value
     pub const MIN_POSITIVE_SUBNORMAL: f16 = f16(0x0001u16);
-    /// Maximum subnormal [`struct@f16`] value
+    /// Maximum subnormal [`f16`] value
     pub const MAX_SUBNORMAL: f16 = f16(0x03FFu16);
 
-    /// [`struct@f16`] 1
+    /// [`f16`] 1
     pub const ONE: f16 = f16(0x3C00u16);
-    /// [`struct@f16`] 0
+    /// [`f16`] 0
     pub const ZERO: f16 = f16(0x0000u16);
-    /// [`struct@f16`] -0
+    /// [`f16`] -0
     pub const NEG_ZERO: f16 = f16(0x8000u16);
-    /// [`struct@f16`] -1
+    /// [`f16`] -1
     pub const NEG_ONE: f16 = f16(0xBC00u16);
 
-    /// [`struct@f16`] Euler's number (ℯ)
+    /// [`f16`] Euler's number (ℯ)
     pub const E: f16 = f16(0x4170u16);
-    /// [`struct@f16`] Archimedes' constant (π)
+    /// [`f16`] Archimedes' constant (π)
     pub const PI: f16 = f16(0x4248u16);
-    /// [`struct@f16`] 1/π
+    /// [`f16`] 1/π
     pub const FRAC_1_PI: f16 = f16(0x3518u16);
-    /// [`struct@f16`] 1/√2
+    /// [`f16`] 1/√2
     pub const FRAC_1_SQRT_2: f16 = f16(0x39A8u16);
-    /// [`struct@f16`] 2/π
+    /// [`f16`] 2/π
     pub const FRAC_2_PI: f16 = f16(0x3918u16);
-    /// [`struct@f16`] 2/√π
+    /// [`f16`] 2/√π
     pub const FRAC_2_SQRT_PI: f16 = f16(0x3C83u16);
-    /// [`struct@f16`] π/2
+    /// [`f16`] π/2
     pub const FRAC_PI_2: f16 = f16(0x3E48u16);
-    /// [`struct@f16`] π/3
+    /// [`f16`] π/3
     pub const FRAC_PI_3: f16 = f16(0x3C30u16);
-    /// [`struct@f16`] π/4
+    /// [`f16`] π/4
     pub const FRAC_PI_4: f16 = f16(0x3A48u16);
-    /// [`struct@f16`] π/6
+    /// [`f16`] π/6
     pub const FRAC_PI_6: f16 = f16(0x3830u16);
-    /// [`struct@f16`] π/8
+    /// [`f16`] π/8
     pub const FRAC_PI_8: f16 = f16(0x3648u16);
-    /// [`struct@f16`] 𝗅𝗇 10
+    /// [`f16`] 𝗅𝗇 10
     pub const LN_10: f16 = f16(0x409Bu16);
-    /// [`struct@f16`] 𝗅𝗇 2
+    /// [`f16`] 𝗅𝗇 2
     pub const LN_2: f16 = f16(0x398Cu16);
-    /// [`struct@f16`] 𝗅𝗈𝗀₁₀ℯ
+    /// [`f16`] 𝗅𝗈𝗀₁₀ℯ
     pub const LOG10_E: f16 = f16(0x36F3u16);
-    /// [`struct@f16`] 𝗅𝗈𝗀₁₀2
+    /// [`f16`] 𝗅𝗈𝗀₁₀2
     pub const LOG10_2: f16 = f16(0x34D1u16);
-    /// [`struct@f16`] 𝗅𝗈𝗀₂ℯ
+    /// [`f16`] 𝗅𝗈𝗀₂ℯ
     pub const LOG2_E: f16 = f16(0x3DC5u16);
-    /// [`struct@f16`] 𝗅𝗈𝗀₂10
+    /// [`f16`] 𝗅𝗈𝗀₂10
     pub const LOG2_10: f16 = f16(0x42A5u16);
-    /// [`struct@f16`] √2
+    /// [`f16`] √2
     pub const SQRT_2: f16 = f16(0x3DA8u16);
 }
 
@@ -1352,7 +1348,7 @@ mod test {
     #[allow(unused_imports)]
     use core::cmp::Ordering;
     #[cfg(feature = "num-traits")]
-    use num_traits::{AsPrimitive, FromBytes, FromPrimitive, ToBytes, ToPrimitive};
+    use num_traits::{AsPrimitive, FromPrimitive, ToPrimitive};
     use quickcheck_macros::quickcheck;
 
     #[cfg(feature = "num-traits")]
@@ -1385,16 +1381,6 @@ mod test {
         assert_eq!(<f16 as FromPrimitive>::from_i32(2).unwrap(), two);
         assert_eq!(<f16 as FromPrimitive>::from_f32(2.0).unwrap(), two);
         assert_eq!(<f16 as FromPrimitive>::from_f64(2.0).unwrap(), two);
-    }
-
-    #[cfg(feature = "num-traits")]
-    #[test]
-    fn to_and_from_bytes() {
-        let two = f16::from_f32(2.0);
-        assert_eq!(<f16 as ToBytes>::to_le_bytes(&two), [0, 64]);
-        assert_eq!(<f16 as FromBytes>::from_le_bytes(&[0, 64]), two);
-        assert_eq!(<f16 as ToBytes>::to_be_bytes(&two), [64, 0]);
-        assert_eq!(<f16 as FromBytes>::from_be_bytes(&[64, 0]), two);
     }
 
     #[test]

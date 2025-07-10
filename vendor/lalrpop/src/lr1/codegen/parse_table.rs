@@ -41,7 +41,7 @@ enum Comment<'a, T> {
     Reduce(T, &'a Production),
 }
 
-impl<T: fmt::Display> fmt::Display for Comment<'_, T> {
+impl<'a, T: fmt::Display> fmt::Display for Comment<'a, T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match *self {
             Comment::Goto(ref token, new_state) => {
@@ -1540,7 +1540,6 @@ impl<'ascent, 'grammar, W: Write> CodeGenerator<'ascent, 'grammar, W, TableDrive
 
     /// Emit the array of terminal tokens for use in generating error output
     fn emit_terminal_repr_list(&mut self) -> io::Result<()> {
-        rust!(self.out, "#[allow(clippy::needless_raw_string_hashes)]");
         rust!(self.out, "const {}TERMINAL: &[&str] = &[", self.prefix);
         let all_terminals = if self.grammar.uses_error_recovery {
             // Subtract one to exclude the error terminal

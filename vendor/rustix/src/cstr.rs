@@ -5,10 +5,7 @@
 /// strings, and passing strings to rustix as `CStr`s means that rustix doesn't
 /// need to copy them into a separate buffer to NUL-terminate them.
 ///
-/// In Rust ≥ 1.77, users can use [C-string literals] instead of this macro.
-///
 /// [`CStr`]: crate::ffi::CStr
-/// [C-string literals]: https://blog.rust-lang.org/2024/03/21/Rust-1.77.0.html#c-string-literals
 ///
 /// # Examples
 ///
@@ -57,30 +54,24 @@ macro_rules! cstr {
     }};
 }
 
-#[cfg(test)]
-mod tests {
-    #[allow(unused_imports)]
-    use super::*;
+#[test]
+fn test_cstr() {
+    use crate::ffi::CString;
+    use alloc::borrow::ToOwned as _;
+    assert_eq!(cstr!(""), &*CString::new("").unwrap());
+    assert_eq!(cstr!("").to_owned(), CString::new("").unwrap());
+    assert_eq!(cstr!("hello"), &*CString::new("hello").unwrap());
+    assert_eq!(cstr!("hello").to_owned(), CString::new("hello").unwrap());
+}
 
-    #[test]
-    fn test_cstr() {
-        use crate::ffi::CString;
-        use alloc::borrow::ToOwned as _;
-        assert_eq!(cstr!(""), &*CString::new("").unwrap());
-        assert_eq!(cstr!("").to_owned(), CString::new("").unwrap());
-        assert_eq!(cstr!("hello"), &*CString::new("hello").unwrap());
-        assert_eq!(cstr!("hello").to_owned(), CString::new("hello").unwrap());
-    }
+#[test]
+#[should_panic]
+fn test_invalid_cstr() {
+    let _ = cstr!("hello\0world");
+}
 
-    #[test]
-    #[should_panic]
-    fn test_invalid_cstr() {
-        let _ = cstr!("hello\0world");
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_invalid_empty_cstr() {
-        let _ = cstr!("\0");
-    }
+#[test]
+#[should_panic]
+fn test_invalid_empty_cstr() {
+    let _ = cstr!("\0");
 }

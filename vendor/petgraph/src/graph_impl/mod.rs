@@ -29,8 +29,6 @@ pub type DefaultIx = u32;
 
 /// Trait for the unsigned integer type used for node and edge indices.
 ///
-/// # Safety
-///
 /// Marked `unsafe` because: the trait must faithfully preserve
 /// and convert index values.
 pub unsafe trait IndexType: Copy + Default + Hash + Ord + fmt::Debug + 'static {
@@ -323,24 +321,24 @@ impl<E, Ix: IndexType> Edge<E, Ix> {
 /// but these are only stable across certain operations:
 ///
 /// * **Removing nodes or edges may shift other indices.** Removing a node will
-///     force the last node to shift its index to take its place. Similarly,
-///     removing an edge shifts the index of the last edge.
+/// force the last node to shift its index to take its place. Similarly,
+/// removing an edge shifts the index of the last edge.
 /// * Adding nodes or edges keeps indices stable.
 ///
 /// The `Ix` parameter is `u32` by default. The goal is that you can ignore this parameter
 /// completely unless you need a very big graph -- then you can use `usize`.
 ///
 /// * The fact that the node and edge indices in the graph each are numbered in compact
-///     intervals (from 0 to *n* - 1 for *n* nodes) simplifies some graph algorithms.
+/// intervals (from 0 to *n* - 1 for *n* nodes) simplifies some graph algorithms.
 ///
 /// * You can select graph index integer type after the size of the graph. A smaller
-///     size may have better performance.
+/// size may have better performance.
 ///
 /// * Using indices allows mutation while traversing the graph, see `Dfs`,
-///     and `.neighbors(a).detach()`.
+/// and `.neighbors(a).detach()`.
 ///
 /// * You can create several graphs using the equal node indices but with
-///     differing weights or differing edges.
+/// differing weights or differing edges.
 ///
 /// * Indices don't allow as much compile time checking as references.
 ///
@@ -1517,7 +1515,7 @@ pub struct Neighbors<'a, E: 'a, Ix: 'a = DefaultIx> {
     next: [EdgeIndex<Ix>; 2],
 }
 
-impl<E, Ix> Iterator for Neighbors<'_, E, Ix>
+impl<'a, E, Ix> Iterator for Neighbors<'a, E, Ix>
 where
     Ix: IndexType,
 {
@@ -1546,14 +1544,14 @@ where
     }
 }
 
-impl<E, Ix> Clone for Neighbors<'_, E, Ix>
+impl<'a, E, Ix> Clone for Neighbors<'a, E, Ix>
 where
     Ix: IndexType,
 {
     clone_fields!(Neighbors, skip_start, edges, next,);
 }
 
-impl<E, Ix> Neighbors<'_, E, Ix>
+impl<'a, E, Ix> Neighbors<'a, E, Ix>
 where
     Ix: IndexType,
 {
@@ -1587,7 +1585,7 @@ where
     EdgesWalkerMut { edges, next, dir }
 }
 
-impl<E, Ix> EdgesWalkerMut<'_, E, Ix>
+impl<'a, E, Ix> EdgesWalkerMut<'a, E, Ix>
 where
     Ix: IndexType,
 {
@@ -1735,10 +1733,13 @@ where
     type Item = EdgeReference<'a, E, Ix>;
 
     fn next(&mut self) -> Option<EdgeReference<'a, E, Ix>> {
-        let target_node = self.target_node;
-        self.edges
-            .by_ref()
-            .find(|&edge| edge.node[1] == target_node)
+        while let Some(edge) = self.edges.next() {
+            if edge.node[1] == self.target_node {
+                return Some(edge);
+            }
+        }
+
+        None
     }
     fn size_hint(&self) -> (usize, Option<usize>) {
         let (_, upper) = self.edges.size_hint();
@@ -1751,7 +1752,7 @@ fn swap_pair<T>(mut x: [T; 2]) -> [T; 2] {
     x
 }
 
-impl<E, Ty, Ix> Clone for Edges<'_, E, Ty, Ix>
+impl<'a, E, Ty, Ix> Clone for Edges<'a, E, Ty, Ix>
 where
     Ix: IndexType,
     Ty: EdgeType,
@@ -2109,15 +2110,15 @@ pub struct EdgeReference<'a, E: 'a, Ix = DefaultIx> {
     weight: &'a E,
 }
 
-impl<E, Ix: IndexType> Clone for EdgeReference<'_, E, Ix> {
+impl<'a, E, Ix: IndexType> Clone for EdgeReference<'a, E, Ix> {
     fn clone(&self) -> Self {
         *self
     }
 }
 
-impl<E, Ix: IndexType> Copy for EdgeReference<'_, E, Ix> {}
+impl<'a, E, Ix: IndexType> Copy for EdgeReference<'a, E, Ix> {}
 
-impl<E, Ix: IndexType> PartialEq for EdgeReference<'_, E, Ix>
+impl<'a, E, Ix: IndexType> PartialEq for EdgeReference<'a, E, Ix>
 where
     E: PartialEq,
 {
@@ -2287,7 +2288,7 @@ where
     }
 }
 
-impl<N, Ix> DoubleEndedIterator for NodeReferences<'_, N, Ix>
+impl<'a, N, Ix> DoubleEndedIterator for NodeReferences<'a, N, Ix>
 where
     Ix: IndexType,
 {
@@ -2298,7 +2299,7 @@ where
     }
 }
 
-impl<N, Ix> ExactSizeIterator for NodeReferences<'_, N, Ix> where Ix: IndexType {}
+impl<'a, N, Ix> ExactSizeIterator for NodeReferences<'a, N, Ix> where Ix: IndexType {}
 
 impl<'a, Ix, E> EdgeReference<'a, E, Ix>
 where
@@ -2313,7 +2314,7 @@ where
     }
 }
 
-impl<Ix, E> visit::EdgeRef for EdgeReference<'_, E, Ix>
+impl<'a, Ix, E> visit::EdgeRef for EdgeReference<'a, E, Ix>
 where
     Ix: IndexType,
 {
@@ -2360,7 +2361,7 @@ where
     }
 }
 
-impl<E, Ix> DoubleEndedIterator for EdgeReferences<'_, E, Ix>
+impl<'a, E, Ix> DoubleEndedIterator for EdgeReferences<'a, E, Ix>
 where
     Ix: IndexType,
 {
@@ -2373,7 +2374,7 @@ where
     }
 }
 
-impl<E, Ix> ExactSizeIterator for EdgeReferences<'_, E, Ix> where Ix: IndexType {}
+impl<'a, E, Ix> ExactSizeIterator for EdgeReferences<'a, E, Ix> where Ix: IndexType {}
 
 impl<N, E, Ty, Ix> visit::EdgeIndexable for Graph<N, E, Ty, Ix>
 where

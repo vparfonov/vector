@@ -15,17 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::VecDeque;
-use std::task::ready;
-use std::task::Context;
-use std::task::Poll;
-
-use async_trait::async_trait;
-
 use crate::raw::*;
 use crate::*;
+use std::collections::VecDeque;
+use std::future::Future;
 
-/// PageList is used to implement [`List`] based on API supporting pagination. By implementing
+/// PageList is used to implement [`oio::List`] based on API supporting pagination. By implementing
 /// PageList, services don't need to care about the details of page list.
 ///
 /// # Architecture
@@ -35,16 +30,17 @@ use crate::*;
 /// - Services impl `PageList`
 /// - `PageLister` impl `List`
 /// - Expose `PageLister` as `Accessor::Lister`
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 pub trait PageList: Send + Sync + Unpin + 'static {
     /// next_page is used to fetch next page of entries from underlying storage.
-    async fn next_page(&self, ctx: &mut PageContext) -> Result<()>;
+    #[cfg(not(target_arch = "wasm32"))]
+    fn next_page(&self, ctx: &mut PageContext) -> impl Future<Output = Result<()>> + MaybeSend;
+    #[cfg(target_arch = "wasm32")]
+    fn next_page(&self, ctx: &mut PageContext) -> impl Future<Output = Result<()>>;
 }
 
 /// PageContext is the context passing between `PageList`.
 ///
-/// [`PageLister`] will init the PageContext, and implementor of [`PageList`] should fill the `PageContext`
+/// [`PageLister`] will init the PageContext, and implementer of [`PageList`] should fill the `PageContext`
 /// based on their needs.
 ///
 /// - Set `done` to `true` if all page have been fetched.
@@ -57,32 +53,19 @@ pub struct PageContext {
     pub done: bool,
     /// token is used by underlying storage services to fetch next page.
     pub token: String,
-    /// entries is used to store entries fetched from underlying storage.
+    /// entries are used to store entries fetched from underlying storage.
     ///
     /// Please always reuse the same `VecDeque` to avoid unnecessary memory allocation.
-    /// PageLister makes sure that entries is reset before calling `next_page`. Implementor
-    /// can calling `push_back` on `entries` directly.
+    /// PageLister makes sure that entries is reset before calling `next_page`. Implementer
+    /// can call `push_back` on `entries` directly.
     pub entries: VecDeque<oio::Entry>,
 }
 
-/// PageLister implements [`List`] based on [`PageList`].
+/// PageLister implements [`oio::List`] based on [`PageList`].
 pub struct PageLister<L: PageList> {
-    state: State<L>,
+    inner: L,
+    ctx: PageContext,
 }
-
-enum State<L> {
-    Idle(Option<(L, PageContext)>),
-    Fetch(BoxedFuture<((L, PageContext), Result<()>)>),
-}
-
-/// # Safety
-///
-/// wasm32 is a special target that we only have one event-loop for this state.
-unsafe impl<L: PageList> Send for State<L> {}
-/// # Safety
-///
-/// We will only take `&mut Self` reference for State.
-unsafe impl<L: PageList> Sync for State<L> {}
 
 impl<L> PageLister<L>
 where
@@ -91,14 +74,12 @@ where
     /// Create a new PageLister.
     pub fn new(l: L) -> Self {
         Self {
-            state: State::Idle(Some((
-                l,
-                PageContext {
-                    done: false,
-                    token: "".to_string(),
-                    entries: VecDeque::new(),
-                },
-            ))),
+            inner: l,
+            ctx: PageContext {
+                done: false,
+                token: "".to_string(),
+                entries: VecDeque::new(),
+            },
         }
     }
 }
@@ -107,33 +88,16 @@ impl<L> oio::List for PageLister<L>
 where
     L: PageList,
 {
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<oio::Entry>>> {
+    async fn next(&mut self) -> Result<Option<oio::Entry>> {
         loop {
-            match &mut self.state {
-                State::Idle(st) => {
-                    if let Some((_, ctx)) = st.as_mut() {
-                        if let Some(entry) = ctx.entries.pop_front() {
-                            return Poll::Ready(Ok(Some(entry)));
-                        }
-                        if ctx.done {
-                            return Poll::Ready(Ok(None));
-                        }
-                    }
-
-                    let (l, mut ctx) = st.take().expect("lister must be valid");
-                    let fut = async move {
-                        let res = l.next_page(&mut ctx).await;
-                        ((l, ctx), res)
-                    };
-                    self.state = State::Fetch(Box::pin(fut));
-                }
-                State::Fetch(fut) => {
-                    let ((l, ctx), res) = ready!(fut.as_mut().poll(cx));
-                    self.state = State::Idle(Some((l, ctx)));
-
-                    res?;
-                }
+            if let Some(entry) = self.ctx.entries.pop_front() {
+                return Ok(Some(entry));
             }
+            if self.ctx.done {
+                return Ok(None);
+            }
+
+            self.inner.next_page(&mut self.ctx).await?;
         }
     }
 }

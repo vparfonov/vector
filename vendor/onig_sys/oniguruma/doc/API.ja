@@ -1,4 +1,4 @@
-鬼車インターフェース Version 6.9.7   2022/02/04
+鬼車インターフェース Version 6.9.10   2024/05/26
 
 #include <oniguruma.h>
 
@@ -275,6 +275,7 @@
 # int onig_set_retry_limit_in_match_of_match_param(OnigMatchParam* mp, unsigned long limit)
 
   一回のマッチでのリトライ数の制限値をセットする。
+  ０は無制限を意味する。
 
   引数
   1 mp: マッチパラメタオブジェクトアドレス
@@ -361,6 +362,8 @@
       onig_set_callout_user_data_of_match_param()で指定するuser_dataは、
       calloutで使用されるuser_dataと共用される。
 
+    ONIG_OPTION_MATCH_WHOLE_STRING  マッチした終端の位置がendになることを要求
+
 
 # int onig_search_with_param(regex_t* reg, const UChar* str, const UChar* end,
                    const UChar* start, const UChar* range, OnigRegion* region,
@@ -400,6 +403,7 @@
     ONIG_OPTION_NOT_END_STRING      endを文字列終端と看做さない (\z, \Z 失敗)
     ONIG_OPTION_NOT_BEGIN_POSITION  startを検索開始位置と看做さない (\G 失敗)
     ONIG_OPTION_CALLBACK_EACH_MATCH 全てのマッチ成功に対してコールバック関数が呼び出される。
+    ONIG_OPTION_MATCH_WHOLE_STRING  マッチした終端の位置がendになることを要求
 
 
 # int onig_match_with_param(regex_t* reg, const UChar* str, const UChar* end,
@@ -445,7 +449,7 @@
 
   引数
   1 rset: regsetオブジェクトを返すためのアドレス
-  2 n:    正規表現オブジェクトの個数
+  2 n:    正規表現の個数
   3 regs: 正規表現オブジェクトの配列
 
   戻り値
@@ -476,7 +480,7 @@
   引数
   1 set: regsetオブジェクト
   2 at:  変更する場所のインデックス
-  2 reg: 正規表現オブジェクト
+  3 reg: 正規表現オブジェクト
 
   戻り値
   正常終了: ONIG_NORMAL == 0
@@ -635,7 +639,7 @@
   戻り値
   正常終了: 指定された名前に対するグループ数
             (例 /(?<x>..)(?<x>..)/  ==>  2)
-  名前に対するグループが存在しない: -1
+  名前に対するグループが存在しない: ONIGERR_UNDEFINED_NAME_REFERENCE
 
   引数
   1 reg:       正規表現オブジェクト
@@ -984,6 +988,7 @@
 # int onig_set_retry_limit_in_match(unsigned long limit)
 
   一回のマッチング内でのリトライ数の制限値を指定する。
+  ０は無制限を意味する。
 
   正常終了戻り値: ONIG_NORMAL
 

@@ -17,7 +17,6 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use http::StatusCode;
 
 use super::core::DropboxCore;
@@ -37,27 +36,16 @@ impl DropboxWriter {
     }
 }
 
-#[async_trait]
 impl oio::OneShotWrite for DropboxWriter {
-    async fn write_once(&self, bs: &dyn oio::WriteBuf) -> Result<()> {
-        let bs = oio::ChunkedBytes::from_vec(bs.vectored_bytes(bs.remaining()));
-
+    async fn write_once(&self, bs: Buffer) -> Result<Metadata> {
         let resp = self
             .core
-            .dropbox_update(
-                &self.path,
-                Some(bs.len()),
-                &self.op,
-                AsyncBody::ChunkedBytes(bs),
-            )
+            .dropbox_update(&self.path, Some(bs.len()), &self.op, bs)
             .await?;
         let status = resp.status();
         match status {
-            StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::OK => Ok(Metadata::default()),
+            _ => Err(parse_error(resp)),
         }
     }
 }

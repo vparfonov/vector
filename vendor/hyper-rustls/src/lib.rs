@@ -43,6 +43,8 @@ mod stream;
 mod log {
     #[cfg(any(feature = "rustls-native-certs", feature = "webpki-roots"))]
     pub(crate) use log::debug;
+    #[cfg(feature = "rustls-native-certs")]
+    pub(crate) use log::warn;
 }
 
 #[cfg(not(feature = "logging"))]
@@ -51,11 +53,17 @@ mod log {
     macro_rules! debug    ( ($($tt:tt)*) => {{}} );
     #[cfg(any(feature = "rustls-native-certs", feature = "webpki-roots"))]
     pub(crate) use debug;
+    #[cfg(feature = "rustls-native-certs")]
+    macro_rules! warn_    ( ($($tt:tt)*) => {{}} );
+    #[cfg(feature = "rustls-native-certs")]
+    pub(crate) use warn_ as warn;
 }
 
 pub use crate::config::ConfigBuilderExt;
 pub use crate::connector::builder::ConnectorBuilder as HttpsConnectorBuilder;
-pub use crate::connector::HttpsConnector;
+pub use crate::connector::{
+    DefaultServerNameResolver, FixedServerNameResolver, HttpsConnector, ResolveServerName,
+};
 pub use crate::stream::MaybeHttpsStream;
 
 /// The various states of the [`HttpsConnectorBuilder`]

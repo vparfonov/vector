@@ -1,4 +1,4 @@
-鬼車 正規表現 Version 6.9.8    2022/04/11
+鬼車 正規表現 Version 6.9.9    2024/06/10
 
 使用文法: ONIG_SYNTAX_ONIGURUMA (既定値)
 
@@ -234,24 +234,21 @@
 
     Unicodeの場合:
 
-      alnum    Letter | Mark | Decimal_Number
-      alpha    Letter | Mark
-      ascii    0000 - 007F
-      blank    Space_Separator | 0009
-      cntrl    Control | Format | Unassigned | Private_Use | Surrogate
+      alnum    Alphabetic | Decimal_Number
+      alpha    Alphabetic
+      ascii    U+0000 - U+007F
+      blank    Space_Separator | U+0009
+      cntrl    U+0000 - U+001F, U+007F - U+009F
       digit    Decimal_Number
-      graph    [[:^space:]] && ^Control && ^Unassigned && ^Surrogate
-      lower    Lowercase_Letter
-      print    [[:graph:]] | [[:space:]]
-      punct    Connector_Punctuation | Dash_Punctuation | Close_Punctuation |
-               Final_Punctuation | Initial_Punctuation | Other_Punctuation |
-               Open_Punctuation
-      space    Space_Separator | Line_Separator | Paragraph_Separator |
-               U+0009 | U+000A | U+000B | U+000C | U+000D | U+0085
-      upper    Uppercase_Letter
+      graph    ^White_Space && ^[[:cntrl:]] && ^Unassigned && ^Surrogate
+      lower    Lowercase
+      print    [[:graph:]] | Space_Separator
+      punct    Punctuation | Symbol
+      space    White_Space
+      upper    Uppercase
       xdigit   U+0030 - U+0039 | U+0041 - U+0046 | U+0061 - U+0066
                (0-9, a-f, A-F)
-      word     Letter | Mark | Decimal_Number | Connector_Punctuation
+      word     Alphabetic | Mark | Decimal_Number | Connector_Punctuation
 
 
 
@@ -283,6 +280,9 @@
 
                       * これは次の')'またはパターンの終わりまでのグループを形成する
                         /ab(?i)c|def|gh/ == /ab(?i:c|def|gh)/
+
+  * (?i)オプションは、wordタイプ(\w, \p{Word})には有効ではない。但しwordタイプが文字クラスの中で使用された場合は有効になる。しかし、このことはwordタイプを(?W)オプションと共に使用した時にしか気にする必要はないであろう。
+
 
   /(?CIL).../, /(?CIL:...)/   全体オプション
 

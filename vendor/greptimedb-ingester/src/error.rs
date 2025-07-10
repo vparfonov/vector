@@ -21,38 +21,71 @@ use tonic::Status;
 #[snafu(visibility(pub))]
 pub enum Error {
     #[snafu(display("Invalid client tls config, {}", msg))]
-    InvalidTlsConfig { msg: String },
+    InvalidTlsConfig {
+        msg: String,
+        #[snafu(implicit)]
+        location: Location,
+    },
 
     #[snafu(display("Invalid config file path, {}", source))]
     InvalidConfigFilePath {
         source: io::Error,
+        #[snafu(implicit)]
         location: Location,
     },
 
     #[snafu(display("Failed to create gRPC channel, source: {}", source))]
     CreateChannel {
         source: tonic::transport::Error,
+        #[snafu(implicit)]
         location: Location,
     },
 
     #[snafu(display("Unknown proto column datatype: {}", datatype))]
-    UnknownColumnDataType { datatype: i32, location: Location },
+    UnknownColumnDataType {
+        datatype: i32,
+        #[snafu(implicit)]
+        location: Location,
+    },
 
     #[snafu(display("Illegal GRPC client state: {}", err_msg))]
-    IllegalGrpcClientState { err_msg: String, location: Location },
+    IllegalGrpcClientState {
+        err_msg: String,
+        #[snafu(implicit)]
+        location: Location,
+    },
 
     #[snafu(display("Missing required field in protobuf, field: {}", field))]
-    MissingField { field: String, location: Location },
+    MissingField {
+        field: String,
+        #[snafu(implicit)]
+        location: Location,
+    },
 
     // Server error carried in Tonic Status's metadata.
     #[snafu(display("{}", msg))]
-    Server { status: Status, msg: String },
+    Server { status: Box<Status>, msg: String },
 
     #[snafu(display("Illegal Database response: {err_msg}"))]
-    IllegalDatabaseResponse { err_msg: String },
+    IllegalDatabaseResponse {
+        err_msg: String,
+        #[snafu(implicit)]
+        location: Location,
+    },
 
     #[snafu(display("Failed to send request with streaming: {}", err_msg))]
-    ClientStreaming { err_msg: String, location: Location },
+    ClientStreaming {
+        err_msg: String,
+        #[snafu(implicit)]
+        location: Location,
+    },
+
+    #[snafu(display("Failed to parse ascii string: {}", value))]
+    InvalidAscii {
+        value: String,
+        #[snafu(implicit)]
+        location: Location,
+    },
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -69,7 +102,10 @@ impl From<Status> for Error {
 
         let msg = get_metadata_value(&e, INNER_ERROR_MSG).unwrap_or(e.to_string());
 
-        Self::Server { status: e, msg }
+        Self::Server {
+            status: Box::new(e),
+            msg,
+        }
     }
 }
 

@@ -17,7 +17,6 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use bytes::Buf;
 use quick_xml::de;
 
@@ -48,8 +47,6 @@ impl AzblobLister {
     }
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl oio::PageList for AzblobLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let resp = self
@@ -58,10 +55,10 @@ impl oio::PageList for AzblobLister {
             .await?;
 
         if resp.status() != http::StatusCode::OK {
-            return Err(parse_error(resp).await?);
+            return Err(parse_error(resp));
         }
 
-        let bs = resp.into_body().bytes().await?;
+        let bs = resp.into_body();
 
         let output: ListBlobsOutput =
             de::from_reader(bs.reader()).map_err(new_xml_deserialize_error)?;
@@ -86,11 +83,9 @@ impl oio::PageList for AzblobLister {
         }
 
         for object in output.blobs.blob {
-            let path = build_rel_path(&self.core.root, &object.name);
-
-            // azblob could return the dir itself in contents.
-            if path == self.path || path.is_empty() {
-                continue;
+            let mut path = build_rel_path(&self.core.root, &object.name);
+            if path.is_empty() {
+                path = "/".to_string();
             }
 
             let meta = Metadata::new(EntryMode::from_path(&path))

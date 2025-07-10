@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "sqlx-macros-core"
-version = "0.8.5"
+version = "0.8.6"
 authors = [
     "Ryan Leckey <leckey.ryan@gmail.com>",
     "Austin Bonander <austin.bonander@gmail.com>",
@@ -62,11 +62,11 @@ version = "1.0.73"
 version = "0.10.0"
 
 [dependencies.sqlx-core]
-version = "=0.8.5"
+version = "=0.8.6"
 features = ["offline"]
 
 [dependencies.sqlx-mysql]
-version = "=0.8.5"
+version = "=0.8.6"
 features = [
     "offline",
     "migrate",
@@ -74,7 +74,7 @@ features = [
 optional = true
 
 [dependencies.sqlx-postgres]
-version = "=0.8.5"
+version = "=0.8.6"
 features = [
     "offline",
     "migrate",
@@ -82,7 +82,7 @@ features = [
 optional = true
 
 [dependencies.sqlx-sqlite]
-version = "=0.8.5"
+version = "=0.8.6"
 features = [
     "offline",
     "migrate",
@@ -99,9 +99,6 @@ features = [
     "clone-impls",
 ]
 default-features = false
-
-[dependencies.tempfile]
-version = "3.10.1"
 
 [dependencies.tokio]
 version = "1"

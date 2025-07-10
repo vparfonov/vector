@@ -57,7 +57,7 @@ pub trait Completer {
     /// returns the start position and the completion candidates for the
     /// partial word to be completed.
     ///
-    /// ("ls /usr/loc", 11) => Ok((3, vec!["/usr/local/"]))
+    /// `("ls /usr/loc", 11)` => `Ok((3, vec!["/usr/local/"]))`
     fn complete(
         &self, // FIXME should be `&mut self`
         line: &str,
@@ -405,7 +405,7 @@ pub fn extract_word(
     }
 }
 
-/// Returns the longest common prefix among all `Candidate::replacement()`s.
+/// Returns the longest common prefix among all [`Candidate::replacement()`]s.
 pub fn longest_common_prefix<C: Candidate>(candidates: &[C]) -> Option<&str> {
     if candidates.is_empty() {
         return None;

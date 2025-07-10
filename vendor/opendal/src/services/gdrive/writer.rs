@@ -17,13 +17,12 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
 use http::StatusCode;
 
 use super::core::GdriveCore;
 use super::core::GdriveFile;
 use super::error::parse_error;
-use crate::raw::oio::WriteBuf;
 use crate::raw::*;
 use crate::*;
 
@@ -46,11 +45,8 @@ impl GdriveWriter {
     }
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl oio::OneShotWrite for GdriveWriter {
-    async fn write_once(&self, bs: &dyn WriteBuf) -> Result<()> {
-        let bs = bs.bytes(bs.remaining());
+    async fn write_once(&self, bs: Buffer) -> Result<Metadata> {
         let size = bs.len();
 
         let resp = if let Some(file_id) = &self.file_id {
@@ -68,16 +64,14 @@ impl oio::OneShotWrite for GdriveWriter {
             StatusCode::OK | StatusCode::CREATED => {
                 // If we don't have the file id before, let's update the cache to avoid re-fetching.
                 if self.file_id.is_none() {
-                    let bs = resp.into_body().bytes().await?;
+                    let bs = resp.into_body();
                     let file: GdriveFile =
-                        serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+                        serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
                     self.core.path_cache.insert(&self.path, &file.id).await;
-                } else {
-                    resp.into_body().consume().await?;
                 }
-                Ok(())
+                Ok(Metadata::default())
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 }

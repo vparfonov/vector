@@ -7,7 +7,6 @@ use crate::lr1::lookahead::TokenSet;
 use crate::lr1::tls::Lr1Tls;
 use crate::test_util::{compare, expect_debug, normalized_grammar};
 use crate::tls::Tls;
-use rand::SeedableRng;
 use string_cache::DefaultAtom as Atom;
 
 use super::{build_lr0_states, build_lr1_states, use_lane_table, Lr};
@@ -16,13 +15,11 @@ fn nt(t: &str) -> NonterminalString {
     NonterminalString(Atom::from(t))
 }
 
-const ITERATIONS: usize = 96;
+const ITERATIONS: usize = 22;
 
 fn random_test<'g>(grammar: &Grammar, states: &'g [Lr1State<'g>], start_symbol: NonterminalString) {
-    let mut rng = rand_chacha::ChaCha8Rng::seed_from_u64(0);
-
     for i in 0..ITERATIONS {
-        let input_tree = generate::random_parse_tree(grammar, start_symbol.clone(), &mut rng);
+        let input_tree = generate::random_parse_tree(grammar, start_symbol.clone());
         let output_tree = interpret(states, input_tree.terminals()).unwrap();
 
         println!("test {}", i);
@@ -284,6 +281,7 @@ T: () = {
 fn issue_144() {
     let _tls = Tls::test();
 
+    #[allow(clippy::needless_raw_string_hashes)] // Fix merged for next clippy release, after 1.72
     let grammar = normalized_grammar(
         r##"
 grammar;

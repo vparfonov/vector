@@ -28,28 +28,40 @@ name = "greptimedb_ingester"
 path = "src/lib.rs"
 
 [[example]]
-name = "ingest"
-path = "examples/ingest.rs"
+name = "config_utils"
+path = "examples/config_utils.rs"
 
 [[example]]
-name = "stream_ingest"
-path = "examples/stream_ingest.rs"
+name = "high_level_ingest"
+path = "examples/high_level_ingest.rs"
+
+[[example]]
+name = "high_level_stream_ingest"
+path = "examples/high_level_stream_ingest.rs"
+
+[[example]]
+name = "low_level_ingest"
+path = "examples/low_level_ingest.rs"
+
+[[example]]
+name = "low_level_stream_ingest"
+path = "examples/low_level_stream_ingest.rs"
 
 [dependencies]
-dashmap = "5.4"
+dashmap = "6.1"
 derive_builder = "0.20"
 enum_dispatch = "0.3"
 futures = "0.3"
 futures-util = "0.3"
 parking_lot = "0.12"
 prost = "0.12"
-rand = "0.8"
-snafu = "0.7"
+rand = "0.9"
+snafu = "0.8"
 tower = "0.4"
 
 [dependencies.greptime-proto]
 git = "https://github.com/GreptimeTeam/greptime-proto.git"
-tag = "v0.7.0"
+tag = "v0.9.0"
 
 [dependencies.tokio]
 version = "1"
@@ -72,7 +84,7 @@ features = [
 ]
 
 [dev-dependencies]
-derive-new = "0.5"
+derive-new = "0.7"
 
 [dev-dependencies.tokio]
 version = "1"

@@ -10,21 +10,14 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
-rust-version = "1.60"
+edition = "2018"
 name = "async-broadcast"
-version = "0.7.2"
+version = "0.7.1"
 authors = [
     "Stjepan Glavina <stjepang@gmail.com>",
     "Yoshua Wuyts <yoshuawuyts@gmail.com>",
     "Zeeshan Ali Khan <zeeshanak@gnome.org>",
 ]
-build = false
-autolib = false
-autobins = false
-autoexamples = false
-autotests = false
-autobenches = false
 description = "Async broadcast channels"
 documentation = "https://docs.rs/async-broadcast"
 readme = "README.md"
@@ -33,17 +26,8 @@ categories = []
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/smol-rs/async-broadcast"
 
-[lib]
-name = "async_broadcast"
-path = "src/lib.rs"
-
-[[test]]
-name = "test"
-path = "tests/test.rs"
-
 [[bench]]
 name = "broadcast_bench"
-path = "benches/broadcast_bench.rs"
 harness = false
 
 [dependencies.event-listener]

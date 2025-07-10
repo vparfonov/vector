@@ -1,17 +1,10 @@
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use futures::{channel::oneshot, lock::Mutex};
-#[cfg(any(feature = "tokio-runtime", feature = "async-std-runtime"))]
-use native_tls::Certificate;
 use rand::Rng;
-#[cfg(all(
-    any(feature = "tokio-rustls-runtime", feature = "async-std-rustls-runtime"),
-    not(any(feature = "tokio-runtime", feature = "async-std-runtime"))
-))]
-use rustls::Certificate;
 use url::Url;
 
-use crate::{connection::Connection, error::ConnectionError, executor::Executor};
+use crate::{connection::Connection, error::ConnectionError, executor::Executor, Certificate};
 
 /// holds connection information for a broker
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -75,6 +68,59 @@ impl Default for OperationRetryOptions {
     }
 }
 
+impl OperationRetryOptions {
+    pub fn allow_retry(&self, current: u32) -> bool {
+        self.max_retries.is_none() || current < self.max_retries.unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_allow_retry_no_max_retries() {
+        let options = OperationRetryOptions {
+            operation_timeout: Duration::from_secs(30),
+            retry_delay: Duration::from_secs(5),
+            max_retries: None,
+        };
+
+        // If max_retries is None, it should always allow retries
+        assert!(options.allow_retry(0));
+        assert!(options.allow_retry(100));
+        assert!(options.allow_retry(u32::MAX));
+    }
+
+    #[test]
+    fn test_allow_retry_with_max_retries() {
+        let options = OperationRetryOptions {
+            operation_timeout: Duration::from_secs(30),
+            retry_delay: Duration::from_secs(5),
+            max_retries: Some(3),
+        };
+
+        // If max_retries is set to 3, we allow retries for current < 3
+        assert!(options.allow_retry(0)); // current < 3
+        assert!(options.allow_retry(2)); // current < 3
+        assert!(!options.allow_retry(3)); // current == 3
+        assert!(!options.allow_retry(4)); // current > 3
+    }
+
+    #[test]
+    fn test_allow_retry_max_retries_is_zero() {
+        let options = OperationRetryOptions {
+            operation_timeout: Duration::from_secs(30),
+            retry_delay: Duration::from_secs(5),
+            max_retries: Some(0),
+        };
+
+        // If max_retries is 0, it should not allow any retries
+        assert!(!options.allow_retry(0)); // current == 0
+        assert!(!options.allow_retry(1)); // current > 0
+    }
+}
+
 /// configuration for TLS connections
 #[derive(Debug, Clone)]
 pub struct TlsOptions {
@@ -123,6 +169,7 @@ pub struct ConnectionManager<Exe: Executor> {
     pub(crate) operation_retry_options: OperationRetryOptions,
     tls_options: TlsOptions,
     certificate_chain: Vec<Certificate>,
+    outbound_channel_size: usize,
 }
 
 impl<Exe: Executor> ConnectionManager<Exe> {
@@ -133,6 +180,7 @@ impl<Exe: Executor> ConnectionManager<Exe> {
         connection_retry: Option<ConnectionRetryOptions>,
         operation_retry_options: OperationRetryOptions,
         tls: Option<TlsOptions>,
+        outbound_channel_size: usize,
         executor: Arc<Exe>,
     ) -> Result<Self, ConnectionError> {
         let connection_retry_options = connection_retry.unwrap_or_default();
@@ -154,11 +202,10 @@ impl<Exe: Executor> ConnectionManager<Exe> {
             None => vec![],
             Some(certificate_chain) => {
                 let mut v = vec![];
-                for cert in pem::parse_many(certificate_chain)
-                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
-                    .iter()
-                    .rev()
-                {
+                let certificates = pem::parse_many(certificate_chain)
+                    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+                for cert in certificates.iter().rev() {
                     #[cfg(any(feature = "tokio-runtime", feature = "async-std-runtime"))]
                     v.push(
                         Certificate::from_der(cert.contents())
@@ -172,7 +219,7 @@ impl<Exe: Executor> ConnectionManager<Exe> {
                         ),
                         not(any(feature = "tokio-runtime", feature = "async-std-runtime"))
                     ))]
-                    v.push(Certificate(cert.contents().to_vec()));
+                    v.push(Certificate::from(cert.contents().to_vec()));
                 }
                 v
             }
@@ -191,6 +238,7 @@ impl<Exe: Executor> ConnectionManager<Exe> {
             operation_retry_options,
             tls_options,
             certificate_chain,
+            outbound_channel_size,
         };
         let broker_address = BrokerAddress {
             url: url.clone(),
@@ -312,6 +360,7 @@ impl<Exe: Executor> ConnectionManager<Exe> {
                 self.tls_options.tls_hostname_verification_enabled,
                 self.connection_retry_options.connection_timeout,
                 self.operation_retry_options.operation_timeout,
+                self.outbound_channel_size,
                 self.executor.clone(),
             )
             .await
@@ -490,13 +539,15 @@ impl<Exe: Executor> ConnectionManager<Exe> {
                     // in a mutex, and a case appears where the Arc is cloned
                     // somewhere at the same time, that just means the manager
                     // will create a new connection the next time it is asked
+                    let strong_count = Arc::strong_count(conn);
                     trace!(
                         "checking connection {}, is valid? {}, strong_count {}",
                         conn.id(),
                         conn.is_valid(),
-                        Arc::strong_count(conn)
+                        strong_count
                     );
-                    conn.is_valid() && Arc::strong_count(conn) > 1
+
+                    conn.is_valid() && strong_count > 1
                 }
             });
     }

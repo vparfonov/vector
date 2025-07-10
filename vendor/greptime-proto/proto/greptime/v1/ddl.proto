@@ -33,29 +33,57 @@ message DdlRequest {
     AlterExpr alter = 3;
     DropTableExpr drop_table = 4;
     TruncateTableExpr truncate_table = 7;
-    CreateFlowTaskExpr create_flow_task = 8;
-    DropFlowTaskExpr drop_flow_task = 9;
+    CreateFlowExpr create_flow = 8;
+    DropFlowExpr drop_flow = 9;
+    CreateViewExpr create_view = 10;
+    DropViewExpr drop_view = 11;
   }
 }
 
-// Create a flow task to run the SQL when new data arrives.
-message CreateFlowTaskExpr {
+// Create a flow to run the SQL when new data arrives.
+message CreateFlowExpr {
   string catalog_name = 1;
-  string task_name = 2;
+  string flow_name = 2;
   repeated TableName source_table_names = 3;
   TableName sink_table_name = 4;
   bool or_replace = 5;
   bool create_if_not_exists = 6;
-  string expire_when = 7;
+  // Expire data older than the given duration seconds.
+  ExpireAfter expire_after = 7;
   string comment = 8;
   string sql = 9;
-  map<string, string> task_options = 10;
+  map<string, string> flow_options = 10;
 }
 
-// Remove a flow task.
-message DropFlowTaskExpr {
+// Drop a flow.
+message DropFlowExpr {
   string catalog_name = 1;
-  string task_name = 2;
+  string flow_name = 2;
+  FlowId flow_id = 3;
+  bool drop_if_exists = 5;
+}
+
+// Create a view
+message CreateViewExpr {
+  string catalog_name = 1;
+  string schema_name = 2;
+  string view_name = 3;
+  bytes logical_plan = 4;
+  bool create_if_not_exists = 5;
+  bool or_replace = 6;
+  repeated TableName table_names = 7;
+  repeated string columns = 8;
+  repeated string plan_columns = 9;
+  string definition = 10;
+}
+
+// Drop a view
+message DropViewExpr {
+  string catalog_name = 1;
+  string schema_name = 2;
+  string view_name = 3;
+  TableId view_id = 4;
+  bool drop_if_exists = 5;
 }
 
 message CreateTableExpr {
@@ -81,6 +109,7 @@ message AlterExpr {
     DropColumns drop_columns = 5;
     RenameTable rename_table = 6;
     ChangeColumnTypes change_column_types = 7;
+    ChangeTableOptions change_table_options = 8;
   }
 }
 
@@ -126,14 +155,25 @@ message AddColumn {
 }
 
 message ChangeColumnType {
-    string column_name = 1;
-    ColumnDataType target_type = 2;
-    ColumnDataTypeExtension target_type_extension = 3;
+  string column_name = 1;
+  ColumnDataType target_type = 2;
+  ColumnDataTypeExtension target_type_extension = 3;
+}
+
+message ChangeTableOptions {
+    repeated ChangeTableOption change_table_options = 1;
+}
+
+message ChangeTableOption {
+  string key = 1;
+  string value = 2;
 }
 
 message DropColumn { string name = 1; }
 
 message TableId { uint32 id = 1; }
+
+message FlowId { uint32 id = 1; }
 
 message ColumnDef {
   string name = 1;
@@ -142,8 +182,12 @@ message ColumnDef {
   bytes default_constraint = 4;
   SemanticType semantic_type = 5;
   string comment = 6;
+
   // Extension for ColumnDataType.
   ColumnDataTypeExtension datatype_extension = 7;
+
+  // Additional column options.
+  ColumnOptions options = 8;
 }
 
 message AddColumnLocation {

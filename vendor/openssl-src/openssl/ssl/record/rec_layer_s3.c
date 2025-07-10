@@ -1,11 +1,13 @@
 /*
- * Copyright 1995-2024 The OpenSSL Project Authors. All Rights Reserved.
+ * Copyright 1995-2025 The OpenSSL Project Authors. All Rights Reserved.
  *
  * Licensed under the Apache License 2.0 (the "License").  You may not use
  * this file except in compliance with the License.  You can obtain a copy
  * in the file LICENSE in the source distribution or at
  * https://www.openssl.org/source/license.html
  */
+
+#include "internal/e_os.h"
 
 #include <stdio.h>
 #include <limits.h>
@@ -20,6 +22,7 @@
 #include "record_local.h"
 #include "internal/packet.h"
 #include "internal/comp.h"
+#include "internal/ssl_unwrap.h"
 
 void RECORD_LAYER_init(RECORD_LAYER *rl, SSL_CONNECTION *s)
 {
@@ -588,7 +591,7 @@ int ssl_release_record(SSL_CONNECTION *s, TLS_RECORD *rr, size_t length)
  *   -  SSL3_RT_APPLICATION_DATA (when ssl3_read calls us)
  *   -  0 (during a shutdown, no data has to be returned)
  *
- * If we don't have stored data to work from, read a SSL/TLS record first
+ * If we don't have stored data to work from, read an SSL/TLS record first
  * (possibly multiple records if we still don't have anything to return).
  *
  * This function must handle any surprises the peer may have for us, such as
@@ -1129,7 +1132,7 @@ static void rlayer_msg_callback_wrapper(int write_p, int version,
                                         size_t len, void *cbarg)
 {
     SSL_CONNECTION *s = cbarg;
-    SSL *ssl = SSL_CONNECTION_GET_SSL(s);
+    SSL *ssl = SSL_CONNECTION_GET_USER_SSL(s);
 
     if (s->msg_callback != NULL)
         s->msg_callback(write_p, version, content_type, buf, len, ssl,
@@ -1149,7 +1152,7 @@ static OSSL_FUNC_rlayer_padding_fn rlayer_padding_wrapper;
 static size_t rlayer_padding_wrapper(void *cbarg, int type, size_t len)
 {
     SSL_CONNECTION *s = cbarg;
-    SSL *ssl = SSL_CONNECTION_GET_SSL(s);
+    SSL *ssl = SSL_CONNECTION_GET_USER_SSL(s);
 
     return s->rlayer.record_padding_cb(ssl, type, len,
                                        s->rlayer.record_padding_arg);

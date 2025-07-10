@@ -15,17 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::task::ready;
-use std::task::Context;
-use std::task::Poll;
-
-use futures::FutureExt;
-
 use crate::raw::*;
 use crate::*;
-
-/// ListFuture is the future returned while calling async list.
-type ListFuture<A, L> = BoxedFuture<(A, oio::Entry, Result<(RpList, L)>)>;
 
 /// FlatLister will walk dir in bottom up way:
 ///
@@ -63,92 +54,83 @@ type ListFuture<A, L> = BoxedFuture<(A, oio::Entry, Result<(RpList, L)>)>;
 /// Especially, for storage services that can't return dirs first, ToFlatLister
 /// may output parent dirs' files before nested dirs, this is expected because files
 /// always output directly while listing.
-pub struct FlatLister<A: Accessor, L> {
-    acc: Option<A>,
-    root: String,
+pub struct FlatLister<A: Access, L> {
+    acc: A,
 
     next_dir: Option<oio::Entry>,
     active_lister: Vec<(Option<oio::Entry>, L)>,
-    list_future: Option<ListFuture<A, L>>,
 }
 
 /// # Safety
 ///
 /// wasm32 is a special target that we only have one event-loop for this FlatLister.
-unsafe impl<A: Accessor, L> Send for FlatLister<A, L> {}
+unsafe impl<A: Access, L> Send for FlatLister<A, L> {}
 /// # Safety
 ///
 /// We will only take `&mut Self` reference for FsLister.
-unsafe impl<A: Accessor, L> Sync for FlatLister<A, L> {}
+unsafe impl<A: Access, L> Sync for FlatLister<A, L> {}
 
 impl<A, L> FlatLister<A, L>
 where
-    A: Accessor,
+    A: Access,
 {
     /// Create a new flat lister
     pub fn new(acc: A, path: &str) -> FlatLister<A, L> {
         FlatLister {
-            acc: Some(acc),
-            root: path.to_string(),
+            acc,
             next_dir: Some(oio::Entry::new(path, Metadata::new(EntryMode::DIR))),
             active_lister: vec![],
-            list_future: None,
         }
     }
 }
 
 impl<A, L> oio::List for FlatLister<A, L>
 where
-    A: Accessor<Lister = L>,
+    A: Access<Lister = L>,
     L: oio::List,
 {
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<oio::Entry>>> {
+    async fn next(&mut self) -> Result<Option<oio::Entry>> {
         loop {
-            if let Some(fut) = self.list_future.as_mut() {
-                let (acc, de, res) = ready!(fut.poll_unpin(cx));
-                self.acc = Some(acc);
-                self.list_future = None;
-
-                let (_, l) = res?;
-                self.active_lister.push((Some(de), l))
-            }
-
             if let Some(de) = self.next_dir.take() {
-                let acc = self.acc.take().expect("Accessor must be valid");
-                let fut = async move {
-                    let res = acc.list(de.path(), OpList::new()).await;
-                    (acc, de, res)
-                };
-                self.list_future = Some(Box::pin(fut));
-                continue;
+                let (_, mut l) = self.acc.list(de.path(), OpList::new()).await?;
+                if let Some(v) = l.next().await? {
+                    self.active_lister.push((Some(de.clone()), l));
+
+                    if v.mode().is_dir() {
+                        // should not loop itself again
+                        if v.path() != de.path() {
+                            self.next_dir = Some(v);
+                            continue;
+                        }
+                    } else {
+                        return Ok(Some(v));
+                    }
+                }
             }
 
             let (de, lister) = match self.active_lister.last_mut() {
                 Some((de, lister)) => (de, lister),
-                None => return Poll::Ready(Ok(None)),
+                None => return Ok(None),
             };
 
-            match ready!(lister.poll_next(cx))? {
+            match lister.next().await? {
                 Some(v) if v.mode().is_dir() => {
-                    self.next_dir = Some(v);
-                    continue;
-                }
-                Some(v) => return Poll::Ready(Ok(Some(v))),
-                None => {
-                    match de.take() {
-                        Some(de) => {
-                            // Only push entry if it's not root dir
-                            if de.path() != self.root {
-                                return Poll::Ready(Ok(Some(de)));
-                            }
-                            continue;
-                        }
-                        None => {
-                            let _ = self.active_lister.pop();
-                            continue;
-                        }
+                    // should not loop itself again
+                    if v.path() != de.as_ref().expect("de should not be none here").path() {
+                        self.next_dir = Some(v);
+                        continue;
                     }
                 }
+                Some(v) => return Ok(Some(v)),
+                None => match de.take() {
+                    Some(de) => {
+                        return Ok(Some(de));
+                    }
+                    None => {
+                        let _ = self.active_lister.pop();
+                        continue;
+                    }
+                },
             }
         }
     }
@@ -156,17 +138,26 @@ where
 
 impl<A, P> oio::BlockingList for FlatLister<A, P>
 where
-    A: Accessor<BlockingLister = P>,
+    A: Access<BlockingLister = P>,
     P: oio::BlockingList,
 {
     fn next(&mut self) -> Result<Option<oio::Entry>> {
         loop {
             if let Some(de) = self.next_dir.take() {
-                let acc = self.acc.take().expect("Accessor must be valid");
-                let (_, l) = acc.blocking_list(de.path(), OpList::new())?;
+                let (_, mut l) = self.acc.blocking_list(de.path(), OpList::new())?;
+                if let Some(v) = l.next()? {
+                    self.active_lister.push((Some(de.clone()), l));
 
-                self.acc = Some(acc);
-                self.active_lister.push((Some(de), l))
+                    if v.mode().is_dir() {
+                        // should not loop itself again
+                        if v.path() != de.path() {
+                            self.next_dir = Some(v);
+                            continue;
+                        }
+                    } else {
+                        return Ok(Some(v));
+                    }
+                }
             }
 
             let (de, lister) = match self.active_lister.last_mut() {
@@ -176,25 +167,21 @@ where
 
             match lister.next()? {
                 Some(v) if v.mode().is_dir() => {
-                    self.next_dir = Some(v);
-                    continue;
-                }
-                Some(v) => return Ok(Some(v)),
-                None => {
-                    match de.take() {
-                        Some(de) => {
-                            // Only push entry if it's not root dir
-                            if de.path() != self.root {
-                                return Ok(Some(de));
-                            }
-                            continue;
-                        }
-                        None => {
-                            let _ = self.active_lister.pop();
-                            continue;
-                        }
+                    if v.path() != de.as_ref().expect("de should not be none here").path() {
+                        self.next_dir = Some(v);
+                        continue;
                     }
                 }
+                Some(v) => return Ok(Some(v)),
+                None => match de.take() {
+                    Some(de) => {
+                        return Ok(Some(de));
+                    }
+                    None => {
+                        let _ = self.active_lister.pop();
+                        continue;
+                    }
+                },
             }
         }
     }
@@ -203,10 +190,10 @@ where
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::sync::Arc;
     use std::vec;
     use std::vec::IntoIter;
 
-    use async_trait::async_trait;
     use log::debug;
     use oio::BlockingList;
 
@@ -236,20 +223,23 @@ mod tests {
         }
     }
 
-    #[async_trait]
-    impl Accessor for MockService {
+    impl Access for MockService {
         type Reader = ();
         type BlockingReader = ();
         type Writer = ();
         type BlockingWriter = ();
         type Lister = ();
         type BlockingLister = MockLister;
+        type Deleter = ();
+        type BlockingDeleter = ();
 
-        fn info(&self) -> AccessorInfo {
-            let mut am = AccessorInfo::default();
-            am.full_capability_mut().list = true;
-
-            am
+        fn info(&self) -> Arc<AccessorInfo> {
+            let am = AccessorInfo::default();
+            am.update_full_capability(|mut cap| {
+                cap.list = true;
+                cap
+            });
+            am.into()
         }
 
         fn blocking_list(&self, path: &str, _: OpList) -> Result<(RpList, Self::BlockingLister)> {

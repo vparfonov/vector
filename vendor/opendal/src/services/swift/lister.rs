@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
 
 use super::core::*;
 use super::error::parse_error;
@@ -43,7 +43,6 @@ impl SwiftLister {
     }
 }
 
-#[async_trait]
 impl oio::PageList for SwiftLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let response = self
@@ -54,13 +53,13 @@ impl oio::PageList for SwiftLister {
         let status_code = response.status();
 
         if !status_code.is_success() {
-            let error = parse_error(response).await?;
+            let error = parse_error(response);
             return Err(error);
         }
 
-        let bytes = response.into_body().bytes().await?;
+        let bytes = response.into_body();
         let decoded_response: Vec<ListOpResponse> =
-            serde_json::from_slice(&bytes).map_err(new_json_deserialize_error)?;
+            serde_json::from_reader(bytes.reader()).map_err(new_json_deserialize_error)?;
 
         // Update token and done based on resp.
         if let Some(entry) = decoded_response.last() {
@@ -68,7 +67,7 @@ impl oio::PageList for SwiftLister {
                 ListOpResponse::Subdir { subdir } => subdir,
                 ListOpResponse::FileInfo { name, .. } => name,
             };
-            ctx.token = path.clone();
+            ctx.token.clone_from(path);
         } else {
             ctx.done = true;
         }
@@ -76,8 +75,12 @@ impl oio::PageList for SwiftLister {
         for status in decoded_response {
             let entry: oio::Entry = match status {
                 ListOpResponse::Subdir { subdir } => {
+                    let mut path = build_rel_path(self.core.root.as_str(), subdir.as_str());
+                    if path.is_empty() {
+                        path = "/".to_string();
+                    }
                     let meta = Metadata::new(EntryMode::DIR);
-                    oio::Entry::new(&subdir, meta)
+                    oio::Entry::with(path, meta)
                 }
                 ListOpResponse::FileInfo {
                     bytes,
@@ -86,21 +89,27 @@ impl oio::PageList for SwiftLister {
                     content_type,
                     mut last_modified,
                 } => {
-                    // this is the pseudo directory itself; we'll skip it.
-                    if name == self.path {
-                        continue;
+                    let mut path = build_rel_path(self.core.root.as_str(), name.as_str());
+                    if path.is_empty() {
+                        path = "/".to_string();
                     }
-
-                    let mut meta = Metadata::new(EntryMode::from_path(&name));
+                    let mut meta = Metadata::new(EntryMode::from_path(path.as_str()));
                     meta.set_content_length(bytes);
                     meta.set_content_md5(hash.as_str());
 
-                    // we'll change "2023-10-28T19:18:11.682610" to "2023-10-28T19:18:11.682610Z"
-                    last_modified.push('Z');
+                    // OpenStack Swift returns time without 'Z' at the end,
+                    // which causes an error in parse_datetime_from_rfc3339.
+                    // we'll change "2023-10-28T19:18:11.682610" to "2023-10-28T19:18:11.682610Z".
+                    if !last_modified.ends_with('Z') {
+                        last_modified.push('Z');
+                    }
                     meta.set_last_modified(parse_datetime_from_rfc3339(last_modified.as_str())?);
-                    meta.set_content_type(content_type.as_str());
 
-                    oio::Entry::with(name, meta)
+                    if let Some(content_type) = content_type {
+                        meta.set_content_type(content_type.as_str());
+                    }
+
+                    oio::Entry::with(path, meta)
                 }
             };
             ctx.entries.push_back(entry);

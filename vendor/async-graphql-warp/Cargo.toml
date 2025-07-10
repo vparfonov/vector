@@ -10,9 +10,9 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
+edition = "2024"
 name = "async-graphql-warp"
-version = "7.0.16"
+version = "7.0.17"
 authors = [
     "sunli <scott_s829@163.com>",
     "Koxiaet",
@@ -38,13 +38,14 @@ categories = [
 ]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/async-graphql/async-graphql"
+resolver = "2"
 
 [lib]
 name = "async_graphql_warp"
 path = "src/lib.rs"
 
 [dependencies.async-graphql]
-version = "7.0.16"
+version = "7.0.17"
 default-features = false
 
 [dependencies.futures-util]

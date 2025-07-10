@@ -17,12 +17,13 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
 use http::StatusCode;
 
 use super::core::B2Core;
 use super::core::StartLargeFileResponse;
 use super::core::UploadPartResponse;
+use super::core::UploadResponse;
 use super::error::parse_error;
 use crate::raw::*;
 use crate::*;
@@ -44,11 +45,26 @@ impl B2Writer {
             op,
         }
     }
+
+    pub fn parse_body_into_meta(path: &str, resp: UploadResponse) -> Metadata {
+        let mut meta = Metadata::new(EntryMode::from_path(path));
+
+        if let Some(md5) = resp.content_md5 {
+            meta.set_content_md5(&md5);
+        }
+
+        if let Some(content_type) = resp.content_type {
+            meta.set_content_type(&content_type);
+        }
+
+        meta.set_content_length(resp.content_length);
+
+        meta
+    }
 }
 
-#[async_trait]
 impl oio::MultipartWrite for B2Writer {
-    async fn write_once(&self, size: u64, body: AsyncBody) -> Result<()> {
+    async fn write_once(&self, size: u64, body: Buffer) -> Result<Metadata> {
         let resp = self
             .core
             .upload_file(&self.path, Some(size), &self.op, body)
@@ -58,10 +74,16 @@ impl oio::MultipartWrite for B2Writer {
 
         match status {
             StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(())
+                let bs = resp.into_body();
+
+                let result: UploadResponse =
+                    serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
+
+                let meta = Self::parse_body_into_meta(&self.path, result);
+
+                Ok(meta)
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -72,14 +94,14 @@ impl oio::MultipartWrite for B2Writer {
 
         match status {
             StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
+                let bs = resp.into_body();
 
                 let result: StartLargeFileResponse =
-                    serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+                    serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
 
                 Ok(result.file_id)
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -88,7 +110,7 @@ impl oio::MultipartWrite for B2Writer {
         upload_id: &str,
         part_number: usize,
         size: u64,
-        body: AsyncBody,
+        body: Buffer,
     ) -> Result<oio::MultipartPart> {
         // B2 requires part number must between [1..=10000]
         let part_number = part_number + 1;
@@ -102,21 +124,26 @@ impl oio::MultipartWrite for B2Writer {
 
         match status {
             StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
+                let bs = resp.into_body();
 
                 let result: UploadPartResponse =
-                    serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+                    serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
 
                 Ok(oio::MultipartPart {
                     etag: result.content_sha1,
                     part_number,
+                    checksum: None,
                 })
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    async fn complete_part(&self, upload_id: &str, parts: &[oio::MultipartPart]) -> Result<()> {
+    async fn complete_part(
+        &self,
+        upload_id: &str,
+        parts: &[oio::MultipartPart],
+    ) -> Result<Metadata> {
         let part_sha1_array = parts
             .iter()
             .map(|p| {
@@ -138,11 +165,16 @@ impl oio::MultipartWrite for B2Writer {
 
         match status {
             StatusCode::OK => {
-                resp.into_body().consume().await?;
+                let bs = resp.into_body();
 
-                Ok(())
+                let result: UploadResponse =
+                    serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
+
+                let meta = Self::parse_body_into_meta(&self.path, result);
+
+                Ok(meta)
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -150,11 +182,8 @@ impl oio::MultipartWrite for B2Writer {
         let resp = self.core.cancel_large_file(upload_id).await?;
         match resp.status() {
             // b2 returns code 200 if abort succeeds.
-            StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::OK => Ok(()),
+            _ => Err(parse_error(resp)),
         }
     }
 }

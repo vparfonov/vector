@@ -19,14 +19,19 @@
 //!
 //! It's highly recommended that you start by reading [`concepts`] first.
 
+#![allow(rustdoc::bare_urls)]
+
 pub mod comparisons;
 
 pub mod concepts;
 
 pub mod internals;
 
+pub mod performance;
+
 /// Changes log for all OpenDAL released versions.
 #[doc = include_str!("../../CHANGELOG.md")]
+#[cfg(not(doctest))]
 pub mod changelog {}
 
 #[cfg(not(doctest))]

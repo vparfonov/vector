@@ -43,11 +43,22 @@ pub struct Decompress {
 /// in-memory data.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
+#[allow(clippy::unnecessary_cast)]
 pub enum FlushCompress {
     /// A typical parameter for passing to compression/decompression functions,
     /// this indicates that the underlying stream to decide how much data to
     /// accumulate before producing output in order to maximize compression.
     None = ffi::MZ_NO_FLUSH as isize,
+
+    /// All pending output is flushed to the output buffer, but the output is
+    /// not aligned to a byte boundary.
+    ///
+    /// All input data so far will be available to the decompressor (as with
+    /// `Flush::Sync`). This completes the current deflate block and follows it
+    /// with an empty fixed codes block that is 10 bytes long, and it assures
+    /// that enough bytes are output in order for the decompressor to finish the
+    /// block before the empty fixed code block.
+    Partial = ffi::MZ_PARTIAL_FLUSH as isize,
 
     /// All pending output is flushed to the output buffer and the output is
     /// aligned on a byte boundary so that the decompressor can get all input
@@ -57,16 +68,6 @@ pub enum FlushCompress {
     /// it should only be used when necessary. This will complete the current
     /// deflate block and follow it with an empty stored block.
     Sync = ffi::MZ_SYNC_FLUSH as isize,
-
-    /// All pending output is flushed to the output buffer, but the output is
-    /// not aligned to a byte boundary.
-    ///
-    /// All of the input data so far will be available to the decompressor (as
-    /// with `Flush::Sync`. This completes the current deflate block and follows
-    /// it with an empty fixed codes block that is 10 bites long, and it assures
-    /// that enough bytes are output in order for the decompressor to finish the
-    /// block before the empty fixed code block.
-    Partial = ffi::MZ_PARTIAL_FLUSH as isize,
 
     /// All output is flushed as with `Flush::Sync` and the compression state is
     /// reset so decompression can restart from this point if previous
@@ -86,6 +87,7 @@ pub enum FlushCompress {
 /// decompressing in-memory data.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[non_exhaustive]
+#[allow(clippy::unnecessary_cast)]
 pub enum FlushDecompress {
     /// A typical parameter for passing to compression/decompression functions,
     /// this indicates that the underlying stream to decide how much data to
@@ -109,7 +111,7 @@ pub enum FlushDecompress {
 }
 
 /// The inner state for an error when decompressing
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) enum DecompressErrorInner {
     General { msg: ErrorMessage },
     NeedsDictionary(u32),
@@ -117,7 +119,7 @@ pub(crate) enum DecompressErrorInner {
 
 /// Error returned when a decompression object finds that the input stream of
 /// bytes was not a valid input stream of bytes.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DecompressError(pub(crate) DecompressErrorInner);
 
 impl DecompressError {
@@ -147,7 +149,7 @@ pub(crate) fn decompress_need_dict<T>(adler: u32) -> Result<T, DecompressError> 
 
 /// Error returned when a compression object is used incorrectly or otherwise
 /// generates an error.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct CompressError {
     pub(crate) msg: ErrorMessage,
 }
@@ -277,6 +279,7 @@ impl Compress {
 
         match rc {
             ffi::MZ_STREAM_ERROR => compress_failed(self.inner.inner.msg()),
+            #[allow(clippy::unnecessary_cast)]
             ffi::MZ_OK => Ok(unsafe { (*stream).adler } as u32),
             c => panic!("unknown return code: {}", c),
         }
@@ -493,6 +496,7 @@ impl Decompress {
             ffi::inflateSetDictionary(stream, dictionary.as_ptr(), dictionary.len() as ffi::uInt)
         };
 
+        #[allow(clippy::unnecessary_cast)]
         match rc {
             ffi::MZ_STREAM_ERROR => decompress_failed(self.inner.inner.msg()),
             ffi::MZ_DATA_ERROR => decompress_need_dict(unsafe { (*stream).adler } as u32),

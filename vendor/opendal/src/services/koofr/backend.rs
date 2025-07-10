@@ -15,53 +15,38 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
+use http::Response;
 use http::StatusCode;
 use log::debug;
-use serde::Deserialize;
 use tokio::sync::Mutex;
 use tokio::sync::OnceCell;
 
 use super::core::File;
 use super::core::KoofrCore;
 use super::core::KoofrSigner;
+use super::delete::KoofrDeleter;
 use super::error::parse_error;
 use super::lister::KoofrLister;
 use super::writer::KoofrWriter;
 use super::writer::KoofrWriters;
 use crate::raw::*;
+use crate::services::KoofrConfig;
 use crate::*;
 
-/// Config for backblaze Koofr services support.
-#[derive(Default, Deserialize)]
-#[serde(default)]
-#[non_exhaustive]
-pub struct KoofrConfig {
-    /// root of this backend.
-    ///
-    /// All operations will happen under this root.
-    pub root: Option<String>,
-    /// Koofr endpoint.
-    pub endpoint: String,
-    /// Koofr email.
-    pub email: String,
-    /// password of this backend. (Must be the application password)
-    pub password: Option<String>,
-}
+impl Configurator for KoofrConfig {
+    type Builder = KoofrBuilder;
 
-impl Debug for KoofrConfig {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut ds = f.debug_struct("Config");
-
-        ds.field("root", &self.root);
-        ds.field("email", &self.email);
-
-        ds.finish()
+    #[allow(deprecated)]
+    fn into_builder(self) -> Self::Builder {
+        KoofrBuilder {
+            config: self,
+            http_client: None,
+        }
     }
 }
 
@@ -71,6 +56,7 @@ impl Debug for KoofrConfig {
 pub struct KoofrBuilder {
     config: KoofrConfig,
 
+    #[deprecated(since = "0.53.0", note = "Use `Operator::update_http_client` instead")]
     http_client: Option<HttpClient>,
 }
 
@@ -87,7 +73,7 @@ impl KoofrBuilder {
     /// Set root of this backend.
     ///
     /// All operations will happen under this root.
-    pub fn root(&mut self, root: &str) -> &mut Self {
+    pub fn root(mut self, root: &str) -> Self {
         self.config.root = if root.is_empty() {
             None
         } else {
@@ -100,7 +86,7 @@ impl KoofrBuilder {
     /// endpoint.
     ///
     /// It is required. e.g. `https://api.koofr.net/`
-    pub fn endpoint(&mut self, endpoint: &str) -> &mut Self {
+    pub fn endpoint(mut self, endpoint: &str) -> Self {
         self.config.endpoint = endpoint.to_string();
 
         self
@@ -109,7 +95,7 @@ impl KoofrBuilder {
     /// email.
     ///
     /// It is required. e.g. `test@example.com`
-    pub fn email(&mut self, email: &str) -> &mut Self {
+    pub fn email(mut self, email: &str) -> Self {
         self.config.email = email.to_string();
 
         self
@@ -117,7 +103,7 @@ impl KoofrBuilder {
 
     /// Koofr application password.
     ///
-    /// Go to https://app.koofr.net/app/admin/preferences/password.
+    /// Go to <https://app.koofr.net/app/admin/preferences/password>.
     /// Click "Generate Password" button to generate a new application password.
     ///
     /// # Notes
@@ -125,7 +111,7 @@ impl KoofrBuilder {
     /// This is not user's Koofr account password.
     /// Please use the application password instead.
     /// Please also remind users of this.
-    pub fn password(&mut self, password: &str) -> &mut Self {
+    pub fn password(mut self, password: &str) -> Self {
         self.config.password = if password.is_empty() {
             None
         } else {
@@ -141,7 +127,9 @@ impl KoofrBuilder {
     ///
     /// This API is part of OpenDAL's Raw API. `HttpClient` could be changed
     /// during minor updates.
-    pub fn http_client(&mut self, client: HttpClient) -> &mut Self {
+    #[deprecated(since = "0.53.0", note = "Use `Operator::update_http_client` instead")]
+    #[allow(deprecated)]
+    pub fn http_client(mut self, client: HttpClient) -> Self {
         self.http_client = Some(client);
         self
     }
@@ -149,31 +137,10 @@ impl KoofrBuilder {
 
 impl Builder for KoofrBuilder {
     const SCHEME: Scheme = Scheme::Koofr;
-    type Accessor = KoofrBackend;
-
-    /// Converts a HashMap into an KoofrBuilder instance.
-    ///
-    /// # Arguments
-    ///
-    /// * `map` - A HashMap containing the configuration values.
-    ///
-    /// # Returns
-    ///
-    /// Returns an instance of KoofrBuilder.
-    fn from_map(map: HashMap<String, String>) -> Self {
-        // Deserialize the configuration from the HashMap.
-        let config = KoofrConfig::deserialize(ConfigDeserializer::new(map))
-            .expect("config deserialize must succeed");
-
-        // Create an KoofrBuilder instance with the deserialized config.
-        KoofrBuilder {
-            config,
-            http_client: None,
-        }
-    }
+    type Config = KoofrConfig;
 
     /// Builds the backend and returns the result of KoofrBackend.
-    fn build(&mut self) -> Result<Self::Accessor> {
+    fn build(self) -> Result<impl Access> {
         debug!("backend build started: {:?}", &self);
 
         let root = normalize_root(&self.config.root.clone().unwrap_or_default());
@@ -202,26 +169,57 @@ impl Builder for KoofrBuilder {
                 .with_context("service", Scheme::Koofr)),
         }?;
 
-        let client = if let Some(client) = self.http_client.take() {
-            client
-        } else {
-            HttpClient::new().map_err(|err| {
-                err.with_operation("Builder::build")
-                    .with_context("service", Scheme::Koofr)
-            })?
-        };
-
         let signer = Arc::new(Mutex::new(KoofrSigner::default()));
 
         Ok(KoofrBackend {
             core: Arc::new(KoofrCore {
+                info: {
+                    let am = AccessorInfo::default();
+                    am.set_scheme(Scheme::Koofr)
+                        .set_root(&root)
+                        .set_native_capability(Capability {
+                            stat: true,
+                            stat_has_content_length: true,
+                            stat_has_content_type: true,
+                            stat_has_last_modified: true,
+
+                            create_dir: true,
+
+                            read: true,
+
+                            write: true,
+                            write_can_empty: true,
+
+                            delete: true,
+
+                            rename: true,
+
+                            copy: true,
+
+                            list: true,
+                            list_has_content_length: true,
+                            list_has_content_type: true,
+                            list_has_last_modified: true,
+
+                            shared: true,
+
+                            ..Default::default()
+                        });
+
+                    // allow deprecated api here for compatibility
+                    #[allow(deprecated)]
+                    if let Some(client) = self.http_client {
+                        am.update_http_client(|_| client);
+                    }
+
+                    am.into()
+                },
                 root,
                 endpoint: self.config.endpoint.clone(),
                 email: self.config.email.clone(),
                 password,
                 mount_id: OnceCell::new(),
                 signer,
-                client,
             }),
         })
     }
@@ -233,41 +231,18 @@ pub struct KoofrBackend {
     core: Arc<KoofrCore>,
 }
 
-#[async_trait]
-impl Accessor for KoofrBackend {
-    type Reader = IncomingAsyncBody;
+impl Access for KoofrBackend {
+    type Reader = HttpBody;
     type Writer = KoofrWriters;
     type Lister = oio::PageLister<KoofrLister>;
+    type Deleter = oio::OneShotDeleter<KoofrDeleter>;
     type BlockingReader = ();
     type BlockingWriter = ();
     type BlockingLister = ();
+    type BlockingDeleter = ();
 
-    fn info(&self) -> AccessorInfo {
-        let mut am = AccessorInfo::default();
-        am.set_scheme(Scheme::Koofr)
-            .set_root(&self.core.root)
-            .set_native_capability(Capability {
-                stat: true,
-
-                create_dir: true,
-
-                read: true,
-
-                write: true,
-                write_can_empty: true,
-
-                delete: true,
-
-                rename: true,
-
-                copy: true,
-
-                list: true,
-
-                ..Default::default()
-            });
-
-        am
+    fn info(&self) -> Arc<AccessorInfo> {
+        self.core.info.clone()
     }
 
     async fn create_dir(&self, path: &str, _: OpCreateDir) -> Result<RpCreateDir> {
@@ -286,9 +261,10 @@ impl Accessor for KoofrBackend {
 
         match status {
             StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
+                let bs = resp.into_body();
 
-                let file: File = serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+                let file: File =
+                    serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
 
                 let mode = if file.ty == "dir" {
                     EntryMode::DIR
@@ -304,25 +280,23 @@ impl Accessor for KoofrBackend {
 
                 Ok(RpStat::new(md))
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    async fn read(&self, path: &str, _args: OpRead) -> Result<(RpRead, Self::Reader)> {
-        let resp = self.core.get(path).await?;
+    async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
+        let resp = self.core.get(path, args.range()).await?;
 
         let status = resp.status();
-
         match status {
             StatusCode::OK | StatusCode::PARTIAL_CONTENT => {
-                let size = parse_content_length(resp.headers())?;
-                let range = parse_content_range(resp.headers())?;
-                Ok((
-                    RpRead::new().with_size(size).with_range(range),
-                    resp.into_body(),
-                ))
+                Ok((RpRead::default(), resp.into_body()))
             }
-            _ => Err(parse_error(resp).await?),
+            _ => {
+                let (part, mut body) = resp.into_parts();
+                let buf = body.to_buffer().await?;
+                Err(parse_error(Response::from_parts(part, buf)))
+            }
         }
     }
 
@@ -334,17 +308,11 @@ impl Accessor for KoofrBackend {
         Ok((RpWrite::default(), w))
     }
 
-    async fn delete(&self, path: &str, _: OpDelete) -> Result<RpDelete> {
-        let resp = self.core.remove(path).await?;
-
-        let status = resp.status();
-
-        match status {
-            StatusCode::OK => Ok(RpDelete::default()),
-            // Allow 404 when deleting a non-existing object
-            StatusCode::NOT_FOUND => Ok(RpDelete::default()),
-            _ => Err(parse_error(resp).await?),
-        }
+    async fn delete(&self) -> Result<(RpDelete, Self::Deleter)> {
+        Ok((
+            RpDelete::default(),
+            oio::OneShotDeleter::new(KoofrDeleter::new(self.core.clone())),
+        ))
     }
 
     async fn list(&self, path: &str, _args: OpList) -> Result<(RpList, Self::Lister)> {
@@ -364,7 +332,7 @@ impl Accessor for KoofrBackend {
         let status = resp.status();
 
         if status != StatusCode::OK && status != StatusCode::NOT_FOUND {
-            return Err(parse_error(resp).await?);
+            return Err(parse_error(resp));
         }
 
         let resp = self.core.copy(from, to).await?;
@@ -372,12 +340,8 @@ impl Accessor for KoofrBackend {
         let status = resp.status();
 
         match status {
-            StatusCode::OK => {
-                resp.into_body().consume().await?;
-
-                Ok(RpCopy::default())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::OK => Ok(RpCopy::default()),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -393,7 +357,7 @@ impl Accessor for KoofrBackend {
         let status = resp.status();
 
         if status != StatusCode::OK && status != StatusCode::NOT_FOUND {
-            return Err(parse_error(resp).await?);
+            return Err(parse_error(resp));
         }
 
         let resp = self.core.move_object(from, to).await?;
@@ -401,12 +365,8 @@ impl Accessor for KoofrBackend {
         let status = resp.status();
 
         match status {
-            StatusCode::OK => {
-                resp.into_body().consume().await?;
-
-                Ok(RpRename::default())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::OK => Ok(RpRename::default()),
+            _ => Err(parse_error(resp)),
         }
     }
 }

@@ -15,9 +15,9 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use async_trait::async_trait;
-use http::StatusCode;
 use std::sync::Arc;
+
+use http::StatusCode;
 
 use super::core::*;
 use super::error::*;
@@ -41,7 +41,6 @@ impl WebdavLister {
     }
 }
 
-#[async_trait]
 impl oio::PageList for WebdavLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let resp = self.core.webdav_list(&self.path, &self.args).await?;
@@ -57,15 +56,15 @@ impl oio::PageList for WebdavLister {
         };
 
         let bs = if resp.status().is_success() {
-            resp.into_body().bytes().await?
+            resp.into_body()
         } else if resp.status() == StatusCode::NOT_FOUND && self.path.ends_with('/') {
             ctx.done = true;
             return Ok(());
         } else {
-            return Err(parse_error(resp).await?);
+            return Err(parse_error(resp));
         };
 
-        let result: Multistatus = deserialize_multistatus(&bs)?;
+        let result: Multistatus = deserialize_multistatus(&bs.to_bytes())?;
 
         for res in result.response {
             let mut path = res
@@ -81,18 +80,12 @@ impl oio::PageList for WebdavLister {
                 path += "/"
             }
 
-            // Ignore the root path itself.
-            if self.core.root == path {
-                continue;
-            }
-
-            let normalized_path = build_rel_path(&self.core.root, &path);
-            let decoded_path = percent_decode_path(&normalized_path);
-
-            if normalized_path == self.path || decoded_path == self.path {
-                // WebDAV server may return the current path as an entry.
-                continue;
-            }
+            let decoded_path = percent_decode_path(&path);
+            let normalized_path = if self.core.root != decoded_path {
+                build_rel_path(&self.core.root, &decoded_path)
+            } else {
+                "/".to_owned()
+            };
 
             // HACKS! HACKS! HACKS!
             //
@@ -103,7 +96,8 @@ impl oio::PageList for WebdavLister {
                 continue;
             }
 
-            ctx.entries.push_back(oio::Entry::new(&decoded_path, meta))
+            ctx.entries
+                .push_back(oio::Entry::new(&normalized_path, meta))
         }
         ctx.done = true;
 

@@ -15,6 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
+use std::io;
+
 use crate::*;
 
 /// Parse std io error into opendal::Error.
@@ -31,18 +33,33 @@ pub fn new_std_io_error(err: std::io::Error) -> Error {
         NotFound => (ErrorKind::NotFound, false),
         PermissionDenied => (ErrorKind::PermissionDenied, false),
         AlreadyExists => (ErrorKind::AlreadyExists, false),
-        InvalidInput => (ErrorKind::InvalidInput, false),
         Unsupported => (ErrorKind::Unsupported, false),
 
         Interrupted | UnexpectedEof | TimedOut | WouldBlock => (ErrorKind::Unexpected, true),
         _ => (ErrorKind::Unexpected, true),
     };
 
-    let mut err = Error::new(kind, &err.kind().to_string()).set_source(err);
+    let mut err = Error::new(kind, err.kind().to_string()).set_source(err);
 
     if retryable {
         err = err.set_temporary();
     }
 
     err
+}
+
+/// helper functions to format `Error` into `io::Error`.
+///
+/// This function is added privately by design and only valid in current
+/// context (i.e. `raw` mod). We don't want to expose this function to
+/// users.
+#[inline]
+pub(crate) fn format_std_io_error(err: Error) -> io::Error {
+    let kind = match err.kind() {
+        ErrorKind::NotFound => io::ErrorKind::NotFound,
+        ErrorKind::PermissionDenied => io::ErrorKind::PermissionDenied,
+        _ => io::ErrorKind::Interrupted,
+    };
+
+    io::Error::new(kind, err)
 }

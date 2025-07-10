@@ -211,7 +211,7 @@ impl MatchBlock {
     }
 }
 
-impl Validator<'_> {
+impl<'grammar> Validator<'grammar> {
     fn validate(&mut self) -> NormResult<()> {
         for item in &self.grammar.items {
             match *item {

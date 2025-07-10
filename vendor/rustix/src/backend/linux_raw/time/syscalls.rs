@@ -21,30 +21,29 @@ use linux_raw_sys::general::timespec as __kernel_old_timespec;
 pub(crate) use crate::backend::vdso_wrappers::{clock_gettime, clock_gettime_dynamic};
 
 #[inline]
-#[must_use]
-pub(crate) fn clock_getres(id: ClockId) -> Timespec {
+pub(crate) fn clock_getres(which_clock: ClockId) -> Timespec {
     #[cfg(target_pointer_width = "32")]
     unsafe {
         let mut result = MaybeUninit::<Timespec>::uninit();
-        if let Err(err) = ret(syscall!(__NR_clock_getres_time64, id, &mut result)) {
+        if let Err(err) = ret(syscall!(__NR_clock_getres_time64, which_clock, &mut result)) {
             // See the comments in `clock_gettime_via_syscall` about emulation.
             debug_assert_eq!(err, io::Errno::NOSYS);
-            clock_getres_old(id, &mut result);
+            clock_getres_old(which_clock, &mut result);
         }
         result.assume_init()
     }
     #[cfg(target_pointer_width = "64")]
     unsafe {
         let mut result = MaybeUninit::<Timespec>::uninit();
-        ret_infallible(syscall!(__NR_clock_getres, id, &mut result));
+        ret_infallible(syscall!(__NR_clock_getres, which_clock, &mut result));
         result.assume_init()
     }
 }
 
 #[cfg(target_pointer_width = "32")]
-unsafe fn clock_getres_old(id: ClockId, result: &mut MaybeUninit<Timespec>) {
+unsafe fn clock_getres_old(which_clock: ClockId, result: &mut MaybeUninit<Timespec>) {
     let mut old_result = MaybeUninit::<__kernel_old_timespec>::uninit();
-    ret_infallible(syscall!(__NR_clock_getres, id, &mut old_result));
+    ret_infallible(syscall!(__NR_clock_getres, which_clock, &mut old_result));
     let old_result = old_result.assume_init();
     result.write(Timespec {
         tv_sec: old_result.tv_sec.into(),
@@ -53,28 +52,32 @@ unsafe fn clock_getres_old(id: ClockId, result: &mut MaybeUninit<Timespec>) {
 }
 
 #[inline]
-pub(crate) fn clock_settime(id: ClockId, timespec: Timespec) -> io::Result<()> {
+pub(crate) fn clock_settime(which_clock: ClockId, timespec: Timespec) -> io::Result<()> {
     // `clock_settime64` was introduced in Linux 5.1. The old `clock_settime`
     // syscall is not y2038-compatible on 32-bit architectures.
     #[cfg(target_pointer_width = "32")]
     unsafe {
         match ret(syscall_readonly!(
             __NR_clock_settime64,
-            id,
+            which_clock,
             by_ref(&timespec)
         )) {
-            Err(io::Errno::NOSYS) => clock_settime_old(id, timespec),
+            Err(io::Errno::NOSYS) => clock_settime_old(which_clock, timespec),
             otherwise => otherwise,
         }
     }
     #[cfg(target_pointer_width = "64")]
     unsafe {
-        ret(syscall_readonly!(__NR_clock_settime, id, by_ref(&timespec)))
+        ret(syscall_readonly!(
+            __NR_clock_settime,
+            which_clock,
+            by_ref(&timespec)
+        ))
     }
 }
 
 #[cfg(target_pointer_width = "32")]
-unsafe fn clock_settime_old(id: ClockId, timespec: Timespec) -> io::Result<()> {
+unsafe fn clock_settime_old(which_clock: ClockId, timespec: Timespec) -> io::Result<()> {
     let old_timespec = __kernel_old_timespec {
         tv_sec: timespec
             .tv_sec
@@ -84,7 +87,7 @@ unsafe fn clock_settime_old(id: ClockId, timespec: Timespec) -> io::Result<()> {
     };
     ret(syscall_readonly!(
         __NR_clock_settime,
-        id,
+        which_clock,
         by_ref(&old_timespec)
     ))
 }

@@ -1,24 +1,25 @@
 //! Unix specific definitions
-#[cfg(feature = "buffer-redux")]
-use buffer_redux::BufReader;
 use std::cmp;
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 #[cfg(not(feature = "buffer-redux"))]
 use std::io::BufReader;
 use std::io::{self, ErrorKind, Read, Write};
-use std::os::unix::io::{AsFd, AsRawFd, BorrowedFd, IntoRawFd, RawFd};
+use std::os::fd::{AsFd, AsRawFd, BorrowedFd, IntoRawFd, RawFd};
 use std::os::unix::net::UnixStream;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, SyncSender};
 use std::sync::{Arc, Mutex};
 
+#[cfg(feature = "buffer-redux")]
+use buffer_redux::BufReader;
 use log::{debug, warn};
 use nix::errno::Errno;
 use nix::poll::{self, PollFlags, PollTimeout};
 use nix::sys::select::{self, FdSet};
 #[cfg(not(feature = "termios"))]
 use nix::sys::termios::Termios;
+use nix::sys::time::TimeValLike;
 use nix::unistd::{close, isatty, read, write};
 #[cfg(feature = "termios")]
 use termios::Termios;
@@ -29,19 +30,18 @@ use super::{width, Event, RawMode, RawReader, Renderer, Term};
 use crate::config::{Behavior, BellStyle, ColorMode, Config};
 use crate::highlight::Highlighter;
 use crate::keys::{KeyCode as K, KeyEvent, KeyEvent as E, Modifiers as M};
-use crate::layout::{Layout, Position};
+use crate::layout::{GraphemeClusterMode, Layout, Position, Unit};
 use crate::line_buffer::LineBuffer;
-use crate::{error, Cmd, ReadlineError, Result};
-
-/// Unsupported Terminals that don't support RAW mode
-const UNSUPPORTED_TERM: [&str; 3] = ["dumb", "cons25", "emacs"];
+use crate::{error, error::Signal, Cmd, ReadlineError, Result};
 
 const BRACKETED_PASTE_ON: &str = "\x1b[?2004h";
 const BRACKETED_PASTE_OFF: &str = "\x1b[?2004l";
+const BEGIN_SYNCHRONIZED_UPDATE: &str = "\x1b[?2026h";
+const END_SYNCHRONIZED_UPDATE: &str = "\x1b[?2026l";
 
 nix::ioctl_read_bad!(win_size, libc::TIOCGWINSZ, libc::winsize);
 
-fn get_win_size(fd: RawFd) -> (usize, usize) {
+fn get_win_size(fd: AltFd) -> (Unit, Unit) {
     use std::mem::zeroed;
 
     if cfg!(test) {
@@ -50,21 +50,17 @@ fn get_win_size(fd: RawFd) -> (usize, usize) {
 
     unsafe {
         let mut size: libc::winsize = zeroed();
-        match win_size(fd, &mut size) {
+        match win_size(fd.0, &mut size) {
             Ok(0) => {
                 // In linux pseudo-terminals are created with dimensions of
                 // zero. If host application didn't initialize the correct
                 // size before start we treat zero size as 80 columns and
                 // infinite rows
-                let cols = if size.ws_col == 0 {
-                    80
-                } else {
-                    size.ws_col as usize
-                };
+                let cols = if size.ws_col == 0 { 80 } else { size.ws_col };
                 let rows = if size.ws_row == 0 {
-                    usize::MAX
+                    Unit::MAX
                 } else {
-                    size.ws_row as usize
+                    size.ws_row
                 };
                 (cols, rows)
             }
@@ -73,24 +69,23 @@ fn get_win_size(fd: RawFd) -> (usize, usize) {
     }
 }
 
-/// Check TERM environment variable to see if current term is in our
-/// unsupported list
-fn is_unsupported_term() -> bool {
-    match std::env::var("TERM") {
-        Ok(term) => {
-            for iter in &UNSUPPORTED_TERM {
-                if (*iter).eq_ignore_ascii_case(&term) {
-                    return true;
-                }
-            }
-            false
-        }
-        Err(_) => false,
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct AltFd(RawFd);
+impl IntoRawFd for AltFd {
+    #[inline]
+    fn into_raw_fd(self) -> RawFd {
+        self.0
+    }
+}
+impl AsFd for AltFd {
+    #[inline]
+    fn as_fd(&self) -> BorrowedFd<'_> {
+        unsafe { BorrowedFd::borrow_raw(self.0) }
     }
 }
 
 /// Return whether or not STDIN, STDOUT or STDERR is a TTY
-fn is_a_tty(fd: RawFd) -> bool {
+fn is_a_tty(fd: AltFd) -> bool {
     isatty(fd).unwrap_or(false)
 }
 
@@ -108,8 +103,8 @@ pub type KeyMap = PosixKeyMap;
 #[must_use = "You must restore default mode (disable_raw_mode)"]
 pub struct PosixMode {
     termios: Termios,
-    tty_in: RawFd,
-    tty_out: Option<RawFd>,
+    tty_in: AltFd,
+    tty_out: Option<AltFd>,
     raw_mode: Arc<AtomicBool>,
 }
 
@@ -132,8 +127,8 @@ impl RawMode for PosixMode {
 // Rust std::io::Stdin is buffered with no way to know if bytes are available.
 // So we use low-level stuff instead...
 struct TtyIn {
-    fd: RawFd,
-    sigwinch_pipe: Option<RawFd>,
+    fd: AltFd,
+    sig_pipe: Option<AltFd>,
 }
 
 impl Read for TtyIn {
@@ -141,19 +136,21 @@ impl Read for TtyIn {
         loop {
             let res = unsafe {
                 libc::read(
-                    self.fd,
+                    self.fd.0,
                     buf.as_mut_ptr().cast::<libc::c_void>(),
                     buf.len() as libc::size_t,
                 )
             };
             if res == -1 {
                 let error = io::Error::last_os_error();
-                if error.kind() == ErrorKind::Interrupted && self.sigwinch()? {
-                    return Err(io::Error::new(
-                        ErrorKind::Interrupted,
-                        error::WindowResizedError,
-                    ));
-                } else if error.kind() != ErrorKind::Interrupted {
+                if error.kind() == ErrorKind::Interrupted {
+                    if let Some(signal) = self.sig()? {
+                        return Err(io::Error::new(
+                            ErrorKind::Interrupted,
+                            error::SignalError(signal),
+                        ));
+                    }
+                } else {
                     return Err(error);
                 }
             } else {
@@ -165,18 +162,18 @@ impl Read for TtyIn {
 }
 
 impl TtyIn {
-    /// Check if a SIGWINCH signal has been received
-    fn sigwinch(&self) -> nix::Result<bool> {
-        if let Some(pipe) = self.sigwinch_pipe {
+    /// Check if a signal has been received
+    fn sig(&self) -> nix::Result<Option<Signal>> {
+        if let Some(pipe) = self.sig_pipe {
             let mut buf = [0u8; 64];
             match read(pipe, &mut buf) {
-                Ok(0) => Ok(false),
-                Ok(_) => Ok(true),
-                Err(e) if e == Errno::EWOULDBLOCK || e == Errno::EINTR => Ok(false),
+                Ok(0) => Ok(None),
+                Ok(_) => Ok(Some(Signal::from(buf[0]))),
+                Err(e) if e == Errno::EWOULDBLOCK || e == Errno::EINTR => Ok(None),
                 Err(e) => Err(e),
             }
         } else {
-            Ok(false)
+            Ok(None)
         }
     }
 }
@@ -194,12 +191,13 @@ pub struct PosixRawReader {
     key_map: PosixKeyMap,
     // external print reader
     pipe_reader: Option<PipeReader>,
+    #[cfg(target_os = "macos")]
+    is_dev_tty: bool,
 }
 
 impl AsFd for PosixRawReader {
     fn as_fd(&self) -> BorrowedFd<'_> {
-        let fd = self.tty_in.get_ref().fd;
-        unsafe { BorrowedFd::borrow_raw(fd) }
+        self.tty_in.get_ref().fd.as_fd()
     }
 }
 
@@ -236,14 +234,15 @@ const RXVT_CTRL_SHIFT: char = '@';
 
 impl PosixRawReader {
     fn new(
-        fd: RawFd,
-        sigwinch_pipe: Option<RawFd>,
+        fd: AltFd,
+        sig_pipe: Option<AltFd>,
         buffer: Option<PosixBuffer>,
         config: &Config,
         key_map: PosixKeyMap,
         pipe_reader: Option<PipeReader>,
+        #[cfg(target_os = "macos")] is_dev_tty: bool,
     ) -> Self {
-        let inner = TtyIn { fd, sigwinch_pipe };
+        let inner = TtyIn { fd, sig_pipe };
         #[cfg(any(not(feature = "buffer-redux"), test))]
         let (tty_in, _) = (BufReader::with_capacity(1024, inner), buffer);
         #[cfg(all(feature = "buffer-redux", not(test)))]
@@ -258,6 +257,8 @@ impl PosixRawReader {
             parser: Parser::new(),
             key_map,
             pipe_reader,
+            #[cfg(target_os = "macos")]
+            is_dev_tty,
         }
     }
 
@@ -305,9 +306,8 @@ impl PosixRawReader {
             match self.poll(timeout) {
                 // Ignore poll errors, it's very likely we'll pick them up on
                 // the next read anyway.
-                Ok(0) | Err(_) => Ok(E::ESC),
-                Ok(n) => {
-                    debug_assert!(n > 0, "{}", n);
+                Ok(false) | Err(_) => Ok(E::ESC),
+                Ok(true) => {
                     // recurse, and add the alt modifier.
                     let E(k, m) = self._do_escape_sequence(false)?;
                     Ok(E(k, m | M::ALT))
@@ -324,7 +324,7 @@ impl PosixRawReader {
         if seq2.is_ascii_digit() {
             match seq2 {
                 '0' | '9' => {
-                    debug!(target: "rustyline", "unsupported esc sequence: \\E[{:?}", seq2);
+                    debug!(target: "rustyline", "unsupported esc sequence: \\E[{seq2:?}");
                     Ok(E(K::UnknownEscSeq, M::NONE))
                 }
                 _ => {
@@ -342,7 +342,7 @@ impl PosixRawReader {
                 'D' => E(K::F(4), M::NONE),
                 'E' => E(K::F(5), M::NONE),
                 _ => {
-                    debug!(target: "rustyline", "unsupported esc sequence: \\E[[{:?}", seq3);
+                    debug!(target: "rustyline", "unsupported esc sequence: \\E[[{seq3:?}");
                     E(K::UnknownEscSeq, M::NONE)
                 }
             })
@@ -368,7 +368,7 @@ impl PosixRawReader {
                 'c' => E(K::Right, M::SHIFT), // rxvt
                 'd' => E(K::Left, M::SHIFT),  // rxvt
                 _ => {
-                    debug!(target: "rustyline", "unsupported esc sequence: \\E[{:?}", seq2);
+                    debug!(target: "rustyline", "unsupported esc sequence: \\E[{seq2:?}");
                     E(K::UnknownEscSeq, M::NONE)
                 }
             })
@@ -389,7 +389,7 @@ impl PosixRawReader {
                 PAGE_DOWN => E(K::PageDown, M::NONE),
                 _ => {
                     debug!(target: "rustyline",
-                           "unsupported esc sequence: \\E[{}~", seq2);
+                           "unsupported esc sequence: \\E[{seq2}~");
                     E(K::UnknownEscSeq, M::NONE)
                 }
             })
@@ -413,7 +413,7 @@ impl PosixRawReader {
                     //('6', '3') => KeyCode::ScrollDown,
                     _ => {
                         debug!(target: "rustyline",
-                               "unsupported esc sequence: \\E[{}{}~", seq2, seq3);
+                               "unsupported esc sequence: \\E[{seq2}{seq3}~");
                         E(K::UnknownEscSeq, M::NONE)
                     }
                 })
@@ -445,18 +445,18 @@ impl PosixRawReader {
                             //('2', '4', '6') => E(K::F(24), M::CTRL),
                             _ => {
                                 debug!(target: "rustyline",
-                                       "unsupported esc sequence: \\E[{}{};{}~", seq2, seq3, seq5);
+                                       "unsupported esc sequence: \\E[{seq2}{seq3};{seq5}~");
                                 E(K::UnknownEscSeq, M::NONE)
                             }
                         })
                     } else {
                         debug!(target: "rustyline",
-                               "unsupported esc sequence: \\E[{}{};{}{}", seq2, seq3, seq5, seq6);
+                               "unsupported esc sequence: \\E[{seq2}{seq3};{seq5}{seq6}");
                         Ok(E(K::UnknownEscSeq, M::NONE))
                     }
                 } else {
                     debug!(target: "rustyline",
-                           "unsupported esc sequence: \\E[{}{};{:?}", seq2, seq3, seq5);
+                           "unsupported esc sequence: \\E[{seq2}{seq3};{seq5:?}");
                     Ok(E(K::UnknownEscSeq, M::NONE))
                 }
             } else if seq4.is_ascii_digit() {
@@ -467,18 +467,18 @@ impl PosixRawReader {
                         ('2', '0', '1') => E(K::BracketedPasteEnd, M::NONE),
                         _ => {
                             debug!(target: "rustyline",
-                                   "unsupported esc sequence: \\E[{}{}{}~", seq2, seq3, seq4);
+                                   "unsupported esc sequence: \\E[{seq2}{seq3}{seq4}~");
                             E(K::UnknownEscSeq, M::NONE)
                         }
                     })
                 } else {
                     debug!(target: "rustyline",
-                           "unsupported esc sequence: \\E[{}{}{}{}", seq2, seq3, seq4, seq5);
+                           "unsupported esc sequence: \\E[{seq2}{seq3}{seq4}{seq5}");
                     Ok(E(K::UnknownEscSeq, M::NONE))
                 }
             } else {
                 debug!(target: "rustyline",
-                       "unsupported esc sequence: \\E[{}{}{:?}", seq2, seq3, seq4);
+                       "unsupported esc sequence: \\E[{seq2}{seq3}{seq4:?}");
                 Ok(E(K::UnknownEscSeq, M::NONE))
             }
         } else if seq3 == ';' {
@@ -589,7 +589,7 @@ impl PosixRawReader {
                         ('9', LEFT) => E(K::Left, M::ALT),
                         _ => {
                             debug!(target: "rustyline",
-                                   "unsupported esc sequence: \\E[1;{}{:?}", seq4, seq5);
+                                   "unsupported esc sequence: \\E[1;{seq4}{seq5:?}");
                             E(K::UnknownEscSeq, M::NONE)
                         }
                     })
@@ -625,18 +625,18 @@ impl PosixRawReader {
                         (PAGE_DOWN, CTRL_ALT_SHIFT) => E(K::PageDown, M::CTRL_ALT_SHIFT),
                         _ => {
                             debug!(target: "rustyline",
-                                   "unsupported esc sequence: \\E[{};{:?}~", seq2, seq4);
+                                   "unsupported esc sequence: \\E[{seq2};{seq4:?}~");
                             E(K::UnknownEscSeq, M::NONE)
                         }
                     })
                 } else {
                     debug!(target: "rustyline",
-                           "unsupported esc sequence: \\E[{};{}{:?}", seq2, seq4, seq5);
+                           "unsupported esc sequence: \\E[{seq2};{seq4}{seq5:?}");
                     Ok(E(K::UnknownEscSeq, M::NONE))
                 }
             } else {
                 debug!(target: "rustyline",
-                       "unsupported esc sequence: \\E[{};{:?}", seq2, seq4);
+                       "unsupported esc sequence: \\E[{seq2};{seq4:?}");
                 Ok(E(K::UnknownEscSeq, M::NONE))
             }
         } else {
@@ -661,7 +661,7 @@ impl PosixRawReader {
                 (RXVT_END, RXVT_CTRL_SHIFT) => E(K::End, M::CTRL_SHIFT),
                 _ => {
                     debug!(target: "rustyline",
-                           "unsupported esc sequence: \\E[{}{:?}", seq2, seq3);
+                           "unsupported esc sequence: \\E[{seq2}{seq3:?}");
                     E(K::UnknownEscSeq, M::NONE)
                 }
             })
@@ -695,68 +695,97 @@ impl PosixRawReader {
             'w' => E(K::F(9), M::NONE),  // kf9 or ka1
             'x' => E(K::F(10), M::NONE), // kf10 or ka2
             _ => {
-                debug!(target: "rustyline", "unsupported esc sequence: \\EO{:?}", seq2);
+                debug!(target: "rustyline", "unsupported esc sequence: \\EO{seq2:?}");
                 E(K::UnknownEscSeq, M::NONE)
             }
         })
     }
 
-    fn poll(&mut self, timeout_ms: PollTimeout) -> Result<i32> {
+    fn poll(&mut self, timeout: PollTimeout) -> Result<bool> {
         let n = self.tty_in.buffer().len();
         if n > 0 {
-            return Ok(n as i32);
+            return Ok(true);
         }
+        #[cfg(target_os = "macos")]
+        if self.is_dev_tty {
+            // poll doesn't work for /dev/tty on MacOS but select does
+            return Ok(match self.select(Some(timeout), false /* ignored */)? {
+                Event::Timeout(true) => false,
+                _ => true,
+            });
+        }
+        debug!(target: "rustyline", "poll with: {timeout:?}");
         let mut fds = [poll::PollFd::new(self.as_fd(), PollFlags::POLLIN)];
-        let r = poll::poll(&mut fds, timeout_ms);
+        let r = poll::poll(&mut fds, timeout);
+        debug!(target: "rustyline", "poll returns: {r:?}");
         match r {
-            Ok(n) => Ok(n),
+            Ok(n) => Ok(n != 0),
             Err(Errno::EINTR) => {
-                if self.tty_in.get_ref().sigwinch()? {
-                    Err(ReadlineError::WindowResized)
+                if let Some(signal) = self.tty_in.get_ref().sig()? {
+                    Err(ReadlineError::Signal(signal))
                 } else {
-                    Ok(0) // Ignore EINTR while polling
+                    Ok(false) // Ignore EINTR while polling
                 }
             }
             Err(e) => Err(e.into()),
         }
     }
 
-    fn select(&mut self, single_esc_abort: bool) -> Result<Event> {
+    // timeout is used only with /dev/tty on MacOs
+    fn select(&mut self, timeout: Option<PollTimeout>, single_esc_abort: bool) -> Result<Event> {
         let tty_in = self.as_fd();
-        let sigwinch_pipe = self
-            .tty_in
-            .get_ref()
-            .sigwinch_pipe
-            .map(|fd| unsafe { BorrowedFd::borrow_raw(fd) });
-        let pipe_reader = self
-            .pipe_reader
-            .as_ref()
-            .map(|pr| pr.lock().unwrap().0.as_raw_fd())
-            .map(|fd| unsafe { BorrowedFd::borrow_raw(fd) });
+        let sig_pipe = self.tty_in.get_ref().sig_pipe.as_ref().map(|fd| fd.as_fd());
+        let pipe_reader = if timeout.is_some() {
+            None
+        } else {
+            self.pipe_reader
+                .as_ref()
+                .map(|pr| pr.lock().unwrap().0.as_raw_fd())
+                .map(|fd| unsafe { BorrowedFd::borrow_raw(fd) })
+        };
         loop {
             let mut readfds = FdSet::new();
-            if let Some(sigwinch_pipe) = sigwinch_pipe {
-                readfds.insert(sigwinch_pipe);
+            if let Some(sig_pipe) = sig_pipe {
+                readfds.insert(sig_pipe);
             }
             readfds.insert(tty_in);
             if let Some(pipe_reader) = pipe_reader {
                 readfds.insert(pipe_reader);
             }
-            if let Err(err) = select::select(None, Some(&mut readfds), None, None, None) {
-                if err == Errno::EINTR && self.tty_in.get_ref().sigwinch()? {
-                    return Err(ReadlineError::WindowResized);
-                } else if err != Errno::EINTR {
-                    return Err(err.into());
+            let mut timeout = match timeout {
+                Some(pt) => pt
+                    .as_millis()
+                    .map(|ms| nix::sys::time::TimeVal::milliseconds(ms as i64)),
+                None => None,
+            };
+            if let Err(err) = select::select(None, Some(&mut readfds), None, None, timeout.as_mut())
+            {
+                if err == Errno::EINTR {
+                    if let Some(signal) = self.tty_in.get_ref().sig()? {
+                        return Err(ReadlineError::Signal(signal));
+                    } else {
+                        continue;
+                    }
                 } else {
-                    continue;
+                    return Err(err.into());
                 }
             };
-            if sigwinch_pipe.map_or(false, |fd| readfds.contains(fd)) {
-                self.tty_in.get_ref().sigwinch()?;
-                return Err(ReadlineError::WindowResized);
+            if sig_pipe.is_some_and(|fd| readfds.contains(fd)) {
+                if let Some(signal) = self.tty_in.get_ref().sig()? {
+                    return Err(ReadlineError::Signal(signal));
+                }
             } else if readfds.contains(tty_in) {
+                #[cfg(target_os = "macos")]
+                if timeout.is_some() {
+                    return Ok(Event::Timeout(false));
+                }
                 // prefer user input over external print
                 return self.next_key(single_esc_abort).map(Event::KeyPress);
+            } else if timeout.is_some() {
+                #[cfg(target_os = "macos")]
+                return Ok(Event::Timeout(true));
+                #[cfg(not(target_os = "macos"))]
+                unreachable!()
             } else if let Some(ref pipe_reader) = self.pipe_reader {
                 let mut guard = pipe_reader.lock().unwrap();
                 let mut buf = [0; 1];
@@ -775,14 +804,14 @@ impl RawReader for PosixRawReader {
     #[cfg(not(feature = "signal-hook"))]
     fn wait_for_input(&mut self, single_esc_abort: bool) -> Result<Event> {
         match self.pipe_reader {
-            Some(_) => self.select(single_esc_abort),
+            Some(_) => self.select(None, single_esc_abort),
             None => self.next_key(single_esc_abort).map(Event::KeyPress),
         }
     }
 
     #[cfg(feature = "signal-hook")]
     fn wait_for_input(&mut self, single_esc_abort: bool) -> Result<Event> {
-        self.select(single_esc_abort)
+        self.select(None, single_esc_abort)
     }
 
     fn next_key(&mut self, single_esc_abort: bool) -> Result<KeyEvent> {
@@ -799,7 +828,7 @@ impl RawReader for PosixRawReader {
                 self.timeout_ms
             };
             match self.poll(timeout_ms) {
-                Ok(0) => {
+                Ok(false) => {
                     // single escape
                 }
                 Ok(_) => {
@@ -810,7 +839,7 @@ impl RawReader for PosixRawReader {
                 Err(e) => return Err(e),
             }
         }
-        debug!(target: "rustyline", "c: {:?} => key: {:?}", c, key);
+        debug!(target: "rustyline", "c: {c:?} => key: {key:?}");
         Ok(key)
     }
 
@@ -858,7 +887,7 @@ impl RawReader for PosixRawReader {
     fn find_binding(&self, key: &KeyEvent) -> Option<Cmd> {
         let cmd = self.key_map.get(key).cloned();
         if let Some(ref cmd) = cmd {
-            debug!(target: "rustyline", "terminal key binding: {:?} => {:?}", key, cmd);
+            debug!(target: "rustyline", "terminal key binding: {key:?} => {cmd:?}");
         }
         cmd
     }
@@ -891,16 +920,27 @@ impl Receiver for Utf8 {
 
 /// Console output writer
 pub struct PosixRenderer {
-    out: RawFd,
-    cols: usize, // Number of columns in terminal
+    out: AltFd,
+    cols: Unit, // Number of columns in terminal
     buffer: String,
-    tab_stop: usize,
+    tab_stop: Unit,
     colors_enabled: bool,
+    enable_synchronized_output: bool,
+    grapheme_cluster_mode: GraphemeClusterMode,
     bell_style: BellStyle,
+    /// 0 when BSU is first used or after last ESU
+    synchronized_update: usize,
 }
 
 impl PosixRenderer {
-    fn new(out: RawFd, tab_stop: usize, colors_enabled: bool, bell_style: BellStyle) -> Self {
+    fn new(
+        out: AltFd,
+        tab_stop: Unit,
+        colors_enabled: bool,
+        enable_synchronized_output: bool,
+        grapheme_cluster_mode: GraphemeClusterMode,
+        bell_style: BellStyle,
+    ) -> Self {
         let (cols, _) = get_win_size(out);
         Self {
             out,
@@ -908,7 +948,10 @@ impl PosixRenderer {
             buffer: String::with_capacity(1024),
             tab_stop,
             colors_enabled,
+            enable_synchronized_output,
+            grapheme_cluster_mode,
             bell_style,
+            synchronized_update: 0,
         }
     }
 
@@ -988,6 +1031,7 @@ impl Renderer for PosixRenderer {
         highlighter: Option<&dyn Highlighter>,
     ) -> Result<()> {
         use std::fmt::Write;
+        self.begin_synchronized_update()?;
         self.buffer.clear();
 
         let default_prompt = new_layout.default_prompt;
@@ -1038,6 +1082,7 @@ impl Renderer for PosixRenderer {
         }
 
         write_all(self.out, self.buffer.as_str())?;
+        self.end_synchronized_update()?;
         Ok(())
     }
 
@@ -1060,7 +1105,7 @@ impl Renderer for PosixRenderer {
             let cw = if c == "\t" {
                 self.tab_stop - (pos.col % self.tab_stop)
             } else {
-                width(c, &mut esc_seq)
+                width(self.grapheme_cluster_mode, c, &mut esc_seq)
             };
             pos.col += cw;
             if pos.col > self.cols {
@@ -1100,13 +1145,13 @@ impl Renderer for PosixRenderer {
         self.cols = cols;
     }
 
-    fn get_columns(&self) -> usize {
+    fn get_columns(&self) -> Unit {
         self.cols
     }
 
     /// Try to get the number of rows in the current terminal,
     /// or assume 24 if it fails.
-    fn get_rows(&self) -> usize {
+    fn get_rows(&self) -> Unit {
         let (_, rows) = get_win_size(self.out);
         rows
     }
@@ -1115,15 +1160,19 @@ impl Renderer for PosixRenderer {
         self.colors_enabled
     }
 
+    fn grapheme_cluster_mode(&self) -> GraphemeClusterMode {
+        self.grapheme_cluster_mode
+    }
+
     fn move_cursor_at_leftmost(&mut self, rdr: &mut PosixRawReader) -> Result<()> {
-        if rdr.poll(PollTimeout::ZERO)? != 0 {
+        if rdr.poll(PollTimeout::ZERO)? {
             debug!(target: "rustyline", "cannot request cursor location");
             return Ok(());
         }
         /* Report cursor location */
         self.write_and_flush("\x1b[6n")?;
         /* Read the response: ESC [ rows ; cols R */
-        if rdr.poll(PollTimeout::from(100u8))? == 0
+        if !rdr.poll(PollTimeout::from(100u8))?
             || rdr.next_char()? != '\x1b'
             || rdr.next_char()? != '['
             || read_digits_until(rdr, ';')?.is_none()
@@ -1132,9 +1181,29 @@ impl Renderer for PosixRenderer {
             return Ok(());
         }
         let col = read_digits_until(rdr, 'R')?;
-        debug!(target: "rustyline", "initial cursor location: {:?}", col);
+        debug!(target: "rustyline", "initial cursor location: {col:?}");
         if col != Some(1) {
             self.write_and_flush("\n")?;
+        }
+        Ok(())
+    }
+
+    fn begin_synchronized_update(&mut self) -> Result<()> {
+        if self.enable_synchronized_output {
+            if self.synchronized_update == 0 {
+                self.write_and_flush(BEGIN_SYNCHRONIZED_UPDATE)?;
+            }
+            self.synchronized_update = self.synchronized_update.saturating_add(1);
+        }
+        Ok(())
+    }
+
+    fn end_synchronized_update(&mut self) -> Result<()> {
+        if self.enable_synchronized_output {
+            self.synchronized_update = self.synchronized_update.saturating_sub(1);
+            if self.synchronized_update == 0 {
+                self.write_and_flush(END_SYNCHRONIZED_UPDATE)?;
+            }
         }
         Ok(())
     }
@@ -1157,10 +1226,10 @@ fn read_digits_until(rdr: &mut PosixRawReader, sep: char) -> Result<Option<u32>>
     Ok(Some(num))
 }
 
-fn write_all(fd: RawFd, buf: &str) -> nix::Result<()> {
+fn write_all(fd: AltFd, buf: &str) -> nix::Result<()> {
     let mut bytes = buf.as_bytes();
     while !bytes.is_empty() {
-        match write(unsafe { BorrowedFd::borrow_raw(fd) }, bytes) {
+        match write(fd, bytes) {
             Ok(0) => return Err(Errno::EIO),
             Ok(n) => bytes = &bytes[n..],
             Err(Errno::EINTR) => {}
@@ -1170,7 +1239,7 @@ fn write_all(fd: RawFd, buf: &str) -> nix::Result<()> {
     Ok(())
 }
 
-pub struct PosixCursorGuard(RawFd);
+pub struct PosixCursorGuard(AltFd);
 
 impl Drop for PosixCursorGuard {
     fn drop(&mut self) {
@@ -1178,7 +1247,7 @@ impl Drop for PosixCursorGuard {
     }
 }
 
-fn set_cursor_visibility(fd: RawFd, visible: bool) -> Result<Option<PosixCursorGuard>> {
+fn set_cursor_visibility(fd: AltFd, visible: bool) -> Result<Option<PosixCursorGuard>> {
     write_all(fd, if visible { "\x1b[?25h" } else { "\x1b[?25l" })?;
     Ok(if visible {
         None
@@ -1188,36 +1257,41 @@ fn set_cursor_visibility(fd: RawFd, visible: bool) -> Result<Option<PosixCursorG
 }
 
 #[cfg(not(feature = "signal-hook"))]
-static mut SIGWINCH_PIPE: RawFd = -1;
+static mut SIG_PIPE: AltFd = AltFd(-1);
 #[cfg(not(feature = "signal-hook"))]
-extern "C" fn sigwinch_handler(_: libc::c_int) {
-    let _ = unsafe { write(BorrowedFd::borrow_raw(SIGWINCH_PIPE), b"s") };
+extern "C" fn sig_handler(sig: libc::c_int) {
+    let b = error::Signal::to_byte(sig);
+    let _ = unsafe { write(SIG_PIPE, &[b]) };
 }
 
 #[derive(Clone, Debug)]
-struct SigWinCh {
-    pipe: RawFd,
+struct Sig {
+    pipe: AltFd,
     #[cfg(not(feature = "signal-hook"))]
-    original: nix::sys::signal::SigAction,
+    original_sigint: nix::sys::signal::SigAction,
+    #[cfg(not(feature = "signal-hook"))]
+    original_sigwinch: nix::sys::signal::SigAction,
     #[cfg(feature = "signal-hook")]
     id: signal_hook::SigId,
 }
-impl SigWinCh {
+impl Sig {
     #[cfg(not(feature = "signal-hook"))]
     fn install_sigwinch_handler() -> Result<Self> {
         use nix::sys::signal;
         let (pipe, pipe_write) = UnixStream::pair()?;
         pipe.set_nonblocking(true)?;
-        unsafe { SIGWINCH_PIPE = pipe_write.into_raw_fd() };
-        let sigwinch = signal::SigAction::new(
-            signal::SigHandler::Handler(sigwinch_handler),
+        unsafe { SIG_PIPE = AltFd(pipe_write.into_raw_fd()) };
+        let sa = signal::SigAction::new(
+            signal::SigHandler::Handler(sig_handler),
             signal::SaFlags::empty(),
             signal::SigSet::empty(),
         );
-        let original = unsafe { signal::sigaction(signal::SIGWINCH, &sigwinch)? };
+        let original_sigint = unsafe { signal::sigaction(signal::SIGINT, &sa)? };
+        let original_sigwinch = unsafe { signal::sigaction(signal::SIGWINCH, &sa)? };
         Ok(Self {
-            pipe: pipe.into_raw_fd(),
-            original,
+            pipe: AltFd(pipe.into_raw_fd()),
+            original_sigint,
+            original_sigwinch,
         })
     }
 
@@ -1227,7 +1301,7 @@ impl SigWinCh {
         pipe.set_nonblocking(true)?;
         let id = signal_hook::low_level::pipe::register(libc::SIGWINCH, pipe_write)?;
         Ok(Self {
-            pipe: pipe.into_raw_fd(),
+            pipe: AltFd(pipe.into_raw_fd()),
             id,
         })
     }
@@ -1235,10 +1309,11 @@ impl SigWinCh {
     #[cfg(not(feature = "signal-hook"))]
     fn uninstall_sigwinch_handler(self) -> Result<()> {
         use nix::sys::signal;
-        let _ = unsafe { signal::sigaction(signal::SIGWINCH, &self.original)? };
+        let _ = unsafe { signal::sigaction(signal::SIGINT, &self.original_sigint)? };
+        let _ = unsafe { signal::sigaction(signal::SIGWINCH, &self.original_sigwinch)? };
         close(self.pipe)?;
-        unsafe { close(SIGWINCH_PIPE)? };
-        unsafe { SIGWINCH_PIPE = -1 };
+        unsafe { close(SIG_PIPE)? };
+        unsafe { SIG_PIPE = AltFd(-1) };
         Ok(())
     }
 
@@ -1256,21 +1331,23 @@ pub type Terminal = PosixTerminal;
 #[derive(Clone, Debug)]
 pub struct PosixTerminal {
     unsupported: bool,
-    tty_in: RawFd,
+    tty_in: AltFd,
     is_in_a_tty: bool,
-    tty_out: RawFd,
+    tty_out: AltFd,
     is_out_a_tty: bool,
     close_on_drop: bool,
     pub(crate) color_mode: ColorMode,
-    tab_stop: usize,
+    grapheme_cluster_mode: GraphemeClusterMode,
+    tab_stop: u8,
     bell_style: BellStyle,
     enable_bracketed_paste: bool,
+    enable_synchronized_output: bool,
     raw_mode: Arc<AtomicBool>,
     // external print reader
     pipe_reader: Option<PipeReader>,
     // external print writer
     pipe_writer: Option<PipeWriter>,
-    sigwinch: Option<SigWinCh>,
+    sig: Option<Sig>,
     enable_signals: bool,
 }
 
@@ -1293,42 +1370,25 @@ impl Term for PosixTerminal {
     type Reader = PosixRawReader;
     type Writer = PosixRenderer;
 
-    fn new(
-        color_mode: ColorMode,
-        behavior: Behavior,
-        tab_stop: usize,
-        bell_style: BellStyle,
-        enable_bracketed_paste: bool,
-        enable_signals: bool,
-    ) -> Result<Self> {
+    fn new(config: Config) -> Result<Self> {
         let (tty_in, is_in_a_tty, tty_out, is_out_a_tty, close_on_drop) =
-            if behavior == Behavior::PreferTerm {
+            if config.behavior() == Behavior::PreferTerm {
                 let tty = OpenOptions::new().read(true).write(true).open("/dev/tty");
                 if let Ok(tty) = tty {
-                    let fd = tty.into_raw_fd();
+                    let fd = AltFd(tty.into_raw_fd());
                     let is_a_tty = is_a_tty(fd); // TODO: useless ?
                     (fd, is_a_tty, fd, is_a_tty, true)
                 } else {
-                    (
-                        libc::STDIN_FILENO,
-                        is_a_tty(libc::STDIN_FILENO),
-                        libc::STDOUT_FILENO,
-                        is_a_tty(libc::STDOUT_FILENO),
-                        false,
-                    )
+                    let (i, o) = (AltFd(libc::STDIN_FILENO), AltFd(libc::STDOUT_FILENO));
+                    (i, is_a_tty(i), o, is_a_tty(o), false)
                 }
             } else {
-                (
-                    libc::STDIN_FILENO,
-                    is_a_tty(libc::STDIN_FILENO),
-                    libc::STDOUT_FILENO,
-                    is_a_tty(libc::STDOUT_FILENO),
-                    false,
-                )
+                let (i, o) = (AltFd(libc::STDIN_FILENO), AltFd(libc::STDOUT_FILENO));
+                (i, is_a_tty(i), o, is_a_tty(o), false)
             };
-        let unsupported = is_unsupported_term();
-        let sigwinch = if !unsupported && is_in_a_tty && is_out_a_tty {
-            Some(SigWinCh::install_sigwinch_handler()?)
+        let unsupported = super::is_unsupported_term();
+        let sig = if !unsupported && is_in_a_tty && is_out_a_tty {
+            Some(Sig::install_sigwinch_handler()?)
         } else {
             None
         };
@@ -1339,15 +1399,17 @@ impl Term for PosixTerminal {
             tty_out,
             is_out_a_tty,
             close_on_drop,
-            color_mode,
-            tab_stop,
-            bell_style,
-            enable_bracketed_paste,
+            color_mode: config.color_mode(),
+            grapheme_cluster_mode: config.grapheme_cluster_mode(),
+            tab_stop: config.tab_stop(),
+            bell_style: config.bell_style(),
+            enable_bracketed_paste: config.enable_bracketed_paste(),
+            enable_synchronized_output: config.enable_synchronized_output(),
             raw_mode: Arc::new(AtomicBool::new(false)),
             pipe_reader: None,
             pipe_writer: None,
-            sigwinch,
-            enable_signals,
+            sig,
+            enable_signals: config.enable_signals(),
         })
     }
 
@@ -1381,7 +1443,7 @@ impl Term for PosixTerminal {
         let out = if !self.enable_bracketed_paste {
             None
         } else if let Err(e) = write_all(self.tty_out, BRACKETED_PASTE_ON) {
-            debug!(target: "rustyline", "Cannot enable bracketed paste: {}", e);
+            debug!(target: "rustyline", "Cannot enable bracketed paste: {e}");
             None
         } else {
             Some(self.tty_out)
@@ -1413,19 +1475,23 @@ impl Term for PosixTerminal {
     ) -> PosixRawReader {
         PosixRawReader::new(
             self.tty_in,
-            self.sigwinch.as_ref().map(|s| s.pipe),
+            self.sig.as_ref().map(|s| s.pipe),
             buffer,
             config,
             key_map,
             self.pipe_reader.clone(),
+            #[cfg(target_os = "macos")]
+            self.close_on_drop,
         )
     }
 
     fn create_writer(&self) -> PosixRenderer {
         PosixRenderer::new(
             self.tty_out,
-            self.tab_stop,
+            Unit::from(self.tab_stop),
             self.colors_enabled(),
+            self.enable_synchronized_output,
+            self.grapheme_cluster_mode,
             self.bell_style,
         )
     }
@@ -1476,8 +1542,8 @@ impl Drop for PosixTerminal {
             close(self.tty_in);
             debug_assert_eq!(self.tty_in, self.tty_out);
         }
-        if let Some(sigwinch) = self.sigwinch.take() {
-            sigwinch.uninstall_sigwinch_handler();
+        if let Some(sig) = self.sig.take() {
+            sig.uninstall_sigwinch_handler();
         }
     }
 }
@@ -1486,7 +1552,7 @@ impl Drop for PosixTerminal {
 pub struct ExternalPrinter {
     writer: PipeWriter,
     raw_mode: Arc<AtomicBool>,
-    tty_out: RawFd,
+    tty_out: AltFd,
 }
 
 impl super::ExternalPrinter for ExternalPrinter {
@@ -1519,21 +1585,18 @@ pub fn suspend() -> Result<()> {
 
 #[cfg(not(feature = "termios"))]
 mod termios_ {
-    use super::PosixKeyMap;
+    use super::{AltFd, PosixKeyMap};
     use crate::keys::{KeyEvent, Modifiers as M};
     use crate::{Cmd, Result};
     use nix::sys::termios::{self, SetArg, SpecialCharacterIndices as SCI, Termios};
     use std::collections::HashMap;
-    use std::os::unix::io::{BorrowedFd, RawFd};
-    pub fn disable_raw_mode(tty_in: RawFd, termios: &Termios) -> Result<()> {
-        let fd = unsafe { BorrowedFd::borrow_raw(tty_in) };
-        Ok(termios::tcsetattr(fd, SetArg::TCSADRAIN, termios)?)
+    pub fn disable_raw_mode(tty_in: AltFd, termios: &Termios) -> Result<()> {
+        Ok(termios::tcsetattr(tty_in, SetArg::TCSADRAIN, termios)?)
     }
-    pub fn enable_raw_mode(tty_in: RawFd, enable_signals: bool) -> Result<(Termios, PosixKeyMap)> {
+    pub fn enable_raw_mode(tty_in: AltFd, enable_signals: bool) -> Result<(Termios, PosixKeyMap)> {
         use nix::sys::termios::{ControlFlags, InputFlags, LocalFlags};
 
-        let fd = unsafe { BorrowedFd::borrow_raw(tty_in) };
-        let original_mode = termios::tcgetattr(fd)?;
+        let original_mode = termios::tcgetattr(tty_in)?;
         let mut raw = original_mode.clone();
         // disable BREAK interrupt, CR to NL conversion on input,
         // input parity check, strip high bit (bit 8), output flow control
@@ -1565,7 +1628,7 @@ mod termios_ {
         map_key(&mut key_map, &raw, SCI::VQUIT, "VQUIT", Cmd::Interrupt);
         map_key(&mut key_map, &raw, SCI::VSUSP, "VSUSP", Cmd::Suspend);
 
-        termios::tcsetattr(fd, SetArg::TCSADRAIN, &raw)?;
+        termios::tcsetattr(tty_in, SetArg::TCSADRAIN, &raw)?;
         Ok((original_mode, key_map))
     }
     fn map_key(
@@ -1577,23 +1640,22 @@ mod termios_ {
     ) {
         let cc = char::from(raw.control_chars[index as usize]);
         let key = KeyEvent::new(cc, M::NONE);
-        log::debug!(target: "rustyline", "{}: {:?}", name, key);
+        log::debug!(target: "rustyline", "{name}: {key:?}");
         key_map.insert(key, cmd);
     }
 }
 #[cfg(feature = "termios")]
 mod termios_ {
-    use super::PosixKeyMap;
+    use super::{AltFd, PosixKeyMap};
     use crate::keys::{KeyEvent, Modifiers as M};
     use crate::{Cmd, Result};
     use std::collections::HashMap;
-    use std::os::unix::io::RawFd;
     use termios::{self, Termios};
-    pub fn disable_raw_mode(tty_in: RawFd, termios: &Termios) -> Result<()> {
-        Ok(termios::tcsetattr(tty_in, termios::TCSADRAIN, termios)?)
+    pub fn disable_raw_mode(tty_in: AltFd, termios: &Termios) -> Result<()> {
+        Ok(termios::tcsetattr(tty_in.0, termios::TCSADRAIN, termios)?)
     }
-    pub fn enable_raw_mode(tty_in: RawFd, enable_signals: bool) -> Result<(Termios, PosixKeyMap)> {
-        let original_mode = Termios::from_fd(tty_in)?;
+    pub fn enable_raw_mode(tty_in: AltFd, enable_signals: bool) -> Result<(Termios, PosixKeyMap)> {
+        let original_mode = Termios::from_fd(tty_in.0)?;
         let mut raw = original_mode;
         // disable BREAK interrupt, CR to NL conversion on input,
         // input parity check, strip high bit (bit 8), output flow control
@@ -1621,7 +1683,7 @@ mod termios_ {
         map_key(&mut key_map, &raw, termios::VQUIT, "VQUIT", Cmd::Interrupt);
         map_key(&mut key_map, &raw, termios::VSUSP, "VSUSP", Cmd::Suspend);
 
-        termios::tcsetattr(tty_in, termios::TCSADRAIN, &raw)?;
+        termios::tcsetattr(tty_in.0, termios::TCSADRAIN, &raw)?;
         Ok((original_mode, key_map))
     }
     fn map_key(
@@ -1633,33 +1695,32 @@ mod termios_ {
     ) {
         let cc = char::from(raw.c_cc[index]);
         let key = KeyEvent::new(cc, M::NONE);
-        log::debug!(target: "rustyline", "{}: {:?}", name, key);
+        log::debug!(target: "rustyline", "{name}: {key:?}");
         key_map.insert(key, cmd);
     }
 }
 
 #[cfg(test)]
 mod test {
-    use super::{Position, PosixRenderer, PosixTerminal, Renderer};
+    use super::{AltFd, Position, PosixRenderer, PosixTerminal, Renderer};
     use crate::config::BellStyle;
+    use crate::layout::GraphemeClusterMode;
     use crate::line_buffer::{LineBuffer, NoListener};
 
     #[test]
     #[ignore]
     fn prompt_with_ansi_escape_codes() {
-        let out = PosixRenderer::new(libc::STDOUT_FILENO, 4, true, BellStyle::default());
+        let out = PosixRenderer::new(
+            AltFd(libc::STDOUT_FILENO),
+            4,
+            true,
+            true,
+            GraphemeClusterMode::default(),
+            BellStyle::default(),
+        );
         let pos = out.calculate_position("\x1b[1;32m>>\x1b[0m ", Position::default());
         assert_eq!(3, pos.col);
         assert_eq!(0, pos.row);
-    }
-
-    #[test]
-    fn test_unsupported_term() {
-        std::env::set_var("TERM", "xterm");
-        assert!(!super::is_unsupported_term());
-
-        std::env::set_var("TERM", "dumb");
-        assert!(super::is_unsupported_term());
     }
 
     #[test]
@@ -1676,7 +1737,14 @@ mod test {
 
     #[test]
     fn test_line_wrap() {
-        let mut out = PosixRenderer::new(libc::STDOUT_FILENO, 4, true, BellStyle::default());
+        let mut out = PosixRenderer::new(
+            AltFd(libc::STDOUT_FILENO),
+            4,
+            true,
+            true,
+            GraphemeClusterMode::default(),
+            BellStyle::default(),
+        );
         let prompt = "> ";
         let default_prompt = true;
         let prompt_size = out.calculate_position(prompt, Position::default());

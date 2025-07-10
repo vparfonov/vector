@@ -17,7 +17,6 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use http::StatusCode;
 
 use super::core::constants::X_UPYUN_MULTI_UUID;
@@ -40,24 +39,17 @@ impl UpyunWriter {
     }
 }
 
-#[async_trait]
 impl oio::MultipartWrite for UpyunWriter {
-    async fn write_once(&self, size: u64, body: AsyncBody) -> Result<()> {
-        let req = self
-            .core
-            .upload(&self.path, Some(size), &self.op, body)
-            .await?;
+    async fn write_once(&self, size: u64, body: Buffer) -> Result<Metadata> {
+        let req = self.core.upload(&self.path, Some(size), &self.op, body)?;
 
         let resp = self.core.send(req).await?;
 
         let status = resp.status();
 
         match status {
-            StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::OK => Ok(Metadata::default()),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -74,12 +66,12 @@ impl oio::MultipartWrite for UpyunWriter {
                 let id =
                     parse_header_to_str(resp.headers(), X_UPYUN_MULTI_UUID)?.ok_or(Error::new(
                         ErrorKind::Unexpected,
-                        &format!("{} header is missing", X_UPYUN_MULTI_UUID),
+                        format!("{} header is missing", X_UPYUN_MULTI_UUID),
                     ))?;
 
                 Ok(id.to_string())
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -88,31 +80,31 @@ impl oio::MultipartWrite for UpyunWriter {
         upload_id: &str,
         part_number: usize,
         size: u64,
-        body: AsyncBody,
+        body: Buffer,
     ) -> Result<oio::MultipartPart> {
         let req = self
             .core
-            .upload_part(&self.path, upload_id, part_number, size, body)
-            .await?;
+            .upload_part(&self.path, upload_id, part_number, size, body)?;
 
         let resp = self.core.send(req).await?;
 
         let status = resp.status();
 
         match status {
-            StatusCode::NO_CONTENT | StatusCode::CREATED => {
-                resp.into_body().consume().await?;
-
-                Ok(oio::MultipartPart {
-                    part_number,
-                    etag: "".to_string(),
-                })
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::NO_CONTENT | StatusCode::CREATED => Ok(oio::MultipartPart {
+                part_number,
+                etag: "".to_string(),
+                checksum: None,
+            }),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    async fn complete_part(&self, upload_id: &str, _parts: &[oio::MultipartPart]) -> Result<()> {
+    async fn complete_part(
+        &self,
+        upload_id: &str,
+        _parts: &[oio::MultipartPart],
+    ) -> Result<Metadata> {
         let resp = self
             .core
             .complete_multipart_upload(&self.path, upload_id)
@@ -121,12 +113,8 @@ impl oio::MultipartWrite for UpyunWriter {
         let status = resp.status();
 
         match status {
-            StatusCode::NO_CONTENT => {
-                resp.into_body().consume().await?;
-
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::NO_CONTENT => Ok(Metadata::default()),
+            _ => Err(parse_error(resp)),
         }
     }
 

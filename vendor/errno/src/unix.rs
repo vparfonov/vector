@@ -77,8 +77,6 @@ extern "C" {
             target_os = "netbsd",
             target_os = "android",
             target_os = "espidf",
-            target_os = "vxworks",
-            target_os = "cygwin",
             target_env = "newlib"
         ),
         link_name = "__errno"

@@ -10,7 +10,6 @@ This service can be used to:
 - [ ] copy
 - [x] rename
 - [x] list
-- [ ] scan
 - [ ] presign
 - [ ] blocking
 
@@ -25,7 +24,7 @@ You can refer to [`AlluxioBuilder`]'s docs for more information
 
 ### Via Builder
 
-```rust
+```rust,no_run
 use anyhow::Result;
 use opendal::services::Alluxio;
 use opendal::Operator;
@@ -33,12 +32,11 @@ use opendal::Operator;
 #[tokio::main]
 async fn main() -> Result<()> {
     // create backend builder
-    let mut builder = Alluxio::default();
-
-    // set the storage bucket for OpenDAL
-    builder.root("/");
-    // set the endpoint for OpenDAL
-    builder.endpoint("http://127.0.0.1:39999");
+    let mut builder = Alluxio::default()
+        // set the storage bucket for OpenDAL
+        .root("/")
+        // set the endpoint for OpenDAL
+        .endpoint("http://127.0.0.1:39999");
 
     let op: Operator = Operator::new(builder)?.finish();
 

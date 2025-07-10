@@ -15,69 +15,38 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use http::Request;
+use http::Response;
 use http::StatusCode;
 use log::debug;
-use serde::Deserialize;
 use tokio::sync::RwLock;
 
 use super::core::constants;
 use super::core::parse_file_info;
 use super::core::B2Core;
+use super::core::B2Signer;
+use super::delete::B2Deleter;
 use super::error::parse_error;
 use super::lister::B2Lister;
 use super::writer::B2Writer;
 use super::writer::B2Writers;
 use crate::raw::*;
-use crate::services::b2::core::B2Signer;
-use crate::services::b2::core::ListFileNamesResponse;
+use crate::services::B2Config;
 use crate::*;
 
-/// Config for backblaze b2 services support.
-#[derive(Default, Deserialize)]
-#[serde(default)]
-#[non_exhaustive]
-pub struct B2Config {
-    /// root of this backend.
-    ///
-    /// All operations will happen under this root.
-    pub root: Option<String>,
-    /// keyID of this backend.
-    ///
-    /// - If application_key_id is set, we will take user's input first.
-    /// - If not, we will try to load it from environment.
-    pub application_key_id: Option<String>,
-    /// applicationKey of this backend.
-    ///
-    /// - If application_key is set, we will take user's input first.
-    /// - If not, we will try to load it from environment.
-    pub application_key: Option<String>,
-    /// bucket of this backend.
-    ///
-    /// required.
-    pub bucket: String,
-    /// bucket id of this backend.
-    ///
-    /// required.
-    pub bucket_id: String,
-}
+impl Configurator for B2Config {
+    type Builder = B2Builder;
 
-impl Debug for B2Config {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut d = f.debug_struct("B2Config");
-
-        d.field("root", &self.root)
-            .field("application_key_id", &self.application_key_id)
-            .field("bucket_id", &self.bucket_id)
-            .field("bucket", &self.bucket);
-
-        d.finish_non_exhaustive()
+    #[allow(deprecated)]
+    fn into_builder(self) -> Self::Builder {
+        B2Builder {
+            config: self,
+            http_client: None,
+        }
     }
 }
 
@@ -87,6 +56,7 @@ impl Debug for B2Config {
 pub struct B2Builder {
     config: B2Config,
 
+    #[deprecated(since = "0.53.0", note = "Use `Operator::update_http_client` instead")]
     http_client: Option<HttpClient>,
 }
 
@@ -103,7 +73,7 @@ impl B2Builder {
     /// Set root of this backend.
     ///
     /// All operations will happen under this root.
-    pub fn root(&mut self, root: &str) -> &mut Self {
+    pub fn root(mut self, root: &str) -> Self {
         self.config.root = if root.is_empty() {
             None
         } else {
@@ -114,7 +84,7 @@ impl B2Builder {
     }
 
     /// application_key_id of this backend.
-    pub fn application_key_id(&mut self, application_key_id: &str) -> &mut Self {
+    pub fn application_key_id(mut self, application_key_id: &str) -> Self {
         self.config.application_key_id = if application_key_id.is_empty() {
             None
         } else {
@@ -125,7 +95,7 @@ impl B2Builder {
     }
 
     /// application_key of this backend.
-    pub fn application_key(&mut self, application_key: &str) -> &mut Self {
+    pub fn application_key(mut self, application_key: &str) -> Self {
         self.config.application_key = if application_key.is_empty() {
             None
         } else {
@@ -137,7 +107,7 @@ impl B2Builder {
 
     /// Set bucket name of this backend.
     /// You can find it in <https://secure.backblaze.com/b2_buckets.html>
-    pub fn bucket(&mut self, bucket: &str) -> &mut Self {
+    pub fn bucket(mut self, bucket: &str) -> Self {
         self.config.bucket = bucket.to_string();
 
         self
@@ -145,7 +115,7 @@ impl B2Builder {
 
     /// Set bucket id of this backend.
     /// You can find it in <https://secure.backblaze.com/b2_buckets.html>
-    pub fn bucket_id(&mut self, bucket_id: &str) -> &mut Self {
+    pub fn bucket_id(mut self, bucket_id: &str) -> Self {
         self.config.bucket_id = bucket_id.to_string();
 
         self
@@ -157,7 +127,9 @@ impl B2Builder {
     ///
     /// This API is part of OpenDAL's Raw API. `HttpClient` could be changed
     /// during minor updates.
-    pub fn http_client(&mut self, client: HttpClient) -> &mut Self {
+    #[deprecated(since = "0.53.0", note = "Use `Operator::update_http_client` instead")]
+    #[allow(deprecated)]
+    pub fn http_client(mut self, client: HttpClient) -> Self {
         self.http_client = Some(client);
         self
     }
@@ -165,31 +137,10 @@ impl B2Builder {
 
 impl Builder for B2Builder {
     const SCHEME: Scheme = Scheme::B2;
-    type Accessor = B2Backend;
-
-    /// Converts a HashMap into an B2Builder instance.
-    ///
-    /// # Arguments
-    ///
-    /// * `map` - A HashMap containing the configuration values.
-    ///
-    /// # Returns
-    ///
-    /// Returns an instance of B2Builder.
-    fn from_map(map: HashMap<String, String>) -> Self {
-        // Deserialize the configuration from the HashMap.
-        let config = B2Config::deserialize(ConfigDeserializer::new(map))
-            .expect("config deserialize must succeed");
-
-        // Create an B2Builder instance with the deserialized config.
-        B2Builder {
-            config,
-            http_client: None,
-        }
-    }
+    type Config = B2Config;
 
     /// Builds the backend and returns the result of B2Backend.
-    fn build(&mut self) -> Result<Self::Accessor> {
+    fn build(self) -> Result<impl Access> {
         debug!("backend build started: {:?}", &self);
 
         let root = normalize_root(&self.config.root.clone().unwrap_or_default());
@@ -231,15 +182,6 @@ impl Builder for B2Builder {
             ),
         }?;
 
-        let client = if let Some(client) = self.http_client.take() {
-            client
-        } else {
-            HttpClient::new().map_err(|err| {
-                err.with_operation("Builder::build")
-                    .with_context("service", Scheme::B2)
-            })?
-        };
-
         let signer = B2Signer {
             application_key_id,
             application_key,
@@ -248,12 +190,69 @@ impl Builder for B2Builder {
 
         Ok(B2Backend {
             core: Arc::new(B2Core {
+                info: {
+                    let am = AccessorInfo::default();
+                    am.set_scheme(Scheme::B2)
+                        .set_root(&root)
+                        .set_native_capability(Capability {
+                            stat: true,
+                            stat_has_content_length: true,
+                            stat_has_content_md5: true,
+                            stat_has_content_type: true,
+
+                            read: true,
+
+                            write: true,
+                            write_can_empty: true,
+                            write_can_multi: true,
+                            write_with_content_type: true,
+                            // The min multipart size of b2 is 5 MiB.
+                            //
+                            // ref: <https://www.backblaze.com/docs/cloud-storage-large-files>
+                            write_multi_min_size: Some(5 * 1024 * 1024),
+                            // The max multipart size of b2 is 5 Gb.
+                            //
+                            // ref: <https://www.backblaze.com/docs/cloud-storage-large-files>
+                            write_multi_max_size: if cfg!(target_pointer_width = "64") {
+                                Some(5 * 1024 * 1024 * 1024)
+                            } else {
+                                Some(usize::MAX)
+                            },
+
+                            delete: true,
+                            copy: true,
+
+                            list: true,
+                            list_with_limit: true,
+                            list_with_start_after: true,
+                            list_with_recursive: true,
+                            list_has_content_length: true,
+                            list_has_content_md5: true,
+                            list_has_content_type: true,
+
+                            presign: true,
+                            presign_read: true,
+                            presign_write: true,
+                            presign_stat: true,
+
+                            shared: true,
+
+                            ..Default::default()
+                        });
+
+                    // allow deprecated api here for compatibility
+                    #[allow(deprecated)]
+                    if let Some(client) = self.http_client {
+                        am.update_http_client(|_| client);
+                    }
+
+                    am.into()
+                },
                 signer: Arc::new(RwLock::new(signer)),
                 root,
 
                 bucket: self.config.bucket.clone(),
                 bucket_id: self.config.bucket_id.clone(),
-                client,
             }),
         })
     }
@@ -265,60 +264,18 @@ pub struct B2Backend {
     core: Arc<B2Core>,
 }
 
-#[async_trait]
-impl Accessor for B2Backend {
-    type Reader = IncomingAsyncBody;
+impl Access for B2Backend {
+    type Reader = HttpBody;
     type Writer = B2Writers;
     type Lister = oio::PageLister<B2Lister>;
+    type Deleter = oio::OneShotDeleter<B2Deleter>;
     type BlockingReader = ();
     type BlockingWriter = ();
     type BlockingLister = ();
+    type BlockingDeleter = ();
 
-    fn info(&self) -> AccessorInfo {
-        let mut am = AccessorInfo::default();
-        am.set_scheme(Scheme::B2)
-            .set_root(&self.core.root)
-            .set_native_capability(Capability {
-                stat: true,
-
-                read: true,
-                read_can_next: true,
-                read_with_range: true,
-
-                write: true,
-                write_can_empty: true,
-                write_can_multi: true,
-                write_with_content_type: true,
-                // The min multipart size of b2 is 5 MiB.
-                //
-                // ref: <https://www.backblaze.com/docs/cloud-storage-large-files>
-                write_multi_min_size: Some(5 * 1024 * 1024),
-                // The max multipart size of b2 is 5 Gb.
-                //
-                // ref: <https://www.backblaze.com/docs/cloud-storage-large-files>
-                write_multi_max_size: if cfg!(target_pointer_width = "64") {
-                    Some(5 * 1024 * 1024 * 1024)
-                } else {
-                    Some(usize::MAX)
-                },
-
-                delete: true,
-                copy: true,
-
-                list: true,
-                list_with_limit: true,
-                list_with_start_after: true,
-                list_with_recursive: true,
-
-                presign: true,
-                presign_read: true,
-                presign_write: true,
-                presign_stat: true,
-
-                ..Default::default()
-            });
-
-        am
+    fn info(&self) -> Arc<AccessorInfo> {
+        self.core.info.clone()
     }
 
     /// B2 have a get_file_info api required a file_id field, but field_id need call list api, list api also return file info
@@ -330,48 +287,28 @@ impl Accessor for B2Backend {
         }
 
         let delimiter = if path.ends_with('/') { Some("/") } else { None };
-        let resp = self
-            .core
-            .list_file_names(Some(path), delimiter, None, None)
-            .await?;
 
-        let status = resp.status();
-
-        match status {
-            StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
-
-                let resp: ListFileNamesResponse =
-                    serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
-                if resp.files.is_empty() {
-                    return Err(Error::new(ErrorKind::NotFound, "no such file or directory"));
-                }
-                let meta = parse_file_info(&resp.files[0]);
-                Ok(RpStat::new(meta))
-            }
-            _ => Err(parse_error(resp).await?),
-        }
+        let file_info = self.core.get_file_info(path, delimiter).await?;
+        let meta = parse_file_info(&file_info);
+        Ok(RpStat::new(meta))
     }
 
     async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
-        let resp = self.core.download_file_by_name(path, &args).await?;
+        let resp = self
+            .core
+            .download_file_by_name(path, args.range(), &args)
+            .await?;
 
         let status = resp.status();
-
         match status {
             StatusCode::OK | StatusCode::PARTIAL_CONTENT => {
-                let size = parse_content_length(resp.headers())?;
-                let range = parse_content_range(resp.headers())?;
-                Ok((
-                    RpRead::new().with_size(size).with_range(range),
-                    resp.into_body(),
-                ))
+                Ok((RpRead::default(), resp.into_body()))
             }
-            StatusCode::RANGE_NOT_SATISFIABLE => {
-                resp.into_body().consume().await?;
-                Ok((RpRead::new().with_size(Some(0)), IncomingAsyncBody::empty()))
+            _ => {
+                let (part, mut body) = resp.into_parts();
+                let buf = body.to_buffer().await?;
+                Err(parse_error(Response::from_parts(part, buf)))
             }
-            _ => Err(parse_error(resp).await?),
         }
     }
 
@@ -379,28 +316,16 @@ impl Accessor for B2Backend {
         let concurrent = args.concurrent();
         let writer = B2Writer::new(self.core.clone(), path, args);
 
-        let w = oio::MultipartWriter::new(writer, concurrent);
+        let w = oio::MultipartWriter::new(self.core.info.clone(), writer, concurrent);
 
         Ok((RpWrite::default(), w))
     }
 
-    async fn delete(&self, path: &str, _: OpDelete) -> Result<RpDelete> {
-        let resp = self.core.hide_file(path).await?;
-
-        let status = resp.status();
-
-        match status {
-            StatusCode::OK => Ok(RpDelete::default()),
-            _ => {
-                let err = parse_error(resp).await?;
-                match err.kind() {
-                    ErrorKind::NotFound => Ok(RpDelete::default()),
-                    // Representative deleted
-                    ErrorKind::AlreadyExists => Ok(RpDelete::default()),
-                    _ => Err(err),
-                }
-            }
-        }
+    async fn delete(&self) -> Result<(RpDelete, Self::Deleter)> {
+        Ok((
+            RpDelete::default(),
+            oio::OneShotDeleter::new(B2Deleter::new(self.core.clone())),
+        ))
     }
 
     async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
@@ -417,28 +342,9 @@ impl Accessor for B2Backend {
     }
 
     async fn copy(&self, from: &str, to: &str, _args: OpCopy) -> Result<RpCopy> {
-        let resp = self
-            .core
-            .list_file_names(Some(from), None, None, None)
-            .await?;
+        let file_info = self.core.get_file_info(from, None).await?;
 
-        let status = resp.status();
-
-        let source_file_id = match status {
-            StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
-
-                let resp: ListFileNamesResponse =
-                    serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
-                if resp.files.is_empty() {
-                    return Err(Error::new(ErrorKind::NotFound, "no such file or directory"));
-                }
-
-                let file_id = resp.files[0].clone().file_id;
-                Ok(file_id)
-            }
-            _ => Err(parse_error(resp).await?),
-        }?;
+        let source_file_id = file_info.file_id;
 
         let Some(source_file_id) = source_file_id else {
             return Err(Error::new(ErrorKind::IsADirectory, "is a directory"));
@@ -450,7 +356,7 @@ impl Accessor for B2Backend {
 
         match status {
             StatusCode::OK => Ok(RpCopy::default()),
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -459,7 +365,7 @@ impl Accessor for B2Backend {
             PresignOperation::Stat(_) => {
                 let resp = self
                     .core
-                    .get_download_authorization(path, &OpRead::default(), args.expire())
+                    .get_download_authorization(path, args.expire())
                     .await?;
                 let path = build_abs_path(&self.core.root, path);
 
@@ -472,9 +378,7 @@ impl Accessor for B2Backend {
 
                 let req = Request::get(url);
 
-                let req = req
-                    .body(AsyncBody::Empty)
-                    .map_err(new_request_build_error)?;
+                let req = req.body(Buffer::new()).map_err(new_request_build_error)?;
 
                 // We don't need this request anymore, consume
                 let (parts, _) = req.into_parts();
@@ -485,10 +389,10 @@ impl Accessor for B2Backend {
                     parts.headers,
                 )))
             }
-            PresignOperation::Read(op) => {
+            PresignOperation::Read(_) => {
                 let resp = self
                     .core
-                    .get_download_authorization(path, op, args.expire())
+                    .get_download_authorization(path, args.expire())
                     .await?;
                 let path = build_abs_path(&self.core.root, path);
 
@@ -501,9 +405,7 @@ impl Accessor for B2Backend {
 
                 let req = Request::get(url);
 
-                let req = req
-                    .body(AsyncBody::Empty)
-                    .map_err(new_request_build_error)?;
+                let req = req.body(Buffer::new()).map_err(new_request_build_error)?;
 
                 // We don't need this request anymore, consume
                 let (parts, _) = req.into_parts();
@@ -524,9 +426,7 @@ impl Accessor for B2Backend {
                 req = req.header(http::header::CONTENT_TYPE, "b2/x-auto");
                 req = req.header(constants::X_BZ_CONTENT_SHA1, "do_not_verify");
 
-                let req = req
-                    .body(AsyncBody::Empty)
-                    .map_err(new_request_build_error)?;
+                let req = req.body(Buffer::new()).map_err(new_request_build_error)?;
                 // We don't need this request anymore, consume it directly.
                 let (parts, _) = req.into_parts();
 
@@ -536,6 +436,10 @@ impl Accessor for B2Backend {
                     parts.headers,
                 )))
             }
+            PresignOperation::Delete(_) => Err(Error::new(
+                ErrorKind::Unsupported,
+                "operation is not supported",
+            )),
         }
     }
 }

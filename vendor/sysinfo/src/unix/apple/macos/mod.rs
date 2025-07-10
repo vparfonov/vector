@@ -12,11 +12,19 @@ cfg_if! {
         pub use crate::sys::app_store::process;
     }
 
+
     if #[cfg(any(
-            feature = "system",
             feature = "disk",
-            target_arch = "x86",
-            target_arch = "x86_64",
+            all(
+                not(feature = "apple-sandbox"),
+                any(
+                    feature = "system",
+                    all(
+                        feature = "component",
+                        any(target_arch = "x86", target_arch = "x86_64")
+                    )
+                )
+            ),
         ))]
     {
         pub(crate) mod utils;
@@ -33,3 +41,17 @@ cfg_if! {
         pub mod component;
     }
 }
+
+// Make formattable by rustfmt.
+#[cfg(any())]
+mod component;
+#[cfg(any())]
+mod cpu;
+#[cfg(any())]
+mod disk;
+#[cfg(any())]
+mod process;
+#[cfg(any())]
+mod system;
+#[cfg(any())]
+mod utils;

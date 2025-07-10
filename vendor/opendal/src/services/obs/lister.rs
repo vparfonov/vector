@@ -17,7 +17,6 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use bytes::Buf;
 use quick_xml::de;
 
@@ -48,7 +47,6 @@ impl ObsLister {
     }
 }
 
-#[async_trait]
 impl oio::PageList for ObsLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let resp = self
@@ -57,10 +55,10 @@ impl oio::PageList for ObsLister {
             .await?;
 
         if resp.status() != http::StatusCode::OK {
-            return Err(parse_error(resp).await?);
+            return Err(parse_error(resp));
         }
 
-        let bs = resp.into_body().bytes().await?;
+        let bs = resp.into_body();
 
         let output: ListObjectsOutput =
             de::from_reader(bs.reader()).map_err(new_xml_deserialize_error)?;
@@ -86,9 +84,9 @@ impl oio::PageList for ObsLister {
         }
 
         for object in output.contents {
-            let path = build_rel_path(&self.core.root, &object.key);
-            if path == self.path || path.is_empty() {
-                continue;
+            let mut path = build_rel_path(&self.core.root, &object.key);
+            if path.is_empty() {
+                path = "/".to_string();
             }
 
             let meta = Metadata::new(EntryMode::from_path(&path)).with_content_length(object.size);

@@ -71,7 +71,7 @@ where
 
 // === UnsyncBoxBody ===
 impl<D, E> UnsyncBoxBody<D, E> {
-    /// Create a new `UnsyncBoxBody`.
+    /// Create a new `BoxBody`.
     pub fn new<B>(body: B) -> Self
     where
         B: Body<Data = D, Error = E> + Send + 'static,

@@ -19,9 +19,8 @@ use std::default::Default;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;
-use std::time::Duration;
 
-use backon::ExponentialBuilder;
+use bytes::Buf;
 use bytes::Bytes;
 use chrono::DateTime;
 use chrono::Utc;
@@ -31,29 +30,17 @@ use http::header::CONTENT_TYPE;
 use http::Request;
 use http::Response;
 use http::StatusCode;
-use once_cell::sync::Lazy;
 use serde::Deserialize;
 use serde::Serialize;
 use tokio::sync::Mutex;
 
 use super::error::parse_error;
-use super::error::DropboxErrorResponse;
 use crate::raw::*;
 use crate::*;
 
-/// BACKOFF is the backoff used inside dropbox to make sure dropbox async task succeed.
-pub static BACKOFF: Lazy<ExponentialBuilder> = Lazy::new(|| {
-    ExponentialBuilder::default()
-        .with_max_delay(Duration::from_secs(10))
-        .with_max_times(10)
-        .with_jitter()
-});
-
 pub struct DropboxCore {
+    pub info: Arc<AccessorInfo>,
     pub root: String,
-
-    pub client: HttpClient,
-
     pub signer: Arc<Mutex<DropboxSigner>>,
 }
 
@@ -97,21 +84,23 @@ impl DropboxCore {
         let request = Request::post(&url)
             .header(CONTENT_TYPE, "application/x-www-form-urlencoded")
             .header(CONTENT_LENGTH, bs.len())
-            .body(AsyncBody::Bytes(bs))
+            .body(Buffer::from(bs))
             .map_err(new_request_build_error)?;
 
-        let resp = self.client.send(request).await?;
-        let body = resp.into_body().bytes().await?;
+        let resp = self.info.http_client().send(request).await?;
+        let body = resp.into_body();
 
         let token: DropboxTokenResponse =
-            serde_json::from_slice(&body).map_err(new_json_deserialize_error)?;
+            serde_json::from_reader(body.reader()).map_err(new_json_deserialize_error)?;
 
         // Update signer after token refreshed.
-        signer.access_token = token.access_token.clone();
+        signer.access_token.clone_from(&token.access_token);
 
         // Refresh it 2 minutes earlier.
-        signer.expires_in = Utc::now() + chrono::Duration::seconds(token.expires_in as i64)
-            - chrono::Duration::seconds(120);
+        signer.expires_in = Utc::now()
+            + chrono::TimeDelta::try_seconds(token.expires_in as i64)
+                .expect("expires_in must be valid seconds")
+            - chrono::TimeDelta::try_seconds(120).expect("120 must be valid seconds");
 
         let value = format!("Bearer {}", token.access_token)
             .parse()
@@ -124,8 +113,9 @@ impl DropboxCore {
     pub async fn dropbox_get(
         &self,
         path: &str,
-        args: OpRead,
-    ) -> Result<Response<IncomingAsyncBody>> {
+        range: BytesRange,
+        _: &OpRead,
+    ) -> Result<Response<HttpBody>> {
         let url: String = "https://content.dropboxapi.com/2/files/download".to_string();
         let download_args = DropboxDownloadArgs {
             path: build_rooted_abs_path(&self.root, path),
@@ -137,17 +127,16 @@ impl DropboxCore {
             .header("Dropbox-API-Arg", request_payload)
             .header(CONTENT_LENGTH, 0);
 
-        let range = args.range();
         if !range.is_full() {
             req = req.header(header::RANGE, range.to_header());
         }
 
-        let mut request = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
+        let req = req.extension(Operation::Read);
+
+        let mut request = req.body(Buffer::new()).map_err(new_request_build_error)?;
 
         self.sign(&mut request).await?;
-        self.client.send(request).await
+        self.info.http_client().fetch(request).await
     }
 
     pub async fn dropbox_update(
@@ -155,8 +144,8 @@ impl DropboxCore {
         path: &str,
         size: Option<usize>,
         args: &OpWrite,
-        body: AsyncBody,
-    ) -> Result<Response<IncomingAsyncBody>> {
+        body: Buffer,
+    ) -> Result<Response<Buffer>> {
         let url = "https://content.dropboxapi.com/2/files/upload".to_string();
         let dropbox_update_args = DropboxUploadArgs {
             path: build_rooted_abs_path(&self.root, path),
@@ -171,6 +160,8 @@ impl DropboxCore {
             args.content_type().unwrap_or("application/octet-stream"),
         );
 
+        let request_builder = request_builder.extension(Operation::Write);
+
         let mut request = request_builder
             .header(
                 "Dropbox-API-Arg",
@@ -180,10 +171,10 @@ impl DropboxCore {
             .map_err(new_request_build_error)?;
 
         self.sign(&mut request).await?;
-        self.client.send(request).await
+        self.info.http_client().send(request).await
     }
 
-    pub async fn dropbox_delete(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn dropbox_delete(&self, path: &str) -> Result<Response<Buffer>> {
         let url = "https://api.dropboxapi.com/2/files/delete_v2".to_string();
         let args = DropboxDeleteArgs {
             path: self.build_path(path),
@@ -194,81 +185,12 @@ impl DropboxCore {
         let mut request = Request::post(&url)
             .header(CONTENT_TYPE, "application/json")
             .header(CONTENT_LENGTH, bs.len())
-            .body(AsyncBody::Bytes(bs))
+            .extension(Operation::Delete)
+            .body(Buffer::from(bs))
             .map_err(new_request_build_error)?;
 
         self.sign(&mut request).await?;
-        self.client.send(request).await
-    }
-
-    pub async fn dropbox_delete_batch(
-        &self,
-        paths: Vec<String>,
-    ) -> Result<Response<IncomingAsyncBody>> {
-        let url = "https://api.dropboxapi.com/2/files/delete_batch".to_string();
-        let args = DropboxDeleteBatchArgs {
-            entries: paths
-                .into_iter()
-                .map(|path| DropboxDeleteBatchEntry {
-                    path: self.build_path(&path),
-                })
-                .collect(),
-        };
-
-        let bs = Bytes::from(serde_json::to_string(&args).map_err(new_json_serialize_error)?);
-
-        let mut request = Request::post(&url)
-            .header(CONTENT_TYPE, "application/json")
-            .header(CONTENT_LENGTH, bs.len())
-            .body(AsyncBody::Bytes(bs))
-            .map_err(new_request_build_error)?;
-
-        self.sign(&mut request).await?;
-        self.client.send(request).await
-    }
-
-    pub async fn dropbox_delete_batch_check(&self, async_job_id: String) -> Result<RpBatch> {
-        let url = "https://api.dropboxapi.com/2/files/delete_batch/check".to_string();
-        let args = DropboxDeleteBatchCheckArgs { async_job_id };
-
-        let bs = Bytes::from(serde_json::to_vec(&args).map_err(new_json_serialize_error)?);
-
-        let mut request = Request::post(&url)
-            .header(CONTENT_TYPE, "application/json")
-            .header(CONTENT_LENGTH, bs.len())
-            .body(AsyncBody::Bytes(bs))
-            .map_err(new_request_build_error)?;
-
-        self.sign(&mut request).await?;
-
-        let resp = self.client.send(request).await?;
-        if resp.status() != StatusCode::OK {
-            return Err(parse_error(resp).await?);
-        }
-
-        let bs = resp.into_body().bytes().await?;
-
-        let decoded_response = serde_json::from_slice::<DropboxDeleteBatchResponse>(&bs)
-            .map_err(new_json_deserialize_error)?;
-        match decoded_response.tag.as_str() {
-            "in_progress" => Err(Error::new(
-                ErrorKind::Unexpected,
-                "delete batch job still in progress",
-            )
-            .set_temporary()),
-            "complete" => {
-                let entries = decoded_response.entries.unwrap_or_default();
-                let results = self.handle_batch_delete_complete_result(entries);
-                Ok(RpBatch::new(results))
-            }
-            _ => Err(Error::new(
-                ErrorKind::Unexpected,
-                &format!(
-                    "delete batch check failed with unexpected tag {}",
-                    decoded_response.tag
-                ),
-            )),
-        }
+        self.info.http_client().send(request).await
     }
 
     pub async fn dropbox_create_folder(&self, path: &str) -> Result<RpCreateDir> {
@@ -282,16 +204,17 @@ impl DropboxCore {
         let mut request = Request::post(&url)
             .header(CONTENT_TYPE, "application/json")
             .header(CONTENT_LENGTH, bs.len())
-            .body(AsyncBody::Bytes(bs))
+            .extension(Operation::CreateDir)
+            .body(Buffer::from(bs))
             .map_err(new_request_build_error)?;
 
         self.sign(&mut request).await?;
-        let resp = self.client.send(request).await?;
+        let resp = self.info.http_client().send(request).await?;
         let status = resp.status();
         match status {
             StatusCode::OK => Ok(RpCreateDir::default()),
             _ => {
-                let err = parse_error(resp).await?;
+                let err = parse_error(resp);
                 match err.kind() {
                     ErrorKind::AlreadyExists => Ok(RpCreateDir::default()),
                     _ => Err(err),
@@ -300,7 +223,98 @@ impl DropboxCore {
         }
     }
 
-    pub async fn dropbox_get_metadata(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn dropbox_list(
+        &self,
+        path: &str,
+        recursive: bool,
+        limit: Option<usize>,
+    ) -> Result<Response<Buffer>> {
+        let url = "https://api.dropboxapi.com/2/files/list_folder".to_string();
+
+        // The default settings here align with the DropboxAPI default settings.
+        // Refer: https://www.dropbox.com/developers/documentation/http/documentation#files-list_folder
+        let args = DropboxListArgs {
+            path: self.build_path(path),
+            recursive,
+            limit: limit.unwrap_or(1000),
+        };
+
+        let bs = Bytes::from(serde_json::to_string(&args).map_err(new_json_serialize_error)?);
+
+        let mut request = Request::post(&url)
+            .header(CONTENT_TYPE, "application/json")
+            .header(CONTENT_LENGTH, bs.len())
+            .extension(Operation::List)
+            .body(Buffer::from(bs))
+            .map_err(new_request_build_error)?;
+
+        self.sign(&mut request).await?;
+        self.info.http_client().send(request).await
+    }
+
+    pub async fn dropbox_list_continue(&self, cursor: &str) -> Result<Response<Buffer>> {
+        let url = "https://api.dropboxapi.com/2/files/list_folder/continue".to_string();
+
+        let args = DropboxListContinueArgs {
+            cursor: cursor.to_string(),
+        };
+
+        let bs = Bytes::from(serde_json::to_string(&args).map_err(new_json_serialize_error)?);
+
+        let mut request = Request::post(&url)
+            .header(CONTENT_TYPE, "application/json")
+            .header(CONTENT_LENGTH, bs.len())
+            .extension(Operation::List)
+            .body(Buffer::from(bs))
+            .map_err(new_request_build_error)?;
+
+        self.sign(&mut request).await?;
+        self.info.http_client().send(request).await
+    }
+
+    pub async fn dropbox_copy(&self, from: &str, to: &str) -> Result<Response<Buffer>> {
+        let url = "https://api.dropboxapi.com/2/files/copy_v2".to_string();
+
+        let args = DropboxCopyArgs {
+            from_path: self.build_path(from),
+            to_path: self.build_path(to),
+        };
+
+        let bs = Bytes::from(serde_json::to_string(&args).map_err(new_json_serialize_error)?);
+
+        let mut request = Request::post(&url)
+            .header(CONTENT_TYPE, "application/json")
+            .header(CONTENT_LENGTH, bs.len())
+            .extension(Operation::Copy)
+            .body(Buffer::from(bs))
+            .map_err(new_request_build_error)?;
+
+        self.sign(&mut request).await?;
+        self.info.http_client().send(request).await
+    }
+
+    pub async fn dropbox_move(&self, from: &str, to: &str) -> Result<Response<Buffer>> {
+        let url = "https://api.dropboxapi.com/2/files/move_v2".to_string();
+
+        let args = DropboxMoveArgs {
+            from_path: self.build_path(from),
+            to_path: self.build_path(to),
+        };
+
+        let bs = Bytes::from(serde_json::to_string(&args).map_err(new_json_serialize_error)?);
+
+        let mut request = Request::post(&url)
+            .header(CONTENT_TYPE, "application/json")
+            .header(CONTENT_LENGTH, bs.len())
+            .extension(Operation::Rename)
+            .body(Buffer::from(bs))
+            .map_err(new_request_build_error)?;
+
+        self.sign(&mut request).await?;
+        self.info.http_client().send(request).await
+    }
+
+    pub async fn dropbox_get_metadata(&self, path: &str) -> Result<Response<Buffer>> {
         let url = "https://api.dropboxapi.com/2/files/get_metadata".to_string();
         let args = DropboxMetadataArgs {
             path: self.build_path(path),
@@ -312,49 +326,13 @@ impl DropboxCore {
         let mut request = Request::post(&url)
             .header(CONTENT_TYPE, "application/json")
             .header(CONTENT_LENGTH, bs.len())
-            .body(AsyncBody::Bytes(bs))
+            .extension(Operation::Stat)
+            .body(Buffer::from(bs))
             .map_err(new_request_build_error)?;
 
         self.sign(&mut request).await?;
 
-        self.client.send(request).await
-    }
-
-    pub fn handle_batch_delete_complete_result(
-        &self,
-        entries: Vec<DropboxDeleteBatchResponseEntry>,
-    ) -> Vec<(String, Result<BatchedReply>)> {
-        let mut results = Vec::with_capacity(entries.len());
-        for entry in entries {
-            let result = match entry.tag.as_str() {
-                // Only success response has metadata and then path,
-                // so we cannot tell which path failed.
-                "success" => {
-                    let path = entry
-                        .metadata
-                        .expect("metadata should be present")
-                        .path_display;
-                    (path, Ok(RpDelete::default().into()))
-                }
-                "failure" => {
-                    let error = entry.error.expect("error should be present");
-                    let err = Error::new(
-                        ErrorKind::Unexpected,
-                        &format!("delete failed with error {}", error.error_summary),
-                    );
-                    ("".to_string(), Err(err))
-                }
-                _ => (
-                    "".to_string(),
-                    Err(Error::new(
-                        ErrorKind::Unexpected,
-                        &format!("delete failed with unexpected tag {}", entry.tag),
-                    )),
-                ),
-            };
-            results.push(result);
-        }
-        results
+        self.info.http_client().send(request).await
     }
 }
 
@@ -432,6 +410,30 @@ struct DropboxCreateFolderArgs {
     path: String,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct DropboxListArgs {
+    path: String,
+    recursive: bool,
+    limit: usize,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct DropboxListContinueArgs {
+    cursor: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct DropboxCopyArgs {
+    from_path: String,
+    to_path: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+struct DropboxMoveArgs {
+    from_path: String,
+    to_path: String,
+}
+
 #[derive(Default, Clone, Debug, Deserialize, Serialize)]
 struct DropboxMetadataArgs {
     include_deleted: bool,
@@ -502,6 +504,14 @@ pub struct DropboxMetadataSharingInfo {
 
 #[derive(Default, Debug, Deserialize)]
 #[serde(default)]
+pub struct DropboxListResponse {
+    pub entries: Vec<DropboxMetadataResponse>,
+    pub cursor: String,
+    pub has_more: bool,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default)]
 pub struct DropboxDeleteBatchResponse {
     #[serde(rename(deserialize = ".tag"))]
     pub tag: String,
@@ -515,5 +525,11 @@ pub struct DropboxDeleteBatchResponseEntry {
     #[serde(rename(deserialize = ".tag"))]
     pub tag: String,
     pub metadata: Option<DropboxMetadataResponse>,
-    pub error: Option<DropboxErrorResponse>,
+}
+
+#[derive(Default, Debug, Deserialize)]
+#[serde(default)]
+pub struct DropboxDeleteBatchFailureResponseCause {
+    #[serde(rename(deserialize = ".tag"))]
+    pub tag: String,
 }

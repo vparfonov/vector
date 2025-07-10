@@ -18,15 +18,11 @@
 use std::ffi::CString;
 use std::fmt::Debug;
 use std::fmt::Formatter;
-use std::io;
-use std::task::Context;
-use std::task::Poll;
 
-use async_trait::async_trait;
-use bytes::Bytes;
+use bytes::Buf;
 use probe::probe_lazy;
 
-use crate::raw::Accessor;
+use crate::raw::Access;
 use crate::raw::*;
 use crate::*;
 
@@ -72,34 +68,21 @@ use crate::*;
 /// 1. reader_read_start, arguments: path
 /// 2. reader_read_ok, arguments: path, length
 /// 3. reader_read_error, arguments: path
-/// 4. reader_seek_start, arguments: path
-/// 5. reader_seek_ok, arguments: path, offset
-/// 6. reader_seek_error, arguments: path
-/// 7. reader_next_start, arguments: path
-/// 8. reader_next_ok, arguments: path, length
-/// 9. reader_next_error, arguments: path
-/// 10. reader_next_end, arguments: path
 ///
 /// ### For BlockingReader
 ///
 /// 1. blocking_reader_read_start, arguments: path
 /// 2. blocking_reader_read_ok, arguments: path, length
 /// 3. blocking_reader_read_error, arguments: path
-/// 4. blocking_reader_seek_start, arguments: path
-/// 5. blocking_reader_seek_ok, arguments: path, offset
-/// 6. blocking_reader_seek_error, arguments: path
-/// 7. blocking_reader_next_start, arguments: path
-/// 8. blocking_reader_next_ok, arguments: path, length
-/// 9. blocking_reader_next_error, arguments: path
 ///
 /// ### For Writer
 ///
 /// 1. writer_write_start, arguments: path
 /// 2. writer_write_ok, arguments: path, length
 /// 3. writer_write_error, arguments: path
-/// 4. writer_poll_abort_start, arguments: path
-/// 5. writer_poll_abort_ok, arguments: path
-/// 6. writer_poll_abort_error, arguments: path
+/// 4. writer_abort_start, arguments: path
+/// 5. writer_abort_ok, arguments: path
+/// 6. writer_abort_error, arguments: path
 /// 7. writer_close_start, arguments: path
 /// 8. writer_close_ok, arguments: path
 /// 9. writer_close_error, arguments: path
@@ -114,31 +97,28 @@ use crate::*;
 /// 6. blocking_writer_close_error, arguments: path
 ///
 /// Example:
-/// ```
-/// use anyhow::Result;
-/// use opendal::layers::DTraceLayer;
-/// use opendal::services::Fs;
-/// use opendal::Operator;
 ///
-/// #[tokio::main]
-/// async fn main() -> Result<()> {
-///     let mut builder = Fs::default();
+/// ```no_run
+/// # use opendal::layers::DtraceLayer;
+/// # use opendal::services;
+/// # use opendal::Operator;
+/// # use opendal::Result;
 ///
-///     builder.root("/tmp");
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// // `Accessor` provides the low level APIs, we will use `Operator` normally.
+/// let op: Operator = Operator::new(services::Fs::default().root("/tmp"))?
+///     .layer(DtraceLayer::default())
+///     .finish();
 ///
-///     // `Accessor` provides the low level APIs, we will use `Operator` normally.
-///     let op: Operator = Operator::new(builder)?
-///         .layer(DtraceLayer::default())
-///         .finish();
-///
-///     let path = "/tmp/test.txt";
-///     for _ in 1..100000 {
-///         let bs = vec![0; 64 * 1024 * 1024];
-///         op.write(path, bs).await?;
-///         op.read(path).await?;
-///     }
-///     Ok(())
+/// let path = "/tmp/test.txt";
+/// for _ in 1..100000 {
+///     let bs = vec![0; 64 * 1024 * 1024];
+///     op.write(path, bs).await?;
+///     op.read(path).await?;
 /// }
+/// Ok(())
+/// # }
 /// ```
 ///
 /// Then you can use `readelf -n target/debug/examples/dtrace` to see the probes:
@@ -171,19 +151,19 @@ use crate::*;
 #[derive(Default, Debug, Clone)]
 pub struct DtraceLayer {}
 
-impl<A: Accessor> Layer<A> for DtraceLayer {
-    type LayeredAccessor = DTraceAccessor<A>;
-    fn layer(&self, inner: A) -> Self::LayeredAccessor {
+impl<A: Access> Layer<A> for DtraceLayer {
+    type LayeredAccess = DTraceAccessor<A>;
+    fn layer(&self, inner: A) -> Self::LayeredAccess {
         DTraceAccessor { inner }
     }
 }
 
 #[derive(Clone)]
-pub struct DTraceAccessor<A: Accessor> {
+pub struct DTraceAccessor<A: Access> {
     inner: A,
 }
 
-impl<A: Accessor> Debug for DTraceAccessor<A> {
+impl<A: Access> Debug for DTraceAccessor<A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DTraceAccessor")
             .field("inner", &self.inner)
@@ -191,8 +171,7 @@ impl<A: Accessor> Debug for DTraceAccessor<A> {
     }
 }
 
-#[async_trait]
-impl<A: Accessor> LayeredAccessor for DTraceAccessor<A> {
+impl<A: Access> LayeredAccess for DTraceAccessor<A> {
     type Inner = A;
     type Reader = DtraceLayerWrapper<A::Reader>;
     type BlockingReader = DtraceLayerWrapper<A::BlockingReader>;
@@ -200,6 +179,8 @@ impl<A: Accessor> LayeredAccessor for DTraceAccessor<A> {
     type BlockingWriter = DtraceLayerWrapper<A::BlockingWriter>;
     type Lister = A::Lister;
     type BlockingLister = A::BlockingLister;
+    type Deleter = A::Deleter;
+    type BlockingDeleter = A::BlockingDeleter;
 
     fn inner(&self) -> &Self::Inner {
         &self.inner
@@ -246,12 +227,8 @@ impl<A: Accessor> LayeredAccessor for DTraceAccessor<A> {
         result
     }
 
-    async fn delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
-        let c_path = CString::new(path).unwrap();
-        probe_lazy!(opendal, delete_start, c_path.as_ptr());
-        let result = self.inner.delete(path, args).await;
-        probe_lazy!(opendal, delete_end, c_path.as_ptr());
-        result
+    async fn delete(&self) -> Result<(RpDelete, Self::Deleter)> {
+        self.inner.delete().await
     }
 
     async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
@@ -260,10 +237,6 @@ impl<A: Accessor> LayeredAccessor for DTraceAccessor<A> {
         let result = self.inner.list(path, args).await;
         probe_lazy!(opendal, list_end, c_path.as_ptr());
         result
-    }
-
-    async fn batch(&self, args: OpBatch) -> Result<RpBatch> {
-        self.inner.batch(args).await
     }
 
     async fn presign(&self, path: &str, args: OpPresign) -> Result<RpPresign> {
@@ -312,12 +285,8 @@ impl<A: Accessor> LayeredAccessor for DTraceAccessor<A> {
         result
     }
 
-    fn blocking_delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
-        let c_path = CString::new(path).unwrap();
-        probe_lazy!(opendal, blocking_delete_start, c_path.as_ptr());
-        let result = self.inner.blocking_delete(path, args);
-        probe_lazy!(opendal, blocking_delete_end, c_path.as_ptr());
-        result
+    fn blocking_delete(&self) -> Result<(RpDelete, Self::BlockingDeleter)> {
+        self.inner.blocking_delete()
     }
 
     fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingLister)> {
@@ -344,179 +313,110 @@ impl<R> DtraceLayerWrapper<R> {
 }
 
 impl<R: oio::Read> oio::Read for DtraceLayerWrapper<R> {
-    fn poll_read(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<usize>> {
+    async fn read(&mut self) -> Result<Buffer> {
         let c_path = CString::new(self.path.clone()).unwrap();
         probe_lazy!(opendal, reader_read_start, c_path.as_ptr());
-        self.inner.poll_read(cx, buf).map(|res| match res {
-            Ok(n) => {
-                probe_lazy!(opendal, reader_read_ok, c_path.as_ptr(), n);
-                Ok(n)
+        match self.inner.read().await {
+            Ok(bs) => {
+                probe_lazy!(opendal, reader_read_ok, c_path.as_ptr(), bs.remaining());
+                Ok(bs)
             }
             Err(e) => {
                 probe_lazy!(opendal, reader_read_error, c_path.as_ptr());
                 Err(e)
             }
-        })
-    }
-    fn poll_seek(&mut self, cx: &mut Context<'_>, pos: io::SeekFrom) -> Poll<Result<u64>> {
-        let c_path = CString::new(self.path.clone()).unwrap();
-        probe_lazy!(opendal, reader_seek_start, c_path.as_ptr());
-        self.inner.poll_seek(cx, pos).map(|res| match res {
-            Ok(n) => {
-                probe_lazy!(opendal, reader_seek_ok, c_path.as_ptr(), n);
-                Ok(n)
-            }
-            Err(e) => {
-                probe_lazy!(opendal, reader_seek_error, c_path.as_ptr());
-                Err(e)
-            }
-        })
-    }
-
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Bytes>>> {
-        let c_path = CString::new(self.path.clone()).unwrap();
-        probe_lazy!(opendal, reader_next_start, c_path.as_ptr());
-        self.inner.poll_next(cx).map(|res| match res {
-            Some(Ok(bytes)) => {
-                probe_lazy!(opendal, reader_next_ok, c_path.as_ptr(), bytes.len());
-                Some(Ok(bytes))
-            }
-            Some(Err(e)) => {
-                probe_lazy!(opendal, reader_next_error, c_path.as_ptr());
-                Some(Err(e))
-            }
-            None => {
-                probe_lazy!(opendal, reader_next_end, c_path.as_ptr());
-                None
-            }
-        })
+        }
     }
 }
 
 impl<R: oio::BlockingRead> oio::BlockingRead for DtraceLayerWrapper<R> {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+    fn read(&mut self) -> Result<Buffer> {
         let c_path = CString::new(self.path.clone()).unwrap();
         probe_lazy!(opendal, blocking_reader_read_start, c_path.as_ptr());
         self.inner
-            .read(buf)
-            .map(|n| {
-                probe_lazy!(opendal, blocking_reader_read_ok, c_path.as_ptr(), n);
-                n
-            })
-            .map_err(|e| {
-                probe_lazy!(opendal, blocking_reader_read_error, c_path.as_ptr());
-                e
-            })
-    }
-
-    fn seek(&mut self, pos: io::SeekFrom) -> Result<u64> {
-        let c_path = CString::new(self.path.clone()).unwrap();
-        probe_lazy!(opendal, blocking_reader_seek_start, c_path.as_ptr());
-        self.inner
-            .seek(pos)
-            .map(|res| {
-                probe_lazy!(opendal, blocking_reader_seek_ok, c_path.as_ptr(), res);
-                res
-            })
-            .map_err(|e| {
-                probe_lazy!(opendal, blocking_reader_seek_error, c_path.as_ptr());
-                e
-            })
-    }
-
-    fn next(&mut self) -> Option<Result<Bytes>> {
-        let c_path = CString::new(self.path.clone()).unwrap();
-        probe_lazy!(opendal, blocking_reader_next_start, c_path.as_ptr());
-        self.inner.next().map(|res| match res {
-            Ok(bytes) => {
+            .read()
+            .inspect(|bs| {
                 probe_lazy!(
                     opendal,
-                    blocking_reader_next_ok,
+                    blocking_reader_read_ok,
                     c_path.as_ptr(),
-                    bytes.len()
+                    bs.remaining()
                 );
-                Ok(bytes)
-            }
-            Err(e) => {
-                probe_lazy!(opendal, blocking_reader_next_error, c_path.as_ptr());
-                Err(e)
-            }
-        })
+            })
+            .inspect_err(|_| {
+                probe_lazy!(opendal, blocking_reader_read_error, c_path.as_ptr());
+            })
     }
 }
 
 impl<R: oio::Write> oio::Write for DtraceLayerWrapper<R> {
-    fn poll_write(&mut self, cx: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
+    async fn write(&mut self, bs: Buffer) -> Result<()> {
         let c_path = CString::new(self.path.clone()).unwrap();
         probe_lazy!(opendal, writer_write_start, c_path.as_ptr());
         self.inner
-            .poll_write(cx, bs)
-            .map_ok(|n| {
-                probe_lazy!(opendal, writer_write_ok, c_path.as_ptr(), n);
-                n
+            .write(bs)
+            .await
+            .map(|_| {
+                probe_lazy!(opendal, writer_write_ok, c_path.as_ptr());
             })
-            .map_err(|err| {
+            .inspect_err(|_| {
                 probe_lazy!(opendal, writer_write_error, c_path.as_ptr());
-                err
             })
     }
 
-    fn poll_abort(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
+    async fn abort(&mut self) -> Result<()> {
         let c_path = CString::new(self.path.clone()).unwrap();
         probe_lazy!(opendal, writer_poll_abort_start, c_path.as_ptr());
         self.inner
-            .poll_abort(cx)
-            .map_ok(|_| {
+            .abort()
+            .await
+            .map(|_| {
                 probe_lazy!(opendal, writer_poll_abort_ok, c_path.as_ptr());
             })
-            .map_err(|err| {
+            .inspect_err(|_| {
                 probe_lazy!(opendal, writer_poll_abort_error, c_path.as_ptr());
-                err
             })
     }
 
-    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
+    async fn close(&mut self) -> Result<Metadata> {
         let c_path = CString::new(self.path.clone()).unwrap();
         probe_lazy!(opendal, writer_close_start, c_path.as_ptr());
         self.inner
-            .poll_close(cx)
-            .map_ok(|_| {
+            .close()
+            .await
+            .inspect(|_| {
                 probe_lazy!(opendal, writer_close_ok, c_path.as_ptr());
             })
-            .map_err(|err| {
+            .inspect_err(|_| {
                 probe_lazy!(opendal, writer_close_error, c_path.as_ptr());
-                err
             })
     }
 }
 
 impl<R: oio::BlockingWrite> oio::BlockingWrite for DtraceLayerWrapper<R> {
-    fn write(&mut self, bs: &dyn oio::WriteBuf) -> Result<usize> {
+    fn write(&mut self, bs: Buffer) -> Result<()> {
         let c_path = CString::new(self.path.clone()).unwrap();
         probe_lazy!(opendal, blocking_writer_write_start, c_path.as_ptr());
         self.inner
             .write(bs)
-            .map(|n| {
-                probe_lazy!(opendal, blocking_writer_write_ok, c_path.as_ptr(), n);
-                n
+            .map(|_| {
+                probe_lazy!(opendal, blocking_writer_write_ok, c_path.as_ptr());
             })
-            .map_err(|err| {
+            .inspect_err(|_| {
                 probe_lazy!(opendal, blocking_writer_write_error, c_path.as_ptr());
-                err
             })
     }
 
-    fn close(&mut self) -> Result<()> {
+    fn close(&mut self) -> Result<Metadata> {
         let c_path = CString::new(self.path.clone()).unwrap();
         probe_lazy!(opendal, blocking_writer_close_start, c_path.as_ptr());
         self.inner
             .close()
-            .map(|_| {
+            .inspect(|_| {
                 probe_lazy!(opendal, blocking_writer_close_ok, c_path.as_ptr());
             })
-            .map_err(|err| {
+            .inspect_err(|_| {
                 probe_lazy!(opendal, blocking_writer_close_error, c_path.as_ptr());
-                err
             })
     }
 }

@@ -43,6 +43,7 @@ impl std::fmt::Debug for crate::Process {
             .field("memory usage", &self.memory())
             .field("virtual memory usage", &self.virtual_memory())
             .field("CPU usage", &self.cpu_usage())
+            .field("accumulated CPU time", &self.accumulated_cpu_time())
             .field("status", &self.status())
             .field("root", &self.root())
             .field("disk_usage", &self.disk_usage())
@@ -57,11 +58,12 @@ impl std::fmt::Debug for crate::Disk {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             fmt,
-            "Disk({:?})[FS: {:?}][Type: {:?}][removable: {}] mounted on {:?}: {}/{} B",
+            "Disk({:?})[FS: {:?}][Type: {:?}][removable: {}][I/O: {:?}] mounted on {:?}: {}/{} B",
             self.name(),
             self.file_system(),
             self.kind(),
             if self.is_removable() { "yes" } else { "no" },
+            self.usage(),
             self.mount_point(),
             self.available_space(),
             self.total_space(),
@@ -86,23 +88,21 @@ impl std::fmt::Debug for crate::Components {
 #[cfg(feature = "component")]
 impl std::fmt::Debug for crate::Component {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(critical) = self.critical() {
-            write!(
-                f,
-                "{}: {}°C (max: {}°C / critical: {}°C)",
-                self.label(),
-                self.temperature(),
-                self.max(),
-                critical
-            )
+        write!(f, "{} ", self.label())?;
+        if let Some(temperature) = self.temperature() {
+            write!(f, "temperature: {temperature}°C (")?;
         } else {
-            write!(
-                f,
-                "{}: {}°C (max: {}°C)",
-                self.label(),
-                self.temperature(),
-                self.max()
-            )
+            f.write_str("temperature: unknown (")?;
+        }
+        if let Some(max) = self.max() {
+            write!(f, "max: {max}°C / ")?;
+        } else {
+            f.write_str("max: unknown / ")?;
+        }
+        if let Some(critical) = self.critical() {
+            write!(f, "critical: {critical}°C)")
+        } else {
+            f.write_str("critical: unknown)")
         }
     }
 }
@@ -130,6 +130,7 @@ impl std::fmt::Debug for crate::NetworkData {
             .field("total errors income", &self.total_errors_on_received())
             .field("errors outcome", &self.errors_on_transmitted())
             .field("total errors outcome", &self.total_errors_on_transmitted())
+            .field("maximum transfer unit", &self.mtu())
             .finish()
     }
 }

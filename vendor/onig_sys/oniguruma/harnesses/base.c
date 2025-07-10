@@ -1,6 +1,6 @@
 /*
  * base.c  contributed by Mark Griffin
- * Copyright (c) 2019-2021  K.Kosako
+ * Copyright (c) 2019-2022  K.Kosako
  */
 #include <stdio.h>
 #include <unistd.h>
@@ -20,7 +20,7 @@
 #define MATCH_STACK_LIMIT        10000000
 #define MAX_REM_SIZE              1048576
 #define MAX_SLOW_REM_SIZE            1024
-#define MAX_SLOW_REM_SIZE2            100
+#define MAX_SLOW_REM_SIZE2             80
 #define SLOW_RETRY_LIMIT             2000
 #define SLOW_SUBEXP_CALL_LIMIT        100
 #define MAX_SLOW_BACKWARD_REM_SIZE    200
@@ -201,7 +201,7 @@ each_match_callback_func(const UChar* str, const UChar* end,
   return ONIG_NORMAL;
 }
 
-static unsigned int calc_retry_limit(sl, len)
+static unsigned int calc_retry_limit(int sl, int len)
 {
   unsigned int r;
   unsigned int upper;
@@ -247,16 +247,17 @@ search(regex_t* reg, unsigned char* str, unsigned char* end, OnigOptionType opti
   len = (size_t )(end - str);
   retry_limit = calc_retry_limit(sl, len);
 
-#ifdef STANDALONE
-  fprintf(stdout, "retry limit: %u\n", retry_limit);
-#endif
-
   onig_set_retry_limit_in_search(retry_limit);
   onig_set_match_stack_limit_size(MATCH_STACK_LIMIT);
   if (sl >= 2)
     onig_set_subexp_call_limit_in_search(SLOW_SUBEXP_CALL_LIMIT);
   else
     onig_set_subexp_call_limit_in_search(SUBEXP_CALL_LIMIT);
+
+#ifdef STANDALONE
+  fprintf(stdout, "retry limit: %u\n", retry_limit);
+  fprintf(stdout, "end - str: %td\n", end - str);
+#endif
 
   if (backward != 0) {
     start = end;
@@ -315,15 +316,18 @@ static long VALID_STRING_COUNT;
 
 static int
 exec(OnigEncoding enc, OnigOptionType options, OnigSyntaxType* syntax,
-     char* apattern, char* apattern_end, char* astr, UChar* end, int backward,
-     int sl)
+     char* apattern, char* apattern_end,
+     char* adata_pattern, char* adata_pattern_end,
+     char* astr, UChar* end, int backward, int sl)
 {
   int r;
   regex_t* reg;
   OnigErrorInfo einfo;
-  UChar* pattern = (UChar* )apattern;
   UChar* str     = (UChar* )astr;
+  UChar* pattern = (UChar* )apattern;
   UChar* pattern_end = (UChar* )apattern_end;
+  UChar* data_pattern = (UChar* )adata_pattern;
+  UChar* data_pattern_end = (UChar* )adata_pattern_end;
 
   EXEC_COUNT++;
   EXEC_COUNT_INTERVAL++;
@@ -357,8 +361,11 @@ exec(OnigEncoding enc, OnigOptionType options, OnigSyntaxType* syntax,
   }
   REGEX_SUCCESS_COUNT++;
 
-  r = search(reg, pattern, pattern_end, options, backward, sl);
-  if (r == -2) return -2;
+  if (data_pattern == pattern ||
+      onigenc_is_valid_mbc_string(enc, data_pattern, data_pattern_end) != 0) {
+    r = search(reg, data_pattern, data_pattern_end, options, backward, sl);
+    if (r == -2) return -2;
+  }
 
   if (onigenc_is_valid_mbc_string(enc, str, end) != 0) {
     VALID_STRING_COUNT++;
@@ -371,6 +378,28 @@ exec(OnigEncoding enc, OnigOptionType options, OnigSyntaxType* syntax,
   return 0;
 }
 
+static size_t
+fix_size(size_t x, OnigEncoding enc, int sl, int backward)
+{
+  if (x > MAX_REM_SIZE) x = MAX_REM_SIZE;
+
+  if (sl > 0) {
+    if (sl >= 256) { // 256: exists heavy element
+      if (x > MAX_SLOW_REM_SIZE2) x = MAX_SLOW_REM_SIZE2;
+    }
+    else {
+      if (x > MAX_SLOW_REM_SIZE) x = MAX_SLOW_REM_SIZE;
+    }
+  }
+  if (backward != 0 && enc == ONIG_ENCODING_GB18030) {
+    if (x > MAX_SLOW_BACKWARD_REM_SIZE)
+      x = MAX_SLOW_BACKWARD_REM_SIZE;
+  }
+
+  ADJUST_LEN(enc, x);
+  return x;
+}
+
 static int
 alloc_exec(OnigEncoding enc, OnigOptionType options, OnigSyntaxType* syntax,
            int backward, int pattern_size, size_t rem_size, unsigned char *data)
@@ -379,8 +408,11 @@ alloc_exec(OnigEncoding enc, OnigOptionType options, OnigSyntaxType* syntax,
 
   int r;
   int sl;
+  int data_pattern_size;
   unsigned char *pattern;
   unsigned char *pattern_end;
+  unsigned char *data_pattern;
+  unsigned char *data_pattern_end;
   unsigned char *str_null_end;
 
 #ifdef TEST_PATTERN
@@ -389,35 +421,35 @@ alloc_exec(OnigEncoding enc, OnigOptionType options, OnigSyntaxType* syntax,
   pattern_end = pattern + sizeof(TestPattern);
 #else
   pattern = (unsigned char *)malloc(pattern_size != 0 ? pattern_size : 1);
-  memcpy(pattern, data, pattern_size);
   pattern_end = pattern + pattern_size;
+  memcpy(pattern, data, pattern_size);
 #endif
-
-  data += pattern_size;
-  rem_size -= pattern_size;
-
-  if (rem_size > MAX_REM_SIZE) rem_size = MAX_REM_SIZE;
 
   sl = onig_detect_can_be_slow_pattern(pattern, pattern_end, options, enc, syntax);
 #ifdef STANDALONE
   fprintf(stdout, "sl: %d\n", sl);
 #endif
-  if (sl > 0) {
-    if (sl >= 256) { // 256: exists heavy element
-      if (rem_size > MAX_SLOW_REM_SIZE2)
-        rem_size = MAX_SLOW_REM_SIZE2;
-    }
-    else {
-      if (rem_size > MAX_SLOW_REM_SIZE)
-        rem_size = MAX_SLOW_REM_SIZE;
-    }
+
+  data_pattern_size = fix_size(pattern_size, enc, sl, backward);
+
+  if (
+#ifdef TEST_PATTERN
+      1 ||
+#endif
+      data_pattern_size != pattern_size) {
+    data_pattern = (unsigned char *)malloc(data_pattern_size != 0
+                                           ? data_pattern_size : 1);
+    data_pattern_end = data_pattern + data_pattern_size;
+    memcpy(data_pattern, data, data_pattern_size);
   }
-  if (backward != 0 && enc == ONIG_ENCODING_GB18030) {
-    if (rem_size > MAX_SLOW_BACKWARD_REM_SIZE)
-      rem_size = MAX_SLOW_BACKWARD_REM_SIZE;
+  else {
+    data_pattern     = pattern;
+    data_pattern_end = pattern_end;
   }
 
-  ADJUST_LEN(enc, rem_size);
+  data += pattern_size;
+  rem_size -= pattern_size;
+  rem_size = fix_size(rem_size, enc, sl, backward);
 #ifdef STANDALONE
   fprintf(stdout, "rem_size: %ld\n", rem_size);
 #endif
@@ -427,8 +459,12 @@ alloc_exec(OnigEncoding enc, OnigOptionType options, OnigSyntaxType* syntax,
   str_null_end = str + rem_size;
 
   r = exec(enc, options, syntax,
-           (char *)pattern, (char *)pattern_end,
-           (char *)str, str_null_end, backward, sl);
+           (char* )pattern,      (char* )pattern_end,
+           (char* )data_pattern, (char* )data_pattern_end,
+           (char* )str, str_null_end, backward, sl);
+
+  if (data_pattern != pattern)
+    free(data_pattern);
 
   free(pattern);
   free(str);

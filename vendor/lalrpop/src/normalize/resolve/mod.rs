@@ -283,7 +283,7 @@ impl Validator {
     }
 }
 
-impl ScopeChain<'_> {
+impl<'scope> ScopeChain<'scope> {
     fn def(&self, id: &Atom) -> Option<Def> {
         self.identifiers
             .get(id)

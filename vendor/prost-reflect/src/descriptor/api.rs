@@ -338,13 +338,13 @@ impl DescriptorPool {
             files: &'a [FileDescriptorInner],
         }
 
-        impl<'a> fmt::Debug for FileDescriptorSet<'a> {
+        impl fmt::Debug for FileDescriptorSet<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
                 f.debug_struct("FileDescriptorSet").finish_non_exhaustive()
             }
         }
 
-        impl<'a> Message for FileDescriptorSet<'a> {
+        impl Message for FileDescriptorSet<'_> {
             fn encode_raw(&self, buf: &mut impl BufMut)
             where
                 Self: Sized,
@@ -753,6 +753,19 @@ impl MessageDescriptor {
             .map(|&index| FieldDescriptor {
                 message: self.clone(),
                 index,
+            })
+    }
+
+    pub(crate) fn fields_in_index_order(
+        &self,
+    ) -> impl ExactSizeIterator<Item = FieldDescriptor> + '_ {
+        self.inner()
+            .fields
+            .iter()
+            .enumerate()
+            .map(|(index, _)| FieldDescriptor {
+                message: self.clone(),
+                index: index as u32,
             })
     }
 

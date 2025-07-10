@@ -10,7 +10,6 @@ This service can be used to:
 - [ ] copy
 - [ ] rename
 - [ ] list
-- [x] scan
 - [ ] presign
 - [ ] blocking
 
@@ -28,15 +27,15 @@ You can refer to [`MokaBuilder`]'s docs for more information
 
 ### Via Builder
 
-```rust
+```rust,no_run
 use anyhow::Result;
 use opendal::services::Moka;
 use opendal::Operator;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut builder = Moka::default();
-    builder.name("opendal");
+    let mut builder = Moka::default()
+        .name("opendal");
 
     let op: Operator = Operator::new(builder)?.finish();
     Ok(())

@@ -10,7 +10,6 @@ This service can be used to:
 - [ ] copy
 - [ ] rename
 - [ ] ~~list~~
-- [ ] scan
 - [ ] ~~presign~~
 - [ ] blocking
 
@@ -26,20 +25,20 @@ This service can be used to:
 
 ### Via Builder
 
-```rust
+```rust,no_run
 use anyhow::Result;
 use opendal::services::Gridfs;
 use opendal::Operator;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut builder = Gridfs::default();
-    builder.root("/");
-    builder.connection_string("mongodb://myUser:myPassword@localhost:27017/myAuthDB");
-    builder.database("your_database");
-    builder.bucket("your_bucket");
-    // The chunk size in bytes used to break the user file into chunks.
-    builder.chunk_size(255);
+    let mut builder = Gridfs::default()
+        .root("/")
+        .connection_string("mongodb://myUser:myPassword@localhost:27017/myAuthDB")
+        .database("your_database")
+        .bucket("your_bucket")
+        // The chunk size in bytes used to break the user file into chunks.
+        .chunk_size(255);
 
     let op = Operator::new(builder)?.finish();
     Ok(())

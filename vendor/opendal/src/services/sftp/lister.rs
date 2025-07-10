@@ -16,17 +16,14 @@
 // under the License.
 
 use std::pin::Pin;
-use std::task::ready;
-use std::task::Context;
-use std::task::Poll;
 
-use async_trait::async_trait;
 use futures::StreamExt;
 use openssh_sftp_client::fs::DirEntry;
 use openssh_sftp_client::fs::ReadDir;
 
 use super::error::parse_sftp_error;
 use crate::raw::oio;
+use crate::raw::oio::Entry;
 use crate::Result;
 
 pub struct SftpLister {
@@ -45,27 +42,37 @@ impl SftpLister {
     }
 }
 
-#[async_trait]
 impl oio::List for SftpLister {
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<oio::Entry>>> {
-        let item = ready!(self.dir.poll_next_unpin(cx))
-            .transpose()
-            .map_err(parse_sftp_error)?;
+    async fn next(&mut self) -> Result<Option<Entry>> {
+        loop {
+            let item = self
+                .dir
+                .next()
+                .await
+                .transpose()
+                .map_err(parse_sftp_error)?;
 
-        match item {
-            Some(e) => {
-                if e.filename().to_str() == Some(".") || e.filename().to_str() == Some("..") {
-                    self.poll_next(cx)
-                } else {
-                    Poll::Ready(Ok(Some(map_entry(self.prefix.as_str(), e))))
+            match item {
+                Some(e) => {
+                    if e.filename().to_str() == Some("..") {
+                        continue;
+                    } else if e.filename().to_str() == Some(".") {
+                        let mut path = self.prefix.as_str();
+                        if self.prefix.is_empty() {
+                            path = "/";
+                        }
+                        return Ok(Some(Entry::new(path, e.metadata().into())));
+                    } else {
+                        return Ok(Some(map_entry(self.prefix.as_str(), e)));
+                    }
                 }
+                None => return Ok(None),
             }
-            None => Poll::Ready(Ok(None)),
         }
     }
 }
 
-fn map_entry(prefix: &str, value: DirEntry) -> oio::Entry {
+fn map_entry(prefix: &str, value: DirEntry) -> Entry {
     let path = format!(
         "{}{}{}",
         prefix,
@@ -77,5 +84,5 @@ fn map_entry(prefix: &str, value: DirEntry) -> oio::Entry {
         }
     );
 
-    oio::Entry::new(path.as_str(), value.metadata().into())
+    Entry::new(path.as_str(), value.metadata().into())
 }

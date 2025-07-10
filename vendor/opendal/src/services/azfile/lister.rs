@@ -17,9 +17,9 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
 use http::StatusCode;
-use quick_xml::de::from_str;
+use quick_xml::de;
 use serde::Deserialize;
 
 use super::core::AzfileCore;
@@ -39,7 +39,6 @@ impl AzfileLister {
     }
 }
 
-#[async_trait]
 impl oio::PageList for AzfileLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let resp = self
@@ -54,14 +53,19 @@ impl oio::PageList for AzfileLister {
                 ctx.done = true;
                 return Ok(());
             }
-            return Err(parse_error(resp).await?);
+            return Err(parse_error(resp));
         }
 
-        let bs = resp.into_body().bytes().await?;
+        // Return self at the first page.
+        if ctx.token.is_empty() && !ctx.done {
+            let e = oio::Entry::new(&self.path, Metadata::new(EntryMode::DIR));
+            ctx.entries.push_back(e);
+        }
 
-        let text = String::from_utf8(bs.to_vec()).expect("response convert to string must success");
+        let bs = resp.into_body();
 
-        let results: EnumerationResults = from_str(&text).map_err(new_xml_deserialize_error)?;
+        let results: EnumerationResults =
+            de::from_reader(bs.reader()).map_err(new_xml_deserialize_error)?;
 
         if results.next_marker.is_empty() {
             ctx.done = true;
@@ -150,6 +154,8 @@ struct Properties {
 
 #[cfg(test)]
 mod tests {
+    use quick_xml::de::from_str;
+
     use super::*;
 
     #[test]

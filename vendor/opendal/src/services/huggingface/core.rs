@@ -15,26 +15,26 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::fmt::Debug;
-
 use bytes::Bytes;
 use http::header;
 use http::Request;
 use http::Response;
 use serde::Deserialize;
+use std::fmt::Debug;
+use std::sync::Arc;
 
 use super::backend::RepoType;
 use crate::raw::*;
 use crate::*;
 
 pub struct HuggingfaceCore {
+    pub info: Arc<AccessorInfo>,
+
     pub repo_type: RepoType,
     pub repo_id: String,
     pub revision: String,
     pub root: String,
     pub token: Option<String>,
-
-    pub client: HttpClient,
 }
 
 impl Debug for HuggingfaceCore {
@@ -49,7 +49,7 @@ impl Debug for HuggingfaceCore {
 }
 
 impl HuggingfaceCore {
-    pub async fn hf_path_info(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn hf_path_info(&self, path: &str) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path)
             .trim_end_matches('/')
             .to_string();
@@ -66,7 +66,8 @@ impl HuggingfaceCore {
         };
 
         let mut req = Request::post(&url);
-
+        // Inject operation to the request.
+        req = req.extension(Operation::Stat);
         if let Some(token) = &self.token {
             let auth_header_content = format_authorization_by_bearer(token)?;
             req = req.header(header::AUTHORIZATION, auth_header_content);
@@ -77,17 +78,13 @@ impl HuggingfaceCore {
         let req_body = format!("paths={}&expand=True", percent_encode_path(&p));
 
         let req = req
-            .body(AsyncBody::Bytes(Bytes::from(req_body)))
+            .body(Buffer::from(Bytes::from(req_body)))
             .map_err(new_request_build_error)?;
 
-        self.client.send(req).await
+        self.info.http_client().send(req).await
     }
 
-    pub async fn hf_list(
-        &self,
-        path: &str,
-        recursive: bool,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn hf_list(&self, path: &str, recursive: bool) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path)
             .trim_end_matches('/')
             .to_string();
@@ -112,20 +109,24 @@ impl HuggingfaceCore {
         }
 
         let mut req = Request::get(&url);
-
+        // Inject operation to the request.
+        req = req.extension(Operation::List);
         if let Some(token) = &self.token {
             let auth_header_content = format_authorization_by_bearer(token)?;
             req = req.header(header::AUTHORIZATION, auth_header_content);
         }
 
-        let req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
+        let req = req.body(Buffer::new()).map_err(new_request_build_error)?;
 
-        self.client.send(req).await
+        self.info.http_client().send(req).await
     }
 
-    pub async fn hf_resolve(&self, path: &str, arg: OpRead) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn hf_resolve(
+        &self,
+        path: &str,
+        range: BytesRange,
+        _args: &OpRead,
+    ) -> Result<Response<HttpBody>> {
         let p = build_abs_path(&self.root, path)
             .trim_end_matches('/')
             .to_string();
@@ -152,16 +153,14 @@ impl HuggingfaceCore {
             req = req.header(header::AUTHORIZATION, auth_header_content);
         }
 
-        let range = arg.range();
         if !range.is_full() {
-            req = req.header(header::RANGE, &range.to_header());
+            req = req.header(header::RANGE, range.to_header());
         }
+        // Inject operation to the request.
+        let req = req.extension(Operation::Read);
+        let req = req.body(Buffer::new()).map_err(new_request_build_error)?;
 
-        let req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
-
-        self.client.send(req).await
+        self.info.http_client().fetch(req).await
     }
 }
 
@@ -202,7 +201,6 @@ pub(super) struct HuggingfaceLastCommit {
 #[allow(dead_code)]
 pub(super) struct HuggingfaceSecurity {
     pub blob_id: String,
-    pub name: String,
     pub safe: bool,
     pub av_scan: Option<HuggingfaceAvScan>,
     pub pickle_import_scan: Option<HuggingfacePickleImportScan>,
@@ -367,7 +365,6 @@ mod tests {
             }),
             security: Some(HuggingfaceSecurity {
                 blob_id: "45fa7c3d85ee7dd4139adbc056da25ae136a65f2".to_string(),
-                name: "maelstrom/lib/maelstrom.jar".to_string(),
                 safe: true,
                 av_scan: Some(HuggingfaceAvScan {
                     virus_found: false,

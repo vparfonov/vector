@@ -1,6 +1,6 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::{Disk, DiskKind};
+use crate::{Disk, DiskKind, DiskRefreshKind, DiskUsage};
 
 use std::{ffi::OsStr, path::Path};
 
@@ -8,11 +8,11 @@ pub(crate) struct DiskInner;
 
 impl DiskInner {
     pub(crate) fn kind(&self) -> DiskKind {
-        unreachable!()
+        DiskKind::Unknown(-1)
     }
 
     pub(crate) fn name(&self) -> &OsStr {
-        unreachable!()
+        OsStr::new("")
     }
 
     pub(crate) fn file_system(&self) -> &OsStr {
@@ -39,8 +39,12 @@ impl DiskInner {
         false
     }
 
-    pub(crate) fn refresh(&mut self) -> bool {
+    pub(crate) fn refresh_specifics(&mut self, _refreshes: DiskRefreshKind) -> bool {
         true
+    }
+
+    pub(crate) fn usage(&self) -> DiskUsage {
+        DiskUsage::default()
     }
 }
 
@@ -61,7 +65,11 @@ impl DisksInner {
         self.disks
     }
 
-    pub(crate) fn refresh_list(&mut self) {
+    pub(crate) fn refresh_specifics(
+        &mut self,
+        _remove_not_listed_disks: bool,
+        _refreshes: DiskRefreshKind,
+    ) {
         // Does nothing.
     }
 

@@ -8,8 +8,8 @@
 //!
 //! # Rust Library
 //!
-//! Provides a [`Case`](enum.Case.html) enum which defines a variety of cases to convert into.
-//! Strings have implemented the [`Casing`](trait.Casing.html) trait, which adds methods for
+//! Provides a [`Case`] enum which defines a variety of cases to convert into.
+//! Strings have implemented the [`Casing`] trait, which adds methods for
 //! case conversion.
 //!
 //! You can convert strings into a case using the [`to_case`](Casing::to_case) method.
@@ -22,14 +22,14 @@
 //! ```
 //!
 //! By default, `to_case` will split along a set of default word boundaries, that is
-//! * space characters ` `,
 //! * underscores `_`,
 //! * hyphens `-`,
+//! * spaces ` `,
 //! * changes in capitalization from lowercase to uppercase `aA`,
 //! * adjacent digits and letters `a1`, `1a`, `A1`, `1A`,
 //! * and acroynms `AAa` (as in `HTTPRequest`).
 //!
-//! For more accuracy, the `from_case` method splits based on the word boundaries
+//! For more precision, the `from_case` method splits based on the word boundaries
 //! of a particular case.  For example, splitting from snake case will only use
 //! underscores as word boundaries.
 //! ```
@@ -44,7 +44,7 @@
 //! );
 //! ```
 //!
-//! Case conversion can detect acronyms for camel-like strings.  It also ignores any leading,
+//! This library can detect acronyms in camel-like strings.  It also ignores any leading,
 //! trailing, or duplicate delimiters.
 //! ```
 //! # use convert_case::{Case, Casing};
@@ -111,7 +111,7 @@
 //! Say an identifier has the word `2D`, such as `scale2D`.  No exclusive usage of `from_case` will
 //! be enough to solve the problem.  In this case we can further specify which boundaries to split
 //! the string on.  `convert_case` provides some patterns for achieving this specificity.
-//! We can specify what boundaries we want to split on using instances the [`Boundary` struct](Boundary).
+//! We can specify what boundaries we want to split on using instances of the [`Boundary`] struct.
 //! ```
 //! use convert_case::{Boundary, Case, Casing};
 //!
@@ -185,21 +185,57 @@
 //!
 //! To learn more about building a boundary from scratch, read the [`Boundary`] struct.
 //!
-//! # Custom Cases
+//! # Custom Case
 //!
-//! Because `Case` is an enum, you can't create your own variant for your use case.  However
-//! the parameters for case conversion have been encapsulated into the [`Converter`] struct
-//! which can be used for specific use cases.
+//! Case has a special variant [`Case::Custom`] that exposes the three components necessary
+//! for case conversion.  This allows you to define a custom case that behaves appropriately
+//! in the `.to_case` and `.from_case` methods.
 //!
-//! Suppose you wanted to format a word like camel case, where the first word is lower case and the
-//! rest are capitalized.  But you want to include a delimeter like underscore.  This case isn't
-//! available as a `Case` variant, but you can create it by constructing the parameters of the
-//! `Converter`.
+//! A common example might be a "dot case" that has lowercase letters and is delimited by
+//! periods.  We could define this as follows.
 //! ```
-//! use convert_case::{Case, Casing, Converter, Pattern};
+//! use convert_case::{Case, Casing, pattern, Boundary};
+//!
+//! let dot_case = Case::Custom {
+//!     boundaries: &[Boundary::from_delim(".")],
+//!     pattern: pattern::lowercase,
+//!     delim: ".",
+//! };
+//!
+//! assert_eq!(
+//!     "dot.case.var",
+//!     "Dot case var".to_case(dot_case)
+//! )
+//! ```
+//! And because we defined boundary conditions, this means `.from_case` should also behave as expected.
+//! ```
+//! # use convert_case::{Case, Casing, pattern, Boundary};
+//! # let dot_case = Case::Custom {
+//! #     boundaries: &[Boundary::from_delim(".")],
+//! #     pattern: pattern::lowercase,
+//! #     delim: ".",
+//! # };
+//! assert_eq!(
+//!     "dotCaseVar",
+//!     "dot.case.var".from_case(dot_case).to_case(Case::Camel)
+//! )
+//! ```
+//!
+//! # Converter Struct
+//!
+//! Case conversion takes place in two parts.  The first splits an identifier into a series of words,
+//! and the second joins the words back together.  Each of these are steps are defined using the
+//! `.from_case` and `.to_case` methods respectively.
+//!
+//! [`Converter`] is a struct that encapsulates the boundaries used for splitting and the pattern
+//! and delimiter for mutating and joining.  The [`convert`](Converter::convert) method will
+//! apply the boundaries, pattern, and delimiter appropriately.  This lets you define the
+//! parameters for case conversion upfront.
+//! ```
+//! use convert_case::{Converter, pattern};
 //!
 //! let conv = Converter::new()
-//!     .set_pattern(Pattern::Camel)
+//!     .set_pattern(pattern::camel)
 //!     .set_delim("_");
 //!
 //! assert_eq!(
@@ -207,35 +243,32 @@
 //!     conv.convert("My Special Case")
 //! )
 //! ```
-//! Just as with the `Casing` trait, you can also manually set the boundaries strings are split
-//! on.  You can use any of the [`Pattern`] variants available.  This even includes [`Pattern::Sentence`]
-//! which isn't used in any `Case` variant.  You can also set no pattern at all, which will
-//! maintain the casing of each letter in the input string.  You can also, of course, set any string as your
-//! delimeter.
-//!
 //! For more details on how strings are converted, see the docs for [`Converter`].
 //!
 //! # Random Feature
 //!
-//! To ensure this library had zero dependencies, randomness was moved to the _random_ feature,
-//! which requires the `rand` crate. You can enable this feature by including the
-//! following in your `Cargo.toml`.
+//! This feature adds two additional cases: [`Case::Random`] and [`Case::PseudoRandom`].
+//! The `random` feature depends on the [`rand`](https://docs.rs/rand) crate.
+//!
+//! You can enable this feature by including the following in your `Cargo.toml`.
 //! ```{toml}
 //! [dependencies]
-//! convert_case = { version = "^0.3.0", features = ["random"] }
+//! convert_case = { version = "^0.8.0", features = ["random"] }
 //! ```
-//! This will add two additional cases: Random and PseudoRandom.  You can read about their
-//! construction in the [Case enum](enum.Case.html).
+
+#![cfg_attr(not(test), no_std)]
+extern crate alloc;
+
+use alloc::string::{String, ToString};
 
 mod boundary;
 mod case;
 mod converter;
-mod pattern;
 
+pub mod pattern;
 pub use boundary::{split, Boundary};
 pub use case::Case;
 pub use converter::Converter;
-pub use pattern::Pattern;
 
 /// Describes items that can be converted into a case.  This trait is used
 /// in conjunction with the [`StateConverter`] struct which is returned from a couple
@@ -327,7 +360,7 @@ where
     }
 
     fn from_case(&self, case: Case) -> StateConverter<T> {
-        StateConverter::new_from_case(self, case)
+        StateConverter::new(self).from_case(case)
     }
 
     fn is_case(&self, case: Case) -> bool {
@@ -359,14 +392,6 @@ impl<'a, T: AsRef<str>> StateConverter<'a, T> {
         Self {
             s,
             conv: Converter::new(),
-        }
-    }
-
-    /// Only called by Casing function from_case()
-    fn new_from_case(s: &'a T, case: Case) -> Self {
-        Self {
-            s,
-            conv: Converter::new().from_case(case),
         }
     }
 
@@ -446,12 +471,15 @@ impl<'a, T: AsRef<str>> StateConverter<'a, T> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use strum::IntoEnumIterator;
+
+    use alloc::vec;
+    use alloc::vec::Vec;
 
     fn possible_cases(s: &str) -> Vec<Case> {
         Case::deterministic_cases()
-            .into_iter()
-            .filter(|case| s.from_case(*case).to_case(*case) == s)
+            .iter()
+            .filter(|&case| s.from_case(*case).to_case(*case) == s)
+            .map(|c| *c)
             .collect()
     }
 
@@ -473,8 +501,8 @@ mod test {
             (Case::Alternating, "mY vArIaBlE 22 nAmE"),
         ];
 
-        for (case_a, str_a) in examples.iter() {
-            for (case_b, str_b) in examples.iter() {
+        for (case_a, str_a) in &examples {
+            for (case_b, str_b) in &examples {
                 assert_eq!(*str_a, str_b.from_case(*case_b).to_case(*case_a))
             }
         }
@@ -583,8 +611,11 @@ mod test {
 
     #[test]
     fn empty_string() {
-        for (case_a, case_b) in Case::iter().zip(Case::iter()) {
-            assert_eq!("", "".from_case(case_a).to_case(case_b));
+        for (case_a, case_b) in Case::all_cases()
+            .into_iter()
+            .zip(Case::all_cases().into_iter())
+        {
+            assert_eq!("", "".from_case(*case_a).to_case(*case_b));
         }
     }
 
@@ -645,7 +676,7 @@ mod test {
     #[cfg(feature = "random")]
     #[test]
     fn random_case_boundaries() {
-        for random_case in Case::random_cases() {
+        for &random_case in Case::random_cases() {
             assert_eq!(
                 "split_by_spaces",
                 "Split By Spaces"
@@ -691,7 +722,7 @@ mod test {
     #[test]
     fn detect_each_case() {
         let s = "My String Identifier".to_string();
-        for case in Case::deterministic_cases() {
+        for &case in Case::deterministic_cases() {
             let new_s = s.from_case(case).to_case(case);
             let possible = possible_cases(&new_s);
             assert!(possible.iter().any(|c| c == &case));

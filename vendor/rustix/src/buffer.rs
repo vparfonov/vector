@@ -1,4 +1,4 @@
-//! Utilities for functions that return data via buffers.
+//! Utilities to help with buffering.
 
 #![allow(unsafe_code)]
 
@@ -22,19 +22,18 @@ use core::slice;
 ///
 /// Passing a `&mut [u8]`:
 ///
-/// ```
+/// ```rust
 /// # use rustix::io::read;
 /// # fn example(fd: rustix::fd::BorrowedFd) -> rustix::io::Result<()> {
 /// let mut buf = [0_u8; 64];
 /// let nread = read(fd, &mut buf)?;
-/// // `nread` is the number of bytes read.
 /// # Ok(())
 /// # }
 /// ```
 ///
 /// Passing a `&mut [MaybeUninit<u8>]`:
 ///
-/// ```
+/// ```rust
 /// # use rustix::io::read;
 /// # use std::mem::MaybeUninit;
 /// # fn example(fd: rustix::fd::BorrowedFd) -> rustix::io::Result<()> {
@@ -48,14 +47,13 @@ use core::slice;
 ///
 /// Passing a [`SpareCapacity`], via the [`spare_capacity`] helper function:
 ///
-/// ```
+/// ```rust
 /// # use rustix::io::read;
 /// # use rustix::buffer::spare_capacity;
 /// # fn example(fd: rustix::fd::BorrowedFd) -> rustix::io::Result<()> {
 /// let mut buf = Vec::with_capacity(64);
 /// let nread = read(fd, spare_capacity(&mut buf))?;
-/// // `nread` is the number of bytes read.
-/// // Also, `buf.len()` is now `nread` elements longer than it was before.
+/// // Also, `buf.len()` is now `nread` elements greater.
 /// # Ok(())
 /// # }
 /// ```
@@ -93,7 +91,7 @@ use core::slice;
 /// If you see errors like
 /// "captured variable cannot escape `FnMut` closure body",
 /// use an explicit loop instead of `retry_on_intr`, assuming you're using
-/// that. See `error_retry_closure_uninit` in examples/buffer_errors.rs.
+/// that. See `error_retry_closure_uninit` in examples.rs.
 pub trait Buffer<T>: private::Sealed<T> {}
 
 // Implement `Buffer` for all the types that implement `Sealed`.
@@ -293,9 +291,6 @@ mod private {
 
         /// Return a pointer and length for this buffer.
         ///
-        /// The length is the number of elements of type `T`, not a number of
-        /// bytes.
-        ///
         /// It's tempting to have this return `&mut [MaybeUninit<T>]` instead,
         /// however that would require this function to be `unsafe`, because
         /// callers could use the `&mut [MaybeUninit<T>]` slice to set elements
@@ -307,8 +302,7 @@ mod private {
         ///
         /// # Safety
         ///
-        /// At least `len` elements of the buffer must now be initialized.
-        #[must_use]
+        /// At least `len` bytes of the buffer must now be initialized.
         unsafe fn assume_init(self, len: usize) -> Self::Output;
     }
 }
@@ -324,8 +318,7 @@ mod tests {
         use crate::io::read;
         use core::mem::MaybeUninit;
 
-        // We need to obtain input stream, so open our own source file.
-        let input = std::fs::File::open("src/buffer.rs").unwrap();
+        let input = std::fs::File::open("Cargo.toml").unwrap();
 
         let mut buf = vec![0_u8; 3];
         buf.reserve(32);
@@ -364,17 +357,12 @@ mod tests {
         use crate::io::read;
         use std::io::{Seek, SeekFrom};
 
-        // We need to obtain input stream with contents that we can compare
-        // against, so open our own source file.
-        let mut input = std::fs::File::open("src/buffer.rs").unwrap();
+        let mut input = std::fs::File::open("Cargo.toml").unwrap();
 
         let mut buf = [0_u8; 64];
         let nread = read(&input, &mut buf).unwrap();
         assert_eq!(nread, buf.len());
-        assert_eq!(
-            &buf[..58],
-            b"//! Utilities for functions that return data via buffers.\n"
-        );
+        assert_eq!(&buf[..9], b"[package]");
         input.seek(SeekFrom::End(-1)).unwrap();
         let nread = read(&input, &mut buf).unwrap();
         assert_eq!(nread, 1);
@@ -390,21 +378,16 @@ mod tests {
         use core::mem::MaybeUninit;
         use std::io::{Seek, SeekFrom};
 
-        // We need to obtain input stream with contents that we can compare
-        // against, so open our own source file.
-        let mut input = std::fs::File::open("src/buffer.rs").unwrap();
+        let mut input = std::fs::File::open("Cargo.toml").unwrap();
 
         let mut buf = [MaybeUninit::<u8>::uninit(); 64];
         let (init, uninit) = read(&input, &mut buf).unwrap();
         assert_eq!(uninit.len(), 0);
-        assert_eq!(
-            &init[..58],
-            b"//! Utilities for functions that return data via buffers.\n"
-        );
+        assert_eq!(&init[..9], b"[package]");
         assert_eq!(init.len(), buf.len());
         assert_eq!(
-            unsafe { core::mem::transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(&mut buf[..58]) },
-            b"//! Utilities for functions that return data via buffers.\n"
+            unsafe { core::mem::transmute::<&mut [MaybeUninit<u8>], &mut [u8]>(&mut buf[..9]) },
+            b"[package]"
         );
         input.seek(SeekFrom::End(-1)).unwrap();
         let (init, uninit) = read(&input, &mut buf).unwrap();
@@ -422,18 +405,13 @@ mod tests {
         use crate::io::read;
         use std::io::{Seek, SeekFrom};
 
-        // We need to obtain input stream with contents that we can compare
-        // against, so open our own source file.
-        let mut input = std::fs::File::open("src/buffer.rs").unwrap();
+        let mut input = std::fs::File::open("Cargo.toml").unwrap();
 
         let mut buf = Vec::with_capacity(64);
         let nread = read(&input, spare_capacity(&mut buf)).unwrap();
         assert_eq!(nread, buf.capacity());
         assert_eq!(nread, buf.len());
-        assert_eq!(
-            &buf[..58],
-            b"//! Utilities for functions that return data via buffers.\n"
-        );
+        assert_eq!(&buf[..9], b"[package]");
         buf.clear();
         input.seek(SeekFrom::End(-1)).unwrap();
         let nread = read(&input, spare_capacity(&mut buf)).unwrap();

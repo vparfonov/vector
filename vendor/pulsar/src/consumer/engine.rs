@@ -43,7 +43,7 @@ pub struct ConsumerEngine<Exe: Executor> {
     event_rx: mpsc::UnboundedReceiver<EngineEvent<Exe>>,
     event_tx: UnboundedSender<EngineEvent<Exe>>,
     batch_size: u32,
-    remaining_messages: u32,
+    remaining_messages: i64,
     unacked_message_redelivery_delay: Option<Duration>,
     unacked_messages: HashMap<MessageIdData, Instant>,
     dead_letter_policy: Option<DeadLetterPolicy>,
@@ -83,7 +83,7 @@ impl<Exe: Executor> ConsumerEngine<Exe> {
             event_rx,
             event_tx,
             batch_size,
-            remaining_messages: batch_size,
+            remaining_messages: batch_size as i64,
             unacked_message_redelivery_delay,
             unacked_messages: HashMap::new(),
             dead_letter_policy,
@@ -108,10 +108,12 @@ impl<Exe: Executor> ConsumerEngine<Exe> {
                     }
                 }
             }
+
             let send_end_res = event_tx.send(mapper(None)).await;
             if let Err(err) = send_end_res {
                 log::error!("Error sending end event to channel - {err}");
             }
+
             log::warn!("rx terminated");
         }))
     }
@@ -146,34 +148,79 @@ impl<Exe: Executor> ConsumerEngine<Exe> {
                     })?;
             }
 
-            if self.remaining_messages < self.batch_size / 2 {
+            // In the casual workflow, we use the `batch_size` as a maximum number that we could
+            // send using a send flow command message to ask the broker to send us
+            // messages, which is why we have a subtraction below (`batch_size` -
+            // `remaining_messages`).
+            //
+            // In the special case of batch messages (which is defined by clients), the number of
+            // messages could be greater than the given batch size and the remaining
+            // messages goes negative, which is why we use an `i64` as we want to keep
+            // track of the number of negative messages as the next send flow will be
+            // the batch_size - minus remaining messages which allow us to retrieve the casual
+            // workflow of flow command messages.
+            //
+            // Here is the example of it works for a batch_size at 1000 and the error case:
+            //
+            // ```
+            // Message (1) -> (batch_size = 1000, remaing_messages = 999, no flow message trigger)
+            // ... 499 messages later ...
+            // Message (1) -> (batch_size = 1000, remaing_messages = 499, flow message trigger, ask broker to send => batch_size - remaining_messages = 501)
+            // ... 200 messages later ...
+            // BatchMessage (1024) -> (batch_size = 1000, remaining_messages = 4294967096, no flow message trigger) [underflow on remaining messages - without the patch]
+            // BatchMessage (1024) -> (batch_size = 1000, remaining_messages = -1124, flow message trigger, ask broker to send =>  batch_size - remaining_messages = 2124) [no underflow on remaining messages - with the patch]
+            // ```
+            if self.remaining_messages < (self.batch_size.div_ceil(2) as i64) {
                 match self
                     .connection
                     .sender()
-                    .send_flow(self.id, self.batch_size - self.remaining_messages)
+                    .send_flow(
+                        self.id,
+                        (self.batch_size as i64 - self.remaining_messages) as u32,
+                    )
+                    .await
                 {
                     Ok(()) => {}
                     Err(ConnectionError::Disconnected) => {
-                        self.reconnect().await?;
-                        self.connection
-                            .sender()
-                            .send_flow(self.id, self.batch_size - self.remaining_messages)?;
+                        debug!("consumer engine: consumer connection disconnected, trying to reconnect");
+                        continue;
                     }
-                    Err(e) => return Err(e.into()),
+                    // we don't need to handle the SlowDown error, since send_flow waits on the
+                    // channel to be not full
+                    Err(e) => {
+                        error!("consumer engine: we got a unrecoverable connection error, {e}");
+                        return Err(e.into());
+                    }
                 }
-                self.remaining_messages = self.batch_size;
+
+                self.remaining_messages = self.batch_size as i64;
             }
 
             match Self::timeout(self.event_rx.next(), Duration::from_secs(1)).await {
-                Err(_timeout) => {}
+                Err(_) => {
+                    // If you are reading this comment, you may have an issue where you have
+                    // received a batched message that is greater that the batch
+                    // size and then break the way that we send flow command message.
+                    //
+                    // In that case, you could increase your batch size or patch this driver by
+                    // adding the following line, if you are sure that you have
+                    // at least 1 incoming message per second.
+                    //
+                    // ```rust
+                    // self.remaining_messages = 0;
+                    // ```
+                    debug!("consumer engine: timeout (1s)");
+                }
                 Ok(Some(EngineEvent::Message(msg))) => {
+                    debug!("consumer engine: received message, {:?}", msg);
                     let out = self.handle_message_opt(msg).await;
                     if let Some(res) = out {
                         return res;
                     }
                 }
                 Ok(Some(EngineEvent::EngineMessage(msg))) => {
-                    let continue_loop = self.handle_ack_opt(msg);
+                    debug!("consumer engine: received engine message");
+                    let continue_loop = self.handle_ack_opt(msg).await;
                     if !continue_loop {
                         return Ok(());
                     }
@@ -199,8 +246,14 @@ impl<Exe: Executor> ConsumerEngine<Exe> {
                 self.remaining_messages -= message
                     .payload
                     .as_ref()
-                    .and_then(|payload| payload.metadata.num_messages_in_batch)
-                    .unwrap_or(1i32) as u32;
+                    .and_then(|payload| {
+                        debug!(
+                            "Consumer: received message payload, num_messages_in_batch = {:?}",
+                            payload.metadata.num_messages_in_batch
+                        );
+                        payload.metadata.num_messages_in_batch
+                    })
+                    .unwrap_or(1) as i64;
 
                 match self.process_message(message).await {
                     // Continue
@@ -220,14 +273,14 @@ impl<Exe: Executor> ConsumerEngine<Exe> {
         }
     }
 
-    fn handle_ack_opt(&mut self, ack_opt: Option<EngineMessage<Exe>>) -> bool {
+    async fn handle_ack_opt(&mut self, ack_opt: Option<EngineMessage<Exe>>) -> bool {
         match ack_opt {
             None => {
                 trace!("ack channel was closed");
                 false
             }
             Some(EngineMessage::Ack(message_id, cumulative)) => {
-                self.ack(message_id, cumulative);
+                self.ack(message_id, cumulative).await;
                 true
             }
             Some(EngineMessage::Nack(message_id)) => {
@@ -235,6 +288,7 @@ impl<Exe: Executor> ConsumerEngine<Exe> {
                     .connection
                     .sender()
                     .send_redeliver_unacknowleged_messages(self.id, vec![message_id.clone()])
+                    .await
                 {
                     error!(
                         "could not ask for redelivery for message {:?}: {:?}",
@@ -260,6 +314,7 @@ impl<Exe: Executor> ConsumerEngine<Exe> {
                         .connection
                         .sender()
                         .send_redeliver_unacknowleged_messages(self.id, ids)
+                        .await
                     {
                         error!("could not ask for redelivery: {:?}", e);
                     } else {
@@ -283,13 +338,14 @@ impl<Exe: Executor> ConsumerEngine<Exe> {
     }
 
     #[cfg_attr(feature = "telemetry", tracing::instrument(skip_all))]
-    fn ack(&mut self, message_id: MessageIdData, cumulative: bool) {
+    async fn ack(&mut self, message_id: MessageIdData, cumulative: bool) {
         // FIXME: this does not handle cumulative acks
         self.unacked_messages.remove(&message_id);
         let res = self
             .connection
             .sender()
-            .send_ack(self.id, vec![message_id], cumulative);
+            .send_ack(self.id, vec![message_id], cumulative)
+            .await;
         if res.is_err() {
             error!("ack error: {:?}", res);
         }
@@ -382,15 +438,13 @@ impl<Exe: Executor> ConsumerEngine<Exe> {
     ) -> Result<(), Error> {
         let compression = match payload.metadata.compression {
             None => proto::CompressionType::None,
-            Some(compression) => {
-                proto::CompressionType::from_i32(compression).ok_or_else(|| {
-                    error!("unknown compression type: {}", compression);
-                    Error::Consumer(ConsumerError::Io(std::io::Error::new(
-                        ErrorKind::Other,
-                        format!("unknown compression type: {compression}"),
-                    )))
-                })?
-            }
+            Some(compression) => proto::CompressionType::try_from(compression).map_err(|err| {
+                error!("unknown compression type: {}", compression);
+                Error::Consumer(ConsumerError::Io(std::io::Error::new(
+                    ErrorKind::Other,
+                    format!("unknown compression type {compression}: {err}"),
+                )))
+            })?,
         };
 
         let payload = match compression {
@@ -507,7 +561,7 @@ impl<Exe: Executor> ConsumerEngine<Exe> {
                             Error::Custom("DLQ send error".to_string())
                         })?;
 
-                    self.ack(message_id, false);
+                    self.ack(message_id, false).await;
                 }
                 _ => self.send_to_consumer(message_id, payload).await?,
             }
@@ -566,6 +620,7 @@ impl<Exe: Executor> ConsumerEngine<Exe> {
         )
         .await?;
 
+        self.remaining_messages = self.batch_size as i64;
         self.messages_rx = Some(messages);
 
         Ok(())

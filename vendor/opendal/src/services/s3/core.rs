@@ -17,21 +17,26 @@
 
 use std::fmt;
 use std::fmt::Debug;
+use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Write;
-use std::sync::atomic;
 use std::sync::atomic::AtomicBool;
+use std::sync::{atomic, Arc};
 use std::time::Duration;
 
+use base64::prelude::BASE64_STANDARD;
+use base64::Engine;
 use bytes::Bytes;
-use http::header::HeaderName;
+use constants::X_AMZ_META_PREFIX;
 use http::header::CACHE_CONTROL;
 use http::header::CONTENT_DISPOSITION;
+use http::header::CONTENT_ENCODING;
 use http::header::CONTENT_LENGTH;
 use http::header::CONTENT_TYPE;
 use http::header::HOST;
 use http::header::IF_MATCH;
 use http::header::IF_NONE_MATCH;
+use http::header::{HeaderName, IF_MODIFIED_SINCE, IF_UNMODIFIED_SINCE};
 use http::HeaderValue;
 use http::Request;
 use http::Response;
@@ -44,10 +49,11 @@ use serde::Serialize;
 use crate::raw::*;
 use crate::*;
 
-mod constants {
+pub mod constants {
     pub const X_AMZ_COPY_SOURCE: &str = "x-amz-copy-source";
 
     pub const X_AMZ_SERVER_SIDE_ENCRYPTION: &str = "x-amz-server-side-encryption";
+    pub const X_AMZ_SERVER_REQUEST_PAYER: (&str, &str) = ("x-amz-request-payer", "requester");
     pub const X_AMZ_SERVER_SIDE_ENCRYPTION_CUSTOMER_ALGORITHM: &str =
         "x-amz-server-side-encryption-customer-algorithm";
     pub const X_AMZ_SERVER_SIDE_ENCRYPTION_CUSTOMER_KEY: &str =
@@ -65,12 +71,23 @@ mod constants {
     pub const X_AMZ_COPY_SOURCE_SERVER_SIDE_ENCRYPTION_CUSTOMER_KEY_MD5: &str =
         "x-amz-copy-source-server-side-encryption-customer-key-md5";
 
+    pub const X_AMZ_WRITE_OFFSET_BYTES: &str = "x-amz-write-offset-bytes";
+
+    pub const X_AMZ_META_PREFIX: &str = "x-amz-meta-";
+
+    pub const X_AMZ_VERSION_ID: &str = "x-amz-version-id";
+    pub const X_AMZ_OBJECT_SIZE: &str = "x-amz-object-size";
+
     pub const RESPONSE_CONTENT_DISPOSITION: &str = "response-content-disposition";
     pub const RESPONSE_CONTENT_TYPE: &str = "response-content-type";
     pub const RESPONSE_CACHE_CONTROL: &str = "response-cache-control";
+
+    pub const S3_QUERY_VERSION_ID: &str = "versionId";
 }
 
 pub struct S3Core {
+    pub info: Arc<AccessorInfo>,
+
     pub bucket: String,
     pub endpoint: String,
     pub root: String,
@@ -81,13 +98,13 @@ pub struct S3Core {
     pub server_side_encryption_customer_key_md5: Option<HeaderValue>,
     pub default_storage_class: Option<HeaderValue>,
     pub allow_anonymous: bool,
-    pub disable_stat_with_override: bool,
+    pub disable_list_objects_v2: bool,
+    pub enable_request_payer: bool,
 
     pub signer: AwsV4Signer,
     pub loader: Box<dyn AwsCredentialLoad>,
     pub credential_loaded: AtomicBool,
-    pub client: HttpClient,
-    pub batch_max_operations: usize,
+    pub checksum_algorithm: Option<ChecksumAlgorithm>,
 }
 
 impl Debug for S3Core {
@@ -105,7 +122,7 @@ impl S3Core {
     async fn load_credential(&self) -> Result<Option<AwsCredential>> {
         let cred = self
             .loader
-            .load_credential(self.client.client())
+            .load_credential(GLOBAL_REQWEST_CLIENT.clone())
             .await
             .map_err(new_request_credential_error)?;
 
@@ -182,8 +199,8 @@ impl S3Core {
     }
 
     #[inline]
-    pub async fn send(&self, req: Request<AsyncBody>) -> Result<Response<IncomingAsyncBody>> {
-        self.client.send(req).await
+    pub async fn send(&self, req: Request<Buffer>) -> Result<Response<Buffer>> {
+        self.info.http_client().send(req).await
     }
 
     /// # Note
@@ -246,10 +263,102 @@ impl S3Core {
 
         req
     }
+    pub fn calculate_checksum(&self, body: &Buffer) -> Option<String> {
+        match self.checksum_algorithm {
+            None => None,
+            Some(ChecksumAlgorithm::Crc32c) => {
+                let mut crc = 0u32;
+                body.clone()
+                    .for_each(|b| crc = crc32c::crc32c_append(crc, &b));
+                Some(BASE64_STANDARD.encode(crc.to_be_bytes()))
+            }
+        }
+    }
+    pub fn insert_checksum_header(
+        &self,
+        mut req: http::request::Builder,
+        checksum: &str,
+    ) -> http::request::Builder {
+        if let Some(checksum_algorithm) = self.checksum_algorithm.as_ref() {
+            req = req.header(checksum_algorithm.to_header_name(), checksum);
+        }
+        req
+    }
+
+    pub fn insert_checksum_type_header(
+        &self,
+        mut req: http::request::Builder,
+    ) -> http::request::Builder {
+        if let Some(checksum_algorithm) = self.checksum_algorithm.as_ref() {
+            req = req.header("x-amz-checksum-algorithm", checksum_algorithm.to_string());
+        }
+        req
+    }
+
+    pub fn insert_metadata_headers(
+        &self,
+        mut req: http::request::Builder,
+        size: Option<u64>,
+        args: &OpWrite,
+    ) -> http::request::Builder {
+        if let Some(size) = size {
+            req = req.header(CONTENT_LENGTH, size.to_string())
+        }
+
+        if let Some(mime) = args.content_type() {
+            req = req.header(CONTENT_TYPE, mime)
+        }
+
+        if let Some(pos) = args.content_disposition() {
+            req = req.header(CONTENT_DISPOSITION, pos)
+        }
+
+        if let Some(encoding) = args.content_encoding() {
+            req = req.header(CONTENT_ENCODING, encoding);
+        }
+
+        if let Some(cache_control) = args.cache_control() {
+            req = req.header(CACHE_CONTROL, cache_control)
+        }
+
+        if let Some(if_match) = args.if_match() {
+            req = req.header(IF_MATCH, if_match);
+        }
+
+        if args.if_not_exists() {
+            req = req.header(IF_NONE_MATCH, "*");
+        }
+
+        // Set storage class header
+        if let Some(v) = &self.default_storage_class {
+            req = req.header(HeaderName::from_static(constants::X_AMZ_STORAGE_CLASS), v);
+        }
+
+        // Set user metadata headers.
+        if let Some(user_metadata) = args.user_metadata() {
+            for (key, value) in user_metadata {
+                req = req.header(format!("{X_AMZ_META_PREFIX}{key}"), value)
+            }
+        }
+        req
+    }
+
+    pub fn insert_request_payer_header(
+        &self,
+        mut req: http::request::Builder,
+    ) -> http::request::Builder {
+        if self.enable_request_payer {
+            req = req.header(
+                HeaderName::from_static(constants::X_AMZ_SERVER_REQUEST_PAYER.0),
+                HeaderValue::from_static(constants::X_AMZ_SERVER_REQUEST_PAYER.1),
+            );
+        }
+        req
+    }
 }
 
 impl S3Core {
-    pub fn s3_head_object_request(&self, path: &str, args: OpStat) -> Result<Request<AsyncBody>> {
+    pub fn s3_head_object_request(&self, path: &str, args: OpStat) -> Result<Request<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         let mut url = format!("{}/{}", self.endpoint, percent_encode_path(&p));
@@ -277,6 +386,13 @@ impl S3Core {
                 percent_encode_path(override_cache_control)
             ))
         }
+        if let Some(version) = args.version() {
+            query_args.push(format!(
+                "{}={}",
+                constants::S3_QUERY_VERSION_ID,
+                percent_decode_path(version)
+            ))
+        }
         if !query_args.is_empty() {
             url.push_str(&format!("?{}", query_args.join("&")));
         }
@@ -288,19 +404,40 @@ impl S3Core {
         if let Some(if_none_match) = args.if_none_match() {
             req = req.header(IF_NONE_MATCH, if_none_match);
         }
-
         if let Some(if_match) = args.if_match() {
             req = req.header(IF_MATCH, if_match);
         }
 
-        let req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
+        if let Some(if_modified_since) = args.if_modified_since() {
+            req = req.header(
+                IF_MODIFIED_SINCE,
+                format_datetime_into_http_date(if_modified_since),
+            );
+        }
+        if let Some(if_unmodified_since) = args.if_unmodified_since() {
+            req = req.header(
+                IF_UNMODIFIED_SINCE,
+                format_datetime_into_http_date(if_unmodified_since),
+            );
+        }
+
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
+        // Inject operation to the request.
+        req = req.extension(Operation::Stat);
+
+        let req = req.body(Buffer::new()).map_err(new_request_build_error)?;
 
         Ok(req)
     }
 
-    pub fn s3_get_object_request(&self, path: &str, args: OpRead) -> Result<Request<AsyncBody>> {
+    pub fn s3_get_object_request(
+        &self,
+        path: &str,
+        range: BytesRange,
+        args: &OpRead,
+    ) -> Result<Request<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         // Construct headers to add to the request
@@ -329,13 +466,19 @@ impl S3Core {
                 percent_encode_path(override_cache_control)
             ))
         }
+        if let Some(version) = args.version() {
+            query_args.push(format!(
+                "{}={}",
+                constants::S3_QUERY_VERSION_ID,
+                percent_decode_path(version)
+            ))
+        }
         if !query_args.is_empty() {
             url.push_str(&format!("?{}", query_args.join("&")));
         }
 
         let mut req = Request::get(&url);
 
-        let range = args.range();
         if !range.is_full() {
             req = req.header(http::header::RANGE, range.to_header());
         }
@@ -347,13 +490,32 @@ impl S3Core {
         if let Some(if_match) = args.if_match() {
             req = req.header(IF_MATCH, if_match);
         }
+
+        if let Some(if_modified_since) = args.if_modified_since() {
+            req = req.header(
+                IF_MODIFIED_SINCE,
+                format_datetime_into_http_date(if_modified_since),
+            );
+        }
+
+        if let Some(if_unmodified_since) = args.if_unmodified_since() {
+            req = req.header(
+                IF_UNMODIFIED_SINCE,
+                format_datetime_into_http_date(if_unmodified_since),
+            );
+        }
+
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
         // Set SSE headers.
         // TODO: how will this work with presign?
         req = self.insert_sse_headers(req, false);
 
-        let req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
+        // Inject operation to the request.
+        req = req.extension(Operation::Read);
+
+        let req = req.body(Buffer::new()).map_err(new_request_build_error)?;
 
         Ok(req)
     }
@@ -361,13 +523,14 @@ impl S3Core {
     pub async fn s3_get_object(
         &self,
         path: &str,
-        args: OpRead,
-    ) -> Result<Response<IncomingAsyncBody>> {
-        let mut req = self.s3_get_object_request(path, args)?;
+        range: BytesRange,
+        args: &OpRead,
+    ) -> Result<Response<HttpBody>> {
+        let mut req = self.s3_get_object_request(path, range, args)?;
 
         self.sign(&mut req).await?;
 
-        self.send(req).await
+        self.info.http_client().fetch(req).await
     }
 
     pub fn s3_put_object_request(
@@ -375,37 +538,30 @@ impl S3Core {
         path: &str,
         size: Option<u64>,
         args: &OpWrite,
-        body: AsyncBody,
-    ) -> Result<Request<AsyncBody>> {
+        body: Buffer,
+    ) -> Result<Request<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         let url = format!("{}/{}", self.endpoint, percent_encode_path(&p));
 
         let mut req = Request::put(&url);
 
-        if let Some(size) = size {
-            req = req.header(CONTENT_LENGTH, size.to_string())
-        }
+        req = self.insert_metadata_headers(req, size, args);
 
-        if let Some(mime) = args.content_type() {
-            req = req.header(CONTENT_TYPE, mime)
-        }
-
-        if let Some(pos) = args.content_disposition() {
-            req = req.header(CONTENT_DISPOSITION, pos)
-        }
-
-        if let Some(cache_control) = args.cache_control() {
-            req = req.header(CACHE_CONTROL, cache_control)
-        }
-
-        // Set storage class header
-        if let Some(v) = &self.default_storage_class {
-            req = req.header(HeaderName::from_static(constants::X_AMZ_STORAGE_CLASS), v);
-        }
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
 
         // Set SSE headers.
         req = self.insert_sse_headers(req, true);
+
+        // Calculate Checksum.
+        if let Some(checksum) = self.calculate_checksum(&body) {
+            // Set Checksum header.
+            req = self.insert_checksum_header(req, &checksum);
+        }
+
+        // Inject operation to the request.
+        req = req.extension(Operation::Write);
 
         // Set body
         let req = req.body(body).map_err(new_request_build_error)?;
@@ -413,11 +569,44 @@ impl S3Core {
         Ok(req)
     }
 
-    pub async fn s3_head_object(
+    pub fn s3_append_object_request(
         &self,
         path: &str,
-        args: OpStat,
-    ) -> Result<Response<IncomingAsyncBody>> {
+        position: u64,
+        size: u64,
+        args: &OpWrite,
+        body: Buffer,
+    ) -> Result<Request<Buffer>> {
+        let p = build_abs_path(&self.root, path);
+        let url = format!("{}/{}", self.endpoint, percent_encode_path(&p));
+        let mut req = Request::put(&url);
+
+        // Only include full metadata headers when creating a new object via append (position == 0)
+        // For existing objects or subsequent appends, only include content-length
+        if position == 0 {
+            req = self.insert_metadata_headers(req, Some(size), args);
+        } else {
+            req = req.header(CONTENT_LENGTH, size.to_string());
+        }
+
+        req = req.header(constants::X_AMZ_WRITE_OFFSET_BYTES, position.to_string());
+
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
+        // Set SSE headers.
+        req = self.insert_sse_headers(req, true);
+
+        // Inject operation to the request.
+        req = req.extension(Operation::Write);
+
+        // Set body
+        let req = req.body(body).map_err(new_request_build_error)?;
+
+        Ok(req)
+    }
+
+    pub async fn s3_head_object(&self, path: &str, args: OpStat) -> Result<Response<Buffer>> {
         let mut req = self.s3_head_object_request(path, args)?;
 
         self.sign(&mut req).await?;
@@ -425,13 +614,34 @@ impl S3Core {
         self.send(req).await
     }
 
-    pub async fn s3_delete_object(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn s3_delete_object(&self, path: &str, args: &OpDelete) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
-        let url = format!("{}/{}", self.endpoint, percent_encode_path(&p));
+        let mut url = format!("{}/{}", self.endpoint, percent_encode_path(&p));
 
-        let mut req = Request::delete(&url)
-            .body(AsyncBody::Empty)
+        let mut query_args = Vec::new();
+
+        if let Some(version) = args.version() {
+            query_args.push(format!(
+                "{}={}",
+                constants::S3_QUERY_VERSION_ID,
+                percent_encode_path(version)
+            ))
+        }
+
+        if !query_args.is_empty() {
+            url.push_str(&format!("?{}", query_args.join("&")));
+        }
+
+        let mut req = Request::delete(&url);
+
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
+        let mut req = req
+            // Inject operation to the request.
+            .extension(Operation::Delete)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.sign(&mut req).await?;
@@ -439,11 +649,7 @@ impl S3Core {
         self.send(req).await
     }
 
-    pub async fn s3_copy_object(
-        &self,
-        from: &str,
-        to: &str,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn s3_copy_object(&self, from: &str, to: &str) -> Result<Response<Buffer>> {
         let from = build_abs_path(&self.root, from);
         let to = build_abs_path(&self.root, to);
 
@@ -491,9 +697,14 @@ impl S3Core {
             )
         }
 
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
         let mut req = req
+            // Inject operation to the request.
+            .extension(Operation::Copy)
             .header(constants::X_AMZ_COPY_SOURCE, &source)
-            .body(AsyncBody::Empty)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.sign(&mut req).await?;
@@ -501,47 +712,91 @@ impl S3Core {
         self.send(req).await
     }
 
-    pub async fn s3_list_objects(
+    pub async fn s3_list_objects_v1(
+        &self,
+        path: &str,
+        marker: &str,
+        delimiter: &str,
+        limit: Option<usize>,
+    ) -> Result<Response<Buffer>> {
+        let p = build_abs_path(&self.root, path);
+
+        let mut url = QueryPairsWriter::new(&self.endpoint);
+
+        if !p.is_empty() {
+            url = url.push("prefix", &percent_encode_path(&p));
+        }
+        if !delimiter.is_empty() {
+            url = url.push("delimiter", delimiter);
+        }
+        if let Some(limit) = limit {
+            url = url.push("max-keys", &limit.to_string());
+        }
+        if !marker.is_empty() {
+            url = url.push("marker", &percent_encode_path(marker));
+        }
+
+        let mut req = Request::get(url.finish());
+
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
+        let mut req = req
+            // Inject operation to the request.
+            .extension(Operation::List)
+            .body(Buffer::new())
+            .map_err(new_request_build_error)?;
+
+        self.sign(&mut req).await?;
+
+        self.send(req).await
+    }
+
+    pub async fn s3_list_objects_v2(
         &self,
         path: &str,
         continuation_token: &str,
         delimiter: &str,
         limit: Option<usize>,
         start_after: Option<String>,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    ) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
-        let mut url = format!("{}?list-type=2", self.endpoint);
+        let mut url = QueryPairsWriter::new(&self.endpoint);
+        url = url.push("list-type", "2");
+
         if !p.is_empty() {
-            write!(url, "&prefix={}", percent_encode_path(&p))
-                .expect("write into string must succeed");
+            url = url.push("prefix", &percent_encode_path(&p));
         }
         if !delimiter.is_empty() {
-            write!(url, "&delimiter={delimiter}").expect("write into string must succeed");
+            url = url.push("delimiter", delimiter);
         }
         if let Some(limit) = limit {
-            write!(url, "&max-keys={limit}").expect("write into string must succeed");
+            url = url.push("max-keys", &limit.to_string());
         }
         if let Some(start_after) = start_after {
-            let start_after = build_abs_path(&self.root, &start_after);
-            write!(url, "&start-after={}", percent_encode_path(&start_after))
-                .expect("write into string must succeed");
+            url = url.push("start-after", &percent_encode_path(&start_after));
         }
         if !continuation_token.is_empty() {
             // AWS S3 could return continuation-token that contains `=`
             // which could lead `reqsign` parse query wrongly.
             // URL encode continuation-token before starting signing so that
             // our signer will not be confused.
-            write!(
-                url,
-                "&continuation-token={}",
-                percent_encode_path(continuation_token)
-            )
-            .expect("write into string must succeed");
+            url = url.push(
+                "continuation-token",
+                &percent_encode_path(continuation_token),
+            );
         }
 
-        let mut req = Request::get(&url)
-            .body(AsyncBody::Empty)
+        let mut req = Request::get(url.finish());
+
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
+        let mut req = req
+            // Inject operation to the request.
+            .extension(Operation::List)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.sign(&mut req).await?;
@@ -553,7 +808,7 @@ impl S3Core {
         &self,
         path: &str,
         args: &OpWrite,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    ) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         let url = format!("{}/{}?uploads", self.endpoint, percent_encode_path(&p));
@@ -577,12 +832,26 @@ impl S3Core {
             req = req.header(HeaderName::from_static(constants::X_AMZ_STORAGE_CLASS), v);
         }
 
-        // Set SSE headers.
-        let req = self.insert_sse_headers(req, true);
+        // Set user metadata headers.
+        if let Some(user_metadata) = args.user_metadata() {
+            for (key, value) in user_metadata {
+                req = req.header(format!("{X_AMZ_META_PREFIX}{key}"), value)
+            }
+        }
 
-        let mut req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
+        // Set SSE headers.
+        req = self.insert_sse_headers(req, true);
+
+        // Set SSE headers.
+        req = self.insert_checksum_type_header(req);
+
+        // Inject operation to the request.
+        req = req.extension(Operation::Write);
+
+        let mut req = req.body(Buffer::new()).map_err(new_request_build_error)?;
 
         self.sign(&mut req).await?;
 
@@ -595,8 +864,9 @@ impl S3Core {
         upload_id: &str,
         part_number: usize,
         size: u64,
-        body: AsyncBody,
-    ) -> Result<Request<AsyncBody>> {
+        body: Buffer,
+        checksum: Option<String>,
+    ) -> Result<Request<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -611,8 +881,19 @@ impl S3Core {
 
         req = req.header(CONTENT_LENGTH, size);
 
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
         // Set SSE headers.
         req = self.insert_sse_headers(req, true);
+
+        if let Some(checksum) = checksum {
+            // Set Checksum header.
+            req = self.insert_checksum_header(req, &checksum);
+        }
+
+        // Inject operation to the request.
+        req = req.extension(Operation::Write);
 
         // Set body
         let req = req.body(body).map_err(new_request_build_error)?;
@@ -625,7 +906,7 @@ impl S3Core {
         path: &str,
         upload_id: &str,
         parts: Vec<CompleteMultipartUploadRequestPart>,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    ) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -635,20 +916,26 @@ impl S3Core {
             percent_encode_path(upload_id)
         );
 
-        let req = Request::post(&url);
+        let mut req = Request::post(&url);
 
         // Set SSE headers.
-        let req = self.insert_sse_headers(req, true);
+        req = self.insert_sse_headers(req, true);
 
         let content = quick_xml::se::to_string(&CompleteMultipartUploadRequest { part: parts })
-            .map_err(new_xml_deserialize_error)?;
+            .map_err(new_xml_serialize_error)?;
         // Make sure content length has been set to avoid post with chunked encoding.
-        let req = req.header(CONTENT_LENGTH, content.len());
+        req = req.header(CONTENT_LENGTH, content.len());
         // Set content-type to `application/xml` to avoid mixed with form post.
-        let req = req.header(CONTENT_TYPE, "application/xml");
+        req = req.header(CONTENT_TYPE, "application/xml");
+
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
+        // Inject operation to the request.
+        req = req.extension(Operation::Write);
 
         let mut req = req
-            .body(AsyncBody::Bytes(Bytes::from(content)))
+            .body(Buffer::from(Bytes::from(content)))
             .map_err(new_request_build_error)?;
 
         self.sign(&mut req).await?;
@@ -661,7 +948,7 @@ impl S3Core {
         &self,
         path: &str,
         upload_id: &str,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    ) -> Result<Response<Buffer>> {
         let p = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -671,40 +958,106 @@ impl S3Core {
             percent_encode_path(upload_id)
         );
 
-        let mut req = Request::delete(&url)
-            .body(AsyncBody::Empty)
+        let mut req = Request::delete(&url);
+
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
+        let mut req = req
+            // Inject operation to the request.
+            .extension(Operation::Write)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
+
         self.sign(&mut req).await?;
         self.send(req).await
     }
 
     pub async fn s3_delete_objects(
         &self,
-        paths: Vec<String>,
-    ) -> Result<Response<IncomingAsyncBody>> {
+        paths: Vec<(String, OpDelete)>,
+    ) -> Result<Response<Buffer>> {
         let url = format!("{}/?delete", self.endpoint);
 
-        let req = Request::post(&url);
+        let mut req = Request::post(&url);
 
         let content = quick_xml::se::to_string(&DeleteObjectsRequest {
             object: paths
                 .into_iter()
-                .map(|path| DeleteObjectsRequestObject {
+                .map(|(path, op)| DeleteObjectsRequestObject {
                     key: build_abs_path(&self.root, &path),
+                    version_id: op.version().map(|v| v.to_owned()),
                 })
                 .collect(),
         })
-        .map_err(new_xml_deserialize_error)?;
+        .map_err(new_xml_serialize_error)?;
 
         // Make sure content length has been set to avoid post with chunked encoding.
-        let req = req.header(CONTENT_LENGTH, content.len());
+        req = req.header(CONTENT_LENGTH, content.len());
         // Set content-type to `application/xml` to avoid mixed with form post.
-        let req = req.header(CONTENT_TYPE, "application/xml");
+        req = req.header(CONTENT_TYPE, "application/xml");
         // Set content-md5 as required by API.
-        let req = req.header("CONTENT-MD5", format_content_md5(content.as_bytes()));
+        req = req.header("CONTENT-MD5", format_content_md5(content.as_bytes()));
+
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
+        // Inject operation to the request.
+        req = req.extension(Operation::Delete);
 
         let mut req = req
-            .body(AsyncBody::Bytes(Bytes::from(content)))
+            .body(Buffer::from(Bytes::from(content)))
+            .map_err(new_request_build_error)?;
+
+        self.sign(&mut req).await?;
+
+        self.send(req).await
+    }
+
+    pub async fn s3_list_object_versions(
+        &self,
+        prefix: &str,
+        delimiter: &str,
+        limit: Option<usize>,
+        key_marker: &str,
+        version_id_marker: &str,
+    ) -> Result<Response<Buffer>> {
+        let p = build_abs_path(&self.root, prefix);
+
+        let mut url = format!("{}?versions", self.endpoint);
+        if !p.is_empty() {
+            write!(url, "&prefix={}", percent_encode_path(p.as_str()))
+                .expect("write into string must succeed");
+        }
+        if !delimiter.is_empty() {
+            write!(url, "&delimiter={}", delimiter).expect("write into string must succeed");
+        }
+
+        if let Some(limit) = limit {
+            write!(url, "&max-keys={}", limit).expect("write into string must succeed");
+        }
+        if !key_marker.is_empty() {
+            write!(url, "&key-marker={}", percent_encode_path(key_marker))
+                .expect("write into string must succeed");
+        }
+        if !version_id_marker.is_empty() {
+            write!(
+                url,
+                "&version-id-marker={}",
+                percent_encode_path(version_id_marker)
+            )
+            .expect("write into string must succeed");
+        }
+
+        let mut req = Request::get(&url);
+
+        // Set request payer header if enabled.
+        req = self.insert_request_payer_header(req);
+
+        let mut req = req
+            // Inject operation to the request.
+            .extension(Operation::List)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.sign(&mut req).await?;
@@ -749,7 +1102,7 @@ pub struct CompleteMultipartUploadRequestPart {
     ///     etag: String,
     /// }
     ///
-    /// fn partial_escape<S>(s: &str, ser: S) -> std::result::Result<S::Ok, S::Error>
+    /// fn partial_escape<S>(s: &str, ser: S) -> Result<S::Ok, S::Error>
     /// where
     ///     S: serde::Serializer,
     /// {
@@ -762,6 +1115,22 @@ pub struct CompleteMultipartUploadRequestPart {
     /// ref: <https://github.com/tafia/quick-xml/issues/362>
     #[serde(rename = "ETag")]
     pub etag: String,
+    #[serde(rename = "ChecksumCRC32C", skip_serializing_if = "Option::is_none")]
+    pub checksum_crc32c: Option<String>,
+}
+
+/// Output of `CompleteMultipartUpload` operation
+#[derive(Debug, Default, Deserialize)]
+#[serde[default, rename_all = "PascalCase"]]
+pub struct CompleteMultipartUploadResult {
+    pub bucket: String,
+    pub key: String,
+    pub location: String,
+    #[serde(rename = "ETag")]
+    pub etag: String,
+    pub code: String,
+    pub message: String,
+    pub request_id: String,
 }
 
 /// Request of DeleteObjects.
@@ -775,6 +1144,8 @@ pub struct DeleteObjectsRequest {
 #[serde(rename_all = "PascalCase")]
 pub struct DeleteObjectsRequestObject {
     pub key: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub version_id: Option<String>,
 }
 
 /// Result of DeleteObjects.
@@ -789,6 +1160,7 @@ pub struct DeleteObjectsResult {
 #[serde(rename_all = "PascalCase")]
 pub struct DeleteObjectsResultDeleted {
     pub key: String,
+    pub version_id: Option<String>,
 }
 
 #[derive(Default, Debug, Deserialize)]
@@ -797,9 +1169,29 @@ pub struct DeleteObjectsResultError {
     pub code: String,
     pub key: String,
     pub message: String,
+    pub version_id: Option<String>,
 }
 
-/// Output of ListBucket/ListObjects.
+/// Output of ListBucket/ListObjects (a.k.a ListObjectsV1).
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct ListObjectsOutputV1 {
+    pub is_truncated: Option<bool>,
+    /// ## Notes
+    ///
+    /// `next_marker` is returned only if we have the delimiter request parameter
+    /// specified. If the response does not include the NextMarker element and it
+    /// is truncated, we should use the value of the last Key element in the
+    /// response as the marker parameter in the subsequent request to get the
+    /// next set of object keys.
+    ///
+    /// If the contents is empty, we should find common_prefixes instead.
+    pub next_marker: Option<String>,
+    pub common_prefixes: Vec<OutputCommonPrefix>,
+    pub contents: Vec<ListObjectsOutputContent>,
+}
+
+/// Output of ListBucketV2/ListObjectsV2.
 ///
 /// ## Note
 ///
@@ -810,7 +1202,7 @@ pub struct DeleteObjectsResultError {
 /// is not exist.
 #[derive(Default, Debug, Deserialize)]
 #[serde(default, rename_all = "PascalCase")]
-pub struct ListObjectsOutput {
+pub struct ListObjectsOutputV2 {
     pub is_truncated: Option<bool>,
     pub next_continuation_token: Option<String>,
     pub common_prefixes: Vec<OutputCommonPrefix>,
@@ -831,6 +1223,61 @@ pub struct ListObjectsOutputContent {
 #[serde(rename_all = "PascalCase")]
 pub struct OutputCommonPrefix {
     pub prefix: String,
+}
+
+/// Output of ListObjectVersions
+#[derive(Default, Debug, Deserialize)]
+#[serde(default, rename_all = "PascalCase")]
+pub struct ListObjectVersionsOutput {
+    pub is_truncated: Option<bool>,
+    pub next_key_marker: Option<String>,
+    pub next_version_id_marker: Option<String>,
+    pub common_prefixes: Vec<OutputCommonPrefix>,
+    pub version: Vec<ListObjectVersionsOutputVersion>,
+    pub delete_marker: Vec<ListObjectVersionsOutputDeleteMarker>,
+}
+
+#[derive(Default, Debug, Eq, PartialEq, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct ListObjectVersionsOutputVersion {
+    pub key: String,
+    pub version_id: String,
+    pub is_latest: bool,
+    pub size: u64,
+    pub last_modified: String,
+    #[serde(rename = "ETag")]
+    pub etag: Option<String>,
+}
+
+#[derive(Default, Debug, Eq, PartialEq, Deserialize)]
+#[serde(rename_all = "PascalCase")]
+pub struct ListObjectVersionsOutputDeleteMarker {
+    pub key: String,
+    pub version_id: String,
+    pub is_latest: bool,
+    pub last_modified: String,
+}
+
+pub enum ChecksumAlgorithm {
+    Crc32c,
+}
+impl ChecksumAlgorithm {
+    pub fn to_header_name(&self) -> HeaderName {
+        match self {
+            Self::Crc32c => HeaderName::from_static("x-amz-checksum-crc32c"),
+        }
+    }
+}
+impl Display for ChecksumAlgorithm {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                Self::Crc32c => "CRC32C",
+            }
+        )
+    }
 }
 
 #[cfg(test)]
@@ -869,14 +1316,17 @@ mod tests {
                 CompleteMultipartUploadRequestPart {
                     part_number: 1,
                     etag: "\"a54357aff0632cce46d942af68356b38\"".to_string(),
+                    ..Default::default()
                 },
                 CompleteMultipartUploadRequestPart {
                     part_number: 2,
                     etag: "\"0c78aef83f66abc1fa1e8477f296d394\"".to_string(),
+                    ..Default::default()
                 },
                 CompleteMultipartUploadRequestPart {
                     part_number: 3,
                     etag: "\"acbd18db4cc2f85cedef654fccc4a4d8\"".to_string(),
+                    ..Default::default()
                 },
             ],
         };
@@ -901,9 +1351,56 @@ mod tests {
             </CompleteMultipartUpload>"#
                 // Cleanup space and new line
                 .replace([' ', '\n'], "")
-                // Escape `"` by hand to address <https://github.com/tafia/quick-xml/issues/362>
-                .replace('"', "&quot;")
         )
+    }
+
+    /// this example is from: https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html
+    #[test]
+    fn test_deserialize_complete_multipart_upload_result() {
+        let bs = Bytes::from(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+            <CompleteMultipartUploadResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+             <Location>http://Example-Bucket.s3.region.amazonaws.com/Example-Object</Location>
+             <Bucket>Example-Bucket</Bucket>
+             <Key>Example-Object</Key>
+             <ETag>"3858f62230ac3c915f300c664312c11f-9"</ETag>
+            </CompleteMultipartUploadResult>"#,
+        );
+
+        let out: CompleteMultipartUploadResult =
+            quick_xml::de::from_reader(bs.reader()).expect("must success");
+
+        assert_eq!(out.bucket, "Example-Bucket");
+        assert_eq!(out.key, "Example-Object");
+        assert_eq!(
+            out.location,
+            "http://Example-Bucket.s3.region.amazonaws.com/Example-Object"
+        );
+        assert_eq!(out.etag, "\"3858f62230ac3c915f300c664312c11f-9\"");
+    }
+
+    #[test]
+    fn test_deserialize_complete_multipart_upload_result_when_return_error() {
+        let bs = Bytes::from(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+
+                <Error>
+                <Code>InternalError</Code>
+                <Message>We encountered an internal error. Please try again.</Message>
+                <RequestId>656c76696e6727732072657175657374</RequestId>
+                <HostId>Uuag1LuByRx9e6j5Onimru9pO4ZVKnJ2Qz7/C1NPcfTWAtRPfTaOFg==</HostId>
+                </Error>"#,
+        );
+
+        let out: CompleteMultipartUploadResult =
+            quick_xml::de::from_reader(bs.reader()).expect("must success");
+
+        assert_eq!(out.code, "InternalError");
+        assert_eq!(
+            out.message,
+            "We encountered an internal error. Please try again."
+        );
+        assert_eq!(out.request_id, "656c76696e6727732072657175657374");
     }
 
     /// This example is from https://docs.aws.amazon.com/AmazonS3/latest/API/API_DeleteObjects.html#API_DeleteObjects_Examples
@@ -913,9 +1410,11 @@ mod tests {
             object: vec![
                 DeleteObjectsRequestObject {
                     key: "sample1.txt".to_string(),
+                    version_id: None,
                 },
                 DeleteObjectsRequestObject {
                     key: "sample2.txt".to_string(),
+                    version_id: Some("11111".to_owned()),
                 },
             ],
         };
@@ -930,6 +1429,7 @@ mod tests {
              </Object>
              <Object>
                <Key>sample2.txt</Key>
+               <VersionId>11111</VersionId>
              </Object>
              </Delete>"#
                 // Cleanup space and new line
@@ -966,7 +1466,92 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_list_output() {
+    fn test_deserialize_delete_objects_with_version_id() {
+        let bs = Bytes::from(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+                  <DeleteResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                    <Deleted>
+                      <Key>SampleDocument.txt</Key>
+                      <VersionId>OYcLXagmS.WaD..oyH4KRguB95_YhLs7</VersionId>
+                    </Deleted>
+                  </DeleteResult>"#,
+        );
+
+        let out: DeleteObjectsResult =
+            quick_xml::de::from_reader(bs.reader()).expect("must success");
+
+        assert_eq!(out.deleted.len(), 1);
+        assert_eq!(out.deleted[0].key, "SampleDocument.txt");
+        assert_eq!(
+            out.deleted[0].version_id,
+            Some("OYcLXagmS.WaD..oyH4KRguB95_YhLs7".to_owned())
+        );
+        assert_eq!(out.error.len(), 0);
+    }
+
+    /// This example is from https://docs.aws.amazon.com/AmazonS3/latest/API/API_ListObjects.html#API_ListObjects_Examples
+    #[test]
+    fn test_parse_list_output_v1() {
+        let bs = bytes::Bytes::from(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+            <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                <Name>bucket</Name>
+                <Prefix/>
+                <Marker/>
+                <MaxKeys>1000</MaxKeys>
+                <IsTruncated>false</IsTruncated>
+                <Contents>
+                    <Key>my-image.jpg</Key>
+                    <LastModified>2009-10-12T17:50:30.000Z</LastModified>
+                    <ETag>"fba9dede5f27731c9771645a39863328"</ETag>
+                    <Size>434234</Size>
+                    <StorageClass>STANDARD</StorageClass>
+                    <Owner>
+                        <ID>75aa57f09aa0c8caeab4f8c24e99d10f8e7faeebf76c078efc7c6caea54ba06a</ID>
+                        <DisplayName>mtd@amazon.com</DisplayName>
+                    </Owner>
+                </Contents>
+                <Contents>
+                   <Key>my-third-image.jpg</Key>
+                     <LastModified>2009-10-12T17:50:30.000Z</LastModified>
+                     <ETag>"1b2cf535f27731c974343645a3985328"</ETag>
+                     <Size>64994</Size>
+                     <StorageClass>STANDARD_IA</StorageClass>
+                     <Owner>
+                        <ID>75aa57f09aa0c8caeab4f8c24e99d10f8e7faeebf76c078efc7c6caea54ba06a</ID>
+                        <DisplayName>mtd@amazon.com</DisplayName>
+                    </Owner>
+                </Contents>
+            </ListBucketResult>"#,
+        );
+
+        let out: ListObjectsOutputV1 =
+            quick_xml::de::from_reader(bs.reader()).expect("must success");
+
+        assert!(!out.is_truncated.unwrap());
+        assert!(out.next_marker.is_none());
+        assert!(out.common_prefixes.is_empty());
+        assert_eq!(
+            out.contents,
+            vec![
+                ListObjectsOutputContent {
+                    key: "my-image.jpg".to_string(),
+                    size: 434234,
+                    etag: Some("\"fba9dede5f27731c9771645a39863328\"".to_string()),
+                    last_modified: "2009-10-12T17:50:30.000Z".to_string(),
+                },
+                ListObjectsOutputContent {
+                    key: "my-third-image.jpg".to_string(),
+                    size: 64994,
+                    last_modified: "2009-10-12T17:50:30.000Z".to_string(),
+                    etag: Some("\"1b2cf535f27731c974343645a3985328\"".to_string()),
+                },
+            ]
+        )
+    }
+
+    #[test]
+    fn test_parse_list_output_v2() {
         let bs = bytes::Bytes::from(
             r#"<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
   <Name>example-bucket</Name>
@@ -1004,7 +1589,8 @@ mod tests {
 </ListBucketResult>"#,
         );
 
-        let out: ListObjectsOutput = quick_xml::de::from_reader(bs.reader()).expect("must success");
+        let out: ListObjectsOutputV2 =
+            quick_xml::de::from_reader(bs.reader()).expect("must success");
 
         assert!(!out.is_truncated.unwrap());
         assert!(out.next_continuation_token.is_none());
@@ -1038,5 +1624,115 @@ mod tests {
                 },
             ]
         )
+    }
+
+    #[test]
+    fn test_parse_list_object_versions() {
+        let bs = bytes::Bytes::from(
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+                <ListVersionsResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+                <Name>mtp-versioning-fresh</Name>
+                <Prefix/>
+                <KeyMarker>key3</KeyMarker>
+                <VersionIdMarker>null</VersionIdMarker>
+                <NextKeyMarker>key3</NextKeyMarker>
+                <NextVersionIdMarker>d-d309mfjFrUmoQ0DBsVqmcMV15OI.</NextVersionIdMarker>
+                <MaxKeys>3</MaxKeys>
+                <IsTruncated>true</IsTruncated>
+                <Version>
+                    <Key>key3</Key>
+                    <VersionId>8XECiENpj8pydEDJdd-_VRrvaGKAHOaGMNW7tg6UViI.</VersionId>
+                    <IsLatest>true</IsLatest>
+                    <LastModified>2009-12-09T00:18:23.000Z</LastModified>
+                    <ETag>"396fefef536d5ce46c7537ecf978a360"</ETag>
+                    <Size>217</Size>
+                    <Owner>
+                        <ID>75aa57f09aa0c8caeab4f8c24e99d10f8e7faeebf76c078efc7c6caea54ba06a</ID>
+                    </Owner>
+                    <StorageClass>STANDARD</StorageClass>
+                </Version>
+                <Version>
+                    <Key>key3</Key>
+                    <VersionId>d-d309mfjFri40QYukDozqBt3UmoQ0DBsVqmcMV15OI.</VersionId>
+                    <IsLatest>false</IsLatest>
+                    <LastModified>2009-12-09T00:18:08.000Z</LastModified>
+                    <ETag>"396fefef536d5ce46c7537ecf978a360"</ETag>
+                    <Size>217</Size>
+                    <Owner>
+                        <ID>75aa57f09aa0c8caeab4f8c24e99d10f8e7faeebf76c078efc7c6caea54ba06a</ID>
+                    </Owner>
+                    <StorageClass>STANDARD</StorageClass>
+                </Version>
+                <CommonPrefixes>
+                    <Prefix>photos/</Prefix>
+                </CommonPrefixes>
+                <CommonPrefixes>
+                    <Prefix>videos/</Prefix>
+                </CommonPrefixes>
+                 <DeleteMarker>
+                    <Key>my-third-image.jpg</Key>
+                    <VersionId>03jpff543dhffds434rfdsFDN943fdsFkdmqnh892</VersionId>
+                    <IsLatest>true</IsLatest>
+                    <LastModified>2009-10-15T17:50:30.000Z</LastModified>
+                    <Owner>
+                        <ID>75aa57f09aa0c8caeab4f8c24e99d10f8e7faeebf76c078efc7c6caea54ba06a</ID>
+                        <DisplayName>mtd@amazon.com</DisplayName>
+                    </Owner>
+                </DeleteMarker>
+                </ListVersionsResult>"#,
+        );
+
+        let output: ListObjectVersionsOutput =
+            quick_xml::de::from_reader(bs.reader()).expect("must succeed");
+
+        assert!(output.is_truncated.unwrap());
+        assert_eq!(output.next_key_marker, Some("key3".to_owned()));
+        assert_eq!(
+            output.next_version_id_marker,
+            Some("d-d309mfjFrUmoQ0DBsVqmcMV15OI.".to_owned())
+        );
+        assert_eq!(
+            output.common_prefixes,
+            vec![
+                OutputCommonPrefix {
+                    prefix: "photos/".to_owned()
+                },
+                OutputCommonPrefix {
+                    prefix: "videos/".to_owned()
+                }
+            ]
+        );
+
+        assert_eq!(
+            output.version,
+            vec![
+                ListObjectVersionsOutputVersion {
+                    key: "key3".to_owned(),
+                    version_id: "8XECiENpj8pydEDJdd-_VRrvaGKAHOaGMNW7tg6UViI.".to_owned(),
+                    is_latest: true,
+                    size: 217,
+                    last_modified: "2009-12-09T00:18:23.000Z".to_owned(),
+                    etag: Some("\"396fefef536d5ce46c7537ecf978a360\"".to_owned()),
+                },
+                ListObjectVersionsOutputVersion {
+                    key: "key3".to_owned(),
+                    version_id: "d-d309mfjFri40QYukDozqBt3UmoQ0DBsVqmcMV15OI.".to_owned(),
+                    is_latest: false,
+                    size: 217,
+                    last_modified: "2009-12-09T00:18:08.000Z".to_owned(),
+                    etag: Some("\"396fefef536d5ce46c7537ecf978a360\"".to_owned()),
+                }
+            ]
+        );
+
+        assert_eq!(
+            output.delete_marker,
+            vec![ListObjectVersionsOutputDeleteMarker {
+                key: "my-third-image.jpg".to_owned(),
+                version_id: "03jpff543dhffds434rfdsFDN943fdsFkdmqnh892".to_owned(),
+                is_latest: true,
+                last_modified: "2009-10-15T17:50:30.000Z".to_owned(),
+            },]
+        );
     }
 }

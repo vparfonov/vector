@@ -18,49 +18,37 @@
 use std::fmt::Display;
 use std::fmt::Formatter;
 
-/// Operation is the name for APIs in `Accessor`.
+/// Operation is the name of the operation that is being performed.
+///
+/// Most operations can be mapped to the methods of the `Access` trait,
+/// but we modify the names to make them more readable and clear for users.
+///
+/// The same operation might have different meanings and costs in different
+/// storage services.
 #[derive(Debug, Copy, Clone, Hash, Eq, PartialEq, Default)]
 #[non_exhaustive]
 pub enum Operation {
-    /// Operation for [`crate::raw::Accessor::info`]
+    /// Operation to retrieve information about the specified storage services.
     #[default]
     Info,
-    /// Operation for [`crate::raw::Accessor::create_dir`]
+    /// Operation to create a directory.
     CreateDir,
-    /// Operation for [`crate::raw::Accessor::read`]
+    /// Operation to read a file.
     Read,
-    /// Operation for [`crate::raw::Accessor::write`]
+    /// Operation to write to a file.
     Write,
-    /// Operation for [`crate::raw::Accessor::copy`]
+    /// Operation to copy a file.
     Copy,
-    /// Operation for [`crate::raw::Accessor::rename`]
+    /// Operation to rename a file.
     Rename,
-    /// Operation for [`crate::raw::Accessor::stat`]
+    /// Operation to stat a file or a directory.
     Stat,
-    /// Operation for [`crate::raw::Accessor::delete`]
+    /// Operation to delete files.
     Delete,
-    /// Operation for [`crate::raw::Accessor::list`]
+    /// Operation to get the next file from the list.
     List,
-    /// Operation for [`crate::raw::Accessor::batch`]
-    Batch,
-    /// Operation for [`crate::raw::Accessor::presign`]
+    /// Operation to generate a presigned URL.
     Presign,
-    /// Operation for [`crate::raw::Accessor::blocking_create_dir`]
-    BlockingCreateDir,
-    /// Operation for [`crate::raw::Accessor::blocking_read`]
-    BlockingRead,
-    /// Operation for [`crate::raw::Accessor::blocking_write`]
-    BlockingWrite,
-    /// Operation for [`crate::raw::Accessor::blocking_copy`]
-    BlockingCopy,
-    /// Operation for [`crate::raw::Accessor::blocking_rename`]
-    BlockingRename,
-    /// Operation for [`crate::raw::Accessor::blocking_stat`]
-    BlockingStat,
-    /// Operation for [`crate::raw::Accessor::blocking_delete`]
-    BlockingDelete,
-    /// Operation for [`crate::raw::Accessor::blocking_list`]
-    BlockingList,
 }
 
 impl Operation {
@@ -79,7 +67,7 @@ impl Display for Operation {
 impl From<Operation> for &'static str {
     fn from(v: Operation) -> &'static str {
         match v {
-            Operation::Info => "metadata",
+            Operation::Info => "info",
             Operation::CreateDir => "create_dir",
             Operation::Read => "read",
             Operation::Write => "write",
@@ -89,15 +77,6 @@ impl From<Operation> for &'static str {
             Operation::Delete => "delete",
             Operation::List => "list",
             Operation::Presign => "presign",
-            Operation::Batch => "batch",
-            Operation::BlockingCreateDir => "blocking_create_dir",
-            Operation::BlockingRead => "blocking_read",
-            Operation::BlockingWrite => "blocking_write",
-            Operation::BlockingCopy => "blocking_copy",
-            Operation::BlockingRename => "blocking_rename",
-            Operation::BlockingStat => "blocking_stat",
-            Operation::BlockingDelete => "blocking_delete",
-            Operation::BlockingList => "blocking_list",
         }
     }
 }

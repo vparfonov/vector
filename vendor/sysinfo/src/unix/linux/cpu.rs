@@ -19,11 +19,6 @@ macro_rules! to_str {
 pub(crate) struct CpusWrapper {
     pub(crate) global_cpu: CpuUsage,
     pub(crate) cpus: Vec<Cpu>,
-    /// Field set to `false` in `update_cpus` and to `true` in `refresh_processes_specifics`.
-    ///
-    /// The reason behind this is to avoid calling the `update_cpus` more than necessary.
-    /// For example when running `refresh_all` or `refresh_specifics`.
-    need_cpus_update: bool,
     got_cpu_frequency: bool,
     /// This field is needed to prevent updating when not enough time passed since last update.
     last_update: Option<Instant>,
@@ -34,7 +29,6 @@ impl CpusWrapper {
         Self {
             global_cpu: CpuUsage::default(),
             cpus: Vec::with_capacity(4),
-            need_cpus_update: true,
             got_cpu_frequency: false,
             last_update: None,
         }
@@ -45,9 +39,7 @@ impl CpusWrapper {
         only_update_global_cpu: bool,
         refresh_kind: CpuRefreshKind,
     ) {
-        if self.need_cpus_update {
-            self.refresh(only_update_global_cpu, refresh_kind);
-        }
+        self.refresh(only_update_global_cpu, refresh_kind);
     }
 
     pub(crate) fn refresh(&mut self, only_update_global_cpu: bool, refresh_kind: CpuRefreshKind) {
@@ -76,7 +68,6 @@ impl CpusWrapper {
             };
             let buf = BufReader::new(f);
 
-            self.need_cpus_update = false;
             let mut i: usize = 0;
             let mut it = buf.split(b'\n');
 
@@ -169,7 +160,7 @@ impl CpusWrapper {
             }
 
             #[cfg(not(feature = "multithread"))]
-            fn iter_mut<'a>(val: &'a mut Vec<Cpu>) -> std::slice::IterMut<'a, Cpu> {
+            fn iter_mut(val: &mut [Cpu]) -> std::slice::IterMut<'_, Cpu> {
                 val.iter_mut()
             }
 
@@ -192,10 +183,6 @@ impl CpusWrapper {
 
     pub(crate) fn is_empty(&self) -> bool {
         self.cpus.is_empty()
-    }
-
-    pub(crate) fn set_need_cpus_update(&mut self) {
-        self.need_cpus_update = true;
     }
 }
 
@@ -446,7 +433,7 @@ pub(crate) fn get_cpu_frequency(cpu_core_index: usize) -> u64 {
             || line.starts_with("bogomips per cpu")
     });
     find_cpu_mhz
-        .and_then(|line| line.split(':').last())
+        .and_then(|line| line.split(':').next_back())
         .and_then(|val| val.replace("MHz", "").trim().parse::<f64>().ok())
         .map(|speed| speed as u64)
         .unwrap_or_default()
@@ -543,7 +530,7 @@ fn get_arm_implementer(implementer: u32) -> Option<&'static str> {
 /// Obtain the part of this CPU core.
 ///
 /// This has been obtained from util-linux's lscpu implementation, see
-/// https://github.com/util-linux/util-linux/blob/7076703b529d255600631306419cca1b48ab850a/sys-utils/lscpu-arm.c#L34
+/// https://github.com/util-linux/util-linux/blob/eb788e20b82d0e1001a30867c71c8bfb2bb86819/sys-utils/lscpu-arm.c#L25
 ///
 /// This list will have to be updated every time a new core appears, please keep it synchronized
 /// with util-linux and update the link above with the commit you have used.
@@ -596,8 +583,12 @@ fn get_arm_part(implementer: u32, part: u32) -> Option<&'static str> {
         (0x41, 0xd0d) => "Cortex-A77",
         (0x41, 0xd0e) => "Cortex-A76AE",
         (0x41, 0xd13) => "Cortex-R52",
+        (0x41, 0xd15) => "Cortex-R82",
+        (0x41, 0xd16) => "Cortex-R52+",
         (0x41, 0xd20) => "Cortex-M23",
         (0x41, 0xd21) => "Cortex-M33",
+        (0x41, 0xd22) => "Cortex-R55",
+        (0x41, 0xd23) => "Cortex-R85",
         (0x41, 0xd40) => "Neoverse-V1",
         (0x41, 0xd41) => "Cortex-A78",
         (0x41, 0xd42) => "Cortex-A78AE",
@@ -612,6 +603,14 @@ fn get_arm_part(implementer: u32, part: u32) -> Option<&'static str> {
         (0x41, 0xd4c) => "Cortex-X1C",
         (0x41, 0xd4d) => "Cortex-A715",
         (0x41, 0xd4e) => "Cortex-X3",
+        (0x41, 0xd4f) => "Neoverse-V2",
+        (0x41, 0xd80) => "Cortex-A520",
+        (0x41, 0xd81) => "Cortex-A720",
+        (0x41, 0xd82) => "Cortex-X4",
+        (0x41, 0xd84) => "Neoverse-V3",
+        (0x41, 0xd85) => "Cortex-X925",
+        (0x41, 0xd87) => "Cortex-A725",
+        (0x41, 0xd8e) => "Neoverse-N3",
 
         // Broadcom
         (0x42, 0x00f) => "Brahma-B15",
@@ -731,14 +730,14 @@ pub(crate) fn get_vendor_id_and_brand() -> HashMap<usize, (String, String)> {
 
     fn get_value(s: &str) -> String {
         s.split(':')
-            .last()
+            .next_back()
             .map(|x| x.trim().to_owned())
             .unwrap_or_default()
     }
 
     fn get_hex_value(s: &str) -> u32 {
         s.split(':')
-            .last()
+            .next_back()
             .map(|x| x.trim())
             .filter(|x| x.starts_with("0x"))
             .map(|x| u32::from_str_radix(&x[2..], 16).unwrap())

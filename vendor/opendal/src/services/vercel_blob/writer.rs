@@ -17,10 +17,13 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
 use http::StatusCode;
 
-use super::core::{InitiateMultipartUploadResponse, Part, UploadPartResponse, VercelBlobCore};
+use super::core::InitiateMultipartUploadResponse;
+use super::core::Part;
+use super::core::UploadPartResponse;
+use super::core::VercelBlobCore;
 use super::error::parse_error;
 use crate::raw::*;
 use crate::*;
@@ -39,24 +42,15 @@ impl VercelBlobWriter {
     }
 }
 
-#[async_trait]
 impl oio::MultipartWrite for VercelBlobWriter {
-    async fn write_once(&self, size: u64, body: AsyncBody) -> Result<()> {
-        let req = self
-            .core
-            .get_put_request(&self.path, Some(size), &self.op, body)
-            .await?;
-
-        let resp = self.core.send(req).await?;
+    async fn write_once(&self, size: u64, body: Buffer) -> Result<Metadata> {
+        let resp = self.core.upload(&self.path, size, &self.op, body).await?;
 
         let status = resp.status();
 
         match status {
-            StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::OK => Ok(Metadata::default()),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -70,14 +64,14 @@ impl oio::MultipartWrite for VercelBlobWriter {
 
         match status {
             StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
+                let bs = resp.into_body();
 
-                let resp = serde_json::from_slice::<InitiateMultipartUploadResponse>(&bs)
-                    .map_err(new_json_deserialize_error)?;
+                let resp: InitiateMultipartUploadResponse =
+                    serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
 
                 Ok(resp.upload_id)
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -86,7 +80,7 @@ impl oio::MultipartWrite for VercelBlobWriter {
         upload_id: &str,
         part_number: usize,
         size: u64,
-        body: AsyncBody,
+        body: Buffer,
     ) -> Result<oio::MultipartPart> {
         let part_number = part_number + 1;
 
@@ -99,21 +93,26 @@ impl oio::MultipartWrite for VercelBlobWriter {
 
         match status {
             StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
+                let bs = resp.into_body();
 
-                let resp = serde_json::from_slice::<UploadPartResponse>(&bs)
-                    .map_err(new_json_deserialize_error)?;
+                let resp: UploadPartResponse =
+                    serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
 
                 Ok(oio::MultipartPart {
                     part_number,
                     etag: resp.etag,
+                    checksum: None,
                 })
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    async fn complete_part(&self, upload_id: &str, parts: &[oio::MultipartPart]) -> Result<()> {
+    async fn complete_part(
+        &self,
+        upload_id: &str,
+        parts: &[oio::MultipartPart],
+    ) -> Result<Metadata> {
         let parts = parts
             .iter()
             .map(|p| Part {
@@ -130,12 +129,8 @@ impl oio::MultipartWrite for VercelBlobWriter {
         let status = resp.status();
 
         match status {
-            StatusCode::OK => {
-                resp.into_body().consume().await?;
-
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::OK => Ok(Metadata::default()),
+            _ => Err(parse_error(resp)),
         }
     }
 

@@ -1,6 +1,9 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use crate::{Cpu, CpuRefreshKind, LoadAvg, MemoryRefreshKind, Pid, Process, ProcessesToUpdate, ProcessRefreshKind};
+use crate::{
+    Cpu, CpuRefreshKind, LoadAvg, MemoryRefreshKind, Pid, Process, ProcessRefreshKind,
+    ProcessesToUpdate,
+};
 
 use std::collections::HashMap;
 use std::time::Duration;
@@ -68,10 +71,6 @@ impl SystemInner {
         &[]
     }
 
-    pub(crate) fn physical_core_count(&self) -> Option<usize> {
-        None
-    }
-
     pub(crate) fn total_memory(&self) -> u64 {
         0
     }
@@ -136,10 +135,22 @@ impl SystemInner {
         std::env::consts::OS.to_owned()
     }
 
+    pub(crate) fn distribution_id_like() -> Vec<String> {
+        Vec::new()
+    }
+
+    pub(crate) fn kernel_name() -> Option<&'static str> {
+        None
+    }
+
     pub(crate) fn host_name() -> Option<String> {
         None
     }
     pub(crate) fn cpu_arch() -> Option<String> {
+        None
+    }
+
+    pub(crate) fn physical_core_count() -> Option<usize> {
         None
     }
 }

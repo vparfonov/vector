@@ -162,9 +162,7 @@ mod tests {
     use std::io::Read;
 
     fn calculate_crc32_checksum(input: &str) -> Bytes {
-        let checksum =
-            crc_fast::checksum(crc_fast::CrcAlgorithm::Crc32IsoHdlc, input.as_bytes()) as u32;
-
+        let checksum = crc32fast::hash(input.as_bytes());
         Bytes::copy_from_slice(&checksum.to_be_bytes())
     }
 

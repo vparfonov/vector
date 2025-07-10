@@ -133,14 +133,12 @@ pub mod visit;
 #[macro_use]
 pub mod data;
 
-pub mod acyclic;
 pub mod adj;
 pub mod algo;
 pub mod csr;
 pub mod dot;
 #[cfg(feature = "generate")]
 pub mod generate;
-pub mod graph6;
 mod graph_impl;
 #[cfg(feature = "graphmap")]
 pub mod graphmap;
@@ -172,20 +170,29 @@ pub mod graph {
 #[cfg(feature = "stable_graph")]
 pub use crate::graph_impl::stable_graph;
 
+macro_rules! copyclone {
+    ($name:ident) => {
+        impl Clone for $name {
+            #[inline]
+            fn clone(&self) -> Self {
+                *self
+            }
+        }
+    };
+}
+
 // Index into the NodeIndex and EdgeIndex arrays
 /// Edge direction.
-#[derive(Clone, Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
+#[derive(Copy, Debug, PartialEq, PartialOrd, Ord, Eq, Hash)]
 #[repr(usize)]
-#[cfg_attr(
-    feature = "serde-1",
-    derive(serde_derive::Serialize, serde_derive::Deserialize)
-)]
 pub enum Direction {
     /// An `Outgoing` edge is an outward edge *from* the current node.
     Outgoing = 0,
     /// An `Incoming` edge is an inbound edge *to* the current node.
     Incoming = 1,
 }
+
+copyclone!(Direction);
 
 impl Direction {
     /// Return the opposite `Direction`.
@@ -208,20 +215,14 @@ impl Direction {
 pub use crate::Direction as EdgeDirection;
 
 /// Marker type for a directed graph.
-#[derive(Clone, Copy, Debug)]
-#[cfg_attr(
-    feature = "serde-1",
-    derive(serde_derive::Serialize, serde_derive::Deserialize)
-)]
+#[derive(Copy, Debug)]
 pub enum Directed {}
+copyclone!(Directed);
 
 /// Marker type for an undirected graph.
-#[derive(Clone, Copy, Debug)]
-#[cfg_attr(
-    feature = "serde-1",
-    derive(serde_derive::Serialize, serde_derive::Deserialize)
-)]
+#[derive(Copy, Debug)]
 pub enum Undirected {}
+copyclone!(Undirected);
 
 /// A graph's edge type determines whether it has directed edges or not.
 pub trait EdgeType {
@@ -270,7 +271,7 @@ impl<Ix, E> IntoWeightedEdge<E> for (Ix, Ix, E) {
     }
 }
 
-impl<Ix, E> IntoWeightedEdge<E> for (Ix, Ix, &E)
+impl<'a, Ix, E> IntoWeightedEdge<E> for (Ix, Ix, &'a E)
 where
     E: Clone,
 {
@@ -281,7 +282,7 @@ where
     }
 }
 
-impl<Ix, E> IntoWeightedEdge<E> for &(Ix, Ix)
+impl<'a, Ix, E> IntoWeightedEdge<E> for &'a (Ix, Ix)
 where
     Ix: Copy,
     E: Default,
@@ -293,7 +294,7 @@ where
     }
 }
 
-impl<Ix, E> IntoWeightedEdge<E> for &(Ix, Ix, E)
+impl<'a, Ix, E> IntoWeightedEdge<E> for &'a (Ix, Ix, E)
 where
     Ix: Copy,
     E: Clone,

@@ -64,13 +64,12 @@ use crate::process::{RawPid, WaitOptions, WaitStatus};
 )))]
 use crate::process::{Resource, Rlimit};
 #[cfg(not(any(
-    target_os = "cygwin",
     target_os = "espidf",
     target_os = "horizon",
     target_os = "openbsd",
     target_os = "redox",
     target_os = "vita",
-    target_os = "wasi",
+    target_os = "wasi"
 )))]
 use crate::process::{WaitId, WaitIdOptions, WaitIdStatus};
 use core::mem::MaybeUninit;
@@ -385,13 +384,12 @@ pub(crate) fn _waitpid(
 }
 
 #[cfg(not(any(
-    target_os = "cygwin",
     target_os = "espidf",
     target_os = "horizon",
     target_os = "openbsd",
     target_os = "redox",
     target_os = "vita",
-    target_os = "wasi",
+    target_os = "wasi"
 )))]
 #[inline]
 pub(crate) fn waitid(id: WaitId<'_>, options: WaitIdOptions) -> io::Result<Option<WaitIdStatus>> {
@@ -408,13 +406,12 @@ pub(crate) fn waitid(id: WaitId<'_>, options: WaitIdOptions) -> io::Result<Optio
 }
 
 #[cfg(not(any(
-    target_os = "cygwin",
     target_os = "espidf",
     target_os = "horizon",
     target_os = "openbsd",
     target_os = "redox",
     target_os = "vita",
-    target_os = "wasi",
+    target_os = "wasi"
 )))]
 #[inline]
 fn _waitid_all(options: WaitIdOptions) -> io::Result<Option<WaitIdStatus>> {
@@ -434,13 +431,12 @@ fn _waitid_all(options: WaitIdOptions) -> io::Result<Option<WaitIdStatus>> {
 }
 
 #[cfg(not(any(
-    target_os = "cygwin",
     target_os = "espidf",
     target_os = "horizon",
     target_os = "openbsd",
     target_os = "redox",
     target_os = "vita",
-    target_os = "wasi",
+    target_os = "wasi"
 )))]
 #[inline]
 fn _waitid_pid(pid: Pid, options: WaitIdOptions) -> io::Result<Option<WaitIdStatus>> {
@@ -460,13 +456,12 @@ fn _waitid_pid(pid: Pid, options: WaitIdOptions) -> io::Result<Option<WaitIdStat
 }
 
 #[cfg(not(any(
-    target_os = "cygwin",
     target_os = "espidf",
     target_os = "horizon",
     target_os = "openbsd",
     target_os = "redox",
     target_os = "vita",
-    target_os = "wasi",
+    target_os = "wasi"
 )))]
 #[inline]
 fn _waitid_pgid(pgid: Option<Pid>, options: WaitIdOptions) -> io::Result<Option<WaitIdStatus>> {
@@ -510,13 +505,12 @@ fn _waitid_pidfd(fd: BorrowedFd<'_>, options: WaitIdOptions) -> io::Result<Optio
 /// The caller must ensure that `status` is initialized and that `waitid`
 /// returned successfully.
 #[cfg(not(any(
-    target_os = "cygwin",
     target_os = "espidf",
     target_os = "horizon",
     target_os = "openbsd",
     target_os = "redox",
     target_os = "vita",
-    target_os = "wasi",
+    target_os = "wasi"
 )))]
 #[inline]
 unsafe fn cvt_waitid_status(status: MaybeUninit<c::siginfo_t>) -> Option<WaitIdStatus> {

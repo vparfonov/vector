@@ -12,15 +12,21 @@
 [package]
 edition = "2021"
 name = "pulsar"
-version = "6.3.0"
+version = "6.3.1"
 authors = [
     "Colin Stearns <cstearns@developers.wyyerd.com>",
     "Kevin Stenerson <kstenerson@developers.wyyerd.com>",
     "Geoffroy Couprie <contact@geoffroycouprie.com>",
 ]
+build = "build.rs"
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Rust client for Apache Pulsar"
 documentation = "https://docs.rs/pulsar"
-readme = "./README.md"
+readme = "README.md"
 keywords = [
     "pulsar",
     "api",
@@ -29,16 +35,39 @@ keywords = [
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/streamnative/pulsar-rs"
 
+[lib]
+name = "pulsar"
+path = "src/lib.rs"
+
+[[example]]
+name = "batching"
+path = "examples/batching.rs"
+
+[[example]]
+name = "consumer"
+path = "examples/consumer.rs"
+
+[[example]]
+name = "producer"
+path = "examples/producer.rs"
+
+[[example]]
+name = "reader"
+path = "examples/reader.rs"
+
+[[example]]
+name = "round_trip"
+path = "examples/round_trip.rs"
+
+[dependencies.async-channel]
+version = "^2.3.1"
+
 [dependencies.async-native-tls]
 version = "^0.5.0"
 optional = true
 
-[dependencies.async-rustls]
-version = "^0.4.0"
-optional = true
-
 [dependencies.async-std]
-version = "^1.12.0"
+version = "^1.13.0"
 features = [
     "attributes",
     "unstable",
@@ -46,20 +75,17 @@ features = [
 optional = true
 
 [dependencies.async-trait]
-version = "^0.1.72"
+version = "^0.1.83"
 
 [dependencies.asynchronous-codec]
-version = "^0.6.2"
+version = "^0.7.0"
 optional = true
 
-[dependencies.bit-vec]
-version = "^0.6.3"
-
 [dependencies.bytes]
-version = "^1.4.0"
+version = "^1.9.0"
 
 [dependencies.chrono]
-version = "^0.4.26"
+version = "^0.4.39"
 features = [
     "clock",
     "std",
@@ -67,34 +93,32 @@ features = [
 default-features = false
 
 [dependencies.crc]
-version = "^3.0.1"
+version = "^3.2.1"
 
 [dependencies.data-url]
-version = "^0.3.0"
+version = "^0.3.1"
 optional = true
 
 [dependencies.flate2]
-version = "^1.0.26"
+version = "^1.0.35"
 optional = true
 
 [dependencies.futures]
-version = "^0.3.28"
+version = "^0.3.31"
 
-[dependencies.futures-io]
-version = "^0.3.28"
-
-[dependencies.futures-timer]
-version = "^3.0.2"
+[dependencies.futures-rustls]
+version = "^0.26.0"
+optional = true
 
 [dependencies.log]
-version = "^0.4.19"
+version = "^0.4.22"
 
 [dependencies.lz4]
-version = "^1.24.0"
+version = "^1.28.0"
 optional = true
 
 [dependencies.native-tls]
-version = "^0.2.11"
+version = "^0.2.12"
 optional = true
 
 [dependencies.nom]
@@ -103,47 +127,47 @@ features = ["alloc"]
 default-features = false
 
 [dependencies.oauth2]
-version = "^4.4.1"
+version = "^4.4.2"
 optional = true
 
 [dependencies.openidconnect]
-version = "^3.3.0"
+version = "^3.5.0"
 optional = true
 
 [dependencies.pem]
-version = "^3.0.0"
+version = "^3.0.4"
 
 [dependencies.prost]
-version = "^0.11.9"
+version = "^0.13.4"
 
 [dependencies.prost-derive]
-version = "^0.11.9"
+version = "^0.13.4"
 
 [dependencies.rand]
 version = "^0.8.5"
 
 [dependencies.regex]
-version = "^1.9.1"
+version = "^1.11.1"
 
 [dependencies.rustls]
-version = "^0.21.6"
+version = "^0.23.20"
 optional = true
 
 [dependencies.serde]
-version = "^1.0.175"
+version = "^1.0.216"
 features = ["derive"]
 optional = true
 
 [dependencies.serde_json]
-version = "^1.0.103"
+version = "^1.0.133"
 optional = true
 
 [dependencies.snap]
-version = "^1.1.0"
+version = "^1.1.1"
 optional = true
 
 [dependencies.tokio]
-version = "^1.29.1"
+version = "^1.42.0"
 features = [
     "rt",
     "net",
@@ -156,58 +180,58 @@ version = "^0.3.1"
 optional = true
 
 [dependencies.tokio-rustls]
-version = "^0.24.1"
+version = "^0.26.1"
 optional = true
 
 [dependencies.tokio-util]
-version = "^0.7.8"
+version = "^0.7.13"
 features = ["codec"]
 optional = true
 
 [dependencies.tracing]
-version = "^0.1.37"
+version = "^0.1.41"
 optional = true
 
 [dependencies.url]
-version = "^2.4.0"
+version = "^2.5.4"
 
 [dependencies.uuid]
-version = "^1.4.1"
+version = "^1.11.0"
 features = [
     "v4",
     "fast-rng",
 ]
 
 [dependencies.webpki-roots]
-version = "^0.25.1"
+version = "^0.26.7"
 optional = true
 
 [dependencies.zstd]
-version = "^0.12.4"
+version = "^0.13.2"
 optional = true
 
 [dev-dependencies.env_logger]
-version = "^0.10.0"
+version = "^0.11.5"
 
 [dev-dependencies.serde]
-version = "^1.0.175"
+version = "^1.0.216"
 features = ["derive"]
 
 [dev-dependencies.serde_json]
-version = "^1.0.103"
+version = "^1.0.133"
 
 [dev-dependencies.tokio]
-version = "^1.29.1"
+version = "^1.42.0"
 features = [
     "macros",
     "rt-multi-thread",
 ]
 
 [build-dependencies.prost-build]
-version = "^0.11.9"
+version = "^0.13.4"
 
 [build-dependencies.protobuf-src]
-version = "1.1.0"
+version = "^2.1.0"
 optional = true
 
 [features]
@@ -220,7 +244,7 @@ async-std-runtime = [
 async-std-rustls-runtime = [
     "async-std",
     "asynchronous-codec",
-    "async-rustls",
+    "futures-rustls",
     "rustls",
     "webpki-roots",
 ]

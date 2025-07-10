@@ -20,9 +20,7 @@ use http::StatusCode;
 use serde::Deserialize;
 
 use crate::raw::*;
-use crate::Error;
-use crate::ErrorKind;
-use crate::Result;
+use crate::*;
 
 #[derive(Default, Debug, Deserialize)]
 struct GdriveError {
@@ -35,9 +33,9 @@ struct GdriveInnerError {
 }
 
 /// Parse error response into Error.
-pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
+pub(super) fn parse_error(resp: Response<Buffer>) -> Error {
     let (parts, body) = resp.into_parts();
-    let bs = body.bytes().await?;
+    let bs = body.to_bytes();
 
     let (mut kind, mut retryable) = match parts.status {
         StatusCode::NOT_FOUND => (ErrorKind::NotFound, false),
@@ -60,7 +58,7 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
             parse_gdrive_error_code(gdrive_err.error.message.as_str()).unwrap_or((kind, retryable));
     }
 
-    let mut err = Error::new(kind, &message);
+    let mut err = Error::new(kind, message);
 
     err = with_error_response_context(err, parts);
 
@@ -68,7 +66,7 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
         err = err.set_temporary();
     }
 
-    Ok(err)
+    err
 }
 
 pub fn parse_gdrive_error_code(message: &str) -> Option<(ErrorKind, bool)> {

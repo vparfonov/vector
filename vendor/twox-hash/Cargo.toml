@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.81"
 name = "twox-hash"
-version = "2.1.0"
+version = "2.1.1"
 authors = ["Jake Goulding <jake.goulding@gmail.com>"]
 build = false
 autolib = false
@@ -37,28 +37,6 @@ repository = "https://github.com/shepmaster/twox-hash"
 [package.metadata.docs.rs]
 all-features = true
 
-[lib]
-name = "twox_hash"
-path = "src/lib.rs"
-
-[dependencies.rand]
-version = "0.8.0"
-features = [
-    "std",
-    "std_rng",
-]
-optional = true
-default-features = false
-
-[dependencies.serde]
-version = "1.0.0"
-features = ["derive"]
-optional = true
-default-features = false
-
-[dev-dependencies.serde_json]
-version = "1.0.117"
-
 [features]
 alloc = []
 default = [
@@ -76,6 +54,25 @@ xxhash32 = []
 xxhash3_128 = []
 xxhash3_64 = []
 xxhash64 = []
+
+[lib]
+name = "twox_hash"
+path = "src/lib.rs"
+
+[dependencies.rand]
+version = "0.9.0"
+features = ["thread_rng"]
+optional = true
+default-features = false
+
+[dependencies.serde]
+version = "1.0.0"
+features = ["derive"]
+optional = true
+default-features = false
+
+[dev-dependencies.serde_json]
+version = "1.0.117"
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

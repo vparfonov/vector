@@ -14,7 +14,6 @@
 #![allow(clippy::unnecessary_map_on_constructor)]
 #![allow(rustdoc::bare_urls)]
 #![allow(rustdoc::redundant_explicit_links)]
-#![allow(rustdoc::invalid_html_tags)]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_auto_cfg))]
@@ -30,7 +29,7 @@
 //! ```toml
 //! [dependencies]
 //! aws-config = { version = "1.1.7", features = ["behavior-version-latest"] }
-//! aws-sdk-s3 = "1.86.0"
+//! aws-sdk-s3 = "1.82.0"
 //! tokio = { version = "1", features = ["full"] }
 //! ```
 //!
@@ -198,7 +197,7 @@ pub mod primitives;
 /// Data structures used by operation inputs/outputs.
 pub mod types;
 
-pub(crate) mod endpoint_auth_plugin;
+mod auth_plugin;
 
 mod event_receiver;
 

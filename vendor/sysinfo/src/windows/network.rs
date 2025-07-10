@@ -5,10 +5,8 @@ use crate::{IpNetwork, MacAddr, NetworkData};
 
 use std::collections::{hash_map, HashMap};
 
-use windows::Win32::NetworkManagement::IpHelper::{
-    FreeMibTable, GetIfEntry2, GetIfTable2, MIB_IF_ROW2, MIB_IF_TABLE2,
-};
-use windows::Win32::NetworkManagement::Ndis::{MediaConnectStateDisconnected, NET_LUID_LH};
+use windows::Win32::NetworkManagement::IpHelper::{FreeMibTable, GetIfTable2, MIB_IF_TABLE2};
+use windows::Win32::NetworkManagement::Ndis::MediaConnectStateDisconnected;
 
 macro_rules! old_and_new {
     ($ty_:expr, $name:ident, $old:ident, $new_val:expr) => {{
@@ -32,7 +30,7 @@ impl NetworksInner {
         &self.interfaces
     }
 
-    pub(crate) fn refresh_list(&mut self) {
+    pub(crate) fn refresh(&mut self, remove_not_listed_interfaces: bool) {
         let mut table: *mut MIB_IF_TABLE2 = std::ptr::null_mut();
 
         unsafe {
@@ -94,6 +92,8 @@ impl NetworksInner {
                     Ok(s) => s,
                     _ => continue,
                 };
+
+                let mtu = ptr.Mtu as u64;
                 match self.interfaces.entry(interface_name) {
                     hash_map::Entry::Occupied(mut e) => {
                         let interface = e.get_mut();
@@ -114,6 +114,9 @@ impl NetworksInner {
                         );
                         old_and_new!(interface, errors_in, old_errors_in, ptr.InErrors);
                         old_and_new!(interface, errors_out, old_errors_out, ptr.OutErrors);
+                        if interface.mtu != mtu {
+                            interface.mtu = mtu;
+                        }
                         interface.updated = true;
                     }
                     hash_map::Entry::Vacant(e) => {
@@ -122,7 +125,6 @@ impl NetworksInner {
 
                         e.insert(NetworkData {
                             inner: NetworkDataInner {
-                                id: ptr.InterfaceLuid,
                                 current_out: ptr.OutOctets,
                                 old_out: ptr.OutOctets,
                                 current_in: ptr.InOctets,
@@ -137,6 +139,7 @@ impl NetworksInner {
                                 old_errors_out: ptr.OutErrors,
                                 mac_addr: MacAddr::UNSPECIFIED,
                                 ip_networks: vec![],
+                                mtu,
                                 updated: true,
                             },
                         });
@@ -145,47 +148,22 @@ impl NetworksInner {
             }
             FreeMibTable(table as _);
         }
-        // Remove interfaces which are gone.
-        self.interfaces.retain(|_, d| d.inner.updated);
+        if remove_not_listed_interfaces {
+            // Remove interfaces which are gone.
+            self.interfaces.retain(|_, i| {
+                if !i.inner.updated {
+                    return false;
+                }
+                i.inner.updated = false;
+                true
+            });
+        }
         // Refresh all interfaces' addresses.
         refresh_networks_addresses(&mut self.interfaces);
-    }
-
-    pub(crate) fn refresh(&mut self) {
-        let entry = std::mem::MaybeUninit::<MIB_IF_ROW2>::zeroed();
-
-        unsafe {
-            let mut entry = entry.assume_init();
-            for (_, interface) in self.interfaces.iter_mut() {
-                let interface = &mut interface.inner;
-                entry.InterfaceLuid = interface.id;
-                entry.InterfaceIndex = 0; // to prevent the function to pick this one as index
-                if GetIfEntry2(&mut entry).is_err() {
-                    continue;
-                }
-                old_and_new!(interface, current_out, old_out, entry.OutOctets);
-                old_and_new!(interface, current_in, old_in, entry.InOctets);
-                old_and_new!(
-                    interface,
-                    packets_in,
-                    old_packets_in,
-                    entry.InUcastPkts.saturating_add(entry.InNUcastPkts)
-                );
-                old_and_new!(
-                    interface,
-                    packets_out,
-                    old_packets_out,
-                    entry.OutUcastPkts.saturating_add(entry.OutNUcastPkts)
-                );
-                old_and_new!(interface, errors_in, old_errors_in, entry.InErrors);
-                old_and_new!(interface, errors_out, old_errors_out, entry.OutErrors);
-            }
-        }
     }
 }
 
 pub(crate) struct NetworkDataInner {
-    id: NET_LUID_LH,
     current_out: u64,
     old_out: u64,
     current_in: u64,
@@ -201,6 +179,8 @@ pub(crate) struct NetworkDataInner {
     updated: bool,
     pub(crate) mac_addr: MacAddr,
     pub(crate) ip_networks: Vec<IpNetwork>,
+    /// Interface Maximum Transfer Unit (MTU)
+    mtu: u64,
 }
 
 impl NetworkDataInner {
@@ -258,5 +238,9 @@ impl NetworkDataInner {
 
     pub(crate) fn ip_networks(&self) -> &[IpNetwork] {
         &self.ip_networks
+    }
+
+    pub(crate) fn mtu(&self) -> u64 {
+        self.mtu
     }
 }

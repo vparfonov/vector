@@ -1,4 +1,4 @@
-use std::io::Write;
+use std::io::{Error, Write};
 
 use clap::{Arg, ArgAction, Command, ValueHint};
 
@@ -15,6 +15,11 @@ impl Generator for Zsh {
     }
 
     fn generate(&self, cmd: &Command, buf: &mut dyn Write) {
+        self.try_generate(cmd, buf)
+            .expect("failed to write completion file");
+    }
+
+    fn try_generate(&self, cmd: &Command, buf: &mut dyn Write) -> Result<(), Error> {
         let bin_name = cmd
             .get_bin_name()
             .expect("crate::generate should have set the bin_name");
@@ -53,7 +58,6 @@ fi
             subcommands = get_subcommands_of(cmd),
             subcommand_details = subcommand_details(cmd)
         )
-        .expect("failed to write completion file");
     }
 }
 
@@ -349,7 +353,11 @@ fn get_args_of(parent: &Command, p_global: Option<&Command>) -> String {
 
         let subcommand_text = format!("\"*::: :->{name}\" \\", name = parent.get_name());
         segments.push(subcommand_text);
-    };
+    } else if parent.is_allow_external_subcommands_set() {
+        // If the command has an external subcommand value parser, we need to
+        // add a catch-all for the subcommand. Otherwise there would be no autocompletion whatsoever.
+        segments.push(String::from("\"*::external_command:_default\" \\"));
+    }
 
     segments.push(String::from("&& ret=0"));
     segments.join("\n")

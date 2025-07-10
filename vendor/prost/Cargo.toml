@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.71.1"
 name = "prost"
-version = "0.13.3"
+version = "0.13.5"
 authors = [
     "Dan Burkert <dan@danburkert.com>",
     "Lucio Franco <luciofranco14@gmail.com>",
@@ -21,6 +21,7 @@ authors = [
     "Tokio Contributors <team@tokio.rs>",
 ]
 build = false
+autolib = false
 autobins = false
 autoexamples = false
 autotests = false
@@ -34,6 +35,16 @@ keywords = [
 categories = ["encoding"]
 license = "Apache-2.0"
 repository = "https://github.com/tokio-rs/prost"
+
+[features]
+default = [
+    "derive",
+    "std",
+]
+derive = ["dep:prost-derive"]
+no-recursion-limit = []
+prost-derive = ["derive"]
+std = []
 
 [lib]
 name = "prost"
@@ -50,7 +61,7 @@ version = "1"
 default-features = false
 
 [dependencies.prost-derive]
-version = "0.13.3"
+version = "0.13.5"
 optional = true
 
 [dev-dependencies.criterion]
@@ -61,14 +72,4 @@ default-features = false
 version = "1"
 
 [dev-dependencies.rand]
-version = "0.8"
-
-[features]
-default = [
-    "derive",
-    "std",
-]
-derive = ["dep:prost-derive"]
-no-recursion-limit = []
-prost-derive = ["derive"]
-std = []
+version = "0.9"

@@ -25,7 +25,7 @@ pub struct Config {
     cloneable: ::aws_smithy_types::config_bag::CloneableLayer,
     pub(crate) runtime_components: crate::config::RuntimeComponentsBuilder,
     pub(crate) runtime_plugins: ::std::vec::Vec<crate::config::SharedRuntimePlugin>,
-    pub(crate) behavior_version: ::std::option::Option<crate::config::BehaviorVersion>,
+    behavior_version: ::std::option::Option<crate::config::BehaviorVersion>,
 }
 impl Config {
     ///
@@ -1136,7 +1136,6 @@ impl ServiceRuntimePlugin {
         let config = {
             let mut cfg = ::aws_smithy_types::config_bag::Layer::new("secretsmanager");
             cfg.store_put(crate::idempotency_token::default_provider());
-            cfg.store_put(::aws_smithy_runtime::client::orchestrator::AuthSchemeAndEndpointOrchestrationV2);
             ::std::option::Option::Some(cfg.freeze())
         };
         let mut runtime_components = ::aws_smithy_runtime_api::client::runtime_components::RuntimeComponentsBuilder::new("ServiceRuntimePlugin");
@@ -1289,7 +1288,7 @@ pub use ::aws_types::app_name::AppName;
 #[allow(dead_code)]
 fn service_config_key<'a>(env: &'a str, profile: &'a str) -> aws_types::service_config::ServiceConfigKey<'a> {
     ::aws_types::service_config::ServiceConfigKey::builder()
-        .service_id("Secrets Manager")
+        .service_id("secretsmanager")
         .env(env)
         .profile(profile)
         .build()

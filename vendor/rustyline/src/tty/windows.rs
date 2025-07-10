@@ -13,7 +13,6 @@ use std::sync::Arc;
 
 use log::{debug, warn};
 use unicode_segmentation::UnicodeSegmentation;
-use unicode_width::UnicodeWidthStr;
 use windows_sys::Win32::Foundation::{self as foundation, BOOL, FALSE, HANDLE, TRUE};
 use windows_sys::Win32::System::Console as console;
 use windows_sys::Win32::System::Threading as threading;
@@ -23,7 +22,7 @@ use super::{width, Event, RawMode, RawReader, Renderer, Term};
 use crate::config::{Behavior, BellStyle, ColorMode, Config};
 use crate::highlight::Highlighter;
 use crate::keys::{KeyCode as K, KeyEvent, Modifiers as M};
-use crate::layout::{Layout, Position};
+use crate::layout::{GraphemeClusterMode, Layout, Position, Unit};
 use crate::line_buffer::LineBuffer;
 use crate::{error, Cmd, Result};
 
@@ -33,11 +32,10 @@ fn get_std_handle(fd: console::STD_HANDLE) -> Result<HANDLE> {
 }
 
 fn check_handle(handle: HANDLE) -> Result<HANDLE> {
-    if handle == foundation::INVALID_HANDLE_VALUE {
+    if std::ptr::eq(handle, foundation::INVALID_HANDLE_VALUE) {
         Err(io::Error::last_os_error())?;
     } else if handle.is_null() {
-        Err(io::Error::new(
-            io::ErrorKind::Other,
+        Err(io::Error::other(
             "no stdio handle available for this process",
         ))?;
     }
@@ -52,13 +50,13 @@ fn check(rc: BOOL) -> io::Result<()> {
     }
 }
 
-fn get_win_size(handle: HANDLE) -> (usize, usize) {
+fn get_win_size(handle: HANDLE) -> (Unit, Unit) {
     let mut info = unsafe { mem::zeroed() };
     match unsafe { console::GetConsoleScreenBufferInfo(handle, &mut info) } {
         FALSE => (80, 24),
         _ => (
-            info.dwSize.X as usize,
-            (1 + info.srWindow.Bottom - info.srWindow.Top) as usize,
+            Unit::try_from(info.dwSize.X).unwrap(),
+            Unit::try_from(1 + info.srWindow.Bottom - info.srWindow.Top).unwrap(),
         ), // (info.srWindow.Right - info.srWindow.Left + 1)
     }
 }
@@ -191,7 +189,7 @@ fn read_input(handle: HANDLE, max_count: u32) -> Result<KeyEvent> {
 
         if u32::from(rec.EventType) == console::WINDOW_BUFFER_SIZE_EVENT {
             debug!(target: "rustyline", "SIGWINCH");
-            return Err(error::ReadlineError::WindowResized);
+            return Err(error::ReadlineError::Signal(error::Signal::Resize));
         } else if u32::from(rec.EventType) != console::KEY_EVENT {
             continue;
         }
@@ -286,15 +284,21 @@ fn read_input(handle: HANDLE, max_count: u32) -> Result<KeyEvent> {
 
 pub struct ConsoleRenderer {
     conout: HANDLE,
-    cols: usize, // Number of columns in terminal
+    cols: Unit, // Number of columns in terminal
     buffer: String,
     utf16: Vec<u16>,
     colors_enabled: bool,
+    grapheme_cluster_mode: GraphemeClusterMode,
     bell_style: BellStyle,
 }
 
 impl ConsoleRenderer {
-    fn new(conout: HANDLE, colors_enabled: bool, bell_style: BellStyle) -> Self {
+    fn new(
+        conout: HANDLE,
+        colors_enabled: bool,
+        grapheme_cluster_mode: GraphemeClusterMode,
+        bell_style: BellStyle,
+    ) -> Self {
         // Multi line editing is enabled by ENABLE_WRAP_AT_EOL_OUTPUT mode
         let (cols, _) = get_win_size(conout);
         Self {
@@ -303,6 +307,7 @@ impl ConsoleRenderer {
             buffer: String::with_capacity(1024),
             utf16: Vec::with_capacity(1024),
             colors_enabled,
+            grapheme_cluster_mode,
             bell_style,
         }
     }
@@ -343,13 +348,13 @@ impl ConsoleRenderer {
 
     // You can't have both ENABLE_WRAP_AT_EOL_OUTPUT and
     // ENABLE_VIRTUAL_TERMINAL_PROCESSING. So we need to wrap manually.
-    fn wrap_at_eol(&mut self, s: &str, mut col: usize) -> usize {
+    fn wrap_at_eol(&mut self, s: &str, mut col: Unit) -> Unit {
         let mut esc_seq = 0;
         for c in s.graphemes(true) {
             if c == "\n" {
                 col = 0;
             } else {
-                let cw = width(c, &mut esc_seq);
+                let cw = width(self.grapheme_cluster_mode, c, &mut esc_seq);
                 col += cw;
                 if col > self.cols {
                     self.buffer.push('\n');
@@ -501,7 +506,7 @@ impl Renderer for ConsoleRenderer {
                 pos.col = 0;
                 pos.row += 1;
             } else {
-                let cw = c.width();
+                let cw = self.grapheme_cluster_mode.width(c);
                 pos.col += cw;
                 if pos.col > self.cols {
                     pos.row += 1;
@@ -544,19 +549,23 @@ impl Renderer for ConsoleRenderer {
         self.cols = cols;
     }
 
-    fn get_columns(&self) -> usize {
+    fn get_columns(&self) -> Unit {
         self.cols
     }
 
     /// Try to get the number of rows in the current terminal,
     /// or assume 24 if it fails.
-    fn get_rows(&self) -> usize {
+    fn get_rows(&self) -> Unit {
         let (_, rows) = get_win_size(self.conout);
         rows
     }
 
     fn colors_enabled(&self) -> bool {
         self.colors_enabled
+    }
+
+    fn grapheme_cluster_mode(&self) -> GraphemeClusterMode {
+        self.grapheme_cluster_mode
     }
 
     fn move_cursor_at_leftmost(&mut self, _: &mut ConsoleRawReader) -> Result<()> {
@@ -627,6 +636,7 @@ pub struct Console {
     conout: HANDLE,
     close_on_drop: bool,
     pub(crate) color_mode: ColorMode,
+    grapheme_cluster_mode: GraphemeClusterMode,
     ansi_colors_supported: bool,
     bell_style: BellStyle,
     raw_mode: Arc<AtomicBool>,
@@ -656,15 +666,8 @@ impl Term for Console {
     type Reader = ConsoleRawReader;
     type Writer = ConsoleRenderer;
 
-    fn new(
-        color_mode: ColorMode,
-        behavior: Behavior,
-        _tab_stop: usize,
-        bell_style: BellStyle,
-        _enable_bracketed_paste: bool,
-        _enable_signals: bool,
-    ) -> Result<Self> {
-        let (conin, conout, close_on_drop) = if behavior == Behavior::PreferTerm {
+    fn new(config: Config) -> Result<Self> {
+        let (conin, conout, close_on_drop) = if config.behavior() == Behavior::PreferTerm {
             if let (Ok(conin), Ok(conout)) = (
                 OpenOptions::new().read(true).write(true).open("CONIN$"),
                 OpenOptions::new().read(true).write(true).open("CONOUT$"),
@@ -710,18 +713,18 @@ impl Term for Console {
             conout_isatty,
             conout: conout.unwrap_or(ptr::null_mut()),
             close_on_drop,
-            color_mode,
+            color_mode: config.color_mode(),
+            grapheme_cluster_mode: config.grapheme_cluster_mode(),
             ansi_colors_supported: false,
-            bell_style,
+            bell_style: config.bell_style(),
             raw_mode: Arc::new(AtomicBool::new(false)),
             pipe_reader: None,
             pipe_writer: None,
         })
     }
 
-    /// Checking for an unsupported TERM in windows is a no-op
     fn is_unsupported(&self) -> bool {
-        false
+        super::is_unsupported_term()
     }
 
     fn is_input_tty(&self) -> bool {
@@ -739,8 +742,7 @@ impl Term for Console {
     /// Enable RAW mode for the terminal.
     fn enable_raw_mode(&mut self) -> Result<(ConsoleMode, ConsoleKeyMap)> {
         if !self.conin_isatty {
-            Err(io::Error::new(
-                io::ErrorKind::Other,
+            Err(io::Error::other(
                 "no stdio handle available for this process",
             ))?;
         }
@@ -821,7 +823,12 @@ impl Term for Console {
     }
 
     fn create_writer(&self) -> ConsoleRenderer {
-        ConsoleRenderer::new(self.conout, self.colors_enabled(), self.bell_style)
+        ConsoleRenderer::new(
+            self.conout,
+            self.colors_enabled(),
+            self.grapheme_cluster_mode,
+            self.bell_style,
+        )
     }
 
     fn writeln(&self) -> Result<()> {

@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "sqlx-postgres"
-version = "0.8.5"
+version = "0.8.6"
 authors = [
     "Ryan Leckey <leckey.ryan@gmail.com>",
     "Austin Bonander <austin.bonander@gmail.com>",
@@ -165,7 +165,7 @@ version = "1.7.0"
 features = ["serde"]
 
 [dependencies.sqlx-core]
-version = "=0.8.5"
+version = "=0.8.6"
 features = ["json"]
 
 [dependencies.stringprep]
@@ -196,7 +196,7 @@ version = "1.2.1"
 default-features = false
 
 [dev-dependencies.sqlx]
-version = "=0.8.5"
+version = "=0.8.6"
 features = [
     "postgres",
     "derive",

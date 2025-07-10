@@ -1,7 +1,3 @@
-#[cfg(feature = "logging")]
-use crate::log::warn;
-use crate::KeyLog;
-
 use alloc::vec::Vec;
 use core::fmt::{Debug, Formatter};
 use std::env::var_os;
@@ -11,6 +7,9 @@ use std::io;
 use std::io::Write;
 use std::sync::Mutex;
 
+use crate::log::warn;
+use crate::KeyLog;
+
 // Internal mutable state for KeyLogFile
 struct KeyLogFileInner {
     file: Option<File>,
@@ -19,14 +18,11 @@ struct KeyLogFileInner {
 
 impl KeyLogFileInner {
     fn new(var: Option<OsString>) -> Self {
-        let path = match &var {
-            Some(path) => path,
-            None => {
-                return Self {
-                    file: None,
-                    buf: Vec::new(),
-                };
-            }
+        let Some(path) = &var else {
+            return Self {
+                file: None,
+                buf: Vec::new(),
+            };
         };
 
         #[cfg_attr(not(feature = "logging"), allow(unused_variables))]

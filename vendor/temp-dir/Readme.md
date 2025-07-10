@@ -73,19 +73,21 @@ Metric output format: x/y
     x = unsafe code used by the build
     y = total unsafe code found in the crate
 
-Symbols: 
+Symbols:
     🔒  = No `unsafe` usage found, declares #![forbid(unsafe_code)]
     ❓  = No `unsafe` usage found, missing #![forbid(unsafe_code)]
     ☢️  = `unsafe` usage found
 
 Functions  Expressions  Impls  Traits  Methods  Dependency
 
-0/0        0/0          0/0    0/0     0/0      🔒  temp-dir 0.1.14
+0/0        0/0          0/0    0/0     0/0      🔒  temp-dir 0.1.16
 
-0/0        0/0          0/0    0/0     0/0    
+0/0        0/0          0/0    0/0     0/0
 
 ```
 # Changelog
+- v0.1.16 - `dont_delete_on_drop()`.  Thanks to [A L Manning](https://gitlab.com/A-Manning) for [discussion](https://gitlab.com/leonhard-llc/ops/-/merge_requests/5).
+- v0.1.15 - Remove a dev dependency.
 - v0.1.14 - `AsRef<Path>`
 - v0.1.13 - Update docs.
 - v0.1.12 - Work when the directory already exists.
@@ -102,12 +104,12 @@ Functions  Expressions  Impls  Traits  Methods  Dependency
   Thanks to Reddit user
   [burntsushi](https://www.reddit.com/r/rust/comments/ma6y0x/tempdir_simple_temporary_directory_with_cleanup/gruo5iu/).
 - v0.1.6 - Add
-    [`TempDir::panic_on_cleanup_error`](https://docs.rs/temp-dir/latest/temp_dir/struct.TempDir.html#method.panic_on_cleanup_error).
-    Thanks to Reddit users
-    [`KhorneLordOfChaos`](https://www.reddit.com/r/rust/comments/ma6y0x/tempdir_simple_temporary_directory_with_cleanup/grsb5s3/)
-    and
-    [`dpc_pw`](https://www.reddit.com/r/rust/comments/ma6y0x/tempdir_simple_temporary_directory_with_cleanup/gru26df/)
-    for their comments.
+  [`TempDir::panic_on_cleanup_error`](https://docs.rs/temp-dir/latest/temp_dir/struct.TempDir.html#method.panic_on_cleanup_error).
+  Thanks to Reddit users
+  [`KhorneLordOfChaos`](https://www.reddit.com/r/rust/comments/ma6y0x/tempdir_simple_temporary_directory_with_cleanup/grsb5s3/)
+  and
+  [`dpc_pw`](https://www.reddit.com/r/rust/comments/ma6y0x/tempdir_simple_temporary_directory_with_cleanup/gru26df/)
+  for their comments.
 - v0.1.5 - Explain how it handles symbolic links.
   Thanks to Reddit user Mai4eeze for this
   [idea](https://www.reddit.com/r/rust/comments/ma6y0x/tempdir_simple_temporary_directory_with_cleanup/grsoz2g/).

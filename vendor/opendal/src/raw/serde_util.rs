@@ -28,6 +28,11 @@ use serde::de::{self};
 
 use crate::*;
 
+/// Parse xml serialize error into opendal::Error.
+pub fn new_xml_serialize_error(e: quick_xml::SeError) -> Error {
+    Error::new(ErrorKind::Unexpected, "serialize xml").set_source(e)
+}
+
 /// Parse xml deserialize error into opendal::Error.
 pub fn new_xml_deserialize_error(e: quick_xml::DeError) -> Error {
     Error::new(ErrorKind::Unexpected, "deserialize xml").set_source(e)
@@ -45,7 +50,7 @@ pub fn new_json_deserialize_error(e: serde_json::Error) -> Error {
 
 /// ConfigDeserializer is used to deserialize given configs from `HashMap<String, String>`.
 ///
-/// This is only used by our services config.
+/// This is only used by our services' config.
 pub struct ConfigDeserializer(MapDeserializer<'static, Pairs, de::value::Error>);
 
 impl ConfigDeserializer {
@@ -59,14 +64,14 @@ impl ConfigDeserializer {
 impl<'de> Deserializer<'de> for ConfigDeserializer {
     type Error = de::value::Error;
 
-    fn deserialize_any<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
         self.deserialize_map(visitor)
     }
 
-    fn deserialize_map<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -95,7 +100,7 @@ impl Iterator for Pairs {
 /// Pair is used to hold both key and value of a config for better error output.
 struct Pair(String, String);
 
-impl<'de> IntoDeserializer<'de, de::value::Error> for Pair {
+impl IntoDeserializer<'_, de::value::Error> for Pair {
     type Deserializer = Self;
 
     fn into_deserializer(self) -> Self::Deserializer {
@@ -106,14 +111,14 @@ impl<'de> IntoDeserializer<'de, de::value::Error> for Pair {
 impl<'de> Deserializer<'de> for Pair {
     type Error = de::value::Error;
 
-    fn deserialize_any<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
         self.1.into_deserializer().deserialize_any(visitor)
     }
 
-    fn deserialize_bool<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -127,7 +132,7 @@ impl<'de> Deserializer<'de> for Pair {
         }
     }
 
-    fn deserialize_i8<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_i8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -140,7 +145,7 @@ impl<'de> Deserializer<'de> for Pair {
         }
     }
 
-    fn deserialize_i16<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_i16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -153,7 +158,7 @@ impl<'de> Deserializer<'de> for Pair {
         }
     }
 
-    fn deserialize_i32<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_i32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -166,7 +171,7 @@ impl<'de> Deserializer<'de> for Pair {
         }
     }
 
-    fn deserialize_i64<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_i64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -179,7 +184,7 @@ impl<'de> Deserializer<'de> for Pair {
         }
     }
 
-    fn deserialize_u8<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_u8<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -192,7 +197,7 @@ impl<'de> Deserializer<'de> for Pair {
         }
     }
 
-    fn deserialize_u16<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_u16<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -205,7 +210,7 @@ impl<'de> Deserializer<'de> for Pair {
         }
     }
 
-    fn deserialize_u32<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_u32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -218,7 +223,7 @@ impl<'de> Deserializer<'de> for Pair {
         }
     }
 
-    fn deserialize_u64<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_u64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -231,7 +236,7 @@ impl<'de> Deserializer<'de> for Pair {
         }
     }
 
-    fn deserialize_f32<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -244,7 +249,7 @@ impl<'de> Deserializer<'de> for Pair {
         }
     }
 
-    fn deserialize_f64<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -257,7 +262,7 @@ impl<'de> Deserializer<'de> for Pair {
         }
     }
 
-    fn deserialize_option<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {
@@ -268,7 +273,7 @@ impl<'de> Deserializer<'de> for Pair {
         }
     }
 
-    fn deserialize_seq<V>(self, visitor: V) -> std::result::Result<V::Value, Self::Error>
+    fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: Visitor<'de>,
     {

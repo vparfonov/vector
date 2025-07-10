@@ -15,51 +15,35 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
+use http::Response;
 use http::StatusCode;
 use log::debug;
-use serde::Deserialize;
 
 use super::core::*;
+use super::delete::PcloudDeleter;
 use super::error::parse_error;
 use super::error::PcloudError;
 use super::lister::PcloudLister;
 use super::writer::PcloudWriter;
 use super::writer::PcloudWriters;
 use crate::raw::*;
+use crate::services::PcloudConfig;
 use crate::*;
 
-/// Config for backblaze Pcloud services support.
-#[derive(Default, Deserialize)]
-#[serde(default)]
-#[non_exhaustive]
-pub struct PcloudConfig {
-    /// root of this backend.
-    ///
-    /// All operations will happen under this root.
-    pub root: Option<String>,
-    ///pCloud  endpoint address.
-    pub endpoint: String,
-    /// pCloud username.
-    pub username: Option<String>,
-    /// pCloud password.
-    pub password: Option<String>,
-}
+impl Configurator for PcloudConfig {
+    type Builder = PcloudBuilder;
 
-impl Debug for PcloudConfig {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut ds = f.debug_struct("Config");
-
-        ds.field("root", &self.root);
-        ds.field("endpoint", &self.endpoint);
-        ds.field("username", &self.username);
-
-        ds.finish()
+    #[allow(deprecated)]
+    fn into_builder(self) -> Self::Builder {
+        PcloudBuilder {
+            config: self,
+            http_client: None,
+        }
     }
 }
 
@@ -69,6 +53,7 @@ impl Debug for PcloudConfig {
 pub struct PcloudBuilder {
     config: PcloudConfig,
 
+    #[deprecated(since = "0.53.0", note = "Use `Operator::update_http_client` instead")]
     http_client: Option<HttpClient>,
 }
 
@@ -85,7 +70,7 @@ impl PcloudBuilder {
     /// Set root of this backend.
     ///
     /// All operations will happen under this root.
-    pub fn root(&mut self, root: &str) -> &mut Self {
+    pub fn root(mut self, root: &str) -> Self {
         self.config.root = if root.is_empty() {
             None
         } else {
@@ -96,11 +81,11 @@ impl PcloudBuilder {
     }
 
     /// Pcloud endpoint.
-    /// https://api.pcloud.com for United States and https://eapi.pcloud.com for Europe
+    /// <https://api.pcloud.com> for United States and <https://eapi.pcloud.com> for Europe
     /// ref to [doc.pcloud.com](https://docs.pcloud.com/)
     ///
     /// It is required. e.g. `https://api.pcloud.com`
-    pub fn endpoint(&mut self, endpoint: &str) -> &mut Self {
+    pub fn endpoint(mut self, endpoint: &str) -> Self {
         self.config.endpoint = endpoint.to_string();
 
         self
@@ -109,7 +94,7 @@ impl PcloudBuilder {
     /// Pcloud username.
     ///
     /// It is required. your pCloud login email, e.g. `example@gmail.com`
-    pub fn username(&mut self, username: &str) -> &mut Self {
+    pub fn username(mut self, username: &str) -> Self {
         self.config.username = if username.is_empty() {
             None
         } else {
@@ -122,7 +107,7 @@ impl PcloudBuilder {
     /// Pcloud password.
     ///
     /// It is required. your pCloud login password, e.g. `password`
-    pub fn password(&mut self, password: &str) -> &mut Self {
+    pub fn password(mut self, password: &str) -> Self {
         self.config.password = if password.is_empty() {
             None
         } else {
@@ -138,7 +123,9 @@ impl PcloudBuilder {
     ///
     /// This API is part of OpenDAL's Raw API. `HttpClient` could be changed
     /// during minor updates.
-    pub fn http_client(&mut self, client: HttpClient) -> &mut Self {
+    #[deprecated(since = "0.53.0", note = "Use `Operator::update_http_client` instead")]
+    #[allow(deprecated)]
+    pub fn http_client(mut self, client: HttpClient) -> Self {
         self.http_client = Some(client);
         self
     }
@@ -146,31 +133,10 @@ impl PcloudBuilder {
 
 impl Builder for PcloudBuilder {
     const SCHEME: Scheme = Scheme::Pcloud;
-    type Accessor = PcloudBackend;
-
-    /// Converts a HashMap into an PcloudBuilder instance.
-    ///
-    /// # Arguments
-    ///
-    /// * `map` - A HashMap containing the configuration values.
-    ///
-    /// # Returns
-    ///
-    /// Returns an instance of PcloudBuilder.
-    fn from_map(map: HashMap<String, String>) -> Self {
-        // Deserialize the configuration from the HashMap.
-        let config = PcloudConfig::deserialize(ConfigDeserializer::new(map))
-            .expect("config deserialize must succeed");
-
-        // Create an PcloudBuilder instance with the deserialized config.
-        PcloudBuilder {
-            config,
-            http_client: None,
-        }
-    }
+    type Config = PcloudConfig;
 
     /// Builds the backend and returns the result of PcloudBackend.
-    fn build(&mut self) -> Result<Self::Accessor> {
+    fn build(self) -> Result<impl Access> {
         debug!("backend build started: {:?}", &self);
 
         let root = normalize_root(&self.config.root.clone().unwrap_or_default());
@@ -199,22 +165,48 @@ impl Builder for PcloudBuilder {
                 .with_context("service", Scheme::Pcloud)),
         }?;
 
-        let client = if let Some(client) = self.http_client.take() {
-            client
-        } else {
-            HttpClient::new().map_err(|err| {
-                err.with_operation("Builder::build")
-                    .with_context("service", Scheme::Pcloud)
-            })?
-        };
-
         Ok(PcloudBackend {
             core: Arc::new(PcloudCore {
+                info: {
+                    let am = AccessorInfo::default();
+                    am.set_scheme(Scheme::Pcloud)
+                        .set_root(&root)
+                        .set_native_capability(Capability {
+                            stat: true,
+                            stat_has_content_length: true,
+                            stat_has_last_modified: true,
+
+                            create_dir: true,
+
+                            read: true,
+
+                            write: true,
+
+                            delete: true,
+                            rename: true,
+                            copy: true,
+
+                            list: true,
+                            list_has_content_length: true,
+                            list_has_last_modified: true,
+
+                            shared: true,
+
+                            ..Default::default()
+                        });
+
+                    // allow deprecated api here for compatibility
+                    #[allow(deprecated)]
+                    if let Some(client) = self.http_client {
+                        am.update_http_client(|_| client);
+                    }
+
+                    am.into()
+                },
                 root,
                 endpoint: self.config.endpoint.clone(),
                 username,
                 password,
-                client,
             }),
         })
     }
@@ -226,39 +218,18 @@ pub struct PcloudBackend {
     core: Arc<PcloudCore>,
 }
 
-#[async_trait]
-impl Accessor for PcloudBackend {
-    type Reader = IncomingAsyncBody;
+impl Access for PcloudBackend {
+    type Reader = HttpBody;
     type Writer = PcloudWriters;
     type Lister = oio::PageLister<PcloudLister>;
+    type Deleter = oio::OneShotDeleter<PcloudDeleter>;
     type BlockingReader = ();
     type BlockingWriter = ();
     type BlockingLister = ();
+    type BlockingDeleter = ();
 
-    fn info(&self) -> AccessorInfo {
-        let mut am = AccessorInfo::default();
-        am.set_scheme(Scheme::Pcloud)
-            .set_root(&self.core.root)
-            .set_native_capability(Capability {
-                stat: true,
-
-                create_dir: true,
-
-                read: true,
-                read_can_next: true,
-
-                write: true,
-
-                delete: true,
-                rename: true,
-                copy: true,
-
-                list: true,
-
-                ..Default::default()
-            });
-
-        am
+    fn info(&self) -> Arc<AccessorInfo> {
+        self.core.info.clone()
     }
 
     async fn create_dir(&self, path: &str, _: OpCreateDir) -> Result<RpCreateDir> {
@@ -273,15 +244,15 @@ impl Accessor for PcloudBackend {
 
         match status {
             StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
+                let bs = resp.into_body();
                 let resp: StatResponse =
-                    serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+                    serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
                 let result = resp.result;
                 if result == 2010 || result == 2055 || result == 2002 {
-                    return Err(Error::new(ErrorKind::NotFound, &format!("{resp:?}")));
+                    return Err(Error::new(ErrorKind::NotFound, format!("{resp:?}")));
                 }
                 if result != 0 {
-                    return Err(Error::new(ErrorKind::Unexpected, &format!("{resp:?}")));
+                    return Err(Error::new(ErrorKind::Unexpected, format!("{resp:?}")));
                 }
 
                 if let Some(md) = resp.metadata {
@@ -289,29 +260,28 @@ impl Accessor for PcloudBackend {
                     return md.map(RpStat::new);
                 }
 
-                Err(Error::new(ErrorKind::Unexpected, &format!("{resp:?}")))
+                Err(Error::new(ErrorKind::Unexpected, format!("{resp:?}")))
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    async fn read(&self, path: &str, _args: OpRead) -> Result<(RpRead, Self::Reader)> {
+    async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
         let link = self.core.get_file_link(path).await?;
 
-        let resp = self.core.download(&link).await?;
+        let resp = self.core.download(&link, args.range()).await?;
 
         let status = resp.status();
 
         match status {
-            StatusCode::OK => {
-                let size = parse_content_length(resp.headers())?;
-                let range = parse_content_range(resp.headers())?;
-                Ok((
-                    RpRead::new().with_size(size).with_range(range),
-                    resp.into_body(),
-                ))
+            StatusCode::OK | StatusCode::PARTIAL_CONTENT => {
+                Ok((RpRead::default(), resp.into_body()))
             }
-            _ => Err(parse_error(resp).await?),
+            _ => {
+                let (part, mut body) = resp.into_parts();
+                let buf = body.to_buffer().await?;
+                Err(parse_error(Response::from_parts(part, buf)))
+            }
         }
     }
 
@@ -323,31 +293,11 @@ impl Accessor for PcloudBackend {
         Ok((RpWrite::default(), w))
     }
 
-    async fn delete(&self, path: &str, _: OpDelete) -> Result<RpDelete> {
-        let resp = if path.ends_with('/') {
-            self.core.delete_folder(path).await?
-        } else {
-            self.core.delete_file(path).await?
-        };
-
-        let status = resp.status();
-
-        match status {
-            StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
-                let resp: PcloudError =
-                    serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
-                let result = resp.result;
-
-                // pCloud returns 2005 or 2009 if the file or folder is not found
-                if result != 0 && result != 2005 && result != 2009 {
-                    return Err(Error::new(ErrorKind::Unexpected, &format!("{resp:?}")));
-                }
-
-                Ok(RpDelete::default())
-            }
-            _ => Err(parse_error(resp).await?),
-        }
+    async fn delete(&self) -> Result<(RpDelete, Self::Deleter)> {
+        Ok((
+            RpDelete::default(),
+            oio::OneShotDeleter::new(PcloudDeleter::new(self.core.clone())),
+        ))
     }
 
     async fn list(&self, path: &str, _args: OpList) -> Result<(RpList, Self::Lister)> {
@@ -368,20 +318,20 @@ impl Accessor for PcloudBackend {
 
         match status {
             StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
+                let bs = resp.into_body();
                 let resp: PcloudError =
-                    serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+                    serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
                 let result = resp.result;
                 if result == 2009 || result == 2010 || result == 2055 || result == 2002 {
-                    return Err(Error::new(ErrorKind::NotFound, &format!("{resp:?}")));
+                    return Err(Error::new(ErrorKind::NotFound, format!("{resp:?}")));
                 }
                 if result != 0 {
-                    return Err(Error::new(ErrorKind::Unexpected, &format!("{resp:?}")));
+                    return Err(Error::new(ErrorKind::Unexpected, format!("{resp:?}")));
                 }
 
                 Ok(RpCopy::default())
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -398,20 +348,20 @@ impl Accessor for PcloudBackend {
 
         match status {
             StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
+                let bs = resp.into_body();
                 let resp: PcloudError =
-                    serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+                    serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
                 let result = resp.result;
                 if result == 2009 || result == 2010 || result == 2055 || result == 2002 {
-                    return Err(Error::new(ErrorKind::NotFound, &format!("{resp:?}")));
+                    return Err(Error::new(ErrorKind::NotFound, format!("{resp:?}")));
                 }
                 if result != 0 {
-                    return Err(Error::new(ErrorKind::Unexpected, &format!("{resp:?}")));
+                    return Err(Error::new(ErrorKind::Unexpected, format!("{resp:?}")));
                 }
 
                 Ok(RpRename::default())
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 }

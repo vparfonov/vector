@@ -14,16 +14,18 @@
 
 #![allow(clippy::duplicate_mod)]
 
+use std::prelude::v1::*;
+
 use base64::{engine::general_purpose, Engine as _};
 
 use crate::error::{DerTypeId, Error};
 use crate::verify_cert::Budget;
 use crate::{der, signed_data};
-use alloc::{string::String, vec::Vec};
 
 use super::{
-    INVALID_SIGNATURE_FOR_RSA_KEY, OK_IF_RSA_AVAILABLE, SUPPORTED_ALGORITHMS_IN_TESTS,
-    UNSUPPORTED_ECDSA_SHA512_SIGNATURE, UNSUPPORTED_SIGNATURE_ALGORITHM_FOR_RSA_KEY,
+    INVALID_SIGNATURE_FOR_RSA_KEY, OK_IF_POINT_COMPRESSION_SUPPORTED, OK_IF_RSA_AVAILABLE,
+    SUPPORTED_ALGORITHMS_IN_TESTS, UNSUPPORTED_ECDSA_SHA512_SIGNATURE,
+    UNSUPPORTED_SIGNATURE_ALGORITHM_FOR_RSA_KEY,
 };
 
 macro_rules! test_file_bytes {
@@ -345,6 +347,22 @@ test_verify_signed_data!(
     OK_IF_RSA_AVAILABLE
 );
 
+test_verify_signed_data!(
+    test_ecdsa_prime256v1_sha256,
+    "ours/ecdsa-prime256v1-sha256.pem",
+    Ok(())
+);
+test_verify_signed_data!(
+    test_ecdsa_prime256v1_sha256_compressed,
+    "ours/ecdsa-prime256v1-sha256-compressed.pem",
+    OK_IF_POINT_COMPRESSION_SUPPORTED
+);
+test_verify_signed_data!(
+    test_ecdsa_prime256v1_sha256_spki_inside_spki,
+    "ours/ecdsa-prime256v1-sha256-spki-inside-spki.pem",
+    Err(Error::InvalidSignatureForPublicKey)
+);
+
 struct TestSignedData {
     spki: Vec<u8>,
     data: Vec<u8>,
@@ -369,7 +387,7 @@ fn parse_test_signed_data(file_contents: &[u8]) -> TestSignedData {
 
 use alloc::str::Lines;
 
-fn read_pem_section(lines: &mut Lines, section_name: &str) -> Vec<u8> {
+fn read_pem_section(lines: &mut Lines<'_>, section_name: &str) -> Vec<u8> {
     // Skip comments and header
     let begin_section = format!("-----BEGIN {}-----", section_name);
     loop {

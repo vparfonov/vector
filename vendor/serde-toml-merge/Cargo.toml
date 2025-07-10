@@ -12,12 +12,22 @@
 [package]
 edition = "2018"
 name = "serde-toml-merge"
-version = "0.3.8"
+version = "0.3.9"
 authors = ["Jeremie Drouet <jeremie.drouet@gmail.com>"]
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Merge your toml values."
 readme = "readme.md"
 license = "MIT"
 repository = "https://github.com/jdrouet/serde-toml-merge"
+
+[lib]
+name = "serde_toml_merge"
+path = "src/lib.rs"
 
 [dependencies.toml]
 version = "0.8"

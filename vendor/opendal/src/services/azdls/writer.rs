@@ -17,12 +17,10 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use http::StatusCode;
 
-use super::core::AzdlsCore;
+use super::core::{AzdlsCore, FILE};
 use super::error::parse_error;
-use crate::raw::oio::WriteBuf;
 use crate::raw::*;
 use crate::*;
 
@@ -41,55 +39,31 @@ impl AzdlsWriter {
     }
 }
 
-#[async_trait]
 impl oio::OneShotWrite for AzdlsWriter {
-    async fn write_once(&self, bs: &dyn WriteBuf) -> Result<()> {
-        let mut req =
-            self.core
-                .azdls_create_request(&self.path, "file", &self.op, AsyncBody::Empty)?;
-
-        self.core.sign(&mut req).await?;
-
-        let resp = self.core.send(req).await?;
+    async fn write_once(&self, bs: Buffer) -> Result<Metadata> {
+        let resp = self.core.azdls_create(&self.path, FILE, &self.op).await?;
 
         let status = resp.status();
         match status {
-            StatusCode::CREATED | StatusCode::OK => {
-                resp.into_body().consume().await?;
-            }
+            StatusCode::CREATED | StatusCode::OK => {}
             _ => {
-                return Err(parse_error(resp)
-                    .await?
-                    .with_operation("Backend::azdls_create_request"));
+                return Err(parse_error(resp).with_operation("Backend::azdls_create_request"));
             }
         }
 
-        let bs = oio::ChunkedBytes::from_vec(bs.vectored_bytes(bs.remaining()));
-        let mut req = self.core.azdls_update_request(
-            &self.path,
-            Some(bs.len() as u64),
-            0,
-            AsyncBody::ChunkedBytes(bs),
-        )?;
-
-        self.core.sign(&mut req).await?;
-
-        let resp = self.core.send(req).await?;
+        let resp = self
+            .core
+            .azdls_update(&self.path, Some(bs.len() as u64), 0, bs)
+            .await?;
 
         let status = resp.status();
         match status {
-            StatusCode::OK | StatusCode::ACCEPTED => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp)
-                .await?
-                .with_operation("Backend::azdls_update_request")),
+            StatusCode::OK | StatusCode::ACCEPTED => Ok(Metadata::default()),
+            _ => Err(parse_error(resp).with_operation("Backend::azdls_update_request")),
         }
     }
 }
 
-#[async_trait]
 impl oio::AppendWrite for AzdlsWriter {
     async fn offset(&self) -> Result<u64> {
         let resp = self.core.azdls_get_properties(&self.path).await?;
@@ -100,50 +74,32 @@ impl oio::AppendWrite for AzdlsWriter {
         match status {
             StatusCode::OK => Ok(parse_content_length(headers)?.unwrap_or_default()),
             StatusCode::NOT_FOUND => Ok(0),
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    async fn append(&self, offset: u64, size: u64, body: AsyncBody) -> Result<()> {
+    async fn append(&self, offset: u64, size: u64, body: Buffer) -> Result<Metadata> {
         if offset == 0 {
-            let mut req =
-                self.core
-                    .azdls_create_request(&self.path, "file", &self.op, AsyncBody::Empty)?;
-
-            self.core.sign(&mut req).await?;
-
-            let resp = self.core.send(req).await?;
+            let resp = self.core.azdls_create(&self.path, FILE, &self.op).await?;
 
             let status = resp.status();
             match status {
-                StatusCode::CREATED | StatusCode::OK => {
-                    resp.into_body().consume().await?;
-                }
+                StatusCode::CREATED | StatusCode::OK => {}
                 _ => {
-                    return Err(parse_error(resp)
-                        .await?
-                        .with_operation("Backend::azdls_create_request"));
+                    return Err(parse_error(resp).with_operation("Backend::azdls_create_request"));
                 }
             }
         }
 
-        let mut req = self
+        let resp = self
             .core
-            .azdls_update_request(&self.path, Some(size), offset, body)?;
-
-        self.core.sign(&mut req).await?;
-
-        let resp = self.core.send(req).await?;
+            .azdls_update(&self.path, Some(size), offset, body)
+            .await?;
 
         let status = resp.status();
         match status {
-            StatusCode::OK | StatusCode::ACCEPTED => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp)
-                .await?
-                .with_operation("Backend::azdls_update_request")),
+            StatusCode::OK | StatusCode::ACCEPTED => Ok(Metadata::default()),
+            _ => Err(parse_error(resp).with_operation("Backend::azdls_update_request")),
         }
     }
 }

@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use std::cell::Cell;
 use std::path::{Path, PathBuf};
 
-use rusqlite::{Connection, DatabaseName, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension};
 
 use crate::history::SearchResult;
 use crate::{Config, History, HistoryDuplicates, ReadlineError, Result, SearchDirection};
@@ -162,7 +162,7 @@ COMMIT;
             return true;
         }
         if line.is_empty()
-            || (self.ignore_space && line.chars().next().map_or(true, char::is_whitespace))
+            || (self.ignore_space && line.chars().next().is_none_or(char::is_whitespace))
         {
             return true;
         }
@@ -334,7 +334,7 @@ PRAGMA incremental_vacuum;
             }
         } else {
             // TODO Validate: backup whole history
-            self.conn.backup(DatabaseName::Main, path, None)?;
+            self.conn.backup(c"main", path, None)?;
             // TODO Validate: keep using original path
         }
         Ok(())
@@ -372,7 +372,7 @@ PRAGMA incremental_vacuum;
             // TODO check that there is no memory entries (session_id == 0) ?
             self.reset(path)?;
             self.check_schema()?;
-        } else if self.path.as_ref().map_or(true, |p| p != path) {
+        } else if self.path.as_ref().is_none_or(|p| p != path) {
             self.reset(path)?;
             self.check_schema()?;
         }

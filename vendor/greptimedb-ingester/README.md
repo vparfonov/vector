@@ -4,7 +4,7 @@ A Rust client for ingesting data into GreptimeDB, using GreptimeDB's gRPC
 protocol.
 
 See
-[examples](https://github.com/GreptimeTeam/greptimedb-ingester-rust/blob/master/examples/ingest.rs)
+[examples](https://github.com/GreptimeTeam/greptimedb-ingester-rust/blob/master/examples)
 for latest usage demo.
 
 ## License

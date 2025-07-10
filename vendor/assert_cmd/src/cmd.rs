@@ -37,6 +37,8 @@ impl Command {
     ///
     /// See the [`cargo` module documentation][crate::cargo] for caveats and workarounds.
     ///
+    /// **NOTE:** Prefer [`cargo_bin!`][crate::cargo::cargo_bin!] as this makes assumptions about cargo
+    ///
     /// # Examples
     ///
     /// ```rust,no_run
@@ -604,7 +606,7 @@ impl From<process::Command> for Command {
     }
 }
 
-impl<'c> OutputOkExt for &'c mut Command {
+impl OutputOkExt for &mut Command {
     fn ok(self) -> OutputResult {
         let output = self.output().map_err(OutputError::with_cause)?;
         if output.status.success() {
@@ -643,12 +645,12 @@ impl<'c> OutputOkExt for &'c mut Command {
     }
 }
 
-impl<'c> OutputAssertExt for &'c mut Command {
+impl OutputAssertExt for &mut Command {
     fn assert(self) -> Assert {
         let output = match self.output() {
             Ok(output) => output,
             Err(err) => {
-                panic!("Failed to spawn {:?}: {}", self, err);
+                panic!("Failed to spawn {self:?}: {err}");
             }
         };
         let assert = Assert::new(output).append_context("command", format!("{:?}", self.cmd));

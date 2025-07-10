@@ -2,7 +2,9 @@
 
 use std::collections::HashMap;
 use std::fmt;
-use std::net::IpAddr;
+use std::net::{AddrParseError, IpAddr};
+use std::num::ParseIntError;
+use std::str::FromStr;
 
 use crate::{NetworkDataInner, NetworksInner};
 
@@ -44,7 +46,7 @@ impl Networks {
     /// use sysinfo::Networks;
     ///
     /// let mut networks = Networks::new();
-    /// networks.refresh_list();
+    /// networks.refresh(true);
     /// for (interface_name, network) in &networks {
     ///     println!("[{interface_name}]: {network:?}");
     /// }
@@ -56,8 +58,7 @@ impl Networks {
     }
 
     /// Creates a new [`Networks`][crate::Networks] type with the network interfaces
-    /// list loaded. It is a combination of [`Networks::new`] and
-    /// [`Networks::refresh_list`].
+    /// list loaded.
     ///
     /// ```no_run
     /// use sysinfo::Networks;
@@ -69,7 +70,7 @@ impl Networks {
     /// ```
     pub fn new_with_refreshed_list() -> Self {
         let mut networks = Self::new();
-        networks.refresh_list();
+        networks.refresh(false);
         networks
     }
 
@@ -87,36 +88,17 @@ impl Networks {
         self.inner.list()
     }
 
-    /// Refreshes the network interfaces list.
-    ///
-    /// ```no_run
-    /// use sysinfo::Networks;
-    ///
-    /// let mut networks = Networks::new();
-    /// networks.refresh_list();
-    /// ```
-    pub fn refresh_list(&mut self) {
-        self.inner.refresh_list()
-    }
-
-    /// Refreshes the network interfaces' content. If you didn't run [`Networks::refresh_list`]
-    /// before, calling this method won't do anything as no interfaces are present.
-    ///
-    /// ⚠️ If a network interface is added or removed, this method won't take it into account. Use
-    /// [`Networks::refresh_list`] instead.
-    ///
-    /// ⚠️ If you didn't call [`Networks::refresh_list`] beforehand, this method will do nothing
-    /// as the network list will be empty.
+    /// Refreshes the network interfaces.
     ///
     /// ```no_run
     /// use sysinfo::Networks;
     ///
     /// let mut networks = Networks::new_with_refreshed_list();
     /// // Wait some time...? Then refresh the data of each network.
-    /// networks.refresh();
+    /// networks.refresh(true);
     /// ```
-    pub fn refresh(&mut self) {
-        self.inner.refresh()
+    pub fn refresh(&mut self, remove_not_listed_interfaces: bool) {
+        self.inner.refresh(remove_not_listed_interfaces)
     }
 }
 
@@ -156,7 +138,7 @@ impl NetworkData {
     /// // Waiting a bit to get data from network...
     /// thread::sleep(time::Duration::from_millis(10));
     /// // Refreshing again to generate diff.
-    /// networks.refresh();
+    /// networks.refresh(true);
     ///
     /// for (interface_name, network) in &networks {
     ///     println!("in: {} B", network.received());
@@ -196,7 +178,7 @@ impl NetworkData {
     /// // Waiting a bit to get data from network...
     /// thread::sleep(time::Duration::from_millis(10));
     /// // Refreshing again to generate diff.
-    /// networks.refresh();
+    /// networks.refresh(true);
     ///
     /// for (interface_name, network) in &networks {
     ///     println!("out: {} B", network.transmitted());
@@ -236,7 +218,7 @@ impl NetworkData {
     /// // Waiting a bit to get data from network...
     /// thread::sleep(time::Duration::from_millis(10));
     /// // Refreshing again to generate diff.
-    /// networks.refresh();
+    /// networks.refresh(true);
     ///
     /// for (interface_name, network) in &networks {
     ///     println!("in: {}", network.packets_received());
@@ -276,7 +258,7 @@ impl NetworkData {
     /// // Waiting a bit to get data from network...
     /// thread::sleep(time::Duration::from_millis(10));
     /// // Refreshing again to generate diff.
-    /// networks.refresh();
+    /// networks.refresh(true);
     ///
     /// for (interface_name, network) in &networks {
     ///     println!("out: {}", network.packets_transmitted());
@@ -316,7 +298,7 @@ impl NetworkData {
     /// // Waiting a bit to get data from network...
     /// thread::sleep(time::Duration::from_millis(10));
     /// // Refreshing again to generate diff.
-    /// networks.refresh();
+    /// networks.refresh(true);
     ///
     /// for (interface_name, network) in &networks {
     ///     println!("in: {}", network.errors_on_received());
@@ -356,7 +338,7 @@ impl NetworkData {
     /// // Waiting a bit to get data from network...
     /// thread::sleep(time::Duration::from_millis(10));
     /// // Refreshing again to generate diff.
-    /// networks.refresh();
+    /// networks.refresh(true);
     ///
     /// for (interface_name, network) in &networks {
     ///     println!("out: {}", network.errors_on_transmitted());
@@ -410,12 +392,27 @@ impl NetworkData {
     pub fn ip_networks(&self) -> &[IpNetwork] {
         self.inner.ip_networks()
     }
+
+    /// Returns the Maximum Transfer Unit (MTU) of the interface.
+    ///
+    /// ```no_run
+    /// use sysinfo::Networks;
+    ///
+    /// let mut networks = Networks::new_with_refreshed_list();
+    /// for (interface_name, network) in &networks {
+    ///     println!("mtu: {}", network.mtu());
+    /// }
+    /// ```
+    pub fn mtu(&self) -> u64 {
+        self.inner.mtu()
+    }
 }
 
 /// MAC address for network interface.
 ///
 /// It is returned by [`NetworkData::mac_address`][crate::NetworkData::mac_address].
-#[derive(PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 pub struct MacAddr(pub [u8; 6]);
 
 impl MacAddr {
@@ -439,14 +436,59 @@ impl fmt::Display for MacAddr {
     }
 }
 
-/// Ip networks address for network interface.
+/// Error type returned from `MacAddr::from_str` implementation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MacAddrFromStrError {
+    /// A number is not in hexadecimal format.
+    IntError(ParseIntError),
+    /// Input is not of format `{02X}:{02X}:{02X}:{02X}:{02X}:{02X}`.
+    InvalidAddrFormat,
+}
+
+impl FromStr for MacAddr {
+    type Err = MacAddrFromStrError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s
+            .split(':')
+            .map(|s| u8::from_str_radix(s, 16).map_err(MacAddrFromStrError::IntError));
+
+        let Some(data0) = parts.next() else {
+            return Err(MacAddrFromStrError::InvalidAddrFormat);
+        };
+        let Some(data1) = parts.next() else {
+            return Err(MacAddrFromStrError::InvalidAddrFormat);
+        };
+        let Some(data2) = parts.next() else {
+            return Err(MacAddrFromStrError::InvalidAddrFormat);
+        };
+        let Some(data3) = parts.next() else {
+            return Err(MacAddrFromStrError::InvalidAddrFormat);
+        };
+        let Some(data4) = parts.next() else {
+            return Err(MacAddrFromStrError::InvalidAddrFormat);
+        };
+        let Some(data5) = parts.next() else {
+            return Err(MacAddrFromStrError::InvalidAddrFormat);
+        };
+
+        if parts.next().is_some() {
+            return Err(MacAddrFromStrError::InvalidAddrFormat);
+        }
+
+        Ok(MacAddr([data0?, data1?, data2?, data3?, data4?, data5?]))
+    }
+}
+
+/// IP networks address for network interface.
 ///
 /// It is returned by [`NetworkData::ip_networks`][crate::NetworkData::ip_networks].
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 pub struct IpNetwork {
-    /// The ip of the network interface
+    /// The IP of the network interface.
     pub addr: IpAddr,
-    /// The netmask, prefix of the ipaddress
+    /// The netmask, prefix of the IP address.
     pub prefix: u8,
 }
 
@@ -456,10 +498,46 @@ impl fmt::Display for IpNetwork {
     }
 }
 
+/// Error type returned from `MacAddr::from_str` implementation.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum IpNetworkFromStrError {
+    /// Prefix is not an integer.
+    PrefixError(ParseIntError),
+    /// Failed to parse IP address.
+    AddrParseError(AddrParseError),
+    /// Input is not of format `[IP address]/[number]`.
+    InvalidAddrFormat,
+}
+
+impl FromStr for IpNetwork {
+    type Err = IpNetworkFromStrError;
+
+    #[allow(clippy::from_str_radix_10)]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut parts = s.split('/');
+
+        let Some(addr) = parts.next() else {
+            return Err(IpNetworkFromStrError::InvalidAddrFormat);
+        };
+        let Some(prefix) = parts.next() else {
+            return Err(IpNetworkFromStrError::InvalidAddrFormat);
+        };
+        if parts.next().is_some() {
+            return Err(IpNetworkFromStrError::InvalidAddrFormat);
+        }
+
+        Ok(IpNetwork {
+            addr: IpAddr::from_str(addr).map_err(IpNetworkFromStrError::AddrParseError)?,
+            prefix: u8::from_str_radix(prefix, 10).map_err(IpNetworkFromStrError::PrefixError)?,
+        })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
     use std::net::{IpAddr, Ipv4Addr, Ipv6Addr};
+    use std::str::FromStr;
 
     // Ensure that the `Display` and `Debug` traits are implemented on the `MacAddr` struct
     #[test]
@@ -480,6 +558,24 @@ mod tests {
     #[test]
     fn check_mac_address_is_unspecified_false() {
         assert!(!MacAddr([1, 2, 3, 4, 5, 6]).is_unspecified());
+    }
+
+    #[test]
+    fn check_mac_address_conversions() {
+        let mac = MacAddr([0xa, 0xb, 0xc, 0xd, 0xe, 0xf]);
+
+        let mac_s = mac.to_string();
+        assert_eq!("0a:0b:0c:0d:0e:0f", mac_s);
+        assert_eq!(Ok(mac), MacAddr::from_str(&mac_s));
+
+        assert_eq!(
+            MacAddr::from_str("0a:0b:0c:0d:0e:0f:01"),
+            Err(MacAddrFromStrError::InvalidAddrFormat)
+        );
+        assert_eq!(
+            MacAddr::from_str("0a:0b:0c:0d:0e"),
+            Err(MacAddrFromStrError::InvalidAddrFormat)
+        );
     }
 
     // Ensure that the `Display` and `Debug` traits are implemented on the `IpNetwork` struct
@@ -523,5 +619,39 @@ mod tests {
             return;
         }
         panic!("Networks should have at least one IP network ");
+    }
+
+    #[test]
+    fn check_ip_network_conversions() {
+        let addr = IpNetwork {
+            addr: IpAddr::from(Ipv6Addr::new(0xff, 0xa, 0x8, 0x12, 0x7, 0xc, 0xa, 0xb)),
+            prefix: 12,
+        };
+
+        let addr_s = addr.to_string();
+        assert_eq!("ff:a:8:12:7:c:a:b/12", addr_s);
+        assert_eq!(Ok(addr), IpNetwork::from_str(&addr_s));
+
+        let addr = IpNetwork {
+            addr: IpAddr::from(Ipv4Addr::new(255, 255, 255, 0)),
+            prefix: 21,
+        };
+
+        let addr_s = addr.to_string();
+        assert_eq!("255.255.255.0/21", addr_s);
+        assert_eq!(Ok(addr), IpNetwork::from_str(&addr_s));
+
+        assert_eq!(
+            IpNetwork::from_str("ff:a:8:12:7:c:a:b"),
+            Err(IpNetworkFromStrError::InvalidAddrFormat)
+        );
+        assert_eq!(
+            IpNetwork::from_str("ff:a:8:12:7:c:a:b/12/12"),
+            Err(IpNetworkFromStrError::InvalidAddrFormat)
+        );
+        match IpNetwork::from_str("0a:0b:0c:0d:0e/12") {
+            Err(IpNetworkFromStrError::AddrParseError(_)) => {}
+            x => panic!("expected `IpNetworkFromStrError::AddrParseError`, found {x:?}"),
+        }
     }
 }

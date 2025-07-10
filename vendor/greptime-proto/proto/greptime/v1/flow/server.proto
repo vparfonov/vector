@@ -33,6 +33,14 @@ service Flow {
   rpc HandleMirrorRequest(InsertRequests) returns (FlowResponse);
 }
 
+message FlowRequestHeader {
+  // Encoded trace_id & span_id, follow the w3c Trace Context
+  // https://www.w3.org/TR/trace-context/#header-name
+  map<string, string> tracing_context = 1;
+  // The contextual information of the query
+  QueryContext query_context = 2;
+}
+
 message InsertRequests { repeated InsertRequest requests = 1; }
 
 message InsertRequest {
@@ -41,35 +49,40 @@ message InsertRequest {
 }
 
 message FlowRequest {
+  FlowRequestHeader header = 64;
   oneof body {
     CreateRequest create = 1;
-    RemoveRequest remove = 2;
+    DropRequest drop = 2;
+    FlushFlow flush = 3;
   }
 }
 
 message FlowResponse {
   ResponseHeader header = 1;
   uint64 affected_rows = 2;
-  map<string, bytes> extension = 3;
-  // affected task ids
-  repeated TaskId affected_tasks = 4;
+  // affected flow ids
+  repeated FlowId affected_flows = 3;
+  map<string, bytes> extensions = 4;
 }
 
-// Create a flow task
-// 
-// Very similar to `ddl.CreateTaskExpr`, 
+// Create a flow
+//
+// Very similar to `ddl.CreateTaskExpr`,
 // replace `source_table_names` with `source_table_ids`
 message CreateRequest {
-  TaskId task_id = 1; 
+  FlowId flow_id = 1;
   repeated TableId source_table_ids = 2;
   TableName sink_table_name = 3;
   bool create_if_not_exists = 4;
-  string expire_when = 5;
+  // Expire data older than the given duration seconds.
+  ExpireAfter expire_after = 5;
   string comment = 6;
   string sql = 7;
-  map<string, string> task_options = 8;
+  map<string, string> flow_options = 8;
 }
 
-message RemoveRequest { TaskId task_id = 1; }
+message DropRequest { FlowId flow_id = 1; }
 
-message TaskId { uint32 id = 1; }
+message FlushFlow {
+  FlowId flow_id = 1;
+}

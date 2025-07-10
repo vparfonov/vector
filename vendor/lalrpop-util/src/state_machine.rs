@@ -1,8 +1,3 @@
-#![doc(hidden)]
-//! State machine for use by lalrpop generated parsers
-//!
-//! This provides grammar-independent state machine support for generated parsers.  It is intended
-//! to be linked by the generated parser, not used directly by users.
 use alloc::{string::String, vec, vec::Vec};
 use core::fmt::Debug;
 

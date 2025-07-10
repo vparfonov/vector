@@ -194,9 +194,9 @@ impl MemHistory {
     }
 
     /// Customized constructor with:
-    /// - `Config::max_history_size()`,
-    /// - `Config::history_ignore_space()`,
-    /// - `Config::history_duplicates()`.
+    /// - [`Config::max_history_size()`],
+    /// - [`Config::history_ignore_space()`],
+    /// - [`Config::history_duplicates()`].
     #[must_use]
     pub fn with_config(config: Config) -> Self {
         Self {
@@ -259,7 +259,7 @@ impl MemHistory {
             return true;
         }
         if line.is_empty()
-            || (self.ignore_space && line.chars().next().map_or(true, char::is_whitespace))
+            || (self.ignore_space && line.chars().next().is_none_or(char::is_whitespace))
         {
             return true;
         }
@@ -473,9 +473,9 @@ impl FileHistory {
     }
 
     /// Customized constructor with:
-    /// - `Config::max_history_size()`,
-    /// - `Config::history_ignore_space()`,
-    /// - `Config::history_duplicates()`.
+    /// - [`Config::max_history_size()`],
+    /// - [`Config::history_ignore_space()`],
+    /// - [`Config::history_duplicates()`].
     #[must_use]
     pub fn with_config(config: Config) -> Self {
         Self {
@@ -566,7 +566,7 @@ impl FileHistory {
                         }
                         _ => {
                             // only line feed and back slash should have been escaped
-                            warn!(target: "rustyline", "bad escaped line: {}", line);
+                            warn!(target: "rustyline", "bad escaped line: {line}");
                             copy = None;
                             break;
                         }
@@ -600,7 +600,7 @@ impl FileHistory {
         } else {
             self.path_info = Some(PathInfo(path.to_owned(), modified, size));
         }
-        debug!(target: "rustyline", "PathInfo({:?}, {:?}, {})", path, modified, size);
+        debug!(target: "rustyline", "PathInfo({path:?}, {modified:?}, {size})");
         Ok(())
     }
 
@@ -609,7 +609,7 @@ impl FileHistory {
             self.path_info
         {
             if previous_path.as_path() != path {
-                debug!(target: "rustyline", "cannot append: {:?} <> {:?}", previous_path, path);
+                debug!(target: "rustyline", "cannot append: {previous_path:?} <> {path:?}");
                 return Ok(false);
             }
             let modified = file.metadata()?.modified()?;
@@ -830,8 +830,7 @@ cfg_if::cfg_if! {
         }
 
         fn fix_perm(file: &File) {
-            use std::os::unix::io::AsRawFd;
-            let _ = fchmod(file.as_raw_fd(), Mode::S_IRUSR | Mode::S_IWUSR);
+            let _ = fchmod(file, Mode::S_IRUSR | Mode::S_IWUSR);
         }
     }
 }

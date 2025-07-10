@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.71"
 name = "mlua-sys"
-version = "0.6.7"
+version = "0.6.8"
 authors = ["Aleksandr Orlenko <zxteam@pm.me>"]
 build = "build/main.rs"
 links = "lua"
@@ -23,13 +23,13 @@ autoexamples = false
 autotests = false
 autobenches = false
 description = """
-Low level (FFI) bindings to Lua 5.4/5.3/5.2/5.1 (including LuaJIT) and Roblox Luau
+Low level (FFI) bindings to Lua 5.4/5.3/5.2/5.1 (including LuaJIT) and Luau
 """
 documentation = "https://docs.rs/mlua-sys"
 readme = "README.md"
 categories = ["external-ffi-bindings"]
 license = "MIT"
-repository = "https://github.com/khvzak/mlua"
+repository = "https://github.com/mlua-rs/mlua"
 
 [package.metadata.docs.rs]
 features = [

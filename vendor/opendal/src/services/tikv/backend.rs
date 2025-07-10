@@ -15,18 +15,16 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 
-use async_trait::async_trait;
-use serde::Deserialize;
 use tikv_client::Config;
 use tikv_client::RawClient;
 use tokio::sync::OnceCell;
 
 use crate::raw::adapters::kv;
-use crate::raw::*;
+use crate::raw::Access;
+use crate::services::TikvConfig;
 use crate::Builder;
 use crate::Capability;
 use crate::Error;
@@ -34,33 +32,10 @@ use crate::ErrorKind;
 use crate::Scheme;
 use crate::*;
 
-/// Config for Tikv services support.
-#[derive(Default, Deserialize, Clone)]
-#[serde(default)]
-#[non_exhaustive]
-pub struct TikvConfig {
-    /// network address of the TiKV service.
-    pub endpoints: Option<Vec<String>>,
-    /// whether using insecure connection to TiKV
-    pub insecure: bool,
-    /// certificate authority file path
-    pub ca_path: Option<String>,
-    /// cert path
-    pub cert_path: Option<String>,
-    /// key path
-    pub key_path: Option<String>,
-}
-
-impl Debug for TikvConfig {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut d = f.debug_struct("TikvConfig");
-
-        d.field("endpoints", &self.endpoints)
-            .field("insecure", &self.insecure)
-            .field("ca_path", &self.ca_path)
-            .field("cert_path", &self.cert_path)
-            .field("key_path", &self.key_path)
-            .finish()
+impl Configurator for TikvConfig {
+    type Builder = TikvBuilder;
+    fn into_builder(self) -> Self::Builder {
+        TikvBuilder { config: self }
     }
 }
 
@@ -82,7 +57,7 @@ impl Debug for TikvBuilder {
 
 impl TikvBuilder {
     /// Set the network address of the TiKV service.
-    pub fn endpoints(&mut self, endpoints: Vec<String>) -> &mut Self {
+    pub fn endpoints(mut self, endpoints: Vec<String>) -> Self {
         if !endpoints.is_empty() {
             self.config.endpoints = Some(endpoints)
         }
@@ -90,13 +65,13 @@ impl TikvBuilder {
     }
 
     /// Set the insecure connection to TiKV.
-    pub fn insecure(&mut self) -> &mut Self {
+    pub fn insecure(mut self) -> Self {
         self.config.insecure = true;
         self
     }
 
     /// Set the certificate authority file path.
-    pub fn ca_path(&mut self, ca_path: &str) -> &mut Self {
+    pub fn ca_path(mut self, ca_path: &str) -> Self {
         if !ca_path.is_empty() {
             self.config.ca_path = Some(ca_path.to_string())
         }
@@ -104,7 +79,7 @@ impl TikvBuilder {
     }
 
     /// Set the certificate file path.
-    pub fn cert_path(&mut self, cert_path: &str) -> &mut Self {
+    pub fn cert_path(mut self, cert_path: &str) -> Self {
         if !cert_path.is_empty() {
             self.config.cert_path = Some(cert_path.to_string())
         }
@@ -112,7 +87,7 @@ impl TikvBuilder {
     }
 
     /// Set the key file path.
-    pub fn key_path(&mut self, key_path: &str) -> &mut Self {
+    pub fn key_path(mut self, key_path: &str) -> Self {
         if !key_path.is_empty() {
             self.config.key_path = Some(key_path.to_string())
         }
@@ -122,17 +97,10 @@ impl TikvBuilder {
 
 impl Builder for TikvBuilder {
     const SCHEME: Scheme = Scheme::Tikv;
-    type Accessor = TikvBackend;
+    type Config = TikvConfig;
 
-    fn from_map(map: HashMap<String, String>) -> Self {
-        let config = TikvConfig::deserialize(ConfigDeserializer::new(map))
-            .expect("config deserialize must succeed");
-
-        TikvBuilder { config }
-    }
-
-    fn build(&mut self) -> Result<Self::Accessor> {
-        let endpoints = self.config.endpoints.take().ok_or_else(|| {
+    fn build(self) -> Result<impl Access> {
+        let endpoints = self.config.endpoints.ok_or_else(|| {
             Error::new(
                 ErrorKind::ConfigInvalid,
                 "endpoints is required but not set",
@@ -216,30 +184,34 @@ impl Adapter {
     }
 }
 
-#[async_trait]
 impl kv::Adapter for Adapter {
-    fn metadata(&self) -> kv::Metadata {
-        kv::Metadata::new(
+    type Scanner = ();
+
+    fn info(&self) -> kv::Info {
+        kv::Info::new(
             Scheme::Tikv,
             "TiKV",
             Capability {
                 read: true,
                 write: true,
                 blocking: false,
+                shared: true,
                 ..Default::default()
             },
         )
     }
 
-    async fn get(&self, path: &str) -> Result<Option<Vec<u8>>> {
-        self.get_connection()
+    async fn get(&self, path: &str) -> Result<Option<Buffer>> {
+        let result = self
+            .get_connection()
             .await?
             .get(path.to_owned())
             .await
-            .map_err(parse_tikv_error)
+            .map_err(parse_tikv_error)?;
+        Ok(result.map(Buffer::from))
     }
 
-    async fn set(&self, path: &str, value: &[u8]) -> Result<()> {
+    async fn set(&self, path: &str, value: Buffer) -> Result<()> {
         self.get_connection()
             .await?
             .put(path.to_owned(), value.to_vec())

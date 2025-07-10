@@ -2,15 +2,17 @@
 
 use crate::Component;
 
-pub(crate) struct ComponentInner;
+pub(crate) struct ComponentInner {
+    pub(crate) updated: bool,
+}
 
 impl ComponentInner {
-    pub(crate) fn temperature(&self) -> f32 {
-        0.0
+    pub(crate) fn temperature(&self) -> Option<f32> {
+        None
     }
 
-    pub(crate) fn max(&self) -> f32 {
-        0.0
+    pub(crate) fn max(&self) -> Option<f32> {
+        None
     }
 
     pub(crate) fn critical(&self) -> Option<f32> {
@@ -25,7 +27,7 @@ impl ComponentInner {
 }
 
 pub(crate) struct ComponentsInner {
-    components: Vec<Component>,
+    pub(crate) components: Vec<Component>,
 }
 
 impl ComponentsInner {
@@ -51,7 +53,7 @@ impl ComponentsInner {
         &mut self.components
     }
 
-    pub(crate) fn refresh_list(&mut self) {
+    pub(crate) fn refresh(&mut self) {
         // Doesn't do anything.
     }
 }

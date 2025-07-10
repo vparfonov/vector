@@ -2,7 +2,7 @@ use super::*;
 
 /// An error code value returned by most COM functions.
 #[repr(transparent)]
-#[derive(Copy, Clone, Default, Eq, PartialEq)]
+#[derive(Copy, Clone, Default, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[must_use]
 #[allow(non_camel_case_types)]
 pub struct HRESULT(pub i32);
@@ -63,42 +63,53 @@ impl HRESULT {
     }
 
     /// The error message describing the error.
-    pub fn message(&self) -> String {
-        let mut message = HeapString::default();
-        let mut code = self.0;
-        let mut module = 0;
+    pub fn message(self) -> String {
+        #[cfg(windows)]
+        {
+            let mut message = HeapString::default();
+            let mut code = self.0;
+            let mut module = core::ptr::null_mut();
 
-        let mut flags = FORMAT_MESSAGE_ALLOCATE_BUFFER
-            | FORMAT_MESSAGE_FROM_SYSTEM
-            | FORMAT_MESSAGE_IGNORE_INSERTS;
+            let mut flags = FORMAT_MESSAGE_ALLOCATE_BUFFER
+                | FORMAT_MESSAGE_FROM_SYSTEM
+                | FORMAT_MESSAGE_IGNORE_INSERTS;
 
-        unsafe {
-            if self.0 & 0x1000_0000 == 0x1000_0000 {
-                code ^= 0x1000_0000;
-                flags |= FORMAT_MESSAGE_FROM_HMODULE;
+            unsafe {
+                if self.0 & 0x1000_0000 == 0x1000_0000 {
+                    code ^= 0x1000_0000;
+                    flags |= FORMAT_MESSAGE_FROM_HMODULE;
 
-                module =
-                    LoadLibraryExA(b"ntdll.dll\0".as_ptr(), 0, LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
+                    module = LoadLibraryExA(
+                        b"ntdll.dll\0".as_ptr(),
+                        core::ptr::null_mut(),
+                        LOAD_LIBRARY_SEARCH_DEFAULT_DIRS,
+                    );
+                }
+
+                let size = FormatMessageW(
+                    flags,
+                    module as _,
+                    code as _,
+                    0,
+                    &mut message.0 as *mut _ as *mut _,
+                    0,
+                    core::ptr::null(),
+                );
+
+                if !message.0.is_null() && size > 0 {
+                    String::from_utf16_lossy(wide_trim_end(core::slice::from_raw_parts(
+                        message.0,
+                        size as usize,
+                    )))
+                } else {
+                    String::default()
+                }
             }
+        }
 
-            let size = FormatMessageW(
-                flags,
-                module as _,
-                code as _,
-                0,
-                &mut message.0 as *mut _ as *mut _,
-                0,
-                core::ptr::null(),
-            );
-
-            if !message.0.is_null() && size > 0 {
-                String::from_utf16_lossy(wide_trim_end(core::slice::from_raw_parts(
-                    message.0,
-                    size as usize,
-                )))
-            } else {
-                String::default()
-            }
+        #[cfg(not(windows))]
+        {
+            return alloc::format!("0x{:08x}", self.0 as u32);
         }
     }
 

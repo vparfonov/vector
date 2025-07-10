@@ -15,7 +15,6 @@
 use crate::profile::credentials::ProfileFileError;
 use crate::profile::{Profile, ProfileSet};
 use crate::sensitive_command::CommandWithSensitiveArgs;
-use aws_credential_types::attributes::AccountId;
 use aws_credential_types::Credentials;
 
 /// Chain of Profile Providers
@@ -93,12 +92,7 @@ pub(crate) enum BaseProvider<'a> {
     /// [profile assume-role]
     /// credential_process = /opt/bin/awscreds-custom --username helen
     /// ```
-    CredentialProcess {
-        command_with_sensitive_args: CommandWithSensitiveArgs<&'a str>,
-        // The account ID that the credential process falls back to
-        // if the process execution result does not provide one.
-        account_id: Option<&'a str>,
-    },
+    CredentialProcess(CommandWithSensitiveArgs<&'a str>),
 }
 
 /// A profile that specifies a role to assume
@@ -236,7 +230,6 @@ mod static_credentials {
     pub(super) const AWS_ACCESS_KEY_ID: &str = "aws_access_key_id";
     pub(super) const AWS_SECRET_ACCESS_KEY: &str = "aws_secret_access_key";
     pub(super) const AWS_SESSION_TOKEN: &str = "aws_session_token";
-    pub(super) const AWS_ACCOUNT_ID: &str = "aws_account_id";
 }
 
 mod credential_process {
@@ -446,13 +439,13 @@ fn static_creds_from_profile(profile: &Profile) -> Result<Credentials, ProfileFi
         message: "profile missing aws_secret_access_key".into(),
     })?;
     // There might not be an active session token so we don't error out if it's missing
-    let mut builder = Credentials::builder()
-        .access_key_id(access_key)
-        .secret_access_key(secret_key)
-        .provider_name(PROVIDER_NAME);
-    builder.set_session_token(session_token.map(String::from));
-    builder.set_account_id(profile.get(AWS_ACCOUNT_ID).map(AccountId::from));
-    Ok(builder.build())
+    Ok(Credentials::new(
+        access_key,
+        secret_key,
+        session_token.map(|s| s.to_string()),
+        None,
+        PROVIDER_NAME,
+    ))
 }
 
 /// Load credentials from `credential_process`
@@ -465,14 +458,12 @@ fn static_creds_from_profile(profile: &Profile) -> Result<Credentials, ProfileFi
 fn credential_process_from_profile(
     profile: &Profile,
 ) -> Option<Result<BaseProvider<'_>, ProfileFileError>> {
-    let account_id = profile.get(static_credentials::AWS_ACCOUNT_ID);
     profile
         .get(credential_process::CREDENTIAL_PROCESS)
         .map(|credential_process| {
-            Ok(BaseProvider::CredentialProcess {
-                command_with_sensitive_args: CommandWithSensitiveArgs::new(credential_process),
-                account_id,
-            })
+            Ok(BaseProvider::CredentialProcess(
+                CommandWithSensitiveArgs::new(credential_process),
+            ))
         })
 }
 
@@ -557,15 +548,10 @@ mod tests {
                 access_key_id: creds.access_key_id().into(),
                 secret_access_key: creds.secret_access_key().into(),
                 session_token: creds.session_token().map(|tok| tok.to_string()),
-                account_id: creds.account_id().map(|id| id.as_str().to_string()),
             }),
-            BaseProvider::CredentialProcess {
-                command_with_sensitive_args,
-                account_id,
-            } => output.push(Provider::CredentialProcess {
-                command: command_with_sensitive_args.unredacted().into(),
-                account_id: account_id.map(|id| id.to_string()),
-            }),
+            BaseProvider::CredentialProcess(credential_process) => output.push(
+                Provider::CredentialProcess(credential_process.unredacted().into()),
+            ),
             BaseProvider::WebIdentityTokenRole {
                 role_arn,
                 web_identity_token_file,
@@ -616,13 +602,9 @@ mod tests {
             access_key_id: String,
             secret_access_key: String,
             session_token: Option<String>,
-            account_id: Option<String>,
         },
         NamedSource(String),
-        CredentialProcess {
-            command: String,
-            account_id: Option<String>,
-        },
+        CredentialProcess(String),
         WebIdentityToken {
             role_arn: String,
             web_identity_token_file: String,
@@ -641,35 +623,26 @@ mod tests {
     #[test]
     fn base_provider_process_credentials_args_redaction() {
         assert_eq!(
-            r#"CredentialProcess { command_with_sensitive_args: "program", account_id: None }"#,
+            "CredentialProcess(\"program\")",
             format!(
                 "{:?}",
-                BaseProvider::CredentialProcess {
-                    command_with_sensitive_args: CommandWithSensitiveArgs::new("program"),
-                    account_id: None,
-                }
+                BaseProvider::CredentialProcess(CommandWithSensitiveArgs::new("program"))
             )
         );
         assert_eq!(
-            r#"CredentialProcess { command_with_sensitive_args: "program ** arguments redacted **", account_id: None }"#,
+            "CredentialProcess(\"program ** arguments redacted **\")",
             format!(
                 "{:?}",
-                BaseProvider::CredentialProcess {
-                    command_with_sensitive_args: CommandWithSensitiveArgs::new("program arg1 arg2"),
-                    account_id: None
-                }
+                BaseProvider::CredentialProcess(CommandWithSensitiveArgs::new("program arg1 arg2"))
             )
         );
         assert_eq!(
-            r#"CredentialProcess { command_with_sensitive_args: "program ** arguments redacted **", account_id: None }"#,
+            "CredentialProcess(\"program ** arguments redacted **\")",
             format!(
                 "{:?}",
-                BaseProvider::CredentialProcess {
-                    command_with_sensitive_args: CommandWithSensitiveArgs::new(
-                        "program\targ1 arg2"
-                    ),
-                    account_id: None
-                }
+                BaseProvider::CredentialProcess(CommandWithSensitiveArgs::new(
+                    "program\targ1 arg2"
+                ))
             )
         );
     }

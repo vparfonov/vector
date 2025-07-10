@@ -17,15 +17,17 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use http::StatusCode;
-
 use super::core::*;
+use super::error::from_s3_error;
 use super::error::parse_error;
+use super::error::S3Error;
 use crate::raw::*;
 use crate::*;
+use bytes::Buf;
+use constants::{X_AMZ_OBJECT_SIZE, X_AMZ_VERSION_ID};
+use http::StatusCode;
 
-pub type S3Writers = oio::MultipartWriter<S3Writer>;
+pub type S3Writers = TwoWays<oio::MultipartWriter<S3Writer>, oio::AppendWriter<S3Writer>>;
 
 pub struct S3Writer {
     core: Arc<S3Core>,
@@ -42,12 +44,26 @@ impl S3Writer {
             op,
         }
     }
+
+    fn parse_header_into_meta(path: &str, headers: &http::HeaderMap) -> Result<Metadata> {
+        let mut meta = Metadata::new(EntryMode::from_path(path));
+        if let Some(etag) = parse_etag(headers)? {
+            meta.set_etag(etag);
+        }
+        if let Some(version) = parse_header_to_str(headers, X_AMZ_VERSION_ID)? {
+            meta.set_version(version);
+        }
+        if let Some(size) = parse_header_to_str(headers, X_AMZ_OBJECT_SIZE)? {
+            if let Ok(value) = size.parse() {
+                meta.set_content_length(value);
+            }
+        }
+        Ok(meta)
+    }
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
 impl oio::MultipartWrite for S3Writer {
-    async fn write_once(&self, size: u64, body: AsyncBody) -> Result<()> {
+    async fn write_once(&self, size: u64, body: Buffer) -> Result<Metadata> {
         let mut req = self
             .core
             .s3_put_object_request(&self.path, Some(size), &self.op, body)?;
@@ -58,12 +74,11 @@ impl oio::MultipartWrite for S3Writer {
 
         let status = resp.status();
 
+        let meta = S3Writer::parse_header_into_meta(&self.path, resp.headers())?;
+
         match status {
-            StatusCode::CREATED | StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::CREATED | StatusCode::OK => Ok(meta),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -77,15 +92,14 @@ impl oio::MultipartWrite for S3Writer {
 
         match status {
             StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
+                let bs = resp.into_body();
 
                 let result: InitiateMultipartUploadResult =
-                    quick_xml::de::from_reader(bytes::Buf::reader(bs))
-                        .map_err(new_xml_deserialize_error)?;
+                    quick_xml::de::from_reader(bs.reader()).map_err(new_xml_deserialize_error)?;
 
                 Ok(result.upload_id)
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -94,14 +108,21 @@ impl oio::MultipartWrite for S3Writer {
         upload_id: &str,
         part_number: usize,
         size: u64,
-        body: AsyncBody,
+        body: Buffer,
     ) -> Result<oio::MultipartPart> {
         // AWS S3 requires part number must between [1..=10000]
         let part_number = part_number + 1;
 
-        let mut req =
-            self.core
-                .s3_upload_part_request(&self.path, upload_id, part_number, size, body)?;
+        let checksum = self.core.calculate_checksum(&body);
+
+        let mut req = self.core.s3_upload_part_request(
+            &self.path,
+            upload_id,
+            part_number,
+            size,
+            body,
+            checksum.clone(),
+        )?;
 
         self.core.sign(&mut req).await?;
 
@@ -120,20 +141,36 @@ impl oio::MultipartWrite for S3Writer {
                     })?
                     .to_string();
 
-                resp.into_body().consume().await?;
-
-                Ok(oio::MultipartPart { part_number, etag })
+                Ok(oio::MultipartPart {
+                    part_number,
+                    etag,
+                    checksum,
+                })
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    async fn complete_part(&self, upload_id: &str, parts: &[oio::MultipartPart]) -> Result<()> {
+    async fn complete_part(
+        &self,
+        upload_id: &str,
+        parts: &[oio::MultipartPart],
+    ) -> Result<Metadata> {
         let parts = parts
             .iter()
-            .map(|p| CompleteMultipartUploadRequestPart {
-                part_number: p.part_number,
-                etag: p.etag.clone(),
+            .map(|p| match &self.core.checksum_algorithm {
+                None => CompleteMultipartUploadRequestPart {
+                    part_number: p.part_number,
+                    etag: p.etag.clone(),
+                    ..Default::default()
+                },
+                Some(checksum_algorithm) => match checksum_algorithm {
+                    ChecksumAlgorithm::Crc32c => CompleteMultipartUploadRequestPart {
+                        part_number: p.part_number,
+                        etag: p.etag.clone(),
+                        checksum_crc32c: p.checksum.clone(),
+                    },
+                },
             })
             .collect();
 
@@ -144,13 +181,32 @@ impl oio::MultipartWrite for S3Writer {
 
         let status = resp.status();
 
+        let mut meta = S3Writer::parse_header_into_meta(&self.path, resp.headers())?;
+
         match status {
             StatusCode::OK => {
-                resp.into_body().consume().await?;
+                // still check if there is any error because S3 might return error for status code 200
+                // https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html#API_CompleteMultipartUpload_Example_4
+                let (parts, body) = resp.into_parts();
 
-                Ok(())
+                let ret: CompleteMultipartUploadResult =
+                    quick_xml::de::from_reader(body.reader()).map_err(new_xml_deserialize_error)?;
+                if !ret.code.is_empty() {
+                    return Err(from_s3_error(
+                        S3Error {
+                            code: ret.code,
+                            message: ret.message,
+                            resource: "".to_string(),
+                            request_id: ret.request_id,
+                        },
+                        parts,
+                    ));
+                }
+                meta.set_etag(&ret.etag);
+
+                Ok(meta)
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
@@ -161,11 +217,44 @@ impl oio::MultipartWrite for S3Writer {
             .await?;
         match resp.status() {
             // s3 returns code 204 if abort succeeds.
-            StatusCode::NO_CONTENT => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::NO_CONTENT => Ok(()),
+            _ => Err(parse_error(resp)),
+        }
+    }
+}
+
+impl oio::AppendWrite for S3Writer {
+    async fn offset(&self) -> Result<u64> {
+        let resp = self
+            .core
+            .s3_head_object(&self.path, OpStat::default())
+            .await?;
+
+        let status = resp.status();
+
+        match status {
+            StatusCode::OK => Ok(parse_content_length(resp.headers())?.unwrap_or_default()),
+            StatusCode::NOT_FOUND => Ok(0),
+            _ => Err(parse_error(resp)),
+        }
+    }
+
+    async fn append(&self, offset: u64, size: u64, body: Buffer) -> Result<Metadata> {
+        let mut req = self
+            .core
+            .s3_append_object_request(&self.path, offset, size, &self.op, body)?;
+
+        self.core.sign(&mut req).await?;
+
+        let resp = self.core.send(req).await?;
+
+        let status = resp.status();
+
+        let meta = S3Writer::parse_header_into_meta(&self.path, resp.headers())?;
+
+        match status {
+            StatusCode::CREATED | StatusCode::OK => Ok(meta),
+            _ => Err(parse_error(resp)),
         }
     }
 }

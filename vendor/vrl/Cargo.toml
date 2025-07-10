@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.81"
+rust-version = "1.82"
 name = "vrl"
-version = "0.23.0"
+version = "0.25.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 build = "build.rs"
 autolib = false
@@ -157,7 +157,7 @@ stdlib = [
     "dep:aes-siv",
     "dep:base16",
     "dep:base62",
-    "dep:base64",
+    "dep:base64-simd",
     "dep:cbc",
     "dep:cfb-mode",
     "dep:chacha20poly1305",
@@ -170,7 +170,6 @@ stdlib = [
     "dep:crypto_secretbox",
     "dep:csv",
     "dep:ctr",
-    "dep:data-encoding",
     "dep:digest",
     "dep:domain",
     "dep:dns-lookup",
@@ -283,8 +282,8 @@ optional = true
 version = "2.2.1"
 optional = true
 
-[dependencies.base64]
-version = "0.22"
+[dependencies.base64-simd]
+version = "0.8"
 optional = true
 
 [dependencies.bytes]
@@ -353,7 +352,7 @@ version = "0.7.1"
 optional = true
 
 [dependencies.crc]
-version = "3.2.1"
+version = "3.3.0"
 optional = true
 
 [dependencies.crypto_secretbox]
@@ -367,10 +366,6 @@ optional = true
 
 [dependencies.ctr]
 version = "0.9"
-optional = true
-
-[dependencies.data-encoding]
-version = "2"
 optional = true
 
 [dependencies.digest]
@@ -396,8 +391,8 @@ optional = true
 default-features = false
 
 [dependencies.flate2]
-version = "1"
-features = ["default"]
+version = "1.1.2"
+features = ["zlib-rs"]
 optional = true
 default-features = false
 
@@ -571,7 +566,7 @@ optional = true
 default-features = false
 
 [dependencies.rustyline]
-version = "15"
+version = "16"
 optional = true
 default-features = false
 
@@ -676,7 +671,7 @@ version = "1"
 version = "0.10"
 
 [dev-dependencies.criterion]
-version = "0.5"
+version = "0.6"
 
 [dev-dependencies.indoc]
 version = "2"
@@ -734,7 +729,7 @@ version = "2"
 optional = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.domain]
-version = "0.10.4"
+version = "0.11.0"
 features = [
     "resolv-sync",
     "serde",
@@ -742,7 +737,7 @@ features = [
 optional = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.grok]
-version = "2"
+version = "2.1"
 optional = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.hostname]
@@ -755,7 +750,7 @@ optional = true
 default-features = false
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies.tokio]
-version = "1.44"
+version = "1.45"
 features = [
     "io-util",
     "macros",

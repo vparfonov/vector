@@ -1,5 +1,41 @@
 # Migration guide
 
+## 0.33 to 0.34
+
+### Major changes
+
+The `multithread` feature is now disabled by default. It is to reduce the issues linked to the `rayon` crate usage.
+
+The `System::physical_core_count` method was turned into an associated function. No need to have a `System` instance to get this information anymore.
+
+The `System::refresh_all` and `System::refresh_specifics` methods now remove dead processes. If you don't want the dead processes to be removed, you will need to use `System::refresh_processes_specifics` directly instead.
+
+### New APIs
+
+The `Process` type has new methods: `accumulated_cpu_time`, `exists`, `open_files` and `open_files_limit`.
+
+The `Process::wait` method now returns `Option<ExitStatus>` instead of `ExitStatus`.
+
+The `System` type has new methods: `distribution_id_like` and `kernel_long_version`.
+
+The `ProcessRefreshKind` type has a new "refresh kind": `tasks`.
+
+## 0.32 to 0.33
+
+### Major changes
+
+`Users::refresh_list`, `Groups::refresh_list`, `Components::refresh_list`, `Networks::refresh_list` and `Disks::refresh_list` methods were renamed into `refresh`. All of them except for `Users::refresh` and `Groups::refresh` expect a boolean to tell whether or not `sysinfo` should keep removed items.
+
+`Component::temperature` and `Component::max` now returns `Option<f32>` instead of returning `f32::NaN` in case the information isn't available.
+
+`*RefreshKind::new` methods were renamed `nothing` to better the match the `*RefreshKind::everything` method.
+
+### New APIs
+
+`Disks` now has a new `refresh_specifics` method expecting a `DiskRefreshKind` argument to allow you finer-grained refreshes.
+
+The `NetworkData` type now has a new `mtu` method to retrieve the Maximum Transfer Unit.
+
 ## 0.31 to 0.32
 
 ### Major changes

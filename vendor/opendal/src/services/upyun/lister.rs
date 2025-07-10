@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
 
 use super::core::ListObjectsResponse;
 use super::core::UpyunCore;
@@ -45,7 +45,6 @@ impl UpyunLister {
     }
 }
 
-#[async_trait]
 impl oio::PageList for UpyunLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let resp = self
@@ -65,14 +64,14 @@ impl oio::PageList for UpyunLister {
                 return Ok(());
             }
             _ => {
-                return Err(parse_error(resp).await?);
+                return Err(parse_error(resp));
             }
         }
 
-        let bs = resp.into_body().bytes().await?;
+        let bs = resp.into_body();
 
-        let response = serde_json::from_slice::<ListObjectsResponse>(&bs)
-            .map_err(new_json_deserialize_error)?;
+        let response: ListObjectsResponse =
+            serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
 
         // ref https://help.upyun.com/knowledge-base/rest_api/#e88eb7e58f96e79baee5bd95e69687e4bbb6e58897e8a1a8
         // when iter is "g2gCZAAEbmV4dGQAA2VvZg", it means the list is done.

@@ -6,8 +6,6 @@ use crate::backend::conv::ret;
 use crate::backend::conv::ret_c_int;
 #[cfg(any(linux_kernel, target_os = "illumos", target_os = "redox"))]
 use crate::backend::conv::ret_u32;
-#[cfg(bsd)]
-use crate::event::kqueue::Event;
 #[cfg(solarish)]
 use crate::event::port::Event;
 #[cfg(any(
@@ -49,6 +47,8 @@ use {crate::backend::conv::borrowed_fd, crate::fd::BorrowedFd};
     target_os = "redox"
 ))]
 use {crate::backend::conv::ret_owned_fd, crate::fd::OwnedFd};
+#[cfg(bsd)]
+use {crate::event::kqueue::Event, crate::utils::as_ptr};
 
 #[cfg(any(
     linux_kernel,
@@ -96,28 +96,8 @@ pub(crate) unsafe fn kevent(
     kq: BorrowedFd<'_>,
     changelist: &[Event],
     eventlist: (*mut Event, usize),
-    timeout: Option<&Timespec>,
+    timeout: Option<&c::timespec>,
 ) -> io::Result<c::c_int> {
-    // If we don't have to fix y2038 on this platform, `Timespec` is the same
-    // as `c::timespec` and it's easy.
-    #[cfg(not(fix_y2038))]
-    let timeout = crate::timespec::option_as_libc_timespec_ptr(timeout);
-
-    // If we do have to fix y2038 on this platform, convert to `c::timespec`.
-    #[cfg(fix_y2038)]
-    let converted_timeout;
-    #[cfg(fix_y2038)]
-    let timeout = match timeout {
-        None => null(),
-        Some(timeout) => {
-            converted_timeout = c::timespec {
-                tv_sec: timeout.tv_sec.try_into().map_err(|_| io::Errno::OVERFLOW)?,
-                tv_nsec: timeout.tv_nsec as _,
-            };
-            &converted_timeout
-        }
-    };
-
     ret_c_int(c::kevent(
         borrowed_fd(kq),
         changelist.as_ptr().cast(),
@@ -127,7 +107,7 @@ pub(crate) unsafe fn kevent(
             .map_err(|_| io::Errno::OVERFLOW)?,
         eventlist.0.cast(),
         eventlist.1.try_into().map_err(|_| io::Errno::OVERFLOW)?,
-        timeout,
+        timeout.map_or(null(), as_ptr),
     ))
 }
 
@@ -249,7 +229,7 @@ pub(crate) unsafe fn select(
         Some(timeout) => {
             // Convert from `Timespec` to `c::timeval`.
             timeout_data = c::timeval {
-                tv_sec: timeout.tv_sec.try_into().map_err(|_| io::Errno::INVAL)?,
+                tv_sec: timeout.tv_sec.try_into().map_err(|_| io::Errno::OVERFLOW)?,
                 tv_usec: ((timeout.tv_nsec + 999) / 1000) as _,
             };
             &timeout_data
@@ -326,7 +306,7 @@ pub(crate) unsafe fn select(
         Some(timeout) => {
             // Convert from `Timespec` to `c::timeval`.
             timeout_data = c::timeval {
-                tv_sec: timeout.tv_sec.try_into().map_err(|_| io::Errno::INVAL)?,
+                tv_sec: timeout.tv_sec.try_into().map_err(|_| io::Errno::OVERFLOW)?,
                 tv_usec: ((timeout.tv_nsec + 999) / 1000) as _,
             };
             &timeout_data

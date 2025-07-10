@@ -130,7 +130,7 @@ pub fn normalize_path(path: &str) -> String {
 /// - Add leading `/` if not starts with: `abc/` => `/abc/`
 /// - Add trailing `/` if not ends with: `/abc` => `/abc/`
 ///
-/// Finally, we will got path like `/path/to/root/`.
+/// Finally, we will get path like `/path/to/root/`.
 pub fn normalize_root(v: &str) -> String {
     let mut v = v
         .split('/')
@@ -157,7 +157,7 @@ pub fn get_basename(path: &str) -> &str {
     if !path.ends_with('/') {
         return path
             .split('/')
-            .last()
+            .next_back()
             .expect("file path without name is invalid");
     }
 
@@ -290,6 +290,7 @@ mod tests {
             ("file walk", "foo/bar/baz", "foo/bar/"),
             ("dir rel path", "bar/baz/", "bar/"),
             ("dir root", "/", "/"),
+            ("dir abs path", "/foo/bar/", "/foo/"),
             ("dir walk", "foo/bar/baz/", "foo/bar/"),
         ];
 

@@ -15,15 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::io::SeekFrom;
 use std::num::NonZeroU32;
 use std::sync::Arc;
-use std::task::Context;
-use std::task::Poll;
 use std::thread;
 
-use async_trait::async_trait;
-use bytes::Bytes;
 use governor::clock::Clock;
 use governor::clock::DefaultClock;
 use governor::middleware::NoOpMiddleware;
@@ -54,17 +49,21 @@ use crate::*;
 /// # Examples
 ///
 /// This example limits bandwidth to 10 KiB/s and burst size to 10 MiB.
-/// ```
-/// use anyhow::Result;
-/// use opendal::layers::ThrottleLayer;
-/// use opendal::services;
-/// use opendal::Operator;
-/// use opendal::Scheme;
 ///
+/// ```no_run
+/// # use opendal::layers::ThrottleLayer;
+/// # use opendal::services;
+/// # use opendal::Operator;
+/// # use opendal::Result;
+/// # use opendal::Scheme;
+///
+/// # fn main() -> Result<()> {
 /// let _ = Operator::new(services::Memory::default())
 ///     .expect("must init")
 ///     .layer(ThrottleLayer::new(10 * 1024, 10000 * 1024))
 ///     .finish();
+/// Ok(())
+/// # }
 /// ```
 #[derive(Clone)]
 pub struct ThrottleLayer {
@@ -87,10 +86,10 @@ impl ThrottleLayer {
     }
 }
 
-impl<A: Accessor> Layer<A> for ThrottleLayer {
-    type LayeredAccessor = ThrottleAccessor<A>;
+impl<A: Access> Layer<A> for ThrottleLayer {
+    type LayeredAccess = ThrottleAccessor<A>;
 
-    fn layer(&self, accessor: A) -> Self::LayeredAccessor {
+    fn layer(&self, accessor: A) -> Self::LayeredAccess {
         let rate_limiter = Arc::new(RateLimiter::direct(
             Quota::per_second(self.bandwidth).allow_burst(self.burst),
         ));
@@ -107,21 +106,21 @@ impl<A: Accessor> Layer<A> for ThrottleLayer {
 type SharedRateLimiter = Arc<RateLimiter<NotKeyed, InMemoryState, DefaultClock, NoOpMiddleware>>;
 
 #[derive(Debug, Clone)]
-pub struct ThrottleAccessor<A: Accessor> {
+pub struct ThrottleAccessor<A: Access> {
     inner: A,
     rate_limiter: SharedRateLimiter,
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-impl<A: Accessor> LayeredAccessor for ThrottleAccessor<A> {
+impl<A: Access> LayeredAccess for ThrottleAccessor<A> {
     type Inner = A;
     type Reader = ThrottleWrapper<A::Reader>;
-    type BlockingReader = ThrottleWrapper<A::BlockingReader>;
     type Writer = ThrottleWrapper<A::Writer>;
-    type BlockingWriter = ThrottleWrapper<A::BlockingWriter>;
     type Lister = A::Lister;
+    type Deleter = A::Deleter;
+    type BlockingReader = ThrottleWrapper<A::BlockingReader>;
+    type BlockingWriter = ThrottleWrapper<A::BlockingWriter>;
     type BlockingLister = A::BlockingLister;
+    type BlockingDeleter = A::BlockingDeleter;
 
     fn inner(&self) -> &Self::Inner {
         &self.inner
@@ -145,6 +144,10 @@ impl<A: Accessor> LayeredAccessor for ThrottleAccessor<A> {
             .map(|(rp, w)| (rp, ThrottleWrapper::new(w, limiter)))
     }
 
+    async fn delete(&self) -> Result<(RpDelete, Self::Deleter)> {
+        self.inner.delete().await
+    }
+
     async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
         self.inner.list(path, args).await
     }
@@ -163,6 +166,10 @@ impl<A: Accessor> LayeredAccessor for ThrottleAccessor<A> {
         self.inner
             .blocking_write(path, args)
             .map(|(rp, w)| (rp, ThrottleWrapper::new(w, limiter)))
+    }
+
+    fn blocking_delete(&self) -> Result<(RpDelete, Self::BlockingDeleter)> {
+        self.inner.blocking_delete()
     }
 
     fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingLister)> {
@@ -185,43 +192,25 @@ impl<R> ThrottleWrapper<R> {
 }
 
 impl<R: oio::Read> oio::Read for ThrottleWrapper<R> {
-    fn poll_read(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<usize>> {
-        // TODO: How can we handle buffer reads with a limiter?
-        self.inner.poll_read(cx, buf)
-    }
-
-    fn poll_seek(&mut self, cx: &mut Context<'_>, pos: SeekFrom) -> Poll<Result<u64>> {
-        self.inner.poll_seek(cx, pos)
-    }
-
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Bytes>>> {
-        self.inner.poll_next(cx)
+    async fn read(&mut self) -> Result<Buffer> {
+        self.inner.read().await
     }
 }
 
 impl<R: oio::BlockingRead> oio::BlockingRead for ThrottleWrapper<R> {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        // TODO: How can we handle buffer reads with a limiter?
-        self.inner.read(buf)
-    }
-
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
-        self.inner.seek(pos)
-    }
-
-    fn next(&mut self) -> Option<Result<Bytes>> {
-        self.inner.next()
+    fn read(&mut self) -> Result<Buffer> {
+        self.inner.read()
     }
 }
 
 impl<R: oio::Write> oio::Write for ThrottleWrapper<R> {
-    fn poll_write(&mut self, cx: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
-        let buf_length = NonZeroU32::new(bs.remaining() as u32).unwrap();
+    async fn write(&mut self, bs: Buffer) -> Result<()> {
+        let buf_length = NonZeroU32::new(bs.len() as u32).unwrap();
 
         loop {
             match self.limiter.check_n(buf_length) {
                 Ok(res) => match res {
-                    Ok(_) => return self.inner.poll_write(cx, bs),
+                    Ok(_) => return self.inner.write(bs).await,
                     // the query is valid but the Decider can not accommodate them.
                     Err(not_until) => {
                         let _ = not_until.wait_time_from(DefaultClock::default().now());
@@ -232,26 +221,26 @@ impl<R: oio::Write> oio::Write for ThrottleWrapper<R> {
                     }
                 },
                 // the query was invalid as the rate limit parameters can "never" accommodate the number of cells queried for.
-                Err(_) => return Poll::Ready(Err(Error::new(
+                Err(_) => return Err(Error::new(
                     ErrorKind::RateLimited,
                     "InsufficientCapacity due to burst size being smaller than the request size",
-                ))),
+                )),
             }
         }
     }
 
-    fn poll_abort(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        self.inner.poll_abort(cx)
+    async fn abort(&mut self) -> Result<()> {
+        self.inner.abort().await
     }
 
-    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        self.inner.poll_close(cx)
+    async fn close(&mut self) -> Result<Metadata> {
+        self.inner.close().await
     }
 }
 
 impl<R: oio::BlockingWrite> oio::BlockingWrite for ThrottleWrapper<R> {
-    fn write(&mut self, bs: &dyn oio::WriteBuf) -> Result<usize> {
-        let buf_length = NonZeroU32::new(bs.remaining() as u32).unwrap();
+    fn write(&mut self, bs: Buffer) -> Result<()> {
+        let buf_length = NonZeroU32::new(bs.len() as u32).unwrap();
 
         loop {
             match self.limiter.check_n(buf_length) {
@@ -272,7 +261,7 @@ impl<R: oio::BlockingWrite> oio::BlockingWrite for ThrottleWrapper<R> {
         }
     }
 
-    fn close(&mut self) -> Result<()> {
+    fn close(&mut self) -> Result<Metadata> {
         self.inner.close()
     }
 }

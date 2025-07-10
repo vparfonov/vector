@@ -4,20 +4,20 @@
 // purpose with or without fee is hereby granted, provided that the above
 // copyright notice and this permission notice appear in all copies.
 //
-// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHORS DISCLAIM ALL WARRANTIES
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
 // WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
 // SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 // WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
 // OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
 // CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-use super::{Modulus, Width};
+use super::Modulus;
 use crate::{
     error,
-    limb::{self, Limb, LimbMask, LIMB_BYTES},
+    limb::{self, Limb},
 };
-use alloc::{borrow::ToOwned, boxed::Box, vec};
+use alloc::{boxed::Box, vec};
 use core::{
     marker::PhantomData,
     ops::{Deref, DerefMut},
@@ -58,68 +58,19 @@ impl<M> Clone for BoxedLimbs<M> {
 }
 
 impl<M> BoxedLimbs<M> {
-    // The caller must ensure that `limbs.len()` is the same width as the
-    // modulus.
-    pub(super) fn new_unchecked(limbs: Box<[Limb]>) -> Self {
-        Self {
-            limbs,
-            m: PhantomData,
-        }
-    }
-
-    pub(super) fn positive_minimal_width_from_be_bytes(
-        input: untrusted::Input,
-    ) -> Result<Self, error::KeyRejected> {
-        // Reject leading zeros. Also reject the value zero ([0]) because zero
-        // isn't positive.
-        if untrusted::Reader::new(input).peek(0) {
-            return Err(error::KeyRejected::invalid_encoding());
-        }
-        let num_limbs = (input.len() + LIMB_BYTES - 1) / LIMB_BYTES;
-        let mut r = Self::zero(Width {
-            num_limbs,
-            m: PhantomData,
-        });
-        limb::parse_big_endian_and_pad_consttime(input, &mut r)
-            .map_err(|error::Unspecified| error::KeyRejected::unexpected_error())?;
-        Ok(r)
-    }
-
-    pub(super) fn minimal_width_from_unpadded(limbs: &[Limb]) -> Self {
-        debug_assert_ne!(limbs.last(), Some(&0));
-        Self {
-            limbs: limbs.to_owned().into_boxed_slice(),
-            m: PhantomData,
-        }
-    }
-
     pub(super) fn from_be_bytes_padded_less_than(
         input: untrusted::Input,
         m: &Modulus<M>,
     ) -> Result<Self, error::Unspecified> {
-        let mut r = Self::zero(m.width());
+        let mut r = Self::zero(m.limbs().len());
         limb::parse_big_endian_and_pad_consttime(input, &mut r)?;
-        if limb::limbs_less_than_limbs_consttime(&r, m.limbs()) != LimbMask::True {
-            return Err(error::Unspecified);
-        }
+        limb::verify_limbs_less_than_limbs_leak_bit(&r, m.limbs())?;
         Ok(r)
     }
 
-    #[inline]
-    pub(super) fn is_zero(&self) -> bool {
-        limb::limbs_are_zero_constant_time(&self.limbs) == LimbMask::True
-    }
-
-    pub(super) fn zero(width: Width<M>) -> Self {
+    pub(super) fn zero(len: usize) -> Self {
         Self {
-            limbs: vec![0; width.num_limbs].into_boxed_slice(),
-            m: PhantomData,
-        }
-    }
-
-    pub(super) fn width(&self) -> Width<M> {
-        Width {
-            num_limbs: self.limbs.len(),
+            limbs: vec![0; len].into_boxed_slice(),
             m: PhantomData,
         }
     }

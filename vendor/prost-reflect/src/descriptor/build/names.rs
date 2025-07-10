@@ -47,7 +47,7 @@ struct NameVisitor<'a> {
     errors: Vec<DescriptorErrorKind>,
 }
 
-impl<'a> Visitor for NameVisitor<'a> {
+impl Visitor for NameVisitor<'_> {
     fn visit_file(&mut self, path: &[i32], index: FileIndex, file: &FileDescriptorProto) {
         debug_assert_eq!(to_index(self.pool.files.len()), index);
 
@@ -257,7 +257,7 @@ impl<'a> Visitor for NameVisitor<'a> {
                 });
         }
 
-        let allow_alias = enum_.options.as_ref().map_or(false, |o| {
+        let allow_alias = enum_.options.as_ref().is_some_and(|o| {
             o.value.allow_alias()
                 || o.value.uninterpreted_option.iter().any(|u| {
                     u.name.len() == 1
@@ -326,7 +326,7 @@ impl<'a> Visitor for NameVisitor<'a> {
     }
 }
 
-impl<'a> NameVisitor<'a> {
+impl NameVisitor<'_> {
     fn add_name(
         &mut self,
         file: FileIndex,

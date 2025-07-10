@@ -12,7 +12,6 @@ This service can be used to:
 - [ ] copy
 - [x] rename
 - [x] list
-- [ ] ~~scan~~
 - [ ] ~~presign~~
 - [x] blocking
 - [x] append
@@ -83,7 +82,7 @@ export CLASSPATH=$HADOOP_CONF_DIR:$HADOOP_CLASSPATH:$CLASSPATH
 ```
 4. Use the `cluster_name` specified in the `core-site.xml` file (located in the HADOOP_CONF_DIR folder) to replace namenode:port.
 
-```rust
+```ignore
 builder.name_node("hdfs://cluster_name");
 ```
 
@@ -109,7 +108,7 @@ Enabling the vendored feature ensures that hdrs includes the necessary libhdfs.s
 
 ### Via Builder
 
-```rust
+```rust,no_run
 use std::sync::Arc;
 
 use anyhow::Result;
@@ -119,19 +118,19 @@ use opendal::Operator;
 #[tokio::main]
 async fn main() -> Result<()> {
     // Create fs backend builder.
-    let mut builder = Hdfs::default();
-    // Set the name node for hdfs.
-    // If the string starts with a protocol type such as file://, hdfs://, or gs://, this protocol type will be used.
-    builder.name_node("hdfs://127.0.0.1:9000");
-    // Set the root for hdfs, all operations will happen under this root.
-    //
-    // NOTE: the root must be absolute path.
-    builder.root("/tmp");
-    
-    // Enable the append capacity for hdfs. 
-    // 
-    // Note: HDFS run in non-distributed mode doesn't support append.
-    builder.enable_append(true);
+    let mut builder = Hdfs::default()
+        // Set the name node for hdfs.
+        // If the string starts with a protocol type such as file://, hdfs://, or gs://, this protocol type will be used.
+        .name_node("hdfs://127.0.0.1:9000")
+        // Set the root for hdfs, all operations will happen under this root.
+        //
+        // NOTE: the root must be absolute path.
+        .root("/tmp")
+        
+        // Enable the append capacity for hdfs. 
+        // 
+        // Note: HDFS run in non-distributed mode doesn't support append.
+        .enable_append(true);
 
     // `Accessor` provides the low level APIs, we will use `Operator` normally.
     let op: Operator = Operator::new(builder)?.finish();

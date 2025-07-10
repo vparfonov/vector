@@ -17,44 +17,37 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use http::StatusCode;
 
 use super::core::SwiftCore;
 use super::error::parse_error;
-use crate::raw::oio::WriteBuf;
 use crate::raw::*;
 use crate::*;
 
 pub struct SwiftWriter {
     core: Arc<SwiftCore>,
+    op: OpWrite,
     path: String,
 }
 
 impl SwiftWriter {
-    pub fn new(core: Arc<SwiftCore>, _op: OpWrite, path: String) -> Self {
-        SwiftWriter { core, path }
+    pub fn new(core: Arc<SwiftCore>, op: OpWrite, path: String) -> Self {
+        SwiftWriter { core, op, path }
     }
 }
 
-#[async_trait]
 impl oio::OneShotWrite for SwiftWriter {
-    async fn write_once(&self, bs: &dyn WriteBuf) -> Result<()> {
-        let bs = bs.bytes(bs.remaining());
-
+    async fn write_once(&self, bs: Buffer) -> Result<Metadata> {
         let resp = self
             .core
-            .swift_create_object(&self.path, bs.len() as u64, AsyncBody::Bytes(bs))
+            .swift_create_object(&self.path, bs.len() as u64, &self.op, bs)
             .await?;
 
         let status = resp.status();
 
         match status {
-            StatusCode::CREATED | StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::CREATED | StatusCode::OK => Ok(Metadata::default()),
+            _ => Err(parse_error(resp)),
         }
     }
 }

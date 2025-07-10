@@ -15,51 +15,20 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::HashMap;
 use std::env;
+use std::sync::Arc;
 
-use async_trait::async_trait;
-use bytes::Bytes;
-use http::header;
-use http::header::ACCEPT;
-use http::header::AUTHORIZATION;
-use http::header::CONTENT_LENGTH;
-use http::header::CONTENT_RANGE;
-use http::header::CONTENT_TYPE;
-use http::header::USER_AGENT;
-use http::Request;
-use http::Response;
-use http::StatusCode;
-use log::debug;
-use serde::Deserialize;
-use serde::Serialize;
-
+use super::core::*;
 use super::error::parse_error;
 use super::writer::GhacWriter;
 use crate::raw::*;
+use crate::services::ghac::core::GhacCore;
+use crate::services::GhacConfig;
 use crate::*;
-
-/// The base url for cache url.
-const CACHE_URL_BASE: &str = "_apis/artifactcache";
-/// Cache API requires to provide an accept header.
-const CACHE_HEADER_ACCEPT: &str = "application/json;api-version=6.0-preview.1";
-/// The cache url env for ghac.
-///
-/// The url will be like `https://artifactcache.actions.githubusercontent.com/<id>/`
-const ACTIONS_CACHE_URL: &str = "ACTIONS_CACHE_URL";
-/// The runtime token env for ghac.
-///
-/// This token will be valid for 6h and github action will running for 6
-/// hours at most. So we don't need to refetch it again.
-const ACTIONS_RUNTIME_TOKEN: &str = "ACTIONS_RUNTIME_TOKEN";
-/// The token provided by workflow;
-const GITHUB_TOKEN: &str = "GITHUB_TOKEN";
-/// The github api url for ghac.
-const GITHUB_API_URL: &str = "GITHUB_API_URL";
-/// The repository that runs this action.
-const GITHUB_REPOSITORY: &str = "GITHUB_REPOSITORY";
-/// The github API version that used by OpenDAL.
-const GITHUB_API_VERSION: &str = "2022-11-28";
+use http::Response;
+use http::StatusCode;
+use log::debug;
+use sha2::Digest;
 
 fn value_or_env(
     explicit_value: Option<String>,
@@ -75,30 +44,42 @@ fn value_or_env(
             "{} not found, maybe not in github action environment?",
             env_var_name
         );
-        Error::new(ErrorKind::ConfigInvalid, &text)
+        Error::new(ErrorKind::ConfigInvalid, text)
             .with_operation(operation)
             .set_source(err)
     })
+}
+
+impl Configurator for GhacConfig {
+    type Builder = GhacBuilder;
+
+    #[allow(deprecated)]
+    fn into_builder(self) -> Self::Builder {
+        GhacBuilder {
+            config: self,
+            http_client: None,
+        }
+    }
 }
 
 /// GitHub Action Cache Services support.
 #[doc = include_str!("docs.md")]
 #[derive(Debug, Default)]
 pub struct GhacBuilder {
-    root: Option<String>,
-    version: Option<String>,
-    endpoint: Option<String>,
-    runtime_token: Option<String>,
+    config: GhacConfig,
 
+    #[deprecated(since = "0.53.0", note = "Use `Operator::update_http_client` instead")]
     http_client: Option<HttpClient>,
 }
 
 impl GhacBuilder {
     /// set the working directory root of backend
-    pub fn root(&mut self, root: &str) -> &mut Self {
-        if !root.is_empty() {
-            self.root = Some(root.to_string())
-        }
+    pub fn root(mut self, root: &str) -> Self {
+        self.config.root = if root.is_empty() {
+            None
+        } else {
+            Some(root.to_string())
+        };
 
         self
     }
@@ -109,9 +90,9 @@ impl GhacBuilder {
     /// It's better to make sure this value is only used by this backend.
     ///
     /// If not set, we will use `opendal` as default.
-    pub fn version(&mut self, version: &str) -> &mut Self {
+    pub fn version(mut self, version: &str) -> Self {
         if !version.is_empty() {
-            self.version = Some(version.to_string())
+            self.config.version = Some(version.to_string())
         }
 
         self
@@ -122,9 +103,9 @@ impl GhacBuilder {
     /// For example, this is provided as the `ACTIONS_CACHE_URL` environment variable by the GHA runner.
     ///
     /// Default: the value of the `ACTIONS_CACHE_URL` environment variable.
-    pub fn endpoint(&mut self, endpoint: &str) -> &mut Self {
+    pub fn endpoint(mut self, endpoint: &str) -> Self {
         if !endpoint.is_empty() {
-            self.endpoint = Some(endpoint.to_string())
+            self.config.endpoint = Some(endpoint.to_string())
         }
         self
     }
@@ -135,9 +116,9 @@ impl GhacBuilder {
     /// runner.
     ///
     /// Default: the value of the `ACTIONS_RUNTIME_TOKEN` environment variable.
-    pub fn runtime_token(&mut self, runtime_token: &str) -> &mut Self {
+    pub fn runtime_token(mut self, runtime_token: &str) -> Self {
         if !runtime_token.is_empty() {
-            self.runtime_token = Some(runtime_token.to_string())
+            self.config.runtime_token = Some(runtime_token.to_string())
         }
         self
     }
@@ -148,7 +129,9 @@ impl GhacBuilder {
     ///
     /// This API is part of OpenDAL's Raw API. `HttpClient` could be changed
     /// during minor updates.
-    pub fn http_client(&mut self, client: HttpClient) -> &mut Self {
+    #[deprecated(since = "0.53.0", note = "Use `Operator::update_http_client` instead")]
+    #[allow(deprecated)]
+    pub fn http_client(mut self, client: HttpClient) -> Self {
         self.http_client = Some(client);
         self
     }
@@ -156,103 +139,113 @@ impl GhacBuilder {
 
 impl Builder for GhacBuilder {
     const SCHEME: Scheme = Scheme::Ghac;
-    type Accessor = GhacBackend;
+    type Config = GhacConfig;
 
-    fn from_map(map: HashMap<String, String>) -> Self {
-        let mut builder = GhacBuilder::default();
-
-        map.get("root").map(|v| builder.root(v));
-        map.get("version").map(|v| builder.version(v));
-
-        builder
-    }
-
-    fn build(&mut self) -> Result<Self::Accessor> {
+    fn build(self) -> Result<impl Access> {
         debug!("backend build started: {:?}", self);
 
-        let root = normalize_root(&self.root.take().unwrap_or_default());
+        let root = normalize_root(&self.config.root.unwrap_or_default());
         debug!("backend use root {}", root);
 
-        let client = if let Some(client) = self.http_client.take() {
-            client
-        } else {
-            HttpClient::new().map_err(|err| {
-                err.with_operation("Builder::build")
-                    .with_context("service", Scheme::Ghac)
-            })?
-        };
+        let service_version = get_cache_service_version();
+        debug!("backend use service version {:?}", service_version);
 
-        let backend = GhacBackend {
+        let mut version = self
+            .config
+            .version
+            .clone()
+            .unwrap_or_else(|| "opendal".to_string());
+        debug!("backend use version {version}");
+        // ghac requires to use hex digest of Sha256 as version.
+        if matches!(service_version, GhacVersion::V2) {
+            let hash = sha2::Sha256::digest(&version);
+            version = format!("{:x}", hash);
+        }
+
+        let cache_url = self
+            .config
+            .endpoint
+            .unwrap_or_else(|| get_cache_service_url(service_version));
+        if cache_url.is_empty() {
+            return Err(Error::new(
+                ErrorKind::ConfigInvalid,
+                "cache url for ghac not found, maybe not in github action environment?".to_string(),
+            ));
+        }
+
+        let core = GhacCore {
+            info: {
+                let am = AccessorInfo::default();
+                am.set_scheme(Scheme::Ghac)
+                    .set_root(&root)
+                    .set_name(&version)
+                    .set_native_capability(Capability {
+                        stat: true,
+                        stat_has_cache_control: true,
+                        stat_has_content_length: true,
+                        stat_has_content_type: true,
+                        stat_has_content_encoding: true,
+                        stat_has_content_range: true,
+                        stat_has_etag: true,
+                        stat_has_content_md5: true,
+                        stat_has_last_modified: true,
+                        stat_has_content_disposition: true,
+
+                        read: true,
+
+                        write: true,
+                        write_can_multi: true,
+
+                        shared: true,
+
+                        ..Default::default()
+                    });
+
+                // allow deprecated api here for compatibility
+                #[allow(deprecated)]
+                if let Some(client) = self.http_client {
+                    am.update_http_client(|_| client);
+                }
+
+                am.into()
+            },
             root,
 
-            cache_url: value_or_env(self.endpoint.take(), ACTIONS_CACHE_URL, "Builder::build")?,
+            cache_url,
             catch_token: value_or_env(
-                self.runtime_token.take(),
+                self.config.runtime_token,
                 ACTIONS_RUNTIME_TOKEN,
                 "Builder::build",
             )?,
-            version: self
-                .version
-                .clone()
-                .unwrap_or_else(|| "opendal".to_string()),
+            version,
 
-            api_url: env::var(GITHUB_API_URL)
-                .unwrap_or_else(|_| "https://api.github.com".to_string()),
-            api_token: env::var(GITHUB_TOKEN).unwrap_or_default(),
-            repo: env::var(GITHUB_REPOSITORY).unwrap_or_default(),
-
-            client,
+            service_version,
         };
 
-        Ok(backend)
+        Ok(GhacBackend {
+            core: Arc::new(core),
+        })
     }
 }
 
 /// Backend for github action cache services.
 #[derive(Debug, Clone)]
 pub struct GhacBackend {
-    // root should end with "/"
-    root: String,
-
-    cache_url: String,
-    catch_token: String,
-    version: String,
-
-    api_url: String,
-    api_token: String,
-    repo: String,
-
-    pub client: HttpClient,
+    core: Arc<GhacCore>,
 }
 
-#[async_trait]
-impl Accessor for GhacBackend {
-    type Reader = IncomingAsyncBody;
+impl Access for GhacBackend {
+    type Reader = HttpBody;
     type Writer = GhacWriter;
     type Lister = ();
+    type Deleter = ();
     type BlockingReader = ();
     type BlockingWriter = ();
     type BlockingLister = ();
+    type BlockingDeleter = ();
 
-    fn info(&self) -> AccessorInfo {
-        let mut am = AccessorInfo::default();
-        am.set_scheme(Scheme::Ghac)
-            .set_root(&self.root)
-            .set_name(&self.version)
-            .set_native_capability(Capability {
-                stat: true,
-
-                read: true,
-                read_can_next: true,
-                read_with_range: true,
-
-                write: true,
-                write_can_multi: true,
-                delete: true,
-
-                ..Default::default()
-            });
-        am
+    fn info(&self) -> Arc<AccessorInfo> {
+        self.core.info.clone()
     }
 
     /// Some self-hosted GHES instances are backed by AWS S3 services which only returns
@@ -261,24 +254,7 @@ impl Accessor for GhacBackend {
     ///
     /// In this way, we can support both self-hosted GHES and `github.com`.
     async fn stat(&self, path: &str, _: OpStat) -> Result<RpStat> {
-        let req = self.ghac_query(path).await?;
-
-        let resp = self.client.send(req).await?;
-
-        let location = if resp.status() == StatusCode::OK {
-            let slc = resp.into_body().bytes().await?;
-            let query_resp: GhacQueryResponse =
-                serde_json::from_slice(&slc).map_err(new_json_deserialize_error)?;
-            query_resp.archive_location
-        } else {
-            return Err(parse_error(resp).await?);
-        };
-
-        let req = Request::get(location)
-            .header(header::RANGE, "bytes=0-0")
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
-        let resp = self.client.send(req).await?;
+        let resp = self.core.ghac_stat(path).await?;
 
         let status = resp.status();
         match status {
@@ -292,247 +268,34 @@ impl Accessor for GhacBackend {
                         .expect("content range must contains size"),
                 );
 
-                resp.into_body().consume().await?;
                 Ok(RpStat::new(meta))
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
     async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
-        let req = self.ghac_query(path).await?;
-
-        let resp = self.client.send(req).await?;
-
-        let location = if resp.status() == StatusCode::OK {
-            let slc = resp.into_body().bytes().await?;
-            let query_resp: GhacQueryResponse =
-                serde_json::from_slice(&slc).map_err(new_json_deserialize_error)?;
-            query_resp.archive_location
-        } else {
-            return Err(parse_error(resp).await?);
-        };
-
-        let req = self.ghac_get_location(&location, args.range()).await?;
-        let resp = self.client.send(req).await?;
+        let resp = self.core.ghac_read(path, args.range()).await?;
 
         let status = resp.status();
         match status {
             StatusCode::OK | StatusCode::PARTIAL_CONTENT => {
-                let size = parse_content_length(resp.headers())?;
-                let range = parse_content_range(resp.headers())?;
-                Ok((
-                    RpRead::new().with_size(size).with_range(range),
-                    resp.into_body(),
-                ))
+                Ok((RpRead::default(), resp.into_body()))
             }
-            StatusCode::RANGE_NOT_SATISFIABLE => {
-                resp.into_body().consume().await?;
-                Ok((RpRead::new().with_size(Some(0)), IncomingAsyncBody::empty()))
+            _ => {
+                let (part, mut body) = resp.into_parts();
+                let buf = body.to_buffer().await?;
+                Err(parse_error(Response::from_parts(part, buf)))
             }
-            _ => Err(parse_error(resp).await?),
         }
     }
 
     async fn write(&self, path: &str, _: OpWrite) -> Result<(RpWrite, Self::Writer)> {
-        let req = self.ghac_reserve(path).await?;
+        let url = self.core.ghac_get_upload_url(path).await?;
 
-        let resp = self.client.send(req).await?;
-
-        let cache_id = if resp.status().is_success() {
-            let slc = resp.into_body().bytes().await?;
-            let reserve_resp: GhacReserveResponse =
-                serde_json::from_slice(&slc).map_err(new_json_deserialize_error)?;
-            reserve_resp.cache_id
-        } else {
-            return Err(parse_error(resp)
-                .await
-                .map(|err| err.with_operation("Backend::ghac_reserve"))?);
-        };
-
-        Ok((RpWrite::default(), GhacWriter::new(self.clone(), cache_id)))
+        Ok((
+            RpWrite::default(),
+            GhacWriter::new(self.core.clone(), path.to_string(), url)?,
+        ))
     }
-
-    async fn delete(&self, path: &str, _: OpDelete) -> Result<RpDelete> {
-        if self.api_token.is_empty() {
-            return Err(Error::new(
-                ErrorKind::PermissionDenied,
-                "github token is not configured, delete is permission denied",
-            ));
-        }
-
-        let resp = self.ghac_delete(path).await?;
-
-        // deleting not existing objects is ok
-        if resp.status().is_success() || resp.status() == StatusCode::NOT_FOUND {
-            Ok(RpDelete::default())
-        } else {
-            Err(parse_error(resp).await?)
-        }
-    }
-}
-
-impl GhacBackend {
-    async fn ghac_query(&self, path: &str) -> Result<Request<AsyncBody>> {
-        let p = build_abs_path(&self.root, path);
-
-        let url = format!(
-            "{}{CACHE_URL_BASE}/cache?keys={}&version={}",
-            self.cache_url,
-            percent_encode_path(&p),
-            self.version
-        );
-
-        let mut req = Request::get(&url);
-        req = req.header(AUTHORIZATION, format!("Bearer {}", self.catch_token));
-        req = req.header(ACCEPT, CACHE_HEADER_ACCEPT);
-
-        let req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
-
-        Ok(req)
-    }
-
-    async fn ghac_get_location(
-        &self,
-        location: &str,
-        range: BytesRange,
-    ) -> Result<Request<AsyncBody>> {
-        let mut req = Request::get(location);
-
-        if !range.is_full() {
-            // ghac is backed by azblob, and azblob doesn't support
-            // read with suffix range
-            //
-            // ref: https://learn.microsoft.com/en-us/rest/api/storageservices/specifying-the-range-header-for-blob-service-operations
-            if range.offset().is_none() && range.size().is_some() {
-                return Err(Error::new(
-                    ErrorKind::Unsupported,
-                    "ghac doesn't support read with suffix range",
-                ));
-            }
-
-            req = req.header(http::header::RANGE, range.to_header());
-        }
-
-        req.body(AsyncBody::Empty).map_err(new_request_build_error)
-    }
-
-    async fn ghac_reserve(&self, path: &str) -> Result<Request<AsyncBody>> {
-        let p = build_abs_path(&self.root, path);
-
-        let url = format!("{}{CACHE_URL_BASE}/caches", self.cache_url);
-
-        let bs = serde_json::to_vec(&GhacReserveRequest {
-            key: p,
-            version: self.version.to_string(),
-        })
-        .map_err(new_json_serialize_error)?;
-
-        let mut req = Request::post(&url);
-        req = req.header(AUTHORIZATION, format!("Bearer {}", self.catch_token));
-        req = req.header(ACCEPT, CACHE_HEADER_ACCEPT);
-        req = req.header(CONTENT_LENGTH, bs.len());
-        req = req.header(CONTENT_TYPE, "application/json");
-
-        let req = req
-            .body(AsyncBody::Bytes(Bytes::from(bs)))
-            .map_err(new_request_build_error)?;
-
-        Ok(req)
-    }
-
-    pub async fn ghac_upload(
-        &self,
-        cache_id: i64,
-        offset: u64,
-        size: u64,
-        body: AsyncBody,
-    ) -> Result<Request<AsyncBody>> {
-        let url = format!("{}{CACHE_URL_BASE}/caches/{cache_id}", self.cache_url);
-
-        let mut req = Request::patch(&url);
-        req = req.header(AUTHORIZATION, format!("Bearer {}", self.catch_token));
-        req = req.header(ACCEPT, CACHE_HEADER_ACCEPT);
-        req = req.header(CONTENT_LENGTH, size);
-        req = req.header(CONTENT_TYPE, "application/octet-stream");
-        req = req.header(
-            CONTENT_RANGE,
-            BytesContentRange::default()
-                .with_range(offset, offset + size - 1)
-                .to_header(),
-        );
-
-        let req = req.body(body).map_err(new_request_build_error)?;
-
-        Ok(req)
-    }
-
-    pub async fn ghac_commit(&self, cache_id: i64, size: u64) -> Result<Request<AsyncBody>> {
-        let url = format!("{}{CACHE_URL_BASE}/caches/{cache_id}", self.cache_url);
-
-        let bs =
-            serde_json::to_vec(&GhacCommitRequest { size }).map_err(new_json_serialize_error)?;
-
-        let mut req = Request::post(&url);
-        req = req.header(AUTHORIZATION, format!("Bearer {}", self.catch_token));
-        req = req.header(ACCEPT, CACHE_HEADER_ACCEPT);
-        req = req.header(CONTENT_TYPE, "application/json");
-        req = req.header(CONTENT_LENGTH, bs.len());
-
-        let req = req
-            .body(AsyncBody::Bytes(Bytes::from(bs)))
-            .map_err(new_request_build_error)?;
-
-        Ok(req)
-    }
-
-    async fn ghac_delete(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
-        let p = build_abs_path(&self.root, path);
-
-        let url = format!(
-            "{}/repos/{}/actions/caches?key={}",
-            self.api_url,
-            self.repo,
-            percent_encode_path(&p)
-        );
-
-        let mut req = Request::delete(&url);
-        req = req.header(AUTHORIZATION, format!("Bearer {}", self.api_token));
-        req = req.header(USER_AGENT, format!("opendal/{VERSION} (service ghac)"));
-        req = req.header("X-GitHub-Api-Version", GITHUB_API_VERSION);
-
-        let req = req
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
-
-        self.client.send(req).await
-    }
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GhacQueryResponse {
-    // Not used fields.
-    // cache_key: String,
-    // scope: String,
-    archive_location: String,
-}
-
-#[derive(Serialize)]
-struct GhacReserveRequest {
-    key: String,
-    version: String,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct GhacReserveResponse {
-    cache_id: i64,
-}
-
-#[derive(Serialize)]
-struct GhacCommitRequest {
-    size: u64,
 }

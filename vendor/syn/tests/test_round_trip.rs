@@ -4,12 +4,14 @@
 #![feature(rustc_private)]
 #![allow(
     clippy::blocks_in_conditions,
+    clippy::elidable_lifetime_names,
     clippy::manual_assert,
     clippy::manual_let_else,
     clippy::match_like_matches_macro,
     clippy::needless_lifetimes,
     clippy::uninlined_format_args
 )]
+#![allow(mismatched_lifetime_syntaxes)]
 
 extern crate rustc_ast;
 extern crate rustc_ast_pretty;

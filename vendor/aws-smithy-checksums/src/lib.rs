@@ -129,17 +129,9 @@ pub trait Checksum: Send + Sync {
     fn size(&self) -> u64;
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Crc32 {
-    hasher: crc_fast::Digest,
-}
-
-impl Default for Crc32 {
-    fn default() -> Self {
-        Self {
-            hasher: crc_fast::Digest::new(crc_fast::CrcAlgorithm::Crc32IsoHdlc),
-        }
-    }
+    hasher: crc32fast::Hasher,
 }
 
 impl Crc32 {
@@ -148,9 +140,7 @@ impl Crc32 {
     }
 
     fn finalize(self) -> Bytes {
-        let checksum = self.hasher.finalize() as u32;
-
-        Bytes::copy_from_slice(checksum.to_be_bytes().as_slice())
+        Bytes::copy_from_slice(self.hasher.finalize().to_be_bytes().as_slice())
     }
 
     // Size of the checksum in bytes
@@ -171,28 +161,21 @@ impl Checksum for Crc32 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 struct Crc32c {
-    hasher: crc_fast::Digest,
-}
-
-impl Default for Crc32c {
-    fn default() -> Self {
-        Self {
-            hasher: crc_fast::Digest::new(crc_fast::CrcAlgorithm::Crc32Iscsi),
-        }
-    }
+    state: Option<u32>,
 }
 
 impl Crc32c {
     fn update(&mut self, bytes: &[u8]) {
-        self.hasher.update(bytes);
+        self.state = match self.state {
+            Some(crc) => Some(crc32c::crc32c_append(crc, bytes)),
+            None => Some(crc32c::crc32c(bytes)),
+        };
     }
 
     fn finalize(self) -> Bytes {
-        let checksum = self.hasher.finalize() as u32;
-
-        Bytes::copy_from_slice(checksum.to_be_bytes().as_slice())
+        Bytes::copy_from_slice(self.state.unwrap_or_default().to_be_bytes().as_slice())
     }
 
     // Size of the checksum in bytes
@@ -213,26 +196,25 @@ impl Checksum for Crc32c {
     }
 }
 
-#[derive(Debug)]
+#[derive(Default)]
 struct Crc64Nvme {
-    hasher: crc_fast::Digest,
+    hasher: crc64fast_nvme::Digest,
 }
 
-impl Default for Crc64Nvme {
-    fn default() -> Self {
-        Self {
-            hasher: crc_fast::Digest::new(crc_fast::CrcAlgorithm::Crc64Nvme),
-        }
+// crc64fast_nvme::Digest doesn't impl Debug so we can't derive the impl
+impl Debug for Crc64Nvme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Crc64Nvme").finish()
     }
 }
 
 impl Crc64Nvme {
     fn update(&mut self, bytes: &[u8]) {
-        self.hasher.update(bytes);
+        self.hasher.write(bytes);
     }
 
     fn finalize(self) -> Bytes {
-        Bytes::copy_from_slice(self.hasher.finalize().to_be_bytes().as_slice())
+        Bytes::copy_from_slice(self.hasher.sum64().to_be_bytes().as_slice())
     }
 
     // Size of the checksum in bytes

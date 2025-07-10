@@ -132,11 +132,9 @@ where
     type Item = N;
 
     fn next(&mut self) -> Option<Self::Item> {
-        for (dominator, dominated) in self.iter.by_ref() {
-            // The root node dominates itself, but it should not be included in
-            // the results.
-            if dominated == &self.node && dominated != dominator {
-                return Some(*dominator);
+        while let Some(next) = self.iter.next() {
+            if next.1 == &self.node {
+                return Some(*next.0);
             }
         }
         None
@@ -159,7 +157,7 @@ const UNDEFINED: usize = ::std::usize::MAX;
 /// Cooper et al found it to be faster in practice on control flow graphs of up
 /// to ~30,000 vertices.
 ///
-/// [0]: http://www.hipersoft.rice.edu/grads/publications/dom14.pdf
+/// [0]: http://www.cs.rice.edu/~keith/EMBED/dom.pdf
 pub fn simple_fast<G>(graph: G, root: G::NodeId) -> Dominators<G::NodeId>
 where
     G: IntoNeighbors + Visitable,
@@ -269,7 +267,7 @@ where
                         .map(|p| *node_to_post_order_idx.get(&p).unwrap())
                         .collect()
                 })
-                .unwrap_or_default()
+                .unwrap_or_else(Vec::new)
         })
         .collect()
 }
@@ -328,6 +326,5 @@ mod tests {
         let dom_by: Vec<_> = doms.immediately_dominated_by(1).collect();
         assert_eq!(vec![2], dom_by);
         assert_eq!(None, doms.immediately_dominated_by(99).next());
-        assert_eq!(1, doms.immediately_dominated_by(0).count());
     }
 }

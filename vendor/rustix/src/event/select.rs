@@ -69,9 +69,6 @@ pub struct FdSetElement(pub(crate) usize);
 /// `readfds`, `writefds`, `exceptfds` must point to arrays of `FdSetElement`
 /// containing at least `nfds.div_ceil(size_of::<FdSetElement>())` elements.
 ///
-/// If an unsupported timeout is passed, this function fails with
-/// [`io::Errno::INVAL`].
-///
 /// This `select` wrapper differs from POSIX in that `nfds` is not limited to
 /// `FD_SETSIZE`. Instead of using the fixed-sized `fd_set` type, this function
 /// takes raw pointers to arrays of `fd_set_num_elements(max_fd + 1, num_fds)`,
@@ -341,7 +338,7 @@ impl<'a> Iterator for FdSetIter<'a> {
 }
 
 #[cfg(test)]
-mod tests {
+mod test {
     use super::*;
     use core::mem::{align_of, size_of};
 

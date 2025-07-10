@@ -12,7 +12,7 @@ use crate::chunk::ChunkMode;
 use crate::error::{Error, Result};
 use crate::function::Function;
 use crate::memory::{MemoryState, ALLOCATOR};
-use crate::state::util::{callback_error_ext, ref_stack_pop, StateGuard};
+use crate::state::util::{callback_error_ext, ref_stack_pop};
 use crate::stdlib::StdLib;
 use crate::string::String;
 use crate::table::Table;
@@ -23,13 +23,14 @@ use crate::types::{
     MaybeSend, ReentrantMutex, RegistryKey, ValueRef, XRc,
 };
 use crate::userdata::{
-    AnyUserData, MetaMethod, RawUserDataRegistry, UserData, UserDataRegistry, UserDataStorage,
+    init_userdata_metatable, AnyUserData, MetaMethod, RawUserDataRegistry, UserData, UserDataRegistry,
+    UserDataStorage,
 };
 use crate::util::{
     assert_stack, check_stack, get_destructed_userdata_metatable, get_internal_userdata, get_main_state,
-    get_metatable_ptr, get_userdata, init_error_registry, init_internal_metatable, init_userdata_metatable,
-    pop_error, push_internal_userdata, push_string, push_table, rawset_field, safe_pcall, safe_xpcall,
-    short_type_name, StackGuard, WrappedFailure,
+    get_metatable_ptr, get_userdata, init_error_registry, init_internal_metatable, pop_error,
+    push_internal_userdata, push_string, push_table, rawset_field, safe_pcall, safe_xpcall, short_type_name,
+    StackGuard, WrappedFailure,
 };
 use crate::value::{Nil, Value};
 
@@ -400,7 +401,6 @@ impl RawLua {
                     return Ok(VmState::Continue); // Don't allow recursion
                 }
                 let rawlua = (*extra).raw_lua();
-                let _guard = StateGuard::new(rawlua, state);
                 let debug = Debug::new(rawlua, ar);
                 hook_cb((*extra).lua(), debug)
             });
@@ -505,7 +505,6 @@ impl RawLua {
     /// Wraps a Lua function into a new or recycled thread (coroutine).
     #[cfg(feature = "async")]
     pub(crate) unsafe fn create_recycled_thread(&self, func: &Function) -> Result<Thread> {
-        #[cfg(any(feature = "lua54", feature = "luau"))]
         if let Some(index) = (*self.extra.get()).thread_pool.pop() {
             let thread_state = ffi::lua_tothread(self.ref_thread(), index);
             ffi::lua_xpush(self.ref_thread(), thread_state, func.0.index);
@@ -525,27 +524,47 @@ impl RawLua {
 
     /// Resets thread (coroutine) and returns it to the pool for later use.
     #[cfg(feature = "async")]
-    #[cfg(any(feature = "lua54", feature = "luau"))]
-    pub(crate) unsafe fn recycle_thread(&self, thread: &mut Thread) -> bool {
+    pub(crate) unsafe fn recycle_thread(&self, thread: &mut Thread) {
+        let thread_state = thread.1;
         let extra = &mut *self.extra.get();
-        if extra.thread_pool.len() < extra.thread_pool.capacity() {
-            let thread_state = ffi::lua_tothread(extra.ref_thread, thread.0.index);
-            #[cfg(all(feature = "lua54", not(feature = "vendored")))]
-            let status = ffi::lua_resetthread(thread_state);
-            #[cfg(all(feature = "lua54", feature = "vendored"))]
-            let status = ffi::lua_closethread(thread_state, self.state());
+        if extra.thread_pool.len() == extra.thread_pool.capacity() {
             #[cfg(feature = "lua54")]
-            if status != ffi::LUA_OK {
-                // Error object is on top, drop it
+            if ffi::lua_status(thread_state) != ffi::LUA_OK {
+                // Close all to-be-closed variables without returning thread to the pool
+                #[cfg(not(feature = "vendored"))]
+                ffi::lua_resetthread(thread_state);
+                #[cfg(feature = "vendored")]
+                ffi::lua_closethread(thread_state, self.state());
+            }
+            return;
+        }
+
+        let mut reset_ok = false;
+        if ffi::lua_status(thread_state) == ffi::LUA_OK {
+            if ffi::lua_gettop(thread_state) > 0 {
                 ffi::lua_settop(thread_state, 0);
             }
-            #[cfg(feature = "luau")]
+            reset_ok = true;
+        }
+
+        #[cfg(feature = "lua54")]
+        if !reset_ok {
+            #[cfg(not(feature = "vendored"))]
+            let status = ffi::lua_resetthread(thread_state);
+            #[cfg(feature = "vendored")]
+            let status = ffi::lua_closethread(thread_state, self.state());
+            reset_ok = status == ffi::LUA_OK;
+        }
+        #[cfg(feature = "luau")]
+        if !reset_ok {
             ffi::lua_resetthread(thread_state);
+            reset_ok = true;
+        }
+
+        if reset_ok {
             extra.thread_pool.push(thread.0.index);
             thread.0.drop = false; // Prevent thread from being garbage collected
-            return true;
         }
-        false
     }
 
     /// Pushes a value that implements `IntoLua` onto the Lua stack.
@@ -779,7 +798,7 @@ impl RawLua {
             }
 
             // Create a new metatable from `UserData` definition
-            let mut registry = UserDataRegistry::new(self.lua(), type_id);
+            let mut registry = UserDataRegistry::new(self.lua());
             T::register(&mut registry);
 
             self.create_userdata_metatable(registry.into_raw())
@@ -800,7 +819,7 @@ impl RawLua {
             // Check if metatable creation is pending or create an empty metatable otherwise
             let registry = match (*self.extra.get()).pending_userdata_reg.remove(&type_id) {
                 Some(registry) => registry,
-                None => UserDataRegistry::<T>::new(self.lua(), type_id).into_raw(),
+                None => UserDataRegistry::<T>::new(self.lua()).into_raw(),
             };
             self.create_userdata_metatable(registry)
         })
@@ -815,12 +834,11 @@ impl RawLua {
         let _sg = StackGuard::new(state);
         check_stack(state, 3)?;
 
-        // We push metatable first to ensure having correct metatable with `__gc` method
-        ffi::lua_pushnil(state);
-        ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, get_metatable_id()?);
+        // We generate metatable first to make sure it *always* available when userdata pushed
+        let mt_id = get_metatable_id()?;
         let protect = !self.unlikely_memory_error();
         crate::util::push_userdata(state, data, protect)?;
-        ffi::lua_replace(state, -3);
+        ffi::lua_rawgeti(state, ffi::LUA_REGISTRYINDEX, mt_id);
         ffi::lua_setmetatable(state, -2);
 
         // Set empty environment for Lua 5.1
@@ -1018,17 +1036,22 @@ impl RawLua {
     // Returns `TypeId` for the userdata ref, checking that it's registered and not destructed.
     //
     // Returns `None` if the userdata is registered but non-static.
-    pub(crate) unsafe fn get_userdata_ref_type_id(&self, vref: &ValueRef) -> Result<Option<TypeId>> {
-        self.get_userdata_type_id_inner(self.ref_thread(), vref.index)
+    #[inline(always)]
+    pub(crate) fn get_userdata_ref_type_id(&self, vref: &ValueRef) -> Result<Option<TypeId>> {
+        unsafe { self.get_userdata_type_id_inner(self.ref_thread(), vref.index) }
     }
 
     // Same as `get_userdata_ref_type_id` but assumes the userdata is already on the stack.
-    pub(crate) unsafe fn get_userdata_type_id<T>(&self, idx: c_int) -> Result<Option<TypeId>> {
-        match self.get_userdata_type_id_inner(self.state(), idx) {
+    pub(crate) unsafe fn get_userdata_type_id<T>(
+        &self,
+        state: *mut ffi::lua_State,
+        idx: c_int,
+    ) -> Result<Option<TypeId>> {
+        match self.get_userdata_type_id_inner(state, idx) {
             Ok(type_id) => Ok(type_id),
-            Err(Error::UserDataTypeMismatch) if ffi::lua_type(self.state(), idx) != ffi::LUA_TUSERDATA => {
+            Err(Error::UserDataTypeMismatch) if ffi::lua_type(state, idx) != ffi::LUA_TUSERDATA => {
                 // Report `FromLuaConversionError` instead
-                let idx_type_name = CStr::from_ptr(ffi::luaL_typename(self.state(), idx));
+                let idx_type_name = CStr::from_ptr(ffi::luaL_typename(state, idx));
                 let idx_type_name = idx_type_name.to_str().unwrap();
                 let message = format!("expected userdata of type '{}'", short_type_name::<T>());
                 Err(Error::from_lua_conversion(idx_type_name, "userdata", message))
@@ -1081,7 +1104,6 @@ impl RawLua {
                 // Lua ensures that `LUA_MINSTACK` stack spaces are available (after pushing arguments)
                 // The lock must be already held as the callback is executed
                 let rawlua = (*extra).raw_lua();
-                let _guard = StateGuard::new(rawlua, state);
                 match (*upvalue).data {
                     Some(ref func) => func(rawlua, nargs),
                     None => Err(Error::CallbackDestructed),
@@ -1125,12 +1147,10 @@ impl RawLua {
             // Async functions cannot be scoped and therefore destroyed,
             // so the first upvalue is always valid
             let upvalue = get_userdata::<AsyncCallbackUpvalue>(state, ffi::lua_upvalueindex(1));
-            let extra = (*upvalue).extra.get();
-            callback_error_ext(state, extra, |extra, nargs| {
+            callback_error_ext(state, (*upvalue).extra.get(), |extra, nargs| {
                 // Lua ensures that `LUA_MINSTACK` stack spaces are available (after pushing arguments)
                 // The lock must be already held as the callback is executed
                 let rawlua = (*extra).raw_lua();
-                let _guard = StateGuard::new(rawlua, state);
 
                 let func = &*(*upvalue).data;
                 let fut = func(rawlua, nargs);
@@ -1155,7 +1175,6 @@ impl RawLua {
                 // Lua ensures that `LUA_MINSTACK` stack spaces are available (after pushing arguments)
                 // The lock must be already held as the future is polled
                 let rawlua = (*extra).raw_lua();
-                let _guard = StateGuard::new(rawlua, state);
 
                 let fut = &mut (*upvalue).data;
                 let mut ctx = Context::from_waker(rawlua.waker());

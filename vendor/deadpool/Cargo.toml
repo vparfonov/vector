@@ -10,11 +10,16 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2018"
-rust-version = "1.63"
+edition = "2021"
+rust-version = "1.75"
 name = "deadpool"
-version = "0.10.0"
+version = "0.12.2"
 authors = ["Michael P. Jung <michael.jung@terreon.de>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Dead simple async pool"
 readme = "README.md"
 keywords = [
@@ -24,7 +29,6 @@ keywords = [
 ]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/bikeshedder/deadpool"
-resolver = "2"
 
 [package.metadata.docs.rs]
 all-features = true
@@ -33,17 +37,59 @@ rustdoc-args = [
     "docsrs",
 ]
 
+[lib]
+name = "deadpool"
+path = "src/lib.rs"
+
+[[test]]
+name = "managed"
+path = "tests/managed.rs"
+
+[[test]]
+name = "managed_cancellation"
+path = "tests/managed_cancellation.rs"
+
+[[test]]
+name = "managed_config"
+path = "tests/managed_config.rs"
+
+[[test]]
+name = "managed_deadlock"
+path = "tests/managed_deadlock.rs"
+
+[[test]]
+name = "managed_hooks"
+path = "tests/managed_hooks.rs"
+
+[[test]]
+name = "managed_resize"
+path = "tests/managed_resize.rs"
+
+[[test]]
+name = "managed_timeout"
+path = "tests/managed_timeout.rs"
+
+[[test]]
+name = "managed_unreliable_manager"
+path = "tests/managed_unreliable_manager.rs"
+
+[[test]]
+name = "unmanaged"
+path = "tests/unmanaged.rs"
+
+[[test]]
+name = "unmanaged_timeout"
+path = "tests/unmanaged_timeout.rs"
+
 [[bench]]
 name = "managed"
+path = "benches/managed.rs"
 harness = false
 
 [[bench]]
 name = "unmanaged"
+path = "benches/unmanaged.rs"
 harness = false
-
-[dependencies.async-trait]
-version = "0.1.17"
-optional = true
 
 [dependencies.deadpool-runtime]
 version = "0.1"
@@ -65,18 +111,18 @@ version = "1.0"
 features = ["attributes"]
 
 [dev-dependencies.config]
-version = "0.13"
+version = "0.14"
 features = ["json"]
 
 [dev-dependencies.criterion]
-version = "0.3.4"
+version = "0.5"
 features = [
     "html_reports",
     "async_tokio",
 ]
 
 [dev-dependencies.itertools]
-version = "0.10.3"
+version = "0.13"
 
 [dev-dependencies.tokio]
 version = "1.5.0"
@@ -92,7 +138,7 @@ default = [
     "managed",
     "unmanaged",
 ]
-managed = ["async-trait"]
+managed = []
 rt_async-std_1 = ["deadpool-runtime/async-std_1"]
 rt_tokio_1 = ["deadpool-runtime/tokio_1"]
 unmanaged = []

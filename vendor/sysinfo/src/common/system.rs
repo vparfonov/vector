@@ -4,8 +4,11 @@ use std::collections::{HashMap, HashSet};
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::path::Path;
+use std::process::ExitStatus;
 use std::str::FromStr;
 
+use crate::common::impl_get_set::impl_get_set;
+use crate::common::DiskUsage;
 use crate::{CpuInner, Gid, ProcessInner, SystemInner, Uid};
 
 /// Structs containing system's information such as processes, memory and CPU.
@@ -43,7 +46,7 @@ impl System {
     /// let s = System::new();
     /// ```
     pub fn new() -> Self {
-        Self::new_with_specifics(RefreshKind::new())
+        Self::new_with_specifics(RefreshKind::nothing())
     }
 
     /// Creates a new [`System`] instance with everything loaded.
@@ -71,7 +74,7 @@ impl System {
     ///
     /// // We want to only refresh processes.
     /// let mut system = System::new_with_specifics(
-    ///      RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
+    ///      RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
     /// );
     ///
     /// # if sysinfo::IS_SUPPORTED_SYSTEM && !cfg!(feature = "apple-sandbox") {
@@ -89,6 +92,10 @@ impl System {
     /// Refreshes according to the given [`RefreshKind`]. It calls the corresponding
     /// "refresh_" methods.
     ///
+    /// It will remove dead processes if [`RefreshKind::processes`] returns `Some`.
+    /// If you want to keep dead processes, use [`System::refresh_processes_specifics`]
+    /// directly.
+    ///
     /// ```
     /// use sysinfo::{ProcessRefreshKind, RefreshKind, System};
     ///
@@ -96,7 +103,7 @@ impl System {
     ///
     /// // Let's just update processes:
     /// s.refresh_specifics(
-    ///     RefreshKind::new().with_processes(ProcessRefreshKind::everything()),
+    ///     RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()),
     /// );
     /// ```
     pub fn refresh_specifics(&mut self, refreshes: RefreshKind) {
@@ -107,7 +114,7 @@ impl System {
             self.refresh_cpu_specifics(kind);
         }
         if let Some(kind) = refreshes.processes() {
-            self.refresh_processes_specifics(ProcessesToUpdate::All, false, kind);
+            self.refresh_processes_specifics(ProcessesToUpdate::All, true, kind);
         }
     }
 
@@ -117,6 +124,9 @@ impl System {
     ///
     /// Don't forget to take a look at [`ProcessRefreshKind::everything`] method to see what it
     /// will update for processes more in details.
+    ///
+    /// It will remove dead processes. If you want to keep dead processes, use
+    /// [`System::refresh_processes_specifics`] directly.
     ///
     /// ```no_run
     /// use sysinfo::System;
@@ -150,7 +160,7 @@ impl System {
     /// use sysinfo::{MemoryRefreshKind, System};
     ///
     /// let mut s = System::new();
-    /// s.refresh_memory_specifics(MemoryRefreshKind::new().with_ram());
+    /// s.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
     /// ```
     pub fn refresh_memory_specifics(&mut self, refresh_kind: MemoryRefreshKind) {
         self.inner.refresh_memory_specifics(refresh_kind)
@@ -164,7 +174,7 @@ impl System {
     /// to get accurate value as it uses previous results to compute the next value.
     ///
     /// Calling this method is the same as calling
-    /// `system.refresh_cpu_specifics(CpuRefreshKind::new().with_cpu_usage())`.
+    /// `system.refresh_cpu_specifics(CpuRefreshKind::nothing().with_cpu_usage())`.
     ///
     /// ```no_run
     /// use sysinfo::System;
@@ -178,13 +188,13 @@ impl System {
     ///
     /// [`MINIMUM_CPU_UPDATE_INTERVAL`]: crate::MINIMUM_CPU_UPDATE_INTERVAL
     pub fn refresh_cpu_usage(&mut self) {
-        self.refresh_cpu_specifics(CpuRefreshKind::new().with_cpu_usage())
+        self.refresh_cpu_specifics(CpuRefreshKind::nothing().with_cpu_usage())
     }
 
     /// Refreshes CPUs frequency information.
     ///
     /// Calling this method is the same as calling
-    /// `system.refresh_cpu_specifics(CpuRefreshKind::new().with_frequency())`.
+    /// `system.refresh_cpu_specifics(CpuRefreshKind::nothing().with_frequency())`.
     ///
     /// ```no_run
     /// use sysinfo::System;
@@ -193,7 +203,7 @@ impl System {
     /// s.refresh_cpu_frequency();
     /// ```
     pub fn refresh_cpu_frequency(&mut self) {
-        self.refresh_cpu_specifics(CpuRefreshKind::new().with_frequency())
+        self.refresh_cpu_specifics(CpuRefreshKind::nothing().with_frequency())
     }
 
     /// Refreshes the list of CPU.
@@ -253,7 +263,7 @@ impl System {
         self.inner.refresh_cpu_specifics(refresh_kind)
     }
 
-    /// Gets all processes and updates their information.
+    /// Gets all processes and updates their information, along with all the tasks each process has.
     ///
     /// It does the same as:
     ///
@@ -263,11 +273,11 @@ impl System {
     /// system.refresh_processes_specifics(
     ///     ProcessesToUpdate::All,
     ///     true,
-    ///     ProcessRefreshKind::new()
+    ///     ProcessRefreshKind::nothing()
     ///         .with_memory()
     ///         .with_cpu()
     ///         .with_disk_usage()
-    ///         .with_exe(UpdateKind::OnlyIfNotSet),
+    ///         .with_exe(UpdateKind::OnlyIfNotSet)
     /// );
     /// ```
     ///
@@ -277,6 +287,11 @@ impl System {
     ///
     /// ⚠️ On Linux, `sysinfo` keeps the `stat` files open by default. You can change this behaviour
     /// by using [`set_open_files_limit`][crate::set_open_files_limit].
+    ///
+    /// ⚠️ On Linux, if you dont need the tasks of each process, you can use
+    /// `refresh_processes_specifics` with `ProcessRefreshKind::everything().without_tasks()`.
+    /// Refreshesing all processes and their tasks can be quite expensive. For more information
+    /// see [`ProcessRefreshKind`].
     ///
     /// Example:
     ///
@@ -294,11 +309,12 @@ impl System {
         self.refresh_processes_specifics(
             processes_to_update,
             remove_dead_processes,
-            ProcessRefreshKind::new()
+            ProcessRefreshKind::nothing()
                 .with_memory()
                 .with_cpu()
                 .with_disk_usage()
-                .with_exe(UpdateKind::OnlyIfNotSet),
+                .with_exe(UpdateKind::OnlyIfNotSet)
+                .with_tasks(),
         )
     }
 
@@ -341,7 +357,9 @@ impl System {
         }
         fn update(pid: &Pid, processes: &mut HashMap<Pid, Process>) {
             if let Some(proc) = processes.get_mut(pid) {
-                proc.inner.switch_updated();
+                if !proc.inner.switch_updated() {
+                    proc.inner.set_nonexistent();
+                }
             }
         }
 
@@ -467,7 +485,7 @@ impl System {
     /// use sysinfo::{CpuRefreshKind, RefreshKind, System};
     ///
     /// let mut s = System::new_with_specifics(
-    ///     RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
+    ///     RefreshKind::nothing().with_cpu(CpuRefreshKind::everything()),
     /// );
     /// // Wait a bit because CPU usage is based on diff.
     /// std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
@@ -488,7 +506,7 @@ impl System {
     /// use sysinfo::{CpuRefreshKind, RefreshKind, System};
     ///
     /// let mut s = System::new_with_specifics(
-    ///     RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
+    ///     RefreshKind::nothing().with_cpu(CpuRefreshKind::everything()),
     /// );
     /// // Wait a bit because CPU usage is based on diff.
     /// std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
@@ -500,22 +518,6 @@ impl System {
     /// ```
     pub fn cpus(&self) -> &[Cpu] {
         self.inner.cpus()
-    }
-
-    /// Returns the number of physical cores on the CPU or `None` if it couldn't get it.
-    ///
-    /// In case there are multiple CPUs, it will combine the physical core count of all the CPUs.
-    ///
-    /// **Important**: this information is computed every time this function is called.
-    ///
-    /// ```no_run
-    /// use sysinfo::System;
-    ///
-    /// let s = System::new();
-    /// println!("{:?}", s.physical_core_count());
-    /// ```
-    pub fn physical_core_count(&self) -> Option<usize> {
-        self.inner.physical_core_count()
     }
 
     /// Returns the RAM size in bytes.
@@ -686,6 +688,13 @@ impl System {
 
     /// Returns the system name.
     ///
+    /// | example platform | value of `System::name()` |
+    /// |---|---|
+    /// | linux laptop | "Ubuntu" |
+    /// | android phone | "Pixel 9 Pro" |
+    /// | apple laptop | "Darwin" |
+    /// | windows server | "Windows" |
+    ///
     /// **Important**: this information is computed every time this function is called.
     ///
     /// ```no_run
@@ -699,6 +708,13 @@ impl System {
 
     /// Returns the system's kernel version.
     ///
+    /// | example platform | value of `System::kernel_version()` |
+    /// |---|---|
+    /// | linux laptop | "6.8.0-48-generic" |
+    /// | android phone | "6.1.84-android14-11" |
+    /// | apple laptop | "24.1.0" |
+    /// | windows server | "20348" |
+    ///
     /// **Important**: this information is computed every time this function is called.
     ///
     /// ```no_run
@@ -710,8 +726,15 @@ impl System {
         SystemInner::kernel_version()
     }
 
-    /// Returns the system version (e.g. for MacOS this will return 11.1 rather than the kernel
+    /// Returns the system version (e.g. for macOS this will return 15.1 rather than the kernel
     /// version).
+    ///
+    /// | example platform | value of `System::os_version()` |
+    /// |---|---|
+    /// | linux laptop | "24.04" |
+    /// | android phone | "15" |
+    /// | apple laptop | "15.1.1" |
+    /// | windows server | "10 (20348)" |
     ///
     /// **Important**: this information is computed every time this function is called.
     ///
@@ -724,7 +747,14 @@ impl System {
         SystemInner::os_version()
     }
 
-    /// Returns the system long os version (e.g "MacOS 11.2 BigSur").
+    /// Returns the system long os version.
+    ///
+    /// | example platform | value of `System::long_os_version()` |
+    /// |---|---|
+    /// | linux laptop | "Linux (Ubuntu 24.04)" |
+    /// | android phone | "Android 15 on Pixel 9 Pro" |
+    /// | apple laptop | "macOS 15.1.1 Sequoia" |
+    /// | windows server | "Windows Server 2022 Datacenter" |
     ///
     /// **Important**: this information is computed every time this function is called.
     ///
@@ -744,6 +774,13 @@ impl System {
     /// - <https://www.freedesktop.org/software/systemd/man/os-release.html#ID=>
     /// - <https://doc.rust-lang.org/std/env/consts/constant.OS.html>
     ///
+    /// | example platform | value of `System::distribution_id()` |
+    /// |---|---|
+    /// | linux laptop | "ubuntu" |
+    /// | android phone | "android" |
+    /// | apple laptop | "macos" |
+    /// | windows server | "windows" |
+    ///
     /// **Important**: this information is computed every time this function is called.
     ///
     /// ```no_run
@@ -753,6 +790,68 @@ impl System {
     /// ```
     pub fn distribution_id() -> String {
         SystemInner::distribution_id()
+    }
+
+    /// Returns the distribution ids of operating systems that are closely
+    /// related to the local operating system in regards to packaging and
+    /// programming interfaces, for example listing one or more OS identifiers
+    /// the local OS is a derivative from.
+    ///
+    /// See also
+    /// - <https://www.freedesktop.org/software/systemd/man/latest/os-release.html#ID_LIKE=>
+    ///
+    /// | example platform | value of `System::distribution_id_like()` |
+    /// |---|---|
+    /// | android phone | [] |
+    /// | archlinux laptop | [] |
+    /// | centos server | ["rhel", "fedora"] |
+    /// | ubuntu laptop | ["debian"] |
+    /// | windows laptop | [] |
+    ///
+    /// **Important**: this information is computed every time this function is called.
+    ///
+    /// ```no_run
+    /// use sysinfo::System;
+    ///
+    /// println!("Distribution ID_LIKE: {:?}", System::distribution_id_like());
+    /// ```
+    pub fn distribution_id_like() -> Vec<String> {
+        SystemInner::distribution_id_like()
+    }
+
+    /// Provides kernel version following this string format:
+    ///
+    /// | Platform | Result |
+    /// |-|-|
+    /// | Windows | Windows OS Build 20348.2227 |
+    /// | Linux | Linux 6.12.13-200.fc41.x86_64 |
+    /// | Android | Android 612.13-200 |
+    /// | MacOS | Darwin 21.6.0 |
+    /// | FreeBSD | FreeBSD 199506 |
+    ///
+    /// If any of the information is not available, it will be replaced with "unknown".
+    ///
+    /// **Important**: this information is computed every time this function is called.
+    ///
+    /// ```no_run
+    /// use sysinfo::System;
+    ///
+    /// println!("Kernel long version: {}", System::kernel_long_version());
+    /// ```
+    ///
+    /// [distribution_id]: System::distribution_id
+    /// [kernel_version]: System::kernel_version
+    pub fn kernel_long_version() -> String {
+        let kernel_version = match System::kernel_version() {
+            None => "unknown".to_string(),
+            Some(s) => s,
+        };
+        let kernel_name = SystemInner::kernel_name().unwrap_or("Unknown");
+        if cfg!(windows) {
+            format!("{kernel_name} OS Build {kernel_version}")
+        } else {
+            format!("{kernel_name} {kernel_version}")
+        }
     }
 
     /// Returns the system hostname based off DNS.
@@ -777,8 +876,24 @@ impl System {
     ///
     /// println!("CPU Architecture: {:?}", System::cpu_arch());
     /// ```
-    pub fn cpu_arch() -> Option<String> {
-        SystemInner::cpu_arch()
+    pub fn cpu_arch() -> String {
+        SystemInner::cpu_arch().unwrap_or_else(|| std::env::consts::ARCH.to_owned())
+    }
+
+    /// Returns the number of physical cores on the CPU or `None` if it couldn't get it.
+    ///
+    /// In case there are multiple CPUs, it will combine the physical core count of all the CPUs.
+    ///
+    /// **Important**: this information is computed every time this function is called.
+    ///
+    /// ```no_run
+    /// use sysinfo::System;
+    ///
+    /// let s = System::new();
+    /// println!("{:?}", System::physical_core_count());
+    /// ```
+    pub fn physical_core_count() -> Option<usize> {
+        SystemInner::physical_core_count()
     }
 }
 
@@ -815,7 +930,8 @@ pub struct LoadAvg {
 ///
 /// If you want the list of the supported signals on the current system, use
 /// [`SUPPORTED_SIGNALS`][crate::SUPPORTED_SIGNALS].
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Debug)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 pub enum Signal {
     /// Hangup detected on controlling terminal or death of controlling process.
     Hangup,
@@ -938,42 +1054,9 @@ pub struct CGroupLimits {
     pub rss: u64,
 }
 
-/// Type containing read and written bytes.
-///
-/// It is returned by [`Process::disk_usage`][crate::Process::disk_usage].
-///
-/// ```no_run
-/// use sysinfo::System;
-///
-/// let s = System::new_all();
-/// for (pid, process) in s.processes() {
-///     let disk_usage = process.disk_usage();
-///     println!("[{}] read bytes   : new/total => {}/{} B",
-///         pid,
-///         disk_usage.read_bytes,
-///         disk_usage.total_read_bytes,
-///     );
-///     println!("[{}] written bytes: new/total => {}/{} B",
-///         pid,
-///         disk_usage.written_bytes,
-///         disk_usage.total_written_bytes,
-///     );
-/// }
-/// ```
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd)]
-pub struct DiskUsage {
-    /// Total number of written bytes.
-    pub total_written_bytes: u64,
-    /// Number of written bytes since the last refresh.
-    pub written_bytes: u64,
-    /// Total number of read bytes.
-    pub total_read_bytes: u64,
-    /// Number of read bytes since the last refresh.
-    pub read_bytes: u64,
-}
-
 /// Enum describing the different status of a process.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 pub enum ProcessStatus {
     /// ## Linux
     ///
@@ -1091,6 +1174,7 @@ pub enum ProcessStatus {
 
 /// Enum describing the different kind of threads.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Deserialize))]
 pub enum ThreadKind {
     /// Kernel thread.
     Kernel,
@@ -1125,7 +1209,16 @@ impl Process {
     /// Sends [`Signal::Kill`] to the process (which is the only signal supported on all supported
     /// platforms by this crate).
     ///
-    /// If you want to send another signal, take a look at [`Process::kill_with`].
+    /// Returns `true` if the signal was sent successfully. If you want to wait for this process
+    /// to end, you can use [`Process::wait`].
+    ///
+    /// ⚠️ Even if this function returns `true`, it doesn't necessarily mean that the process will
+    /// be killed. It just means that the signal was sent successfully.
+    ///
+    /// ⚠️ Please note that some processes might not be "killable", like if they run with higher
+    /// levels than the current process for example.
+    ///
+    /// If you want to use another signal, take a look at [`Process::kill_with`].
     ///
     /// To get the list of the supported signals on this system, use
     /// [`SUPPORTED_SIGNALS`][crate::SUPPORTED_SIGNALS].
@@ -1143,10 +1236,14 @@ impl Process {
     }
 
     /// Sends the given `signal` to the process. If the signal doesn't exist on this platform,
-    /// it'll do nothing and will return `None`. Otherwise it'll return if the signal was sent
-    /// successfully.
+    /// it'll do nothing and will return `None`. Otherwise it'll return `Some(bool)`. The boolean
+    /// value will depend on whether or not the signal was sent successfully.
     ///
-    /// If you just want to kill the process, use [`Process::kill`] directly.
+    /// If you just want to kill the process, use [`Process::kill`] directly. If you want to wait
+    /// for this process to end, you can use [`Process::wait`].
+    ///
+    /// ⚠️ Please note that some processes might not be "killable", like if they run with higher
+    /// levels than the current process for example.
     ///
     /// To get the list of the supported signals on this system, use
     /// [`SUPPORTED_SIGNALS`][crate::SUPPORTED_SIGNALS].
@@ -1163,6 +1260,24 @@ impl Process {
     /// ```
     pub fn kill_with(&self, signal: Signal) -> Option<bool> {
         self.inner.kill_with(signal)
+    }
+
+    /// Wait for process termination and returns its [`ExitStatus`] if it could be retrieved,
+    /// returns `None` otherwise.
+    ///
+    /// ```no_run
+    /// use sysinfo::{Pid, System};
+    ///
+    /// let mut s = System::new_all();
+    ///
+    /// if let Some(process) = s.process(Pid::from(1337)) {
+    ///     println!("Waiting for pid 1337");
+    ///     let exit_status = process.wait();
+    ///     println!("Pid 1337 exited with: {exit_status:?}");
+    /// }
+    /// ```
+    pub fn wait(&self) -> Option<ExitStatus> {
+        self.inner.wait()
     }
 
     /// Returns the name of the process.
@@ -1193,8 +1308,8 @@ impl Process {
     ///
     ///  **⚠️ Important ⚠️**
     ///
-    /// On **Windows**, you might need to use `administrator` privileges when running your program  
-    /// to have access to this information.  
+    /// On **Windows**, you might need to use `administrator` privileges when running your program
+    /// to have access to this information.
     ///
     /// ```no_run
     /// use sysinfo::{Pid, System};
@@ -1324,7 +1439,7 @@ impl Process {
     ///
     /// This value has limitations though. Depending on the operating system and type of process,
     /// this value might be a good indicator of the total memory that the process will be using over
-    /// its lifetime. However, for example, in the version 14 of MacOS this value is in the order of
+    /// its lifetime. However, for example, in the version 14 of macOS this value is in the order of
     /// the hundreds of gigabytes for every process, and thus not very informative. Moreover, if a
     /// process maps into memory a very large file, this value will increase accordingly, even if
     /// the process is not actively using the memory.
@@ -1425,7 +1540,7 @@ impl Process {
     /// s.refresh_processes_specifics(
     ///     ProcessesToUpdate::All,
     ///     true,
-    ///     ProcessRefreshKind::new().with_cpu()
+    ///     ProcessRefreshKind::nothing().with_cpu()
     /// );
     /// if let Some(process) = s.process(Pid::from(1337)) {
     ///     println!("{}%", process.cpu_usage());
@@ -1435,10 +1550,30 @@ impl Process {
         self.inner.cpu_usage()
     }
 
+    /// Returns the total accumulated CPU usage (in CPU-milliseconds). Note
+    /// that it might be bigger than the total clock run time of a process if
+    /// run on a multi-core machine.
+    ///
+    /// ```no_run
+    /// use sysinfo::{Pid, System};
+    ///
+    /// let s = System::new_all();
+    /// if let Some(process) = s.process(Pid::from(1337)) {
+    ///     println!("{}", process.accumulated_cpu_time());
+    /// }
+    /// ```
+    pub fn accumulated_cpu_time(&self) -> u64 {
+        self.inner.accumulated_cpu_time()
+    }
+
     /// Returns number of bytes read and written to disk.
     ///
     /// ⚠️ On Windows, this method actually returns **ALL** I/O read and
     /// written bytes.
+    ///
+    /// ⚠️ Files might be cached in memory by your OS, meaning that reading/writing them might not
+    /// increase the `read_bytes`/`written_bytes` values. You can find more information about it
+    /// in the `proc_pid_io` manual (`man proc_pid_io` on unix platforms).
     ///
     /// ```no_run
     /// use sysinfo::{Pid, System};
@@ -1544,23 +1679,6 @@ impl Process {
         self.inner.effective_group_id()
     }
 
-    /// Wait for process termination.
-    ///
-    /// ```no_run
-    /// use sysinfo::{Pid, System};
-    ///
-    /// let mut s = System::new_all();
-    ///
-    /// if let Some(process) = s.process(Pid::from(1337)) {
-    ///     println!("Waiting for pid 1337");
-    ///     process.wait();
-    ///     println!("Pid 1337 exited");
-    /// }
-    /// ```
-    pub fn wait(&self) {
-        self.inner.wait()
-    }
-
     /// Returns the session ID for the current process or `None` if it couldn't
     /// be retrieved.
     ///
@@ -1640,6 +1758,78 @@ impl Process {
             }
         }
     }
+
+    /// Returns `true` if the process doesn't exist anymore but was not yet removed from
+    /// the processes list because the `remove_dead_processes` argument was set to `false`
+    /// in methods like [`System::refresh_processes`].
+    ///
+    /// ```no_run
+    /// use sysinfo::{ProcessesToUpdate, System};
+    ///
+    /// let mut s = System::new_all();
+    /// // We set the `remove_dead_processes` to `false`.
+    /// s.refresh_processes(ProcessesToUpdate::All, false);
+    ///
+    /// for (_, process) in s.processes() {
+    ///     println!(
+    ///         "Process {:?} {}",
+    ///         process.pid(),
+    ///         if process.exists() { "exists" } else { "doesn't exist" },
+    ///     );
+    /// }
+    /// ```
+    pub fn exists(&self) -> bool {
+        self.inner.exists()
+    }
+
+    /// Returns the number of open files in the current process.
+    ///
+    /// Returns `None` if it failed retrieving the information or if the current system is not
+    /// supported.
+    ///
+    /// **Important**: this information is computed every time this function is called (except on
+    /// FreeBSD).
+    ///
+    /// ```no_run
+    /// use sysinfo::System;
+    ///
+    /// let s = System::new_all();
+    ///
+    /// for (_, process) in s.processes() {
+    ///     println!(
+    ///         "Process {:?} {:?}",
+    ///         process.pid(),
+    ///         process.open_files(),
+    ///     );
+    /// }
+    /// ```
+    pub fn open_files(&self) -> Option<u32> {
+        self.inner.open_files()
+    }
+
+    /// Returns the maximum number of open files for the current process.
+    ///
+    /// Returns `None` if it failed retrieving the information or if the current system is not
+    /// supported.
+    ///
+    /// **Important**: this information is computed every time this function is called.
+    ///
+    /// ```no_run
+    /// use sysinfo::System;
+    ///
+    /// let s = System::new_all();
+    ///
+    /// for (_, process) in s.processes() {
+    ///     println!(
+    ///         "Process {:?} {:?}",
+    ///         process.pid(),
+    ///         process.open_files_limit(),
+    ///     );
+    /// }
+    /// ```
+    pub fn open_files_limit(&self) -> Option<u32> {
+        self.inner.open_files_limit()
+    }
 }
 
 macro_rules! pid_decl {
@@ -1715,178 +1905,6 @@ cfg_if! {
     }
 }
 
-macro_rules! impl_get_set {
-    ($ty_name:ident, $name:ident, $with:ident, $without:ident $(, $extra_doc:literal)? $(,)?) => {
-        #[doc = concat!("Returns the value of the \"", stringify!($name), "\" refresh kind.")]
-        $(#[doc = concat!("
-", $extra_doc, "
-")])?
-        #[doc = concat!("
-```
-use sysinfo::", stringify!($ty_name), ";
-
-let r = ", stringify!($ty_name), "::new();
-assert_eq!(r.", stringify!($name), "(), false);
-
-let r = r.with_", stringify!($name), "();
-assert_eq!(r.", stringify!($name), "(), true);
-
-let r = r.without_", stringify!($name), "();
-assert_eq!(r.", stringify!($name), "(), false);
-```")]
-        pub fn $name(&self) -> bool {
-            self.$name
-        }
-
-        #[doc = concat!("Sets the value of the \"", stringify!($name), "\" refresh kind to `true`.
-
-```
-use sysinfo::", stringify!($ty_name), ";
-
-let r = ", stringify!($ty_name), "::new();
-assert_eq!(r.", stringify!($name), "(), false);
-
-let r = r.with_", stringify!($name), "();
-assert_eq!(r.", stringify!($name), "(), true);
-```")]
-        #[must_use]
-        pub fn $with(mut self) -> Self {
-            self.$name = true;
-            self
-        }
-
-        #[doc = concat!("Sets the value of the \"", stringify!($name), "\" refresh kind to `false`.
-
-```
-use sysinfo::", stringify!($ty_name), ";
-
-let r = ", stringify!($ty_name), "::everything();
-assert_eq!(r.", stringify!($name), "(), true);
-
-let r = r.without_", stringify!($name), "();
-assert_eq!(r.", stringify!($name), "(), false);
-```")]
-        #[must_use]
-        pub fn $without(mut self) -> Self {
-            self.$name = false;
-            self
-        }
-    };
-
-    // To handle `UpdateKind`.
-    ($ty_name:ident, $name:ident, $with:ident, $without:ident, UpdateKind $(, $extra_doc:literal)? $(,)?) => {
-        #[doc = concat!("Returns the value of the \"", stringify!($name), "\" refresh kind.")]
-        $(#[doc = concat!("
-", $extra_doc, "
-")])?
-        #[doc = concat!("
-```
-use sysinfo::{", stringify!($ty_name), ", UpdateKind};
-
-let r = ", stringify!($ty_name), "::new();
-assert_eq!(r.", stringify!($name), "(), UpdateKind::Never);
-
-let r = r.with_", stringify!($name), "(UpdateKind::OnlyIfNotSet);
-assert_eq!(r.", stringify!($name), "(), UpdateKind::OnlyIfNotSet);
-
-let r = r.without_", stringify!($name), "();
-assert_eq!(r.", stringify!($name), "(), UpdateKind::Never);
-```")]
-        pub fn $name(&self) -> UpdateKind {
-            self.$name
-        }
-
-        #[doc = concat!("Sets the value of the \"", stringify!($name), "\" refresh kind.
-
-```
-use sysinfo::{", stringify!($ty_name), ", UpdateKind};
-
-let r = ", stringify!($ty_name), "::new();
-assert_eq!(r.", stringify!($name), "(), UpdateKind::Never);
-
-let r = r.with_", stringify!($name), "(UpdateKind::OnlyIfNotSet);
-assert_eq!(r.", stringify!($name), "(), UpdateKind::OnlyIfNotSet);
-```")]
-        #[must_use]
-        pub fn $with(mut self, kind: UpdateKind) -> Self {
-            self.$name = kind;
-            self
-        }
-
-        #[doc = concat!("Sets the value of the \"", stringify!($name), "\" refresh kind to `UpdateKind::Never`.
-
-```
-use sysinfo::{", stringify!($ty_name), ", UpdateKind};
-
-let r = ", stringify!($ty_name), "::everything();
-assert_eq!(r.", stringify!($name), "(), UpdateKind::OnlyIfNotSet);
-
-let r = r.without_", stringify!($name), "();
-assert_eq!(r.", stringify!($name), "(), UpdateKind::Never);
-```")]
-        #[must_use]
-        pub fn $without(mut self) -> Self {
-            self.$name = UpdateKind::Never;
-            self
-        }
-    };
-
-    // To handle `*RefreshKind`.
-    ($ty_name:ident, $name:ident, $with:ident, $without:ident, $typ:ty $(,)?) => {
-        #[doc = concat!("Returns the value of the \"", stringify!($name), "\" refresh kind.
-
-```
-use sysinfo::{", stringify!($ty_name), ", ", stringify!($typ), "};
-
-let r = ", stringify!($ty_name), "::new();
-assert_eq!(r.", stringify!($name), "().is_some(), false);
-
-let r = r.with_", stringify!($name), "(", stringify!($typ), "::everything());
-assert_eq!(r.", stringify!($name), "().is_some(), true);
-
-let r = r.without_", stringify!($name), "();
-assert_eq!(r.", stringify!($name), "().is_some(), false);
-```")]
-        pub fn $name(&self) -> Option<$typ> {
-            self.$name
-        }
-
-        #[doc = concat!("Sets the value of the \"", stringify!($name), "\" refresh kind to `Some(...)`.
-
-```
-use sysinfo::{", stringify!($ty_name), ", ", stringify!($typ), "};
-
-let r = ", stringify!($ty_name), "::new();
-assert_eq!(r.", stringify!($name), "().is_some(), false);
-
-let r = r.with_", stringify!($name), "(", stringify!($typ), "::everything());
-assert_eq!(r.", stringify!($name), "().is_some(), true);
-```")]
-        #[must_use]
-        pub fn $with(mut self, kind: $typ) -> Self {
-            self.$name = Some(kind);
-            self
-        }
-
-        #[doc = concat!("Sets the value of the \"", stringify!($name), "\" refresh kind to `None`.
-
-```
-use sysinfo::", stringify!($ty_name), ";
-
-let r = ", stringify!($ty_name), "::everything();
-assert_eq!(r.", stringify!($name), "().is_some(), true);
-
-let r = r.without_", stringify!($name), "();
-assert_eq!(r.", stringify!($name), "().is_some(), false);
-```")]
-        #[must_use]
-        pub fn $without(mut self) -> Self {
-            self.$name = None;
-            self
-        }
-    };
-}
-
 /// This enum allows you to specify when you want the related information to be updated.
 ///
 /// For example if you only want the [`Process::exe()`] information to be refreshed only if it's not
@@ -1899,7 +1917,7 @@ assert_eq!(r.", stringify!($name), "().is_some(), false);
 /// system.refresh_processes_specifics(
 ///     ProcessesToUpdate::All,
 ///     true,
-///     ProcessRefreshKind::new().with_exe(UpdateKind::OnlyIfNotSet),
+///     ProcessRefreshKind::nothing().with_exe(UpdateKind::OnlyIfNotSet),
 /// );
 /// ```
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -1965,6 +1983,15 @@ pub enum ProcessesToUpdate<'a> {
 /// the information won't be retrieved if the information is accessible without needing
 /// extra computation.
 ///
+/// ⚠️ ** Linux Specific ** ⚠️
+/// When using `ProcessRefreshKind::everything()`, in linux we will fetch all relevant
+/// information from `/proc/<pid>/` as well as all the information from `/proc/<pid>/task/<tid>/`
+/// folders. This makes the refresh mechanism a lot slower depending on the number of tasks
+/// each process has.
+///  
+/// If you don't care about tasks information, use `ProcessRefreshKind::everything().without_tasks()`
+/// as much as possible.
+///
 /// ```
 /// use sysinfo::{ProcessesToUpdate, ProcessRefreshKind, System};
 ///
@@ -1984,7 +2011,7 @@ pub enum ProcessesToUpdate<'a> {
 /// ```
 ///
 /// [`Process`]: crate::Process
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct ProcessRefreshKind {
     cpu: bool,
     disk_usage: bool,
@@ -1995,20 +2022,44 @@ pub struct ProcessRefreshKind {
     environ: UpdateKind,
     cmd: UpdateKind,
     exe: UpdateKind,
+    tasks: bool,
+}
+
+/// Creates a new `ProcessRefreshKind` with every refresh set to `false`, except for `tasks`.
+/// By default, we want to list all processes and tasks are considered processes on their own
+/// in linux so we still fetch them by default. However, the processes information are not
+/// refreshed.
+impl Default for ProcessRefreshKind {
+    fn default() -> Self {
+        Self {
+            cpu: false,
+            disk_usage: false,
+            memory: false,
+            user: UpdateKind::default(),
+            cwd: UpdateKind::default(),
+            root: UpdateKind::default(),
+            environ: UpdateKind::default(),
+            cmd: UpdateKind::default(),
+            exe: UpdateKind::default(),
+            tasks: true, // Process by default includes all tasks.
+        }
+    }
 }
 
 impl ProcessRefreshKind {
-    /// Creates a new `ProcessRefreshKind` with every refresh set to `false`.
-    ///
+    /// Creates a new `ProcessRefreshKind` with every refresh set to `false`, except for `tasks`.
+    /// By default, we want to list all processes and tasks are considered processes on their own
+    /// in linux so we still fetch them by default. However, the processes information are not
+    /// refreshed.
     /// ```
     /// use sysinfo::{ProcessRefreshKind, UpdateKind};
     ///
-    /// let r = ProcessRefreshKind::new();
+    /// let r = ProcessRefreshKind::nothing();
     ///
     /// assert_eq!(r.cpu(), false);
     /// assert_eq!(r.user(), UpdateKind::Never);
     /// ```
-    pub fn new() -> Self {
+    pub fn nothing() -> Self {
         Self::default()
     }
 
@@ -2034,10 +2085,18 @@ impl ProcessRefreshKind {
             environ: UpdateKind::OnlyIfNotSet,
             cmd: UpdateKind::OnlyIfNotSet,
             exe: UpdateKind::OnlyIfNotSet,
+            tasks: true,
         }
     }
 
-    impl_get_set!(ProcessRefreshKind, cpu, with_cpu, without_cpu);
+    impl_get_set!(
+        ProcessRefreshKind,
+        cpu,
+        with_cpu,
+        without_cpu,
+        "\
+It will retrieve both CPU usage and CPU accumulated time,"
+    );
     impl_get_set!(
         ProcessRefreshKind,
         disk_usage,
@@ -2076,6 +2135,7 @@ It will retrieve the following information:
     );
     impl_get_set!(ProcessRefreshKind, cmd, with_cmd, without_cmd, UpdateKind);
     impl_get_set!(ProcessRefreshKind, exe, with_exe, without_exe, UpdateKind);
+    impl_get_set!(ProcessRefreshKind, tasks, with_tasks, without_tasks);
 }
 
 /// Used to determine what you want to refresh specifically on the [`Cpu`] type.
@@ -2110,12 +2170,12 @@ impl CpuRefreshKind {
     /// ```
     /// use sysinfo::CpuRefreshKind;
     ///
-    /// let r = CpuRefreshKind::new();
+    /// let r = CpuRefreshKind::nothing();
     ///
     /// assert_eq!(r.frequency(), false);
     /// assert_eq!(r.cpu_usage(), false);
     /// ```
-    pub fn new() -> Self {
+    pub fn nothing() -> Self {
         Self::default()
     }
 
@@ -2152,7 +2212,7 @@ impl CpuRefreshKind {
 /// let mut system = System::new();
 ///
 /// // We don't want to update all memories information.
-/// system.refresh_memory_specifics(MemoryRefreshKind::new().with_ram());
+/// system.refresh_memory_specifics(MemoryRefreshKind::nothing().with_ram());
 ///
 /// println!("total RAM: {}", system.total_memory());
 /// println!("free RAM:  {}", system.free_memory());
@@ -2169,12 +2229,12 @@ impl MemoryRefreshKind {
     /// ```
     /// use sysinfo::MemoryRefreshKind;
     ///
-    /// let r = MemoryRefreshKind::new();
+    /// let r = MemoryRefreshKind::nothing();
     ///
     /// assert_eq!(r.ram(), false);
     /// assert_eq!(r.swap(), false);
     /// ```
-    pub fn new() -> Self {
+    pub fn nothing() -> Self {
         Self::default()
     }
 
@@ -2229,13 +2289,13 @@ impl RefreshKind {
     /// ```
     /// use sysinfo::RefreshKind;
     ///
-    /// let r = RefreshKind::new();
+    /// let r = RefreshKind::nothing();
     ///
     /// assert_eq!(r.processes().is_some(), false);
     /// assert_eq!(r.memory().is_some(), false);
     /// assert_eq!(r.cpu().is_some(), false);
     /// ```
-    pub fn new() -> Self {
+    pub fn nothing() -> Self {
         Self::default()
     }
 
@@ -2329,7 +2389,7 @@ pub fn get_current_pid() -> Result<Pid, &'static str> {
 /// use sysinfo::{System, RefreshKind, CpuRefreshKind};
 ///
 /// let mut s = System::new_with_specifics(
-///     RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
+///     RefreshKind::nothing().with_cpu(CpuRefreshKind::everything()),
 /// );
 ///
 /// // Wait a bit because CPU usage is based on diff.
@@ -2355,7 +2415,7 @@ impl Cpu {
     /// use sysinfo::{System, RefreshKind, CpuRefreshKind};
     ///
     /// let mut s = System::new_with_specifics(
-    ///     RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
+    ///     RefreshKind::nothing().with_cpu(CpuRefreshKind::everything()),
     /// );
     ///
     /// // Wait a bit because CPU usage is based on diff.
@@ -2377,7 +2437,7 @@ impl Cpu {
     /// use sysinfo::{System, RefreshKind, CpuRefreshKind};
     ///
     /// let s = System::new_with_specifics(
-    ///     RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
+    ///     RefreshKind::nothing().with_cpu(CpuRefreshKind::everything()),
     /// );
     /// for cpu in s.cpus() {
     ///     println!("{}", cpu.name());
@@ -2393,7 +2453,7 @@ impl Cpu {
     /// use sysinfo::{System, RefreshKind, CpuRefreshKind};
     ///
     /// let s = System::new_with_specifics(
-    ///     RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
+    ///     RefreshKind::nothing().with_cpu(CpuRefreshKind::everything()),
     /// );
     /// for cpu in s.cpus() {
     ///     println!("{}", cpu.vendor_id());
@@ -2409,7 +2469,7 @@ impl Cpu {
     /// use sysinfo::{System, RefreshKind, CpuRefreshKind};
     ///
     /// let s = System::new_with_specifics(
-    ///     RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
+    ///     RefreshKind::nothing().with_cpu(CpuRefreshKind::everything()),
     /// );
     /// for cpu in s.cpus() {
     ///     println!("{}", cpu.brand());
@@ -2425,7 +2485,7 @@ impl Cpu {
     /// use sysinfo::{System, RefreshKind, CpuRefreshKind};
     ///
     /// let s = System::new_with_specifics(
-    ///     RefreshKind::new().with_cpu(CpuRefreshKind::everything()),
+    ///     RefreshKind::nothing().with_cpu(CpuRefreshKind::everything()),
     /// );
     /// for cpu in s.cpus() {
     ///     println!("{}", cpu.frequency());
@@ -2462,7 +2522,7 @@ mod test {
 
     #[test]
     fn check_cpu_arch() {
-        assert_eq!(System::cpu_arch().is_some(), IS_SUPPORTED_SYSTEM);
+        assert!(!System::cpu_arch().is_empty());
     }
 
     // Ensure that the CPUs frequency isn't retrieved until we ask for it.
@@ -2650,9 +2710,8 @@ mod test {
         if IS_SUPPORTED_SYSTEM {
             // The physical cores count is recomputed every time the function is called, so the
             // information must be relevant even with nothing initialized.
-            let physical_cores_count = s
-                .physical_core_count()
-                .expect("failed to get number of physical cores");
+            let physical_cores_count =
+                System::physical_core_count().expect("failed to get number of physical cores");
 
             s.refresh_cpu_usage();
             // The cpus shouldn't be empty anymore.
@@ -2660,15 +2719,14 @@ mod test {
 
             // In case we are running inside a VM, it's possible to not have a physical core, only
             // logical ones, which is why we don't test `physical_cores_count > 0`.
-            let physical_cores_count2 = s
-                .physical_core_count()
-                .expect("failed to get number of physical cores");
+            let physical_cores_count2 =
+                System::physical_core_count().expect("failed to get number of physical cores");
             assert!(physical_cores_count2 <= s.cpus().len());
             assert_eq!(physical_cores_count, physical_cores_count2);
         } else {
-            assert_eq!(s.physical_core_count(), None);
+            assert_eq!(System::physical_core_count(), None);
         }
-        assert!(s.physical_core_count().unwrap_or(0) <= s.cpus().len());
+        assert!(System::physical_core_count().unwrap_or(0) <= s.cpus().len());
     }
 
     // This test only exists to ensure that the `Display` and `Debug` traits are implemented on the

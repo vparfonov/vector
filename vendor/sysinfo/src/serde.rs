@@ -95,6 +95,7 @@ impl Serialize for crate::Process {
         state.serialize_field("start_time", &self.start_time())?;
         state.serialize_field("run_time", &self.run_time())?;
         state.serialize_field("cpu_usage", &self.cpu_usage())?;
+        state.serialize_field("accumulated_cpu_time", &self.accumulated_cpu_time())?;
         state.serialize_field("disk_usage", &self.disk_usage())?;
         state.serialize_field("user_id", &self.user_id())?;
         state.serialize_field("group_id", &self.group_id())?;
@@ -135,7 +136,7 @@ impl serde::Serialize for crate::System {
         state.serialize_field("global_cpu_usage", &self.global_cpu_usage())?;
         state.serialize_field("cpus", &self.cpus())?;
 
-        state.serialize_field("physical_core_count", &self.physical_core_count())?;
+        state.serialize_field("physical_core_count", &Self::physical_core_count())?;
         state.serialize_field("total_memory", &self.total_memory())?;
         state.serialize_field("free_memory", &self.free_memory())?;
         state.serialize_field("available_memory", &self.available_memory())?;
@@ -343,8 +344,8 @@ impl Serialize for crate::NetworkData {
     where
         S: Serializer,
     {
-        // `13` corresponds to the number of fields.
-        let mut state = serializer.serialize_struct("NetworkData", 13)?;
+        // `14` corresponds to the number of fields.
+        let mut state = serializer.serialize_struct("NetworkData", 14)?;
 
         state.serialize_field("received", &self.received())?;
         state.serialize_field("total_received", &self.total_received())?;
@@ -366,6 +367,7 @@ impl Serialize for crate::NetworkData {
         )?;
         state.serialize_field("mac_address", &self.mac_address())?;
         state.serialize_field("ip_networks", &self.ip_networks())?;
+        state.serialize_field("mtu", &self.mtu())?;
 
         state.end()
     }

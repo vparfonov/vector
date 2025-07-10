@@ -10,7 +10,6 @@ This service can be used to:
 - [x] copy
 - [ ] rename
 - [x] list
-- [x] scan
 - [ ] presign
 - [ ] blocking
 
@@ -25,7 +24,7 @@ You can refer to [`VercelBlobBuilder`]'s docs for more information
 
 ### Via Builder
 
-```rust
+```rust,no_run
 use anyhow::Result;
 use opendal::services::VercelBlob;
 use opendal::Operator;
@@ -33,12 +32,11 @@ use opendal::Operator;
 #[tokio::main]
 async fn main() -> Result<()> {
     // create backend builder
-    let mut builder = VercelBlob::default();
-
-    // set the storage bucket for OpenDAL
-    builder.root("/");
-    // set the token for OpenDAL
-    builder.token("you_token");
+    let mut builder = VercelBlob::default()
+        // set the storage bucket for OpenDAL
+        .root("/")
+        // set the token for OpenDAL
+        .token("you_token");
 
     let op: Operator = Operator::new(builder)?.finish();
 

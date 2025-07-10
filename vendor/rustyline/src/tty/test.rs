@@ -3,11 +3,11 @@ use std::slice::Iter;
 use std::vec::IntoIter;
 
 use super::{Event, ExternalPrinter, RawMode, RawReader, Renderer, Term};
-use crate::config::{Behavior, BellStyle, ColorMode, Config};
+use crate::config::{BellStyle, ColorMode, Config};
 use crate::error::ReadlineError;
 use crate::highlight::Highlighter;
 use crate::keys::KeyEvent;
-use crate::layout::{Layout, Position};
+use crate::layout::{GraphemeClusterMode, Layout, Position, Unit};
 use crate::line_buffer::LineBuffer;
 use crate::{Cmd, Result};
 
@@ -114,7 +114,7 @@ impl Renderer for Sink {
 
     fn calculate_position(&self, s: &str, orig: Position) -> Position {
         let mut pos = orig;
-        pos.col += s.len();
+        pos.col += u16::try_from(s.len()).unwrap();
         pos
     }
 
@@ -136,16 +136,20 @@ impl Renderer for Sink {
 
     fn update_size(&mut self) {}
 
-    fn get_columns(&self) -> usize {
+    fn get_columns(&self) -> Unit {
         80
     }
 
-    fn get_rows(&self) -> usize {
+    fn get_rows(&self) -> Unit {
         24
     }
 
     fn colors_enabled(&self) -> bool {
         false
+    }
+
+    fn grapheme_cluster_mode(&self) -> GraphemeClusterMode {
+        GraphemeClusterMode::Unicode
     }
 
     fn move_cursor_at_leftmost(&mut self, _: &mut IntoIter<KeyEvent>) -> Result<()> {
@@ -180,19 +184,12 @@ impl Term for DummyTerminal {
     type Reader = IntoIter<KeyEvent>;
     type Writer = Sink;
 
-    fn new(
-        color_mode: ColorMode,
-        _behavior: Behavior,
-        _tab_stop: usize,
-        bell_style: BellStyle,
-        _enable_bracketed_paste: bool,
-        _enable_signals: bool,
-    ) -> Result<Self> {
+    fn new(config: Config) -> Result<Self> {
         Ok(Self {
             keys: vec![],
             cursor: 0,
-            color_mode,
-            bell_style,
+            color_mode: config.color_mode(),
+            bell_style: config.bell_style(),
         })
     }
 

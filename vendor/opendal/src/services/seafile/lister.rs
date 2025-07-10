@@ -17,14 +17,7 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use http::header;
-use http::Request;
-use http::StatusCode;
-use serde::Deserialize;
-
 use super::core::SeafileCore;
-use super::error::parse_error;
 use crate::raw::oio::Entry;
 use crate::raw::*;
 use crate::*;
@@ -44,41 +37,23 @@ impl SeafileLister {
     }
 }
 
-#[async_trait]
 impl oio::PageList for SeafileLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
-        let path = build_rooted_abs_path(&self.core.root, &self.path);
-
-        let auth_info = self.core.get_auth_info().await?;
-
-        let url = format!(
-            "{}/api2/repos/{}/dir/?p={}",
-            self.core.endpoint,
-            auth_info.repo_id,
-            percent_encode_path(&path)
-        );
-
-        let req = Request::get(url);
-
-        let req = req
-            .header(header::AUTHORIZATION, format!("Token {}", auth_info.token))
-            .body(AsyncBody::Empty)
-            .map_err(new_request_build_error)?;
-
-        let resp = self.core.send(req).await?;
-
-        let status = resp.status();
-
-        match status {
-            StatusCode::OK => {
-                let resp_body = &resp.into_body().bytes().await?;
-                let infos = serde_json::from_slice::<Vec<Info>>(resp_body)
-                    .map_err(new_json_deserialize_error)?;
+        let list_response = self.core.list(&self.path).await?;
+        match list_response.infos {
+            Some(infos) => {
+                // add path itself
+                ctx.entries.push_back(Entry::new(
+                    self.path.as_str(),
+                    Metadata::new(EntryMode::DIR),
+                ));
 
                 for info in infos {
                     if !info.name.is_empty() {
-                        let rel_path =
-                            build_rel_path(&self.core.root, &format!("{}{}", path, info.name));
+                        let rel_path = build_rel_path(
+                            &self.core.root,
+                            &format!("{}{}", list_response.rooted_abs_path, info.name),
+                        );
 
                         let entry = if info.type_field == "file" {
                             let meta = Metadata::new(EntryMode::FILE)
@@ -99,22 +74,10 @@ impl oio::PageList for SeafileLister {
                 Ok(())
             }
             // return nothing when not exist
-            StatusCode::NOT_FOUND => {
+            None => {
                 ctx.done = true;
                 Ok(())
             }
-            _ => {
-                return Err(parse_error(resp).await?);
-            }
         }
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct Info {
-    #[serde(rename = "type")]
-    pub type_field: String,
-    pub mtime: i64,
-    pub size: Option<u64>,
-    pub name: String,
 }

@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "sqlx"
-version = "0.8.5"
+version = "0.8.6"
 authors = [
     "Ryan Leckey <leckey.ryan@gmail.com>",
     "Austin Bonander <austin.bonander@gmail.com>",
@@ -265,26 +265,26 @@ harness = false
 required-features = ["sqlite"]
 
 [dependencies.sqlx-core]
-version = "=0.8.5"
+version = "=0.8.6"
 features = [
     "offline",
     "migrate",
 ]
 
 [dependencies.sqlx-macros]
-version = "=0.8.5"
+version = "=0.8.6"
 optional = true
 
 [dependencies.sqlx-mysql]
-version = "=0.8.5"
+version = "=0.8.6"
 optional = true
 
 [dependencies.sqlx-postgres]
-version = "=0.8.5"
+version = "=0.8.6"
 optional = true
 
 [dependencies.sqlx-sqlite]
-version = "=0.8.5"
+version = "=0.8.6"
 optional = true
 
 [dev-dependencies.anyhow]

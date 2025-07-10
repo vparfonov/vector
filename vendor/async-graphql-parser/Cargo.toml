@@ -10,9 +10,9 @@
 # See Cargo.toml.orig for the original contents.
 
 [package]
-edition = "2021"
+edition = "2024"
 name = "async-graphql-parser"
-version = "7.0.16"
+version = "7.0.17"
 authors = [
     "sunli <scott_s829@163.com>",
     "Koxiaet",
@@ -38,6 +38,7 @@ categories = [
 ]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/async-graphql/async-graphql"
+resolver = "2"
 
 [lib]
 name = "async_graphql_parser"
@@ -52,7 +53,7 @@ name = "recursion_limit"
 path = "tests/recursion_limit.rs"
 
 [dependencies.async-graphql-value]
-version = "7.0.16"
+version = "7.0.17"
 
 [dependencies.pest]
 version = "2.7.11"

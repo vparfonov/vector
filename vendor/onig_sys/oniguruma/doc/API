@@ -1,4 +1,4 @@
-Oniguruma API  Version 6.9.7  2021/03/03
+Oniguruma API  Version 6.9.10  2024/06/26
 
 #include <oniguruma.h>
 
@@ -277,6 +277,7 @@ Oniguruma API  Version 6.9.7  2021/03/03
 # int onig_set_retry_limit_in_match_of_match_param(OnigMatchParam* mp, unsigned long limit)
 
   Set a retry limit count of a match process.
+  0 means unlimited.
 
   arguments
   1 mp: match-param pointer
@@ -366,6 +367,8 @@ Oniguruma API  Version 6.9.7  2021/03/03
       The user_data specified by onig_set_callout_user_data_of_match_param()
       will be shared with callout.
 
+    ONIG_OPTION_MATCH_WHOLE_STRING  Try to match the whole of (str), rather than returning after the first match is found.
+
 
 # int onig_search_with_param(regex_t* reg, const UChar* str, const UChar* end,
                    const UChar* start, const UChar* range, OnigRegion* region,
@@ -407,7 +410,7 @@ Oniguruma API  Version 6.9.7  2021/03/03
     ONIG_OPTION_NOT_END_STRING      Do not regard the (end) as a string endpoint  (* fail \z, \Z)
     ONIG_OPTION_NOT_BEGIN_POSITION  Do not regard the (start) as start position of search  (* fail \G)
     ONIG_OPTION_CALLBACK_EACH_MATCH Call back for all successful matches.
-
+    ONIG_OPTION_MATCH_WHOLE_STRING  Try to match the whole of (str), rather than returning after the first match is found.
 
 # int onig_match_with_param(regex_t* reg, const UChar* str, const UChar* end,
                             const UChar* at, OnigRegion* region,
@@ -641,7 +644,7 @@ Oniguruma API  Version 6.9.7  2021/03/03
   return value
   normal: number of groups for the name.
           (ex. /(?<x>..)(?<x>..)/  ==>  2)
-  name not found: -1
+  name not found: ONIGERR_UNDEFINED_NAME_REFERENCE
 
   arguments
   1 reg:       regex object.
@@ -983,6 +986,7 @@ Oniguruma API  Version 6.9.7  2021/03/03
 # int onig_set_retry_limit_in_match(unsigned long limit)
 
   Set the limit of retry counts in matching process.
+  0 means unlimited.
 
   normal return: ONIG_NORMAL
 

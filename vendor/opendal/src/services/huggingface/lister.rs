@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
 
 use super::core::HuggingfaceCore;
 use super::core::HuggingfaceStatus;
@@ -41,20 +41,19 @@ impl HuggingfaceLister {
     }
 }
 
-#[async_trait]
 impl oio::PageList for HuggingfaceLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let response = self.core.hf_list(&self.path, self.recursive).await?;
 
         let status_code = response.status();
         if !status_code.is_success() {
-            let error = parse_error(response).await?;
+            let error = parse_error(response);
             return Err(error);
         }
 
-        let bytes = response.into_body().bytes().await?;
-        let decoded_response = serde_json::from_slice::<Vec<HuggingfaceStatus>>(&bytes)
-            .map_err(new_json_deserialize_error)?;
+        let bytes = response.into_body();
+        let decoded_response: Vec<HuggingfaceStatus> =
+            serde_json::from_reader(bytes.reader()).map_err(new_json_deserialize_error)?;
 
         ctx.done = true;
 

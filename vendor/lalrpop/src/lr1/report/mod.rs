@@ -6,9 +6,6 @@ use std::io::{self, Write};
 
 use super::lookahead::*;
 
-#[cfg(test)]
-mod test;
-
 pub fn generate_report<'grammar, W: Write + 'grammar>(
     out: &'grammar mut W,
     lr1result: &Lr1Result<'grammar>,
@@ -376,13 +373,13 @@ trait HasDisplayLen {
     fn display_len(&self) -> usize;
 }
 
-impl HasDisplayLen for &TerminalString {
+impl<'a> HasDisplayLen for &'a TerminalString {
     fn display_len(&self) -> usize {
         TerminalString::display_len(self)
     }
 }
 
-impl HasDisplayLen for &NonterminalString {
+impl<'a> HasDisplayLen for &'a NonterminalString {
     fn display_len(&self) -> usize {
         self.len()
     }

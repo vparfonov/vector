@@ -67,3 +67,4 @@ multiple-versions = "allow"
 deny = [
     { name = "ring", wrappers = ["rustls", "sct", "rustls-webpki", "aws-config"] },
 ]
+

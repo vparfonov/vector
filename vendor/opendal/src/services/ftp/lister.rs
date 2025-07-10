@@ -17,8 +17,6 @@
 
 use std::str;
 use std::str::FromStr;
-use std::task::Context;
-use std::task::Poll;
 use std::vec::IntoIter;
 
 use suppaftp::list::File;
@@ -41,29 +39,34 @@ impl FtpLister {
 }
 
 impl oio::List for FtpLister {
-    fn poll_next(&mut self, _: &mut Context<'_>) -> Poll<Result<Option<oio::Entry>>> {
+    async fn next(&mut self) -> Result<Option<oio::Entry>> {
         let de = match self.file_iter.next() {
             Some(file_str) => File::from_str(file_str.as_str()).map_err(|e| {
                 Error::new(ErrorKind::Unexpected, "parse file from response").set_source(e)
             })?,
-            None => return Poll::Ready(Ok(None)),
+            None => return Ok(None),
         };
 
         let path = self.path.to_string() + de.name();
 
-        let entry = if de.is_file() {
-            oio::Entry::new(
-                &path,
-                Metadata::new(EntryMode::FILE)
-                    .with_content_length(de.size() as u64)
-                    .with_last_modified(de.modified().into()),
-            )
+        let mut meta = if de.is_file() {
+            Metadata::new(EntryMode::FILE)
         } else if de.is_directory() {
-            oio::Entry::new(&format!("{}/", &path), Metadata::new(EntryMode::DIR))
+            Metadata::new(EntryMode::DIR)
         } else {
-            oio::Entry::new(&path, Metadata::new(EntryMode::Unknown))
+            Metadata::new(EntryMode::Unknown)
+        };
+        meta.set_content_length(de.size() as u64);
+        meta.set_last_modified(de.modified().into());
+
+        let entry = if de.is_file() {
+            oio::Entry::new(&path, meta)
+        } else if de.is_directory() {
+            oio::Entry::new(&format!("{}/", &path), meta)
+        } else {
+            oio::Entry::new(&path, meta)
         };
 
-        Poll::Ready(Ok(Some(entry)))
+        Ok(Some(entry))
     }
 }

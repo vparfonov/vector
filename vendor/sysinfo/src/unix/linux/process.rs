@@ -8,17 +8,19 @@ use std::fs::{self, DirEntry, File};
 use std::io::Read;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
+use std::process::ExitStatus;
 use std::str::{self, FromStr};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use libc::{c_ulong, gid_t, kill, uid_t};
+use libc::{c_ulong, gid_t, uid_t};
 
 use crate::sys::system::SystemInfo;
 use crate::sys::utils::{
     get_all_data_from_file, get_all_utf8_data, realpath, PathHandler, PathPush,
 };
 use crate::{
-    DiskUsage, Gid, Pid, Process, ProcessesToUpdate, ProcessRefreshKind, ProcessStatus, Signal, ThreadKind, Uid,
+    DiskUsage, Gid, Pid, Process, ProcessRefreshKind, ProcessStatus, ProcessesToUpdate, Signal,
+    ThreadKind, Uid,
 };
 
 use crate::sys::system::remaining_files;
@@ -124,6 +126,8 @@ pub(crate) struct ProcessInner {
     written_bytes: u64,
     thread_kind: Option<ThreadKind>,
     proc_path: PathBuf,
+    accumulated_cpu_time: u64,
+    exists: bool,
 }
 
 impl ProcessInner {
@@ -161,12 +165,14 @@ impl ProcessInner {
             written_bytes: 0,
             thread_kind: None,
             proc_path,
+            accumulated_cpu_time: 0,
+            exists: true,
         }
     }
 
     pub(crate) fn kill_with(&self, signal: Signal) -> Option<bool> {
         let c_signal = crate::sys::system::convert_signal(signal)?;
-        unsafe { Some(kill(self.pid.0, c_signal) == 0) }
+        unsafe { Some(libc::kill(self.pid.0, c_signal) == 0) }
     }
 
     pub(crate) fn name(&self) -> &OsStr {
@@ -225,6 +231,10 @@ impl ProcessInner {
         self.cpu_usage
     }
 
+    pub(crate) fn accumulated_cpu_time(&self) -> u64 {
+        self.accumulated_cpu_time
+    }
+
     pub(crate) fn disk_usage(&self) -> DiskUsage {
         DiskUsage {
             written_bytes: self.written_bytes.saturating_sub(self.old_written_bytes),
@@ -250,18 +260,8 @@ impl ProcessInner {
         self.effective_group_id
     }
 
-    pub(crate) fn wait(&self) {
-        let mut status = 0;
-        // attempt waiting
-        unsafe {
-            if retry_eintr!(libc::waitpid(self.pid.0, &mut status, 0)) < 0 {
-                // attempt failed (non-child process) so loop until process ends
-                let duration = std::time::Duration::from_millis(10);
-                while kill(self.pid.0, 0) == 0 {
-                    std::thread::sleep(duration);
-                }
-            }
-        }
+    pub(crate) fn wait(&self) -> Option<ExitStatus> {
+        crate::unix::utils::wait_process(self.pid)
     }
 
     pub(crate) fn session_id(&self) -> Option<Pid> {
@@ -280,7 +280,52 @@ impl ProcessInner {
     }
 
     pub(crate) fn switch_updated(&mut self) -> bool {
-         std::mem::replace(&mut self.updated, false)
+        std::mem::replace(&mut self.updated, false)
+    }
+
+    pub(crate) fn set_nonexistent(&mut self) {
+        self.exists = false;
+    }
+
+    pub(crate) fn exists(&self) -> bool {
+        self.exists
+    }
+
+    pub(crate) fn open_files(&self) -> Option<u32> {
+        let open_files_dir = self.proc_path.as_path().join("fd");
+        match fs::read_dir(&open_files_dir) {
+            Ok(entries) => Some(entries.count() as u32),
+            Err(_error) => {
+                sysinfo_debug!(
+                    "Failed to get open files in `{}`: {_error:?}",
+                    open_files_dir.display(),
+                );
+                None
+            }
+        }
+    }
+
+    pub(crate) fn open_files_limit(&self) -> Option<u32> {
+        let limits_files = self.proc_path.as_path().join("limits");
+        match fs::read_to_string(&limits_files) {
+            Ok(content) => {
+                for line in content.lines() {
+                    if let Some(line) = line.strip_prefix("Max open files ") {
+                        if let Some(nb) = line.split_whitespace().find(|p| !p.is_empty()) {
+                            return u32::from_str(nb).ok();
+                        }
+                    }
+                }
+                None
+            }
+            Err(_error) => {
+                sysinfo_debug!(
+                    "Failed to get limits in `{}`: {_error:?}",
+                    limits_files.display()
+                );
+                None
+            }
+        }
     }
 }
 
@@ -434,6 +479,13 @@ fn update_proc_info(
     if refresh_kind.disk_usage() {
         update_process_disk_activity(p, proc_path);
     }
+    // Needs to be after `update_time_and_memory`.
+    if refresh_kind.cpu() {
+        // The external values for CPU times are in "ticks", which are
+        // scaled by "HZ", which is pegged externally at 100 ticks/second.
+        p.accumulated_cpu_time =
+            p.utime.saturating_add(p.stime).saturating_mul(1_000) / info.clock_cycle;
+    }
 }
 
 fn update_parent_pid(p: &mut ProcessInner, parent_pid: Option<Pid>, str_parts: &[&str]) {
@@ -487,6 +539,71 @@ fn retrieve_all_new_process_info(
     Process { inner: p }
 }
 
+fn update_existing_process(
+    proc: &mut Process,
+    parent_pid: Option<Pid>,
+    uptime: u64,
+    info: &SystemInfo,
+    refresh_kind: ProcessRefreshKind,
+    tasks: Option<HashSet<Pid>>,
+) -> Result<Option<Process>, ()> {
+    let entry = &mut proc.inner;
+    let data = if let Some(mut f) = entry.stat_file.take() {
+        match get_all_data_from_file(&mut f, 1024) {
+            Ok(data) => {
+                // Everything went fine, we put back the file descriptor.
+                entry.stat_file = Some(f);
+                data
+            }
+            Err(_) => {
+                // It's possible that the file descriptor is no longer valid in case the
+                // original process was terminated and another one took its place.
+                _get_stat_data(&entry.proc_path, &mut entry.stat_file)?
+            }
+        }
+    } else {
+        _get_stat_data(&entry.proc_path, &mut entry.stat_file)?
+    };
+    entry.tasks = tasks;
+
+    let parts = parse_stat_file(&data).ok_or(())?;
+    let start_time_without_boot_time = compute_start_time_without_boot_time(&parts, info);
+
+    // It's possible that a new process took this same PID when the "original one" terminated.
+    // If the start time differs, then it means it's not the same process anymore and that we
+    // need to get all its information, hence why we check it here.
+    if start_time_without_boot_time == entry.start_time_without_boot_time {
+        let mut proc_path = PathHandler::new(&entry.proc_path);
+
+        update_proc_info(
+            entry,
+            parent_pid,
+            refresh_kind,
+            &mut proc_path,
+            &parts.str_parts,
+            uptime,
+            info,
+        );
+
+        refresh_user_group_ids(entry, &mut proc_path, refresh_kind);
+        return Ok(None);
+    }
+    // If we're here, it means that the PID still exists but it's a different process.
+    let p = retrieve_all_new_process_info(
+        entry.pid,
+        parent_pid,
+        &parts,
+        &entry.proc_path,
+        info,
+        refresh_kind,
+        uptime,
+    );
+    *proc = p;
+    // Since this PID is already in the HashMap, no need to add it again.
+    Ok(None)
+}
+
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn _get_process_data(
     path: &Path,
     proc_list: &mut HashMap<Pid, Process>,
@@ -495,78 +612,20 @@ pub(crate) fn _get_process_data(
     uptime: u64,
     info: &SystemInfo,
     refresh_kind: ProcessRefreshKind,
-) -> Result<(Option<Process>, Pid), ()> {
-    let data;
-    let parts = if let Some(ref mut entry) = proc_list.get_mut(&pid) {
-        let entry = &mut entry.inner;
-        data = if let Some(mut f) = entry.stat_file.take() {
-            match get_all_data_from_file(&mut f, 1024) {
-                Ok(data) => {
-                    // Everything went fine, we put back the file descriptor.
-                    entry.stat_file = Some(f);
-                    data
-                }
-                Err(_) => {
-                    // It's possible that the file descriptor is no longer valid in case the
-                    // original process was terminated and another one took its place.
-                    _get_stat_data(&entry.proc_path, &mut entry.stat_file)?
-                }
-            }
-        } else {
-            _get_stat_data(path, &mut entry.stat_file)?
-        };
-        let parts = parse_stat_file(&data).ok_or(())?;
-        let start_time_without_boot_time = compute_start_time_without_boot_time(&parts, info);
-
-        // It's possible that a new process took this same PID when the "original one" terminated.
-        // If the start time differs, then it means it's not the same process anymore and that we
-        // need to get all its information, hence why we check it here.
-        if start_time_without_boot_time == entry.start_time_without_boot_time {
-            let mut proc_path = PathHandler::new(path);
-
-            update_proc_info(
-                entry,
-                parent_pid,
-                refresh_kind,
-                &mut proc_path,
-                &parts.str_parts,
-                uptime,
-                info,
-            );
-
-            refresh_user_group_ids(entry, &mut proc_path, refresh_kind);
-            return Ok((None, pid));
-        }
-        parts
-    } else {
-        let mut stat_file = None;
-        let data = _get_stat_data(path, &mut stat_file)?;
-        let parts = parse_stat_file(&data).ok_or(())?;
-
-        let mut p = retrieve_all_new_process_info(
-            pid,
-            parent_pid,
-            &parts,
-            path,
-            info,
-            refresh_kind,
-            uptime,
-        );
-        p.inner.stat_file = stat_file;
-        return Ok((Some(p), pid));
-    };
-
-    // If we're here, it means that the PID still exists but it's a different process.
-    let p =
-        retrieve_all_new_process_info(pid, parent_pid, &parts, path, info, refresh_kind, uptime);
-    match proc_list.get_mut(&pid) {
-        Some(ref mut entry) => **entry = p,
-        // If it ever enters this case, it means that the process was removed from the HashMap
-        // in-between with the usage of dark magic.
-        None => unreachable!(),
+    tasks: Option<HashSet<Pid>>,
+) -> Result<Option<Process>, ()> {
+    if let Some(ref mut entry) = proc_list.get_mut(&pid) {
+        return update_existing_process(entry, parent_pid, uptime, info, refresh_kind, tasks);
     }
-    // Since this PID is already in the HashMap, no need to add it again.
-    Ok((None, pid))
+    let mut stat_file = None;
+    let data = _get_stat_data(path, &mut stat_file)?;
+    let parts = parse_stat_file(&data).ok_or(())?;
+
+    let mut new_process =
+        retrieve_all_new_process_info(pid, parent_pid, &parts, path, info, refresh_kind, uptime);
+    new_process.inner.stat_file = stat_file;
+    new_process.inner.tasks = tasks;
+    Ok(Some(new_process))
 }
 
 fn old_get_memory(entry: &mut ProcessInner, str_parts: &[&str], info: &SystemInfo) {
@@ -659,6 +718,7 @@ fn get_all_pid_entries(
     parent_pid: Option<Pid>,
     entry: DirEntry,
     data: &mut Vec<ProcAndTasks>,
+    enable_task_stats: bool,
 ) -> Option<Pid> {
     let Ok(file_type) = entry.file_type() else {
         return None;
@@ -677,17 +737,19 @@ fn get_all_pid_entries(
     let name = name?;
     let pid = Pid::from(usize::from_str(name.to_str()?).ok()?);
 
-    let tasks_dir = Path::join(&entry, "task");
-
-    let tasks = if let Ok(entries) = fs::read_dir(tasks_dir) {
-        let mut tasks = HashSet::new();
-        for task in entries
-            .into_iter()
-            .filter_map(|entry| get_all_pid_entries(Some(name), Some(pid), entry.ok()?, data))
-        {
-            tasks.insert(task);
+    let tasks = if enable_task_stats {
+        let tasks_dir = Path::join(&entry, "task");
+        if let Ok(entries) = fs::read_dir(tasks_dir) {
+            let mut tasks = HashSet::new();
+            for task in entries.into_iter().filter_map(|entry| {
+                get_all_pid_entries(Some(name), Some(pid), entry.ok()?, data, enable_task_stats)
+            }) {
+                tasks.insert(task);
+            }
+            Some(tasks)
+        } else {
+            None
         }
-        Some(tasks)
     } else {
         None
     };
@@ -719,6 +781,8 @@ where
     val
 }
 
+/// We're forced to read the whole `/proc` folder because if a process died and another took its
+/// place, we need to get the task parent (if it's a task).
 pub(crate) fn refresh_procs(
     proc_list: &mut HashMap<Pid, Process>,
     path: &Path,
@@ -763,36 +827,34 @@ pub(crate) fn refresh_procs(
             Ok(d) => d,
             Err(_err) => {
                 sysinfo_debug!("Failed to read folder {path:?}: {_err:?}");
-                return 0
-            },
+                return 0;
+            }
         };
         let proc_list = Wrap(UnsafeCell::new(proc_list));
 
         iter(d)
-            .map(|entry| {
+            .flat_map(|entry| {
                 let Ok(entry) = entry else { return Vec::new() };
                 let mut entries = Vec::new();
-                get_all_pid_entries(None, None, entry, &mut entries);
+                get_all_pid_entries(None, None, entry, &mut entries, refresh_kind.tasks());
                 entries
             })
-            .flatten()
             .filter(|e| filter_callback(e, filter))
             .filter_map(|e| {
-                let (mut p, _) = _get_process_data(
+                let proc_list = proc_list.get();
+                let new_process = _get_process_data(
                     e.path.as_path(),
-                    proc_list.get(),
+                    proc_list,
                     e.pid,
                     e.parent_pid,
                     uptime,
                     info,
                     refresh_kind,
+                    e.tasks,
                 )
                 .ok()?;
                 nb_updated.fetch_add(1, Ordering::Relaxed);
-                if let Some(ref mut p) = p {
-                    p.inner.tasks = e.tasks;
-                }
-                p
+                new_process
             })
             .collect::<Vec<_>>()
     };
@@ -822,6 +884,24 @@ fn trim_ascii(mut bytes: &[u8]) -> &[u8] {
     bytes
 }
 
+fn split_content(mut data: &[u8]) -> Vec<OsString> {
+    let mut out = Vec::with_capacity(10);
+    while let Some(pos) = data.iter().position(|c| *c == 0) {
+        let s = trim_ascii(&data[..pos]);
+        if !s.is_empty() {
+            out.push(OsStr::from_bytes(s).to_os_string());
+        }
+        data = &data[pos + 1..];
+    }
+    if !data.is_empty() {
+        let s = trim_ascii(data);
+        if !s.is_empty() {
+            out.push(OsStr::from_bytes(s).to_os_string());
+        }
+    }
+    out
+}
+
 fn copy_from_file(entry: &Path) -> Vec<OsString> {
     match File::open(entry) {
         Ok(mut f) => {
@@ -831,16 +911,7 @@ fn copy_from_file(entry: &Path) -> Vec<OsString> {
                 sysinfo_debug!("Failed to read file in `copy_from_file`: {:?}", _e);
                 Vec::new()
             } else {
-                let mut out = Vec::with_capacity(10);
-                let mut data = data.as_slice();
-                while let Some(pos) = data.iter().position(|c| *c == 0) {
-                    let s = trim_ascii(&data[..pos]);
-                    if !s.is_empty() {
-                        out.push(OsStr::from_bytes(s).to_os_string());
-                    }
-                    data = &data[pos + 1..];
-                }
-                out
+                split_content(&data)
             }
         }
         Err(_e) => {
@@ -960,5 +1031,26 @@ impl std::ops::DerefMut for FileCounter {
 impl Drop for FileCounter {
     fn drop(&mut self) {
         remaining_files().fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_content;
+    use std::ffi::OsString;
+
+    // This test ensures that all the parts of the data are split.
+    #[test]
+    fn test_copy_file() {
+        assert_eq!(split_content(b"hello\0"), vec![OsString::from("hello")]);
+        assert_eq!(split_content(b"hello"), vec![OsString::from("hello")]);
+        assert_eq!(
+            split_content(b"hello\0b"),
+            vec![OsString::from("hello"), "b".into()]
+        );
+        assert_eq!(
+            split_content(b"hello\0\0\0\0b"),
+            vec![OsString::from("hello"), "b".into()]
+        );
     }
 }

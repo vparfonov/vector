@@ -16,86 +16,91 @@
 // under the License.
 
 use std::fmt::Debug;
-use std::io;
-use std::task::Context;
-use std::task::Poll;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::FutureExt;
-use tracing::Span;
+use futures::Stream;
+use futures::StreamExt;
+use tracing::{span, Level, Span};
 
 use crate::raw::*;
 use crate::*;
 
-/// Add [tracing](https://docs.rs/tracing/) for every operations.
+/// Add [tracing](https://docs.rs/tracing/) for every operation.
 ///
 /// # Examples
 ///
 /// ## Basic Setup
 ///
-/// ```
-/// use anyhow::Result;
-/// use opendal::layers::TracingLayer;
-/// use opendal::services;
-/// use opendal::Operator;
+/// ```no_run
+/// # use opendal::layers::TracingLayer;
+/// # use opendal::services;
+/// # use opendal::Operator;
+/// # use opendal::Result;
 ///
-/// let _ = Operator::new(services::Memory::default())
-///     .expect("must init")
+/// # fn main() -> Result<()> {
+/// let _ = Operator::new(services::Memory::default())?
 ///     .layer(TracingLayer)
 ///     .finish();
+/// Ok(())
+/// # }
 /// ```
 ///
 /// ## Real usage
 ///
 /// ```no_run
-/// use std::error::Error;
+/// # use anyhow::Result;
+/// # use opendal::layers::TracingLayer;
+/// # use opendal::services;
+/// # use opendal::Operator;
+/// # use opentelemetry::KeyValue;
+/// # use opentelemetry_sdk::trace;
+/// # use opentelemetry_sdk::Resource;
+/// # use tracing_subscriber::prelude::*;
+/// # use tracing_subscriber::EnvFilter;
 ///
-/// use anyhow::Result;
-/// use opendal::layers::TracingLayer;
-/// use opendal::services;
-/// use opendal::Operator;
-/// use opentelemetry::global;
-/// use tracing::span;
-/// use tracing_subscriber::prelude::*;
-/// use tracing_subscriber::EnvFilter;
+/// # fn main() -> Result<()> {
+/// use opentelemetry::trace::TracerProvider;
+/// let tracer_provider = opentelemetry_sdk::trace::SdkTracerProvider::builder()
+///     .with_simple_exporter(opentelemetry_otlp::SpanExporter::builder().with_tonic().build()?)
+///     .with_resource(Resource::builder().with_attributes(vec![
+///         KeyValue::new("service.name", "opendal_example"),
+///     ]).build())
+///     .build();
+/// let tracer = tracer_provider.tracer("opendal_tracer");
+/// let opentelemetry = tracing_opentelemetry::layer().with_tracer(tracer);
 ///
-/// fn main() -> Result<(), Box<dyn Error + Send + Sync + 'static>> {
-///     let tracer = opentelemetry_jaeger::new_pipeline()
-///         .with_service_name("opendal_example")
-///         .install_simple()?;
-///     let opentelemetry = tracing_opentelemetry::layer().with_tracer(tracer);
-///     tracing_subscriber::registry()
-///         .with(EnvFilter::from_default_env())
-///         .with(opentelemetry)
-///         .try_init()?;
+/// tracing_subscriber::registry()
+///     .with(EnvFilter::from_default_env())
+///     .with(opentelemetry)
+///     .try_init()?;
 ///
+/// {
 ///     let runtime = tokio::runtime::Runtime::new()?;
-///
 ///     runtime.block_on(async {
-///         let root = span!(tracing::Level::INFO, "app_start", work_units = 2);
+///         let root = tracing::span!(tracing::Level::INFO, "app_start", work_units = 2);
 ///         let _enter = root.enter();
 ///
 ///         let _ = dotenvy::dotenv();
-///         let op = Operator::from_env::<services::S3>()
-///             .expect("init operator must succeed")
+///         let op = Operator::new(services::Memory::default())?
 ///             .layer(TracingLayer)
 ///             .finish();
 ///
-///         op.object("test")
-///             .write("0".repeat(16 * 1024 * 1024).into_bytes())
-///             .await
-///             .expect("must succeed");
-///         op.stat("test").await.expect("must succeed");
-///         op.read("test").await.expect("must succeed");
-///     });
-///
-///     // Shut down the current tracer provider. This will invoke the shutdown
-///     // method on all span processors. span processors should export remaining
-///     // spans before return.
-///     global::shutdown_tracer_provider();
-///     Ok(())
+///         op.write("test", "0".repeat(16 * 1024 * 1024).into_bytes())
+///             .await?;
+///         op.stat("test").await?;
+///         op.read("test").await?;
+///         Ok::<(), opendal::Error>(())
+///     })?;
 /// }
+///
+/// // Shut down the current tracer provider.
+/// // This will invoke the shutdown method on all span processors.
+/// // span processors should export remaining spans before return.
+/// tracer_provider.shutdown()?;
+///
+/// Ok(())
+/// # }
 /// ```
 ///
 /// # Output
@@ -106,22 +111,84 @@ use crate::*;
 ///
 /// For example:
 ///
-/// ```ignore
-/// extern crate tracing;
+/// ```no_run
+/// # use tracing::dispatcher;
+/// # use tracing::Event;
+/// # use tracing::Metadata;
+/// # use tracing::span::Attributes;
+/// # use tracing::span::Id;
+/// # use tracing::span::Record;
+/// # use tracing::subscriber::Subscriber;
+///
+/// # pub struct FooSubscriber;
+/// # impl Subscriber for FooSubscriber {
+/// #   fn enabled(&self, _: &Metadata) -> bool { false }
+/// #   fn new_span(&self, _: &Attributes) -> Id { Id::from_u64(0) }
+/// #   fn record(&self, _: &Id, _: &Record) {}
+/// #   fn record_follows_from(&self, _: &Id, _: &Id) {}
+/// #   fn event(&self, _: &Event) {}
+/// #   fn enter(&self, _: &Id) {}
+/// #   fn exit(&self, _: &Id) {}
+/// # }
+/// # impl FooSubscriber { fn new() -> Self { FooSubscriber } }
 ///
 /// let my_subscriber = FooSubscriber::new();
-/// tracing::subscriber::set_global_default(my_subscriber)
-///     .expect("setting tracing default failed");
+/// tracing::subscriber::set_global_default(my_subscriber).expect("setting tracing default failed");
 /// ```
 ///
 /// For real-world usage, please take a look at [`tracing-opentelemetry`](https://crates.io/crates/tracing-opentelemetry).
 pub struct TracingLayer;
 
-impl<A: Accessor> Layer<A> for TracingLayer {
-    type LayeredAccessor = TracingAccessor<A>;
+impl<A: Access> Layer<A> for TracingLayer {
+    type LayeredAccess = TracingAccessor<A>;
 
-    fn layer(&self, inner: A) -> Self::LayeredAccessor {
+    fn layer(&self, inner: A) -> Self::LayeredAccess {
+        let info = inner.info();
+
+        // Update http client with metrics http fetcher.
+        info.update_http_client(|client| {
+            HttpClient::with(TracingHttpFetcher {
+                inner: client.into_inner(),
+            })
+        });
+
         TracingAccessor { inner }
+    }
+}
+
+pub struct TracingHttpFetcher {
+    inner: HttpFetcher,
+}
+
+impl HttpFetch for TracingHttpFetcher {
+    async fn fetch(&self, req: http::Request<Buffer>) -> Result<http::Response<HttpBody>> {
+        let span = span!(Level::DEBUG, "http::fetch", ?req);
+
+        let resp = {
+            let _enter = span.enter();
+            self.inner.fetch(req).await?
+        };
+
+        let (parts, body) = resp.into_parts();
+        let body = body.map_inner(|s| Box::new(TracingStream { inner: s, span }));
+        Ok(http::Response::from_parts(parts, body))
+    }
+}
+
+pub struct TracingStream<S> {
+    inner: S,
+    span: Span,
+}
+
+impl<S> Stream for TracingStream<S>
+where
+    S: Stream<Item = Result<Buffer>> + Unpin + 'static,
+{
+    type Item = Result<Buffer>;
+
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let _enter = self.span.clone().entered();
+        self.inner.poll_next_unpin(cx)
     }
 }
 
@@ -130,24 +197,19 @@ pub struct TracingAccessor<A> {
     inner: A,
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-impl<A: Accessor> LayeredAccessor for TracingAccessor<A> {
+impl<A: Access> LayeredAccess for TracingAccessor<A> {
     type Inner = A;
     type Reader = TracingWrapper<A::Reader>;
-    type BlockingReader = TracingWrapper<A::BlockingReader>;
     type Writer = TracingWrapper<A::Writer>;
-    type BlockingWriter = TracingWrapper<A::BlockingWriter>;
     type Lister = TracingWrapper<A::Lister>;
+    type Deleter = TracingWrapper<A::Deleter>;
+    type BlockingReader = TracingWrapper<A::BlockingReader>;
+    type BlockingWriter = TracingWrapper<A::BlockingWriter>;
     type BlockingLister = TracingWrapper<A::BlockingLister>;
+    type BlockingDeleter = TracingWrapper<A::BlockingDeleter>;
 
     fn inner(&self) -> &Self::Inner {
         &self.inner
-    }
-
-    #[tracing::instrument(level = "debug")]
-    fn metadata(&self) -> AccessorInfo {
-        self.inner.info()
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -155,20 +217,26 @@ impl<A: Accessor> LayeredAccessor for TracingAccessor<A> {
         self.inner.create_dir(path, args).await
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
     async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
-        self.inner
-            .read(path, args)
-            .map(|v| v.map(|(rp, r)| (rp, TracingWrapper::new(Span::current(), r))))
-            .await
+        let span = span!(Level::DEBUG, "read", path, ?args);
+
+        let (rp, r) = {
+            let _enter = span.enter();
+            self.inner.read(path, args).await?
+        };
+
+        Ok((rp, TracingWrapper::new(span, r)))
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
     async fn write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::Writer)> {
-        self.inner
-            .write(path, args)
-            .await
-            .map(|(rp, r)| (rp, TracingWrapper::new(Span::current(), r)))
+        let span = span!(Level::DEBUG, "write", path, ?args);
+
+        let (rp, r) = {
+            let _enter = span.enter();
+            self.inner.write(path, args).await?
+        };
+
+        Ok((rp, TracingWrapper::new(span, r)))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -186,17 +254,26 @@ impl<A: Accessor> LayeredAccessor for TracingAccessor<A> {
         self.inner.stat(path, args).await
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
-    async fn delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
-        self.inner.delete(path, args).await
+    async fn delete(&self) -> Result<(RpDelete, Self::Deleter)> {
+        let span = span!(Level::DEBUG, "delete");
+
+        let (rp, r) = {
+            let _enter = span.enter();
+            self.inner.delete().await?
+        };
+
+        Ok((rp, TracingWrapper::new(span, r)))
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
     async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
-        self.inner
-            .list(path, args)
-            .map(|v| v.map(|(rp, s)| (rp, TracingWrapper::new(Span::current(), s))))
-            .await
+        let span = span!(Level::DEBUG, "list", path, ?args);
+
+        let (rp, r) = {
+            let _enter = span.enter();
+            self.inner.list(path, args).await?
+        };
+
+        Ok((rp, TracingWrapper::new(span, r)))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -205,27 +282,30 @@ impl<A: Accessor> LayeredAccessor for TracingAccessor<A> {
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
-    async fn batch(&self, args: OpBatch) -> Result<RpBatch> {
-        self.inner.batch(args).await
-    }
-
-    #[tracing::instrument(level = "debug", skip(self))]
     fn blocking_create_dir(&self, path: &str, args: OpCreateDir) -> Result<RpCreateDir> {
         self.inner.blocking_create_dir(path, args)
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
     fn blocking_read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::BlockingReader)> {
-        self.inner
-            .blocking_read(path, args)
-            .map(|(rp, r)| (rp, TracingWrapper::new(Span::current(), r)))
+        let span = span!(Level::DEBUG, "read", path, ?args);
+
+        let (rp, r) = {
+            let _enter = span.enter();
+            self.inner.blocking_read(path, args)?
+        };
+
+        Ok((rp, TracingWrapper::new(span, r)))
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
     fn blocking_write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::BlockingWriter)> {
-        self.inner
-            .blocking_write(path, args)
-            .map(|(rp, r)| (rp, TracingWrapper::new(Span::current(), r)))
+        let span = span!(Level::DEBUG, "write", path, ?args);
+
+        let (rp, r) = {
+            let _enter = span.enter();
+            self.inner.blocking_write(path, args)?
+        };
+
+        Ok((rp, TracingWrapper::new(span, r)))
     }
 
     #[tracing::instrument(level = "debug", skip(self))]
@@ -243,16 +323,26 @@ impl<A: Accessor> LayeredAccessor for TracingAccessor<A> {
         self.inner.blocking_stat(path, args)
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
-    fn blocking_delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
-        self.inner.blocking_delete(path, args)
+    fn blocking_delete(&self) -> Result<(RpDelete, Self::BlockingDeleter)> {
+        let span = span!(Level::DEBUG, "delete");
+
+        let (rp, r) = {
+            let _enter = span.enter();
+            self.inner.blocking_delete()?
+        };
+
+        Ok((rp, TracingWrapper::new(span, r)))
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
     fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingLister)> {
-        self.inner
-            .blocking_list(path, args)
-            .map(|(rp, it)| (rp, TracingWrapper::new(Span::current(), it)))
+        let span = span!(Level::DEBUG, "list", path, ?args);
+
+        let (rp, r) = {
+            let _enter = span.enter();
+            self.inner.blocking_list(path, args)?
+        };
+
+        Ok((rp, TracingWrapper::new(span, r)))
     }
 }
 
@@ -268,111 +358,95 @@ impl<R> TracingWrapper<R> {
 }
 
 impl<R: oio::Read> oio::Read for TracingWrapper<R> {
-    #[tracing::instrument(
-        parent = &self.span,
-        level = "trace",
-        skip_all)]
-    fn poll_read(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<usize>> {
-        self.inner.poll_read(cx, buf)
-    }
+    async fn read(&mut self) -> Result<Buffer> {
+        let _enter = self.span.enter();
 
-    #[tracing::instrument(
-        parent = &self.span,
-        level = "trace",
-        skip_all)]
-    fn poll_seek(&mut self, cx: &mut Context<'_>, pos: io::SeekFrom) -> Poll<Result<u64>> {
-        self.inner.poll_seek(cx, pos)
-    }
-
-    #[tracing::instrument(
-        parent = &self.span,
-        level = "trace",
-        skip_all)]
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Bytes>>> {
-        self.inner.poll_next(cx)
+        self.inner.read().await
     }
 }
 
 impl<R: oio::BlockingRead> oio::BlockingRead for TracingWrapper<R> {
-    #[tracing::instrument(
-        parent = &self.span,
-        level = "trace",
-        skip_all)]
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        self.inner.read(buf)
-    }
+    fn read(&mut self) -> Result<Buffer> {
+        let _enter = self.span.enter();
 
-    #[tracing::instrument(
-        parent = &self.span,
-        level = "trace",
-        skip_all)]
-    fn seek(&mut self, pos: io::SeekFrom) -> Result<u64> {
-        self.inner.seek(pos)
-    }
-
-    #[tracing::instrument(
-        parent = &self.span,
-        level = "trace",
-        skip_all)]
-    fn next(&mut self) -> Option<Result<Bytes>> {
-        self.inner.next()
+        self.inner.read()
     }
 }
 
 impl<R: oio::Write> oio::Write for TracingWrapper<R> {
-    #[tracing::instrument(
-        parent = &self.span,
-        level = "trace",
-        skip_all)]
-    fn poll_write(&mut self, cx: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
-        self.inner.poll_write(cx, bs)
+    async fn write(&mut self, bs: Buffer) -> Result<()> {
+        let _enter = self.span.enter();
+
+        self.inner.write(bs).await
     }
 
-    #[tracing::instrument(
-        parent = &self.span,
-        level = "trace",
-        skip_all)]
-    fn poll_abort(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        self.inner.poll_abort(cx)
+    async fn abort(&mut self) -> Result<()> {
+        let _enter = self.span.enter();
+
+        self.inner.abort().await
     }
 
-    #[tracing::instrument(
-        parent = &self.span,
-        level = "trace",
-        skip_all)]
-    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        self.inner.poll_close(cx)
+    async fn close(&mut self) -> Result<Metadata> {
+        let _enter = self.span.enter();
+
+        self.inner.close().await
     }
 }
 
 impl<R: oio::BlockingWrite> oio::BlockingWrite for TracingWrapper<R> {
-    #[tracing::instrument(
-        parent = &self.span,
-        level = "trace",
-        skip_all)]
-    fn write(&mut self, bs: &dyn oio::WriteBuf) -> Result<usize> {
+    fn write(&mut self, bs: Buffer) -> Result<()> {
+        let _enter = self.span.enter();
+
         self.inner.write(bs)
     }
 
-    #[tracing::instrument(
-        parent = &self.span,
-        level = "trace",
-        skip_all)]
-    fn close(&mut self) -> Result<()> {
+    fn close(&mut self) -> Result<Metadata> {
+        let _enter = self.span.enter();
+
         self.inner.close()
     }
 }
 
 impl<R: oio::List> oio::List for TracingWrapper<R> {
-    #[tracing::instrument(parent = &self.span, level = "debug", skip_all)]
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<oio::Entry>>> {
-        self.inner.poll_next(cx)
+    async fn next(&mut self) -> Result<Option<oio::Entry>> {
+        let _enter = self.span.enter();
+
+        self.inner.next().await
     }
 }
 
 impl<R: oio::BlockingList> oio::BlockingList for TracingWrapper<R> {
-    #[tracing::instrument(parent = &self.span, level = "debug", skip_all)]
     fn next(&mut self) -> Result<Option<oio::Entry>> {
+        let _enter = self.span.enter();
+
         self.inner.next()
+    }
+}
+
+impl<R: oio::Delete> oio::Delete for TracingWrapper<R> {
+    fn delete(&mut self, path: &str, args: OpDelete) -> Result<()> {
+        let _enter = self.span.enter();
+
+        self.inner.delete(path, args)
+    }
+
+    async fn flush(&mut self) -> Result<usize> {
+        let _enter = self.span.enter();
+
+        self.inner.flush().await
+    }
+}
+
+impl<R: oio::BlockingDelete> oio::BlockingDelete for TracingWrapper<R> {
+    fn delete(&mut self, path: &str, args: OpDelete) -> Result<()> {
+        let _enter = self.span.enter();
+
+        self.inner.delete(path, args)
+    }
+
+    fn flush(&mut self) -> Result<usize> {
+        let _enter = self.span.enter();
+
+        self.inner.flush()
     }
 }

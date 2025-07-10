@@ -6,7 +6,6 @@
 //! # Example
 //!
 //! ```rust
-//! use async_trait::async_trait;
 //! use deadpool::managed;
 //!
 //! #[derive(Debug)]
@@ -22,7 +21,6 @@
 //!
 //! struct Manager {}
 //!
-//! #[async_trait]
 //! impl managed::Manager for Manager {
 //!     type Type = Computer;
 //!     type Error = Error;
@@ -68,10 +66,12 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex, Weak,
     },
-    time::{Duration, Instant},
+    time::Duration,
 };
 
-use async_trait::async_trait;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
+
 use deadpool_runtime::Runtime;
 use tokio::sync::{Semaphore, TryAcquireError};
 
@@ -90,23 +90,26 @@ pub use self::{
 pub type RecycleResult<E> = Result<(), RecycleError<E>>;
 
 /// Manager responsible for creating new [`Object`]s or recycling existing ones.
-#[async_trait]
 pub trait Manager: Sync + Send {
     /// Type of [`Object`]s that this [`Manager`] creates and recycles.
-    type Type;
+    type Type: Send;
     /// Error that this [`Manager`] can return when creating and/or recycling
     /// [`Object`]s.
-    type Error;
+    type Error: Send;
 
     /// Creates a new instance of [`Manager::Type`].
-    async fn create(&self) -> Result<Self::Type, Self::Error>;
+    fn create(&self) -> impl Future<Output = Result<Self::Type, Self::Error>> + Send;
 
     /// Tries to recycle an instance of [`Manager::Type`].
     ///
     /// # Errors
     ///
     /// Returns [`Manager::Error`] if the instance couldn't be recycled.
-    async fn recycle(&self, obj: &mut Self::Type, metrics: &Metrics) -> RecycleResult<Self::Error>;
+    fn recycle(
+        &self,
+        obj: &mut Self::Type,
+        metrics: &Metrics,
+    ) -> impl Future<Output = RecycleResult<Self::Error>> + Send;
 
     /// Detaches an instance of [`Manager::Type`] from this [`Manager`].
     ///
@@ -148,16 +151,16 @@ struct UnreadyObject<'a, M: Manager> {
     pool: &'a PoolInner<M>,
 }
 
-impl<'a, M: Manager> UnreadyObject<'a, M> {
+impl<M: Manager> UnreadyObject<'_, M> {
     fn ready(mut self) -> ObjectInner<M> {
         self.inner.take().unwrap()
     }
     fn inner(&mut self) -> &mut ObjectInner<M> {
-        return self.inner.as_mut().unwrap();
+        self.inner.as_mut().unwrap()
     }
 }
 
-impl<'a, M: Manager> Drop for UnreadyObject<'a, M> {
+impl<M: Manager> Drop for UnreadyObject<'_, M> {
     fn drop(&mut self) {
         if let Some(mut inner) = self.inner.take() {
             self.pool.slots.lock().unwrap().size -= 1;
@@ -409,7 +412,10 @@ impl<M: Manager, W: From<Object<M>>> Pool<M, W> {
         }
 
         inner.metrics.recycle_count += 1;
-        inner.metrics.recycled = Some(Instant::now());
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            inner.metrics.recycled = Some(Instant::now());
+        }
 
         Ok(Some(unready_obj.ready()))
     }
@@ -484,7 +490,7 @@ impl<M: Manager, W: From<Object<M>>> Pool<M, W> {
         }
         // grow pool
         if max_size > old_max_size {
-            let additional = slots.max_size - slots.size;
+            let additional = slots.max_size - old_max_size;
             slots.vec.reserve_exact(additional);
             self.inner.semaphore.add_permits(additional);
         }
@@ -513,18 +519,30 @@ impl<M: Manager, W: From<Object<M>>> Pool<M, W> {
     ///     }
     /// });
     /// ```
-    pub fn retain(&self, f: impl Fn(&M::Type, Metrics) -> bool) {
+    pub fn retain(
+        &self,
+        mut predicate: impl FnMut(&M::Type, Metrics) -> bool,
+    ) -> RetainResult<M::Type> {
+        let mut removed = Vec::with_capacity(self.status().size);
         let mut guard = self.inner.slots.lock().unwrap();
-        let len_before = guard.vec.len();
-        guard.vec.retain_mut(|obj| {
-            if f(&obj.obj, obj.metrics) {
-                true
+        let mut i = 0;
+        // This code can be simplified once `Vec::extract_if` lands in stable Rust.
+        // https://doc.rust-lang.org/std/vec/struct.Vec.html#method.extract_if
+        while i < guard.vec.len() {
+            let obj = &mut guard.vec[i];
+            if predicate(&mut obj.obj, obj.metrics) {
+                i += 1;
             } else {
+                let mut obj = guard.vec.remove(i).unwrap();
                 self.manager().detach(&mut obj.obj);
-                false
+                removed.push(obj.obj);
             }
-        });
-        guard.size -= len_before - guard.vec.len();
+        }
+        guard.size -= removed.len();
+        RetainResult {
+            retained: i,
+            removed,
+        }
     }
 
     /// Get current timeout configuration
@@ -653,5 +671,23 @@ async fn apply_timeout<O, E>(
             .ok_or(PoolError::Timeout(timeout_type))?
             .map_err(Into::into),
         (None, Some(_)) => Err(PoolError::NoRuntimeSpecified),
+    }
+}
+
+#[derive(Debug)]
+/// This is the result returned by `Pool::retain`
+pub struct RetainResult<T> {
+    /// Number of retained objects
+    pub retained: usize,
+    /// Objects that were removed from the pool
+    pub removed: Vec<T>,
+}
+
+impl<T> Default for RetainResult<T> {
+    fn default() -> Self {
+        Self {
+            retained: Default::default(),
+            removed: Default::default(),
+        }
     }
 }

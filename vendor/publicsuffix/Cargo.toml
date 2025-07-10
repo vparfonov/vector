@@ -12,8 +12,13 @@
 [package]
 edition = "2018"
 name = "publicsuffix"
-version = "2.2.3"
+version = "2.3.0"
 authors = ["rushmorem <rushmore@webenchanter.com>"]
+build = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
 description = "Extract root domain and suffix from a domain name"
 documentation = "https://docs.rs/publicsuffix"
 readme = "README.md"
@@ -30,13 +35,25 @@ repository = "https://github.com/rushmorem/publicsuffix"
 [package.metadata.docs.rs]
 all-features = true
 
+[lib]
+name = "publicsuffix"
+path = "src/lib.rs"
+
+[[test]]
+name = "list"
+path = "tests/list.rs"
+
+[[bench]]
+name = "benches"
+path = "benches/benches.rs"
+
 [dependencies.hashbrown]
-version = "0.12.3"
+version = "0.15.1"
 features = ["inline-more"]
 optional = true
 
 [dependencies.idna]
-version = "0.3"
+version = "1.0"
 optional = true
 
 [dependencies.psl-types]
@@ -46,9 +63,6 @@ version = "2.0.11"
 version = "2.6.0"
 optional = true
 default-features = false
-
-[dev-dependencies.lazy_static]
-version = "1.4.0"
 
 [dev-dependencies.rspec]
 version = "1.0.0"

@@ -15,11 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-mod chunked_bytes;
-pub use chunked_bytes::ChunkedBytes;
+mod flex_buf;
+pub use flex_buf::FlexBuf;
 
-mod write_buf;
-pub use write_buf::WriteBuf;
+mod queue_buf;
+pub use queue_buf::QueueBuf;
 
-mod adaptive;
-pub use adaptive::AdaptiveBuf;
+mod pooled_buf;
+pub use pooled_buf::PooledBuf;

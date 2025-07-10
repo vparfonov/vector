@@ -1,4 +1,4 @@
-Oniguruma Regular Expressions Version 6.9.8    2022/04/11
+Oniguruma Regular Expressions Version 6.9.9    2024/06/10
 
 syntax: ONIG_SYNTAX_ONIGURUMA (default syntax)
 
@@ -237,24 +237,21 @@ syntax: ONIG_SYNTAX_ONIGURUMA (default syntax)
 
     Unicode Case:
 
-      alnum    Letter | Mark | Decimal_Number
-      alpha    Letter | Mark
-      ascii    0000 - 007F
-      blank    Space_Separator | 0009
-      cntrl    Control | Format | Unassigned | Private_Use | Surrogate
+      alnum    Alphabetic | Decimal_Number
+      alpha    Alphabetic
+      ascii    U+0000 - U+007F
+      blank    Space_Separator | U+0009
+      cntrl    U+0000 - U+001F, U+007F - U+009F
       digit    Decimal_Number
-      graph    [[:^space:]] && ^Control && ^Unassigned && ^Surrogate
-      lower    Lowercase_Letter
-      print    [[:graph:]] | [[:space:]]
-      punct    Connector_Punctuation | Dash_Punctuation | Close_Punctuation |
-               Final_Punctuation | Initial_Punctuation | Other_Punctuation |
-               Open_Punctuation
-      space    Space_Separator | Line_Separator | Paragraph_Separator |
-               U+0009 | U+000A | U+000B | U+000C | U+000D | U+0085
-      upper    Uppercase_Letter
+      graph    ^White_Space && ^[[:cntrl:]] && ^Unassigned && ^Surrogate
+      lower    Lowercase
+      print    [[:graph:]] | Space_Separator
+      punct    Punctuation | Symbol
+      space    White_Space
+      upper    Uppercase
       xdigit   U+0030 - U+0039 | U+0041 - U+0046 | U+0061 - U+0066
                (0-9, a-f, A-F)
-      word     Letter | Mark | Decimal_Number | Connector_Punctuation
+      word     Alphabetic | Mark | Decimal_Number | Connector_Punctuation
 
 
 
@@ -288,7 +285,10 @@ syntax: ONIG_SYNTAX_ONIGURUMA (default syntax)
                       * It makes a group to the next ')' or end of the pattern.
                         /ab(?i)c|def|gh/ == /ab(?i:c|def|gh)/
 
-  /(?CIL).../, /(?CIL:...)/   whole opiton
+  * (?i) option has no effect on word types (\w, \p{Word}). However, if the word types are used within a character class, it is valid. But, this would only be a concern when word types are used with the (?W) option.
+
+
+  /(?CIL).../, /(?CIL:...)/   whole option
 
                             This option must be placed in a position that
                             affects the entire regular expression.

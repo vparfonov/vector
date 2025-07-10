@@ -95,15 +95,9 @@ where
 
     // init distances of paths with no intermediate nodes
     for edge in graph.edge_references() {
-        let i = graph.to_index(edge.source());
-        let j = graph.to_index(edge.target());
-        let cost = edge_cost(edge);
-
-        if dist[i][j] > cost {
-            dist[i][j] = cost;
-            if !graph.is_directed() {
-                dist[j][i] = cost;
-            }
+        dist[graph.to_index(edge.source())][graph.to_index(edge.target())] = edge_cost(edge);
+        if !graph.is_directed() {
+            dist[graph.to_index(edge.target())][graph.to_index(edge.source())] = edge_cost(edge);
         }
     }
 

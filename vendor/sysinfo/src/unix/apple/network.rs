@@ -1,18 +1,67 @@
 // Take a look at the license at the top of the repository in the LICENSE file.
 
-use libc::{self, c_char, if_msghdr2, CTL_NET, NET_RT_IFLIST2, PF_ROUTE, RTM_IFINFO2};
+use libc::{
+    self, c_char, c_int, c_uint, if_data64, if_msghdr2, sysctl, CTL_NET, IFNAMSIZ, NET_RT_IFLIST2,
+    PF_ROUTE, RTM_IFINFO2,
+};
 
 use std::collections::{hash_map, HashMap};
+use std::mem::{size_of, MaybeUninit};
 use std::ptr::null_mut;
 
 use crate::network::refresh_networks_addresses;
 use crate::{IpNetwork, MacAddr, NetworkData};
 
-macro_rules! old_and_new {
-    ($ty_:expr, $name:ident, $old:ident, $new_val:expr) => {{
-        $ty_.$old = $ty_.$name;
-        $ty_.$name = $new_val;
-    }};
+// FIXME: To be removed once https://github.com/rust-lang/libc/pull/4022 is merged and released.
+#[repr(C)]
+struct ifmibdata {
+    ifmd_name: [c_char; IFNAMSIZ],
+    ifmd_pcount: c_uint,
+    ifmd_flags: c_uint,
+    ifmd_snd_len: c_uint,
+    ifmd_snd_maxlen: c_uint,
+    ifmd_snd_drops: c_uint,
+    ifmd_filler: [c_uint; 4],
+    ifmd_data: if_data64,
+}
+// FIXME: To be removed once https://github.com/rust-lang/libc/pull/4022 is merged and released.
+pub const IFDATA_GENERAL: c_int = 1;
+// FIXME: To be removed once https://github.com/rust-lang/libc/pull/4022 is merged and released.
+pub const IFMIB_IFDATA: c_int = 2;
+// FIXME: To be removed once https://github.com/rust-lang/libc/pull/4022 is merged and released.
+pub const NETLINK_GENERIC: c_int = 0;
+
+#[inline]
+fn update_field(old_field: &mut u64, new_field: &mut u64, value: u64) {
+    *old_field = *new_field;
+    *new_field = value;
+}
+
+fn update_network_data(inner: &mut NetworkDataInner, data: &if_data64) {
+    update_field(&mut inner.old_out, &mut inner.current_out, data.ifi_obytes);
+    update_field(&mut inner.old_in, &mut inner.current_in, data.ifi_ibytes);
+
+    update_field(
+        &mut inner.old_packets_out,
+        &mut inner.packets_out,
+        data.ifi_opackets,
+    );
+    update_field(
+        &mut inner.old_packets_in,
+        &mut inner.packets_in,
+        data.ifi_ipackets,
+    );
+
+    update_field(
+        &mut inner.old_errors_in,
+        &mut inner.errors_in,
+        data.ifi_ierrors,
+    );
+    update_field(
+        &mut inner.old_errors_out,
+        &mut inner.errors_out,
+        data.ifi_oerrors,
+    );
 }
 
 pub(crate) struct NetworksInner {
@@ -30,26 +79,36 @@ impl NetworksInner {
         &self.interfaces
     }
 
-    pub(crate) fn refresh_list(&mut self) {
-        for (_, data) in self.interfaces.iter_mut() {
-            data.inner.updated = false;
+    pub(crate) fn refresh(&mut self, remove_not_listed_interfaces: bool) {
+        self.update_networks();
+        if remove_not_listed_interfaces {
+            self.interfaces.retain(|_, i| {
+                if !i.inner.updated {
+                    return false;
+                }
+                i.inner.updated = false;
+                true
+            });
         }
-        self.update_networks(true);
-        self.interfaces.retain(|_, data| data.inner.updated);
         refresh_networks_addresses(&mut self.interfaces);
-    }
-
-    pub(crate) fn refresh(&mut self) {
-        self.update_networks(false);
     }
 
     #[allow(clippy::cast_ptr_alignment)]
     #[allow(clippy::uninit_vec)]
-    fn update_networks(&mut self, insert: bool) {
+    fn update_networks(&mut self) {
         let mib = &mut [CTL_NET, PF_ROUTE, 0, 0, NET_RT_IFLIST2, 0];
+        let mib2 = &mut [
+            CTL_NET,
+            libc::PF_LINK,
+            NETLINK_GENERIC,
+            IFMIB_IFDATA,
+            0,
+            IFDATA_GENERAL,
+        ];
+
         let mut len = 0;
         unsafe {
-            if libc::sysctl(
+            if sysctl(
                 mib.as_mut_ptr(),
                 mib.len() as _,
                 null_mut(),
@@ -63,7 +122,7 @@ impl NetworksInner {
             }
             let mut buf = Vec::with_capacity(len);
             buf.set_len(len);
-            if libc::sysctl(
+            if sysctl(
                 mib.as_mut_ptr(),
                 mib.len() as _,
                 buf.as_mut_ptr(),
@@ -78,6 +137,7 @@ impl NetworksInner {
             let buf = buf.as_ptr() as *const c_char;
             let lim = buf.add(len);
             let mut next = buf;
+
             while next < lim {
                 let ifm = next as *const libc::if_msghdr;
                 next = next.offset((*ifm).ifm_msglen as isize);
@@ -96,59 +156,73 @@ impl NetworksInner {
                     }
                     name.set_len(libc::strlen(pname));
                     let name = String::from_utf8_unchecked(name);
+                    let mtu = (*if2m).ifm_data.ifi_mtu as u64;
+
+                    // Because data size is capped at 32 bits with the previous sysctl call for some
+                    // reasons, we need to make another sysctl call to get the actual values
+                    // we originally got into `ifm.ifm_data`...
+                    //
+                    // Issue: https://github.com/GuillaumeGomez/sysinfo/issues/1378
+                    let mut mib_data: MaybeUninit<ifmibdata> = MaybeUninit::uninit();
+
+                    mib2[4] = (*if2m).ifm_index as _;
+                    let ret = sysctl(
+                        mib2.as_mut_ptr(),
+                        mib2.len() as _,
+                        mib_data.as_mut_ptr() as *mut _,
+                        &mut size_of::<ifmibdata>(),
+                        null_mut(),
+                        0,
+                    );
+
                     match self.interfaces.entry(name) {
                         hash_map::Entry::Occupied(mut e) => {
                             let interface = e.get_mut();
                             let interface = &mut interface.inner;
 
-                            old_and_new!(
-                                interface,
-                                current_out,
-                                old_out,
-                                (*if2m).ifm_data.ifi_obytes
-                            );
-                            old_and_new!(
-                                interface,
-                                current_in,
-                                old_in,
-                                (*if2m).ifm_data.ifi_ibytes
-                            );
-                            old_and_new!(
-                                interface,
-                                packets_in,
-                                old_packets_in,
-                                (*if2m).ifm_data.ifi_ipackets
-                            );
-                            old_and_new!(
-                                interface,
-                                packets_out,
-                                old_packets_out,
-                                (*if2m).ifm_data.ifi_opackets
-                            );
-                            old_and_new!(
-                                interface,
-                                errors_in,
-                                old_errors_in,
-                                (*if2m).ifm_data.ifi_ierrors
-                            );
-                            old_and_new!(
-                                interface,
-                                errors_out,
-                                old_errors_out,
-                                (*if2m).ifm_data.ifi_oerrors
-                            );
+                            if ret < 0 {
+                                sysinfo_debug!(
+                                    "Cannot get network interface data usage: sysctl failed: {ret}"
+                                );
+                            } else {
+                                let data = mib_data.assume_init();
+                                update_network_data(interface, &data.ifmd_data);
+                            }
+                            if interface.mtu != mtu {
+                                interface.mtu = mtu
+                            }
                             interface.updated = true;
                         }
                         hash_map::Entry::Vacant(e) => {
-                            if !insert {
-                                continue;
+                            let current_in;
+                            let current_out;
+                            let packets_in;
+                            let packets_out;
+                            let errors_in;
+                            let errors_out;
+
+                            if ret < 0 {
+                                sysinfo_debug!(
+                                    "Cannot get network interface data usage: sysctl failed: {ret}"
+                                );
+
+                                current_in = 0;
+                                current_out = 0;
+                                packets_in = 0;
+                                packets_out = 0;
+                                errors_in = 0;
+                                errors_out = 0;
+                            } else {
+                                let data = mib_data.assume_init();
+                                let data = data.ifmd_data;
+
+                                current_in = data.ifi_ibytes;
+                                current_out = data.ifi_obytes;
+                                packets_in = data.ifi_ipackets;
+                                packets_out = data.ifi_opackets;
+                                errors_in = data.ifi_ierrors;
+                                errors_out = data.ifi_oerrors;
                             }
-                            let current_in = (*if2m).ifm_data.ifi_ibytes;
-                            let current_out = (*if2m).ifm_data.ifi_obytes;
-                            let packets_in = (*if2m).ifm_data.ifi_ipackets;
-                            let packets_out = (*if2m).ifm_data.ifi_opackets;
-                            let errors_in = (*if2m).ifm_data.ifi_ierrors;
-                            let errors_out = (*if2m).ifm_data.ifi_oerrors;
 
                             e.insert(NetworkData {
                                 inner: NetworkDataInner {
@@ -167,6 +241,7 @@ impl NetworksInner {
                                     updated: true,
                                     mac_addr: MacAddr::UNSPECIFIED,
                                     ip_networks: vec![],
+                                    mtu,
                                 },
                             });
                         }
@@ -196,6 +271,8 @@ pub(crate) struct NetworkDataInner {
     pub(crate) mac_addr: MacAddr,
     /// IP networks
     pub(crate) ip_networks: Vec<IpNetwork>,
+    /// Interface Maximum Transfer Unit (MTU)
+    mtu: u64,
 }
 
 impl NetworkDataInner {
@@ -253,5 +330,9 @@ impl NetworkDataInner {
 
     pub(crate) fn ip_networks(&self) -> &[IpNetwork] {
         &self.ip_networks
+    }
+
+    pub(crate) fn mtu(&self) -> u64 {
+        self.mtu
     }
 }

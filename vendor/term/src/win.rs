@@ -129,7 +129,7 @@ fn conout() -> io::Result<HandleWrapper> {
             ptr::null_mut(),
             OPEN_EXISTING,
             0,
-            std::ptr::null_mut(),
+            0,
         )
     };
     if handle == INVALID_HANDLE_VALUE {

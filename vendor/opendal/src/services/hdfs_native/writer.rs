@@ -15,38 +15,46 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::task::Context;
-use std::task::Poll;
-
-use hdfs_native::file::FileWriter;
-
-use crate::raw::oio;
-use crate::raw::oio::WriteBuf;
+use crate::raw::*;
+use crate::services::hdfs_native::error::parse_hdfs_error;
 use crate::*;
-
+use hdfs_native::file::FileWriter;
 pub struct HdfsNativeWriter {
-    _f: FileWriter,
+    f: FileWriter,
+    size: u64,
 }
 
 impl HdfsNativeWriter {
-    pub fn new(f: FileWriter) -> Self {
-        HdfsNativeWriter { _f: f }
+    pub fn new(f: FileWriter, initial_size: u64) -> Self {
+        HdfsNativeWriter {
+            f,
+            size: initial_size,
+        }
     }
 }
 
 impl oio::Write for HdfsNativeWriter {
-    fn poll_write(&mut self, _cx: &mut Context<'_>, _bs: &dyn WriteBuf) -> Poll<Result<usize>> {
-        todo!()
+    async fn write(&mut self, mut buf: Buffer) -> Result<()> {
+        let len = buf.len() as u64;
+
+        for bs in buf.by_ref() {
+            self.f.write(bs).await.map_err(parse_hdfs_error)?;
+        }
+
+        self.size += len;
+        Ok(())
     }
 
-    fn poll_close(&mut self, _cx: &mut Context<'_>) -> Poll<Result<()>> {
-        todo!()
+    async fn close(&mut self) -> Result<Metadata> {
+        self.f.close().await.map_err(parse_hdfs_error)?;
+
+        Ok(Metadata::default().with_content_length(self.size))
     }
 
-    fn poll_abort(&mut self, _cx: &mut Context<'_>) -> Poll<Result<()>> {
-        Poll::Ready(Err(Error::new(
+    async fn abort(&mut self) -> Result<()> {
+        Err(Error::new(
             ErrorKind::Unsupported,
             "HdfsNativeWriter doesn't support abort",
-        )))
+        ))
     }
 }

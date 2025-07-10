@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.56"
 name = "enumflags2"
-version = "0.7.11"
+version = "0.7.12"
 authors = [
     "maik klein <maikklein@googlemail.com>",
     "Maja Kądziołka <maya@compilercrim.es>",
@@ -44,7 +44,7 @@ name = "enumflags2"
 path = "src/lib.rs"
 
 [dependencies.enumflags2_derive]
-version = "=0.7.11"
+version = "=0.7.12"
 
 [dependencies.serde]
 version = "^1.0.0"

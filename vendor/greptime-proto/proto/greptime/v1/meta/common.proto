@@ -33,6 +33,7 @@ message RequestHeader {
 enum Role {
   DATANODE = 0;
   FRONTEND = 1;
+  FLOWNODE = 2;
 }
 
 message ResponseHeader {
@@ -51,8 +52,6 @@ message Peer {
   uint64 id = 1;
   string addr = 2;
 }
-
-message TableId { uint32 id = 1; }
 
 message TimeInterval {
   // The unix timestamp in millis of the start of this period.

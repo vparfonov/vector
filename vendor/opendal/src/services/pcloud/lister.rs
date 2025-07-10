@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
 use http::StatusCode;
 
 use super::core::*;
@@ -41,7 +41,6 @@ impl PcloudLister {
     }
 }
 
-#[async_trait]
 impl oio::PageList for PcloudLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let resp = self.core.list_folder(&self.path).await?;
@@ -50,10 +49,10 @@ impl oio::PageList for PcloudLister {
 
         match status {
             StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
+                let bs = resp.into_body();
 
-                let resp: ListFolderResponse =
-                    serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+                let resp: ListFolderResponse = serde_json::from_reader(bs.clone().reader())
+                    .map_err(new_json_deserialize_error)?;
                 let result = resp.result;
 
                 if result == 2005 {
@@ -62,7 +61,7 @@ impl oio::PageList for PcloudLister {
                 }
 
                 if result != 0 {
-                    return Err(Error::new(ErrorKind::Unexpected, &format!("{resp:?}")));
+                    return Err(Error::new(ErrorKind::Unexpected, format!("{resp:?}")));
                 }
 
                 if let Some(metadata) = resp.metadata {
@@ -85,12 +84,12 @@ impl oio::PageList for PcloudLister {
                     return Ok(());
                 }
 
-                return Err(Error::new(
+                Err(Error::new(
                     ErrorKind::Unexpected,
-                    &String::from_utf8_lossy(&bs),
-                ));
+                    String::from_utf8_lossy(&bs.to_bytes()),
+                ))
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 }

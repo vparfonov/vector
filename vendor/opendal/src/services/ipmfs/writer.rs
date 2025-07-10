@@ -15,41 +15,35 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use async_trait::async_trait;
+use std::sync::Arc;
+
 use http::StatusCode;
 
-use super::backend::IpmfsBackend;
+use super::core::IpmfsCore;
 use super::error::parse_error;
-use crate::raw::oio::WriteBuf;
 use crate::raw::*;
 use crate::*;
 
 pub struct IpmfsWriter {
-    backend: IpmfsBackend,
-
+    core: Arc<IpmfsCore>,
     path: String,
 }
 
 impl IpmfsWriter {
-    pub fn new(backend: IpmfsBackend, path: String) -> Self {
-        IpmfsWriter { backend, path }
+    pub fn new(core: Arc<IpmfsCore>, path: String) -> Self {
+        IpmfsWriter { core, path }
     }
 }
 
-#[async_trait]
 impl oio::OneShotWrite for IpmfsWriter {
-    async fn write_once(&self, bs: &dyn WriteBuf) -> Result<()> {
-        let bs = oio::ChunkedBytes::from_vec(bs.vectored_bytes(bs.remaining()));
-        let resp = self.backend.ipmfs_write(&self.path, bs).await?;
+    async fn write_once(&self, bs: Buffer) -> Result<Metadata> {
+        let resp = self.core.ipmfs_write(&self.path, bs).await?;
 
         let status = resp.status();
 
         match status {
-            StatusCode::CREATED | StatusCode::OK => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp).await?),
+            StatusCode::CREATED | StatusCode::OK => Ok(Metadata::default()),
+            _ => Err(parse_error(resp)),
         }
     }
 }

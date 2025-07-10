@@ -262,7 +262,7 @@ impl DynamicMessage {
     pub fn has_field_by_number(&self, number: u32) -> bool {
         self.desc
             .get_field(number)
-            .map_or(false, |field_desc| self.has_field(&field_desc))
+            .is_some_and(|field_desc| self.has_field(&field_desc))
     }
 
     /// Gets the value of the field with the given number, or the default value if it is unset.
@@ -346,7 +346,7 @@ impl DynamicMessage {
     pub fn has_field_by_name(&self, name: &str) -> bool {
         self.desc
             .get_field_by_name(name)
-            .map_or(false, |field_desc| self.has_field(&field_desc))
+            .is_some_and(|field_desc| self.has_field(&field_desc))
     }
 
     /// Gets the value of the field with the given name, or the default value if it is unset.
@@ -1199,4 +1199,60 @@ impl fmt::Display for Value {
 fn type_sizes() {
     assert_eq!(std::mem::size_of::<DynamicMessage>(), 40);
     assert_eq!(std::mem::size_of::<Value>(), 56);
+}
+
+pub(crate) enum Either<L, R> {
+    Left(L),
+    Right(R),
+}
+
+impl<L: Iterator, R: Iterator<Item = L::Item>> Iterator for Either<L, R> {
+    type Item = L::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Either::Left(left) => left.next(),
+            Either::Right(right) => right.next(),
+        }
+    }
+}
+
+fn get_type_url_message_name(type_url: &str) -> Result<&str, String> {
+    let (_type_domain_name, message_name) = type_url
+        .rsplit_once('/')
+        .ok_or_else(|| format!("unsupported type url '{type_url}': missing at least one '/'",))?;
+
+    Ok(message_name)
+}
+
+#[test]
+fn test_get_type_url_message_name() {
+    assert_eq!(
+        get_type_url_message_name("type.googleapis.com/my.messages.Message"),
+        Ok("my.messages.Message")
+    );
+    assert_eq!(
+        get_type_url_message_name("type.googleprod.com/my.messages.Message"),
+        Ok("my.messages.Message")
+    );
+    assert_eq!(
+        get_type_url_message_name("/my.messages.Message"),
+        Ok("my.messages.Message")
+    );
+    assert_eq!(
+        get_type_url_message_name("any.url.com/my.messages.Message"),
+        Ok("my.messages.Message")
+    );
+    assert_eq!(
+        get_type_url_message_name("http://even.multiple/slashes/my.messages.Message"),
+        Ok("my.messages.Message")
+    );
+    assert_eq!(
+        get_type_url_message_name("/any.type.isAlsoValid"),
+        Ok("any.type.isAlsoValid")
+    );
+    assert_eq!(
+        get_type_url_message_name("my.messages.Message"),
+        Err("unsupported type url 'my.messages.Message': missing at least one '/'".to_owned())
+    );
 }

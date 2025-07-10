@@ -46,18 +46,20 @@ use serde::Serialize;
 
 pub(crate) use extra::ExtraData;
 pub use raw::RawLua;
-use util::{callback_error_ext, StateGuard};
+use util::callback_error_ext;
 
 /// Top level Lua struct which represents an instance of Lua VM.
-#[derive(Clone)]
 pub struct Lua {
     pub(self) raw: XRc<ReentrantMutex<RawLua>>,
     // Controls whether garbage collection should be run on drop
     pub(self) collect_garbage: bool,
 }
 
+/// Weak reference to Lua instance.
+///
+/// This can used to prevent circular references between Lua and Rust objects.
 #[derive(Clone)]
-pub(crate) struct WeakLua(XWeak<ReentrantMutex<RawLua>>);
+pub struct WeakLua(XWeak<ReentrantMutex<RawLua>>);
 
 pub(crate) struct LuaGuard(ArcReentrantMutexGuard<RawLua>);
 
@@ -97,9 +99,6 @@ pub struct LuaOptions {
     pub catch_rust_panics: bool,
 
     /// Max size of thread (coroutine) object pool used to execute asynchronous functions.
-    ///
-    /// It works on Lua 5.4 and Luau, where [`lua_resetthread`] function
-    /// is available and allows to reuse old coroutines after resetting their state.
     ///
     /// Default: **0** (disabled)
     ///
@@ -150,6 +149,16 @@ impl Drop for Lua {
     fn drop(&mut self) {
         if self.collect_garbage {
             let _ = self.gc_collect();
+        }
+    }
+}
+
+impl Clone for Lua {
+    #[inline]
+    fn clone(&self) -> Self {
+        Lua {
+            raw: XRc::clone(&self.raw),
+            collect_garbage: false,
         }
     }
 }
@@ -421,7 +430,6 @@ impl Lua {
 
         callback_error_ext(state, ptr::null_mut(), move |extra, nargs| {
             let rawlua = (*extra).raw_lua();
-            let _guard = StateGuard::new(rawlua, state);
             let args = A::from_stack_args(nargs, 1, None, rawlua)?;
             func(rawlua.lua(), args)?.push_into_stack(rawlua)?;
             Ok(1)
@@ -612,7 +620,7 @@ impl Lua {
     ///     .into_function()?,
     /// )?;
     /// while co.status() == ThreadStatus::Resumable {
-    ///     co.resume(())?;
+    ///     co.resume::<()>(())?;
     /// }
     /// # Ok(())
     /// # }
@@ -639,7 +647,6 @@ impl Lua {
                 if Rc::strong_count(&interrupt_cb) > 2 {
                     return Ok(VmState::Continue); // Don't allow recursion
                 }
-                let _guard = StateGuard::new((*extra).raw_lua(), state);
                 interrupt_cb((*extra).lua())
             });
             match result {
@@ -687,18 +694,19 @@ impl Lua {
         unsafe extern "C-unwind" fn warn_proc(ud: *mut c_void, msg: *const c_char, tocont: c_int) {
             let extra = ud as *mut ExtraData;
             callback_error_ext((*extra).raw_lua().state(), extra, |extra, _| {
-                let cb = mlua_expect!(
-                    (*extra).warn_callback.as_ref(),
-                    "no warning callback set in warn_proc"
-                );
+                let warn_callback = (*extra).warn_callback.clone();
+                let warn_callback = mlua_expect!(warn_callback, "no warning callback set in warn_proc");
+                if XRc::strong_count(&warn_callback) > 2 {
+                    return Ok(());
+                }
                 let msg = StdString::from_utf8_lossy(CStr::from_ptr(msg).to_bytes());
-                cb((*extra).lua(), &msg, tocont != 0)
+                warn_callback((*extra).lua(), &msg, tocont != 0)
             });
         }
 
         let lua = self.lock();
         unsafe {
-            (*lua.extra.get()).warn_callback = Some(Box::new(callback));
+            (*lua.extra.get()).warn_callback = Some(XRc::new(callback));
             ffi::lua_setwarnf(lua.state(), Some(warn_proc), lua.extra.get() as *mut c_void);
         }
     }
@@ -1313,7 +1321,7 @@ impl Lua {
     /// This methods provides a way to add fields or methods to userdata objects of a type `T`.
     pub fn register_userdata_type<T: 'static>(&self, f: impl FnOnce(&mut UserDataRegistry<T>)) -> Result<()> {
         let type_id = TypeId::of::<T>();
-        let mut registry = UserDataRegistry::new(self, type_id);
+        let mut registry = UserDataRegistry::new(self);
         f(&mut registry);
 
         let lua = self.lock();
@@ -1792,8 +1800,8 @@ impl Lua {
         let state = lua.state();
         unsafe {
             let mut unref_list = (*lua.extra.get()).registry_unref_list.lock();
-            let unref_list = mem::replace(&mut *unref_list, Some(Vec::new()));
-            for id in mlua_expect!(unref_list, "unref list not set") {
+            let unref_list = unref_list.replace(Vec::new());
+            for id in mlua_expect!(unref_list, "unref list is not set") {
                 ffi::luaL_unref(state, ffi::LUA_REGISTRYINDEX, id);
             }
         }
@@ -1823,7 +1831,7 @@ impl Lua {
     /// fn main() -> Result<()> {
     ///     let lua = Lua::new();
     ///     lua.set_app_data("hello");
-    ///     lua.create_function(hello)?.call(())?;
+    ///     lua.create_function(hello)?.call::<()>(())?;
     ///     let s = lua.app_data_ref::<&str>().unwrap();
     ///     assert_eq!(*s, "world");
     ///     Ok(())
@@ -1907,12 +1915,23 @@ impl Lua {
     }
 
     /// Returns an internal `Poll::Pending` constant used for executing async callbacks.
+    ///
+    /// Every time when [`Future`] is Pending, Lua corotine is suspended with this constant.
     #[cfg(feature = "async")]
     #[doc(hidden)]
     #[inline(always)]
     pub fn poll_pending() -> LightUserData {
         static ASYNC_POLL_PENDING: u8 = 0;
         LightUserData(&ASYNC_POLL_PENDING as *const u8 as *mut std::os::raw::c_void)
+    }
+
+    /// Returns a weak reference to the Lua instance.
+    ///
+    /// This is useful for creating a reference to the Lua instance that does not prevent it from
+    /// being deallocated.
+    #[inline(always)]
+    pub fn weak(&self) -> WeakLua {
+        WeakLua(XRc::downgrade(&self.raw))
     }
 
     // Luau version located in `luau/mod.rs`
@@ -1953,11 +1972,6 @@ impl Lua {
         LuaGuard(self.raw.lock_arc())
     }
 
-    #[inline(always)]
-    pub(crate) fn weak(&self) -> WeakLua {
-        WeakLua(XRc::downgrade(&self.raw))
-    }
-
     /// Returns a handle to the unprotected Lua state without any synchronization.
     ///
     /// This is useful where we know that the lock is already held by the caller.
@@ -1980,13 +1994,29 @@ impl WeakLua {
         Some(LuaGuard::new(self.0.upgrade()?))
     }
 
+    /// Upgrades the weak Lua reference to a strong reference.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Lua instance is destroyed.
     #[track_caller]
     #[inline(always)]
-    pub(crate) fn upgrade(&self) -> Lua {
+    pub fn upgrade(&self) -> Lua {
         Lua {
             raw: self.0.upgrade().expect("Lua instance is destroyed"),
             collect_garbage: false,
         }
+    }
+
+    /// Tries to upgrade the weak Lua reference to a strong reference.
+    ///
+    /// Returns `None` if the Lua instance is destroyed.
+    #[inline(always)]
+    pub fn try_upgrade(&self) -> Option<Lua> {
+        Some(Lua {
+            raw: self.0.upgrade()?,
+            collect_garbage: false,
+        })
     }
 }
 

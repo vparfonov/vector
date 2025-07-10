@@ -16,8 +16,8 @@ typedef unsigned long long st_data_t;
 typedef struct st_table st_table;
 
 struct st_hash_type {
-    int (*compare)();
-    int (*hash)();
+    int (*compare)(st_data_t, st_data_t);
+    int (*hash)(st_data_t);
 };
 
 struct st_table {
@@ -34,13 +34,6 @@ enum st_retval {ST_CONTINUE, ST_STOP, ST_DELETE, ST_CHECK};
 #ifndef _
 # define _(args) args
 #endif
-#ifndef ANYARGS
-# ifdef __cplusplus
-#   define ANYARGS ...
-# else
-#   define ANYARGS
-# endif
-#endif
 
 st_table *st_init_table _((struct st_hash_type *));
 st_table *st_init_table_with_size _((struct st_hash_type *, int));
@@ -52,7 +45,7 @@ int st_delete _((st_table *, st_data_t *, st_data_t *));
 int st_delete_safe _((st_table *, st_data_t *, st_data_t *, st_data_t));
 int st_insert _((st_table *, st_data_t, st_data_t));
 int st_lookup _((st_table *, st_data_t, st_data_t *));
-int st_foreach _((st_table *, int (*)(ANYARGS), st_data_t));
+int st_foreach _((st_table *, int (*)(st_data_t, st_data_t, st_data_t), st_data_t));
 void st_add_direct _((st_table *, st_data_t, st_data_t));
 void st_free_table _((st_table *));
 void st_cleanup_safe _((st_table *, st_data_t));

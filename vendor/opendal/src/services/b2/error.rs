@@ -20,9 +20,7 @@ use http::Response;
 use serde::Deserialize;
 
 use crate::raw::*;
-use crate::Error;
-use crate::ErrorKind;
-use crate::Result;
+use crate::*;
 
 /// the error response of b2
 #[derive(Default, Debug, Deserialize)]
@@ -34,9 +32,9 @@ struct B2Error {
 }
 
 /// Parse error response into Error.
-pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
+pub(super) fn parse_error(resp: Response<Buffer>) -> Error {
     let (parts, body) = resp.into_parts();
-    let bs = body.bytes().await?;
+    let bs = body.to_bytes();
 
     let (mut kind, mut retryable) = match parts.status.as_u16() {
         403 => (ErrorKind::PermissionDenied, false),
@@ -57,7 +55,7 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
         (kind, retryable) = parse_b2_error_code(b2_err.code.as_str()).unwrap_or((kind, retryable));
     };
 
-    let mut err = Error::new(kind, &message);
+    let mut err = Error::new(kind, message);
 
     err = with_error_response_context(err, parts);
 
@@ -65,11 +63,11 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
         err = err.set_temporary();
     }
 
-    Ok(err)
+    err
 }
 
 /// Returns the `Error kind` of this code and whether the error is retryable.
-pub fn parse_b2_error_code(code: &str) -> Option<(ErrorKind, bool)> {
+pub(crate) fn parse_b2_error_code(code: &str) -> Option<(ErrorKind, bool)> {
     match code {
         "already_hidden" => Some((ErrorKind::AlreadyExists, false)),
         "no_such_file" => Some((ErrorKind::NotFound, false)),
@@ -79,7 +77,6 @@ pub fn parse_b2_error_code(code: &str) -> Option<(ErrorKind, bool)> {
 
 #[cfg(test)]
 mod test {
-    use futures::stream;
     use http::StatusCode;
 
     use super::*;
@@ -124,16 +121,12 @@ mod test {
 
         for res in err_res {
             let bs = bytes::Bytes::from(res.0);
-            let body = IncomingAsyncBody::new(
-                Box::new(oio::into_stream(stream::iter(vec![Ok(bs.clone())]))),
-                None,
-            );
+            let body = Buffer::from(bs);
             let resp = Response::builder().status(res.2).body(body).unwrap();
 
-            let err = parse_error(resp).await;
+            let err = parse_error(resp);
 
-            assert!(err.is_ok());
-            assert_eq!(err.unwrap().kind(), res.1);
+            assert_eq!(err.kind(), res.1);
         }
     }
 }

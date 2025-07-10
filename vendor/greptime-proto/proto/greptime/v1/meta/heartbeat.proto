@@ -23,7 +23,7 @@ import "greptime/v1/meta/common.proto";
 service Heartbeat {
   // Heartbeat, there may be many contents of the heartbeat, such as:
   // 1. Metadata to be registered to meta server and discoverable by other
-  // nodes.
+  //    nodes.
   // 2. Some performance metrics, such as Load, CPU usage, etc.
   // 3. The number of computing tasks being executed.
   rpc Heartbeat(stream HeartbeatRequest) returns (stream HeartbeatResponse) {}
@@ -46,6 +46,8 @@ message HeartbeatRequest {
   uint64 duration_since_epoch = 6;
   // The node's epoch
   uint64 node_epoch = 7;
+  NodeInfo info = 8;
+  FlowStat flow_stat = 9;
 }
 
 enum RegionRole {
@@ -53,6 +55,21 @@ enum RegionRole {
   Leader = 0;
   // Readonly region.
   Follower = 1;
+  // A downgrading region, which is in the process of downgrading from Leader to
+  // Follower.
+  //
+  // This role is used to prevent the region from being written during the
+  // downgrade process.
+  DowngradingLeader = 2;
+}
+
+message NodeInfo {
+  // The node build version
+  string version = 1;
+  // The node build git commit hash
+  string git_commit = 2;
+  // The node start timestamp
+  uint64 start_time_ms = 3;
 }
 
 message RegionStat {
@@ -63,12 +80,18 @@ message RegionStat {
   int64 wcus = 3;
   // Approximate bytes of this region
   int64 approximate_bytes = 4;
-  // Approximate number of rows in this region
-  int64 approximate_rows = 5;
   // Engine name
   string engine = 6;
   // Region role
   RegionRole role = 7;
+  map<string, bytes> extensions = 99;
+}
+
+message FlowStat {
+  // Each flow's in mem state's size in bytes
+  // due to protobuf's key can't be a message, so we use uint32 as the key which
+  // is [`FlowId`]'s inner field `id`
+  map<uint32, uint64> flow_stat_size = 1;
 }
 
 message HeartbeatResponse {

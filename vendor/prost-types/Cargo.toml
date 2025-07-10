@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.71.1"
 name = "prost-types"
-version = "0.13.3"
+version = "0.13.5"
 authors = [
     "Dan Burkert <dan@danburkert.com>",
     "Lucio Franco <luciofranco14@gmail.com>",
@@ -21,6 +21,7 @@ authors = [
     "Tokio Contributors <team@tokio.rs>",
 ]
 build = false
+autolib = false
 autobins = false
 autoexamples = false
 autotests = false
@@ -30,22 +31,28 @@ readme = "README.md"
 license = "Apache-2.0"
 repository = "https://github.com/tokio-rs/prost"
 
+[features]
+arbitrary = ["dep:arbitrary"]
+default = ["std"]
+std = ["prost/std"]
+
 [lib]
 name = "prost_types"
 path = "src/lib.rs"
 doctest = false
 
+[dependencies.arbitrary]
+version = "1.4"
+features = ["derive"]
+optional = true
+
 [dependencies.prost]
-version = "0.13.3"
+version = "0.13.5"
 features = ["prost-derive"]
 default-features = false
 
 [dev-dependencies.proptest]
 version = "1"
-
-[features]
-default = ["std"]
-std = ["prost/std"]
 
 [lints.rust.unexpected_cfgs]
 level = "warn"

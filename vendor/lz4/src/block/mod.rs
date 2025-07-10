@@ -23,7 +23,7 @@ use super::liblz4::*;
 use std::io::{Error, ErrorKind, Result};
 
 /// Represents the compression mode do be used.
-#[derive(Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum CompressionMode {
     /// High compression with compression parameter
     HIGHCOMPRESSION(i32),
@@ -31,6 +31,12 @@ pub enum CompressionMode {
     FAST(i32),
     /// Default compression
     DEFAULT,
+}
+
+impl Default for CompressionMode {
+    fn default() -> Self {
+        CompressionMode::DEFAULT
+    }
 }
 
 /// Returns the size of the buffer that is guaranteed to hold the result of
@@ -89,7 +95,8 @@ pub fn compress(src: &[u8], mode: Option<CompressionMode>, prepend_size: bool) -
 ///
 /// # Errors
 /// Returns std::io::Error with ErrorKind::InvalidInput if the src buffer is too long.
-/// Returns std::io::Error with ErrorKind::Other if the compression data does not find in `buffer`.
+/// The buffer cannot be larger than `i32::MAX`.
+/// Returns std::io::Error with ErrorKind::Other if the compression data does not fit in `buffer`.
 pub fn compress_to_buffer(
     src: &[u8],
     mode: Option<CompressionMode>,
@@ -211,7 +218,8 @@ pub fn decompress(src: &[u8], uncompressed_size: Option<i32>) -> Result<Vec<u8>>
 
     let mut buffer = vec![0u8; size];
 
-    decompress_to_buffer(src, uncompressed_size, &mut buffer)?;
+    let sz = decompress_to_buffer(src, uncompressed_size, &mut buffer)?;
+    buffer.truncate(sz);
     Ok(buffer)
 }
 
@@ -286,6 +294,18 @@ mod test {
     use crate::block::{compress, decompress, decompress_to_buffer, CompressionMode};
 
     use super::compress_to_buffer;
+
+    /// This test will fail unless the buffer created by decompress is correctly truncated
+    #[test]
+    fn decompress_truncate_test() {
+        let src = "111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111111".as_bytes();
+        let rs_compressed = compress(src, None, false).unwrap();
+        let rs_compressed_rs_uncompressed =
+            decompress(&rs_compressed, Some((src.len() as i32) * 256)).unwrap();
+
+        // compare the uncompressed result from rust
+        assert_eq!(rs_compressed_rs_uncompressed, src,);
+    }
 
     #[test]
     fn test_compression_without_prefix() {

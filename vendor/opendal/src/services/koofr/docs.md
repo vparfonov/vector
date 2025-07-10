@@ -10,7 +10,6 @@ This service can be used to:
 - [x] copy
 - [x] rename
 - [x] list
-- [x] scan
 - [ ] presign
 - [ ] blocking
 
@@ -27,7 +26,7 @@ You can refer to [`KoofrBuilder`]'s docs for more information
 
 ### Via Builder
 
-```rust
+```rust,no_run
 use anyhow::Result;
 use opendal::services::Koofr;
 use opendal::Operator;
@@ -35,16 +34,15 @@ use opendal::Operator;
 #[tokio::main]
 async fn main() -> Result<()> {
     // create backend builder
-    let mut builder = Koofr::default();
-
-    // set the storage bucket for OpenDAL
-    builder.root("/");
-    // set the bucket for OpenDAL
-    builder.endpoint("https://api.koofr.net/");
-    // set the email for OpenDAL
-    builder.email("me@example.com");
-    // set the password for OpenDAL
-    builder.password("xxx xxx xxx xxx");
+    let mut builder = Koofr::default()
+        // set the storage bucket for OpenDAL
+        .root("/")
+        // set the bucket for OpenDAL
+        .endpoint("https://api.koofr.net/")
+        // set the email for OpenDAL
+        .email("me@example.com")
+        // set the password for OpenDAL
+        .password("xxx xxx xxx xxx");
 
     let op: Operator = Operator::new(builder)?.finish();
 

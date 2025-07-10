@@ -47,7 +47,9 @@
 #[cfg(feature = "__rustls")]
 use rustls::{
     client::danger::HandshakeSignatureValid, client::danger::ServerCertVerified,
-    client::danger::ServerCertVerifier, DigitallySignedStruct, Error as TLSError, SignatureScheme,
+    client::danger::ServerCertVerifier, crypto::WebPkiSupportedAlgorithms,
+    server::ParsedCertificate, DigitallySignedStruct, Error as TLSError, RootCertStore,
+    SignatureScheme,
 };
 #[cfg(feature = "__rustls")]
 use rustls_pki_types::{ServerName, UnixTime};
@@ -55,6 +57,13 @@ use std::{
     fmt,
     io::{BufRead, BufReader},
 };
+
+/// Represents a X509 certificate revocation list.
+#[cfg(feature = "__rustls")]
+pub struct CertificateRevocationList {
+    #[cfg(feature = "__rustls")]
+    inner: rustls_pki_types::CertificateRevocationListDer<'static>,
+}
 
 /// Represents a server X509 certificate.
 #[derive(Clone)]
@@ -407,6 +416,75 @@ impl Identity {
     }
 }
 
+#[cfg(feature = "__rustls")]
+impl CertificateRevocationList {
+    /// Parses a PEM encoded CRL.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::fs::File;
+    /// # use std::io::Read;
+    /// # fn crl() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut buf = Vec::new();
+    /// File::open("my_crl.pem")?
+    ///     .read_to_end(&mut buf)?;
+    /// let crl = reqwest::tls::CertificateRevocationList::from_pem(&buf)?;
+    /// # drop(crl);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Optional
+    ///
+    /// This requires the `rustls-tls(-...)` Cargo feature enabled.
+    #[cfg(feature = "__rustls")]
+    pub fn from_pem(pem: &[u8]) -> crate::Result<CertificateRevocationList> {
+        Ok(CertificateRevocationList {
+            #[cfg(feature = "__rustls")]
+            inner: rustls_pki_types::CertificateRevocationListDer::from(pem.to_vec()),
+        })
+    }
+
+    /// Creates a collection of `CertificateRevocationList`s from a PEM encoded CRL bundle.
+    /// Example byte sources may be `.crl` or `.pem` files.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use std::fs::File;
+    /// # use std::io::Read;
+    /// # fn crls() -> Result<(), Box<dyn std::error::Error>> {
+    /// let mut buf = Vec::new();
+    /// File::open("crl-bundle.crl")?
+    ///     .read_to_end(&mut buf)?;
+    /// let crls = reqwest::tls::CertificateRevocationList::from_pem_bundle(&buf)?;
+    /// # drop(crls);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Optional
+    ///
+    /// This requires the `rustls-tls(-...)` Cargo feature enabled.
+    #[cfg(feature = "__rustls")]
+    pub fn from_pem_bundle(pem_bundle: &[u8]) -> crate::Result<Vec<CertificateRevocationList>> {
+        let mut reader = BufReader::new(pem_bundle);
+
+        rustls_pemfile::crls(&mut reader)
+            .map(|result| match result {
+                Ok(crl) => Ok(CertificateRevocationList { inner: crl }),
+                Err(_) => Err(crate::error::builder("invalid crl encoding")),
+            })
+            .collect::<crate::Result<Vec<CertificateRevocationList>>>()
+    }
+
+    #[cfg(feature = "__rustls")]
+    pub(crate) fn as_rustls_crl<'a>(&self) -> rustls_pki_types::CertificateRevocationListDer<'a> {
+        self.inner.clone()
+    }
+}
+
 impl fmt::Debug for Certificate {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Certificate").finish()
@@ -416,6 +494,13 @@ impl fmt::Debug for Certificate {
 impl fmt::Debug for Identity {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("Identity").finish()
+    }
+}
+
+#[cfg(feature = "__rustls")]
+impl fmt::Debug for CertificateRevocationList {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("CertificateRevocationList").finish()
     }
 }
 
@@ -571,6 +656,71 @@ impl ServerCertVerifier for NoVerifier {
     }
 }
 
+#[cfg(feature = "__rustls")]
+#[derive(Debug)]
+pub(crate) struct IgnoreHostname {
+    roots: RootCertStore,
+    signature_algorithms: WebPkiSupportedAlgorithms,
+}
+
+#[cfg(feature = "__rustls")]
+impl IgnoreHostname {
+    pub(crate) fn new(
+        roots: RootCertStore,
+        signature_algorithms: WebPkiSupportedAlgorithms,
+    ) -> Self {
+        Self {
+            roots,
+            signature_algorithms,
+        }
+    }
+}
+
+#[cfg(feature = "__rustls")]
+impl ServerCertVerifier for IgnoreHostname {
+    fn verify_server_cert(
+        &self,
+        end_entity: &rustls_pki_types::CertificateDer<'_>,
+        intermediates: &[rustls_pki_types::CertificateDer<'_>],
+        _server_name: &ServerName<'_>,
+        _ocsp_response: &[u8],
+        now: UnixTime,
+    ) -> Result<ServerCertVerified, TLSError> {
+        let cert = ParsedCertificate::try_from(end_entity)?;
+
+        rustls::client::verify_server_cert_signed_by_trust_anchor(
+            &cert,
+            &self.roots,
+            intermediates,
+            now,
+            self.signature_algorithms.all,
+        )?;
+        Ok(ServerCertVerified::assertion())
+    }
+
+    fn verify_tls12_signature(
+        &self,
+        message: &[u8],
+        cert: &rustls_pki_types::CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TLSError> {
+        rustls::crypto::verify_tls12_signature(message, cert, dss, &self.signature_algorithms)
+    }
+
+    fn verify_tls13_signature(
+        &self,
+        message: &[u8],
+        cert: &rustls_pki_types::CertificateDer<'_>,
+        dss: &DigitallySignedStruct,
+    ) -> Result<HandshakeSignatureValid, TLSError> {
+        rustls::crypto::verify_tls13_signature(message, cert, dss, &self.signature_algorithms)
+    }
+
+    fn supported_verify_schemes(&self) -> Vec<SignatureScheme> {
+        self.signature_algorithms.supported_schemes()
+    }
+}
+
 /// Hyper extension carrying extra TLS layer information.
 /// Made available to clients on responses when `tls_info` is set.
 #[derive(Clone)]
@@ -668,5 +818,25 @@ mod tests {
         ";
 
         assert!(Certificate::from_pem_bundle(PEM_BUNDLE).is_ok())
+    }
+
+    #[cfg(feature = "__rustls")]
+    #[test]
+    fn crl_from_pem() {
+        let pem = b"-----BEGIN X509 CRL-----\n-----END X509 CRL-----\n";
+
+        CertificateRevocationList::from_pem(pem).unwrap();
+    }
+
+    #[cfg(feature = "__rustls")]
+    #[test]
+    fn crl_from_pem_bundle() {
+        let pem_bundle = std::fs::read("tests/support/crl.pem").unwrap();
+
+        let result = CertificateRevocationList::from_pem_bundle(&pem_bundle);
+
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(result.len(), 1);
     }
 }

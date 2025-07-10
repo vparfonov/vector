@@ -118,7 +118,7 @@ struct Item {
 
 const START: DfaStateIndex = DfaStateIndex(0);
 
-impl DfaBuilder<'_> {
+impl<'nfa> DfaBuilder<'nfa> {
     fn build(&self) -> Result<Dfa, DfaConstructionError> {
         let mut kernel_set = KernelSet::new();
         let mut states = vec![];

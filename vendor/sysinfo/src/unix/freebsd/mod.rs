@@ -20,6 +20,10 @@ cfg_if! {
         pub(crate) use crate::unix::DisksInner;
     }
 
+    if #[cfg(any(feature = "disk", feature = "system"))] {
+        pub mod ffi;
+    }
+
     if #[cfg(feature = "component")] {
         pub mod component;
 
@@ -40,3 +44,19 @@ cfg_if! {
 
 #[doc = include_str!("../../../md_doc/is_supported.md")]
 pub const IS_SUPPORTED_SYSTEM: bool = true;
+
+// Make formattable by rustfmt.
+#[cfg(any())]
+mod component;
+#[cfg(any())]
+mod cpu;
+#[cfg(any())]
+mod disk;
+#[cfg(any())]
+mod ffi;
+#[cfg(any())]
+mod network;
+#[cfg(any())]
+mod process;
+#[cfg(any())]
+mod system;

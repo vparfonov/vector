@@ -6,8 +6,9 @@ use crate::base::message_builder::{
 };
 use crate::base::opt::{ComposeOptData, LongOptData, OptRecord};
 use crate::base::wire::{Composer, ParseError};
-use crate::base::{Header, Message, ParsedName, Rtype, StaticCompressor};
-use crate::rdata::AllRecordData;
+use crate::base::{
+    Header, Message, Rtype, StaticCompressor, UnknownRecordData,
+};
 use bytes::Bytes;
 use octseq::Octets;
 use std::boxed::Box;
@@ -259,7 +260,7 @@ impl<Octs: AsRef<[u8]> + Debug + Octets> RequestMessage<Octs> {
         let mut target = target.answer();
         for rr in &mut source {
             let rr = rr?
-                .into_record::<AllRecordData<_, ParsedName<_>>>()?
+                .into_record::<UnknownRecordData<_>>()?
                 .expect("record expected");
             target.push(rr)?;
         }
@@ -269,7 +270,7 @@ impl<Octs: AsRef<[u8]> + Debug + Octets> RequestMessage<Octs> {
         let mut target = target.authority();
         for rr in &mut source {
             let rr = rr?
-                .into_record::<AllRecordData<_, ParsedName<_>>>()?
+                .into_record::<UnknownRecordData<_>>()?
                 .expect("record expected");
             target.push(rr)?;
         }
@@ -281,7 +282,7 @@ impl<Octs: AsRef<[u8]> + Debug + Octets> RequestMessage<Octs> {
             let rr = rr?;
             if rr.rtype() != Rtype::OPT {
                 let rr = rr
-                    .into_record::<AllRecordData<_, ParsedName<_>>>()?
+                    .into_record::<UnknownRecordData<_>>()?
                     .expect("record expected");
                 target.push(rr)?;
             }
@@ -467,7 +468,7 @@ impl<Octs: AsRef<[u8]> + Debug + Octets> RequestMessageMulti<Octs> {
         let mut target = target.answer();
         for rr in &mut source {
             let rr = rr?
-                .into_record::<AllRecordData<_, ParsedName<_>>>()?
+                .into_record::<UnknownRecordData<_>>()?
                 .expect("record expected");
             target.push(rr)?;
         }
@@ -477,7 +478,7 @@ impl<Octs: AsRef<[u8]> + Debug + Octets> RequestMessageMulti<Octs> {
         let mut target = target.authority();
         for rr in &mut source {
             let rr = rr?
-                .into_record::<AllRecordData<_, ParsedName<_>>>()?
+                .into_record::<UnknownRecordData<_>>()?
                 .expect("record expected");
             target.push(rr)?;
         }
@@ -489,7 +490,7 @@ impl<Octs: AsRef<[u8]> + Debug + Octets> RequestMessageMulti<Octs> {
             let rr = rr?;
             if rr.rtype() != Rtype::OPT {
                 let rr = rr
-                    .into_record::<AllRecordData<_, ParsedName<_>>>()?
+                    .into_record::<UnknownRecordData<_>>()?
                     .expect("record expected");
                 target.push(rr)?;
             }
@@ -691,9 +692,12 @@ pub enum Error {
     /// TSIG authentication failed.
     Authentication(tsig::ValidationError),
 
-    #[cfg(feature = "unstable-validator")]
+    #[cfg(all(
+        feature = "unstable-validator",
+        any(feature = "ring", feature = "openssl")
+    ))]
     /// An error happened during DNSSEC validation.
-    Validation(crate::validator::context::Error),
+    Validation(crate::dnssec::validator::context::Error),
 }
 
 impl From<LongOptData> for Error {
@@ -720,9 +724,12 @@ impl From<super::dgram::QueryError> for Error {
     }
 }
 
-#[cfg(feature = "unstable-validator")]
-impl From<crate::validator::context::Error> for Error {
-    fn from(err: crate::validator::context::Error) -> Self {
+#[cfg(all(
+    feature = "unstable-validator",
+    any(feature = "ring", feature = "openssl")
+))]
+impl From<crate::dnssec::validator::context::Error> for Error {
+    fn from(err: crate::dnssec::validator::context::Error) -> Self {
         Self::Validation(err)
     }
 }
@@ -782,7 +789,10 @@ impl fmt::Display for Error {
             #[cfg(feature = "tsig")]
             Error::Authentication(err) => fmt::Display::fmt(err, f),
 
-            #[cfg(feature = "unstable-validator")]
+            #[cfg(all(
+                feature = "unstable-validator",
+                any(feature = "ring", feature = "openssl")
+            ))]
             Error::Validation(_) => {
                 write!(f, "error validating response")
             }
@@ -827,7 +837,10 @@ impl error::Error for Error {
             #[cfg(feature = "tsig")]
             Error::Authentication(e) => Some(e),
 
-            #[cfg(feature = "unstable-validator")]
+            #[cfg(all(
+                feature = "unstable-validator",
+                any(feature = "ring", feature = "openssl")
+            ))]
             Error::Validation(e) => Some(e),
         }
     }

@@ -7,9 +7,9 @@ This service can be used to:
 - [x] write
 - [x] create_dir
 - [x] delete
-- [ ] copy
-- [ ] rename
-- [ ] list
+- [x] copy
+- [x] rename
+- [x] list
 - [x] batch
 - [ ] blocking
 
@@ -46,7 +46,7 @@ You can refer to [`DropboxBuilder`]'s docs for more information
 
 ### Via Builder
 
-```rust
+```rust,no_run
 use anyhow::Result;
 use opendal::raw::OpWrite;
 use opendal::services::Dropbox;
@@ -54,9 +54,9 @@ use opendal::Operator;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut builder = Dropbox::default();
-    builder.root("/opendal");
-    builder.access_token("<token>");
+    let mut builder = Dropbox::default()
+        .root("/opendal")
+        .access_token("<token>");
 
     let op: Operator = Operator::new(builder)?.finish();
     Ok(())

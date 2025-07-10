@@ -11,9 +11,9 @@
 
 [package]
 edition = "2021"
-rust-version = "1.68.2"
+rust-version = "1.79.0"
 name = "domain"
-version = "0.10.4"
+version = "0.11.0"
 authors = ["NLnet Labs <dns-team@nlnetlabs.nl>"]
 build = false
 autolib = false
@@ -22,7 +22,7 @@ autoexamples = false
 autotests = false
 autobenches = false
 description = "A DNS library for Rust."
-homepage = "https://github.com/nlnetlabs/domain/"
+homepage = "https://nlnetlabs.nl/projects/domain/"
 documentation = "https://docs.rs/domain"
 readme = "README.md"
 keywords = [
@@ -40,6 +40,12 @@ rustdoc-args = [
 ]
 
 [features]
+alloc = []
+arbitrary = ["dep:arbitrary"]
+bumpalo = [
+    "dep:bumpalo",
+    "std",
+]
 bytes = [
     "dep:bytes",
     "octseq/bytes",
@@ -59,6 +65,7 @@ net = [
     "std",
     "tokio",
 ]
+openssl = ["dep:openssl"]
 resolv = [
     "net",
     "smallvec",
@@ -68,30 +75,47 @@ resolv-sync = [
     "resolv",
     "tokio/rt",
 ]
+ring = ["dep:ring"]
 serde = [
     "dep:serde",
     "octseq/serde",
 ]
-sign = ["std"]
 smallvec = [
     "dep:smallvec",
     "octseq/smallvec",
 ]
 std = [
+    "alloc",
+    "dep:hashbrown",
+    "bumpalo?/std",
     "bytes?/std",
     "octseq/std",
     "time/std",
+]
+tracing = [
+    "dep:log",
+    "dep:tracing",
 ]
 tsig = [
     "bytes",
     "ring",
     "smallvec",
 ]
+unstable-client-cache = [
+    "unstable-client-transport",
+    "moka",
+]
 unstable-client-transport = [
     "moka",
     "net",
     "tracing",
 ]
+unstable-crypto = ["bytes"]
+unstable-crypto-sign = [
+    "dep:secrecy",
+    "unstable-crypto",
+]
+unstable-new = []
 unstable-server-transport = [
     "arc-swap",
     "chrono/clock",
@@ -99,6 +123,14 @@ unstable-server-transport = [
     "net",
     "siphasher",
     "tracing",
+]
+unstable-sign = [
+    "std",
+    "dep:smallvec",
+    "dep:serde",
+    "time/formatting",
+    "tracing",
+    "unstable-crypto-sign",
 ]
 unstable-stelline = [
     "tokio/test-util",
@@ -110,9 +142,10 @@ unstable-stelline = [
     "zonefile",
 ]
 unstable-validator = [
-    "validate",
     "zonefile",
     "unstable-client-transport",
+    "unstable-crypto",
+    "moka",
 ]
 unstable-xfr = ["net"]
 unstable-zonetree = [
@@ -125,11 +158,6 @@ unstable-zonetree = [
     "tracing",
     "unstable-xfr",
     "zonefile",
-]
-validate = [
-    "bytes",
-    "std",
-    "ring",
 ]
 zonefile = [
     "bytes",
@@ -150,10 +178,19 @@ required-features = [
 ]
 
 [[example]]
+name = "client-cache-transport"
+path = "examples/client-cache-transport.rs"
+required-features = [
+    "net",
+    "unstable-client-cache",
+]
+
+[[example]]
 name = "client-transports"
 path = "examples/client-transports.rs"
 required-features = [
     "net",
+    "tokio-rustls",
     "unstable-client-transport",
 ]
 
@@ -173,16 +210,36 @@ required-features = [
 ]
 
 [[example]]
+name = "keyset"
+path = "examples/keyset.rs"
+required-features = [
+    "serde",
+    "unstable-sign",
+    "ring",
+]
+
+[[example]]
 name = "lookup"
 path = "examples/lookup.rs"
 required-features = ["resolv"]
 
 [[example]]
+name = "query-routing"
+path = "examples/query-routing.rs"
+required-features = [
+    "net",
+    "unstable-client-transport",
+    "unstable-server-transport",
+    "tracing-subscriber",
+]
+
+[[example]]
 name = "query-zone"
 path = "examples/query-zone.rs"
 required-features = [
-    "zonefile",
+    "tracing-subscriber",
     "unstable-zonetree",
+    "zonefile",
 ]
 
 [[example]]
@@ -201,6 +258,10 @@ path = "examples/serve-zone.rs"
 required-features = [
     "zonefile",
     "net",
+    "tokio-stream",
+    "tracing-subscriber",
+    "tsig",
+    "unstable-client-transport",
     "unstable-server-transport",
     "unstable-zonetree",
 ]
@@ -210,6 +271,9 @@ name = "server-transports"
 path = "examples/server-transports.rs"
 required-features = [
     "net",
+    "tokio-stream",
+    "tracing-subscriber",
+    "unstable-client-transport",
     "unstable-server-transport",
 ]
 
@@ -225,12 +289,21 @@ path = "tests/net-client.rs"
 name = "net-client-cache"
 path = "tests/net-client-cache.rs"
 
+[dependencies.arbitrary]
+version = "1.4.1"
+features = ["derive"]
+optional = true
+
 [dependencies.arc-swap]
 version = "1.7.0"
 optional = true
 
+[dependencies.bumpalo]
+version = "3.12"
+optional = true
+
 [dependencies.bytes]
-version = "1.0"
+version = "1.2"
 optional = true
 default-features = false
 
@@ -239,9 +312,21 @@ version = "0.4.35"
 optional = true
 default-features = false
 
+[dependencies.domain-macros]
+version = "=0.11.0"
+
 [dependencies.futures-util]
 version = "0.3"
 optional = true
+
+[dependencies.hashbrown]
+version = "0.14.2"
+features = [
+    "allocator-api2",
+    "inline-more",
+]
+optional = true
+default-features = false
 
 [dependencies.heapless]
 version = "0.8"
@@ -252,6 +337,10 @@ version = "0.2.153"
 optional = true
 default-features = false
 
+[dependencies.log]
+version = "0.4.22"
+optional = true
+
 [dependencies.moka]
 version = "0.12.3"
 features = ["future"]
@@ -260,6 +349,10 @@ optional = true
 [dependencies.octseq]
 version = "0.5.2"
 default-features = false
+
+[dependencies.openssl]
+version = "0.10.72"
+optional = true
 
 [dependencies.parking_lot]
 version = "0.12"
@@ -274,11 +367,15 @@ version = "0.8"
 optional = true
 
 [dependencies.ring]
-version = "0.17"
+version = "0.17.2"
 optional = true
 
 [dependencies.rustversion]
 version = "1"
+optional = true
+
+[dependencies.secrecy]
+version = "0.10"
 optional = true
 
 [dependencies.serde]
@@ -321,6 +418,7 @@ optional = true
 
 [dependencies.tracing]
 version = "0.1.40"
+features = ["log"]
 optional = true
 
 [dependencies.tracing-subscriber]
@@ -328,14 +426,20 @@ version = "0.3.18"
 features = ["env-filter"]
 optional = true
 
+[dev-dependencies.itertools]
+version = "0.13.0"
+
 [dev-dependencies.lazy_static]
 version = "1.4.0"
 
 [dev-dependencies.mock_instant]
 version = "0.5.1"
 
+[dev-dependencies.pretty_assertions]
+version = "1.4.1"
+
 [dev-dependencies.rstest]
-version = "0.19.0"
+version = "0.23.0"
 
 [dev-dependencies.rustls-pemfile]
 version = "2.1.2"

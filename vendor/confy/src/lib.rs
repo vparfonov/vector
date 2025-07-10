@@ -51,7 +51,7 @@
 //! }
 //!
 //! fn main() -> Result<(), confy::ConfyError> {
-//!     let cfg = confy::load("my-app-name", None)?;
+//!     let cfg: MyConfig = confy::load("my-app-name", None)?;
 //!     Ok(())
 //! }
 //! ```
@@ -61,12 +61,35 @@
 //![dependencies]
 //!serde = { version = "1.0.152", features = ["derive"] } # <- Only one serde version needed (serde or serde_derive)
 //!serde_derive = "1.0.152" # <- Only one serde version needed (serde or serde_derive)
-//!confy = "^0.5"
+//!confy = "^0.6"
 //!```
 //! Updating the configuration is then done via the [`store`] function.
 //!
 //! [`store`]: fn.store.html
 //!
+//! ## Features
+//!
+//! Exactly **one** of the features has to be enabled from the following table.
+//!
+//! ### Tip
+//! to add this crate to your project with the default, toml config do the following: `cargo add confy`, otherwise do something like: `cargo add confy --no-default-features --features yaml_conf`, for more info, see [cargo docs on features]
+//! 
+//! [cargo docs on features]: https://docs.rust-lang.org/cargo/reference/resolver.html#features
+//! 
+//! feature | file format | description
+//! ------- | ----------- | -----------
+//! **default**: `toml_conf` | [toml] | considered a reasonable default, uses the standard-compliant [`toml` crate]
+//! `yaml_conf` | [yaml] | uses the [`serde_yaml` crate]
+//! `ron_conf` | [ron] | Rusty Object Notation, uses the [`ron` crate]
+//! `basic_toml_conf` | [toml] | alternative to the default `toml_conf`, instead of using the [`toml` crate], the [`basic_toml` crate] is used, in order to cut down on the number of dependencies, speed up compilation and shrink binary size. **_DISCLAIMER_**: this crate is **not** standard compliant, **nor** maintained, otherwise should work fine in most situations.
+//!
+//! [toml]: https://toml.io
+//! [`toml` crate]: https://docs.rs/toml
+//! [yaml]: https://yaml.org
+//! [`serde_yaml` crate]: https://docs.rs/serde_yaml
+//! [ron]: https://docs.rs/ron
+//! [`ron` crate]: https://docs.rs/ron
+//! [`basic_toml` crate]: https://docs.rs/basic_toml
 
 mod utils;
 use utils::*;
@@ -78,26 +101,50 @@ use std::io::{ErrorKind::NotFound, Write};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
-#[cfg(not(any(feature = "toml_conf", feature = "yaml_conf", feature = "ron_conf")))]
+#[cfg(feature = "toml_conf")]
+use toml::{
+    de::Error as TomlDeErr, from_str as toml_from_str, ser::Error as TomlSerErr,
+    to_string_pretty as toml_to_string_pretty,
+};
+
+#[cfg(feature = "basic_toml_conf")]
+use basic_toml::{
+    from_str as toml_from_str, to_string as toml_to_string_pretty, Error as TomlDeErr,
+    Error as TomlSerErr,
+};
+
+#[cfg(not(any(
+    feature = "toml_conf",
+    feature = "basic_toml_conf",
+    feature = "yaml_conf",
+    feature = "ron_conf"
+)))]
 compile_error!(
     "Exactly one config language feature must be enabled to use \
-confy.  Please enable one of either the `toml_conf`, `yaml_conf`, \
-or `ron_conf` features."
+confy. Please enable one of either the `toml_conf`, `yaml_conf`, \
+, `ron_conf` or `toml_basic_conf` features."
 );
 
 #[cfg(any(
-    all(feature = "toml_conf", feature = "yaml_conf"),
-    all(feature = "toml_conf", feature = "ron_conf"),
+    all(feature = "toml_conf", feature = "basic_toml_conf"),
+    all(
+        any(feature = "toml_conf", feature = "basic_toml_conf"),
+        feature = "yaml_conf"
+    ),
+    all(
+        any(feature = "toml_conf", feature = "basic_toml_conf"),
+        feature = "ron_conf"
+    ),
     all(feature = "ron_conf", feature = "yaml_conf"),
 ))]
 compile_error!(
     "Exactly one config language feature must be enabled to compile \
-confy.  Please disable one of either the `toml_conf`, `yaml_conf`, or `ron_conf` features. \
+confy.  Please disable one of either the `toml_conf`, `basic_toml_conf`, `yaml_conf`, or `ron_conf` features. \
 NOTE: `toml_conf` is a default feature, so disabling it might mean switching off \
 default features for confy in your Cargo.toml"
 );
 
-#[cfg(feature = "toml_conf")]
+#[cfg(any(feature = "toml_conf", feature = "basic_toml_conf"))]
 const EXTENSION: &str = "toml";
 
 #[cfg(feature = "yaml_conf")]
@@ -109,9 +156,9 @@ const EXTENSION: &str = "ron";
 /// The errors the confy crate can encounter.
 #[derive(Debug, Error)]
 pub enum ConfyError {
-    #[cfg(feature = "toml_conf")]
+    #[cfg(any(feature = "toml_conf", feature = "basic_toml_conf"))]
     #[error("Bad TOML data")]
-    BadTomlData(#[source] toml::de::Error),
+    BadTomlData(#[source] TomlDeErr),
 
     #[cfg(feature = "yaml_conf")]
     #[error("Bad YAML data")]
@@ -130,9 +177,9 @@ pub enum ConfyError {
     #[error("Bad configuration directory: {0}")]
     BadConfigDirectory(String),
 
-    #[cfg(feature = "toml_conf")]
+    #[cfg(any(feature = "toml_conf", feature = "basic_toml_conf"))]
     #[error("Failed to serialize configuration data into TOML")]
-    SerializeTomlError(#[source] toml::ser::Error),
+    SerializeTomlError(#[source] TomlSerErr),
 
     #[cfg(feature = "yaml_conf")]
     #[error("Failed to serialize configuration data into YAML")]
@@ -206,9 +253,9 @@ pub fn load_path<T: Serialize + DeserializeOwned + Default>(
                 .get_string()
                 .map_err(ConfyError::ReadConfigurationFileError)?;
 
-            #[cfg(feature = "toml_conf")]
+            #[cfg(any(feature = "toml_conf", feature = "basic_toml_conf"))]
             {
-                let cfg_data = toml::from_str(&cfg_string);
+                let cfg_data = toml_from_str(&cfg_string);
                 cfg_data.map_err(ConfyError::BadTomlData)
             }
             #[cfg(feature = "yaml_conf")]
@@ -230,6 +277,61 @@ pub fn load_path<T: Serialize + DeserializeOwned + Default>(
             store_path(path, &cfg)?;
             Ok(cfg)
         }
+        Err(e) => Err(ConfyError::GeneralLoadError(e)),
+    }
+}
+
+/// Load an application configuration from a specified path.
+///
+/// A new configuration file is created with `op`'s result if none
+/// exists or file content is incorrect.
+///
+/// This is an alternate version of [`load`] that allows the specification of
+/// an arbitrary path instead of a system one.  For more information on errors
+/// and behavior, see [`load`]'s documentation.
+///
+/// [`load`]: fn.load.html
+pub fn load_or_else<T, F>(path: impl AsRef<Path>, op: F) -> Result<T, ConfyError>
+where
+    T: DeserializeOwned + Serialize,
+    F: FnOnce() -> T,
+{
+    let path_ref = path.as_ref();
+    let load_value = || {
+        let cfg = op();
+        if let Some(parent) = path.as_ref().parent() {
+            fs::create_dir_all(parent).map_err(ConfyError::DirectoryCreationFailed)?;
+        }
+        store_path(path_ref, &cfg)?;
+        Ok(cfg)
+    };
+
+    match File::open(path_ref) {
+        Ok(mut cfg) => {
+            let mut load_from_file = || {
+                let cfg_string = cfg
+                    .get_string()
+                    .map_err(ConfyError::ReadConfigurationFileError)?;
+
+                #[cfg(any(feature = "toml_conf", feature = "basic_toml_conf"))]
+                {
+                    let cfg_data = toml_from_str(&cfg_string);
+                    cfg_data.map_err(ConfyError::BadTomlData)
+                }
+                #[cfg(feature = "yaml_conf")]
+                {
+                    let cfg_data = serde_yaml::from_str(&cfg_string);
+                    cfg_data.map_err(ConfyError::BadYamlData)
+                }
+                #[cfg(feature = "ron_conf")]
+                {
+                    let cfg_data = ron::from_str(&cfg_string);
+                    cfg_data.map_err(ConfyError::BadRonData)
+                }
+            };
+            load_from_file().or_else(|_| load_value())
+        }
+        Err(ref e) if e.kind() == NotFound => load_value(),
         Err(e) => Err(ConfyError::GeneralLoadError(e)),
     }
 }
@@ -325,9 +427,9 @@ fn do_store<T: Serialize>(
     fs::create_dir_all(config_dir).map_err(ConfyError::DirectoryCreationFailed)?;
 
     let s;
-    #[cfg(feature = "toml_conf")]
+    #[cfg(any(feature = "toml_conf", feature = "basic_toml_conf"))]
     {
-        s = toml::to_string_pretty(&cfg).map_err(ConfyError::SerializeTomlError)?;
+        s = toml_to_string_pretty(&cfg).map_err(ConfyError::SerializeTomlError)?;
     }
     #[cfg(feature = "yaml_conf")]
     {
@@ -420,6 +522,36 @@ mod tests {
         with_config_path(|path| {
             let config: ExampleConfig = load_path(path).expect("load_path failed");
             assert_eq!(config, ExampleConfig::default());
+        })
+    }
+
+    /// [`load_or_else`] loads [`ExampleConfig`].
+    #[test]
+    fn load_or_else_works() {
+        with_config_path(|path| {
+            let the_value = || ExampleConfig {
+                name: "a".to_string(),
+                count: 5,
+            };
+
+            let config: ExampleConfig = load_or_else(path, the_value).expect("load_or_else failed");
+            assert_eq!(config, the_value());
+        });
+
+        with_config_path(|path| {
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            let mut file = File::create(path).expect("creating file failed");
+            file.write("some normal text".as_bytes())
+                .expect("write to file failed");
+            drop(file);
+
+            let the_value = || ExampleConfig {
+                name: "a".to_string(),
+                count: 5,
+            };
+
+            let config: ExampleConfig = load_or_else(path, the_value).expect("load_or_else failed");
+            assert_eq!(config, the_value());
         })
     }
 

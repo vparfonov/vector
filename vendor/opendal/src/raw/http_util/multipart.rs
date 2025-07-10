@@ -15,16 +15,11 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::VecDeque;
 use std::mem;
 use std::str::FromStr;
-use std::task::ready;
-use std::task::Context;
-use std::task::Poll;
 
 use bytes::Bytes;
 use bytes::BytesMut;
-use futures::stream;
 use http::header::CONTENT_DISPOSITION;
 use http::header::CONTENT_LENGTH;
 use http::header::CONTENT_TYPE;
@@ -40,11 +35,6 @@ use http::Uri;
 use http::Version;
 
 use super::new_request_build_error;
-use super::AsyncBody;
-use super::IncomingAsyncBody;
-use crate::raw::oio;
-use crate::raw::oio::Stream;
-use crate::raw::oio::Streamer;
 use crate::*;
 
 /// Multipart is a builder for multipart/form-data.
@@ -111,22 +101,20 @@ impl<T: Part> Multipart<T> {
         Ok(self)
     }
 
-    pub(crate) fn build(self) -> (u64, MultipartStream<T>) {
-        let mut total_size = 0;
+    pub(crate) fn build(self) -> Buffer {
+        let mut bufs = Vec::with_capacity(self.parts.len() + 2);
 
+        // Build pre part.
         let mut bs = BytesMut::new();
         bs.extend_from_slice(b"--");
         bs.extend_from_slice(self.boundary.as_bytes());
         bs.extend_from_slice(b"\r\n");
+        let pre_part = Buffer::from(bs.freeze());
 
-        let pre_part = bs.freeze();
-
-        let mut parts = VecDeque::new();
-        // Write headers.
-        for v in self.parts.into_iter() {
-            let (size, stream) = v.format();
-            total_size += pre_part.len() as u64 + size;
-            parts.push_back(stream);
+        // Write all parts.
+        for part in self.parts {
+            bufs.push(pre_part.clone());
+            bufs.push(part.format());
         }
 
         // Write the last boundary
@@ -135,27 +123,20 @@ impl<T: Part> Multipart<T> {
         bs.extend_from_slice(self.boundary.as_bytes());
         bs.extend_from_slice(b"--");
         bs.extend_from_slice(b"\r\n");
-        let final_part = bs.freeze();
 
-        total_size += final_part.len() as u64;
+        // Build final part.
+        bufs.push(Buffer::from(bs.freeze()));
 
-        (
-            total_size,
-            MultipartStream {
-                pre_part,
-                pre_part_consumed: false,
-                parts,
-                final_part: Some(final_part),
-            },
-        )
+        bufs.into_iter().flatten().collect()
     }
 
     /// Consume the input and generate a request with multipart body.
     ///
     /// This function will make sure content_type and content_length set correctly.
-    pub fn apply(self, mut builder: http::request::Builder) -> Result<Request<AsyncBody>> {
+    pub fn apply(self, mut builder: http::request::Builder) -> Result<Request<Buffer>> {
         let boundary = self.boundary.clone();
-        let (content_length, stream) = self.build();
+        let buf = self.build();
+        let content_length = buf.len();
 
         // Insert content type with correct boundary.
         builder = builder.header(
@@ -165,43 +146,7 @@ impl<T: Part> Multipart<T> {
         // Insert content length with calculated size.
         builder = builder.header(CONTENT_LENGTH, content_length);
 
-        builder
-            .body(AsyncBody::Stream(Box::new(stream)))
-            .map_err(new_request_build_error)
-    }
-}
-
-pub struct MultipartStream<T: Part> {
-    pre_part: Bytes,
-    pre_part_consumed: bool,
-
-    parts: VecDeque<T::STREAM>,
-
-    final_part: Option<Bytes>,
-}
-
-impl<T: Part> Stream for MultipartStream<T> {
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Bytes>>> {
-        if let Some(stream) = self.parts.front_mut() {
-            if !self.pre_part_consumed {
-                self.pre_part_consumed = true;
-                return Poll::Ready(Some(Ok(self.pre_part.clone())));
-            }
-            return match ready!(stream.poll_next(cx)) {
-                None => {
-                    self.pre_part_consumed = false;
-                    self.parts.pop_front();
-                    return self.poll_next(cx);
-                }
-                Some(v) => Poll::Ready(Some(v)),
-            };
-        }
-
-        if let Some(final_part) = self.final_part.take() {
-            return Poll::Ready(Some(Ok(final_part)));
-        }
-
-        Poll::Ready(None)
+        builder.body(buf).map_err(new_request_build_error)
     }
 }
 
@@ -211,11 +156,9 @@ pub trait Part: Sized + 'static {
     ///
     /// Current available types are: `form-data` and `mixed`
     const TYPE: &'static str;
-    /// STREAM is the stream representation of this part which can be used in multipart body.
-    type STREAM: Stream;
 
     /// format will generates the bytes.
-    fn format(self) -> (u64, Self::STREAM);
+    fn format(self) -> Buffer;
 
     /// parse will parse the bytes into a part.
     fn parse(s: &str) -> Result<Self>;
@@ -225,8 +168,7 @@ pub trait Part: Sized + 'static {
 pub struct FormDataPart {
     headers: HeaderMap,
 
-    content_length: u64,
-    content: Streamer,
+    content: Buffer,
 }
 
 impl FormDataPart {
@@ -245,8 +187,7 @@ impl FormDataPart {
 
         Self {
             headers,
-            content_length: 0,
-            content: Box::new(oio::Cursor::new()),
+            content: Buffer::new(),
         }
     }
 
@@ -257,30 +198,20 @@ impl FormDataPart {
     }
 
     /// Set the content for this part.
-    pub fn content(mut self, content: impl Into<Bytes>) -> Self {
-        let content = content.into();
-
-        self.content_length = content.len() as u64;
-        self.content = Box::new(oio::Cursor::from(content));
-        self
-    }
-
-    /// Set the stream content for this part.
-    pub fn stream(mut self, size: u64, content: Streamer) -> Self {
-        self.content_length = size;
-        self.content = content;
+    pub fn content(mut self, content: impl Into<Buffer>) -> Self {
+        self.content = content.into();
         self
     }
 }
 
 impl Part for FormDataPart {
     const TYPE: &'static str = "form-data";
-    type STREAM = FormDataPartStream;
 
-    fn format(self) -> (u64, FormDataPartStream) {
-        let mut bs = BytesMut::new();
+    fn format(self) -> Buffer {
+        let mut bufs = Vec::with_capacity(3);
 
         // Building pre-content.
+        let mut bs = BytesMut::new();
         for (k, v) in self.headers.iter() {
             // Trick!
             //
@@ -300,18 +231,15 @@ impl Part for FormDataPart {
             bs.extend_from_slice(b"\r\n");
         }
         bs.extend_from_slice(b"\r\n");
-        let bs = bs.freeze();
+        bufs.push(Buffer::from(bs.freeze()));
 
-        // pre-content + content + post-content (b`\r\n`)
-        let total_size = bs.len() as u64 + self.content_length + 2;
+        // Building content.
+        bufs.push(self.content);
 
-        (
-            total_size,
-            FormDataPartStream {
-                pre_content: Some(bs),
-                content: Some(self.content),
-            },
-        )
+        // Building post-content.
+        bufs.push(Buffer::from("\r\n"));
+
+        bufs.into_iter().flatten().collect()
     }
 
     fn parse(_: &str) -> Result<Self> {
@@ -322,32 +250,6 @@ impl Part for FormDataPart {
     }
 }
 
-pub struct FormDataPartStream {
-    /// Including headers and the first `b\r\n`
-    pre_content: Option<Bytes>,
-    content: Option<Streamer>,
-}
-
-impl Stream for FormDataPartStream {
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Bytes>>> {
-        if let Some(pre_content) = self.pre_content.take() {
-            return Poll::Ready(Some(Ok(pre_content)));
-        }
-
-        if let Some(stream) = self.content.as_mut() {
-            return match ready!(stream.poll_next(cx)) {
-                None => {
-                    self.content = None;
-                    Poll::Ready(Some(Ok(Bytes::from_static(b"\r\n"))))
-                }
-                Some(v) => Poll::Ready(Some(v)),
-            };
-        }
-
-        Poll::Ready(None)
-    }
-}
-
 /// MixedPart is a builder for multipart/mixed part.
 pub struct MixedPart {
     part_headers: HeaderMap,
@@ -355,8 +257,7 @@ pub struct MixedPart {
     /// Common
     version: Version,
     headers: HeaderMap,
-    content_length: u64,
-    content: Option<Streamer>,
+    content: Buffer,
 
     /// Request only
     method: Option<Method>,
@@ -380,8 +281,7 @@ impl MixedPart {
 
             version: Version::HTTP_11,
             headers: HeaderMap::new(),
-            content_length: 0,
-            content: None,
+            content: Buffer::new(),
 
             uri: Some(uri),
             method: None,
@@ -391,30 +291,12 @@ impl MixedPart {
     }
 
     /// Build a mixed part from a request.
-    pub fn from_request(req: Request<AsyncBody>) -> Self {
+    pub fn from_request(req: Request<Buffer>) -> Self {
         let mut part_headers = HeaderMap::new();
         part_headers.insert(CONTENT_TYPE, "application/http".parse().unwrap());
         part_headers.insert("content-transfer-encoding", "binary".parse().unwrap());
 
-        let (parts, body) = req.into_parts();
-
-        let (content_length, content) = match body {
-            AsyncBody::Empty => (0, None),
-            AsyncBody::Bytes(bs) => (
-                bs.len() as u64,
-                Some(Box::new(oio::Cursor::from(bs)) as Streamer),
-            ),
-            AsyncBody::ChunkedBytes(bs) => (bs.len() as u64, Some(Box::new(bs) as Streamer)),
-            AsyncBody::Stream(stream) => {
-                let len = parts
-                    .headers
-                    .get(CONTENT_LENGTH)
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.parse::<u64>().ok())
-                    .expect("the content length of a mixed part must be valid");
-                (len, Some(stream))
-            }
-        };
+        let (parts, content) = req.into_parts();
 
         Self {
             part_headers,
@@ -430,7 +312,6 @@ impl MixedPart {
             ),
             version: parts.version,
             headers: parts.headers,
-            content_length,
             content,
 
             method: Some(parts.method),
@@ -439,7 +320,7 @@ impl MixedPart {
     }
 
     /// Consume a mixed part to build a response.
-    pub fn into_response(mut self) -> Response<IncomingAsyncBody> {
+    pub fn into_response(mut self) -> Response<Buffer> {
         let mut builder = Response::builder();
 
         builder = builder.status(self.status_code.unwrap_or(StatusCode::OK));
@@ -447,14 +328,8 @@ impl MixedPart {
         // Swap headers directly instead of copy the entire map.
         mem::swap(builder.headers_mut().unwrap(), &mut self.headers);
 
-        let body = if let Some(stream) = self.content {
-            IncomingAsyncBody::new(stream, Some(self.content_length))
-        } else {
-            IncomingAsyncBody::new(Box::new(oio::into_stream(stream::empty())), Some(0))
-        };
-
         builder
-            .body(body)
+            .body(self.content)
             .expect("mixed part must be valid response")
     }
 
@@ -483,30 +358,20 @@ impl MixedPart {
     }
 
     /// Set the content for this part.
-    pub fn content(mut self, content: impl Into<Bytes>) -> Self {
-        let content = content.into();
-
-        self.content_length = content.len() as u64;
-        self.content = Some(Box::new(oio::Cursor::from(content)));
-        self
-    }
-
-    /// Set the stream content for this part.
-    pub fn stream(mut self, size: u64, content: Streamer) -> Self {
-        self.content_length = size;
-        self.content = Some(content);
+    pub fn content(mut self, content: impl Into<Buffer>) -> Self {
+        self.content = content.into();
         self
     }
 }
 
 impl Part for MixedPart {
     const TYPE: &'static str = "mixed";
-    type STREAM = MixedPartStream;
 
-    fn format(self) -> (u64, Self::STREAM) {
-        let mut bs = BytesMut::new();
+    fn format(self) -> Buffer {
+        let mut bufs = Vec::with_capacity(3);
 
         // Write parts headers.
+        let mut bs = BytesMut::new();
         for (k, v) in self.part_headers.iter() {
             // Trick!
             //
@@ -561,23 +426,14 @@ impl Part for MixedPart {
             bs.extend_from_slice(b"\r\n");
         }
         bs.extend_from_slice(b"\r\n");
+        bufs.push(Buffer::from(bs.freeze()));
 
-        let bs = bs.freeze();
-
-        // pre-content + content + post-content;
-        let mut total_size = bs.len() as u64;
-
-        if self.content.is_some() {
-            total_size += self.content_length + 2;
+        if !self.content.is_empty() {
+            bufs.push(self.content);
+            bufs.push(Buffer::from("\r\n"))
         }
 
-        (
-            total_size,
-            MixedPartStream {
-                pre_content: Some(bs),
-                content: self.content,
-            },
-        )
+        bufs.into_iter().flatten().collect()
     }
 
     /// TODO
@@ -614,7 +470,7 @@ impl Part for MixedPart {
         let parts = http_response.split("\r\n\r\n").collect::<Vec<&str>>();
         let headers_content = parts[0];
         let body_content = parts.get(1).unwrap_or(&"");
-        let body_bytes = Bytes::from(body_content.to_string());
+        let body_bytes = Buffer::from(body_content.to_string());
 
         let status_line = headers_content.lines().next().unwrap_or("");
         let status_code = status_line
@@ -651,8 +507,7 @@ impl Part for MixedPart {
             part_headers,
             version: Version::HTTP_11,
             headers,
-            content_length: body_bytes.len() as u64,
-            content: Some(Box::new(oio::Cursor::from(body_bytes))),
+            content: body_bytes,
 
             method: None,
             uri: None,
@@ -668,29 +523,108 @@ impl Part for MixedPart {
     }
 }
 
-pub struct MixedPartStream {
-    /// Including headers and the first `b\r\n`
-    pre_content: Option<Bytes>,
-    content: Option<Streamer>,
+/// RelatedPart is a builder for multipart/related part.
+pub struct RelatedPart {
+    /// Common
+    headers: HeaderMap,
+    content: Buffer,
 }
 
-impl Stream for MixedPartStream {
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Bytes>>> {
-        if let Some(pre_content) = self.pre_content.take() {
-            return Poll::Ready(Some(Ok(pre_content)));
+impl Default for RelatedPart {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl RelatedPart {
+    /// Create a new related
+    pub fn new() -> Self {
+        Self {
+            headers: HeaderMap::new(),
+            content: Buffer::new(),
+        }
+    }
+
+    /// Build a mixed part from a request.
+    pub fn from_request(req: Request<Buffer>) -> Self {
+        let (parts, content) = req.into_parts();
+
+        Self {
+            headers: parts.headers,
+            content,
+        }
+    }
+
+    /// Consume a mixed part to build a response.
+    pub fn into_response(mut self) -> Response<Buffer> {
+        let mut builder = Response::builder();
+
+        // Swap headers directly instead of copy the entire map.
+        mem::swap(builder.headers_mut().unwrap(), &mut self.headers);
+
+        builder
+            .body(self.content)
+            .expect("a related part must be valid response")
+    }
+
+    /// Insert a header into part.
+    pub fn header(mut self, key: HeaderName, value: HeaderValue) -> Self {
+        self.headers.insert(key, value);
+        self
+    }
+
+    /// Set the content for this part.
+    pub fn content(mut self, content: impl Into<Buffer>) -> Self {
+        self.content = content.into();
+        self
+    }
+}
+
+impl Part for RelatedPart {
+    const TYPE: &'static str = "related";
+
+    fn format(self) -> Buffer {
+        // This is what multipart/related body might look for an insert in GCS
+        // https://cloud.google.com/storage/docs/uploading-objects
+        /*
+        --separator_string
+        Content-Type: application/json; charset=UTF-8
+
+        {"name":"my-document.txt"}
+
+        --separator_string
+        Content-Type: text/plain
+
+        This is a text file.
+        --separator_string--
+        */
+
+        let mut bufs = Vec::with_capacity(3);
+        let mut bs = BytesMut::new();
+
+        // Write request headers.
+        for (k, v) in self.headers.iter() {
+            bs.extend_from_slice(k.as_str().as_bytes());
+            bs.extend_from_slice(b": ");
+            bs.extend_from_slice(v.as_bytes());
+            bs.extend_from_slice(b"\r\n");
+        }
+        bs.extend_from_slice(b"\r\n");
+        bufs.push(Buffer::from(bs.freeze()));
+
+        if !self.content.is_empty() {
+            bufs.push(self.content);
+            bufs.push(Buffer::from("\r\n"))
         }
 
-        if let Some(stream) = self.content.as_mut() {
-            return match ready!(stream.poll_next(cx)) {
-                None => {
-                    self.content = None;
-                    Poll::Ready(Some(Ok(Bytes::from_static(b"\r\n"))))
-                }
-                Some(v) => Poll::Ready(Some(v)),
-            };
-        }
+        bufs.into_iter().flatten().collect()
+    }
 
-        Poll::Ready(None)
+    fn parse(_s: &str) -> Result<Self> {
+        Err(Error::new(
+            ErrorKind::Unsupported,
+            "parsing multipart/related is not supported",
+        ))
     }
 }
 
@@ -700,18 +634,15 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     use super::*;
-    use crate::raw::oio::StreamExt;
 
-    #[tokio::test]
-    async fn test_multipart_formdata_basic() -> Result<()> {
+    #[test]
+    fn test_multipart_formdata_basic() -> Result<()> {
         let multipart = Multipart::new()
             .with_boundary("lalala")
             .part(FormDataPart::new("foo").content(Bytes::from("bar")))
             .part(FormDataPart::new("hello").content(Bytes::from("world")));
 
-        let (size, body) = multipart.build();
-        let bs = body.collect().await.unwrap();
-        assert_eq!(size, bs.len() as u64);
+        let bs = multipart.build();
 
         let expected = "--lalala\r\n\
              Content-Disposition: form-data; name=\"foo\"\r\n\
@@ -723,13 +654,13 @@ mod tests {
              world\r\n\
              --lalala--\r\n";
 
-        assert_eq!(Bytes::from(expected), bs);
+        assert_eq!(Bytes::from(expected), bs.to_bytes());
         Ok(())
     }
 
     /// This test is inspired by <https://docs.aws.amazon.com/AmazonS3/latest/userguide/HTTPPOSTExamples.html>
-    #[tokio::test]
-    async fn test_multipart_formdata_s3_form_upload() -> Result<()> {
+    #[test]
+    fn test_multipart_formdata_s3_form_upload() -> Result<()> {
         let multipart = Multipart::new()
             .with_boundary("9431149156168")
             .part(FormDataPart::new("key").content("user/eric/MyPicture.jpg"))
@@ -745,9 +676,7 @@ mod tests {
             .part(FormDataPart::new("Signature").content("0RavWzkygo6QX9caELEqKi9kDbU="))
             .part(FormDataPart::new("file").header(CONTENT_TYPE, "image/jpeg".parse().unwrap()).content("...file content...")).part(FormDataPart::new("submit").content("Upload to Amazon S3"));
 
-        let (size, body) = multipart.build();
-        let bs = body.collect().await?;
-        assert_eq!(size, bs.len() as u64);
+        let bs = multipart.build();
 
         let expected = r#"--9431149156168
 Content-Disposition: form-data; name="key"
@@ -801,7 +730,7 @@ Upload to Amazon S3
             expected,
             // Rust can't represent `\r` in a string literal, so we
             // replace `\r\n` with `\n` for comparison
-            String::from_utf8(bs.to_vec())
+            String::from_utf8(bs.to_bytes().to_vec())
                 .unwrap()
                 .replace("\r\n", "\n")
         );
@@ -810,8 +739,8 @@ Upload to Amazon S3
     }
 
     /// This test is inspired by <https://cloud.google.com/storage/docs/batch>
-    #[tokio::test]
-    async fn test_multipart_mixed_gcs_batch_metadata() -> Result<()> {
+    #[test]
+    fn test_multipart_mixed_gcs_batch_metadata() -> Result<()> {
         let multipart = Multipart::new()
             .with_boundary("===============7330845974216740156==")
             .part(
@@ -869,9 +798,7 @@ Upload to Amazon S3
                     .content(r#"{"metadata": {"type": "calico"}}"#),
             );
 
-        let (size, body) = multipart.build();
-        let bs = body.collect().await?;
-        assert_eq!(size, bs.len() as u64);
+        let bs = multipart.build();
 
         let expected = r#"--===============7330845974216740156==
 Content-Type: application/http
@@ -913,7 +840,7 @@ content-length: 32
             expected,
             // Rust can't represent `\r` in a string literal, so we
             // replace `\r\n` with `\n` for comparison
-            String::from_utf8(bs.to_vec())
+            String::from_utf8(bs.to_bytes().to_vec())
                 .unwrap()
                 .replace("\r\n", "\n")
         );
@@ -922,8 +849,8 @@ content-length: 32
     }
 
     /// This test is inspired by <https://learn.microsoft.com/en-us/rest/api/storageservices/blob-batch?tabs=azure-ad>
-    #[tokio::test]
-    async fn test_multipart_mixed_azblob_batch_delete() -> Result<()> {
+    #[test]
+    fn test_multipart_mixed_azblob_batch_delete() -> Result<()> {
         let multipart = Multipart::new()
             .with_boundary("batch_357de4f7-6d0b-4e02-8cd2-6361411a9525")
             .part(
@@ -975,9 +902,7 @@ content-length: 32
                     .header("content-length".parse().unwrap(), "0".parse().unwrap()),
             );
 
-        let (size, body) = multipart.build();
-        let bs = body.collect().await?;
-        assert_eq!(size, bs.len() as u64);
+        let bs = multipart.build();
 
         let expected = r#"--batch_357de4f7-6d0b-4e02-8cd2-6361411a9525
 Content-Type: application/http
@@ -1016,7 +941,7 @@ content-length: 0
             expected,
             // Rust can't represent `\r` in a string literal, so we
             // replace `\r\n` with `\n` for comparison
-            String::from_utf8(bs.to_vec())
+            String::from_utf8(bs.to_bytes().to_vec())
                 .unwrap()
                 .replace("\r\n", "\n")
         );
@@ -1121,7 +1046,7 @@ Content-Length: 846
 
             h
         });
-        assert_eq!(multipart.parts[0].content_length, part0_bs.len() as u64);
+        assert_eq!(multipart.parts[0].content.len(), part0_bs.len());
         assert_eq!(multipart.parts[0].uri, None);
         assert_eq!(multipart.parts[0].method, None);
         assert_eq!(
@@ -1161,7 +1086,7 @@ Content-Length: 846
 
             h
         });
-        assert_eq!(multipart.parts[1].content_length, part1_bs.len() as u64);
+        assert_eq!(multipart.parts[1].content.len(), part1_bs.len());
         assert_eq!(multipart.parts[1].uri, None);
         assert_eq!(multipart.parts[1].method, None);
         assert_eq!(
@@ -1201,12 +1126,55 @@ Content-Length: 846
 
             h
         });
-        assert_eq!(multipart.parts[2].content_length, part2_bs.len() as u64);
+        assert_eq!(multipart.parts[2].content.len(), part2_bs.len());
         assert_eq!(multipart.parts[2].uri, None);
         assert_eq!(multipart.parts[2].method, None);
         assert_eq!(
             multipart.parts[2].status_code,
             Some(StatusCode::from_u16(200).unwrap())
         );
+    }
+
+    #[test]
+    fn test_multipart_related_gcs_simple() {
+        // This is what multipart/related body might look for an insert in GCS
+        // https://cloud.google.com/storage/docs/uploading-objects
+        let expected = r#"--separator_string
+content-type: application/json; charset=UTF-8
+
+{"name":"my-document.txt"}
+--separator_string
+content-type: text/plain
+
+This is a text file.
+--separator_string--
+"#;
+
+        let multipart = Multipart::new()
+            .with_boundary("separator_string")
+            .part(
+                RelatedPart::new()
+                    .header(
+                        "Content-Type".parse().unwrap(),
+                        "application/json; charset=UTF-8".parse().unwrap(),
+                    )
+                    .content(r#"{"name":"my-document.txt"}"#),
+            )
+            .part(
+                RelatedPart::new()
+                    .header(
+                        "Content-Type".parse().unwrap(),
+                        "text/plain".parse().unwrap(),
+                    )
+                    .content("This is a text file."),
+            );
+
+        let bs = multipart.build();
+
+        let output = String::from_utf8(bs.to_bytes().to_vec())
+            .unwrap()
+            .replace("\r\n", "\n");
+
+        assert_eq!(output, expected);
     }
 }

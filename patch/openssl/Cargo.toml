@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.63.0"
 name = "openssl"
-version = "0.10.72"
+version = "0.10.73"
 authors = ["Steven Fackler <sfackler@gmail.com>"]
 build = "build.rs"
 autobins = false

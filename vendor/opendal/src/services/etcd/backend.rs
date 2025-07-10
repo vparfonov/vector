@@ -15,11 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
+use std::vec;
 
-use async_trait::async_trait;
 use bb8::PooledConnection;
 use bb8::RunError;
 use etcd_client::Certificate;
@@ -29,76 +28,19 @@ use etcd_client::Error as EtcdError;
 use etcd_client::GetOptions;
 use etcd_client::Identity;
 use etcd_client::TlsOptions;
-use serde::Deserialize;
 use tokio::sync::OnceCell;
 
 use crate::raw::adapters::kv;
 use crate::raw::*;
+use crate::services::EtcdConfig;
 use crate::*;
 
 const DEFAULT_ETCD_ENDPOINTS: &str = "http://127.0.0.1:2379";
 
-/// Config for Etcd services support.
-#[derive(Default, Deserialize, Clone)]
-#[serde(default)]
-#[non_exhaustive]
-pub struct EtcdConfig {
-    /// network address of the Etcd services.
-    /// If use https, must set TLS options: `ca_path`, `cert_path`, `key_path`.
-    /// e.g. "127.0.0.1:23790,127.0.0.1:23791,127.0.0.1:23792" or "http://127.0.0.1:23790,http://127.0.0.1:23791,http://127.0.0.1:23792" or "https://127.0.0.1:23790,https://127.0.0.1:23791,https://127.0.0.1:23792"
-    ///
-    /// default is "http://127.0.0.1:2379"
-    pub endpoints: Option<String>,
-    /// the username to connect etcd service.
-    ///
-    /// default is None
-    pub username: Option<String>,
-    /// the password for authentication
-    ///
-    /// default is None
-    pub password: Option<String>,
-    /// the working directory of the etcd service. Can be "/path/to/dir"
-    ///
-    /// default is "/"
-    pub root: Option<String>,
-    /// certificate authority file path
-    ///
-    /// default is None
-    pub ca_path: Option<String>,
-    /// cert path
-    ///
-    /// default is None
-    pub cert_path: Option<String>,
-    /// key path
-    ///
-    /// default is None
-    pub key_path: Option<String>,
-}
-
-impl Debug for EtcdConfig {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut ds = f.debug_struct("EtcdConfig");
-
-        ds.field("root", &self.root);
-        if let Some(endpoints) = self.endpoints.clone() {
-            ds.field("endpoints", &endpoints);
-        }
-        if let Some(username) = self.username.clone() {
-            ds.field("username", &username);
-        }
-        if self.password.is_some() {
-            ds.field("password", &"<redacted>");
-        }
-        if let Some(ca_path) = self.ca_path.clone() {
-            ds.field("ca_path", &ca_path);
-        }
-        if let Some(cert_path) = self.cert_path.clone() {
-            ds.field("cert_path", &cert_path);
-        }
-        if let Some(key_path) = self.key_path.clone() {
-            ds.field("key_path", &key_path);
-        }
-        ds.finish()
+impl Configurator for EtcdConfig {
+    type Builder = EtcdBuilder;
+    fn into_builder(self) -> Self::Builder {
+        EtcdBuilder { config: self }
     }
 }
 
@@ -122,7 +64,7 @@ impl EtcdBuilder {
     /// set the network address of etcd service.
     ///
     /// default: "http://127.0.0.1:2379"
-    pub fn endpoints(&mut self, endpoints: &str) -> &mut Self {
+    pub fn endpoints(mut self, endpoints: &str) -> Self {
         if !endpoints.is_empty() {
             self.config.endpoints = Some(endpoints.to_owned());
         }
@@ -132,7 +74,7 @@ impl EtcdBuilder {
     /// set the username for etcd
     ///
     /// default: no username
-    pub fn username(&mut self, username: &str) -> &mut Self {
+    pub fn username(mut self, username: &str) -> Self {
         if !username.is_empty() {
             self.config.username = Some(username.to_owned());
         }
@@ -142,7 +84,7 @@ impl EtcdBuilder {
     /// set the password for etcd
     ///
     /// default: no password
-    pub fn password(&mut self, password: &str) -> &mut Self {
+    pub fn password(mut self, password: &str) -> Self {
         if !password.is_empty() {
             self.config.password = Some(password.to_owned());
         }
@@ -152,17 +94,20 @@ impl EtcdBuilder {
     /// set the working directory, all operations will be performed under it.
     ///
     /// default: "/"
-    pub fn root(&mut self, root: &str) -> &mut Self {
-        if !root.is_empty() {
-            self.config.root = Some(root.to_owned());
-        }
+    pub fn root(mut self, root: &str) -> Self {
+        self.config.root = if root.is_empty() {
+            None
+        } else {
+            Some(root.to_string())
+        };
+
         self
     }
 
     /// Set the certificate authority file path.
     ///
     /// default is None
-    pub fn ca_path(&mut self, ca_path: &str) -> &mut Self {
+    pub fn ca_path(mut self, ca_path: &str) -> Self {
         if !ca_path.is_empty() {
             self.config.ca_path = Some(ca_path.to_string())
         }
@@ -172,7 +117,7 @@ impl EtcdBuilder {
     /// Set the certificate file path.
     ///
     /// default is None
-    pub fn cert_path(&mut self, cert_path: &str) -> &mut Self {
+    pub fn cert_path(mut self, cert_path: &str) -> Self {
         if !cert_path.is_empty() {
             self.config.cert_path = Some(cert_path.to_string())
         }
@@ -182,7 +127,7 @@ impl EtcdBuilder {
     /// Set the key file path.
     ///
     /// default is None
-    pub fn key_path(&mut self, key_path: &str) -> &mut Self {
+    pub fn key_path(mut self, key_path: &str) -> Self {
         if !key_path.is_empty() {
             self.config.key_path = Some(key_path.to_string())
         }
@@ -192,16 +137,9 @@ impl EtcdBuilder {
 
 impl Builder for EtcdBuilder {
     const SCHEME: Scheme = Scheme::Etcd;
-    type Accessor = EtcdBackend;
+    type Config = EtcdConfig;
 
-    fn from_map(map: HashMap<String, String>) -> Self {
-        EtcdBuilder {
-            config: EtcdConfig::deserialize(ConfigDeserializer::new(map))
-                .expect("config deserialize must succeed"),
-        }
-    }
-
-    fn build(&mut self) -> Result<Self::Accessor> {
+    fn build(self) -> Result<impl Access> {
         let endpoints = self
             .config
             .endpoints
@@ -247,7 +185,7 @@ impl Builder for EtcdBuilder {
             client,
             options,
         })
-        .with_root(root.as_str()))
+        .with_normalized_root(root))
     }
 }
 
@@ -267,12 +205,12 @@ pub struct Manager {
     options: ConnectOptions,
 }
 
-#[async_trait]
+#[async_trait::async_trait]
 impl bb8::ManageConnection for Manager {
     type Connection = Client;
     type Error = Error;
 
-    async fn connect(&self) -> std::result::Result<Self::Connection, Self::Error> {
+    async fn connect(&self) -> Result<Self::Connection, Self::Error> {
         let conn = Client::connect(self.endpoints.clone(), Some(self.options.clone()))
             .await
             .map_err(format_etcd_error)?;
@@ -280,7 +218,7 @@ impl bb8::ManageConnection for Manager {
         Ok(conn)
     }
 
-    async fn is_valid(&self, conn: &mut Self::Connection) -> std::result::Result<(), Self::Error> {
+    async fn is_valid(&self, conn: &mut Self::Connection) -> Result<(), Self::Error> {
         let _ = conn.status().await.map_err(format_etcd_error)?;
         Ok(())
     }
@@ -333,36 +271,38 @@ impl Adapter {
     }
 }
 
-#[async_trait]
 impl kv::Adapter for Adapter {
-    fn metadata(&self) -> kv::Metadata {
-        kv::Metadata::new(
+    type Scanner = kv::ScanStdIter<vec::IntoIter<Result<String>>>;
+
+    fn info(&self) -> kv::Info {
+        kv::Info::new(
             Scheme::Etcd,
             &self.endpoints.join(","),
             Capability {
                 read: true,
                 write: true,
                 list: true,
+                shared: true,
 
                 ..Default::default()
             },
         )
     }
 
-    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
+    async fn get(&self, key: &str) -> Result<Option<Buffer>> {
         let mut client = self.conn().await?;
         let resp = client.get(key, None).await.map_err(format_etcd_error)?;
         if let Some(kv) = resp.kvs().first() {
-            Ok(Some(kv.value().to_vec()))
+            Ok(Some(Buffer::from(kv.value().to_vec())))
         } else {
             Ok(None)
         }
     }
 
-    async fn set(&self, key: &str, value: &[u8]) -> Result<()> {
+    async fn set(&self, key: &str, value: Buffer) -> Result<()> {
         let mut client = self.conn().await?;
         let _ = client
-            .put(key, value, None)
+            .put(key, value.to_vec(), None)
             .await
             .map_err(format_etcd_error)?;
         Ok(())
@@ -374,7 +314,7 @@ impl kv::Adapter for Adapter {
         Ok(())
     }
 
-    async fn scan(&self, path: &str) -> Result<Vec<String>> {
+    async fn scan(&self, path: &str) -> Result<Self::Scanner> {
         let mut client = self.conn().await?;
         let get_options = Some(GetOptions::new().with_prefix().with_keys_only());
         let resp = client
@@ -387,13 +327,10 @@ impl kv::Adapter for Adapter {
                 Error::new(ErrorKind::Unexpected, "store key is not valid utf-8 string")
                     .set_source(err)
             })?;
-            if v == path {
-                continue;
-            }
-            res.push(v);
+            res.push(Ok(v));
         }
 
-        Ok(res)
+        Ok(kv::ScanStdIter::new(res.into_iter()))
     }
 }
 

@@ -4,9 +4,9 @@
 // purpose with or without fee is hereby granted, provided that the above
 // copyright notice and this permission notice appear in all copies.
 //
-// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHORS DISCLAIM ALL WARRANTIES
+// THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
 // WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
-// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY
+// MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
 // SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
 // WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
 // OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
@@ -14,18 +14,16 @@
 
 use crate::limb::Limb;
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 #[repr(transparent)]
-pub(in super::super) struct N0([Limb; 2]);
+pub struct N0([Limb; 2]);
 
 impl N0 {
     #[cfg(feature = "alloc")]
     pub(super) const LIMBS_USED: usize = 64 / crate::limb::LIMB_BITS;
-}
 
-impl From<u64> for N0 {
     #[inline]
-    fn from(n0: u64) -> Self {
+    pub const fn precalculated(n0: u64) -> Self {
         #[cfg(target_pointer_width = "64")]
         {
             Self([n0, 0])

@@ -17,13 +17,13 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
 use http::StatusCode;
 use serde::Deserialize;
 
+use super::core::DbfsCore;
 use super::error::parse_error;
 use crate::raw::*;
-use crate::services::dbfs::core::DbfsCore;
 use crate::*;
 
 pub struct DbfsLister {
@@ -37,7 +37,6 @@ impl DbfsLister {
     }
 }
 
-#[async_trait]
 impl oio::PageList for DbfsLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let response = self.core.dbfs_list(&self.path).await?;
@@ -48,13 +47,13 @@ impl oio::PageList for DbfsLister {
                 ctx.done = true;
                 return Ok(());
             }
-            let error = parse_error(response).await?;
+            let error = parse_error(response);
             return Err(error);
         }
 
-        let bytes = response.into_body().bytes().await?;
-        let decoded_response =
-            serde_json::from_slice::<DbfsOutputList>(&bytes).map_err(new_json_deserialize_error)?;
+        let bytes = response.into_body();
+        let decoded_response: DbfsOutputList =
+            serde_json::from_reader(bytes.reader()).map_err(new_json_deserialize_error)?;
 
         ctx.done = true;
 

@@ -12,6 +12,24 @@ use mlua::{
     Value, Variadic,
 };
 
+#[test]
+fn test_weak_lua() {
+    let lua = Lua::new();
+    let weak_lua = lua.weak();
+    assert!(weak_lua.try_upgrade().is_some());
+    drop(lua);
+    assert!(weak_lua.try_upgrade().is_none());
+}
+
+#[test]
+#[should_panic(expected = "Lua instance is destroyed")]
+fn test_weak_lua_panic() {
+    let lua = Lua::new();
+    let weak_lua = lua.weak();
+    drop(lua);
+    let _ = weak_lua.upgrade();
+}
+
 #[cfg(not(feature = "luau"))]
 #[test]
 fn test_safety() -> Result<()> {
@@ -322,7 +340,7 @@ fn test_error() -> Result<()> {
     let return_string_error = globals.get::<Function>("return_string_error")?;
     assert!(return_string_error.call::<Error>(()).is_ok());
 
-    match lua.load("if youre happy and you know it syntax error").exec() {
+    match lua.load("if you are happy and you know it syntax error").exec() {
         Err(Error::SyntaxError {
             incomplete_input: false,
             ..
@@ -1288,6 +1306,13 @@ fn test_warnings() -> Result<()> {
         Err(Error::CallbackError { cause, .. })
             if matches!(*cause, Error::RuntimeError(ref err) if err == "warning error")
     ));
+
+    // Recursive warning
+    lua.set_warning_function(|lua, _, _| {
+        lua.warning("inner", false);
+        Ok(())
+    });
+    lua.warning("hello", false);
 
     Ok(())
 }

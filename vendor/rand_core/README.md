@@ -41,9 +41,8 @@ The traits and error types are also available via `rand`.
 ## Versions
 
 The current version is:
-
-```toml
-rand_core = "0.9.0"
+```
+rand_core = "=0.9.0-beta.1"
 ```
 
 

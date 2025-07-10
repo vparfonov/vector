@@ -68,6 +68,8 @@
 //!
 //! # Cargo Geiger Safety Report
 //! # Changelog
+//! - v0.1.16 - `dont_delete_on_drop()`.  Thanks to [A L Manning](https://gitlab.com/A-Manning) for [discussion](https://gitlab.com/leonhard-llc/ops/-/merge_requests/5).
+//! - v0.1.15 - Remove a dev dependency.
 //! - v0.1.14 - `AsRef<Path>`
 //! - v0.1.13 - Update docs.
 //! - v0.1.12 - Work when the directory already exists.
@@ -84,12 +86,12 @@
 //!   Thanks to Reddit user
 //!   [burntsushi](https://www.reddit.com/r/rust/comments/ma6y0x/tempdir_simple_temporary_directory_with_cleanup/gruo5iu/).
 //! - v0.1.6 - Add
-//!     [`TempDir::panic_on_cleanup_error`](https://docs.rs/temp-dir/latest/temp_dir/struct.TempDir.html#method.panic_on_cleanup_error).
-//!     Thanks to Reddit users
-//!     [`KhorneLordOfChaos`](https://www.reddit.com/r/rust/comments/ma6y0x/tempdir_simple_temporary_directory_with_cleanup/grsb5s3/)
-//!     and
-//!     [`dpc_pw`](https://www.reddit.com/r/rust/comments/ma6y0x/tempdir_simple_temporary_directory_with_cleanup/gru26df/)
-//!     for their comments.
+//!   [`TempDir::panic_on_cleanup_error`](https://docs.rs/temp-dir/latest/temp_dir/struct.TempDir.html#method.panic_on_cleanup_error).
+//!   Thanks to Reddit users
+//!   [`KhorneLordOfChaos`](https://www.reddit.com/r/rust/comments/ma6y0x/tempdir_simple_temporary_directory_with_cleanup/grsb5s3/)
+//!   and
+//!   [`dpc_pw`](https://www.reddit.com/r/rust/comments/ma6y0x/tempdir_simple_temporary_directory_with_cleanup/gru26df/)
+//!   for their comments.
 //! - v0.1.5 - Explain how it handles symbolic links.
 //!   Thanks to Reddit user Mai4eeze for this
 //!   [idea](https://www.reddit.com/r/rust/comments/ma6y0x/tempdir_simple_temporary_directory_with_cleanup/grsoz2g/).
@@ -136,14 +138,15 @@ pub static INTERNAL_RETRY: AtomicBool = AtomicBool::new(true);
 /// ```
 #[derive(Clone, PartialOrd, Ord, PartialEq, Eq, Hash, Debug)]
 pub struct TempDir {
-    path_buf: Option<PathBuf>,
+    delete_on_drop: bool,
     panic_on_delete_err: bool,
+    path_buf: PathBuf,
 }
 impl TempDir {
     fn remove_dir(path: &Path) -> Result<(), std::io::Error> {
         match std::fs::remove_dir_all(path) {
             Ok(()) => Ok(()),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) if e.kind() == ErrorKind::NotFound => Ok(()),
             Err(e) => Err(std::io::Error::new(
                 e.kind(),
                 format!("error removing directory and contents {path:?}: {e}"),
@@ -209,8 +212,9 @@ impl TempDir {
                 }
                 Ok(()) => {
                     return Ok(Self {
-                        path_buf: Some(path_buf),
+                        delete_on_drop: true,
                         panic_on_delete_err: false,
+                        path_buf,
                     })
                 }
             }
@@ -222,8 +226,8 @@ impl TempDir {
     /// # Errors
     /// Returns an error if the directory exists and we fail to remove it and its contents.
     #[allow(clippy::missing_panics_doc)]
-    pub fn cleanup(mut self) -> Result<(), std::io::Error> {
-        Self::remove_dir(&self.path_buf.take().unwrap())
+    pub fn cleanup(self) -> Result<(), std::io::Error> {
+        Self::remove_dir(&self.path_buf)
     }
 
     /// Make the struct panic on drop if it hits an error while
@@ -238,29 +242,36 @@ impl TempDir {
     ///
     /// This is useful when debugging a test.
     pub fn leak(mut self) {
-        self.path_buf.take();
+        self.delete_on_drop = false;
+    }
+
+    /// Do not delete the directory or its contents on Drop.
+    #[must_use]
+    pub fn dont_delete_on_drop(mut self) -> Self {
+        self.delete_on_drop = false;
+        self
     }
 
     /// The path to the directory.
     #[must_use]
     #[allow(clippy::missing_panics_doc)]
     pub fn path(&self) -> &Path {
-        self.path_buf.as_ref().unwrap()
+        &self.path_buf
     }
 
     /// The path to `name` under the directory.
     #[must_use]
     #[allow(clippy::missing_panics_doc)]
     pub fn child(&self, name: impl AsRef<str>) -> PathBuf {
-        let mut result = self.path_buf.as_ref().unwrap().clone();
+        let mut result = self.path_buf.clone();
         result.push(name.as_ref());
         result
     }
 }
 impl Drop for TempDir {
     fn drop(&mut self) {
-        if let Some(path) = self.path_buf.take() {
-            let result = Self::remove_dir(&path);
+        if self.delete_on_drop {
+            let result = Self::remove_dir(&self.path_buf);
             if self.panic_on_delete_err {
                 if let Err(e) = result {
                     panic!("{}", e);

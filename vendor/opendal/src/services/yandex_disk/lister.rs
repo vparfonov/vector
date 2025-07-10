@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
 
 use super::core::parse_info;
 use super::core::MetainformationResponse;
@@ -44,7 +44,6 @@ impl YandexDiskLister {
     }
 }
 
-#[async_trait]
 impl oio::PageList for YandexDiskLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let offset = if ctx.token.is_empty() {
@@ -65,10 +64,10 @@ impl oio::PageList for YandexDiskLister {
 
         match resp.status() {
             http::StatusCode::OK => {
-                let body = resp.into_body().bytes().await?;
+                let body = resp.into_body();
 
                 let resp: MetainformationResponse =
-                    serde_json::from_slice(&body).map_err(new_json_deserialize_error)?;
+                    serde_json::from_reader(body.reader()).map_err(new_json_deserialize_error)?;
 
                 if let Some(embedded) = resp.embedded {
                     let n = embedded.items.len();
@@ -105,7 +104,7 @@ impl oio::PageList for YandexDiskLister {
                 return Ok(());
             }
             _ => {
-                return Err(parse_error(resp).await?);
+                return Err(parse_error(resp));
             }
         }
 

@@ -16,19 +16,12 @@
 // under the License.
 
 use std::sync::Arc;
-use std::task::ready;
-use std::task::Context;
-use std::task::Poll;
 use std::vec::IntoIter;
-
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::future::BoxFuture;
-use futures::FutureExt;
 
 use super::Adapter;
 use super::Value;
 use crate::raw::oio::HierarchyLister;
+use crate::raw::oio::QueueBuf;
 use crate::raw::*;
 use crate::*;
 
@@ -37,6 +30,7 @@ use crate::*;
 pub struct Backend<S: Adapter> {
     kv: Arc<S>,
     root: String,
+    info: Arc<AccessorInfo>,
 }
 
 impl<S> Backend<S>
@@ -45,104 +39,71 @@ where
 {
     /// Create a new kv backend.
     pub fn new(kv: S) -> Self {
+        let kv_info = kv.info();
         Self {
             kv: Arc::new(kv),
             root: "/".to_string(),
+            info: {
+                let am: AccessorInfo = AccessorInfo::default();
+                am.set_root("/");
+                am.set_scheme(kv_info.scheme());
+                am.set_name(kv_info.name());
+
+                let kv_cap = kv_info.capabilities();
+                let mut cap = Capability::default();
+                if kv_cap.get {
+                    cap.read = true;
+                    cap.stat = true;
+                }
+
+                if kv_cap.set {
+                    cap.write = true;
+                    cap.write_can_empty = true;
+                }
+
+                if kv_cap.delete {
+                    cap.delete = true;
+                }
+
+                if kv_cap.scan {
+                    cap.list = true;
+                    cap.list_with_recursive = true;
+                }
+
+                if kv_cap.shared {
+                    cap.shared = true;
+                }
+
+                cap.blocking = true;
+
+                am.set_native_capability(cap);
+
+                am.into()
+            },
         }
     }
 
     /// Configure root within this backend.
     pub fn with_root(mut self, root: &str) -> Self {
-        self.root = normalize_root(root);
+        let root = normalize_root(root);
+        self.info.set_root(&root);
+        self.root = root;
         self
     }
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-impl<S: Adapter> Accessor for Backend<S> {
-    type Reader = oio::Cursor;
-    type BlockingReader = oio::Cursor;
+impl<S: Adapter> Access for Backend<S> {
+    type Reader = Buffer;
     type Writer = KvWriter<S>;
-    type BlockingWriter = KvWriter<S>;
     type Lister = HierarchyLister<KvLister>;
+    type Deleter = oio::OneShotDeleter<KvDeleter<S>>;
+    type BlockingReader = Buffer;
+    type BlockingWriter = KvWriter<S>;
     type BlockingLister = HierarchyLister<KvLister>;
+    type BlockingDeleter = oio::OneShotDeleter<KvDeleter<S>>;
 
-    fn info(&self) -> AccessorInfo {
-        let kv_info = self.kv.info();
-        let mut am: AccessorInfo = AccessorInfo::default();
-        am.set_root(&self.root);
-        am.set_scheme(kv_info.scheme());
-        am.set_name(kv_info.name());
-
-        let kv_cap = kv_info.capabilities();
-        let mut cap = Capability::default();
-        if kv_cap.get {
-            cap.read = true;
-            cap.read_can_seek = true;
-            cap.read_can_next = true;
-            cap.read_with_range = true;
-            cap.stat = true;
-        }
-
-        if kv_cap.set {
-            cap.write = true;
-            cap.write_can_empty = true;
-        }
-
-        if kv_cap.delete {
-            cap.delete = true;
-        }
-
-        if kv_cap.scan {
-            cap.list = true;
-            cap.list_with_recursive = true;
-        }
-
-        cap.blocking = true;
-
-        am.set_native_capability(cap);
-
-        am
-    }
-
-    async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
-        let p = build_abs_path(&self.root, path);
-
-        let bs = match self.kv.get(&p).await? {
-            // TODO: we can reuse the metadata in value to build content range.
-            Some(bs) => bs.value,
-            None => return Err(Error::new(ErrorKind::NotFound, "kv doesn't have this path")),
-        };
-
-        let bs = self.apply_range(bs, args.range());
-
-        Ok((RpRead::new(), oio::Cursor::from(bs)))
-    }
-
-    fn blocking_read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::BlockingReader)> {
-        let p = build_abs_path(&self.root, path);
-
-        let bs = match self.kv.blocking_get(&p)? {
-            // TODO: we can reuse the metadata in value to build content range.
-            Some(bs) => bs.value,
-            None => return Err(Error::new(ErrorKind::NotFound, "kv doesn't have this path")),
-        };
-
-        let bs = self.apply_range(bs, args.range());
-        Ok((RpRead::new(), oio::Cursor::from(bs)))
-    }
-
-    async fn write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::Writer)> {
-        let p = build_abs_path(&self.root, path);
-
-        Ok((RpWrite::new(), KvWriter::new(self.kv.clone(), p, args)))
-    }
-
-    fn blocking_write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::BlockingWriter)> {
-        let p = build_abs_path(&self.root, path);
-
-        Ok((RpWrite::new(), KvWriter::new(self.kv.clone(), p, args)))
+    fn info(&self) -> Arc<AccessorInfo> {
+        self.info.clone()
     }
 
     async fn stat(&self, path: &str, _: OpStat) -> Result<RpStat> {
@@ -159,6 +120,40 @@ impl<S: Adapter> Accessor for Backend<S> {
         }
     }
 
+    async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
+        let p = build_abs_path(&self.root, path);
+
+        let bs = match self.kv.get(&p).await? {
+            // TODO: we can reuse the metadata in value to build content range.
+            Some(bs) => bs.value,
+            None => return Err(Error::new(ErrorKind::NotFound, "kv doesn't have this path")),
+        };
+
+        Ok((RpRead::new(), bs.slice(args.range().to_range_as_usize())))
+    }
+
+    async fn write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::Writer)> {
+        let p = build_abs_path(&self.root, path);
+
+        Ok((RpWrite::new(), KvWriter::new(self.kv.clone(), p, args)))
+    }
+
+    async fn delete(&self) -> Result<(RpDelete, Self::Deleter)> {
+        Ok((
+            RpDelete::default(),
+            oio::OneShotDeleter::new(KvDeleter::new(self.kv.clone(), self.root.clone())),
+        ))
+    }
+
+    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
+        let p = build_abs_path(&self.root, path);
+        let res = self.kv.scan(&p).await?;
+        let lister = KvLister::new(&self.root, res);
+        let lister = HierarchyLister::new(lister, path, args.recursive());
+
+        Ok((RpList::default(), lister))
+    }
+
     fn blocking_stat(&self, path: &str, _: OpStat) -> Result<RpStat> {
         let p = build_abs_path(&self.root, path);
 
@@ -173,27 +168,29 @@ impl<S: Adapter> Accessor for Backend<S> {
         }
     }
 
-    async fn delete(&self, path: &str, _: OpDelete) -> Result<RpDelete> {
+    fn blocking_read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::BlockingReader)> {
         let p = build_abs_path(&self.root, path);
 
-        self.kv.delete(&p).await?;
-        Ok(RpDelete::default())
+        let bs = match self.kv.blocking_get(&p)? {
+            // TODO: we can reuse the metadata in value to build content range.
+            Some(bs) => bs.value,
+            None => return Err(Error::new(ErrorKind::NotFound, "kv doesn't have this path")),
+        };
+
+        Ok((RpRead::new(), bs.slice(args.range().to_range_as_usize())))
     }
 
-    fn blocking_delete(&self, path: &str, _: OpDelete) -> Result<RpDelete> {
+    fn blocking_write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::BlockingWriter)> {
         let p = build_abs_path(&self.root, path);
 
-        self.kv.blocking_delete(&p)?;
-        Ok(RpDelete::default())
+        Ok((RpWrite::new(), KvWriter::new(self.kv.clone(), p, args)))
     }
 
-    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
-        let p = build_abs_path(&self.root, path);
-        let res = self.kv.scan(&p).await?;
-        let lister = KvLister::new(&self.root, res);
-        let lister = HierarchyLister::new(lister, path, args.recursive());
-
-        Ok((RpList::default(), lister))
+    fn blocking_delete(&self) -> Result<(RpDelete, Self::BlockingDeleter)> {
+        Ok((
+            RpDelete::default(),
+            oio::OneShotDeleter::new(KvDeleter::new(self.kv.clone(), self.root.clone())),
+        ))
     }
 
     fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingLister)> {
@@ -203,26 +200,6 @@ impl<S: Adapter> Accessor for Backend<S> {
         let lister = HierarchyLister::new(lister, path, args.recursive());
 
         Ok((RpList::default(), lister))
-    }
-}
-
-impl<S> Backend<S>
-where
-    S: Adapter,
-{
-    fn apply_range(&self, mut bs: Bytes, br: BytesRange) -> Bytes {
-        match (br.offset(), br.size()) {
-            (Some(offset), Some(size)) => {
-                let mut bs = bs.split_off(offset as usize);
-                if (size as usize) < bs.len() {
-                    let _ = bs.split_off(size as usize);
-                }
-                bs
-            }
-            (Some(offset), None) => bs.split_off(offset as usize),
-            (None, Some(size)) => bs.split_off(bs.len() - size as usize),
-            (None, None) => bs,
-        }
     }
 }
 
@@ -246,15 +223,18 @@ impl KvLister {
             } else {
                 EntryMode::FILE
             };
-
-            oio::Entry::new(&build_rel_path(&self.root, &v), Metadata::new(mode))
+            let mut path = build_rel_path(&self.root, &v);
+            if path.is_empty() {
+                path = "/".to_string();
+            }
+            oio::Entry::new(&path, Metadata::new(mode))
         })
     }
 }
 
 impl oio::List for KvLister {
-    fn poll_next(&mut self, _: &mut Context<'_>) -> Poll<Result<Option<oio::Entry>>> {
-        Poll::Ready(Ok(self.inner_next()))
+    async fn next(&mut self) -> Result<Option<oio::Entry>> {
+        Ok(self.inner_next())
     }
 }
 
@@ -269,9 +249,8 @@ pub struct KvWriter<S> {
     path: String,
 
     op: OpWrite,
-    buf: Option<Vec<u8>>,
+    buf: Option<QueueBuf>,
     value: Option<Value>,
-    future: Option<BoxFuture<'static, Result<()>>>,
 }
 
 /// # Safety
@@ -287,12 +266,11 @@ impl<S> KvWriter<S> {
             op,
             buf: None,
             value: None,
-            future: None,
         }
     }
 
     fn build(&mut self) -> Value {
-        let value = self.buf.take().map(Bytes::from).unwrap_or_default();
+        let value = self.buf.take().map(QueueBuf::collect).unwrap_or_default();
 
         let mut metadata = Metadata::new(EntryMode::FILE);
         metadata.set_content_length(value.len() as u64);
@@ -312,79 +290,43 @@ impl<S> KvWriter<S> {
 }
 
 impl<S: Adapter> oio::Write for KvWriter<S> {
-    fn poll_write(&mut self, _: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
-        if self.future.is_some() {
-            self.future = None;
-            return Poll::Ready(Err(Error::new(
-                ErrorKind::Unexpected,
-                "there is a future on going, it's maybe a bug to go into this case",
-            )));
-        }
-
-        let size = bs.chunk().len();
-
-        let mut buf = self.buf.take().unwrap_or_else(|| Vec::with_capacity(size));
-        buf.extend_from_slice(bs.chunk());
-
+    async fn write(&mut self, bs: Buffer) -> Result<()> {
+        let mut buf = self.buf.take().unwrap_or_default();
+        buf.push(bs);
         self.buf = Some(buf);
-
-        Poll::Ready(Ok(size))
+        Ok(())
     }
 
-    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        loop {
-            match self.future.as_mut() {
-                Some(fut) => {
-                    let res = ready!(fut.poll_unpin(cx));
-                    self.future = None;
-                    return Poll::Ready(res);
-                }
-                None => {
-                    let kv = self.kv.clone();
-                    let path = self.path.clone();
-                    let value = match &self.value {
-                        Some(value) => value.clone(),
-                        None => {
-                            let value = self.build();
-                            self.value = Some(value.clone());
-                            value
-                        }
-                    };
-
-                    let fut = async move { kv.set(&path, value).await };
-                    self.future = Some(Box::pin(fut));
-                }
+    async fn close(&mut self) -> Result<Metadata> {
+        let value = match &self.value {
+            Some(value) => value.clone(),
+            None => {
+                let value = self.build();
+                self.value = Some(value.clone());
+                value
             }
-        }
+        };
+        let meta = value.metadata.clone();
+        self.kv.set(&self.path, value).await?;
+
+        Ok(meta)
     }
 
-    fn poll_abort(&mut self, _: &mut Context<'_>) -> Poll<Result<()>> {
-        if self.future.is_some() {
-            self.future = None;
-            return Poll::Ready(Err(Error::new(
-                ErrorKind::Unexpected,
-                "there is a future on going, it's maybe a bug to go into this case",
-            )));
-        }
-
+    async fn abort(&mut self) -> Result<()> {
         self.buf = None;
-        Poll::Ready(Ok(()))
+        Ok(())
     }
 }
 
 impl<S: Adapter> oio::BlockingWrite for KvWriter<S> {
-    fn write(&mut self, bs: &dyn oio::WriteBuf) -> Result<usize> {
-        let size = bs.chunk().len();
-
-        let mut buf = self.buf.take().unwrap_or_else(|| Vec::with_capacity(size));
-        buf.extend_from_slice(bs.chunk());
-
+    fn write(&mut self, bs: Buffer) -> Result<()> {
+        let mut buf = self.buf.take().unwrap_or_default();
+        buf.push(bs);
         self.buf = Some(buf);
-
-        Ok(size)
+        Ok(())
     }
 
-    fn close(&mut self) -> Result<()> {
+    fn close(&mut self) -> Result<Metadata> {
         let kv = self.kv.clone();
         let value = match &self.value {
             Some(value) => value.clone(),
@@ -395,7 +337,37 @@ impl<S: Adapter> oio::BlockingWrite for KvWriter<S> {
             }
         };
 
+        let meta = value.metadata.clone();
         kv.blocking_set(&self.path, value)?;
+        Ok(meta)
+    }
+}
+
+pub struct KvDeleter<S> {
+    kv: Arc<S>,
+    root: String,
+}
+
+impl<S> KvDeleter<S> {
+    fn new(kv: Arc<S>, root: String) -> Self {
+        KvDeleter { kv, root }
+    }
+}
+
+impl<S: Adapter> oio::OneShotDelete for KvDeleter<S> {
+    async fn delete_once(&self, path: String, _: OpDelete) -> Result<()> {
+        let p = build_abs_path(&self.root, &path);
+
+        self.kv.delete(&p).await?;
+        Ok(())
+    }
+}
+
+impl<S: Adapter> oio::BlockingOneShotDelete for KvDeleter<S> {
+    fn blocking_delete_once(&self, path: String, _: OpDelete) -> Result<()> {
+        let p = build_abs_path(&self.root, &path);
+
+        self.kv.blocking_delete(&p)?;
         Ok(())
     }
 }

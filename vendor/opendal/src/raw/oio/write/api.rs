@@ -15,63 +15,14 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::fmt::Display;
-use std::fmt::Formatter;
 use std::future::Future;
-use std::pin::Pin;
-use std::task::Context;
-use std::task::Poll;
+use std::ops::DerefMut;
 
 use crate::raw::*;
 use crate::*;
 
-/// WriteOperation is the name for APIs of Writer.
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
-#[non_exhaustive]
-pub enum WriteOperation {
-    /// Operation for [`Write::write`]
-    Write,
-    /// Operation for [`Write::close`]
-    Close,
-    /// Operation for [`Write::abort`]
-    Abort,
-
-    /// Operation for [`BlockingWrite::write`]
-    BlockingWrite,
-    /// Operation for [`BlockingWrite::close`]
-    BlockingClose,
-}
-
-impl WriteOperation {
-    /// Convert self into static str.
-    pub fn into_static(self) -> &'static str {
-        self.into()
-    }
-}
-
-impl Display for WriteOperation {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.into_static())
-    }
-}
-
-impl From<WriteOperation> for &'static str {
-    fn from(v: WriteOperation) -> &'static str {
-        use WriteOperation::*;
-
-        match v {
-            Write => "Writer::write",
-            Close => "Writer::close",
-            Abort => "Writer::abort",
-
-            BlockingWrite => "BlockingWriter::write",
-            BlockingClose => "BlockingWriter::close",
-        }
-    }
-}
-
 /// Writer is a type erased [`Write`]
-pub type Writer = Box<dyn Write>;
+pub type Writer = Box<dyn WriteDyn>;
 
 /// Write is the trait that OpenDAL returns to callers.
 pub trait Write: Unpin + Send + Sync {
@@ -79,122 +30,70 @@ pub trait Write: Unpin + Send + Sync {
     ///
     /// # Behavior
     ///
-    /// - `Ok(n)` means `n` bytes has been written successfully.
+    /// - `Ok(())` means all bytes has been written successfully.
     /// - `Err(err)` means error happens and no bytes has been written.
-    ///
-    /// It's possible that `n < bs.len()`, caller should pass the remaining bytes
-    /// repeatedly until all bytes has been written.
-    fn poll_write(&mut self, cx: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>>;
+    fn write(&mut self, bs: Buffer) -> impl Future<Output = Result<()>> + MaybeSend;
 
     /// Close the writer and make sure all data has been flushed.
-    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>>;
+    fn close(&mut self) -> impl Future<Output = Result<Metadata>> + MaybeSend;
 
     /// Abort the pending writer.
-    fn poll_abort(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>>;
+    fn abort(&mut self) -> impl Future<Output = Result<()>> + MaybeSend;
 }
 
 impl Write for () {
-    fn poll_write(&mut self, _: &mut Context<'_>, _: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
+    async fn write(&mut self, _: Buffer) -> Result<()> {
         unimplemented!("write is required to be implemented for oio::Write")
     }
 
-    fn poll_close(&mut self, _: &mut Context<'_>) -> Poll<Result<()>> {
-        Poll::Ready(Err(Error::new(
+    async fn close(&mut self) -> Result<Metadata> {
+        Err(Error::new(
             ErrorKind::Unsupported,
             "output writer doesn't support close",
-        )))
+        ))
     }
 
-    fn poll_abort(&mut self, _: &mut Context<'_>) -> Poll<Result<()>> {
-        Poll::Ready(Err(Error::new(
+    async fn abort(&mut self) -> Result<()> {
+        Err(Error::new(
             ErrorKind::Unsupported,
             "output writer doesn't support abort",
-        )))
+        ))
     }
 }
 
-/// `Box<dyn Write>` won't implement `Write` automatically.
-///
-/// To make Writer work as expected, we must add this impl.
-impl<T: Write + ?Sized> Write for Box<T> {
-    fn poll_write(&mut self, cx: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
-        (**self).poll_write(cx, bs)
+pub trait WriteDyn: Unpin + Send + Sync {
+    fn write_dyn(&mut self, bs: Buffer) -> BoxedFuture<Result<()>>;
+
+    fn close_dyn(&mut self) -> BoxedFuture<Result<Metadata>>;
+
+    fn abort_dyn(&mut self) -> BoxedFuture<Result<()>>;
+}
+
+impl<T: Write + ?Sized> WriteDyn for T {
+    fn write_dyn(&mut self, bs: Buffer) -> BoxedFuture<Result<()>> {
+        Box::pin(self.write(bs))
     }
 
-    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        (**self).poll_close(cx)
+    fn close_dyn(&mut self) -> BoxedFuture<Result<Metadata>> {
+        Box::pin(self.close())
     }
 
-    fn poll_abort(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        (**self).poll_abort(cx)
+    fn abort_dyn(&mut self) -> BoxedFuture<Result<()>> {
+        Box::pin(self.abort())
     }
 }
 
-/// Impl WriteExt for all T: Write
-impl<T: Write> WriteExt for T {}
-
-/// Extension of [`Read`] to make it easier for use.
-pub trait WriteExt: Write {
-    /// Build a future for `poll_write`.
-    fn write<'a>(&'a mut self, buf: &'a dyn oio::WriteBuf) -> WriteFuture<'a, Self> {
-        WriteFuture { writer: self, buf }
+impl<T: WriteDyn + ?Sized> Write for Box<T> {
+    async fn write(&mut self, bs: Buffer) -> Result<()> {
+        self.deref_mut().write_dyn(bs).await
     }
 
-    /// Build a future for `poll_close`.
-    fn close(&mut self) -> CloseFuture<Self> {
-        CloseFuture { writer: self }
+    async fn close(&mut self) -> Result<Metadata> {
+        self.deref_mut().close_dyn().await
     }
 
-    /// Build a future for `poll_abort`.
-    fn abort(&mut self) -> AbortFuture<Self> {
-        AbortFuture { writer: self }
-    }
-}
-
-pub struct WriteFuture<'a, W: Write + Unpin + ?Sized> {
-    writer: &'a mut W,
-    buf: &'a dyn oio::WriteBuf,
-}
-
-impl<W> Future for WriteFuture<'_, W>
-where
-    W: Write + Unpin + ?Sized,
-{
-    type Output = Result<usize>;
-
-    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<usize>> {
-        let this = self.get_mut();
-        this.writer.poll_write(cx, this.buf)
-    }
-}
-
-pub struct AbortFuture<'a, W: Write + Unpin + ?Sized> {
-    writer: &'a mut W,
-}
-
-impl<W> Future for AbortFuture<'_, W>
-where
-    W: Write + Unpin + ?Sized,
-{
-    type Output = Result<()>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        self.writer.poll_abort(cx)
-    }
-}
-
-pub struct CloseFuture<'a, W: Write + Unpin + ?Sized> {
-    writer: &'a mut W,
-}
-
-impl<W> Future for CloseFuture<'_, W>
-where
-    W: Write + Unpin + ?Sized,
-{
-    type Output = Result<()>;
-
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        self.writer.poll_close(cx)
+    async fn abort(&mut self) -> Result<()> {
+        self.deref_mut().abort_dyn().await
     }
 }
 
@@ -204,20 +103,28 @@ pub type BlockingWriter = Box<dyn BlockingWrite>;
 /// BlockingWrite is the trait that OpenDAL returns to callers.
 pub trait BlockingWrite: Send + Sync + 'static {
     /// Write whole content at once.
-    fn write(&mut self, bs: &dyn oio::WriteBuf) -> Result<usize>;
+    ///
+    /// # Behavior
+    ///
+    /// - `Ok(n)` means `n` bytes has been written successfully.
+    /// - `Err(err)` means error happens and no bytes has been written.
+    ///
+    /// It's possible that `n < bs.len()`, caller should pass the remaining bytes
+    /// repeatedly until all bytes has been written.
+    fn write(&mut self, bs: Buffer) -> Result<()>;
 
     /// Close the writer and make sure all data has been flushed.
-    fn close(&mut self) -> Result<()>;
+    fn close(&mut self) -> Result<Metadata>;
 }
 
 impl BlockingWrite for () {
-    fn write(&mut self, bs: &dyn oio::WriteBuf) -> Result<usize> {
+    fn write(&mut self, bs: Buffer) -> Result<()> {
         let _ = bs;
 
         unimplemented!("write is required to be implemented for oio::BlockingWrite")
     }
 
-    fn close(&mut self) -> Result<()> {
+    fn close(&mut self) -> Result<Metadata> {
         Err(Error::new(
             ErrorKind::Unsupported,
             "output writer doesn't support close",
@@ -229,11 +136,11 @@ impl BlockingWrite for () {
 ///
 /// To make BlockingWriter work as expected, we must add this impl.
 impl<T: BlockingWrite + ?Sized> BlockingWrite for Box<T> {
-    fn write(&mut self, bs: &dyn oio::WriteBuf) -> Result<usize> {
+    fn write(&mut self, bs: Buffer) -> Result<()> {
         (**self).write(bs)
     }
 
-    fn close(&mut self) -> Result<()> {
+    fn close(&mut self) -> Result<Metadata> {
         (**self).close()
     }
 }

@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.70.0"
 name = "prost-reflect"
-version = "0.14.2"
+version = "0.14.7"
 authors = ["Andrew Hickman <andrew.hickman1@sky.com>"]
 build = false
 exclude = [
@@ -22,7 +22,9 @@ exclude = [
     "src/file_descriptor_set.bin",
     "src/doctest.proto",
     "tests",
+    "doc/*.bin",
 ]
+autolib = false
 autobins = false
 autoexamples = false
 autotests = false
@@ -98,6 +100,15 @@ replace = """
 [{{version}}]: https://github.com/andrewhickman/prost-reflect/compare/{{prev_version}}...{{version}}"""
 search = '\[Unreleased\]: https://github\.com/andrewhickman/prost-reflect/compare/.*?...HEAD'
 
+[features]
+derive = ["prost-reflect-derive"]
+serde = [
+    "serde1",
+    "base64",
+    "serde-value",
+]
+text-format = ["logos"]
+
 [lib]
 name = "prost_reflect"
 path = "src/lib.rs"
@@ -161,12 +172,3 @@ version = "0.9.25"
 [dev-dependencies.similar-asserts]
 version = "1.4.2"
 features = ["serde"]
-
-[features]
-derive = ["prost-reflect-derive"]
-serde = [
-    "serde1",
-    "base64",
-    "serde-value",
-]
-text-format = ["logos"]

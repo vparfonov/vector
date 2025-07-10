@@ -1,24 +1,3 @@
-# Version 0.2.10
-
-- Update windows-sys to v0.59. (#41)
-
-# Version 0.2.9
-
-- Fix the `clippy::needless_borrows_for_generic_args` lint in the README
-  example. (#38)
-
-# Version 0.2.8
-
-- Update README.md to use a working example. (#35)
-
-# Version 0.2.7
-
-- Remove an invalid category from `Cargo.toml`. (#33)
-
-# Version 0.2.6
-
-- Bump `windows-sys` to 0.52 and `async-io` to 3.3.0. (#27)
-
 # Version 0.2.5
 
 - Bump `async-io` to version 2.0.0. (#25)

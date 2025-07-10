@@ -62,7 +62,7 @@ pub(crate) fn set_extension_once<T>(
 }
 
 pub(crate) fn remember_extension(
-    extension: &Extension,
+    extension: &Extension<'_>,
     mut handler: impl FnMut(u8) -> Result<(), Error>,
 ) -> Result<(), Error> {
     // ISO arc for standard certificate and CRL extensions.
@@ -92,7 +92,7 @@ pub(crate) enum DistributionPointName<'a> {
 }
 
 impl<'a> FromDer<'a> for DistributionPointName<'a> {
-    fn from_der(reader: &mut untrusted::Reader<'a>) -> Result<DistributionPointName<'a>, Error> {
+    fn from_der(reader: &mut untrusted::Reader<'a>) -> Result<Self, Error> {
         // RFC 5280 section §4.2.1.13:
         //   When the distributionPoint field is present, it contains either a
         //   SEQUENCE of general names or a single value, nameRelativeToCRLIssuer

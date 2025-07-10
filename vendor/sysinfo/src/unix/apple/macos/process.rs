@@ -4,6 +4,7 @@ use std::ffi::{OsStr, OsString};
 use std::mem::{self, MaybeUninit};
 use std::os::unix::ffi::{OsStrExt, OsStringExt};
 use std::path::{Path, PathBuf};
+use std::process::ExitStatus;
 
 use libc::{c_int, c_void, kill};
 
@@ -44,6 +45,8 @@ pub(crate) struct ProcessInner {
     pub(crate) old_written_bytes: u64,
     pub(crate) read_bytes: u64,
     pub(crate) written_bytes: u64,
+    accumulated_cpu_time: u64,
+    exists: bool,
 }
 
 impl ProcessInner {
@@ -75,6 +78,8 @@ impl ProcessInner {
             old_written_bytes: 0,
             read_bytes: 0,
             written_bytes: 0,
+            accumulated_cpu_time: 0,
+            exists: true,
         }
     }
 
@@ -106,6 +111,8 @@ impl ProcessInner {
             old_written_bytes: 0,
             read_bytes: 0,
             written_bytes: 0,
+            accumulated_cpu_time: 0,
+            exists: true,
         }
     }
 
@@ -177,6 +184,10 @@ impl ProcessInner {
         self.cpu_usage
     }
 
+    pub(crate) fn accumulated_cpu_time(&self) -> u64 {
+        self.accumulated_cpu_time
+    }
+
     pub(crate) fn disk_usage(&self) -> DiskUsage {
         DiskUsage {
             read_bytes: self.read_bytes.saturating_sub(self.old_read_bytes),
@@ -202,18 +213,8 @@ impl ProcessInner {
         self.effective_group_id
     }
 
-    pub(crate) fn wait(&self) {
-        let mut status = 0;
-        // attempt waiting
-        unsafe {
-            if retry_eintr!(libc::waitpid(self.pid.0, &mut status, 0)) < 0 {
-                // attempt failed (non-child process) so loop until process ends
-                let duration = std::time::Duration::from_millis(10);
-                while kill(self.pid.0, 0) == 0 {
-                    std::thread::sleep(duration);
-                }
-            }
-        }
+    pub(crate) fn wait(&self) -> Option<ExitStatus> {
+        crate::unix::utils::wait_process(self.pid)
     }
 
     pub(crate) fn session_id(&self) -> Option<Pid> {
@@ -228,7 +229,15 @@ impl ProcessInner {
     }
 
     pub(crate) fn switch_updated(&mut self) -> bool {
-         std::mem::replace(&mut self.updated, false)
+        std::mem::replace(&mut self.updated, false)
+    }
+
+    pub(crate) fn set_nonexistent(&mut self) {
+        self.exists = false;
+    }
+
+    pub(crate) fn exists(&self) -> bool {
+        self.exists
     }
 }
 
@@ -331,7 +340,7 @@ unsafe fn get_bsd_info(pid: Pid) -> Option<libc::proc_bsdinfo> {
         0,
         &mut info as *mut _ as *mut _,
         mem::size_of::<libc::proc_bsdinfo>() as _,
-    ) != mem::size_of::<libc::proc_bsdinfo>() as _
+    ) != mem::size_of::<libc::proc_bsdinfo>() as c_int
     {
         None
     } else {
@@ -351,12 +360,13 @@ unsafe fn create_new_process(
     now: u64,
     refresh_kind: ProcessRefreshKind,
     info: Option<libc::proc_bsdinfo>,
+    timebase_to_ms: f64,
 ) -> Result<Option<Process>, ()> {
     let info = match info {
         Some(info) => info,
         None => {
             let mut p = ProcessInner::new_empty(pid);
-            if get_exe_and_name_backup(&mut p, refresh_kind) {
+            if get_exe_and_name_backup(&mut p, refresh_kind, false) {
                 get_cwd_root(&mut p, refresh_kind);
                 return Ok(Some(Process { inner: p }));
             }
@@ -371,16 +381,28 @@ unsafe fn create_new_process(
     let run_time = now.saturating_sub(start_time);
 
     let mut p = ProcessInner::new(pid, parent, start_time, run_time);
-    if !get_process_infos(&mut p, refresh_kind) && !get_exe_and_name_backup(&mut p, refresh_kind) {
+    if !get_process_infos(&mut p, refresh_kind)
+        && !get_exe_and_name_backup(&mut p, refresh_kind, false)
+    {
         // If we can't even have the name, no point in keeping it.
         return Err(());
     }
     get_cwd_root(&mut p, refresh_kind);
 
-    if refresh_kind.memory() {
+    if refresh_kind.cpu() || refresh_kind.memory() {
         let task_info = get_task_info(pid);
-        p.memory = task_info.pti_resident_size;
-        p.virtual_memory = task_info.pti_virtual_size;
+
+        if refresh_kind.cpu() {
+            p.accumulated_cpu_time = (task_info
+                .pti_total_user
+                .saturating_add(task_info.pti_total_system)
+                as f64
+                * timebase_to_ms) as u64;
+        }
+        if refresh_kind.memory() {
+            p.memory = task_info.pti_resident_size;
+            p.virtual_memory = task_info.pti_virtual_size;
+        }
     }
 
     p.user_id = Some(Uid(info.pbi_ruid));
@@ -398,10 +420,11 @@ unsafe fn create_new_process(
 unsafe fn get_exe_and_name_backup(
     process: &mut ProcessInner,
     refresh_kind: ProcessRefreshKind,
+    force_check: bool,
 ) -> bool {
     let exe_needs_update = refresh_kind.exe().needs_update(|| process.exe.is_none());
-    if !process.name.is_empty() && !exe_needs_update {
-        return false;
+    if !process.name.is_empty() && !exe_needs_update && !force_check {
+        return true;
     }
     let mut buffer: Vec<u8> = Vec::with_capacity(libc::PROC_PIDPATHINFO_MAXSIZE as _);
     match libc::proc_pidpath(
@@ -639,27 +662,42 @@ pub(crate) fn update_process(
     now: u64,
     refresh_kind: ProcessRefreshKind,
     check_if_alive: bool,
+    timebase_to_ms: f64,
 ) -> Result<Option<Process>, ()> {
     unsafe {
         if let Some(ref mut p) = (*wrap.0.get()).get_mut(&pid) {
             let p = &mut p.inner;
 
+            let mut extra_checked = false;
+
             if let Some(info) = get_bsd_info(pid) {
                 if info.pbi_start_tvsec != p.start_time {
-                    // We don't it to be removed, just replaced.
+                    // We don't want it to be removed, just replaced.
                     p.updated = true;
+                    // To ensure the name and exe path will be updated.
+                    p.name.clear();
+                    p.exe = None;
                     // The owner of this PID changed.
-                    return create_new_process(pid, now, refresh_kind, Some(info));
+                    return create_new_process(pid, now, refresh_kind, Some(info), timebase_to_ms);
                 }
                 let parent = get_parent(&info);
                 // Update the parent if it changed.
                 if p.parent != parent {
                     p.parent = parent;
                 }
+            } else {
+                // Weird that we can't get this information. Sometimes, mac can list PIDs that do
+                // not exist anymore. So let's ensure that the process is actually still alive.
+                if !get_exe_and_name_backup(p, refresh_kind, true) {
+                    // So it's not actually alive, then let's un-update it so it will be removed.
+                    p.updated = false;
+                    return Ok(None);
+                }
+                extra_checked = true;
             }
 
-            if !get_process_infos(p, refresh_kind) {
-                get_exe_and_name_backup(p, refresh_kind);
+            if !get_process_infos(p, refresh_kind) && !extra_checked {
+                get_exe_and_name_backup(p, refresh_kind, false);
             }
             get_cwd_root(p, refresh_kind);
 
@@ -697,6 +735,11 @@ pub(crate) fn update_process(
 
                 if refresh_kind.cpu() {
                     compute_cpu_usage(p, task_info, system_time, user_time, time_interval);
+                    p.accumulated_cpu_time = (task_info
+                        .pti_total_user
+                        .saturating_add(task_info.pti_total_system)
+                        as f64
+                        * timebase_to_ms) as u64;
                 }
                 if refresh_kind.memory() {
                     p.memory = task_info.pti_resident_size;
@@ -706,7 +749,7 @@ pub(crate) fn update_process(
             p.updated = true;
             Ok(None)
         } else {
-            create_new_process(pid, now, refresh_kind, get_bsd_info(pid))
+            create_new_process(pid, now, refresh_kind, get_bsd_info(pid), timebase_to_ms)
         }
     }
 }

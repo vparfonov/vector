@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.71.1"
 name = "metrics"
-version = "0.24.1"
+version = "0.24.2"
 authors = ["Toby Lawrence <toby@nuclearfurnace.com>"]
 description = "A lightweight metrics facade."
 homepage = "https://github.com/metrics-rs/metrics"
@@ -26,6 +26,7 @@ keywords = [
 categories = ["development-tools::debugging"]
 license = "MIT"
 repository = "https://github.com/metrics-rs/metrics"
+resolver = "2"
 
 [lib]
 bench = false
@@ -47,11 +48,8 @@ version = "0.4"
 default-features = false
 
 [dev-dependencies.rand]
-version = "0.8"
-features = [
-    "std",
-    "std_rng",
-]
+version = "0.9"
+features = ["thread_rng"]
 default-features = false
 
 [dev-dependencies.trybuild]

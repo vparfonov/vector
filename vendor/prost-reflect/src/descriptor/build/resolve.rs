@@ -49,7 +49,7 @@ struct ResolveVisitor<'a> {
     errors: Vec<DescriptorErrorKind>,
 }
 
-impl<'a> Visitor for ResolveVisitor<'a> {
+impl Visitor for ResolveVisitor<'_> {
     fn visit_file(&mut self, path: &[i32], index: FileIndex, file: &FileDescriptorProto) {
         let mut transitive_dependencies = HashSet::with_capacity(file.dependency.len() + 1);
         transitive_dependencies.insert(index);
@@ -119,7 +119,7 @@ impl<'a> Visitor for ResolveVisitor<'a> {
         let json_name: Box<str> = self.resolve_field_json_name(field, file, path).into();
 
         let is_packed = cardinality == Cardinality::Repeated
-            && kind.map_or(false, |k| k.is_packable())
+            && kind.is_some_and(|k| k.is_packable())
             && (field
                 .options
                 .as_ref()
@@ -128,7 +128,7 @@ impl<'a> Visitor for ResolveVisitor<'a> {
         let supports_presence = field.proto3_optional()
             || field.oneof_index.is_some()
             || (cardinality != Cardinality::Repeated
-                && (kind.map_or(false, |k| k.is_message()) || syntax == Syntax::Proto2));
+                && (kind.is_some_and(|k| k.is_message()) || syntax == Syntax::Proto2));
 
         let default = kind.and_then(|kind| {
             self.parse_field_default_value(kind, field.default_value.as_deref(), file, path)
@@ -390,7 +390,7 @@ impl<'a> Visitor for ResolveVisitor<'a> {
         self.resolve_field_json_name(extension, file, path);
 
         let is_packed = cardinality == Cardinality::Repeated
-            && kind.map_or(false, |k| k.is_packable())
+            && kind.is_some_and(|k| k.is_packable())
             && (extension
                 .options
                 .as_ref()
@@ -414,7 +414,7 @@ impl<'a> Visitor for ResolveVisitor<'a> {
     }
 }
 
-impl<'a> ResolveVisitor<'a> {
+impl ResolveVisitor<'_> {
     fn resolve_public_dependencies(&self, dependencies: &mut HashSet<FileIndex>, index: FileIndex) {
         let file = &self.pool.files[index as usize];
 
@@ -631,10 +631,7 @@ impl<'a> ResolveVisitor<'a> {
         file: FileIndex,
         path: &[i32],
     ) -> Option<Value> {
-        let default_value = match default_value {
-            Some(value) => value,
-            None => return None,
-        };
+        let default_value = default_value?;
 
         match kind {
             KindIndex::Double

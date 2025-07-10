@@ -1,3 +1,66 @@
+# 0.34.2
+
+ * FreeBSD: Fix segfault when refreshing processes.
+
+# 0.34.1
+
+ * macOS: Remove forgotten debug print.
+
+# 0.34.0
+
+ * `multithread` feature is disabled by default.
+ * Add new `Process` methods: `accumulated_cpu_time`, `exists`, `open_files` and `open_files_limit`.
+ * `Process::wait` method now returns `Option<ExitStatus>`.
+ * Add new `System` methods: `distribution_id_like` and `kernel_long_version`.
+ * Turn `System::physical_core_count` method into an associated function.
+ * Make `System::refresh_all` and `System::refresh_specifics` methods remove dead processes.
+ * Add new `ProcessRefreshKind` refresh: `tasks`.
+ * Fix `Group` docs.
+ * Implement `Deserialize` trait on `DiskKind`, `MacAddr`, `IpNetwork`, `ProcessStatus`, `Signal` and `ThreadKind`.
+ * Implement `FromStr` trait on `IpNetwork` and `MacAddr`.
+ * Implement `Hash` trait on `DiskKind`, `MacAddr`, `ProcessStatus` and `Signal`.
+ * macOS: Removed processes are now correctly handled when refreshing processes.
+ * macOS: Strenghten dist list refresh.
+ * macOS: Fix internal `cfg` handling which triggered compilation failures in some specific cases.
+ * Linux: max cgroups memory is more reliant in case of wrong input.
+ * Linux: Fix processes tasks update.
+ * Linux: Improve disks retrieval.
+ * Windows: Fix antivirus considering programs using `sysinfo` as viruses by replacing uses of `NtQueryInformationProcess` with other "mainstream" Windows API.
+ * Windows: Improve CPU usage computation efficiency.
+ * FreeBSD: Improve `process_procs` when there is only one process to refresh.
+
+# 0.33.1
+
+ * Linux: Fix components retrieval.
+ * Linux: Filter out more virtual file systems for `Disk` API.
+ * Linux/Android: Improve `System::long_os_version()`.
+ * Apple: Add missing CPU brands for iPhone and iPads.
+ * macOS: Improve system name retrieval in `System::long_os_version()`.
+ * Linux/macOS: Avoid trailing whitespace and consecutive whitespace in `System::long_os_version()`.
+ * Windows: Fix `User::groups`.
+ * Improve documentation for `System::name`, `System::kernel_version`, `System::os_version`, `System::long_os_version` and `System::distribution_id`.
+
+# 0.33.0
+
+ * Linux: Add more ARM vendor IDs.
+ * Linux: Improve CPU computation when refreshing a single process CPU usage.
+ * Windows: Fix CPU frequency not being refreshed.
+ * Windows: Improved components retrieval.
+ * Windows: Fix inconsistent `boot_time` information.
+ * Windows: Fix `User::groups`.
+ * macOS: Fix network data information being limited to 32 bits.
+ * macOS: Add newer macOS version for `System::long_os_version`.
+ * unix: Add support for network sub-interfaces.
+ * Use `std::env::consts::ARCH` as fallback for `System::cpu_arch`.
+ * Add disk I/O support provided through `Disk::usage`.
+ * Add `NetworkData::mtu`.
+ * Add `DiskRefreshKind` to have finer-grained disks refreshes.
+ * `Component::temperature` and `Component::max` now returns `Option<f32>`.
+ * `Users::refresh_list`, `Groups::refresh_list`, `Components::refresh_list`, `Networks::refresh_list` and `Disks::refresh_list` methods were renamed `refresh`.
+ * `*RefreshKind::new` methods were renamed `nothing`.
+ * Improve documentation for `DiskUsage::read_bytes`.
+ * Improve documentation for `Process::kill`.
+
 # 0.32.1
 
  * Fix compilation error due to `libc` update.

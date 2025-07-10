@@ -17,7 +17,6 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
 use http::StatusCode;
 
 use super::core::AzfileCore;
@@ -39,11 +38,8 @@ impl AzfileWriter {
     }
 }
 
-#[async_trait]
 impl oio::OneShotWrite for AzfileWriter {
-    async fn write_once(&self, bs: &dyn oio::WriteBuf) -> Result<()> {
-        let bs = oio::ChunkedBytes::from_vec(bs.vectored_bytes(bs.remaining()));
-
+    async fn write_once(&self, bs: Buffer) -> Result<Metadata> {
         let resp = self
             .core
             .azfile_create_file(&self.path, bs.len(), &self.op)
@@ -51,34 +47,24 @@ impl oio::OneShotWrite for AzfileWriter {
 
         let status = resp.status();
         match status {
-            StatusCode::OK | StatusCode::CREATED => {
-                resp.into_body().consume().await?;
-            }
+            StatusCode::OK | StatusCode::CREATED => {}
             _ => {
-                return Err(parse_error(resp)
-                    .await?
-                    .with_operation("Backend::azfile_create_file"));
+                return Err(parse_error(resp).with_operation("Backend::azfile_create_file"));
             }
         }
 
         let resp = self
             .core
-            .azfile_update(&self.path, bs.len() as u64, 0, AsyncBody::ChunkedBytes(bs))
+            .azfile_update(&self.path, bs.len() as u64, 0, bs)
             .await?;
         let status = resp.status();
-        return match status {
-            StatusCode::OK | StatusCode::CREATED => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp)
-                .await?
-                .with_operation("Backend::azfile_update")),
-        };
+        match status {
+            StatusCode::OK | StatusCode::CREATED => Ok(Metadata::default()),
+            _ => Err(parse_error(resp).with_operation("Backend::azfile_update")),
+        }
     }
 }
 
-#[async_trait]
 impl oio::AppendWrite for AzfileWriter {
     async fn offset(&self) -> Result<u64> {
         let resp = self.core.azfile_get_file_properties(&self.path).await?;
@@ -87,11 +73,11 @@ impl oio::AppendWrite for AzfileWriter {
 
         match status {
             StatusCode::OK => Ok(parse_content_length(resp.headers())?.unwrap_or_default()),
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    async fn append(&self, offset: u64, size: u64, body: AsyncBody) -> Result<()> {
+    async fn append(&self, offset: u64, size: u64, body: Buffer) -> Result<Metadata> {
         let resp = self
             .core
             .azfile_update(&self.path, size, offset, body)
@@ -99,13 +85,8 @@ impl oio::AppendWrite for AzfileWriter {
 
         let status = resp.status();
         match status {
-            StatusCode::OK | StatusCode::CREATED => {
-                resp.into_body().consume().await?;
-                Ok(())
-            }
-            _ => Err(parse_error(resp)
-                .await?
-                .with_operation("Backend::azfile_update")),
+            StatusCode::OK | StatusCode::CREATED => Ok(Metadata::default()),
+            _ => Err(parse_error(resp).with_operation("Backend::azfile_update")),
         }
     }
 }

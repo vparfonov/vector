@@ -13,9 +13,7 @@ use self::{
     lex::{Int, Token},
 };
 use crate::{
-    descriptor::{
-        GOOGLE_APIS_DOMAIN, GOOGLE_PROD_DOMAIN, MAP_ENTRY_KEY_NUMBER, MAP_ENTRY_VALUE_NUMBER,
-    },
+    descriptor::{MAP_ENTRY_KEY_NUMBER, MAP_ENTRY_VALUE_NUMBER},
     dynamic::fields::FieldDescriptorLike,
     DynamicMessage, EnumDescriptor, FieldDescriptor, Kind, MapKey, MessageDescriptor, Value,
 };
@@ -103,10 +101,7 @@ impl<'a> Parser<'a> {
 
                 self.parse_field_value(message, &extension)?;
             }
-            FieldName::Any(domain, message_name)
-                if domain == GOOGLE_APIS_DOMAIN.trim_end_matches('/')
-                    || domain == GOOGLE_PROD_DOMAIN.trim_end_matches('/') =>
-            {
+            FieldName::Any(domain, message_name) => {
                 let value_message = match message
                     .desc
                     .parent_pool()
@@ -132,9 +127,6 @@ impl<'a> Parser<'a> {
                 {
                     return Err(ParseErrorKind::InvalidTypeForAny { span });
                 }
-            }
-            FieldName::Any(domain, _) => {
-                return Err(ParseErrorKind::UnknownTypeUrlDomain { domain, span })
             }
         }
 
@@ -250,7 +242,16 @@ impl<'a> Parser<'a> {
             Some((Token::LeftBracket, _)) => {
                 let start = self.bump();
 
-                let mut result = vec![self.parse_value(kind)?.0];
+                let mut result = Vec::new();
+
+                // Check for empty list first
+                if let Some((Token::RightBracket, _)) = self.peek()? {
+                    let end = self.bump();
+                    return Ok((Value::List(result), join_span(start, end)));
+                }
+
+                result.push(self.parse_value(kind)?.0);
+
                 loop {
                     match self.peek()? {
                         Some((Token::Comma, _)) => {
@@ -481,8 +482,25 @@ impl<'a> Parser<'a> {
 
     fn parse_bool(&mut self) -> Result<(bool, Span), ParseErrorKind> {
         match self.peek()? {
-            Some((Token::Ident("false"), _)) => Ok((false, self.bump())),
-            Some((Token::Ident("true"), _)) => Ok((true, self.bump())),
+            Some((Token::Ident("false"), _))
+            | Some((Token::Ident("False"), _))
+            | Some((Token::Ident("f"), _)) => Ok((false, self.bump())),
+            Some((Token::Ident("true"), _))
+            | Some((Token::Ident("True"), _))
+            | Some((Token::Ident("t"), _)) => Ok((true, self.bump())),
+            Some((Token::IntLiteral(v), _)) => {
+                let value = match u8::from_str_radix(v.value, v.radix) {
+                    Ok(v) => v,
+                    Err(_e) => return self.unexpected_token("0 or 1"),
+                };
+                if value == 1 {
+                    Ok((true, self.bump()))
+                } else if value == 0 {
+                    Ok((false, self.bump()))
+                } else {
+                    self.unexpected_token("0 or 1")
+                }
+            }
             _ => self.unexpected_token("'true' or 'false'"),
         }
     }

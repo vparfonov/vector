@@ -3,14 +3,16 @@
 #[non_exhaustive]
 #[derive(::std::clone::Clone, ::std::cmp::PartialEq, ::std::fmt::Debug)]
 pub struct DescribeLogGroupsOutput {
-    /// <p>An array of structures, where each structure contains the information about one log group.</p>
+    /// <p>The log groups.</p>
+    /// <p>If the <code>retentionInDays</code> value is not included for a log group, then that log group's events do not expire.</p>
     pub log_groups: ::std::option::Option<::std::vec::Vec<crate::types::LogGroup>>,
     /// <p>The token for the next set of items to return. The token expires after 24 hours.</p>
     pub next_token: ::std::option::Option<::std::string::String>,
     _request_id: Option<String>,
 }
 impl DescribeLogGroupsOutput {
-    /// <p>An array of structures, where each structure contains the information about one log group.</p>
+    /// <p>The log groups.</p>
+    /// <p>If the <code>retentionInDays</code> value is not included for a log group, then that log group's events do not expire.</p>
     ///
     /// If no value was sent for this field, a default will be set. If you want to determine if no value was sent, use `.log_groups.is_none()`.
     pub fn log_groups(&self) -> &[crate::types::LogGroup] {
@@ -46,19 +48,22 @@ impl DescribeLogGroupsOutputBuilder {
     ///
     /// To override the contents of this collection use [`set_log_groups`](Self::set_log_groups).
     ///
-    /// <p>An array of structures, where each structure contains the information about one log group.</p>
+    /// <p>The log groups.</p>
+    /// <p>If the <code>retentionInDays</code> value is not included for a log group, then that log group's events do not expire.</p>
     pub fn log_groups(mut self, input: crate::types::LogGroup) -> Self {
         let mut v = self.log_groups.unwrap_or_default();
         v.push(input);
         self.log_groups = ::std::option::Option::Some(v);
         self
     }
-    /// <p>An array of structures, where each structure contains the information about one log group.</p>
+    /// <p>The log groups.</p>
+    /// <p>If the <code>retentionInDays</code> value is not included for a log group, then that log group's events do not expire.</p>
     pub fn set_log_groups(mut self, input: ::std::option::Option<::std::vec::Vec<crate::types::LogGroup>>) -> Self {
         self.log_groups = input;
         self
     }
-    /// <p>An array of structures, where each structure contains the information about one log group.</p>
+    /// <p>The log groups.</p>
+    /// <p>If the <code>retentionInDays</code> value is not included for a log group, then that log group's events do not expire.</p>
     pub fn get_log_groups(&self) -> &::std::option::Option<::std::vec::Vec<crate::types::LogGroup>> {
         &self.log_groups
     }

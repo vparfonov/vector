@@ -3,43 +3,21 @@
 // Reexport items defined in either macos or ios ffi module.
 #[cfg(all(
     not(target_os = "ios"),
-    any(feature = "component", feature = "disk", feature = "system"),
+    any(
+        feature = "disk",
+        all(
+            not(feature = "apple-sandbox"),
+            any(feature = "component", feature = "system")
+        ),
+    ),
 ))]
 pub use crate::sys::inner::ffi::*;
 
-cfg_if! {
-    if #[cfg(feature = "disk")] {
-        use core_foundation_sys::{
-            array::CFArrayRef, dictionary::CFDictionaryRef, error::CFErrorRef, string::CFStringRef,
-            url::CFURLRef,
-        };
-        use std::ffi::c_void;
-
-        #[link(name = "CoreFoundation", kind = "framework")]
-        extern "C" {
-            pub fn CFURLCopyResourcePropertiesForKeys(
-                url: CFURLRef,
-                keys: CFArrayRef,
-                error: *mut CFErrorRef,
-            ) -> CFDictionaryRef;
-
-            pub static kCFURLVolumeIsEjectableKey: CFStringRef;
-            pub static kCFURLVolumeIsRemovableKey: CFStringRef;
-            pub static kCFURLVolumeAvailableCapacityKey: CFStringRef;
-            pub static kCFURLVolumeAvailableCapacityForImportantUsageKey: CFStringRef;
-            pub static kCFURLVolumeTotalCapacityKey: CFStringRef;
-            pub static kCFURLVolumeNameKey: CFStringRef;
-            pub static kCFURLVolumeIsLocalKey: CFStringRef;
-            pub static kCFURLVolumeIsInternalKey: CFStringRef;
-            pub static kCFURLVolumeIsBrowsableKey: CFStringRef;
-        }
-
-        #[link(name = "objc", kind = "dylib")]
-        extern "C" {
-            pub fn objc_autoreleasePoolPop(pool: *mut c_void);
-            pub fn objc_autoreleasePoolPush() -> *mut c_void;
-        }
-    }
+#[cfg(feature = "disk")]
+#[link(name = "objc", kind = "dylib")]
+extern "C" {
+    pub fn objc_autoreleasePoolPop(pool: *mut libc::c_void);
+    pub fn objc_autoreleasePoolPush() -> *mut libc::c_void;
 }
 
 #[cfg_attr(feature = "debug", derive(Eq, Hash, PartialEq))]

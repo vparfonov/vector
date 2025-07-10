@@ -5,7 +5,10 @@ use crate::sys::cpu::*;
 use crate::sys::process::*;
 use crate::sys::utils::{get_sys_value, get_sys_value_by_name};
 
-use crate::{Cpu, CpuRefreshKind, LoadAvg, MemoryRefreshKind, Pid, Process, ProcessesToUpdate, ProcessRefreshKind};
+use crate::{
+    Cpu, CpuRefreshKind, LoadAvg, MemoryRefreshKind, Pid, Process, ProcessRefreshKind,
+    ProcessesToUpdate,
+};
 
 #[cfg(all(target_os = "macos", not(feature = "apple-sandbox")))]
 use std::cell::UnsafeCell;
@@ -228,7 +231,7 @@ impl SystemInner {
     #[cfg(any(target_os = "ios", feature = "apple-sandbox"))]
     pub(crate) fn refresh_processes_specifics(
         &mut self,
-        processes_to_update: ProcessesToUpdate<'_>,
+        _processes_to_update: ProcessesToUpdate<'_>,
         _refresh_kind: ProcessRefreshKind,
     ) -> usize {
         0
@@ -266,11 +269,11 @@ impl SystemInner {
                 &(dyn Fn(Pid, &[Pid]) -> bool + Sync + Send),
             ) = match processes_to_update {
                 ProcessesToUpdate::All => (&[], &empty_filter),
-                ProcessesToUpdate::Some(pids) => {
-                    if pids.is_empty() {
+                ProcessesToUpdate::Some(pids_to_refresh) => {
+                    if pids_to_refresh.is_empty() {
                         return 0;
                     }
-                    (pids, &real_filter)
+                    (pids_to_refresh, &real_filter)
                 }
             };
 
@@ -278,6 +281,11 @@ impl SystemInner {
             let now = get_now();
             let port = self.port;
             let time_interval = self.clock_info.as_mut().map(|c| c.get_time_interval(port));
+            let timebase_to_ms = self
+                .clock_info
+                .as_ref()
+                .map(|c| c.timebase_to_ms)
+                .unwrap_or_default();
             let entries: Vec<Process> = {
                 let wrap = &Wrap(UnsafeCell::new(&mut self.process_list));
 
@@ -290,8 +298,16 @@ impl SystemInner {
                             return None;
                         }
                         nb_updated.fetch_add(1, Ordering::Relaxed);
-                        update_process(wrap, pid, time_interval, now, refresh_kind, false)
-                            .unwrap_or_default()
+                        update_process(
+                            wrap,
+                            pid,
+                            time_interval,
+                            now,
+                            refresh_kind,
+                            false,
+                            timebase_to_ms,
+                        )
+                        .unwrap_or_default()
                     })
                     .collect()
             };
@@ -326,10 +342,6 @@ impl SystemInner {
 
     pub(crate) fn cpus(&self) -> &[Cpu] {
         &self.cpus.cpus
-    }
-
-    pub(crate) fn physical_core_count(&self) -> Option<usize> {
-        physical_core_count()
     }
 
     pub(crate) fn total_memory(&self) -> u64 {
@@ -392,45 +404,53 @@ impl SystemInner {
 
     pub(crate) fn long_os_version() -> Option<String> {
         #[cfg(target_os = "macos")]
-        let friendly_name = match Self::os_version().unwrap_or_default() {
-            f_n if f_n.starts_with("14.0") => "Sonoma",
-            f_n if f_n.starts_with("10.16")
-                | f_n.starts_with("11.0")
-                | f_n.starts_with("11.1")
-                | f_n.starts_with("11.2") =>
-            {
-                "Big Sur"
+        {
+            let Some(os_version) = Self::os_version() else {
+                return Some("macOS".to_owned());
+            };
+            // https://en.wikipedia.org/wiki/MacOS_version_history
+            for (version_prefix, macos_spelling, friendly_name) in [
+                ("15", "macOS", "Sequoia"),
+                ("14", "macOS", "Sonoma"),
+                ("13", "macOS", "Ventura"),
+                ("12", "macOS", "Monterey"),
+                ("11", "macOS", "Big Sur"),
+                // Big Sur identifies itself as 10.16 in some situations.
+                // https://en.wikipedia.org/wiki/MacOS_Big_Sur#Development_history
+                ("10.16", "macOS", "Big Sur"),
+                ("10.15", "macOS", "Catalina"),
+                ("10.14", "macOS", "Mojave"),
+                ("10.13", "macOS", "High Sierra"),
+                ("10.12", "macOS", "Sierra"),
+                ("10.11", "OS X", "El Capitan"),
+                ("10.10", "OS X", "Yosemite"),
+                ("10.9", "OS X", "Mavericks"),
+                ("10.8", "OS X", "Mountain Lion"),
+                ("10.7", "Mac OS X", "Lion"),
+                ("10.6", "Mac OS X", "Snow Leopard"),
+                ("10.5", "Mac OS X", "Leopard"),
+                ("10.4", "Mac OS X", "Tiger"),
+                ("10.3", "Mac OS X", "Panther"),
+                ("10.2", "Mac OS X", "Jaguar"),
+                ("10.1", "Mac OS X", "Puma"),
+                ("10.0", "Mac OS X", "Cheetah"),
+            ] {
+                if os_version.starts_with(version_prefix) {
+                    return Some(format!("{macos_spelling} {os_version} {friendly_name}"));
+                }
             }
-            f_n if f_n.starts_with("10.15") => "Catalina",
-            f_n if f_n.starts_with("10.14") => "Mojave",
-            f_n if f_n.starts_with("10.13") => "High Sierra",
-            f_n if f_n.starts_with("10.12") => "Sierra",
-            f_n if f_n.starts_with("10.11") => "El Capitan",
-            f_n if f_n.starts_with("10.10") => "Yosemite",
-            f_n if f_n.starts_with("10.9") => "Mavericks",
-            f_n if f_n.starts_with("10.8") => "Mountain Lion",
-            f_n if f_n.starts_with("10.7") => "Lion",
-            f_n if f_n.starts_with("10.6") => "Snow Leopard",
-            f_n if f_n.starts_with("10.5") => "Leopard",
-            f_n if f_n.starts_with("10.4") => "Tiger",
-            f_n if f_n.starts_with("10.3") => "Panther",
-            f_n if f_n.starts_with("10.2") => "Jaguar",
-            f_n if f_n.starts_with("10.1") => "Puma",
-            f_n if f_n.starts_with("10.0") => "Cheetah",
-            _ => "",
-        };
-
-        #[cfg(target_os = "macos")]
-        let long_name = Some(format!(
-            "MacOS {} {}",
-            Self::os_version().unwrap_or_default(),
-            friendly_name
-        ));
+            Some(format!("macOS {os_version}"))
+        }
 
         #[cfg(target_os = "ios")]
-        let long_name = Some(format!("iOS {}", Self::os_version().unwrap_or_default()));
-
-        long_name
+        {
+            let mut long_name = "iOS".to_owned();
+            if let Some(os_version) = Self::os_version() {
+                long_name.push(' ');
+                long_name.push_str(&os_version);
+            }
+            Some(long_name)
+        }
     }
 
     pub(crate) fn host_name() -> Option<String> {
@@ -477,6 +497,14 @@ impl SystemInner {
         std::env::consts::OS.to_owned()
     }
 
+    pub(crate) fn distribution_id_like() -> Vec<String> {
+        Vec::new()
+    }
+
+    pub(crate) fn kernel_name() -> Option<&'static str> {
+        Some("Darwin")
+    }
+
     pub(crate) fn cpu_arch() -> Option<String> {
         let mut arch_str: [u8; 32] = [0; 32];
         let mut mib = [libc::CTL_HW as _, libc::HW_MACHINE as _];
@@ -497,6 +525,10 @@ impl SystemInner {
                 None
             }
         }
+    }
+
+    pub(crate) fn physical_core_count() -> Option<usize> {
+        physical_core_count()
     }
 }
 

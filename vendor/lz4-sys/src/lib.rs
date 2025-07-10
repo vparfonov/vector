@@ -5,7 +5,19 @@ extern crate libc;
     target_arch = "wasm32",
     not(any(target_env = "wasi", target_os = "wasi"))
 )))]
-use libc::{c_void, c_char, c_uint, size_t, c_int};
+pub use libc::{c_char, c_int, c_uint, c_ulonglong, c_void, size_t};
+
+#[cfg(all(
+    target_arch = "wasm32",
+    not(any(target_env = "wasi", target_os = "wasi"))
+))]
+extern crate alloc;
+
+#[cfg(all(
+    target_arch = "wasm32",
+    not(any(target_env = "wasi", target_os = "wasi"))
+))]
+mod wasm_shim;
 
 #[cfg(all(
     target_arch = "wasm32",
@@ -17,14 +29,14 @@ extern crate std;
     target_arch = "wasm32",
     not(any(target_env = "wasi", target_os = "wasi"))
 ))]
-use std::os::raw::{c_void, c_char, c_uint, c_int};
+pub use std::os::raw::{c_char, c_int, c_uint, c_ulonglong, c_void};
 
 #[cfg(all(
     target_arch = "wasm32",
     not(any(target_env = "wasi", target_os = "wasi"))
 ))]
 #[allow(non_camel_case_types)]
-type size_t = usize;
+pub type size_t = usize;
 
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
@@ -74,13 +86,31 @@ pub enum ContentChecksum {
     ChecksumEnabled,
 }
 
+#[derive(Clone, Debug)]
+#[repr(u32)]
+pub enum FrameType {
+    Frame = 0,
+    SkippableFrame,
+}
+
+
+#[derive(Clone, Debug)]
+#[repr(u32)]
+pub enum BlockChecksum {
+    NoBlockChecksum = 0,
+    BlockChecksumEnabled,
+}
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct LZ4FFrameInfo {
     pub block_size_id: BlockSize,
     pub block_mode: BlockMode,
     pub content_checksum_flag: ContentChecksum,
-    pub reserved: [c_uint; 5],
+    pub frame_type: FrameType,
+    pub content_size: c_ulonglong,
+    pub dict_id: c_uint,
+    pub block_checksum_flag: BlockChecksum,
 }
 
 #[derive(Debug)]
@@ -369,6 +399,14 @@ extern "C" {
     // int LZ4_freeStream(LZ4_stream_t* LZ4_streamPtr)
     pub fn LZ4_freeStream(LZ4_stream: *mut LZ4StreamEncode) -> c_int;
 
+    // int LZ4_setStreamDecode (LZ4_streamDecode_t* LZ4_streamDecode,
+    //                          const char* dictionary,
+    //                          int dictSize)
+    pub fn LZ4_setStreamDecode(LZ4_stream: *mut LZ4StreamDecode,
+                               dictionary: *const u8,
+                               dict_size: c_int)
+                               -> c_int;
+
     // LZ4_streamDecode_t* LZ4_createStreamDecode(void)
     pub fn LZ4_createStreamDecode() -> *mut LZ4StreamDecode;
 
@@ -399,4 +437,9 @@ extern "C" {
 #[test]
 fn test_version_number() {
     unsafe { LZ4_versionNumber(); }
+}
+
+#[test]
+fn test_frame_info_size() {
+    assert_eq!(core::mem::size_of::<LZ4FFrameInfo>(), 32);
 }

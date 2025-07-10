@@ -21,9 +21,7 @@ use serde::Deserialize;
 use serde_json::de;
 
 use crate::raw::*;
-use crate::Error;
-use crate::ErrorKind;
-use crate::Result;
+use crate::*;
 
 #[derive(Deserialize, Default, Debug)]
 #[serde(default)]
@@ -45,9 +43,9 @@ struct IpfsError {
 /// > (if no error, check the daemon logs).
 ///
 /// ref: https://docs.ipfs.tech/reference/kubo/rpc/#http-status-codes
-pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
+pub(super) fn parse_error(resp: Response<Buffer>) -> Error {
     let (parts, body) = resp.into_parts();
-    let bs = body.bytes().await?;
+    let bs = body.to_bytes();
 
     let ipfs_error = de::from_slice::<IpfsError>(&bs).ok();
 
@@ -73,7 +71,7 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
         None => String::from_utf8_lossy(&bs).into_owned(),
     };
 
-    let mut err = Error::new(kind, &message);
+    let mut err = Error::new(kind, message);
 
     err = with_error_response_context(err, parts);
 
@@ -81,5 +79,5 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
         err = err.set_temporary();
     }
 
-    Ok(err)
+    err
 }

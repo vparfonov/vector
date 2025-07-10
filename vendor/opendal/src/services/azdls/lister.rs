@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
 use serde::Deserialize;
 use serde_json::de;
 
@@ -39,7 +39,6 @@ impl AzdlsLister {
     }
 }
 
-#[async_trait]
 impl oio::PageList for AzdlsLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let resp = self
@@ -49,13 +48,18 @@ impl oio::PageList for AzdlsLister {
 
         // azdls will return not found for not-exist path.
         if resp.status() == http::StatusCode::NOT_FOUND {
-            resp.into_body().consume().await?;
             ctx.done = true;
             return Ok(());
         }
 
         if resp.status() != http::StatusCode::OK {
-            return Err(parse_error(resp).await?);
+            return Err(parse_error(resp));
+        }
+
+        // Return self at the first page.
+        if ctx.token.is_empty() && !ctx.done {
+            let e = oio::Entry::new(&self.path, Metadata::new(EntryMode::DIR));
+            ctx.entries.push_back(e);
         }
 
         // Check whether this list is done.
@@ -70,9 +74,9 @@ impl oio::PageList for AzdlsLister {
             ctx.done = true;
         }
 
-        let bs = resp.into_body().bytes().await?;
+        let bs = resp.into_body();
 
-        let output: Output = de::from_slice(&bs).map_err(new_json_deserialize_error)?;
+        let output: Output = de::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
 
         for object in output.paths {
             // Azdls will return `"true"` and `"false"` for is_directory.
@@ -92,7 +96,7 @@ impl oio::PageList for AzdlsLister {
                 .with_last_modified(parse_datetime_from_rfc2822(&object.last_modified)?);
 
             let mut path = build_rel_path(&self.core.root, &object.name);
-            if mode == EntryMode::DIR {
+            if mode.is_dir() {
                 path += "/"
             };
 

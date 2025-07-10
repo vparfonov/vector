@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "maxminddb"
-version = "0.25.0"
+version = "0.26.0"
 authors = ["Gregory J. Oschwald <oschwald@gmail.com>"]
 build = false
 include = [
@@ -45,6 +45,12 @@ categories = [
 license = "ISC"
 repository = "https://github.com/oschwald/maxminddb-rust"
 
+[features]
+default = []
+mmap = ["memmap2"]
+simdutf8 = ["dep:simdutf8"]
+unsafe-str-decode = []
+
 [lib]
 name = "maxminddb"
 path = "src/maxminddb/lib.rs"
@@ -75,6 +81,9 @@ features = ["derive"]
 version = "0.1.5"
 optional = true
 
+[dependencies.thiserror]
+version = "2.0"
+
 [dev-dependencies.criterion]
 version = "0.5"
 
@@ -82,16 +91,10 @@ version = "0.5"
 version = "0.11"
 
 [dev-dependencies.fake]
-version = "3.0"
+version = "4.0"
 
 [dev-dependencies.rayon]
 version = "1.5"
 
 [dev-dependencies.serde_json]
 version = "1.0"
-
-[features]
-default = []
-mmap = ["memmap2"]
-simdutf8 = ["dep:simdutf8"]
-unsafe-str-decode = []

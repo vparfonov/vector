@@ -83,7 +83,7 @@ struct Inliner<'a> {
     new_action_fn_defns: &'a mut Vec<ActionFnDefn>,
 }
 
-impl Inliner<'_> {
+impl<'a> Inliner<'a> {
     fn inline(&mut self, into_symbols: &[Symbol]) {
         if into_symbols.is_empty() {
             // create an action fn for the result of inlining

@@ -15,59 +15,37 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::fmt::Formatter;
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use http::Response;
 use http::StatusCode;
 use log::debug;
-use serde::Deserialize;
 use tokio::sync::RwLock;
 
 use super::core::parse_dir_detail;
 use super::core::parse_file_detail;
 use super::core::SeafileCore;
+use super::core::SeafileSigner;
+use super::delete::SeafileDeleter;
 use super::error::parse_error;
 use super::lister::SeafileLister;
 use super::writer::SeafileWriter;
 use super::writer::SeafileWriters;
 use crate::raw::*;
-use crate::services::seafile::core::SeafileSigner;
+use crate::services::SeafileConfig;
 use crate::*;
 
-/// Config for backblaze seafile services support.
-#[derive(Default, Deserialize)]
-#[serde(default)]
-#[non_exhaustive]
-pub struct SeafileConfig {
-    /// root of this backend.
-    ///
-    /// All operations will happen under this root.
-    pub root: Option<String>,
-    /// endpoint address of this backend.
-    pub endpoint: Option<String>,
-    /// username of this backend.
-    pub username: Option<String>,
-    /// password of this backend.
-    pub password: Option<String>,
-    /// repo_name of this backend.
-    ///
-    /// required.
-    pub repo_name: String,
-}
+impl Configurator for SeafileConfig {
+    type Builder = SeafileBuilder;
 
-impl Debug for SeafileConfig {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut d = f.debug_struct("SeafileConfig");
-
-        d.field("root", &self.root)
-            .field("endpoint", &self.endpoint)
-            .field("username", &self.username)
-            .field("repo_name", &self.repo_name);
-
-        d.finish_non_exhaustive()
+    #[allow(deprecated)]
+    fn into_builder(self) -> Self::Builder {
+        SeafileBuilder {
+            config: self,
+            http_client: None,
+        }
     }
 }
 
@@ -77,6 +55,7 @@ impl Debug for SeafileConfig {
 pub struct SeafileBuilder {
     config: SeafileConfig,
 
+    #[deprecated(since = "0.53.0", note = "Use `Operator::update_http_client` instead")]
     http_client: Option<HttpClient>,
 }
 
@@ -93,7 +72,7 @@ impl SeafileBuilder {
     /// Set root of this backend.
     ///
     /// All operations will happen under this root.
-    pub fn root(&mut self, root: &str) -> &mut Self {
+    pub fn root(mut self, root: &str) -> Self {
         self.config.root = if root.is_empty() {
             None
         } else {
@@ -106,7 +85,7 @@ impl SeafileBuilder {
     /// endpoint of this backend.
     ///
     /// It is required. e.g. `http://127.0.0.1:80`
-    pub fn endpoint(&mut self, endpoint: &str) -> &mut Self {
+    pub fn endpoint(mut self, endpoint: &str) -> Self {
         self.config.endpoint = if endpoint.is_empty() {
             None
         } else {
@@ -119,7 +98,7 @@ impl SeafileBuilder {
     /// username of this backend.
     ///
     /// It is required. e.g. `me@example.com`
-    pub fn username(&mut self, username: &str) -> &mut Self {
+    pub fn username(mut self, username: &str) -> Self {
         self.config.username = if username.is_empty() {
             None
         } else {
@@ -132,7 +111,7 @@ impl SeafileBuilder {
     /// password of this backend.
     ///
     /// It is required. e.g. `asecret`
-    pub fn password(&mut self, password: &str) -> &mut Self {
+    pub fn password(mut self, password: &str) -> Self {
         self.config.password = if password.is_empty() {
             None
         } else {
@@ -145,7 +124,7 @@ impl SeafileBuilder {
     /// Set repo name of this backend.
     ///
     /// It is required. e.g. `myrepo`
-    pub fn repo_name(&mut self, repo_name: &str) -> &mut Self {
+    pub fn repo_name(mut self, repo_name: &str) -> Self {
         self.config.repo_name = repo_name.to_string();
 
         self
@@ -157,7 +136,9 @@ impl SeafileBuilder {
     ///
     /// This API is part of OpenDAL's Raw API. `HttpClient` could be changed
     /// during minor updates.
-    pub fn http_client(&mut self, client: HttpClient) -> &mut Self {
+    #[deprecated(since = "0.53.0", note = "Use `Operator::update_http_client` instead")]
+    #[allow(deprecated)]
+    pub fn http_client(mut self, client: HttpClient) -> Self {
         self.http_client = Some(client);
         self
     }
@@ -165,31 +146,10 @@ impl SeafileBuilder {
 
 impl Builder for SeafileBuilder {
     const SCHEME: Scheme = Scheme::Seafile;
-    type Accessor = SeafileBackend;
-
-    /// Converts a HashMap into an SeafileBuilder instance.
-    ///
-    /// # Arguments
-    ///
-    /// * `map` - A HashMap containing the configuration values.
-    ///
-    /// # Returns
-    ///
-    /// Returns an instance of SeafileBuilder.
-    fn from_map(map: HashMap<String, String>) -> Self {
-        // Deserialize the configuration from the HashMap.
-        let config = SeafileConfig::deserialize(ConfigDeserializer::new(map))
-            .expect("config deserialize must succeed");
-
-        // Create an SeafileBuilder instance with the deserialized config.
-        SeafileBuilder {
-            config,
-            http_client: None,
-        }
-    }
+    type Config = SeafileConfig;
 
     /// Builds the backend and returns the result of SeafileBackend.
-    fn build(&mut self) -> Result<Self::Accessor> {
+    fn build(self) -> Result<impl Access> {
         debug!("backend build started: {:?}", &self);
 
         let root = normalize_root(&self.config.root.clone().unwrap_or_default());
@@ -225,24 +185,47 @@ impl Builder for SeafileBuilder {
                 .with_context("service", Scheme::Seafile)),
         }?;
 
-        let client = if let Some(client) = self.http_client.take() {
-            client
-        } else {
-            HttpClient::new().map_err(|err| {
-                err.with_operation("Builder::build")
-                    .with_context("service", Scheme::Seafile)
-            })?
-        };
-
         Ok(SeafileBackend {
             core: Arc::new(SeafileCore {
+                info: {
+                    let am = AccessorInfo::default();
+                    am.set_scheme(Scheme::Seafile)
+                        .set_root(&root)
+                        .set_native_capability(Capability {
+                            stat: true,
+                            stat_has_content_length: true,
+                            stat_has_last_modified: true,
+
+                            read: true,
+
+                            write: true,
+                            write_can_empty: true,
+
+                            delete: true,
+
+                            list: true,
+                            list_has_content_length: true,
+                            list_has_last_modified: true,
+
+                            shared: true,
+
+                            ..Default::default()
+                        });
+
+                    // allow deprecated api here for compatibility
+                    #[allow(deprecated)]
+                    if let Some(client) = self.http_client {
+                        am.update_http_client(|_| client);
+                    }
+
+                    am.into()
+                },
                 root,
                 endpoint,
                 username,
                 password,
                 repo_name: self.config.repo_name.clone(),
                 signer: Arc::new(RwLock::new(SeafileSigner::default())),
-                client,
             }),
         })
     }
@@ -254,36 +237,18 @@ pub struct SeafileBackend {
     core: Arc<SeafileCore>,
 }
 
-#[async_trait]
-impl Accessor for SeafileBackend {
-    type Reader = IncomingAsyncBody;
+impl Access for SeafileBackend {
+    type Reader = HttpBody;
     type Writer = SeafileWriters;
     type Lister = oio::PageLister<SeafileLister>;
+    type Deleter = oio::OneShotDeleter<SeafileDeleter>;
     type BlockingReader = ();
     type BlockingWriter = ();
     type BlockingLister = ();
+    type BlockingDeleter = ();
 
-    fn info(&self) -> AccessorInfo {
-        let mut am = AccessorInfo::default();
-        am.set_scheme(Scheme::Seafile)
-            .set_root(&self.core.root)
-            .set_native_capability(Capability {
-                stat: true,
-
-                read: true,
-                read_can_next: true,
-
-                write: true,
-                write_can_empty: true,
-
-                delete: true,
-
-                list: true,
-
-                ..Default::default()
-            });
-
-        am
+    fn info(&self) -> Arc<AccessorInfo> {
+        self.core.info.clone()
     }
 
     async fn stat(&self, path: &str, _args: OpStat) -> Result<RpStat> {
@@ -303,21 +268,20 @@ impl Accessor for SeafileBackend {
         metadata.map(RpStat::new)
     }
 
-    async fn read(&self, path: &str, _args: OpRead) -> Result<(RpRead, Self::Reader)> {
-        let resp = self.core.download_file(path).await?;
+    async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
+        let resp = self.core.download_file(path, args.range()).await?;
 
         let status = resp.status();
 
         match status {
-            StatusCode::OK => {
-                let size = parse_content_length(resp.headers())?;
-                let range = parse_content_range(resp.headers())?;
-                Ok((
-                    RpRead::new().with_size(size).with_range(range),
-                    resp.into_body(),
-                ))
+            StatusCode::OK | StatusCode::PARTIAL_CONTENT => {
+                Ok((RpRead::default(), resp.into_body()))
             }
-            _ => Err(parse_error(resp).await?),
+            _ => {
+                let (part, mut body) = resp.into_parts();
+                let buf = body.to_buffer().await?;
+                Err(parse_error(Response::from_parts(part, buf)))
+            }
         }
     }
 
@@ -328,10 +292,11 @@ impl Accessor for SeafileBackend {
         Ok((RpWrite::default(), w))
     }
 
-    async fn delete(&self, path: &str, _args: OpDelete) -> Result<RpDelete> {
-        let _ = self.core.delete(path).await?;
-
-        Ok(RpDelete::default())
+    async fn delete(&self) -> Result<(RpDelete, Self::Deleter)> {
+        Ok((
+            RpDelete::default(),
+            oio::OneShotDeleter::new(SeafileDeleter::new(self.core.clone())),
+        ))
     }
 
     async fn list(&self, path: &str, _args: OpList) -> Result<(RpList, Self::Lister)> {

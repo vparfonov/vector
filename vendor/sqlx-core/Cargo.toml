@@ -12,7 +12,7 @@
 [package]
 edition = "2021"
 name = "sqlx-core"
-version = "0.8.5"
+version = "0.8.6"
 authors = [
     "Ryan Leckey <leckey.ryan@gmail.com>",
     "Austin Bonander <austin.bonander@gmail.com>",
@@ -223,7 +223,7 @@ version = "0.26"
 optional = true
 
 [dev-dependencies.sqlx]
-version = "=0.8.5"
+version = "=0.8.6"
 features = [
     "postgres",
     "sqlite",

@@ -498,7 +498,7 @@ impl<T> Options<T>
 where
     T: Message + Clone,
 {
-    fn from_prost(options: T) -> Self {
+    pub(crate) fn from_prost(options: T) -> Self {
         Options {
             encoded: options.encode_to_vec(),
             value: options,
@@ -545,7 +545,7 @@ where
             src: &'a mut B,
         }
 
-        impl<'a, B> Buf for CopyBufAdapter<'a, B>
+        impl<B> Buf for CopyBufAdapter<'_, B>
         where
             B: Buf,
         {

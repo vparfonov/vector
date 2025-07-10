@@ -1,11 +1,12 @@
 //! This module implements and describes common TTY methods & traits
 
-use unicode_width::UnicodeWidthStr;
+/// Unsupported Terminals that don't support RAW mode
+const UNSUPPORTED_TERM: [&str; 3] = ["dumb", "cons25", "emacs"];
 
-use crate::config::{Behavior, BellStyle, ColorMode, Config};
+use crate::config::Config;
 use crate::highlight::Highlighter;
 use crate::keys::KeyEvent;
-use crate::layout::{Layout, Position};
+use crate::layout::{GraphemeClusterMode, Layout, Position, Unit};
 use crate::line_buffer::LineBuffer;
 use crate::{Cmd, Result};
 
@@ -19,6 +20,8 @@ pub trait RawMode: Sized {
 pub enum Event {
     KeyPress(KeyEvent),
     ExternalPrint(String),
+    #[cfg(target_os = "macos")]
+    Timeout(bool),
 }
 
 /// Translate bytes read from stdin to keys.
@@ -80,6 +83,7 @@ pub trait Renderer {
         }
 
         let new_layout = Layout {
+            grapheme_cluster_mode: self.grapheme_cluster_mode(),
             prompt_size,
             default_prompt,
             cursor,
@@ -108,18 +112,28 @@ pub trait Renderer {
     /// Update the number of columns/rows in the current terminal.
     fn update_size(&mut self);
     /// Get the number of columns in the current terminal.
-    fn get_columns(&self) -> usize;
+    fn get_columns(&self) -> Unit;
     /// Get the number of rows in the current terminal.
-    fn get_rows(&self) -> usize;
+    fn get_rows(&self) -> Unit;
     /// Check if output supports colors.
     fn colors_enabled(&self) -> bool;
+    /// Tell how grapheme clusters are rendered.
+    fn grapheme_cluster_mode(&self) -> GraphemeClusterMode;
 
     /// Make sure prompt is at the leftmost edge of the screen
     fn move_cursor_at_leftmost(&mut self, rdr: &mut Self::Reader) -> Result<()>;
+    /// Begin synchronized update on unix platform
+    fn begin_synchronized_update(&mut self) -> Result<()> {
+        Ok(())
+    }
+    /// End synchronized update on unix platform
+    fn end_synchronized_update(&mut self) -> Result<()> {
+        Ok(())
+    }
 }
 
 // ignore ANSI escape sequence
-fn width(s: &str, esc_seq: &mut u8) -> usize {
+fn width(gcm: GraphemeClusterMode, s: &str, esc_seq: &mut u8) -> Unit {
     if *esc_seq == 1 {
         if s == "[" {
             // CSI
@@ -145,7 +159,7 @@ fn width(s: &str, esc_seq: &mut u8) -> usize {
     } else if s == "\n" {
         0
     } else {
-        s.width()
+        gcm.width(s)
     }
 }
 
@@ -165,14 +179,7 @@ pub trait Term {
     type ExternalPrinter: ExternalPrinter;
     type CursorGuard;
 
-    fn new(
-        color_mode: ColorMode,
-        behavior: Behavior,
-        tab_stop: usize,
-        bell_style: BellStyle,
-        enable_bracketed_paste: bool,
-        enable_signals: bool,
-    ) -> Result<Self>
+    fn new(config: Config) -> Result<Self>
     where
         Self: Sized;
     /// Check if current terminal can provide a rich line-editing user
@@ -200,6 +207,22 @@ pub trait Term {
     fn set_cursor_visibility(&mut self, visible: bool) -> Result<Option<Self::CursorGuard>>;
 }
 
+/// Check TERM environment variable to see if current term is in our
+/// unsupported list
+fn is_unsupported_term() -> bool {
+    match std::env::var("TERM") {
+        Ok(term) => {
+            for iter in &UNSUPPORTED_TERM {
+                if (*iter).eq_ignore_ascii_case(&term) {
+                    return true;
+                }
+            }
+            false
+        }
+        Err(_) => false,
+    }
+}
+
 // If on Windows platform import Windows TTY module
 // and re-export into mod.rs scope
 #[cfg(all(windows, not(target_arch = "wasm32")))]
@@ -218,3 +241,15 @@ pub use self::unix::*;
 mod test;
 #[cfg(any(test, target_arch = "wasm32"))]
 pub use self::test::*;
+
+#[cfg(test)]
+mod test_ {
+    #[test]
+    fn test_unsupported_term() {
+        std::env::set_var("TERM", "xterm");
+        assert!(!super::is_unsupported_term());
+
+        std::env::set_var("TERM", "dumb");
+        assert!(super::is_unsupported_term());
+    }
+}

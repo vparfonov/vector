@@ -19,7 +19,7 @@
 //! So we can't write the following code:
 //!
 //! ```txt
-//! impl Accessor for S3Backend {
+//! impl Access for S3Backend {
 //!     type Writer = impl oio::Write;
 //! }
 //! ```
@@ -27,7 +27,7 @@
 //! Which means we have to write the type directly like:
 //!
 //! ```txt
-//! impl Accessor for OssBackend {
+//! impl Access for OssBackend {
 //!     type Writer = raw::TwoWays<
 //!         oio::MultipartWriter<OssWriter>,
 //!         oio::AppendWriter<OssWriter>,
@@ -37,12 +37,6 @@
 //!
 //! This module is used to provide some enums for the above code. We should remove this module once
 //! type_alias_impl_trait has been stabilized.
-
-use std::io::SeekFrom;
-use std::task::Context;
-use std::task::Poll;
-
-use bytes::Bytes;
 
 use crate::raw::*;
 use crate::*;
@@ -58,70 +52,51 @@ pub enum TwoWays<ONE, TWO> {
 }
 
 impl<ONE: oio::Read, TWO: oio::Read> oio::Read for TwoWays<ONE, TWO> {
-    fn poll_read(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<usize>> {
+    async fn read(&mut self) -> Result<Buffer> {
         match self {
-            Self::One(v) => v.poll_read(cx, buf),
-            Self::Two(v) => v.poll_read(cx, buf),
-        }
-    }
-
-    fn poll_seek(&mut self, cx: &mut Context<'_>, pos: SeekFrom) -> Poll<Result<u64>> {
-        match self {
-            Self::One(v) => v.poll_seek(cx, pos),
-            Self::Two(v) => v.poll_seek(cx, pos),
-        }
-    }
-
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Bytes>>> {
-        match self {
-            Self::One(v) => v.poll_next(cx),
-            Self::Two(v) => v.poll_next(cx),
+            TwoWays::One(v) => v.read().await,
+            TwoWays::Two(v) => v.read().await,
         }
     }
 }
 
 impl<ONE: oio::BlockingRead, TWO: oio::BlockingRead> oio::BlockingRead for TwoWays<ONE, TWO> {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+    fn read(&mut self) -> Result<Buffer> {
         match self {
-            Self::One(v) => v.read(buf),
-            Self::Two(v) => v.read(buf),
-        }
-    }
-
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
-        match self {
-            Self::One(v) => v.seek(pos),
-            Self::Two(v) => v.seek(pos),
-        }
-    }
-
-    fn next(&mut self) -> Option<Result<Bytes>> {
-        match self {
-            Self::One(v) => v.next(),
-            Self::Two(v) => v.next(),
+            Self::One(v) => v.read(),
+            Self::Two(v) => v.read(),
         }
     }
 }
 
 impl<ONE: oio::Write, TWO: oio::Write> oio::Write for TwoWays<ONE, TWO> {
-    fn poll_write(&mut self, cx: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
+    async fn write(&mut self, bs: Buffer) -> Result<()> {
         match self {
-            Self::One(v) => v.poll_write(cx, bs),
-            Self::Two(v) => v.poll_write(cx, bs),
+            Self::One(v) => v.write(bs).await,
+            Self::Two(v) => v.write(bs).await,
         }
     }
 
-    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
+    async fn close(&mut self) -> Result<Metadata> {
         match self {
-            Self::One(v) => v.poll_close(cx),
-            Self::Two(v) => v.poll_close(cx),
+            Self::One(v) => v.close().await,
+            Self::Two(v) => v.close().await,
         }
     }
 
-    fn poll_abort(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
+    async fn abort(&mut self) -> Result<()> {
         match self {
-            Self::One(v) => v.poll_abort(cx),
-            Self::Two(v) => v.poll_abort(cx),
+            Self::One(v) => v.abort().await,
+            Self::Two(v) => v.abort().await,
+        }
+    }
+}
+
+impl<ONE: oio::List, TWO: oio::List> oio::List for TwoWays<ONE, TWO> {
+    async fn next(&mut self) -> Result<Option<oio::Entry>> {
+        match self {
+            Self::One(v) => v.next().await,
+            Self::Two(v) => v.next().await,
         }
     }
 }
@@ -139,27 +114,11 @@ pub enum ThreeWays<ONE, TWO, THREE> {
 }
 
 impl<ONE: oio::Read, TWO: oio::Read, THREE: oio::Read> oio::Read for ThreeWays<ONE, TWO, THREE> {
-    fn poll_read(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<usize>> {
+    async fn read(&mut self) -> Result<Buffer> {
         match self {
-            Self::One(v) => v.poll_read(cx, buf),
-            Self::Two(v) => v.poll_read(cx, buf),
-            Self::Three(v) => v.poll_read(cx, buf),
-        }
-    }
-
-    fn poll_seek(&mut self, cx: &mut Context<'_>, pos: SeekFrom) -> Poll<Result<u64>> {
-        match self {
-            Self::One(v) => v.poll_seek(cx, pos),
-            Self::Two(v) => v.poll_seek(cx, pos),
-            Self::Three(v) => v.poll_seek(cx, pos),
-        }
-    }
-
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Bytes>>> {
-        match self {
-            Self::One(v) => v.poll_next(cx),
-            Self::Two(v) => v.poll_next(cx),
-            Self::Three(v) => v.poll_next(cx),
+            ThreeWays::One(v) => v.read().await,
+            ThreeWays::Two(v) => v.read().await,
+            ThreeWays::Three(v) => v.read().await,
         }
     }
 }
@@ -167,27 +126,11 @@ impl<ONE: oio::Read, TWO: oio::Read, THREE: oio::Read> oio::Read for ThreeWays<O
 impl<ONE: oio::BlockingRead, TWO: oio::BlockingRead, THREE: oio::BlockingRead> oio::BlockingRead
     for ThreeWays<ONE, TWO, THREE>
 {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+    fn read(&mut self) -> Result<Buffer> {
         match self {
-            Self::One(v) => v.read(buf),
-            Self::Two(v) => v.read(buf),
-            Self::Three(v) => v.read(buf),
-        }
-    }
-
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
-        match self {
-            Self::One(v) => v.seek(pos),
-            Self::Two(v) => v.seek(pos),
-            Self::Three(v) => v.seek(pos),
-        }
-    }
-
-    fn next(&mut self) -> Option<Result<Bytes>> {
-        match self {
-            Self::One(v) => v.next(),
-            Self::Two(v) => v.next(),
-            Self::Three(v) => v.next(),
+            Self::One(v) => v.read(),
+            Self::Two(v) => v.read(),
+            Self::Three(v) => v.read(),
         }
     }
 }
@@ -195,27 +138,37 @@ impl<ONE: oio::BlockingRead, TWO: oio::BlockingRead, THREE: oio::BlockingRead> o
 impl<ONE: oio::Write, TWO: oio::Write, THREE: oio::Write> oio::Write
     for ThreeWays<ONE, TWO, THREE>
 {
-    fn poll_write(&mut self, cx: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
+    async fn write(&mut self, bs: Buffer) -> Result<()> {
         match self {
-            Self::One(v) => v.poll_write(cx, bs),
-            Self::Two(v) => v.poll_write(cx, bs),
-            Self::Three(v) => v.poll_write(cx, bs),
+            Self::One(v) => v.write(bs).await,
+            Self::Two(v) => v.write(bs).await,
+            Self::Three(v) => v.write(bs).await,
         }
     }
 
-    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
+    async fn close(&mut self) -> Result<Metadata> {
         match self {
-            Self::One(v) => v.poll_close(cx),
-            Self::Two(v) => v.poll_close(cx),
-            Self::Three(v) => v.poll_close(cx),
+            Self::One(v) => v.close().await,
+            Self::Two(v) => v.close().await,
+            Self::Three(v) => v.close().await,
         }
     }
 
-    fn poll_abort(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
+    async fn abort(&mut self) -> Result<()> {
         match self {
-            Self::One(v) => v.poll_abort(cx),
-            Self::Two(v) => v.poll_abort(cx),
-            Self::Three(v) => v.poll_abort(cx),
+            Self::One(v) => v.abort().await,
+            Self::Two(v) => v.abort().await,
+            Self::Three(v) => v.abort().await,
+        }
+    }
+}
+
+impl<ONE: oio::List, TWO: oio::List, THREE: oio::List> oio::List for ThreeWays<ONE, TWO, THREE> {
+    async fn next(&mut self) -> Result<Option<oio::Entry>> {
+        match self {
+            Self::One(v) => v.next().await,
+            Self::Two(v) => v.next().await,
+            Self::Three(v) => v.next().await,
         }
     }
 }
@@ -241,30 +194,12 @@ where
     THREE: oio::Read,
     FOUR: oio::Read,
 {
-    fn poll_read(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<usize>> {
+    async fn read(&mut self) -> Result<Buffer> {
         match self {
-            Self::One(v) => v.poll_read(cx, buf),
-            Self::Two(v) => v.poll_read(cx, buf),
-            Self::Three(v) => v.poll_read(cx, buf),
-            Self::Four(v) => v.poll_read(cx, buf),
-        }
-    }
-
-    fn poll_seek(&mut self, cx: &mut Context<'_>, pos: SeekFrom) -> Poll<Result<u64>> {
-        match self {
-            Self::One(v) => v.poll_seek(cx, pos),
-            Self::Two(v) => v.poll_seek(cx, pos),
-            Self::Three(v) => v.poll_seek(cx, pos),
-            Self::Four(v) => v.poll_seek(cx, pos),
-        }
-    }
-
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Bytes>>> {
-        match self {
-            Self::One(v) => v.poll_next(cx),
-            Self::Two(v) => v.poll_next(cx),
-            Self::Three(v) => v.poll_next(cx),
-            Self::Four(v) => v.poll_next(cx),
+            FourWays::One(v) => v.read().await,
+            FourWays::Two(v) => v.read().await,
+            FourWays::Three(v) => v.read().await,
+            FourWays::Four(v) => v.read().await,
         }
     }
 }
@@ -276,30 +211,12 @@ where
     THREE: oio::BlockingRead,
     FOUR: oio::BlockingRead,
 {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
+    fn read(&mut self) -> Result<Buffer> {
         match self {
-            Self::One(v) => v.read(buf),
-            Self::Two(v) => v.read(buf),
-            Self::Three(v) => v.read(buf),
-            Self::Four(v) => v.read(buf),
-        }
-    }
-
-    fn seek(&mut self, pos: SeekFrom) -> Result<u64> {
-        match self {
-            Self::One(v) => v.seek(pos),
-            Self::Two(v) => v.seek(pos),
-            Self::Three(v) => v.seek(pos),
-            Self::Four(v) => v.seek(pos),
-        }
-    }
-
-    fn next(&mut self) -> Option<Result<Bytes>> {
-        match self {
-            Self::One(v) => v.next(),
-            Self::Two(v) => v.next(),
-            Self::Three(v) => v.next(),
-            Self::Four(v) => v.next(),
+            Self::One(v) => v.read(),
+            Self::Two(v) => v.read(),
+            Self::Three(v) => v.read(),
+            Self::Four(v) => v.read(),
         }
     }
 }
@@ -311,12 +228,12 @@ where
     THREE: oio::List,
     FOUR: oio::List,
 {
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Result<Option<oio::Entry>>> {
+    async fn next(&mut self) -> Result<Option<oio::Entry>> {
         match self {
-            Self::One(v) => v.poll_next(cx),
-            Self::Two(v) => v.poll_next(cx),
-            Self::Three(v) => v.poll_next(cx),
-            Self::Four(v) => v.poll_next(cx),
+            Self::One(v) => v.next().await,
+            Self::Two(v) => v.next().await,
+            Self::Three(v) => v.next().await,
+            Self::Four(v) => v.next().await,
         }
     }
 }

@@ -17,7 +17,7 @@
 
 use std::sync::Arc;
 
-use async_trait::async_trait;
+use bytes::Buf;
 
 use super::core::KoofrCore;
 use super::core::ListResponse;
@@ -43,7 +43,6 @@ impl KoofrLister {
     }
 }
 
-#[async_trait]
 impl oio::PageList for KoofrLister {
     async fn next_page(&self, ctx: &mut oio::PageContext) -> Result<()> {
         let resp = self.core.list(&self.path).await?;
@@ -56,14 +55,14 @@ impl oio::PageList for KoofrLister {
         match resp.status() {
             http::StatusCode::OK => {}
             _ => {
-                return Err(parse_error(resp).await?);
+                return Err(parse_error(resp));
             }
         }
 
-        let bs = resp.into_body().bytes().await?;
+        let bs = resp.into_body();
 
         let response: ListResponse =
-            serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+            serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
 
         for file in response.files {
             let path = build_abs_path(&normalize_root(&self.path), &file.name);

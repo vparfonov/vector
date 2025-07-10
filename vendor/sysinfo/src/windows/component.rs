@@ -6,7 +6,7 @@ use windows::core::{w, VARIANT};
 use windows::Win32::Foundation::{SysAllocString, SysFreeString};
 use windows::Win32::Security::PSECURITY_DESCRIPTOR;
 use windows::Win32::System::Com::{
-    CoCreateInstance, CoInitializeEx, CoInitializeSecurity, CoSetProxyBlanket, CoUninitialize,
+    CoCreateInstance, CoInitializeEx, CoInitializeSecurity, CoSetProxyBlanket,
     CLSCTX_INPROC_SERVER, EOAC_NONE, RPC_C_AUTHN_LEVEL_CALL, RPC_C_AUTHN_LEVEL_DEFAULT,
     RPC_C_IMP_LEVEL_IMPERSONATE,
 };
@@ -17,19 +17,22 @@ use windows::Win32::System::Wmi::{
     WBEM_FLAG_NONSYSTEM_ONLY, WBEM_FLAG_RETURN_IMMEDIATELY, WBEM_INFINITE,
 };
 
+use std::cell::OnceCell;
+use std::sync::OnceLock;
+
 pub(crate) struct ComponentInner {
     temperature: f32,
     max: f32,
     critical: Option<f32>,
     label: String,
     connection: Option<Connection>,
+    pub(crate) updated: bool,
 }
 
 impl ComponentInner {
     /// Creates a new `ComponentInner` with the given information.
     fn new() -> Option<Self> {
         let mut c = Connection::new()
-            .and_then(|x| x.initialize_security())
             .and_then(|x| x.create_instance())
             .and_then(|x| x.connect_server())
             .and_then(|x| x.set_proxy_blanket())
@@ -42,15 +45,16 @@ impl ComponentInner {
                 max: temperature,
                 critical,
                 connection: Some(c),
+                updated: true,
             })
     }
 
-    pub(crate) fn temperature(&self) -> f32 {
-        self.temperature
+    pub(crate) fn temperature(&self) -> Option<f32> {
+        Some(self.temperature)
     }
 
-    pub(crate) fn max(&self) -> f32 {
-        self.max
+    pub(crate) fn max(&self) -> Option<f32> {
+        Some(self.max)
     }
 
     pub(crate) fn critical(&self) -> Option<f32> {
@@ -64,7 +68,6 @@ impl ComponentInner {
     pub(crate) fn refresh(&mut self) {
         if self.connection.is_none() {
             self.connection = Connection::new()
-                .and_then(|x| x.initialize_security())
                 .and_then(|x| x.create_instance())
                 .and_then(|x| x.connect_server())
                 .and_then(|x| x.set_proxy_blanket());
@@ -86,7 +89,7 @@ impl ComponentInner {
 }
 
 pub(crate) struct ComponentsInner {
-    components: Vec<Component>,
+    pub(crate) components: Vec<Component>,
 }
 
 impl ComponentsInner {
@@ -112,11 +115,19 @@ impl ComponentsInner {
         &mut self.components
     }
 
-    pub(crate) fn refresh_list(&mut self) {
-        self.components = match ComponentInner::new() {
-            Some(c) => vec![Component { inner: c }],
-            None => Vec::new(),
-        };
+    pub(crate) fn refresh(&mut self) {
+        if self.components.is_empty() {
+            self.components = match ComponentInner::new() {
+                Some(c) => vec![Component { inner: c }],
+                None => Vec::new(),
+            };
+        } else {
+            // There should always be only one here but just in case...
+            for c in self.components.iter_mut() {
+                c.refresh();
+                c.inner.updated = true;
+            }
+        }
     }
 }
 
@@ -130,40 +141,64 @@ struct Connection {
     instance: Option<IWbemLocator>,
     server_connection: Option<IWbemServices>,
     enumerator: Option<IEnumWbemClassObject>,
-    initialized: bool,
 }
 
 #[allow(clippy::non_send_fields_in_send_ty)]
 unsafe impl Send for Connection {}
 unsafe impl Sync for Connection {}
 
+static SECURITY: OnceLock<Result<(), ()>> = OnceLock::new();
+thread_local! {
+    pub static CONNECTION: OnceCell<Result<(), ()>> = const { OnceCell::new() };
+}
+
+unsafe fn initialize_connection() -> Result<(), ()> {
+    if CoInitializeEx(None, Default::default()).is_err() {
+        sysinfo_debug!("Failed to initialize connection");
+        Err(())
+    } else {
+        Ok(())
+    }
+}
+
+unsafe fn initialize_security() -> Result<(), ()> {
+    if CoInitializeSecurity(
+        PSECURITY_DESCRIPTOR::default(),
+        -1,
+        None,
+        None,
+        RPC_C_AUTHN_LEVEL_DEFAULT,
+        RPC_C_IMP_LEVEL_IMPERSONATE,
+        None,
+        EOAC_NONE,
+        None,
+    )
+    .is_err()
+    {
+        sysinfo_debug!("Failed to initialize security");
+        Err(())
+    } else {
+        Ok(())
+    }
+}
+
 impl Connection {
     #[allow(clippy::unnecessary_wraps)]
     fn new() -> Option<Connection> {
-        let val = unsafe { CoInitializeEx(None, Default::default()) };
+        if CONNECTION
+            .with(|x| *x.get_or_init(|| unsafe { initialize_connection() }))
+            .is_err()
+            || SECURITY
+                .get_or_init(|| unsafe { initialize_security() })
+                .is_err()
+        {
+            return None;
+        }
         Some(Connection {
             instance: None,
             server_connection: None,
             enumerator: None,
-            initialized: val.is_ok(),
         })
-    }
-
-    fn initialize_security(self) -> Option<Connection> {
-        unsafe {
-            CoInitializeSecurity(
-                PSECURITY_DESCRIPTOR::default(),
-                -1,
-                None,
-                None,
-                RPC_C_AUTHN_LEVEL_DEFAULT,
-                RPC_C_IMP_LEVEL_IMPERSONATE,
-                None,
-                EOAC_NONE,
-                None,
-            )
-        }
-        .map_or(None, |_| Some(self))
     }
 
     fn create_instance(mut self) -> Option<Connection> {
@@ -302,8 +337,5 @@ impl Drop for Connection {
         self.enumerator.take();
         self.server_connection.take();
         self.instance.take();
-        if self.initialized {
-            unsafe { CoUninitialize() };
-        }
     }
 }

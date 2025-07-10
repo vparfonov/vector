@@ -1,13 +1,13 @@
 use core::sync::atomic::Ordering;
-use safe_lock::SafeLock;
 use std::io::ErrorKind;
 use std::path::Path;
+use std::sync::Mutex;
 use temp_dir::{TempDir, INTERNAL_COUNTER, INTERNAL_RETRY};
 
 // TODO: Move this file to tests/ dir.
 
 // The error tests require all tests to run single-threaded.
-static LOCK: SafeLock = SafeLock::new();
+static LOCK: Mutex<()> = Mutex::new(());
 
 fn make_non_writable(path: &Path) {
     let metadata = std::fs::metadata(path).unwrap();
@@ -74,6 +74,16 @@ fn new_error() {
             .starts_with(&format!("error creating directory {dir_path:?}: ")),
         "unexpected error {e:?}",
     );
+}
+
+#[test]
+fn already_exists() {
+    let _guard = LOCK.lock();
+    let previous_counter_value = INTERNAL_COUNTER.load(Ordering::SeqCst);
+    let temp_dir1 = TempDir::new().unwrap();
+    INTERNAL_COUNTER.store(previous_counter_value, Ordering::SeqCst);
+    let temp_dir2 = TempDir::new().unwrap();
+    assert_ne!(temp_dir1.path(), temp_dir2.path());
 }
 
 #[test]
@@ -198,7 +208,7 @@ fn test_drop() {
 #[test]
 fn drop_already_deleted() {
     let _guard = LOCK.lock();
-    let temp_dir = TempDir::new().unwrap();
+    let temp_dir = TempDir::new().unwrap().panic_on_cleanup_error();
     std::fs::remove_dir(temp_dir.path()).unwrap();
 }
 
@@ -253,6 +263,19 @@ fn leak() {
     let file1_path = temp_dir.child("file1");
     std::fs::write(&file1_path, b"abc").unwrap();
     temp_dir.leak();
+    std::fs::metadata(&dir_path).unwrap();
+    std::fs::metadata(&file1_path).unwrap();
+    std::fs::remove_dir_all(&dir_path).unwrap();
+}
+
+#[test]
+fn dont_delete_on_drop() {
+    let _guard = LOCK.lock();
+    let temp_dir = TempDir::new().unwrap().dont_delete_on_drop();
+    let dir_path = temp_dir.path().to_path_buf();
+    let file1_path = temp_dir.child("file1");
+    std::fs::write(&file1_path, b"abc").unwrap();
+    drop(temp_dir);
     std::fs::metadata(&dir_path).unwrap();
     std::fs::metadata(&file1_path).unwrap();
     std::fs::remove_dir_all(&dir_path).unwrap();

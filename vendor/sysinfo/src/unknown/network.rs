@@ -19,9 +19,7 @@ impl NetworksInner {
         &self.interfaces
     }
 
-    pub(crate) fn refresh_list(&mut self) {}
-
-    pub(crate) fn refresh(&mut self) {}
+    pub(crate) fn refresh(&mut self, _remove_not_listed_interfaces: bool) {}
 }
 
 pub(crate) struct NetworkDataInner;
@@ -81,5 +79,9 @@ impl NetworkDataInner {
 
     pub(crate) fn ip_networks(&self) -> &[IpNetwork] {
         &[]
+    }
+
+    pub(crate) fn mtu(&self) -> u64 {
+        0
     }
 }

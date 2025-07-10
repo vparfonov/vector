@@ -31,9 +31,9 @@ struct AlluxioError {
     message: String,
 }
 
-pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
+pub(super) fn parse_error(resp: Response<Buffer>) -> Error {
     let (parts, body) = resp.into_parts();
-    let bs = body.bytes().await?;
+    let bs = body.to_bytes();
 
     let mut kind = match parts.status.as_u16() {
         500 => ErrorKind::Unexpected,
@@ -48,28 +48,26 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
         kind = match alluxio_err.status_code.as_str() {
             "ALREADY_EXISTS" => ErrorKind::AlreadyExists,
             "NOT_FOUND" => ErrorKind::NotFound,
-            "INVALID_ARGUMENT" => ErrorKind::InvalidInput,
             _ => ErrorKind::Unexpected,
         }
     }
 
-    let mut err = Error::new(kind, &message);
+    let mut err = Error::new(kind, message);
 
     err = with_error_response_context(err, parts);
 
-    Ok(err)
+    err
 }
 
 #[cfg(test)]
 mod tests {
-    use futures::stream;
     use http::StatusCode;
 
     use super::*;
 
     /// Error response example is from https://docs.aws.amazon.com/AmazonS3/latest/API/ErrorResponses.html
-    #[tokio::test]
-    async fn test_parse_error() {
+    #[test]
+    fn test_parse_error() {
         let err_res = vec![
             (
                 r#"{"statusCode":"ALREADY_EXISTS","message":"The resource you requested already exist"}"#,
@@ -80,10 +78,6 @@ mod tests {
                 ErrorKind::NotFound,
             ),
             (
-                r#"{"statusCode":"INVALID_ARGUMENT","message":"The argument you provided is invalid"}"#,
-                ErrorKind::InvalidInput,
-            ),
-            (
                 r#"{"statusCode":"INTERNAL_SERVER_ERROR","message":"Internal server error"}"#,
                 ErrorKind::Unexpected,
             ),
@@ -91,19 +85,15 @@ mod tests {
 
         for res in err_res {
             let bs = bytes::Bytes::from(res.0);
-            let body = IncomingAsyncBody::new(
-                Box::new(oio::into_stream(stream::iter(vec![Ok(bs.clone())]))),
-                None,
-            );
+            let body = Buffer::from(bs);
             let resp = Response::builder()
                 .status(StatusCode::INTERNAL_SERVER_ERROR)
                 .body(body)
                 .unwrap();
 
-            let err = parse_error(resp).await;
+            let err = parse_error(resp);
 
-            assert!(err.is_ok());
-            assert_eq!(err.unwrap().kind(), res.1);
+            assert_eq!(err.kind(), res.1);
         }
     }
 }

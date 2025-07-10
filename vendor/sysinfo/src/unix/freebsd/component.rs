@@ -6,17 +6,18 @@ use crate::Component;
 pub(crate) struct ComponentInner {
     id: Vec<u8>,
     label: String,
-    temperature: f32,
+    temperature: Option<f32>,
     max: f32,
+    pub(crate) updated: bool,
 }
 
 impl ComponentInner {
-    pub(crate) fn temperature(&self) -> f32 {
+    pub(crate) fn temperature(&self) -> Option<f32> {
         self.temperature
     }
 
-    pub(crate) fn max(&self) -> f32 {
-        self.max
+    pub(crate) fn max(&self) -> Option<f32> {
+        Some(self.max)
     }
 
     pub(crate) fn critical(&self) -> Option<f32> {
@@ -29,10 +30,10 @@ impl ComponentInner {
 
     pub(crate) fn refresh(&mut self) {
         unsafe {
-            if let Some(temperature) = refresh_component(&self.id) {
-                self.temperature = temperature;
-                if self.temperature > self.max {
-                    self.max = self.temperature;
+            self.temperature = refresh_component(&self.id);
+            if let Some(temperature) = self.temperature {
+                if temperature > self.max {
+                    self.max = temperature;
                 }
             }
         }
@@ -51,7 +52,7 @@ unsafe fn refresh_component(id: &[u8]) -> Option<f32> {
 
 pub(crate) struct ComponentsInner {
     nb_cpus: usize,
-    components: Vec<Component>,
+    pub(crate) components: Vec<Component>,
 }
 
 impl ComponentsInner {
@@ -82,21 +83,28 @@ impl ComponentsInner {
         &mut self.components
     }
 
-    pub(crate) fn refresh_list(&mut self) {
-        self.components.clear();
-        for core in 0..self.nb_cpus {
-            unsafe {
-                let id = format!("dev.cpu.{core}.temperature\0").as_bytes().to_vec();
-                if let Some(temperature) = refresh_component(&id) {
-                    self.components.push(Component {
-                        inner: ComponentInner {
-                            id,
-                            label: format!("CPU {}", core + 1),
-                            temperature,
-                            max: temperature,
-                        },
-                    });
+    pub(crate) fn refresh(&mut self) {
+        if self.components.len() != self.nb_cpus {
+            for core in 0..self.nb_cpus {
+                unsafe {
+                    let id = format!("dev.cpu.{core}.temperature\0").as_bytes().to_vec();
+                    if let Some(temperature) = refresh_component(&id) {
+                        self.components.push(Component {
+                            inner: ComponentInner {
+                                id,
+                                label: format!("CPU {}", core + 1),
+                                temperature: Some(temperature),
+                                max: temperature,
+                                updated: true,
+                            },
+                        });
+                    }
                 }
+            }
+        } else {
+            for c in self.components.iter_mut() {
+                c.refresh();
+                c.inner.updated = true;
             }
         }
     }

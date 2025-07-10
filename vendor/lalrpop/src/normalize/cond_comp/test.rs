@@ -62,12 +62,13 @@ F = ();
     let mut grammar = remove_disabled_decls(&session, grammar);
 
     // remove attributes to compare with expected
-    if let Ok(grammar) = &mut grammar {
-        grammar.items.iter_mut().for_each(|item| {
+    match &mut grammar {
+        Ok(grammar) => grammar.items.iter_mut().for_each(|item| {
             if let super::GrammarItem::Nonterminal(nt) = item {
                 nt.attributes.clear()
             }
-        })
+        }),
+        Err(_) => (),
     };
 
     compare(grammar, NormResult::Ok(expected));

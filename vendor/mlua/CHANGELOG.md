@@ -1,4 +1,29 @@
-## v0.10.2 (Jan 27th, 2025)
+## v0.10.5 (May 24th, 2025)
+
+- mlua-sys is back to 0.6.x (Luau 0.663)
+- Reverted: Trigger abort when Luau userdata destructors are panic (requires new mlua-sys)
+- Reverted: Added large (52bit) integers support for Luau (breaking change)
+
+## v0.10.4 (May 5th, 2025)
+
+_yanked_ because of semver-breaking changes
+
+- Luau updated to 0.672
+- New serde option `encode_empty_tables_as_array` to serialize empty tables as arrays
+- Added `WeakLua` and `Lua::weak()` to create weak references to Lua state
+- Trigger abort when Luau userdata destructors are panic (Luau GC does not support it)
+- Added `AnyUserData::type_id()` method to get the type id of the userdata
+- Added `Chunk::name()`, `Chunk::environment()` and `Chunk::mode()` functions
+- Support borrowing underlying wrapped types for `UserDataRef` and `UserDataRefMut` (under `userdata-wrappers` feature)
+- Added large (52bit) integers support for Luau
+- Enable `serde` for `bstr` if `serialize` feature flag is enabled
+- Recursive warnings (Lua 5.4) are no longer allowed
+- Implemented `IntoLua`/`FromLua` for `BorrowedString` and `BorrowedBytes`
+- Implemented `IntoLua`/`FromLua` for `char`
+- Enable `Thread::reset()` for all Lua versions (limited support for 5.1-5.3)
+- Bugfixes and improvements
+
+## v0.10.3 (Jan 27th, 2025)
 
 - Set `Default` for `Value` to be `Nil`
 - Allow exhaustive match on `Value` (#502)
@@ -304,7 +329,7 @@ Other:
 
 ## v0.8.0
 Changes since 0.7.4
-- Roblox Luau support
+- Luau support
 - Removed C glue
 - Added async support to `__index` and `__newindex` metamethods
 - Added `Function::info()` to get information about functions (#149).
@@ -354,7 +379,7 @@ Breaking changes:
 
 ## v0.8.0-beta.1
 
-- Roblox Luau support
+- Luau support
 - Refactored ffi module. C glue is no longer required
 - Added async support to `__index` and `__newindex` metamethods
 
@@ -467,7 +492,7 @@ Breaking changes:
 - [**Breaking**] Removed `AnyUserData::has_metamethod()`
 - Added `Thread::reset()` for luajit/lua54 to recycle threads.
   It's possible to attach a new function to a thread (coroutine).
-- Added `chunk!` macro support to load chunks of Lua code using the Rust tokenizer and optinally capturing Rust variables.
+- Added `chunk!` macro support to load chunks of Lua code using the Rust tokenizer and optionally capturing Rust variables.
 - Improved error reporting (`Error`'s `__tostring` method formats full stacktraces). This is useful in the module mode.
 
 ## v0.6.0-beta.1
@@ -523,7 +548,7 @@ Breaking changes:
 
 - Lua 5.4 support with `MetaMethod::Close`.
 - `lua53` feature is disabled by default. Now preferred Lua version have to be chosen explicitly.
-- Provide safety guaraness for Lua state, which means that potenially unsafe operations, like loading C modules (using `require` or `package.loadlib`) are disabled. Equalient for the previous `Lua::new()` function is `Lua::unsafe_new()`.
+- Provide safety guarantees for Lua state, which means that potentially unsafe operations, like loading C modules (using `require` or `package.loadlib`) are disabled. Equivalent to the previous `Lua::new()` function is `Lua::unsafe_new()`.
 - New `send` feature to require `Send`.
 - New `module` feature, that disables linking to Lua Core Libraries. Required for modules.
 - Don't allow `'callback` outlive `'lua` in `Lua::create_function()` to fix [the unsoundness](tests/compile/static_callback_args.rs).

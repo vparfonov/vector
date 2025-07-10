@@ -1,18 +1,5 @@
 # [Unreleased]
 
-# [0.3.12] - 2025-05-12
-
-- Issue a better error message if the target is unsupported.
-  [#110](https://github.com/lambda-fairy/rust-errno/pull/110)
-
-# [0.3.11] - 2025-04-04
-
-- Add VxWorks support
-  [#105](https://github.com/lambda-fairy/rust-errno/pull/105)
-
-- Add cygwin support
-  [#106](https://github.com/lambda-fairy/rust-errno/pull/106)
-
 # [0.3.10] - 2024-11-29
 
 - Update to windows-sys 0.59

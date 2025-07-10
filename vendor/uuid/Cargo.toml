@@ -13,7 +13,7 @@
 edition = "2018"
 rust-version = "1.63.0"
 name = "uuid"
-version = "1.16.0"
+version = "1.17.0"
 authors = [
     "Ashley Mannix<ashleymannix@live.com.au>",
     "Dylan DPC<dylan.dpc@gmail.com>",
@@ -125,7 +125,10 @@ rng-rand = [
     "uuid-rng-internal-lib/rand",
 ]
 sha1 = ["dep:sha1_smol"]
-std = []
+std = [
+    "wasm-bindgen?/std",
+    "js-sys?/std",
+]
 v1 = ["atomic"]
 v3 = ["md5"]
 v4 = ["rng"]
@@ -158,7 +161,7 @@ optional = true
 default-features = false
 
 [dependencies.bytemuck]
-version = "1.16.0"
+version = "1.17.0"
 features = ["derive"]
 optional = true
 
@@ -182,7 +185,7 @@ version = "2"
 optional = true
 
 [dependencies.uuid-macro-internal]
-version = "1.16.0"
+version = "1.17.0"
 optional = true
 
 [dependencies.zerocopy]
@@ -208,30 +211,33 @@ version = "1.0.56"
 [dev-dependencies.trybuild]
 version = "1.0.52"
 
-[target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dependencies.uuid-rng-internal-lib]
-version = "1.16.0"
+[target.'cfg(all(target_arch = "wasm32", any(target_os = "unknown", target_os = "none")))'.dependencies.uuid-rng-internal-lib]
+version = "1.17.0"
 optional = true
 package = "uuid-rng-internal"
 
-[target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dependencies.wasm-bindgen]
+[target.'cfg(all(target_arch = "wasm32", any(target_os = "unknown", target_os = "none")))'.dependencies.wasm-bindgen]
 version = "0.2"
+features = ["msrv"]
 optional = true
+default-features = false
 
-[target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dev-dependencies.wasm-bindgen]
+[target.'cfg(all(target_arch = "wasm32", any(target_os = "unknown", target_os = "none")))'.dev-dependencies.wasm-bindgen]
 version = "0.2"
 
-[target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown"))'.dev-dependencies.wasm-bindgen-test]
+[target.'cfg(all(target_arch = "wasm32", any(target_os = "unknown", target_os = "none")))'.dev-dependencies.wasm-bindgen-test]
 version = "0.3"
 
-[target.'cfg(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown", target_feature = "atomics"))'.dependencies.js-sys]
+[target.'cfg(all(target_arch = "wasm32", any(target_os = "unknown", target_os = "none"), target_feature = "atomics"))'.dependencies.js-sys]
+version = "0.3"
+optional = true
+default-features = false
+
+[target.'cfg(not(all(target_arch = "wasm32", any(target_os = "unknown", target_os = "none"))))'.dependencies.getrandom]
 version = "0.3"
 optional = true
 
-[target.'cfg(not(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown")))'.dependencies.getrandom]
-version = "0.3"
-optional = true
-
-[target.'cfg(not(all(target_arch = "wasm32", target_vendor = "unknown", target_os = "unknown")))'.dependencies.rand]
+[target.'cfg(not(all(target_arch = "wasm32", any(target_os = "unknown", target_os = "none"))))'.dependencies.rand]
 version = "0.9"
 optional = true
 

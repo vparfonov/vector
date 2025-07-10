@@ -16,49 +16,47 @@
 // under the License.
 
 use std::collections::BTreeMap;
-use std::collections::HashMap;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::sync::Mutex;
 
-use async_trait::async_trait;
-
 use crate::raw::adapters::typed_kv;
+use crate::raw::Access;
+use crate::services::MemoryConfig;
 use crate::*;
+
+impl Configurator for MemoryConfig {
+    type Builder = MemoryBuilder;
+    fn into_builder(self) -> Self::Builder {
+        MemoryBuilder { config: self }
+    }
+}
 
 /// In memory service support. (BTreeMap Based)
 #[doc = include_str!("docs.md")]
 #[derive(Default)]
 pub struct MemoryBuilder {
-    root: Option<String>,
+    config: MemoryConfig,
 }
 
 impl MemoryBuilder {
     /// Set the root for BTreeMap.
-    pub fn root(&mut self, path: &str) -> &mut Self {
-        self.root = Some(path.into());
+    pub fn root(mut self, path: &str) -> Self {
+        self.config.root = Some(path.into());
         self
     }
 }
 
 impl Builder for MemoryBuilder {
     const SCHEME: Scheme = Scheme::Memory;
-    type Accessor = MemoryBackend;
+    type Config = MemoryConfig;
 
-    fn from_map(map: HashMap<String, String>) -> Self {
-        let mut builder = Self::default();
-
-        map.get("root").map(|v| builder.root(v));
-
-        builder
-    }
-
-    fn build(&mut self) -> Result<Self::Accessor> {
+    fn build(self) -> Result<impl Access> {
         let adapter = Adapter {
             inner: Arc::new(Mutex::new(BTreeMap::default())),
         };
 
-        Ok(MemoryBackend::new(adapter).with_root(self.root.as_deref().unwrap_or_default()))
+        Ok(MemoryBackend::new(adapter).with_root(self.config.root.as_deref().unwrap_or_default()))
     }
 }
 
@@ -76,17 +74,17 @@ impl Debug for Adapter {
     }
 }
 
-#[async_trait]
 impl typed_kv::Adapter for Adapter {
     fn info(&self) -> typed_kv::Info {
         typed_kv::Info::new(
             Scheme::Memory,
-            &format!("{:?}", &self.inner as *const _),
+            &format!("{:p}", Arc::as_ptr(&self.inner)),
             typed_kv::Capability {
                 get: true,
                 set: true,
                 delete: true,
                 scan: true,
+                shared: false,
             },
         )
     }
@@ -128,21 +126,18 @@ impl typed_kv::Adapter for Adapter {
 
     fn blocking_scan(&self, path: &str) -> Result<Vec<String>> {
         let inner = self.inner.lock().unwrap();
-        let keys: Vec<_> = if path.is_empty() {
-            inner.keys().cloned().collect()
-        } else {
-            let right_range = if let Some(path) = path.strip_suffix('/') {
-                format!("{}0", path)
-            } else {
-                format!("{}{}", path, std::char::MAX)
-            };
-            inner
-                .range(path.to_string()..right_range)
-                .filter(|(k, _)| k.as_str() != path)
-                .map(|(k, _)| k.to_string())
-                .collect()
-        };
 
+        if path.is_empty() {
+            return Ok(inner.keys().cloned().collect());
+        }
+
+        let mut keys = Vec::new();
+        for (key, _) in inner.range(path.to_string()..) {
+            if !key.starts_with(path) {
+                break;
+            }
+            keys.push(key.to_string());
+        }
         Ok(keys)
     }
 }
@@ -150,7 +145,7 @@ impl typed_kv::Adapter for Adapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::raw::*;
+    use crate::raw::adapters::typed_kv::{Adapter, Value};
 
     #[test]
     fn test_accessor_metadata_name() {
@@ -159,5 +154,26 @@ mod tests {
 
         let b2 = MemoryBuilder::default().build().unwrap();
         assert_ne!(b1.info().name(), b2.info().name())
+    }
+
+    #[test]
+    fn test_blocking_scan() {
+        let adapter = super::Adapter {
+            inner: Arc::new(Mutex::new(BTreeMap::default())),
+        };
+
+        adapter.blocking_set("aaa/bbb/", Value::new_dir()).unwrap();
+        adapter.blocking_set("aab/bbb/", Value::new_dir()).unwrap();
+        adapter.blocking_set("aab/ccc/", Value::new_dir()).unwrap();
+        adapter
+            .blocking_set(&format!("aab{}aaa/", std::char::MAX), Value::new_dir())
+            .unwrap();
+        adapter.blocking_set("aac/bbb/", Value::new_dir()).unwrap();
+
+        let data = adapter.blocking_scan("aab").unwrap();
+        assert_eq!(data.len(), 3);
+        for path in data {
+            assert!(path.starts_with("aab"));
+        }
     }
 }

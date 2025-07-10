@@ -11,12 +11,15 @@ use self::openssl::ssl::{
     SslVerifyMode,
 };
 use self::openssl::x509::{store::X509StoreBuilder, X509VerifyResult, X509};
+use self::openssl_probe::ProbeResult;
 use std::error;
 use std::fmt;
 use std::io;
-use std::sync::Once;
+use std::sync::LazyLock;
 
 use {Protocol, TlsAcceptorBuilder, TlsConnectorBuilder};
+
+static PROBE_RESULT: LazyLock<ProbeResult> = LazyLock::new(openssl_probe::probe);
 
 #[cfg(have_min_max_version)]
 fn supported_protocols(
@@ -32,7 +35,6 @@ fn supported_protocols(
             Protocol::Tlsv10 => SslVersion::TLS1,
             Protocol::Tlsv11 => SslVersion::TLS1_1,
             Protocol::Tlsv12 => SslVersion::TLS1_2,
-            Protocol::__NonExhaustive => unreachable!(),
         }
     }
 
@@ -71,7 +73,6 @@ fn supported_protocols(
                 | SslOptions::NO_TLSV1
                 | SslOptions::NO_TLSV1_1
         }
-        Some(Protocol::__NonExhaustive) => unreachable!(),
     };
     options |= match max {
         None | Some(Protocol::Tlsv12) => SslOptions::empty(),
@@ -80,17 +81,11 @@ fn supported_protocols(
         Some(Protocol::Sslv3) => {
             SslOptions::NO_TLSV1 | SslOptions::NO_TLSV1_1 | SslOptions::NO_TLSV1_2
         }
-        Some(Protocol::__NonExhaustive) => unreachable!(),
     };
 
     ctx.set_options(options);
 
     Ok(())
-}
-
-fn init_trust() {
-    static ONCE: Once = Once::new();
-    ONCE.call_once(openssl_probe::init_ssl_cert_env_vars);
 }
 
 #[cfg(target_os = "android")]
@@ -162,14 +157,14 @@ pub struct Identity {
 impl Identity {
     pub fn from_pkcs12(buf: &[u8], pass: &str) -> Result<Identity, Error> {
         let pkcs12 = Pkcs12::from_der(buf)?;
-        let parsed = pkcs12.parse(pass)?;
+        let parsed = pkcs12.parse2(pass)?;
         Ok(Identity {
-            pkey: parsed.pkey,
-            cert: parsed.cert,
+            pkey: parsed.pkey.ok_or_else(|| Error::EmptyChain)?,
+            cert: parsed.cert.ok_or_else(|| Error::EmptyChain)?,
             // > The stack is the reverse of what you might expect due to the way
             // > PKCS12_parse is implemented, so we need to load it backwards.
             // > https://github.com/sfackler/rust-native-tls/commit/05fb5e583be589ab63d9f83d986d095639f8ec44
-            chain: parsed.chain.into_iter().flatten().rev().collect(),
+            chain: parsed.ca.into_iter().flatten().rev().collect(),
         })
     }
 
@@ -275,9 +270,20 @@ pub struct TlsConnector {
 
 impl TlsConnector {
     pub fn new(builder: &TlsConnectorBuilder) -> Result<TlsConnector, Error> {
-        init_trust();
-
         let mut connector = SslConnector::builder(SslMethod::tls())?;
+
+        // We need to load these separately so an error on one doesn't prevent the other from loading.
+        if let Some(cert_file) = &PROBE_RESULT.cert_file {
+            if let Err(e) = connector.load_verify_locations(Some(cert_file), None) {
+                debug!("load_verify_locations cert file error: {:?}", e);
+            }
+        }
+        if let Some(cert_dir) = &PROBE_RESULT.cert_dir {
+            if let Err(e) = connector.load_verify_locations(None, Some(cert_dir)) {
+                debug!("load_verify_locations cert dir error: {:?}", e);
+            }
+        }
+
         if let Some(ref identity) = builder.identity {
             connector.set_certificate(&identity.0.cert)?;
             connector.set_private_key(&identity.0.pkey)?;

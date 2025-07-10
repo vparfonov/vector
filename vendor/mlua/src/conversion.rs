@@ -5,7 +5,7 @@ use std::hash::{BuildHasher, Hash};
 use std::os::raw::c_int;
 use std::path::{Path, PathBuf};
 use std::string::String as StdString;
-use std::{slice, str};
+use std::{mem, slice, str};
 
 use bstr::{BStr, BString, ByteSlice, ByteVec};
 use num_traits::cast;
@@ -13,7 +13,7 @@ use num_traits::cast;
 use crate::error::{Error, Result};
 use crate::function::Function;
 use crate::state::{Lua, RawLua};
-use crate::string::String;
+use crate::string::{BorrowedBytes, BorrowedStr, String};
 use crate::table::Table;
 use crate::thread::Thread;
 use crate::traits::{FromLua, IntoLua, ShortTypeName as _};
@@ -88,6 +88,94 @@ impl FromLua for String {
         }
         // Fallback to default
         Self::from_lua(lua.stack_value(idx, Some(type_id)), lua.lua())
+    }
+}
+
+impl IntoLua for BorrowedStr<'_> {
+    #[inline]
+    fn into_lua(self, _: &Lua) -> Result<Value> {
+        Ok(Value::String(self.borrow.into_owned()))
+    }
+
+    #[inline]
+    unsafe fn push_into_stack(self, lua: &RawLua) -> Result<()> {
+        lua.push_ref(&self.borrow.0);
+        Ok(())
+    }
+}
+
+impl IntoLua for &BorrowedStr<'_> {
+    #[inline]
+    fn into_lua(self, _: &Lua) -> Result<Value> {
+        Ok(Value::String(self.borrow.clone().into_owned()))
+    }
+
+    #[inline]
+    unsafe fn push_into_stack(self, lua: &RawLua) -> Result<()> {
+        lua.push_ref(&self.borrow.0);
+        Ok(())
+    }
+}
+
+impl FromLua for BorrowedStr<'_> {
+    fn from_lua(value: Value, lua: &Lua) -> Result<Self> {
+        let s = String::from_lua(value, lua)?;
+        let BorrowedStr { buf, _lua, .. } = BorrowedStr::try_from(&s)?;
+        let buf = unsafe { mem::transmute::<&str, &'static str>(buf) };
+        let borrow = Cow::Owned(s);
+        Ok(Self { buf, borrow, _lua })
+    }
+
+    unsafe fn from_stack(idx: c_int, lua: &RawLua) -> Result<Self> {
+        let s = String::from_stack(idx, lua)?;
+        let BorrowedStr { buf, _lua, .. } = BorrowedStr::try_from(&s)?;
+        let buf = unsafe { mem::transmute::<&str, &'static str>(buf) };
+        let borrow = Cow::Owned(s);
+        Ok(Self { buf, borrow, _lua })
+    }
+}
+
+impl IntoLua for BorrowedBytes<'_> {
+    #[inline]
+    fn into_lua(self, _: &Lua) -> Result<Value> {
+        Ok(Value::String(self.borrow.into_owned()))
+    }
+
+    #[inline]
+    unsafe fn push_into_stack(self, lua: &RawLua) -> Result<()> {
+        lua.push_ref(&self.borrow.0);
+        Ok(())
+    }
+}
+
+impl IntoLua for &BorrowedBytes<'_> {
+    #[inline]
+    fn into_lua(self, _: &Lua) -> Result<Value> {
+        Ok(Value::String(self.borrow.clone().into_owned()))
+    }
+
+    #[inline]
+    unsafe fn push_into_stack(self, lua: &RawLua) -> Result<()> {
+        lua.push_ref(&self.borrow.0);
+        Ok(())
+    }
+}
+
+impl FromLua for BorrowedBytes<'_> {
+    fn from_lua(value: Value, lua: &Lua) -> Result<Self> {
+        let s = String::from_lua(value, lua)?;
+        let BorrowedBytes { buf, _lua, .. } = BorrowedBytes::from(&s);
+        let buf = unsafe { mem::transmute::<&[u8], &'static [u8]>(buf) };
+        let borrow = Cow::Owned(s);
+        Ok(Self { buf, borrow, _lua })
+    }
+
+    unsafe fn from_stack(idx: c_int, lua: &RawLua) -> Result<Self> {
+        let s = String::from_stack(idx, lua)?;
+        let BorrowedBytes { buf, _lua, .. } = BorrowedBytes::from(&s);
+        let buf = unsafe { mem::transmute::<&[u8], &'static [u8]>(buf) };
+        let borrow = Cow::Owned(s);
+        Ok(Self { buf, borrow, _lua })
     }
 }
 
@@ -652,6 +740,51 @@ impl IntoLua for &Path {
     #[inline]
     fn into_lua(self, lua: &Lua) -> Result<Value> {
         self.as_os_str().into_lua(lua)
+    }
+}
+
+impl IntoLua for char {
+    #[inline]
+    fn into_lua(self, lua: &Lua) -> Result<Value> {
+        let mut char_bytes = [0; 4];
+        self.encode_utf8(&mut char_bytes);
+        Ok(Value::String(lua.create_string(&char_bytes[..self.len_utf8()])?))
+    }
+}
+
+impl FromLua for char {
+    fn from_lua(value: Value, _lua: &Lua) -> Result<Self> {
+        let ty = value.type_name();
+        match value {
+            Value::Integer(i) => {
+                cast(i)
+                    .and_then(char::from_u32)
+                    .ok_or_else(|| Error::FromLuaConversionError {
+                        from: ty,
+                        to: "char".to_string(),
+                        message: Some("integer out of range when converting to char".to_string()),
+                    })
+            }
+            Value::String(s) => {
+                let str = s.to_str()?;
+                let mut str_iter = str.chars();
+                match (str_iter.next(), str_iter.next()) {
+                    (Some(char), None) => Ok(char),
+                    _ => Err(Error::FromLuaConversionError {
+                        from: ty,
+                        to: "char".to_string(),
+                        message: Some(
+                            "expected string to have exactly one char when converting to char".to_string(),
+                        ),
+                    }),
+                }
+            }
+            _ => Err(Error::FromLuaConversionError {
+                from: ty,
+                to: Self::type_name(),
+                message: Some("expected string or integer".to_string()),
+            }),
+        }
     }
 }
 

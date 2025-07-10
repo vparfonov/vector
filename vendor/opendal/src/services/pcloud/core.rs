@@ -15,14 +15,15 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::fmt::Debug;
-use std::fmt::Formatter;
-
-use bytes::Bytes;
+use bytes::Buf;
+use http::header;
 use http::Request;
 use http::Response;
 use http::StatusCode;
 use serde::Deserialize;
+use std::fmt::Debug;
+use std::fmt::Formatter;
+use std::sync::Arc;
 
 use super::error::parse_error;
 use super::error::PcloudError;
@@ -31,6 +32,8 @@ use crate::*;
 
 #[derive(Clone)]
 pub struct PcloudCore {
+    pub info: Arc<AccessorInfo>,
+
     /// The root of this core.
     pub root: String,
     /// The endpoint of this backend.
@@ -39,8 +42,6 @@ pub struct PcloudCore {
     pub username: String,
     /// The password of this backend.
     pub password: String,
-
-    pub client: HttpClient,
 }
 
 impl Debug for PcloudCore {
@@ -55,8 +56,8 @@ impl Debug for PcloudCore {
 
 impl PcloudCore {
     #[inline]
-    pub async fn send(&self, req: Request<AsyncBody>) -> Result<Response<IncomingAsyncBody>> {
-        self.client.send(req).await
+    pub async fn send(&self, req: Request<Buffer>) -> Result<Response<Buffer>> {
+        self.info.http_client().send(req).await
     }
 }
 
@@ -76,7 +77,8 @@ impl PcloudCore {
 
         // set body
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Read)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         let resp = self.send(req).await?;
@@ -84,15 +86,15 @@ impl PcloudCore {
         let status = resp.status();
         match status {
             StatusCode::OK => {
-                let bs = resp.into_body().bytes().await?;
+                let bs = resp.into_body();
                 let resp: GetFileLinkResponse =
-                    serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+                    serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
                 let result = resp.result;
                 if result == 2010 || result == 2055 || result == 2002 {
-                    return Err(Error::new(ErrorKind::NotFound, &format!("{resp:?}")));
+                    return Err(Error::new(ErrorKind::NotFound, format!("{resp:?}")));
                 }
                 if result != 0 {
-                    return Err(Error::new(ErrorKind::Unexpected, &format!("{resp:?}")));
+                    return Err(Error::new(ErrorKind::Unexpected, format!("{resp:?}")));
                 }
 
                 if let Some(hosts) = resp.hosts {
@@ -104,19 +106,21 @@ impl PcloudCore {
                 }
                 Err(Error::new(ErrorKind::Unexpected, "hosts is empty"))
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 
-    pub async fn download(&self, url: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn download(&self, url: &str, range: BytesRange) -> Result<Response<HttpBody>> {
         let req = Request::get(url);
 
         // set body
         let req = req
-            .body(AsyncBody::Empty)
+            .header(header::RANGE, range.to_header())
+            .extension(Operation::Read)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
-        self.send(req).await
+        self.info.http_client().fetch(req).await
     }
 
     pub async fn ensure_dir_exists(&self, path: &str) -> Result<()> {
@@ -132,31 +136,28 @@ impl PcloudCore {
 
             match status {
                 StatusCode::OK => {
-                    let bs = resp.into_body().bytes().await?;
+                    let bs = resp.into_body();
                     let resp: PcloudError =
-                        serde_json::from_slice(&bs).map_err(new_json_deserialize_error)?;
+                        serde_json::from_reader(bs.reader()).map_err(new_json_deserialize_error)?;
                     let result = resp.result;
                     if result == 2010 || result == 2055 || result == 2002 {
-                        return Err(Error::new(ErrorKind::NotFound, &format!("{resp:?}")));
+                        return Err(Error::new(ErrorKind::NotFound, format!("{resp:?}")));
                     }
                     if result != 0 {
-                        return Err(Error::new(ErrorKind::Unexpected, &format!("{resp:?}")));
+                        return Err(Error::new(ErrorKind::Unexpected, format!("{resp:?}")));
                     }
 
                     if result != 0 {
-                        return Err(Error::new(ErrorKind::Unexpected, &format!("{resp:?}")));
+                        return Err(Error::new(ErrorKind::Unexpected, format!("{resp:?}")));
                     }
                 }
-                _ => return Err(parse_error(resp).await?),
+                _ => return Err(parse_error(resp)),
             }
         }
         Ok(())
     }
 
-    pub async fn create_folder_if_not_exists(
-        &self,
-        path: &str,
-    ) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn create_folder_if_not_exists(&self, path: &str) -> Result<Response<Buffer>> {
         let url = format!(
             "{}/createfolderifnotexists?path=/{}&username={}&password={}",
             self.endpoint,
@@ -169,13 +170,14 @@ impl PcloudCore {
 
         // set body
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::CreateDir)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn rename_file(&self, from: &str, to: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn rename_file(&self, from: &str, to: &str) -> Result<Response<Buffer>> {
         let from = build_abs_path(&self.root, from);
         let to = build_abs_path(&self.root, to);
 
@@ -192,13 +194,14 @@ impl PcloudCore {
 
         // set body
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Rename)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn rename_folder(&self, from: &str, to: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn rename_folder(&self, from: &str, to: &str) -> Result<Response<Buffer>> {
         let from = build_abs_path(&self.root, from);
         let to = build_abs_path(&self.root, to);
         let url = format!(
@@ -214,13 +217,14 @@ impl PcloudCore {
 
         // set body
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Rename)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn delete_folder(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn delete_folder(&self, path: &str) -> Result<Response<Buffer>> {
         let path = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -235,13 +239,14 @@ impl PcloudCore {
 
         // set body
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Delete)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn delete_file(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn delete_file(&self, path: &str) -> Result<Response<Buffer>> {
         let path = build_abs_path(&self.root, path);
 
         let url = format!(
@@ -256,13 +261,14 @@ impl PcloudCore {
 
         // set body
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Delete)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn copy_file(&self, from: &str, to: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn copy_file(&self, from: &str, to: &str) -> Result<Response<Buffer>> {
         let from = build_abs_path(&self.root, from);
         let to = build_abs_path(&self.root, to);
 
@@ -279,13 +285,14 @@ impl PcloudCore {
 
         // set body
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Copy)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn copy_folder(&self, from: &str, to: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn copy_folder(&self, from: &str, to: &str) -> Result<Response<Buffer>> {
         let from = build_abs_path(&self.root, from);
         let to = build_abs_path(&self.root, to);
 
@@ -302,13 +309,14 @@ impl PcloudCore {
 
         // set body
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Copy)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn stat(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn stat(&self, path: &str) -> Result<Response<Buffer>> {
         let path = build_abs_path(&self.root, path);
 
         let path = path.trim_end_matches('/');
@@ -325,13 +333,14 @@ impl PcloudCore {
 
         // set body
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::Stat)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn upload_file(&self, path: &str, bs: Bytes) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn upload_file(&self, path: &str, bs: Buffer) -> Result<Response<Buffer>> {
         let path = build_abs_path(&self.root, path);
 
         let (name, path) = (get_basename(&path), get_parent(&path).trim_end_matches('/'));
@@ -349,13 +358,14 @@ impl PcloudCore {
 
         // set body
         let req = req
-            .body(AsyncBody::Bytes(bs))
+            .extension(Operation::Write)
+            .body(bs)
             .map_err(new_request_build_error)?;
 
         self.send(req).await
     }
 
-    pub async fn list_folder(&self, path: &str) -> Result<Response<IncomingAsyncBody>> {
+    pub async fn list_folder(&self, path: &str) -> Result<Response<Buffer>> {
         let path = build_abs_path(&self.root, path);
 
         let path = normalize_root(&path);
@@ -374,7 +384,8 @@ impl PcloudCore {
 
         // set body
         let req = req
-            .body(AsyncBody::Empty)
+            .extension(Operation::List)
+            .body(Buffer::new())
             .map_err(new_request_build_error)?;
 
         self.send(req).await
@@ -392,10 +403,6 @@ pub(super) fn parse_stat_metadata(content: StatMetadata) -> Result<Metadata> {
         md.set_content_length(size);
     }
 
-    if let Some(size) = content.size {
-        md.set_content_length(size);
-    }
-
     md.set_last_modified(parse_datetime_from_rfc2822(&content.modified)?);
 
     Ok(md)
@@ -407,10 +414,6 @@ pub(super) fn parse_list_metadata(content: ListMetadata) -> Result<Metadata> {
     } else {
         Metadata::new(EntryMode::FILE)
     };
-
-    if let Some(size) = content.size {
-        md.set_content_length(size);
-    }
 
     if let Some(size) = content.size {
         md.set_content_length(size);
@@ -436,11 +439,9 @@ pub struct StatResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct StatMetadata {
-    pub name: String,
     pub modified: String,
     pub isfolder: bool,
     pub size: Option<u64>,
-    pub contenttype: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -451,11 +452,9 @@ pub struct ListFolderResponse {
 
 #[derive(Debug, Deserialize)]
 pub struct ListMetadata {
-    pub name: String,
     pub path: String,
     pub modified: String,
     pub isfolder: bool,
     pub size: Option<u64>,
-    pub contenttype: Option<String>,
     pub contents: Option<Vec<ListMetadata>>,
 }

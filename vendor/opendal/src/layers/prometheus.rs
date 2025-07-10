@@ -15,873 +15,630 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::fmt::Debug;
-use std::fmt::Formatter;
-use std::io;
-use std::sync::Arc;
-use std::task::Context;
-use std::task::Poll;
+use std::time::Duration;
 
-use async_trait::async_trait;
-use bytes::Bytes;
-use futures::FutureExt;
-use futures::TryFutureExt;
-use log::debug;
+use prometheus::core::AtomicI64;
 use prometheus::core::AtomicU64;
 use prometheus::core::GenericCounterVec;
-use prometheus::exponential_buckets;
-use prometheus::histogram_opts;
+use prometheus::core::GenericGaugeVec;
 use prometheus::register_histogram_vec_with_registry;
 use prometheus::register_int_counter_vec_with_registry;
+use prometheus::register_int_gauge_vec_with_registry;
 use prometheus::HistogramVec;
 use prometheus::Registry;
 
-use crate::raw::Accessor;
+use crate::layers::observe;
+use crate::raw::Access;
 use crate::raw::*;
 use crate::*;
 
-/// Add [prometheus](https://docs.rs/prometheus) for every operations.
+/// Add [prometheus](https://docs.rs/prometheus) for every operation.
 ///
 /// # Prometheus Metrics
 ///
-/// In this section, we will introduce three metrics that are currently being exported by our project. These metrics are essential for understanding the behavior and performance of our applications.
-///
-///
-/// | Metric Name             | Type     | Description                                       | Labels              |
-/// |-------------------------|----------|---------------------------------------------------|---------------------|
-/// | requests_total          | Counter  | Total times of 'create' operation being called   | scheme, operation   |
-/// | requests_duration_seconds | Histogram | Histogram of the time spent on specific operation | scheme, operation   |
-/// | bytes_total             | Histogram | Total size                                        | scheme, operation   |
-///
+/// We provide several metrics, please see the documentation of [`observe`] module.
 /// For a more detailed explanation of these metrics and how they are used, please refer to the [Prometheus documentation](https://prometheus.io/docs/introduction/overview/).
-///
-/// # Histogram Configuration
-///
-/// The metric buckets for these histograms are automatically generated based on the `exponential_buckets(0.01, 2.0, 16)` configuration.
 ///
 /// # Examples
 ///
+/// ```no_run
+/// # use log::debug;
+/// # use log::info;
+/// # use opendal::layers::PrometheusLayer;
+/// # use opendal::services;
+/// # use opendal::Operator;
+/// # use opendal::Result;
+/// # use prometheus::Encoder;
+///
+/// # #[tokio::main]
+/// # async fn main() -> Result<()> {
+/// let registry = prometheus::default_registry();
+///
+/// let op = Operator::new(services::Memory::default())?
+///     .layer(
+///         PrometheusLayer::builder()
+///             .register(registry)
+///             .expect("register metrics successfully"),
+///     )
+///     .finish();
+/// debug!("operator: {op:?}");
+///
+/// // Write data into object test.
+/// op.write("test", "Hello, World!").await?;
+/// // Read data from object.
+/// let bs = op.read("test").await?;
+/// info!("content: {}", String::from_utf8_lossy(&bs.to_bytes()));
+///
+/// // Get object metadata.
+/// let meta = op.stat("test").await?;
+/// info!("meta: {:?}", meta);
+///
+/// // Export prometheus metrics.
+/// let mut buffer = Vec::<u8>::new();
+/// let encoder = prometheus::TextEncoder::new();
+/// encoder.encode(&prometheus::gather(), &mut buffer).unwrap();
+/// println!("## Prometheus Metrics");
+/// println!("{}", String::from_utf8(buffer.clone()).unwrap());
+///
+/// Ok(())
+/// # }
 /// ```
-/// use log::debug;
-/// use log::info;
-/// use opendal::layers::PrometheusLayer;
-/// use opendal::services;
-/// use opendal::Operator;
-/// use opendal::Result;
-/// use prometheus::Encoder;
-///
-/// /// Visit [`opendal::services`] for more service related config.
-/// /// Visit [`opendal::Operator`] for more operator level APIs.
-/// #[tokio::main]
-/// async fn main() -> Result<()> {
-///     // Pick a builder and configure it.
-///     let builder = services::Memory::default();
-///     let registry = prometheus::default_registry();
-///
-///     let op = Operator::new(builder)
-///         .expect("must init")
-///         .layer(PrometheusLayer::with_registry(registry.clone()))
-///         .finish();
-///     debug!("operator: {op:?}");
-///
-///     // Write data into object test.
-///     op.write("test", "Hello, World!").await?;
-///     // Read data from object.
-///     let bs = op.read("test").await?;
-///     info!("content: {}", String::from_utf8_lossy(&bs));
-///
-///     // Get object metadata.
-///     let meta = op.stat("test").await?;
-///     info!("meta: {:?}", meta);
-///
-///     // Export prometheus metrics.
-///     let mut buffer = Vec::<u8>::new();
-///     let encoder = prometheus::TextEncoder::new();
-///     encoder.encode(&prometheus::gather(), &mut buffer).unwrap();
-///     println!("## Prometheus Metrics");
-///     println!("{}", String::from_utf8(buffer.clone()).unwrap());
-///     Ok(())
-/// }
-/// ```
-#[derive(Default, Debug, Clone)]
+#[derive(Clone, Debug)]
 pub struct PrometheusLayer {
-    registry: Registry,
-    requests_duration_seconds_buckets: Vec<f64>,
-    bytes_total_buckets: Vec<f64>,
-    path_label_level: usize,
+    interceptor: PrometheusInterceptor,
 }
 
 impl PrometheusLayer {
-    /// create PrometheusLayer by incoming registry.
-    pub fn with_registry(registry: Registry) -> Self {
+    /// Create a [`PrometheusLayerBuilder`] to set the configuration of metrics.
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use log::debug;
+    /// # use opendal::layers::PrometheusLayer;
+    /// # use opendal::services;
+    /// # use opendal::Operator;
+    /// # use opendal::Result;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// // Pick a builder and configure it.
+    /// let builder = services::Memory::default();
+    /// let registry = prometheus::default_registry();
+    ///
+    /// let duration_seconds_buckets = prometheus::exponential_buckets(0.01, 2.0, 16).unwrap();
+    /// let bytes_buckets = prometheus::exponential_buckets(1.0, 2.0, 16).unwrap();
+    /// let op = Operator::new(builder)?
+    ///     .layer(
+    ///         PrometheusLayer::builder()
+    ///             .duration_seconds_buckets(duration_seconds_buckets)
+    ///             .bytes_buckets(bytes_buckets)
+    ///             .register(registry)
+    ///             .expect("register metrics successfully"),
+    ///     )
+    ///     .finish();
+    /// debug!("operator: {op:?}");
+    ///
+    /// Ok(())
+    /// # }
+    /// ```
+    pub fn builder() -> PrometheusLayerBuilder {
+        PrometheusLayerBuilder::default()
+    }
+}
+
+impl<A: Access> Layer<A> for PrometheusLayer {
+    type LayeredAccess = observe::MetricsAccessor<A, PrometheusInterceptor>;
+
+    fn layer(&self, inner: A) -> Self::LayeredAccess {
+        observe::MetricsLayer::new(self.interceptor.clone()).layer(inner)
+    }
+}
+
+/// [`PrometheusLayerBuilder`] is a config builder to build a [`PrometheusLayer`].
+pub struct PrometheusLayerBuilder {
+    bytes_buckets: Vec<f64>,
+    bytes_rate_buckets: Vec<f64>,
+    entries_buckets: Vec<f64>,
+    entries_rate_buckets: Vec<f64>,
+    duration_seconds_buckets: Vec<f64>,
+    ttfb_buckets: Vec<f64>,
+}
+
+impl Default for PrometheusLayerBuilder {
+    fn default() -> Self {
         Self {
-            registry,
-            requests_duration_seconds_buckets: exponential_buckets(0.01, 2.0, 16).unwrap(),
-            bytes_total_buckets: exponential_buckets(0.01, 2.0, 16).unwrap(),
-            path_label_level: 0,
+            bytes_buckets: observe::DEFAULT_BYTES_BUCKETS.to_vec(),
+            bytes_rate_buckets: observe::DEFAULT_BYTES_RATE_BUCKETS.to_vec(),
+            entries_buckets: observe::DEFAULT_ENTRIES_BUCKETS.to_vec(),
+            entries_rate_buckets: observe::DEFAULT_ENTRIES_RATE_BUCKETS.to_vec(),
+            duration_seconds_buckets: observe::DEFAULT_DURATION_SECONDS_BUCKETS.to_vec(),
+            ttfb_buckets: observe::DEFAULT_TTFB_BUCKETS.to_vec(),
         }
     }
+}
 
-    /// set buckets for requests_duration_seconds
-    pub fn requests_duration_seconds_buckets(mut self, buckets: Vec<f64>) -> Self {
+impl PrometheusLayerBuilder {
+    /// Set buckets for bytes related histogram like `operation_bytes`.
+    pub fn bytes_buckets(mut self, buckets: Vec<f64>) -> Self {
         if !buckets.is_empty() {
-            self.requests_duration_seconds_buckets = buckets;
+            self.bytes_buckets = buckets;
         }
         self
     }
 
-    /// set buckets for bytes_total
-    pub fn bytes_total_buckets(mut self, buckets: Vec<f64>) -> Self {
+    /// Set buckets for bytes rate related histogram like `operation_bytes_rate`.
+    pub fn bytes_rate_buckets(mut self, buckets: Vec<f64>) -> Self {
         if !buckets.is_empty() {
-            self.bytes_total_buckets = buckets;
+            self.bytes_rate_buckets = buckets;
         }
         self
     }
 
-    /// set path label level
-    /// 0: no path label, the path label will be the ""
-    /// >0: the path label will be the path split by "/" and get the last n level, like "/abc/def/ghi", if n=1, the path label will be "/abc"
-    pub fn enable_path_label(mut self, level: usize) -> Self {
-        self.path_label_level = level;
+    /// Set buckets for entries related histogram like `operation_entries`.
+    pub fn entries_buckets(mut self, buckets: Vec<f64>) -> Self {
+        if !buckets.is_empty() {
+            self.entries_buckets = buckets;
+        }
         self
     }
-}
 
-impl<A: Accessor> Layer<A> for PrometheusLayer {
-    type LayeredAccessor = PrometheusAccessor<A>;
-
-    fn layer(&self, inner: A) -> Self::LayeredAccessor {
-        let meta = inner.info();
-        let scheme = meta.scheme();
-
-        PrometheusAccessor {
-            inner,
-            stats: Arc::new(PrometheusMetrics::new(
-                self.registry.clone(),
-                self.requests_duration_seconds_buckets.clone(),
-                self.bytes_total_buckets.clone(),
-                self.path_label_level,
-            )),
-            scheme,
+    /// Set buckets for entries rate related histogram like `operation_entries_rate`.
+    pub fn entries_rate_buckets(mut self, buckets: Vec<f64>) -> Self {
+        if !buckets.is_empty() {
+            self.entries_rate_buckets = buckets;
         }
+        self
     }
-}
 
-/// [`PrometheusMetrics`] provide the performance and IO metrics.
-#[derive(Debug)]
-pub struct PrometheusMetrics {
-    /// Total times of the specific operation be called.
-    pub requests_total: GenericCounterVec<AtomicU64>,
-    /// Latency of the specific operation be called.
-    pub requests_duration_seconds: HistogramVec,
-    /// Size of the specific metrics.
-    pub bytes_total: HistogramVec,
-    /// The Path Level we will keep in the path label.
-    pub path_label_level: usize,
-}
+    /// Set buckets for duration seconds related histogram like `operation_duration_seconds`.
+    pub fn duration_seconds_buckets(mut self, buckets: Vec<f64>) -> Self {
+        if !buckets.is_empty() {
+            self.duration_seconds_buckets = buckets;
+        }
+        self
+    }
 
-impl PrometheusMetrics {
-    /// new with prometheus register.
-    pub fn new(
-        registry: Registry,
-        requests_duration_seconds_buckets: Vec<f64>,
-        bytes_total_buckets: Vec<f64>,
-        path_label_level: usize,
-    ) -> Self {
-        let labels = if path_label_level > 0 {
-            vec!["scheme", "operation", "path"]
-        } else {
-            vec!["scheme", "operation"]
+    /// Set buckets for ttfb related histogram like `operation_ttfb_seconds`.
+    pub fn ttfb_buckets(mut self, buckets: Vec<f64>) -> Self {
+        if !buckets.is_empty() {
+            self.ttfb_buckets = buckets;
+        }
+        self
+    }
+
+    /// Register the metrics into the given registry and return a [`PrometheusLayer`].
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use log::debug;
+    /// # use opendal::layers::PrometheusLayer;
+    /// # use opendal::services;
+    /// # use opendal::Operator;
+    /// # use opendal::Result;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// // Pick a builder and configure it.
+    /// let builder = services::Memory::default();
+    /// let registry = prometheus::default_registry();
+    ///
+    /// let op = Operator::new(builder)?
+    ///     .layer(
+    ///         PrometheusLayer::builder()
+    ///             .register(registry)
+    ///             .expect("register metrics successfully"),
+    ///     )
+    ///     .finish();
+    /// debug!("operator: {op:?}");
+    ///
+    /// Ok(())
+    /// # }
+    /// ```
+    pub fn register(self, registry: &Registry) -> Result<PrometheusLayer> {
+        let labels = OperationLabels::names();
+        let operation_bytes = {
+            let metric = observe::MetricValue::OperationBytes(0);
+            register_histogram_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                self.bytes_buckets.clone(),
+                registry
+            )
+            .map_err(parse_prometheus_error)?
         };
-        let requests_total = register_int_counter_vec_with_registry!(
-            "requests_total",
-            "Total times of create be called",
-            &labels,
-            registry
-        )
-        .unwrap();
-        let opts = histogram_opts!(
-            "requests_duration_seconds",
-            "Histogram of the time spent on specific operation",
-            requests_duration_seconds_buckets
-        );
-
-        let requests_duration_seconds =
-            register_histogram_vec_with_registry!(opts, &labels, registry).unwrap();
-
-        let opts = histogram_opts!("bytes_total", "Total size of ", bytes_total_buckets);
-        let bytes_total = register_histogram_vec_with_registry!(opts, &labels, registry).unwrap();
-
-        Self {
-            requests_total,
-            requests_duration_seconds,
-            bytes_total,
-            path_label_level,
-        }
-    }
-
-    /// error handling is the cold path, so we will not init error counters
-    /// in advance.
-    #[inline]
-    fn increment_errors_total(&self, op: Operation, kind: ErrorKind) {
-        debug!(
-            "Prometheus statistics metrics error, operation {} error {}",
-            op.into_static(),
-            kind.into_static()
-        );
-    }
-
-    /// generate metric label
-    pub fn generate_metric_label<'a>(
-        &self,
-        scheme: &'a str,
-        operation: &'a str,
-        path_label: &'a str,
-    ) -> Vec<&'a str> {
-        match self.path_label_level {
-            0 => {
-                vec![scheme, operation]
-            }
-            n if n > 0 => {
-                let path_value = get_path_label(path_label, self.path_label_level);
-                vec![scheme, operation, path_value]
-            }
-            _ => {
-                vec![scheme, operation]
-            }
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct PrometheusAccessor<A: Accessor> {
-    inner: A,
-    stats: Arc<PrometheusMetrics>,
-    scheme: Scheme,
-}
-
-impl<A: Accessor> Debug for PrometheusAccessor<A> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("PrometheusAccessor")
-            .field("inner", &self.inner)
-            .finish_non_exhaustive()
-    }
-}
-
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-impl<A: Accessor> LayeredAccessor for PrometheusAccessor<A> {
-    type Inner = A;
-    type Reader = PrometheusMetricWrapper<A::Reader>;
-    type BlockingReader = PrometheusMetricWrapper<A::BlockingReader>;
-    type Writer = PrometheusMetricWrapper<A::Writer>;
-    type BlockingWriter = PrometheusMetricWrapper<A::BlockingWriter>;
-    type Lister = A::Lister;
-    type BlockingLister = A::BlockingLister;
-
-    fn inner(&self) -> &Self::Inner {
-        &self.inner
-    }
-
-    async fn create_dir(&self, path: &str, args: OpCreateDir) -> Result<RpCreateDir> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::CreateDir.into_static(),
-            path,
-        );
-
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-        let create_res = self.inner.create_dir(path, args).await;
-
-        timer.observe_duration();
-        create_res.map_err(|e| {
-            self.stats
-                .increment_errors_total(Operation::CreateDir, e.kind());
-            e
-        })
-    }
-
-    async fn read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::Reader)> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::Read.into_static(),
-            path,
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-
-        let read_res = self.inner.read(path, args).await.map(|(rp, r)| {
-            (
-                rp,
-                PrometheusMetricWrapper::new(
-                    r,
-                    Operation::Read,
-                    self.stats.clone(),
-                    self.scheme,
-                    &path.to_string(),
-                ),
+        let operation_bytes_rate = {
+            let metric = observe::MetricValue::OperationBytesRate(0.0);
+            register_histogram_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                self.bytes_rate_buckets.clone(),
+                registry
             )
-        });
-        timer.observe_duration();
-        read_res.map_err(|e| {
-            self.stats.increment_errors_total(Operation::Read, e.kind());
-            e
-        })
-    }
-
-    async fn write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::Writer)> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::Write.into_static(),
-            path,
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-
-        let write_res = self
-            .inner
-            .write(path, args)
-            .map(|v| {
-                v.map(|(rp, r)| {
-                    (
-                        rp,
-                        PrometheusMetricWrapper::new(
-                            r,
-                            Operation::Write,
-                            self.stats.clone(),
-                            self.scheme,
-                            &path.to_string(),
-                        ),
-                    )
-                })
-            })
-            .await;
-        timer.observe_duration();
-        write_res.map_err(|e| {
-            self.stats
-                .increment_errors_total(Operation::Write, e.kind());
-            e
-        })
-    }
-
-    async fn stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::Stat.into_static(),
-            path,
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-
-        let stat_res = self
-            .inner
-            .stat(path, args)
-            .inspect_err(|e| {
-                self.stats.increment_errors_total(Operation::Stat, e.kind());
-            })
-            .await;
-        timer.observe_duration();
-        stat_res.map_err(|e| {
-            self.stats.increment_errors_total(Operation::Stat, e.kind());
-            e
-        })
-    }
-
-    async fn delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::Delete.into_static(),
-            path,
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-
-        let delete_res = self.inner.delete(path, args).await;
-        timer.observe_duration();
-        delete_res.map_err(|e| {
-            self.stats
-                .increment_errors_total(Operation::Delete, e.kind());
-            e
-        })
-    }
-
-    async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::List.into_static(),
-            path,
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-
-        let list_res = self.inner.list(path, args).await;
-
-        timer.observe_duration();
-        list_res.map_err(|e| {
-            self.stats.increment_errors_total(Operation::List, e.kind());
-            e
-        })
-    }
-
-    async fn batch(&self, args: OpBatch) -> Result<RpBatch> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::Batch.into_static(),
-            "",
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-        let result = self.inner.batch(args).await;
-
-        timer.observe_duration();
-        result.map_err(|e| {
-            self.stats
-                .increment_errors_total(Operation::Batch, e.kind());
-            e
-        })
-    }
-
-    async fn presign(&self, path: &str, args: OpPresign) -> Result<RpPresign> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::Presign.into_static(),
-            path,
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-        let result = self.inner.presign(path, args).await;
-        timer.observe_duration();
-
-        result.map_err(|e| {
-            self.stats
-                .increment_errors_total(Operation::Presign, e.kind());
-            e
-        })
-    }
-
-    fn blocking_create_dir(&self, path: &str, args: OpCreateDir) -> Result<RpCreateDir> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::BlockingCreateDir.into_static(),
-            path,
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-        let result = self.inner.blocking_create_dir(path, args);
-
-        timer.observe_duration();
-
-        result.map_err(|e| {
-            self.stats
-                .increment_errors_total(Operation::BlockingCreateDir, e.kind());
-            e
-        })
-    }
-
-    fn blocking_read(&self, path: &str, args: OpRead) -> Result<(RpRead, Self::BlockingReader)> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::BlockingRead.into_static(),
-            path,
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-        let result = self.inner.blocking_read(path, args).map(|(rp, r)| {
-            (
-                rp,
-                PrometheusMetricWrapper::new(
-                    r,
-                    Operation::BlockingRead,
-                    self.stats.clone(),
-                    self.scheme,
-                    &path.to_string(),
-                ),
+            .map_err(parse_prometheus_error)?
+        };
+        let operation_entries = {
+            let metric = observe::MetricValue::OperationEntries(0);
+            register_histogram_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                self.entries_buckets,
+                registry
             )
-        });
-        timer.observe_duration();
-        result.map_err(|e| {
-            self.stats
-                .increment_errors_total(Operation::BlockingRead, e.kind());
-            e
-        })
-    }
-
-    fn blocking_write(&self, path: &str, args: OpWrite) -> Result<(RpWrite, Self::BlockingWriter)> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::BlockingWrite.into_static(),
-            path,
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-        let result = self.inner.blocking_write(path, args).map(|(rp, r)| {
-            (
-                rp,
-                PrometheusMetricWrapper::new(
-                    r,
-                    Operation::BlockingWrite,
-                    self.stats.clone(),
-                    self.scheme,
-                    &path.to_string(),
-                ),
+            .map_err(parse_prometheus_error)?
+        };
+        let operation_entries_rate = {
+            let metric = observe::MetricValue::OperationEntriesRate(0.0);
+            register_histogram_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                self.entries_rate_buckets,
+                registry
             )
-        });
-        timer.observe_duration();
-        result.map_err(|e| {
-            self.stats
-                .increment_errors_total(Operation::BlockingWrite, e.kind());
-            e
+            .map_err(parse_prometheus_error)?
+        };
+        let operation_duration_seconds = {
+            let metric = observe::MetricValue::OperationDurationSeconds(Duration::default());
+            register_histogram_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                self.duration_seconds_buckets.clone(),
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+        let operation_executing = {
+            let metric = observe::MetricValue::OperationExecuting(0);
+            register_int_gauge_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+        let operation_ttfb_seconds = {
+            let metric = observe::MetricValue::OperationTtfbSeconds(Duration::default());
+            register_histogram_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                self.ttfb_buckets.clone(),
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+
+        let labels_with_error = OperationLabels::names().with_error();
+        let operation_errors_total = {
+            let metric = observe::MetricValue::OperationErrorsTotal;
+            register_int_counter_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels_with_error.as_ref(),
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+
+        let http_executing = {
+            let metric = observe::MetricValue::HttpExecuting(0);
+            register_int_gauge_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+        let http_request_bytes = {
+            let metric = observe::MetricValue::HttpRequestBytes(0);
+            register_histogram_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                self.bytes_buckets.clone(),
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+        let http_request_bytes_rate = {
+            let metric = observe::MetricValue::HttpRequestBytesRate(0.0);
+            register_histogram_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                self.bytes_rate_buckets.clone(),
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+        let http_request_duration_seconds = {
+            let metric = observe::MetricValue::HttpRequestDurationSeconds(Duration::default());
+            register_histogram_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                self.duration_seconds_buckets.clone(),
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+        let http_response_bytes = {
+            let metric = observe::MetricValue::HttpResponseBytes(0);
+            register_histogram_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                self.bytes_buckets,
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+        let http_response_bytes_rate = {
+            let metric = observe::MetricValue::HttpResponseBytesRate(0.0);
+            register_histogram_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                self.bytes_rate_buckets,
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+        let http_response_duration_seconds = {
+            let metric = observe::MetricValue::HttpResponseDurationSeconds(Duration::default());
+            register_histogram_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                self.duration_seconds_buckets,
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+        let http_connection_errors_total = {
+            let metric = observe::MetricValue::HttpConnectionErrorsTotal;
+            register_int_counter_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels.as_ref(),
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+
+        let labels_with_status_code = OperationLabels::names().with_status_code();
+        let http_status_errors_total = {
+            let metric = observe::MetricValue::HttpStatusErrorsTotal;
+            register_int_counter_vec_with_registry!(
+                metric.name(),
+                metric.help(),
+                labels_with_status_code.as_ref(),
+                registry
+            )
+            .map_err(parse_prometheus_error)?
+        };
+
+        Ok(PrometheusLayer {
+            interceptor: PrometheusInterceptor {
+                operation_bytes,
+                operation_bytes_rate,
+                operation_entries,
+                operation_entries_rate,
+                operation_duration_seconds,
+                operation_errors_total,
+                operation_executing,
+                operation_ttfb_seconds,
+
+                http_executing,
+                http_request_bytes,
+                http_request_bytes_rate,
+                http_request_duration_seconds,
+                http_response_bytes,
+                http_response_bytes_rate,
+                http_response_duration_seconds,
+                http_connection_errors_total,
+                http_status_errors_total,
+            },
         })
     }
 
-    fn blocking_stat(&self, path: &str, args: OpStat) -> Result<RpStat> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::BlockingStat.into_static(),
-            path,
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-        let result = self.inner.blocking_stat(path, args);
-        timer.observe_duration();
-        result.map_err(|e| {
-            self.stats
-                .increment_errors_total(Operation::BlockingStat, e.kind());
-            e
-        })
-    }
-
-    fn blocking_delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::BlockingDelete.into_static(),
-            path,
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-        let result = self.inner.blocking_delete(path, args);
-        timer.observe_duration();
-
-        result.map_err(|e| {
-            self.stats
-                .increment_errors_total(Operation::BlockingDelete, e.kind());
-            e
-        })
-    }
-
-    fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingLister)> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::BlockingList.into_static(),
-            path,
-        );
-        self.stats.requests_total.with_label_values(&labels).inc();
-
-        let timer = self
-            .stats
-            .requests_duration_seconds
-            .with_label_values(&labels)
-            .start_timer();
-        let result = self.inner.blocking_list(path, args);
-        timer.observe_duration();
-
-        result.map_err(|e| {
-            self.stats
-                .increment_errors_total(Operation::BlockingList, e.kind());
-            e
-        })
+    /// Register the metrics into the default registry and return a [`PrometheusLayer`].
+    ///
+    /// # Example
+    ///
+    /// ```no_run
+    /// # use log::debug;
+    /// # use opendal::layers::PrometheusLayer;
+    /// # use opendal::services;
+    /// # use opendal::Operator;
+    /// # use opendal::Result;
+    /// #
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<()> {
+    /// // Pick a builder and configure it.
+    /// let builder = services::Memory::default();
+    ///
+    /// let op = Operator::new(builder)?
+    ///     .layer(
+    ///         PrometheusLayer::builder()
+    ///             .register_default()
+    ///             .expect("register metrics successfully"),
+    ///     )
+    ///     .finish();
+    /// debug!("operator: {op:?}");
+    ///
+    /// Ok(())
+    /// # }
+    /// ```
+    pub fn register_default(self) -> Result<PrometheusLayer> {
+        let registry = prometheus::default_registry();
+        self.register(registry)
     }
 }
 
-pub struct PrometheusMetricWrapper<R> {
-    inner: R,
-
-    op: Operation,
-    stats: Arc<PrometheusMetrics>,
-    scheme: Scheme,
-    path: String,
+/// Convert the [`prometheus::Error`] to [`Error`].
+fn parse_prometheus_error(err: prometheus::Error) -> Error {
+    Error::new(ErrorKind::Unexpected, err.to_string()).set_source(err)
 }
 
-impl<R> PrometheusMetricWrapper<R> {
-    fn new(
-        inner: R,
-        op: Operation,
-        stats: Arc<PrometheusMetrics>,
-        scheme: Scheme,
-        path: &String,
-    ) -> Self {
-        Self {
-            inner,
-            op,
-            stats,
-            scheme,
-            path: path.to_string(),
+#[derive(Clone, Debug)]
+pub struct PrometheusInterceptor {
+    operation_bytes: HistogramVec,
+    operation_bytes_rate: HistogramVec,
+    operation_entries: HistogramVec,
+    operation_entries_rate: HistogramVec,
+    operation_duration_seconds: HistogramVec,
+    operation_errors_total: GenericCounterVec<AtomicU64>,
+    operation_executing: GenericGaugeVec<AtomicI64>,
+    operation_ttfb_seconds: HistogramVec,
+
+    http_executing: GenericGaugeVec<AtomicI64>,
+    http_request_bytes: HistogramVec,
+    http_request_bytes_rate: HistogramVec,
+    http_request_duration_seconds: HistogramVec,
+    http_response_bytes: HistogramVec,
+    http_response_bytes_rate: HistogramVec,
+    http_response_duration_seconds: HistogramVec,
+    http_connection_errors_total: GenericCounterVec<AtomicU64>,
+    http_status_errors_total: GenericCounterVec<AtomicU64>,
+}
+
+impl observe::MetricsIntercept for PrometheusInterceptor {
+    fn observe(&self, labels: observe::MetricLabels, value: observe::MetricValue) {
+        let labels = OperationLabels(labels);
+        match value {
+            observe::MetricValue::OperationBytes(v) => self
+                .operation_bytes
+                .with_label_values(&labels.values())
+                .observe(v as f64),
+            observe::MetricValue::OperationBytesRate(v) => self
+                .operation_bytes_rate
+                .with_label_values(&labels.values())
+                .observe(v),
+            observe::MetricValue::OperationEntries(v) => self
+                .operation_entries
+                .with_label_values(&labels.values())
+                .observe(v as f64),
+            observe::MetricValue::OperationEntriesRate(v) => self
+                .operation_entries_rate
+                .with_label_values(&labels.values())
+                .observe(v),
+            observe::MetricValue::OperationDurationSeconds(v) => self
+                .operation_duration_seconds
+                .with_label_values(&labels.values())
+                .observe(v.as_secs_f64()),
+            observe::MetricValue::OperationErrorsTotal => self
+                .operation_errors_total
+                .with_label_values(&labels.values())
+                .inc(),
+            observe::MetricValue::OperationExecuting(v) => self
+                .operation_executing
+                .with_label_values(&labels.values())
+                .add(v as i64),
+            observe::MetricValue::OperationTtfbSeconds(v) => self
+                .operation_ttfb_seconds
+                .with_label_values(&labels.values())
+                .observe(v.as_secs_f64()),
+
+            observe::MetricValue::HttpExecuting(v) => self
+                .http_executing
+                .with_label_values(&labels.values())
+                .add(v as i64),
+            observe::MetricValue::HttpRequestBytes(v) => self
+                .http_request_bytes
+                .with_label_values(&labels.values())
+                .observe(v as f64),
+            observe::MetricValue::HttpRequestBytesRate(v) => self
+                .http_request_bytes_rate
+                .with_label_values(&labels.values())
+                .observe(v),
+            observe::MetricValue::HttpRequestDurationSeconds(v) => self
+                .http_request_duration_seconds
+                .with_label_values(&labels.values())
+                .observe(v.as_secs_f64()),
+            observe::MetricValue::HttpResponseBytes(v) => self
+                .http_response_bytes
+                .with_label_values(&labels.values())
+                .observe(v as f64),
+            observe::MetricValue::HttpResponseBytesRate(v) => self
+                .http_response_bytes_rate
+                .with_label_values(&labels.values())
+                .observe(v),
+            observe::MetricValue::HttpResponseDurationSeconds(v) => self
+                .http_response_duration_seconds
+                .with_label_values(&labels.values())
+                .observe(v.as_secs_f64()),
+            observe::MetricValue::HttpConnectionErrorsTotal => self
+                .http_connection_errors_total
+                .with_label_values(&labels.values())
+                .inc(),
+            observe::MetricValue::HttpStatusErrorsTotal => self
+                .http_status_errors_total
+                .with_label_values(&labels.values())
+                .inc(),
         }
     }
 }
 
-impl<R: oio::Read> oio::Read for PrometheusMetricWrapper<R> {
-    fn poll_read(&mut self, cx: &mut Context<'_>, buf: &mut [u8]) -> Poll<Result<usize>> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::Read.into_static(),
-            &self.path,
-        );
-        self.inner.poll_read(cx, buf).map(|res| match res {
-            Ok(bytes) => {
-                self.stats
-                    .bytes_total
-                    .with_label_values(&labels)
-                    .observe(bytes as f64);
-                Ok(bytes)
-            }
-            Err(e) => {
-                self.stats.increment_errors_total(self.op, e.kind());
-                Err(e)
-            }
-        })
-    }
+struct OperationLabelNames(Vec<&'static str>);
 
-    fn poll_seek(&mut self, cx: &mut Context<'_>, pos: io::SeekFrom) -> Poll<Result<u64>> {
-        self.inner.poll_seek(cx, pos).map(|res| match res {
-            Ok(n) => Ok(n),
-            Err(e) => {
-                self.stats.increment_errors_total(self.op, e.kind());
-                Err(e)
-            }
-        })
-    }
-
-    fn poll_next(&mut self, cx: &mut Context<'_>) -> Poll<Option<Result<Bytes>>> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::Read.into_static(),
-            &self.path,
-        );
-        self.inner.poll_next(cx).map(|res| match res {
-            Some(Ok(bytes)) => {
-                self.stats
-                    .bytes_total
-                    .with_label_values(&labels)
-                    .observe(bytes.len() as f64);
-                Some(Ok(bytes))
-            }
-            Some(Err(e)) => {
-                self.stats.increment_errors_total(self.op, e.kind());
-                Some(Err(e))
-            }
-            None => None,
-        })
+impl AsRef<[&'static str]> for OperationLabelNames {
+    fn as_ref(&self) -> &[&'static str] {
+        &self.0
     }
 }
 
-impl<R: oio::BlockingRead> oio::BlockingRead for PrometheusMetricWrapper<R> {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::BlockingRead.into_static(),
-            &self.path,
-        );
-        self.inner
-            .read(buf)
-            .map(|n| {
-                self.stats
-                    .bytes_total
-                    .with_label_values(&labels)
-                    .observe(n as f64);
-                n
-            })
-            .map_err(|e| {
-                self.stats.increment_errors_total(self.op, e.kind());
-                e
-            })
+impl OperationLabelNames {
+    fn with_error(mut self) -> Self {
+        self.0.push(observe::LABEL_ERROR);
+        self
     }
 
-    fn seek(&mut self, pos: io::SeekFrom) -> Result<u64> {
-        self.inner.seek(pos).map_err(|err| {
-            self.stats.increment_errors_total(self.op, err.kind());
-            err
-        })
-    }
-
-    fn next(&mut self) -> Option<Result<Bytes>> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::BlockingRead.into_static(),
-            &self.path,
-        );
-        self.inner.next().map(|res| match res {
-            Ok(bytes) => {
-                self.stats
-                    .bytes_total
-                    .with_label_values(&labels)
-                    .observe(bytes.len() as f64);
-                Ok(bytes)
-            }
-            Err(e) => {
-                self.stats.increment_errors_total(self.op, e.kind());
-                Err(e)
-            }
-        })
+    fn with_status_code(mut self) -> Self {
+        self.0.push(observe::LABEL_STATUS_CODE);
+        self
     }
 }
 
-impl<R: oio::Write> oio::Write for PrometheusMetricWrapper<R> {
-    fn poll_write(&mut self, cx: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::Write.into_static(),
-            &self.path,
-        );
-        self.inner
-            .poll_write(cx, bs)
-            .map_ok(|n| {
-                self.stats
-                    .bytes_total
-                    .with_label_values(&labels)
-                    .observe(n as f64);
-                n
-            })
-            .map_err(|err| {
-                self.stats.increment_errors_total(self.op, err.kind());
-                err
-            })
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+struct OperationLabels(observe::MetricLabels);
+
+impl OperationLabels {
+    fn names() -> OperationLabelNames {
+        OperationLabelNames(vec![
+            observe::LABEL_SCHEME,
+            observe::LABEL_NAMESPACE,
+            observe::LABEL_ROOT,
+            observe::LABEL_OPERATION,
+        ])
     }
 
-    fn poll_abort(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        self.inner.poll_abort(cx).map_err(|err| {
-            self.stats.increment_errors_total(self.op, err.kind());
-            err
-        })
-    }
+    fn values(&self) -> Vec<&str> {
+        let mut labels = Vec::with_capacity(6);
 
-    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        self.inner.poll_close(cx).map_err(|err| {
-            self.stats.increment_errors_total(self.op, err.kind());
-            err
-        })
-    }
-}
+        labels.extend([
+            self.0.scheme.into_static(),
+            self.0.namespace.as_ref(),
+            self.0.root.as_ref(),
+            self.0.operation,
+        ]);
 
-impl<R: oio::BlockingWrite> oio::BlockingWrite for PrometheusMetricWrapper<R> {
-    fn write(&mut self, bs: &dyn oio::WriteBuf) -> Result<usize> {
-        let labels = self.stats.generate_metric_label(
-            self.scheme.into_static(),
-            Operation::BlockingWrite.into_static(),
-            &self.path,
-        );
-        self.inner
-            .write(bs)
-            .map(|n| {
-                self.stats
-                    .bytes_total
-                    .with_label_values(&labels)
-                    .observe(n as f64);
-                n
-            })
-            .map_err(|err| {
-                self.stats.increment_errors_total(self.op, err.kind());
-                err
-            })
-    }
+        if let Some(error) = self.0.error {
+            labels.push(error.into_static());
+        }
 
-    fn close(&mut self) -> Result<()> {
-        self.inner.close().map_err(|err| {
-            self.stats.increment_errors_total(self.op, err.kind());
-            err
-        })
-    }
-}
+        if let Some(status_code) = &self.0.status_code {
+            labels.push(status_code.as_str());
+        }
 
-fn get_path_label(path: &str, path_level: usize) -> &str {
-    if path_level > 0 {
-        return path
-            .char_indices()
-            .filter(|&(_, c)| c == '/')
-            .nth(path_level - 1)
-            .map_or(path, |(i, _)| &path[..i]);
-    }
-    ""
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_path_label() {
-        let path = "abc/def/ghi";
-        assert_eq!(get_path_label(path, 0), "");
-        assert_eq!(get_path_label(path, 1), "abc");
-        assert_eq!(get_path_label(path, 2), "abc/def");
-        assert_eq!(get_path_label(path, 3), "abc/def/ghi");
-        assert_eq!(get_path_label(path, usize::MAX), "abc/def/ghi");
-
-        assert_eq!(get_path_label("", 0), "");
+        labels
     }
 }

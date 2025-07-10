@@ -302,7 +302,7 @@ impl ParameterDisplay for String {
     }
 }
 
-impl ParameterDisplay for &repr::Parameter {
+impl<'me> ParameterDisplay for &'me repr::Parameter {
     fn to_parameter_string(self) -> String {
         format!("{}: {}", self.name, self.ty)
     }

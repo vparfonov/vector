@@ -15,9 +15,19 @@
 // specific language governing permissions and limitations
 // under the License.
 
+#[cfg(feature = "services-vercel-artifacts")]
 mod backend;
-mod builder;
+#[cfg(feature = "services-vercel-artifacts")]
+mod core;
+#[cfg(feature = "services-vercel-artifacts")]
 mod error;
+#[cfg(feature = "services-vercel-artifacts")]
 mod writer;
 
+#[cfg(feature = "services-vercel-artifacts")]
+mod builder;
+#[cfg(feature = "services-vercel-artifacts")]
 pub use builder::VercelArtifactsBuilder as VercelArtifacts;
+
+mod config;
+pub use config::VercelArtifactsConfig;

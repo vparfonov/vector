@@ -64,23 +64,23 @@ enum EncoderState {
 }
 
 #[derive(Debug)]
-pub struct Encoder<Tr: AsRef<Transaction>> {
+pub struct Encoder {
     keys: Vec<RegKey>,
-    tr: Tr,
+    tr: Transaction,
     state: EncoderState,
 }
 
 const ENCODER_SAM: u32 = KEY_CREATE_SUB_KEY | KEY_SET_VALUE;
 
-impl Encoder<Transaction> {
-    pub fn from_key(key: &RegKey) -> EncodeResult<Encoder<Transaction>> {
+impl Encoder {
+    pub fn from_key(key: &RegKey) -> EncodeResult<Encoder> {
         let tr = Transaction::new()?;
         key.open_subkey_transacted_with_flags("", &tr, ENCODER_SAM)
             .map(|k| Encoder::new(k, tr))
             .map_err(EncoderError::IoError)
     }
 
-    fn new(key: RegKey, tr: Transaction) -> Encoder<Transaction> {
+    fn new(key: RegKey, tr: Transaction) -> Encoder {
         let mut keys = Vec::with_capacity(5);
         keys.push(key);
         Encoder {
@@ -90,28 +90,7 @@ impl Encoder<Transaction> {
         }
     }
 
-    pub fn commit(self) -> EncodeResult<()> {
+    pub fn commit(&mut self) -> EncodeResult<()> {
         self.tr.commit().map_err(EncoderError::IoError)
-    }
-}
-
-impl Encoder<&Transaction> {
-    pub fn from_key_transacted<'a>(
-        key: &RegKey,
-        tr: &'a Transaction,
-    ) -> EncodeResult<Encoder<&'a Transaction>> {
-        key.open_subkey_transacted_with_flags("", &tr, ENCODER_SAM)
-            .map(|k| Encoder::new_transacted(k, tr))
-            .map_err(EncoderError::IoError)
-    }
-
-    fn new_transacted(key: RegKey, tr: &Transaction) -> Encoder<&Transaction> {
-        let mut keys = Vec::with_capacity(5);
-        keys.push(key);
-        Encoder {
-            keys,
-            tr,
-            state: Start,
-        }
     }
 }

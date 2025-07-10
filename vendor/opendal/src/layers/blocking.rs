@@ -15,13 +15,8 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use async_trait::async_trait;
-use bytes;
-use bytes::Bytes;
-use futures::future::poll_fn;
 use tokio::runtime::Handle;
 
-use crate::raw::oio::ReadExt;
 use crate::raw::*;
 use crate::*;
 
@@ -37,19 +32,17 @@ use crate::*;
 ///
 /// BlockingLayer will use current async context's runtime to handle the async calls.
 ///
-/// ```rust
-/// # use anyhow::Result;
-/// use opendal::layers::BlockingLayer;
-/// use opendal::services::S3;
-/// use opendal::BlockingOperator;
-/// use opendal::Operator;
+/// ```rust,no_run
+/// # use opendal::layers::BlockingLayer;
+/// # use opendal::services;
+/// # use opendal::BlockingOperator;
+/// # use opendal::Operator;
+/// # use opendal::Result;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<()> {
 ///     // Create fs backend builder.
-///     let mut builder = S3::default();
-///     builder.bucket("test");
-///     builder.region("us-east-1");
+///     let mut builder = services::S3::default().bucket("test").region("us-east-1");
 ///
 ///     // Build an `BlockingOperator` with blocking layer to start operating the storage.
 ///     let _: BlockingOperator = Operator::new(builder)?
@@ -64,15 +57,15 @@ use crate::*;
 /// ## In async context with blocking functions
 ///
 /// If `BlockingLayer` is called in blocking function, please fetch a [`tokio::runtime::EnterGuard`]
-/// first. You can use [`Handle::try_current`] first to get the handle and than call [`Handle::enter`].
+/// first. You can use [`Handle::try_current`] first to get the handle and then call [`Handle::enter`].
 /// This often happens in the case that async function calls blocking function.
 ///
-/// ```rust
-/// use opendal::layers::BlockingLayer;
-/// use opendal::services::S3;
-/// use opendal::BlockingOperator;
-/// use opendal::Operator;
-/// use opendal::Result;
+/// ```rust,no_run
+/// # use opendal::layers::BlockingLayer;
+/// # use opendal::services;
+/// # use opendal::BlockingOperator;
+/// # use opendal::Operator;
+/// # use opendal::Result;
 ///
 /// #[tokio::main]
 /// async fn main() -> Result<()> {
@@ -82,9 +75,7 @@ use crate::*;
 ///
 /// fn blocking_fn() -> Result<BlockingOperator> {
 ///     // Create fs backend builder.
-///     let mut builder = S3::default();
-///     builder.bucket("test");
-///     builder.region("us-east-1");
+///     let mut builder = services::S3::default().bucket("test").region("us-east-1");
 ///
 ///     let handle = tokio::runtime::Handle::try_current().unwrap();
 ///     let _guard = handle.enter();
@@ -102,29 +93,26 @@ use crate::*;
 /// In a pure blocking context, we can create a runtime and use it to create the `BlockingLayer`.
 ///
 /// > The following code uses a global statically created runtime as an example, please manage the
-/// runtime on demand.
+/// > runtime on demand.
 ///
-/// ```rust
-/// use once_cell::sync::Lazy;
-/// use opendal::layers::BlockingLayer;
-/// use opendal::services::S3;
-/// use opendal::BlockingOperator;
-/// use opendal::Operator;
-/// use opendal::Result;
+/// ```rust,no_run
+/// # use std::sync::LazyLock;
+/// # use opendal::layers::BlockingLayer;
+/// # use opendal::services;
+/// # use opendal::BlockingOperator;
+/// # use opendal::Operator;
+/// # use opendal::Result;
 ///
-/// static RUNTIME: Lazy<tokio::runtime::Runtime> = Lazy::new(|| {
+/// static RUNTIME: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
 ///     tokio::runtime::Builder::new_multi_thread()
 ///         .enable_all()
 ///         .build()
 ///         .unwrap()
 /// });
-/// ///
 ///
 /// fn main() -> Result<()> {
 ///     // Create fs backend builder.
-///     let mut builder = S3::default();
-///     builder.bucket("test");
-///     builder.region("us-east-1");
+///     let mut builder = services::S3::default().bucket("test").region("us-east-1");
 ///
 ///     // Fetch the `EnterGuard` from global runtime.
 ///     let _guard = RUNTIME.enter();
@@ -152,10 +140,16 @@ impl BlockingLayer {
     }
 }
 
-impl<A: Accessor> Layer<A> for BlockingLayer {
-    type LayeredAccessor = BlockingAccessor<A>;
+impl<A: Access> Layer<A> for BlockingLayer {
+    type LayeredAccess = BlockingAccessor<A>;
 
-    fn layer(&self, inner: A) -> Self::LayeredAccessor {
+    fn layer(&self, inner: A) -> Self::LayeredAccess {
+        let info = inner.info();
+        info.update_full_capability(|mut cap| {
+            cap.blocking = true;
+            cap
+        });
+
         BlockingAccessor {
             inner,
             handle: self.handle.clone(),
@@ -164,15 +158,13 @@ impl<A: Accessor> Layer<A> for BlockingLayer {
 }
 
 #[derive(Clone, Debug)]
-pub struct BlockingAccessor<A: Accessor> {
+pub struct BlockingAccessor<A: Access> {
     inner: A,
 
     handle: Handle,
 }
 
-#[cfg_attr(not(target_arch = "wasm32"), async_trait)]
-#[cfg_attr(target_arch = "wasm32", async_trait(?Send))]
-impl<A: Accessor> LayeredAccessor for BlockingAccessor<A> {
+impl<A: Access> LayeredAccess for BlockingAccessor<A> {
     type Inner = A;
     type Reader = A::Reader;
     type BlockingReader = BlockingWrapper<A::Reader>;
@@ -180,15 +172,11 @@ impl<A: Accessor> LayeredAccessor for BlockingAccessor<A> {
     type BlockingWriter = BlockingWrapper<A::Writer>;
     type Lister = A::Lister;
     type BlockingLister = BlockingWrapper<A::Lister>;
+    type Deleter = A::Deleter;
+    type BlockingDeleter = BlockingWrapper<A::Deleter>;
 
     fn inner(&self) -> &Self::Inner {
         &self.inner
-    }
-
-    fn metadata(&self) -> AccessorInfo {
-        let mut meta = self.inner.info();
-        meta.full_capability_mut().blocking = true;
-        meta
     }
 
     async fn create_dir(&self, path: &str, args: OpCreateDir) -> Result<RpCreateDir> {
@@ -215,8 +203,8 @@ impl<A: Accessor> LayeredAccessor for BlockingAccessor<A> {
         self.inner.stat(path, args).await
     }
 
-    async fn delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
-        self.inner.delete(path, args).await
+    async fn delete(&self) -> Result<(RpDelete, Self::Deleter)> {
+        self.inner.delete().await
     }
 
     async fn list(&self, path: &str, args: OpList) -> Result<(RpList, Self::Lister)> {
@@ -225,10 +213,6 @@ impl<A: Accessor> LayeredAccessor for BlockingAccessor<A> {
 
     async fn presign(&self, path: &str, args: OpPresign) -> Result<RpPresign> {
         self.inner.presign(path, args).await
-    }
-
-    async fn batch(&self, args: OpBatch) -> Result<RpBatch> {
-        self.inner.batch(args).await
     }
 
     fn blocking_create_dir(&self, path: &str, args: OpCreateDir) -> Result<RpCreateDir> {
@@ -264,8 +248,12 @@ impl<A: Accessor> LayeredAccessor for BlockingAccessor<A> {
         self.handle.block_on(self.inner.stat(path, args))
     }
 
-    fn blocking_delete(&self, path: &str, args: OpDelete) -> Result<RpDelete> {
-        self.handle.block_on(self.inner.delete(path, args))
+    fn blocking_delete(&self) -> Result<(RpDelete, Self::BlockingDeleter)> {
+        self.handle.block_on(async {
+            let (rp, writer) = self.inner.delete().await?;
+            let blocking_deleter = Self::BlockingDeleter::new(self.handle.clone(), writer);
+            Ok((rp, blocking_deleter))
+        })
     }
 
     fn blocking_list(&self, path: &str, args: OpList) -> Result<(RpList, Self::BlockingLister)> {
@@ -279,55 +267,68 @@ impl<A: Accessor> LayeredAccessor for BlockingAccessor<A> {
 
 pub struct BlockingWrapper<I> {
     handle: Handle,
-    inner: I,
+    inner: Option<I>,
 }
 
 impl<I> BlockingWrapper<I> {
     fn new(handle: Handle, inner: I) -> Self {
-        Self { handle, inner }
+        Self {
+            handle,
+            inner: Some(inner),
+        }
     }
 }
 
 impl<I: oio::Read + 'static> oio::BlockingRead for BlockingWrapper<I> {
-    fn read(&mut self, buf: &mut [u8]) -> Result<usize> {
-        self.handle.block_on(self.inner.read(buf))
-    }
-
-    fn seek(&mut self, pos: std::io::SeekFrom) -> Result<u64> {
-        self.handle.block_on(self.inner.seek(pos))
-    }
-
-    fn next(&mut self) -> Option<Result<Bytes>> {
-        self.handle.block_on(self.inner.next())
+    fn read(&mut self) -> Result<Buffer> {
+        self.handle.block_on(self.inner.as_mut().unwrap().read())
     }
 }
 
 impl<I: oio::Write + 'static> oio::BlockingWrite for BlockingWrapper<I> {
-    fn write(&mut self, bs: &dyn oio::WriteBuf) -> Result<usize> {
-        self.handle
-            .block_on(poll_fn(|cx| self.inner.poll_write(cx, bs)))
+    fn write(&mut self, bs: Buffer) -> Result<()> {
+        self.handle.block_on(self.inner.as_mut().unwrap().write(bs))
     }
 
-    fn close(&mut self) -> Result<()> {
-        self.handle
-            .block_on(poll_fn(|cx| self.inner.poll_close(cx)))
+    fn close(&mut self) -> Result<Metadata> {
+        self.handle.block_on(self.inner.as_mut().unwrap().close())
+    }
+}
+
+impl<I> Drop for BlockingWrapper<I> {
+    fn drop(&mut self) {
+        if let Some(inner) = self.inner.take() {
+            self.handle.block_on(async move {
+                drop(inner);
+            });
+        }
     }
 }
 
 impl<I: oio::List> oio::BlockingList for BlockingWrapper<I> {
     fn next(&mut self) -> Result<Option<oio::Entry>> {
-        self.handle.block_on(poll_fn(|cx| self.inner.poll_next(cx)))
+        self.handle.block_on(self.inner.as_mut().unwrap().next())
+    }
+}
+
+impl<I: oio::Delete + 'static> oio::BlockingDelete for BlockingWrapper<I> {
+    fn delete(&mut self, path: &str, args: OpDelete) -> Result<()> {
+        self.inner.as_mut().unwrap().delete(path, args)
+    }
+
+    fn flush(&mut self) -> Result<usize> {
+        self.handle.block_on(self.inner.as_mut().unwrap().flush())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use once_cell::sync::Lazy;
+    use std::sync::LazyLock;
 
     use super::*;
     use crate::types::Result;
 
-    static RUNTIME: Lazy<tokio::runtime::Runtime> = Lazy::new(|| {
+    static RUNTIME: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
         tokio::runtime::Builder::new_multi_thread()
             .enable_all()
             .build()

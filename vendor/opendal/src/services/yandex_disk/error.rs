@@ -21,9 +21,7 @@ use quick_xml::de;
 use serde::Deserialize;
 
 use crate::raw::*;
-use crate::Error;
-use crate::ErrorKind;
-use crate::Result;
+use crate::*;
 
 /// YandexDiskError is the error returned by YandexDisk service.
 #[derive(Default, Debug, Deserialize)]
@@ -35,12 +33,11 @@ struct YandexDiskError {
 }
 
 /// Parse error response into Error.
-pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
+pub(super) fn parse_error(resp: Response<Buffer>) -> Error {
     let (parts, body) = resp.into_parts();
-    let bs = body.bytes().await?;
+    let bs = body.to_bytes();
 
     let (kind, retryable) = match parts.status.as_u16() {
-        400 => (ErrorKind::InvalidInput, false),
         410 | 403 => (ErrorKind::PermissionDenied, false),
         404 => (ErrorKind::NotFound, false),
         // We should retry it when we get 423 error.
@@ -54,7 +51,7 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
         .map(|yandex_disk_err| (format!("{yandex_disk_err:?}"), Some(yandex_disk_err)))
         .unwrap_or_else(|_| (String::from_utf8_lossy(&bs).into_owned(), None));
 
-    let mut err = Error::new(kind, &message);
+    let mut err = Error::new(kind, message);
 
     err = with_error_response_context(err, parts);
 
@@ -62,12 +59,11 @@ pub async fn parse_error(resp: Response<IncomingAsyncBody>) -> Result<Error> {
         err = err.set_temporary();
     }
 
-    Ok(err)
+    err
 }
 
 #[cfg(test)]
 mod test {
-    use futures::stream;
     use http::StatusCode;
 
     use super::*;
@@ -97,16 +93,12 @@ mod test {
 
         for res in err_res {
             let bs = bytes::Bytes::from(res.0);
-            let body = IncomingAsyncBody::new(
-                Box::new(oio::into_stream(stream::iter(vec![Ok(bs.clone())]))),
-                None,
-            );
+            let body = Buffer::from(bs);
             let resp = Response::builder().status(res.2).body(body).unwrap();
 
-            let err = parse_error(resp).await;
+            let err = parse_error(resp);
 
-            assert!(err.is_ok());
-            assert_eq!(err.unwrap().kind(), res.1);
+            assert_eq!(err.kind(), res.1);
         }
     }
 }

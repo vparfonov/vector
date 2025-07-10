@@ -15,142 +15,200 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::task::ready;
-use std::task::Context;
-use std::task::Poll;
-
-use async_trait::async_trait;
-use futures::future::BoxFuture;
-
-use super::backend::GhacBackend;
+use super::core::*;
 use super::error::parse_error;
 use crate::raw::*;
+use crate::services::core::AzblobCore;
+use crate::services::writer::AzblobWriter;
 use crate::*;
+use std::str::FromStr;
+use std::sync::Arc;
 
-pub struct GhacWriter {
-    state: State,
+pub type GhacWriter = TwoWays<GhacWriterV1, GhacWriterV2>;
 
-    cache_id: i64,
+impl GhacWriter {
+    /// TODO: maybe we can move the signed url logic to azblob service instead.
+    pub fn new(core: Arc<GhacCore>, write_path: String, url: String) -> Result<Self> {
+        match core.service_version {
+            GhacVersion::V1 => Ok(TwoWays::One(GhacWriterV1 {
+                core,
+                path: write_path,
+                url,
+                size: 0,
+            })),
+            GhacVersion::V2 => {
+                let uri = http::Uri::from_str(&url)
+                    .map_err(new_http_uri_invalid_error)?
+                    .into_parts();
+                let (Some(scheme), Some(authority), Some(pq)) =
+                    (uri.scheme, uri.authority, uri.path_and_query)
+                else {
+                    return Err(Error::new(
+                        ErrorKind::Unexpected,
+                        "ghac returns invalid signed url",
+                    )
+                    .with_context("url", &url));
+                };
+                let endpoint = format!("{scheme}://{authority}");
+                let Some((container, path)) = pq.path().trim_matches('/').split_once("/") else {
+                    return Err(Error::new(
+                        ErrorKind::Unexpected,
+                        "ghac returns invalid signed url that bucket or path is missing",
+                    )
+                    .with_context("url", &url));
+                };
+                let Some(query) = pq.query() else {
+                    return Err(Error::new(
+                        ErrorKind::Unexpected,
+                        "ghac returns invalid signed url that sas is missing",
+                    )
+                    .with_context("url", &url));
+                };
+                let azure_core = Arc::new(AzblobCore {
+                    info: {
+                        let am = AccessorInfo::default();
+                        am.set_scheme(Scheme::Azblob)
+                            .set_root("/")
+                            .set_name(container)
+                            .set_native_capability(Capability {
+                                stat: true,
+                                stat_with_if_match: true,
+                                stat_with_if_none_match: true,
+                                stat_has_cache_control: true,
+                                stat_has_content_length: true,
+                                stat_has_content_type: true,
+                                stat_has_content_encoding: true,
+                                stat_has_content_range: true,
+                                stat_has_etag: true,
+                                stat_has_content_md5: true,
+                                stat_has_last_modified: true,
+                                stat_has_content_disposition: true,
+
+                                read: true,
+
+                                read_with_if_match: true,
+                                read_with_if_none_match: true,
+                                read_with_override_content_disposition: true,
+                                read_with_if_modified_since: true,
+                                read_with_if_unmodified_since: true,
+
+                                write: true,
+                                write_can_append: true,
+                                write_can_empty: true,
+                                write_can_multi: true,
+                                write_with_cache_control: true,
+                                write_with_content_type: true,
+                                write_with_if_not_exists: true,
+                                write_with_if_none_match: true,
+                                write_with_user_metadata: true,
+
+                                copy: true,
+
+                                list: true,
+                                list_with_recursive: true,
+                                list_has_etag: true,
+                                list_has_content_length: true,
+                                list_has_content_md5: true,
+                                list_has_content_type: true,
+                                list_has_last_modified: true,
+
+                                shared: true,
+
+                                ..Default::default()
+                            });
+
+                        am.into()
+                    },
+                    container: container.to_string(),
+                    root: "/".to_string(),
+                    endpoint,
+                    encryption_key: None,
+                    encryption_key_sha256: None,
+                    encryption_algorithm: None,
+                    loader: {
+                        let config = reqsign::AzureStorageConfig {
+                            sas_token: Some(query.to_string()),
+                            ..Default::default()
+                        };
+                        reqsign::AzureStorageLoader::new(config)
+                    },
+                    signer: { reqsign::AzureStorageSigner::new() },
+                });
+                let w = AzblobWriter::new(azure_core, OpWrite::default(), path.to_string());
+                let writer = oio::BlockWriter::new(core.info.clone(), w, 4);
+                Ok(TwoWays::Two(GhacWriterV2 {
+                    core,
+                    writer,
+                    path: write_path,
+                    url,
+                    size: 0,
+                }))
+            }
+        }
+    }
+}
+
+pub struct GhacWriterV1 {
+    core: Arc<GhacCore>,
+
+    path: String,
+    url: String,
     size: u64,
 }
 
-impl GhacWriter {
-    pub fn new(backend: GhacBackend, cache_id: i64) -> Self {
-        GhacWriter {
-            state: State::Idle(Some(backend)),
-            cache_id,
-            size: 0,
+impl oio::Write for GhacWriterV1 {
+    async fn write(&mut self, bs: Buffer) -> Result<()> {
+        let size = bs.len() as u64;
+        let offset = self.size;
+
+        let resp = self.core.ghac_v1_write(&self.url, size, offset, bs).await?;
+        if !resp.status().is_success() {
+            return Err(parse_error(resp).map(|err| err.with_operation("Backend::ghac_upload")));
         }
+        self.size += size;
+        Ok(())
+    }
+
+    async fn abort(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    async fn close(&mut self) -> Result<Metadata> {
+        self.core
+            .ghac_finalize_upload(&self.path, &self.url, self.size)
+            .await?;
+        Ok(Metadata::default().with_content_length(self.size))
     }
 }
 
-enum State {
-    Idle(Option<GhacBackend>),
-    Upload(BoxFuture<'static, (GhacBackend, Result<usize>)>),
-    Commit(BoxFuture<'static, (GhacBackend, Result<()>)>),
+pub struct GhacWriterV2 {
+    core: Arc<GhacCore>,
+    writer: oio::BlockWriter<AzblobWriter>,
+
+    path: String,
+    url: String,
+    size: u64,
 }
 
-/// # Safety
-///
-/// We will only take `&mut Self` reference for State.
-unsafe impl Sync for State {}
+impl oio::Write for GhacWriterV2 {
+    async fn write(&mut self, bs: Buffer) -> Result<()> {
+        let size = bs.len() as u64;
 
-#[async_trait]
-impl oio::Write for GhacWriter {
-    fn poll_write(&mut self, cx: &mut Context<'_>, bs: &dyn oio::WriteBuf) -> Poll<Result<usize>> {
-        loop {
-            match &mut self.state {
-                State::Idle(backend) => {
-                    let backend = backend.take().expect("GhacWriter must be initialized");
-
-                    let cache_id = self.cache_id;
-                    let offset = self.size;
-                    let size = bs.remaining();
-                    let bs = bs.bytes(size);
-
-                    let fut = async move {
-                        let res = async {
-                            let req = backend
-                                .ghac_upload(cache_id, offset, size as u64, AsyncBody::Bytes(bs))
-                                .await?;
-
-                            let resp = backend.client.send(req).await?;
-
-                            if resp.status().is_success() {
-                                resp.into_body().consume().await?;
-                                Ok(size)
-                            } else {
-                                Err(parse_error(resp)
-                                    .await
-                                    .map(|err| err.with_operation("Backend::ghac_upload"))?)
-                            }
-                        }
-                        .await;
-
-                        (backend, res)
-                    };
-                    self.state = State::Upload(Box::pin(fut));
-                }
-                State::Upload(fut) => {
-                    let (backend, res) = ready!(fut.as_mut().poll(cx));
-                    self.state = State::Idle(Some(backend));
-
-                    let size = res?;
-                    self.size += size as u64;
-                    return Poll::Ready(Ok(size));
-                }
-                State::Commit(_) => {
-                    unreachable!("GhacWriter must not go into State:Commit during poll_write")
-                }
-            }
-        }
+        self.writer.write(bs).await?;
+        self.size += size;
+        Ok(())
     }
 
-    fn poll_abort(&mut self, _: &mut Context<'_>) -> Poll<Result<()>> {
-        self.state = State::Idle(None);
-
-        Poll::Ready(Ok(()))
+    async fn close(&mut self) -> Result<Metadata> {
+        self.writer.close().await?;
+        let _ = self
+            .core
+            .ghac_finalize_upload(&self.path, &self.url, self.size)
+            .await;
+        Ok(Metadata::default().with_content_length(self.size))
     }
 
-    fn poll_close(&mut self, cx: &mut Context<'_>) -> Poll<Result<()>> {
-        loop {
-            match &mut self.state {
-                State::Idle(backend) => {
-                    let backend = backend.take().expect("GhacWriter must be initialized");
-
-                    let cache_id = self.cache_id;
-                    let size = self.size;
-
-                    let fut = async move {
-                        let res = async {
-                            let req = backend.ghac_commit(cache_id, size).await?;
-                            let resp = backend.client.send(req).await?;
-
-                            if resp.status().is_success() {
-                                resp.into_body().consume().await?;
-                                Ok(())
-                            } else {
-                                Err(parse_error(resp)
-                                    .await
-                                    .map(|err| err.with_operation("Backend::ghac_commit"))?)
-                            }
-                        }
-                        .await;
-
-                        (backend, res)
-                    };
-                    self.state = State::Commit(Box::pin(fut));
-                }
-                State::Upload(_) => {
-                    unreachable!("GhacWriter must not go into State:Upload during poll_close")
-                }
-                State::Commit(fut) => {
-                    let (backend, res) = ready!(fut.as_mut().poll(cx));
-                    self.state = State::Idle(Some(backend));
-
-                    return Poll::Ready(res);
-                }
-            }
-        }
+    async fn abort(&mut self) -> Result<()> {
+        Ok(())
     }
 }

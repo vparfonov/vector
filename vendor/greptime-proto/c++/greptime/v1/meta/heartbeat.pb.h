@@ -29,6 +29,9 @@
 #include <google/protobuf/message.h>
 #include <google/protobuf/repeated_field.h>  // IWYU pragma: export
 #include <google/protobuf/extension_set.h>  // IWYU pragma: export
+#include <google/protobuf/map.h>  // IWYU pragma: export
+#include <google/protobuf/map_entry.h>
+#include <google/protobuf/map_field_inl.h>
 #include <google/protobuf/generated_enum_reflection.h>
 #include <google/protobuf/unknown_field_set.h>
 #include "greptime/v1/meta/common.pb.h"
@@ -55,6 +58,12 @@ extern AskLeaderRequestDefaultTypeInternal _AskLeaderRequest_default_instance_;
 class AskLeaderResponse;
 struct AskLeaderResponseDefaultTypeInternal;
 extern AskLeaderResponseDefaultTypeInternal _AskLeaderResponse_default_instance_;
+class FlowStat;
+struct FlowStatDefaultTypeInternal;
+extern FlowStatDefaultTypeInternal _FlowStat_default_instance_;
+class FlowStat_FlowStatSizeEntry_DoNotUse;
+struct FlowStat_FlowStatSizeEntry_DoNotUseDefaultTypeInternal;
+extern FlowStat_FlowStatSizeEntry_DoNotUseDefaultTypeInternal _FlowStat_FlowStatSizeEntry_DoNotUse_default_instance_;
 class GrantedRegion;
 struct GrantedRegionDefaultTypeInternal;
 extern GrantedRegionDefaultTypeInternal _GrantedRegion_default_instance_;
@@ -67,24 +76,34 @@ extern HeartbeatResponseDefaultTypeInternal _HeartbeatResponse_default_instance_
 class MailboxMessage;
 struct MailboxMessageDefaultTypeInternal;
 extern MailboxMessageDefaultTypeInternal _MailboxMessage_default_instance_;
+class NodeInfo;
+struct NodeInfoDefaultTypeInternal;
+extern NodeInfoDefaultTypeInternal _NodeInfo_default_instance_;
 class RegionLease;
 struct RegionLeaseDefaultTypeInternal;
 extern RegionLeaseDefaultTypeInternal _RegionLease_default_instance_;
 class RegionStat;
 struct RegionStatDefaultTypeInternal;
 extern RegionStatDefaultTypeInternal _RegionStat_default_instance_;
+class RegionStat_ExtensionsEntry_DoNotUse;
+struct RegionStat_ExtensionsEntry_DoNotUseDefaultTypeInternal;
+extern RegionStat_ExtensionsEntry_DoNotUseDefaultTypeInternal _RegionStat_ExtensionsEntry_DoNotUse_default_instance_;
 }  // namespace meta
 }  // namespace v1
 }  // namespace greptime
 PROTOBUF_NAMESPACE_OPEN
 template<> ::greptime::v1::meta::AskLeaderRequest* Arena::CreateMaybeMessage<::greptime::v1::meta::AskLeaderRequest>(Arena*);
 template<> ::greptime::v1::meta::AskLeaderResponse* Arena::CreateMaybeMessage<::greptime::v1::meta::AskLeaderResponse>(Arena*);
+template<> ::greptime::v1::meta::FlowStat* Arena::CreateMaybeMessage<::greptime::v1::meta::FlowStat>(Arena*);
+template<> ::greptime::v1::meta::FlowStat_FlowStatSizeEntry_DoNotUse* Arena::CreateMaybeMessage<::greptime::v1::meta::FlowStat_FlowStatSizeEntry_DoNotUse>(Arena*);
 template<> ::greptime::v1::meta::GrantedRegion* Arena::CreateMaybeMessage<::greptime::v1::meta::GrantedRegion>(Arena*);
 template<> ::greptime::v1::meta::HeartbeatRequest* Arena::CreateMaybeMessage<::greptime::v1::meta::HeartbeatRequest>(Arena*);
 template<> ::greptime::v1::meta::HeartbeatResponse* Arena::CreateMaybeMessage<::greptime::v1::meta::HeartbeatResponse>(Arena*);
 template<> ::greptime::v1::meta::MailboxMessage* Arena::CreateMaybeMessage<::greptime::v1::meta::MailboxMessage>(Arena*);
+template<> ::greptime::v1::meta::NodeInfo* Arena::CreateMaybeMessage<::greptime::v1::meta::NodeInfo>(Arena*);
 template<> ::greptime::v1::meta::RegionLease* Arena::CreateMaybeMessage<::greptime::v1::meta::RegionLease>(Arena*);
 template<> ::greptime::v1::meta::RegionStat* Arena::CreateMaybeMessage<::greptime::v1::meta::RegionStat>(Arena*);
+template<> ::greptime::v1::meta::RegionStat_ExtensionsEntry_DoNotUse* Arena::CreateMaybeMessage<::greptime::v1::meta::RegionStat_ExtensionsEntry_DoNotUse>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
 namespace greptime {
 namespace v1 {
@@ -93,12 +112,13 @@ namespace meta {
 enum RegionRole : int {
   Leader = 0,
   Follower = 1,
+  DowngradingLeader = 2,
   RegionRole_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
   RegionRole_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
 };
 bool RegionRole_IsValid(int value);
 constexpr RegionRole RegionRole_MIN = Leader;
-constexpr RegionRole RegionRole_MAX = Follower;
+constexpr RegionRole RegionRole_MAX = DowngradingLeader;
 constexpr int RegionRole_ARRAYSIZE = RegionRole_MAX + 1;
 
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* RegionRole_descriptor();
@@ -243,6 +263,8 @@ class HeartbeatRequest final :
     kPeerFieldNumber = 2,
     kReportIntervalFieldNumber = 3,
     kMailboxMessageFieldNumber = 5,
+    kInfoFieldNumber = 8,
+    kFlowStatFieldNumber = 9,
     kDurationSinceEpochFieldNumber = 6,
     kNodeEpochFieldNumber = 7,
   };
@@ -336,6 +358,42 @@ class HeartbeatRequest final :
       ::greptime::v1::meta::MailboxMessage* mailbox_message);
   ::greptime::v1::meta::MailboxMessage* unsafe_arena_release_mailbox_message();
 
+  // .greptime.v1.meta.NodeInfo info = 8;
+  bool has_info() const;
+  private:
+  bool _internal_has_info() const;
+  public:
+  void clear_info();
+  const ::greptime::v1::meta::NodeInfo& info() const;
+  PROTOBUF_NODISCARD ::greptime::v1::meta::NodeInfo* release_info();
+  ::greptime::v1::meta::NodeInfo* mutable_info();
+  void set_allocated_info(::greptime::v1::meta::NodeInfo* info);
+  private:
+  const ::greptime::v1::meta::NodeInfo& _internal_info() const;
+  ::greptime::v1::meta::NodeInfo* _internal_mutable_info();
+  public:
+  void unsafe_arena_set_allocated_info(
+      ::greptime::v1::meta::NodeInfo* info);
+  ::greptime::v1::meta::NodeInfo* unsafe_arena_release_info();
+
+  // .greptime.v1.meta.FlowStat flow_stat = 9;
+  bool has_flow_stat() const;
+  private:
+  bool _internal_has_flow_stat() const;
+  public:
+  void clear_flow_stat();
+  const ::greptime::v1::meta::FlowStat& flow_stat() const;
+  PROTOBUF_NODISCARD ::greptime::v1::meta::FlowStat* release_flow_stat();
+  ::greptime::v1::meta::FlowStat* mutable_flow_stat();
+  void set_allocated_flow_stat(::greptime::v1::meta::FlowStat* flow_stat);
+  private:
+  const ::greptime::v1::meta::FlowStat& _internal_flow_stat() const;
+  ::greptime::v1::meta::FlowStat* _internal_mutable_flow_stat();
+  public:
+  void unsafe_arena_set_allocated_flow_stat(
+      ::greptime::v1::meta::FlowStat* flow_stat);
+  ::greptime::v1::meta::FlowStat* unsafe_arena_release_flow_stat();
+
   // uint64 duration_since_epoch = 6;
   void clear_duration_since_epoch();
   uint64_t duration_since_epoch() const;
@@ -367,6 +425,8 @@ class HeartbeatRequest final :
     ::greptime::v1::meta::Peer* peer_;
     ::greptime::v1::meta::TimeInterval* report_interval_;
     ::greptime::v1::meta::MailboxMessage* mailbox_message_;
+    ::greptime::v1::meta::NodeInfo* info_;
+    ::greptime::v1::meta::FlowStat* flow_stat_;
     uint64_t duration_since_epoch_;
     uint64_t node_epoch_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
@@ -374,6 +434,212 @@ class HeartbeatRequest final :
   union { Impl_ _impl_; };
   friend struct ::TableStruct_greptime_2fv1_2fmeta_2fheartbeat_2eproto;
 };
+// -------------------------------------------------------------------
+
+class NodeInfo final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:greptime.v1.meta.NodeInfo) */ {
+ public:
+  inline NodeInfo() : NodeInfo(nullptr) {}
+  ~NodeInfo() override;
+  explicit PROTOBUF_CONSTEXPR NodeInfo(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  NodeInfo(const NodeInfo& from);
+  NodeInfo(NodeInfo&& from) noexcept
+    : NodeInfo() {
+    *this = ::std::move(from);
+  }
+
+  inline NodeInfo& operator=(const NodeInfo& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline NodeInfo& operator=(NodeInfo&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const NodeInfo& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const NodeInfo* internal_default_instance() {
+    return reinterpret_cast<const NodeInfo*>(
+               &_NodeInfo_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    1;
+
+  friend void swap(NodeInfo& a, NodeInfo& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(NodeInfo* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(NodeInfo* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  NodeInfo* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<NodeInfo>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const NodeInfo& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const NodeInfo& from) {
+    NodeInfo::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(NodeInfo* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "greptime.v1.meta.NodeInfo";
+  }
+  protected:
+  explicit NodeInfo(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kVersionFieldNumber = 1,
+    kGitCommitFieldNumber = 2,
+    kStartTimeMsFieldNumber = 3,
+  };
+  // string version = 1;
+  void clear_version();
+  const std::string& version() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_version(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_version();
+  PROTOBUF_NODISCARD std::string* release_version();
+  void set_allocated_version(std::string* version);
+  private:
+  const std::string& _internal_version() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_version(const std::string& value);
+  std::string* _internal_mutable_version();
+  public:
+
+  // string git_commit = 2;
+  void clear_git_commit();
+  const std::string& git_commit() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_git_commit(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_git_commit();
+  PROTOBUF_NODISCARD std::string* release_git_commit();
+  void set_allocated_git_commit(std::string* git_commit);
+  private:
+  const std::string& _internal_git_commit() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_git_commit(const std::string& value);
+  std::string* _internal_mutable_git_commit();
+  public:
+
+  // uint64 start_time_ms = 3;
+  void clear_start_time_ms();
+  uint64_t start_time_ms() const;
+  void set_start_time_ms(uint64_t value);
+  private:
+  uint64_t _internal_start_time_ms() const;
+  void _internal_set_start_time_ms(uint64_t value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:greptime.v1.meta.NodeInfo)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr version_;
+    ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr git_commit_;
+    uint64_t start_time_ms_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_greptime_2fv1_2fmeta_2fheartbeat_2eproto;
+};
+// -------------------------------------------------------------------
+
+class RegionStat_ExtensionsEntry_DoNotUse : public ::PROTOBUF_NAMESPACE_ID::internal::MapEntry<RegionStat_ExtensionsEntry_DoNotUse, 
+    std::string, std::string,
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_STRING,
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_BYTES> {
+public:
+  typedef ::PROTOBUF_NAMESPACE_ID::internal::MapEntry<RegionStat_ExtensionsEntry_DoNotUse, 
+    std::string, std::string,
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_STRING,
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_BYTES> SuperType;
+  RegionStat_ExtensionsEntry_DoNotUse();
+  explicit PROTOBUF_CONSTEXPR RegionStat_ExtensionsEntry_DoNotUse(
+      ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  explicit RegionStat_ExtensionsEntry_DoNotUse(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  void MergeFrom(const RegionStat_ExtensionsEntry_DoNotUse& other);
+  static const RegionStat_ExtensionsEntry_DoNotUse* internal_default_instance() { return reinterpret_cast<const RegionStat_ExtensionsEntry_DoNotUse*>(&_RegionStat_ExtensionsEntry_DoNotUse_default_instance_); }
+  static bool ValidateKey(std::string* s) {
+    return ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(s->data(), static_cast<int>(s->size()), ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::PARSE, "greptime.v1.meta.RegionStat.ExtensionsEntry.key");
+ }
+  static bool ValidateValue(void*) { return true; }
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+  friend struct ::TableStruct_greptime_2fv1_2fmeta_2fheartbeat_2eproto;
+};
+
 // -------------------------------------------------------------------
 
 class RegionStat final :
@@ -424,7 +690,7 @@ class RegionStat final :
                &_RegionStat_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    1;
+    3;
 
   friend void swap(RegionStat& a, RegionStat& b) {
     a.Swap(&b);
@@ -485,6 +751,8 @@ class RegionStat final :
   protected:
   explicit RegionStat(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                        bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
   public:
 
   static const ClassData _class_data_;
@@ -494,17 +762,35 @@ class RegionStat final :
 
   // nested types ----------------------------------------------------
 
+
   // accessors -------------------------------------------------------
 
   enum : int {
+    kExtensionsFieldNumber = 99,
     kEngineFieldNumber = 6,
     kRegionIdFieldNumber = 1,
     kRcusFieldNumber = 2,
     kWcusFieldNumber = 3,
     kApproximateBytesFieldNumber = 4,
-    kApproximateRowsFieldNumber = 5,
     kRoleFieldNumber = 7,
   };
+  // map<string, bytes> extensions = 99;
+  int extensions_size() const;
+  private:
+  int _internal_extensions_size() const;
+  public:
+  void clear_extensions();
+  private:
+  const ::PROTOBUF_NAMESPACE_ID::Map< std::string, std::string >&
+      _internal_extensions() const;
+  ::PROTOBUF_NAMESPACE_ID::Map< std::string, std::string >*
+      _internal_mutable_extensions();
+  public:
+  const ::PROTOBUF_NAMESPACE_ID::Map< std::string, std::string >&
+      extensions() const;
+  ::PROTOBUF_NAMESPACE_ID::Map< std::string, std::string >*
+      mutable_extensions();
+
   // string engine = 6;
   void clear_engine();
   const std::string& engine() const;
@@ -555,15 +841,6 @@ class RegionStat final :
   void _internal_set_approximate_bytes(int64_t value);
   public:
 
-  // int64 approximate_rows = 5;
-  void clear_approximate_rows();
-  int64_t approximate_rows() const;
-  void set_approximate_rows(int64_t value);
-  private:
-  int64_t _internal_approximate_rows() const;
-  void _internal_set_approximate_rows(int64_t value);
-  public:
-
   // .greptime.v1.meta.RegionRole role = 7;
   void clear_role();
   ::greptime::v1::meta::RegionRole role() const;
@@ -581,13 +858,204 @@ class RegionStat final :
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
   struct Impl_ {
+    ::PROTOBUF_NAMESPACE_ID::internal::MapField<
+        RegionStat_ExtensionsEntry_DoNotUse,
+        std::string, std::string,
+        ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_STRING,
+        ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_BYTES> extensions_;
     ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr engine_;
     uint64_t region_id_;
     int64_t rcus_;
     int64_t wcus_;
     int64_t approximate_bytes_;
-    int64_t approximate_rows_;
     int role_;
+    mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  };
+  union { Impl_ _impl_; };
+  friend struct ::TableStruct_greptime_2fv1_2fmeta_2fheartbeat_2eproto;
+};
+// -------------------------------------------------------------------
+
+class FlowStat_FlowStatSizeEntry_DoNotUse : public ::PROTOBUF_NAMESPACE_ID::internal::MapEntry<FlowStat_FlowStatSizeEntry_DoNotUse, 
+    uint32_t, uint64_t,
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_UINT32,
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_UINT64> {
+public:
+  typedef ::PROTOBUF_NAMESPACE_ID::internal::MapEntry<FlowStat_FlowStatSizeEntry_DoNotUse, 
+    uint32_t, uint64_t,
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_UINT32,
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_UINT64> SuperType;
+  FlowStat_FlowStatSizeEntry_DoNotUse();
+  explicit PROTOBUF_CONSTEXPR FlowStat_FlowStatSizeEntry_DoNotUse(
+      ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  explicit FlowStat_FlowStatSizeEntry_DoNotUse(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  void MergeFrom(const FlowStat_FlowStatSizeEntry_DoNotUse& other);
+  static const FlowStat_FlowStatSizeEntry_DoNotUse* internal_default_instance() { return reinterpret_cast<const FlowStat_FlowStatSizeEntry_DoNotUse*>(&_FlowStat_FlowStatSizeEntry_DoNotUse_default_instance_); }
+  static bool ValidateKey(void*) { return true; }
+  static bool ValidateValue(void*) { return true; }
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+  friend struct ::TableStruct_greptime_2fv1_2fmeta_2fheartbeat_2eproto;
+};
+
+// -------------------------------------------------------------------
+
+class FlowStat final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:greptime.v1.meta.FlowStat) */ {
+ public:
+  inline FlowStat() : FlowStat(nullptr) {}
+  ~FlowStat() override;
+  explicit PROTOBUF_CONSTEXPR FlowStat(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  FlowStat(const FlowStat& from);
+  FlowStat(FlowStat&& from) noexcept
+    : FlowStat() {
+    *this = ::std::move(from);
+  }
+
+  inline FlowStat& operator=(const FlowStat& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline FlowStat& operator=(FlowStat&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const FlowStat& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const FlowStat* internal_default_instance() {
+    return reinterpret_cast<const FlowStat*>(
+               &_FlowStat_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    5;
+
+  friend void swap(FlowStat& a, FlowStat& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(FlowStat* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(FlowStat* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  FlowStat* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<FlowStat>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const FlowStat& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom( const FlowStat& from) {
+    FlowStat::MergeImpl(*this, from);
+  }
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _impl_._cached_size_.Get(); }
+
+  private:
+  void SharedCtor(::PROTOBUF_NAMESPACE_ID::Arena* arena, bool is_message_owned);
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(FlowStat* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "greptime.v1.meta.FlowStat";
+  }
+  protected:
+  explicit FlowStat(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kFlowStatSizeFieldNumber = 1,
+  };
+  // map<uint32, uint64> flow_stat_size = 1;
+  int flow_stat_size_size() const;
+  private:
+  int _internal_flow_stat_size_size() const;
+  public:
+  void clear_flow_stat_size();
+  private:
+  const ::PROTOBUF_NAMESPACE_ID::Map< uint32_t, uint64_t >&
+      _internal_flow_stat_size() const;
+  ::PROTOBUF_NAMESPACE_ID::Map< uint32_t, uint64_t >*
+      _internal_mutable_flow_stat_size();
+  public:
+  const ::PROTOBUF_NAMESPACE_ID::Map< uint32_t, uint64_t >&
+      flow_stat_size() const;
+  ::PROTOBUF_NAMESPACE_ID::Map< uint32_t, uint64_t >*
+      mutable_flow_stat_size();
+
+  // @@protoc_insertion_point(class_scope:greptime.v1.meta.FlowStat)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  struct Impl_ {
+    ::PROTOBUF_NAMESPACE_ID::internal::MapField<
+        FlowStat_FlowStatSizeEntry_DoNotUse,
+        uint32_t, uint64_t,
+        ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_UINT32,
+        ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::TYPE_UINT64> flow_stat_size_;
     mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   };
   union { Impl_ _impl_; };
@@ -643,7 +1111,7 @@ class HeartbeatResponse final :
                &_HeartbeatResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    2;
+    6;
 
   friend void swap(HeartbeatResponse& a, HeartbeatResponse& b) {
     a.Swap(&b);
@@ -840,7 +1308,7 @@ class GrantedRegion final :
                &_GrantedRegion_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    3;
+    7;
 
   friend void swap(GrantedRegion& a, GrantedRegion& b) {
     a.Swap(&b);
@@ -999,7 +1467,7 @@ class RegionLease final :
                &_RegionLease_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    4;
+    8;
 
   friend void swap(RegionLease& a, RegionLease& b) {
     a.Swap(&b);
@@ -1203,7 +1671,7 @@ class AskLeaderRequest final :
                &_AskLeaderRequest_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    5;
+    9;
 
   friend void swap(AskLeaderRequest& a, AskLeaderRequest& b) {
     a.Swap(&b);
@@ -1360,7 +1828,7 @@ class AskLeaderResponse final :
                &_AskLeaderResponse_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    6;
+    10;
 
   friend void swap(AskLeaderResponse& a, AskLeaderResponse& b) {
     a.Swap(&b);
@@ -1542,7 +2010,7 @@ class MailboxMessage final :
                &_MailboxMessage_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
-    7;
+    11;
 
   friend void swap(MailboxMessage& a, MailboxMessage& b) {
     a.Swap(&b);
@@ -2167,6 +2635,312 @@ inline void HeartbeatRequest::set_node_epoch(uint64_t value) {
   // @@protoc_insertion_point(field_set:greptime.v1.meta.HeartbeatRequest.node_epoch)
 }
 
+// .greptime.v1.meta.NodeInfo info = 8;
+inline bool HeartbeatRequest::_internal_has_info() const {
+  return this != internal_default_instance() && _impl_.info_ != nullptr;
+}
+inline bool HeartbeatRequest::has_info() const {
+  return _internal_has_info();
+}
+inline void HeartbeatRequest::clear_info() {
+  if (GetArenaForAllocation() == nullptr && _impl_.info_ != nullptr) {
+    delete _impl_.info_;
+  }
+  _impl_.info_ = nullptr;
+}
+inline const ::greptime::v1::meta::NodeInfo& HeartbeatRequest::_internal_info() const {
+  const ::greptime::v1::meta::NodeInfo* p = _impl_.info_;
+  return p != nullptr ? *p : reinterpret_cast<const ::greptime::v1::meta::NodeInfo&>(
+      ::greptime::v1::meta::_NodeInfo_default_instance_);
+}
+inline const ::greptime::v1::meta::NodeInfo& HeartbeatRequest::info() const {
+  // @@protoc_insertion_point(field_get:greptime.v1.meta.HeartbeatRequest.info)
+  return _internal_info();
+}
+inline void HeartbeatRequest::unsafe_arena_set_allocated_info(
+    ::greptime::v1::meta::NodeInfo* info) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.info_);
+  }
+  _impl_.info_ = info;
+  if (info) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:greptime.v1.meta.HeartbeatRequest.info)
+}
+inline ::greptime::v1::meta::NodeInfo* HeartbeatRequest::release_info() {
+  
+  ::greptime::v1::meta::NodeInfo* temp = _impl_.info_;
+  _impl_.info_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::greptime::v1::meta::NodeInfo* HeartbeatRequest::unsafe_arena_release_info() {
+  // @@protoc_insertion_point(field_release:greptime.v1.meta.HeartbeatRequest.info)
+  
+  ::greptime::v1::meta::NodeInfo* temp = _impl_.info_;
+  _impl_.info_ = nullptr;
+  return temp;
+}
+inline ::greptime::v1::meta::NodeInfo* HeartbeatRequest::_internal_mutable_info() {
+  
+  if (_impl_.info_ == nullptr) {
+    auto* p = CreateMaybeMessage<::greptime::v1::meta::NodeInfo>(GetArenaForAllocation());
+    _impl_.info_ = p;
+  }
+  return _impl_.info_;
+}
+inline ::greptime::v1::meta::NodeInfo* HeartbeatRequest::mutable_info() {
+  ::greptime::v1::meta::NodeInfo* _msg = _internal_mutable_info();
+  // @@protoc_insertion_point(field_mutable:greptime.v1.meta.HeartbeatRequest.info)
+  return _msg;
+}
+inline void HeartbeatRequest::set_allocated_info(::greptime::v1::meta::NodeInfo* info) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.info_;
+  }
+  if (info) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(info);
+    if (message_arena != submessage_arena) {
+      info = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, info, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.info_ = info;
+  // @@protoc_insertion_point(field_set_allocated:greptime.v1.meta.HeartbeatRequest.info)
+}
+
+// .greptime.v1.meta.FlowStat flow_stat = 9;
+inline bool HeartbeatRequest::_internal_has_flow_stat() const {
+  return this != internal_default_instance() && _impl_.flow_stat_ != nullptr;
+}
+inline bool HeartbeatRequest::has_flow_stat() const {
+  return _internal_has_flow_stat();
+}
+inline void HeartbeatRequest::clear_flow_stat() {
+  if (GetArenaForAllocation() == nullptr && _impl_.flow_stat_ != nullptr) {
+    delete _impl_.flow_stat_;
+  }
+  _impl_.flow_stat_ = nullptr;
+}
+inline const ::greptime::v1::meta::FlowStat& HeartbeatRequest::_internal_flow_stat() const {
+  const ::greptime::v1::meta::FlowStat* p = _impl_.flow_stat_;
+  return p != nullptr ? *p : reinterpret_cast<const ::greptime::v1::meta::FlowStat&>(
+      ::greptime::v1::meta::_FlowStat_default_instance_);
+}
+inline const ::greptime::v1::meta::FlowStat& HeartbeatRequest::flow_stat() const {
+  // @@protoc_insertion_point(field_get:greptime.v1.meta.HeartbeatRequest.flow_stat)
+  return _internal_flow_stat();
+}
+inline void HeartbeatRequest::unsafe_arena_set_allocated_flow_stat(
+    ::greptime::v1::meta::FlowStat* flow_stat) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(_impl_.flow_stat_);
+  }
+  _impl_.flow_stat_ = flow_stat;
+  if (flow_stat) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:greptime.v1.meta.HeartbeatRequest.flow_stat)
+}
+inline ::greptime::v1::meta::FlowStat* HeartbeatRequest::release_flow_stat() {
+  
+  ::greptime::v1::meta::FlowStat* temp = _impl_.flow_stat_;
+  _impl_.flow_stat_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::greptime::v1::meta::FlowStat* HeartbeatRequest::unsafe_arena_release_flow_stat() {
+  // @@protoc_insertion_point(field_release:greptime.v1.meta.HeartbeatRequest.flow_stat)
+  
+  ::greptime::v1::meta::FlowStat* temp = _impl_.flow_stat_;
+  _impl_.flow_stat_ = nullptr;
+  return temp;
+}
+inline ::greptime::v1::meta::FlowStat* HeartbeatRequest::_internal_mutable_flow_stat() {
+  
+  if (_impl_.flow_stat_ == nullptr) {
+    auto* p = CreateMaybeMessage<::greptime::v1::meta::FlowStat>(GetArenaForAllocation());
+    _impl_.flow_stat_ = p;
+  }
+  return _impl_.flow_stat_;
+}
+inline ::greptime::v1::meta::FlowStat* HeartbeatRequest::mutable_flow_stat() {
+  ::greptime::v1::meta::FlowStat* _msg = _internal_mutable_flow_stat();
+  // @@protoc_insertion_point(field_mutable:greptime.v1.meta.HeartbeatRequest.flow_stat)
+  return _msg;
+}
+inline void HeartbeatRequest::set_allocated_flow_stat(::greptime::v1::meta::FlowStat* flow_stat) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete _impl_.flow_stat_;
+  }
+  if (flow_stat) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalGetOwningArena(flow_stat);
+    if (message_arena != submessage_arena) {
+      flow_stat = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, flow_stat, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  _impl_.flow_stat_ = flow_stat;
+  // @@protoc_insertion_point(field_set_allocated:greptime.v1.meta.HeartbeatRequest.flow_stat)
+}
+
+// -------------------------------------------------------------------
+
+// NodeInfo
+
+// string version = 1;
+inline void NodeInfo::clear_version() {
+  _impl_.version_.ClearToEmpty();
+}
+inline const std::string& NodeInfo::version() const {
+  // @@protoc_insertion_point(field_get:greptime.v1.meta.NodeInfo.version)
+  return _internal_version();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void NodeInfo::set_version(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.version_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:greptime.v1.meta.NodeInfo.version)
+}
+inline std::string* NodeInfo::mutable_version() {
+  std::string* _s = _internal_mutable_version();
+  // @@protoc_insertion_point(field_mutable:greptime.v1.meta.NodeInfo.version)
+  return _s;
+}
+inline const std::string& NodeInfo::_internal_version() const {
+  return _impl_.version_.Get();
+}
+inline void NodeInfo::_internal_set_version(const std::string& value) {
+  
+  _impl_.version_.Set(value, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::_internal_mutable_version() {
+  
+  return _impl_.version_.Mutable(GetArenaForAllocation());
+}
+inline std::string* NodeInfo::release_version() {
+  // @@protoc_insertion_point(field_release:greptime.v1.meta.NodeInfo.version)
+  return _impl_.version_.Release();
+}
+inline void NodeInfo::set_allocated_version(std::string* version) {
+  if (version != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.version_.SetAllocated(version, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.version_.IsDefault()) {
+    _impl_.version_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:greptime.v1.meta.NodeInfo.version)
+}
+
+// string git_commit = 2;
+inline void NodeInfo::clear_git_commit() {
+  _impl_.git_commit_.ClearToEmpty();
+}
+inline const std::string& NodeInfo::git_commit() const {
+  // @@protoc_insertion_point(field_get:greptime.v1.meta.NodeInfo.git_commit)
+  return _internal_git_commit();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void NodeInfo::set_git_commit(ArgT0&& arg0, ArgT... args) {
+ 
+ _impl_.git_commit_.Set(static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:greptime.v1.meta.NodeInfo.git_commit)
+}
+inline std::string* NodeInfo::mutable_git_commit() {
+  std::string* _s = _internal_mutable_git_commit();
+  // @@protoc_insertion_point(field_mutable:greptime.v1.meta.NodeInfo.git_commit)
+  return _s;
+}
+inline const std::string& NodeInfo::_internal_git_commit() const {
+  return _impl_.git_commit_.Get();
+}
+inline void NodeInfo::_internal_set_git_commit(const std::string& value) {
+  
+  _impl_.git_commit_.Set(value, GetArenaForAllocation());
+}
+inline std::string* NodeInfo::_internal_mutable_git_commit() {
+  
+  return _impl_.git_commit_.Mutable(GetArenaForAllocation());
+}
+inline std::string* NodeInfo::release_git_commit() {
+  // @@protoc_insertion_point(field_release:greptime.v1.meta.NodeInfo.git_commit)
+  return _impl_.git_commit_.Release();
+}
+inline void NodeInfo::set_allocated_git_commit(std::string* git_commit) {
+  if (git_commit != nullptr) {
+    
+  } else {
+    
+  }
+  _impl_.git_commit_.SetAllocated(git_commit, GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (_impl_.git_commit_.IsDefault()) {
+    _impl_.git_commit_.Set("", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:greptime.v1.meta.NodeInfo.git_commit)
+}
+
+// uint64 start_time_ms = 3;
+inline void NodeInfo::clear_start_time_ms() {
+  _impl_.start_time_ms_ = uint64_t{0u};
+}
+inline uint64_t NodeInfo::_internal_start_time_ms() const {
+  return _impl_.start_time_ms_;
+}
+inline uint64_t NodeInfo::start_time_ms() const {
+  // @@protoc_insertion_point(field_get:greptime.v1.meta.NodeInfo.start_time_ms)
+  return _internal_start_time_ms();
+}
+inline void NodeInfo::_internal_set_start_time_ms(uint64_t value) {
+  
+  _impl_.start_time_ms_ = value;
+}
+inline void NodeInfo::set_start_time_ms(uint64_t value) {
+  _internal_set_start_time_ms(value);
+  // @@protoc_insertion_point(field_set:greptime.v1.meta.NodeInfo.start_time_ms)
+}
+
+// -------------------------------------------------------------------
+
 // -------------------------------------------------------------------
 
 // RegionStat
@@ -2251,26 +3025,6 @@ inline void RegionStat::set_approximate_bytes(int64_t value) {
   // @@protoc_insertion_point(field_set:greptime.v1.meta.RegionStat.approximate_bytes)
 }
 
-// int64 approximate_rows = 5;
-inline void RegionStat::clear_approximate_rows() {
-  _impl_.approximate_rows_ = int64_t{0};
-}
-inline int64_t RegionStat::_internal_approximate_rows() const {
-  return _impl_.approximate_rows_;
-}
-inline int64_t RegionStat::approximate_rows() const {
-  // @@protoc_insertion_point(field_get:greptime.v1.meta.RegionStat.approximate_rows)
-  return _internal_approximate_rows();
-}
-inline void RegionStat::_internal_set_approximate_rows(int64_t value) {
-  
-  _impl_.approximate_rows_ = value;
-}
-inline void RegionStat::set_approximate_rows(int64_t value) {
-  _internal_set_approximate_rows(value);
-  // @@protoc_insertion_point(field_set:greptime.v1.meta.RegionStat.approximate_rows)
-}
-
 // string engine = 6;
 inline void RegionStat::clear_engine() {
   _impl_.engine_.ClearToEmpty();
@@ -2339,6 +3093,70 @@ inline void RegionStat::_internal_set_role(::greptime::v1::meta::RegionRole valu
 inline void RegionStat::set_role(::greptime::v1::meta::RegionRole value) {
   _internal_set_role(value);
   // @@protoc_insertion_point(field_set:greptime.v1.meta.RegionStat.role)
+}
+
+// map<string, bytes> extensions = 99;
+inline int RegionStat::_internal_extensions_size() const {
+  return _impl_.extensions_.size();
+}
+inline int RegionStat::extensions_size() const {
+  return _internal_extensions_size();
+}
+inline void RegionStat::clear_extensions() {
+  _impl_.extensions_.Clear();
+}
+inline const ::PROTOBUF_NAMESPACE_ID::Map< std::string, std::string >&
+RegionStat::_internal_extensions() const {
+  return _impl_.extensions_.GetMap();
+}
+inline const ::PROTOBUF_NAMESPACE_ID::Map< std::string, std::string >&
+RegionStat::extensions() const {
+  // @@protoc_insertion_point(field_map:greptime.v1.meta.RegionStat.extensions)
+  return _internal_extensions();
+}
+inline ::PROTOBUF_NAMESPACE_ID::Map< std::string, std::string >*
+RegionStat::_internal_mutable_extensions() {
+  return _impl_.extensions_.MutableMap();
+}
+inline ::PROTOBUF_NAMESPACE_ID::Map< std::string, std::string >*
+RegionStat::mutable_extensions() {
+  // @@protoc_insertion_point(field_mutable_map:greptime.v1.meta.RegionStat.extensions)
+  return _internal_mutable_extensions();
+}
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// FlowStat
+
+// map<uint32, uint64> flow_stat_size = 1;
+inline int FlowStat::_internal_flow_stat_size_size() const {
+  return _impl_.flow_stat_size_.size();
+}
+inline int FlowStat::flow_stat_size_size() const {
+  return _internal_flow_stat_size_size();
+}
+inline void FlowStat::clear_flow_stat_size() {
+  _impl_.flow_stat_size_.Clear();
+}
+inline const ::PROTOBUF_NAMESPACE_ID::Map< uint32_t, uint64_t >&
+FlowStat::_internal_flow_stat_size() const {
+  return _impl_.flow_stat_size_.GetMap();
+}
+inline const ::PROTOBUF_NAMESPACE_ID::Map< uint32_t, uint64_t >&
+FlowStat::flow_stat_size() const {
+  // @@protoc_insertion_point(field_map:greptime.v1.meta.FlowStat.flow_stat_size)
+  return _internal_flow_stat_size();
+}
+inline ::PROTOBUF_NAMESPACE_ID::Map< uint32_t, uint64_t >*
+FlowStat::_internal_mutable_flow_stat_size() {
+  return _impl_.flow_stat_size_.MutableMap();
+}
+inline ::PROTOBUF_NAMESPACE_ID::Map< uint32_t, uint64_t >*
+FlowStat::mutable_flow_stat_size() {
+  // @@protoc_insertion_point(field_mutable_map:greptime.v1.meta.FlowStat.flow_stat_size)
+  return _internal_mutable_flow_stat_size();
 }
 
 // -------------------------------------------------------------------
@@ -3331,6 +4149,14 @@ inline MailboxMessage::PayloadCase MailboxMessage::payload_case() const {
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------

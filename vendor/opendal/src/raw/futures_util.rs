@@ -15,267 +15,346 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use std::collections::VecDeque;
-use std::future::Future;
-use std::pin::Pin;
-use std::task::Context;
-use std::task::Poll;
+use std::{
+    collections::VecDeque,
+    sync::atomic::Ordering,
+    sync::{atomic::AtomicUsize, Arc},
+};
 
-use futures::stream::FuturesOrdered;
 use futures::FutureExt;
-use futures::StreamExt;
+
+use crate::*;
 
 /// BoxedFuture is the type alias of [`futures::future::BoxFuture`].
 ///
 /// We will switch to [`futures::future::LocalBoxFuture`] on wasm32 target.
 #[cfg(not(target_arch = "wasm32"))]
-pub type BoxedFuture<T> = futures::future::BoxFuture<'static, T>;
+pub type BoxedFuture<'a, T> = futures::future::BoxFuture<'a, T>;
 #[cfg(target_arch = "wasm32")]
-pub type BoxedFuture<T> = futures::future::LocalBoxFuture<'static, T>;
+pub type BoxedFuture<'a, T> = futures::future::LocalBoxFuture<'a, T>;
 
-/// CONCURRENT_LARGE_THRESHOLD is the threshold to determine whether to use
-/// [`FuturesOrdered`] or not.
+/// BoxedStaticFuture is the type alias of [`futures::future::BoxFuture`].
 ///
-/// The value of `8` is picked by random, no strict benchmark is done.
-/// Please raise an issue if you found the value is not good enough or you want to configure
-/// this value at runtime.
-const CONCURRENT_LARGE_THRESHOLD: usize = 8;
+/// We will switch to [`futures::future::LocalBoxFuture`] on wasm32 target.
+#[cfg(not(target_arch = "wasm32"))]
+pub type BoxedStaticFuture<T> = futures::future::BoxFuture<'static, T>;
+#[cfg(target_arch = "wasm32")]
+pub type BoxedStaticFuture<T> = futures::future::LocalBoxFuture<'static, T>;
 
-/// ConcurrentFutures is a stream that can hold a stream of concurrent futures.
+/// MaybeSend is a marker to determine whether a type is `Send` or not.
+/// We use this trait to wrap the `Send` requirement for wasm32 target.
 ///
-/// - the order of the futures is the same.
-/// - the number of concurrent futures is limited by concurrent.
-/// - optimized for small number of concurrent futures.
-/// - zero cost for non-concurrent futures cases (concurrent == 1).
-pub struct ConcurrentFutures<F: Future + Unpin> {
-    tasks: Tasks<F>,
+/// # Safety
+///
+/// [`MaybeSend`] is equivalent to `Send` on non-wasm32 target.
+/// And it's empty trait on wasm32 target to indicate that a type is not `Send`.
+#[cfg(not(target_arch = "wasm32"))]
+pub trait MaybeSend: Send {}
+#[cfg(target_arch = "wasm32")]
+pub trait MaybeSend {}
+
+#[cfg(not(target_arch = "wasm32"))]
+impl<T: Send> MaybeSend for T {}
+#[cfg(target_arch = "wasm32")]
+impl<T> MaybeSend for T {}
+
+/// ConcurrentTasks is used to execute tasks concurrently.
+///
+/// ConcurrentTasks has two generic types:
+///
+/// - `I` represents the input type of the task.
+/// - `O` represents the output type of the task.
+///
+/// # Implementation Notes
+///
+/// The code patterns below are intentional; please do not modify them unless you fully understand these notes.
+///
+/// ```skip
+///  let (i, o) = self
+///     .tasks
+///     .front_mut()                                        // Use `front_mut` instead of `pop_front`
+///     .expect("tasks must be available")
+///     .await;
+/// ...
+/// match o {
+///     Ok(o) => {
+///         let _ = self.tasks.pop_front();                 // `pop_front` after got `Ok(o)`
+///         self.results.push_back(o)
+///     }
+///     Err(err) => {
+///         if err.is_temporary() {
+///             let task = self.create_task(i);
+///             self.tasks
+///                 .front_mut()
+///                 .expect("tasks must be available")
+///                 .replace(task)                          // Use replace here to instead of `push_front`
+///         } else {
+///             self.clear();
+///             self.errored = true;
+///         }
+///         return Err(err);
+///     }
+/// }
+/// ```
+///
+/// Please keep in mind that there is no guarantee the task will be `await`ed until completion. It's possible
+/// the task may be dropped before it resolves. Therefore, we should keep the `Task` in the `tasks` queue until
+/// it is resolved.
+///
+/// For example, users may have a timeout for the task, and the task will be dropped if it exceeds the timeout.
+/// If we `pop_front` the task before it resolves, the task will be canceled and the result will be lost.
+pub struct ConcurrentTasks<I, O> {
+    /// The executor to execute the tasks.
+    ///
+    /// If user doesn't provide an executor, the tasks will be executed with the default executor.
+    executor: Executor,
+    /// The factory to create the task.
+    ///
+    /// Caller of ConcurrentTasks must provides a factory to create the task for executing.
+    ///
+    /// The factory must accept an input and return a future that resolves to a tuple of input and
+    /// output result. If the given result is error, the error will be returned to users and the
+    /// task will be retried.
+    factory: fn(I) -> BoxedStaticFuture<(I, Result<O>)>,
+
+    /// `tasks` holds the ongoing tasks.
+    ///
+    /// Please keep in mind that all tasks are running in the background by `Executor`. We only need
+    /// to poll the tasks to see if they are ready.
+    ///
+    /// Dropping task without `await` it will cancel the task.
+    tasks: VecDeque<Task<(I, Result<O>)>>,
+    /// `results` stores the successful results.
+    results: VecDeque<O>,
+
+    /// The maximum number of concurrent tasks.
     concurrent: usize,
+    /// Tracks the number of tasks that have finished execution but have not yet been collected.
+    /// This count is subtracted from the total concurrency capacity, ensuring that the system
+    /// always schedules new tasks to maintain the user's desired concurrency level.
+    ///
+    /// Example: If `concurrency = 10` and `completed_but_unretrieved = 3`,
+    ///          the system can still spawn 7 new tasks (since 3 slots are "logically occupied"
+    ///          by uncollected results).
+    completed_but_unretrieved: Arc<AtomicUsize>,
+    /// hitting the last unrecoverable error.
+    ///
+    /// If concurrent tasks hit an unrecoverable error, it will stop executing new tasks and return
+    /// an unrecoverable error to users.
+    errored: bool,
 }
 
-/// Tasks is used to hold the entire task queue.
-enum Tasks<F: Future + Unpin> {
-    /// The special case for concurrent == 1.
+impl<I: Send + 'static, O: Send + 'static> ConcurrentTasks<I, O> {
+    /// Create a new concurrent tasks with given executor, concurrent and factory.
     ///
-    /// It works exactly the same like `Option<Fut>` in a struct.
-    Once(Option<F>),
-    /// The special cases for concurrent is small.
-    ///
-    /// At this case, the cost to loop poll is lower than using `FuturesOrdered`.
-    ///
-    /// We will replace the future by `TaskResult::Ready` once it's ready to avoid consume it again.
-    Small(VecDeque<TaskResult<F>>),
-    /// The general cases for large concurrent.
-    ///
-    /// We use `FuturesOrdered` to avoid huge amount of poll on futures.
-    Large(FuturesOrdered<F>),
-}
+    /// The factory is a function pointer that shouldn't capture any context.
+    pub fn new(
+        executor: Executor,
+        concurrent: usize,
+        factory: fn(I) -> BoxedStaticFuture<(I, Result<O>)>,
+    ) -> Self {
+        Self {
+            executor,
+            factory,
 
-impl<F: Future + Unpin> Unpin for Tasks<F> {}
-
-enum TaskResult<F: Future + Unpin> {
-    Polling(F),
-    Ready(F::Output),
-}
-
-impl<F> ConcurrentFutures<F>
-where
-    F: Future + Unpin + 'static,
-{
-    /// Create a new ConcurrentFutures by specifying the number of concurrent futures.
-    pub fn new(concurrent: usize) -> Self {
-        if (0..2).contains(&concurrent) {
-            Self {
-                tasks: Tasks::Once(None),
-                concurrent,
-            }
-        } else if (2..=CONCURRENT_LARGE_THRESHOLD).contains(&concurrent) {
-            Self {
-                tasks: Tasks::Small(VecDeque::with_capacity(concurrent)),
-                concurrent,
-            }
-        } else {
-            Self {
-                tasks: Tasks::Large(FuturesOrdered::new()),
-                concurrent,
-            }
+            tasks: VecDeque::with_capacity(concurrent),
+            results: VecDeque::with_capacity(concurrent),
+            concurrent,
+            completed_but_unretrieved: Arc::default(),
+            errored: false,
         }
     }
 
-    /// Drop all tasks.
+    /// Return true if the tasks are running concurrently.
+    #[inline]
+    fn is_concurrent(&self) -> bool {
+        self.concurrent > 1
+    }
+
+    /// Clear all tasks and results.
+    ///
+    /// All ongoing tasks will be canceled.
     pub fn clear(&mut self) {
-        match &mut self.tasks {
-            Tasks::Once(fut) => *fut = None,
-            Tasks::Small(tasks) => tasks.clear(),
-            Tasks::Large(tasks) => *tasks = FuturesOrdered::new(),
-        }
+        self.tasks.clear();
+        self.results.clear();
     }
 
-    /// Return the length of current concurrent futures (both ongoing and ready).
-    pub fn len(&self) -> usize {
-        match &self.tasks {
-            Tasks::Once(fut) => fut.is_some() as usize,
-            Tasks::Small(v) => v.len(),
-            Tasks::Large(v) => v.len(),
-        }
-    }
-
-    /// Return true if there is no futures in the queue.
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    /// Return the number of remaining space to push new futures.
-    pub fn remaining(&self) -> usize {
-        self.concurrent - self.len()
-    }
-
-    /// Return true if there is remaining space to push new futures.
+    /// Check if there are remaining space to push new tasks.
+    #[inline]
     pub fn has_remaining(&self) -> bool {
-        self.remaining() > 0
+        self.tasks.len() < self.concurrent + self.completed_but_unretrieved.load(Ordering::Relaxed)
     }
 
-    /// Push new future into the end of queue.
-    pub fn push_back(&mut self, f: F) {
-        debug_assert!(
-            self.has_remaining(),
-            "concurrent futures must have remaining space"
-        );
+    /// Chunk if there are remaining results to fetch.
+    #[inline]
+    pub fn has_result(&self) -> bool {
+        !self.results.is_empty()
+    }
 
-        match &mut self.tasks {
-            Tasks::Once(fut) => {
-                *fut = Some(f);
-            }
-            Tasks::Small(v) => v.push_back(TaskResult::Polling(f)),
-            Tasks::Large(v) => v.push_back(f),
+    /// Create a task with given input.
+    pub fn create_task(&self, input: I) -> Task<(I, Result<O>)> {
+        let completed = self.completed_but_unretrieved.clone();
+
+        let fut = (self.factory)(input).inspect(move |_| {
+            completed.fetch_add(1, Ordering::Relaxed);
+        });
+
+        self.executor.execute(fut)
+    }
+
+    /// Execute the task with given input.
+    ///
+    /// - Execute the task in the current thread if is not concurrent.
+    /// - Execute the task in the background if there are available slots.
+    /// - Await the first task in the queue if there is no available slots.
+    pub async fn execute(&mut self, input: I) -> Result<()> {
+        if self.errored {
+            return Err(Error::new(
+                ErrorKind::Unexpected,
+                "concurrent tasks met an unrecoverable error",
+            ));
         }
-    }
 
-    /// Push new future into the start of queue, this task will be exactly the next to poll.
-    pub fn push_front(&mut self, f: F) {
-        debug_assert!(
-            self.has_remaining(),
-            "concurrent futures must have remaining space"
-        );
-
-        match &mut self.tasks {
-            Tasks::Once(fut) => {
-                *fut = Some(f);
-            }
-            Tasks::Small(v) => v.push_front(TaskResult::Polling(f)),
-            Tasks::Large(v) => v.push_front(f),
-        }
-    }
-}
-
-impl<F> futures::Stream for ConcurrentFutures<F>
-where
-    F: Future + Unpin + 'static,
-{
-    type Item = F::Output;
-
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        match &mut self.get_mut().tasks {
-            Tasks::Once(fut) => match fut {
-                Some(x) => x.poll_unpin(cx).map(|v| {
-                    *fut = None;
-                    Some(v)
-                }),
-                None => Poll::Ready(None),
-            },
-            Tasks::Small(v) => {
-                // Poll all tasks together.
-                for task in v.iter_mut() {
-                    if let TaskResult::Polling(f) = task {
-                        match f.poll_unpin(cx) {
-                            Poll::Pending => {}
-                            Poll::Ready(res) => {
-                                // Replace with ready value if this future has been resolved.
-                                *task = TaskResult::Ready(res);
-                            }
-                        }
-                    }
+        // Short path for non-concurrent case.
+        if !self.is_concurrent() {
+            let (_, o) = (self.factory)(input).await;
+            return match o {
+                Ok(o) => {
+                    self.results.push_back(o);
+                    Ok(())
                 }
+                // We don't need to rebuild the future if it's not concurrent.
+                Err(err) => Err(err),
+            };
+        }
 
-                // Pick the first one to check.
-                match v.front_mut() {
-                    // Return pending if the first one is still polling.
-                    Some(TaskResult::Polling(_)) => Poll::Pending,
-                    Some(TaskResult::Ready(_)) => {
-                        let res = v.pop_front().unwrap();
-                        match res {
-                            TaskResult::Polling(_) => unreachable!(),
-                            TaskResult::Ready(res) => Poll::Ready(Some(res)),
-                        }
+        if !self.has_remaining() {
+            let (i, o) = self
+                .tasks
+                .front_mut()
+                .expect("tasks must be available")
+                .await;
+            self.completed_but_unretrieved
+                .fetch_sub(1, Ordering::Relaxed);
+            match o {
+                Ok(o) => {
+                    let _ = self.tasks.pop_front();
+                    self.results.push_back(o)
+                }
+                Err(err) => {
+                    // Retry this task if the error is temporary
+                    if err.is_temporary() {
+                        let task = self.create_task(i);
+                        self.tasks
+                            .front_mut()
+                            .expect("tasks must be available")
+                            .replace(task)
+                    } else {
+                        self.clear();
+                        self.errored = true;
                     }
-                    None => Poll::Ready(None),
+                    return Err(err);
                 }
             }
-            Tasks::Large(v) => v.poll_next_unpin(cx),
         }
+
+        self.tasks.push_back(self.create_task(input));
+        Ok(())
+    }
+
+    /// Fetch the successful result from the result queue.
+    pub async fn next(&mut self) -> Option<Result<O>> {
+        if self.errored {
+            return Some(Err(Error::new(
+                ErrorKind::Unexpected,
+                "concurrent tasks met an unrecoverable error",
+            )));
+        }
+
+        if let Some(result) = self.results.pop_front() {
+            return Some(Ok(result));
+        }
+
+        if let Some(task) = self.tasks.front_mut() {
+            let (i, o) = task.await;
+            self.completed_but_unretrieved
+                .fetch_sub(1, Ordering::Relaxed);
+            return match o {
+                Ok(o) => {
+                    let _ = self.tasks.pop_front();
+                    Some(Ok(o))
+                }
+                Err(err) => {
+                    // Retry this task if the error is temporary
+                    if err.is_temporary() {
+                        let task = self.create_task(i);
+                        self.tasks
+                            .front_mut()
+                            .expect("tasks must be available")
+                            .replace(task)
+                    } else {
+                        self.clear();
+                        self.errored = true;
+                    }
+                    Some(Err(err))
+                }
+            };
+        }
+
+        None
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::task::ready;
     use std::time::Duration;
 
-    use futures::future::BoxFuture;
-    use futures::Stream;
     use rand::Rng;
+    use tokio::time::sleep;
 
     use super::*;
-
-    struct Lister {
-        size: usize,
-        idx: usize,
-        concurrent: usize,
-        tasks: ConcurrentFutures<BoxFuture<'static, usize>>,
-    }
-
-    impl Stream for Lister {
-        type Item = usize;
-
-        fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-            // Randomly sleep for a while, simulate some io operations that up to 100 microseconds.
-            let timeout = Duration::from_micros(rand::thread_rng().gen_range(0..100));
-            let idx = self.idx;
-            if self.tasks.len() < self.concurrent && self.idx < self.size {
-                let fut = async move {
-                    tokio::time::sleep(timeout).await;
-                    idx
-                };
-                self.idx += 1;
-                self.tasks.push_back(Box::pin(fut));
-            }
-
-            if let Some(v) = ready!(self.tasks.poll_next_unpin(cx)) {
-                Poll::Ready(Some(v))
-            } else {
-                Poll::Ready(None)
-            }
-        }
-    }
+    use pretty_assertions::assert_eq;
 
     #[tokio::test]
-    async fn test_concurrent_futures() {
-        let cases = vec![
-            ("once", 1),
-            ("small", CONCURRENT_LARGE_THRESHOLD - 1),
-            ("large", CONCURRENT_LARGE_THRESHOLD + 1),
-        ];
+    async fn test_concurrent_tasks() {
+        let executor = Executor::new();
 
-        for (name, concurrent) in cases {
-            let lister = Lister {
-                size: 1000,
-                idx: 0,
-                concurrent,
-                tasks: ConcurrentFutures::new(concurrent),
-            };
-            let expected: Vec<usize> = (0..1000).collect();
-            let result: Vec<usize> = lister.collect().await;
+        let mut tasks = ConcurrentTasks::new(executor, 16, |(i, dur)| {
+            Box::pin(async move {
+                sleep(dur).await;
 
-            assert_eq!(expected, result, "concurrent futures failed: {}", name);
+                // 5% rate to fail.
+                if rand::thread_rng().gen_range(0..100) > 90 {
+                    return (
+                        (i, dur),
+                        Err(Error::new(ErrorKind::Unexpected, "I'm lucky").set_temporary()),
+                    );
+                }
+                ((i, dur), Ok(i))
+            })
+        });
+
+        let mut ans = vec![];
+
+        for i in 0..10240 {
+            // Sleep up to 10ms
+            let dur = Duration::from_millis(rand::thread_rng().gen_range(0..10));
+            loop {
+                let res = tasks.execute((i, dur)).await;
+                if res.is_ok() {
+                    break;
+                }
+            }
         }
+
+        loop {
+            match tasks.next().await.transpose() {
+                Ok(Some(i)) => ans.push(i),
+                Ok(None) => break,
+                Err(_) => continue,
+            }
+        }
+
+        assert_eq!(ans, (0..10240).collect::<Vec<_>>())
     }
 }

@@ -13,7 +13,7 @@
 edition = "2021"
 rust-version = "1.74"
 name = "clap-verbosity-flag"
-version = "3.0.2"
+version = "3.0.3"
 authors = ["Pascal Hertleif <killercup@gmail.com>"]
 build = false
 include = [
@@ -41,6 +41,7 @@ all-features = true
 rustdoc-args = [
     "--cfg",
     "docsrs",
+    "--generate-link-to-definition",
 ]
 
 [[package.metadata.release.pre-release-replacements]]
@@ -77,6 +78,14 @@ replace = """
 <!-- next-url -->
 [Unreleased]: https://github.com/clap-rs/clap-verbosity-flag/compare/{{tag_name}}...HEAD"""
 search = "<!-- next-url -->"
+
+[badges.codecov]
+repository = "clap-rs/clap-verbosity-flag"
+
+[features]
+default = ["log"]
+log = ["dep:log"]
+tracing = ["dep:tracing-core"]
 
 [lib]
 name = "clap_verbosity_flag"
@@ -130,14 +139,6 @@ version = "0.1"
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
 
-[features]
-default = ["log"]
-log = ["dep:log"]
-tracing = ["dep:tracing-core"]
-
-[badges.codecov]
-repository = "clap-rs/clap-verbosity-flag"
-
 [lints.clippy]
 bool_assert_comparison = "allow"
 branches_sharing_code = "allow"
@@ -183,6 +184,7 @@ rc_mutex = "warn"
 redundant_feature_names = "warn"
 ref_option_ref = "warn"
 rest_pat_in_fully_bound_structs = "warn"
+result_large_err = "allow"
 same_functions_in_if_condition = "warn"
 self_named_module_files = "warn"
 semicolon_if_nothing_returned = "warn"

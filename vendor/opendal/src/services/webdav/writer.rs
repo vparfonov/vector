@@ -15,13 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use async_trait::async_trait;
-use http::StatusCode;
 use std::sync::Arc;
+
+use http::StatusCode;
 
 use super::core::*;
 use super::error::parse_error;
-use crate::raw::oio::WriteBuf;
 use crate::raw::*;
 use crate::*;
 
@@ -38,29 +37,20 @@ impl WebdavWriter {
     }
 }
 
-#[async_trait]
 impl oio::OneShotWrite for WebdavWriter {
-    async fn write_once(&self, bs: &dyn WriteBuf) -> Result<()> {
-        let bs = oio::ChunkedBytes::from_vec(bs.vectored_bytes(bs.remaining()));
-
+    async fn write_once(&self, bs: Buffer) -> Result<Metadata> {
         let resp = self
             .core
-            .webdav_put(
-                &self.path,
-                Some(bs.len() as u64),
-                &self.op,
-                AsyncBody::ChunkedBytes(bs),
-            )
+            .webdav_put(&self.path, Some(bs.len() as u64), &self.op, bs)
             .await?;
 
         let status = resp.status();
 
         match status {
             StatusCode::CREATED | StatusCode::OK | StatusCode::NO_CONTENT => {
-                resp.into_body().consume().await?;
-                Ok(())
+                Ok(Metadata::default())
             }
-            _ => Err(parse_error(resp).await?),
+            _ => Err(parse_error(resp)),
         }
     }
 }

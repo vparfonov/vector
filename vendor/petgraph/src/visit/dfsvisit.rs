@@ -264,12 +264,12 @@ where
     C::continuing()
 }
 
-pub(crate) fn dfs_visitor<G, F, C>(
+fn dfs_visitor<G, F, C>(
     graph: G,
     u: G::NodeId,
     visitor: &mut F,
-    discovered: &mut impl VisitMap<G::NodeId>,
-    finished: &mut impl VisitMap<G::NodeId>,
+    discovered: &mut G::Map,
+    finished: &mut G::Map,
     time: &mut Time,
 ) -> C
 where

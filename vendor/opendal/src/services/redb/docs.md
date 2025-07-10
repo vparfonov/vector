@@ -10,30 +10,30 @@ This service can be used to:
 - [x] copy
 - [x] rename
 - [ ] ~~list~~
-- [ ] scan
 - [ ] ~~presign~~
 - [x] blocking
 
 ## Configuration
 
-- `datadir`: Set the path to the redb data directory
+- `datadir`: Set the path to the redb data directory.
+- `table`: Set the table name for Redb.
 
-You can refer to [`RedbBuilder`]'s docs for more information
+You can refer to [`RedbBuilder`]'s docs for more information.
 
 ## Example
 
 ### Via Builder
 
-```rust
+```rust,no_run
 use anyhow::Result;
 use opendal::services::Redb;
 use opendal::Operator;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let mut builder = Redb::default();
-    builder.datadir("/tmp/opendal/redb");
-    builder.table("opendal-redb");
+    let mut builder = Redb::default()
+        .datadir("/tmp/opendal/redb")
+        .table("opendal-redb");
 
     let op: Operator = Operator::new(builder)?.finish();
     Ok(())

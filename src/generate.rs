@@ -651,6 +651,14 @@ mod tests {
         );
     }
 
+    /// Test for the basic YAML generator.
+    ///
+    /// # Panics
+    ///
+    /// This test will panic if the generated string does not exactly match the
+    /// snapshot. This is sensitive to the key serialization order from `serde`.
+    /// If this fails after a dependency update, verify the new output is correct
+    /// and update the snapshot.
     #[cfg(all(
         feature = "sources-demo_logs",
         feature = "transforms-remap",
@@ -710,6 +718,14 @@ mod tests {
         );
     }
 
+    /// Test for the basic JSON generator.
+    ///
+    /// # Panics
+    ///
+    /// This test will panic if the generated string does not exactly match the
+    /// snapshot. This is sensitive to the key serialization order from `serde`.
+    /// If this fails after a dependency update, verify the new output is correct
+    /// and update the snapshot.
     #[cfg(all(
         feature = "sources-demo_logs",
         feature = "transforms-remap",

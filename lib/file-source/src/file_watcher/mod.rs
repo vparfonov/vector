@@ -11,7 +11,9 @@ use flate2::bufread::MultiGzDecoder;
 use tracing::debug;
 
 use crate::{
-    buffer::read_until_with_max_size, metadata_ext::PortableFileExt, FilePosition, ReadFrom,
+    buffer::{read_until_with_max_size, ReadResult},
+    metadata_ext::PortableFileExt,
+    FilePosition, ReadFrom,
 };
 #[cfg(test)]
 mod tests;
@@ -25,6 +27,12 @@ mod tests;
 pub(super) struct RawLine {
     pub offset: u64,
     pub bytes: Bytes,
+}
+
+#[derive(Debug)]
+pub struct RawLineResult {
+    pub raw_line: Option<RawLine>,
+    pub discarded_for_size_and_truncated: Vec<BytesMut>,
 }
 
 /// The `FileWatcher` struct defines the polling based state machine which reads
@@ -206,7 +214,7 @@ impl FileWatcher {
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler as needed, transparently to the caller.
-    pub(super) fn read_line(&mut self) -> io::Result<Option<RawLine>> {
+    pub(super) fn read_line(&mut self) -> io::Result<RawLineResult> {
         self.track_read_attempt();
 
         let reader = &mut self.reader;
@@ -219,14 +227,23 @@ impl FileWatcher {
             &mut self.buf,
             self.max_line_bytes,
         ) {
-            Ok(Some(_)) => {
+            Ok(ReadResult {
+                successfully_read: Some(_),
+                discarded_for_size_and_truncated,
+            }) => {
                 self.track_read_success();
-                Ok(Some(RawLine {
-                    offset: initial_position,
-                    bytes: self.buf.split().freeze(),
-                }))
+                Ok(RawLineResult {
+                    raw_line: Some(RawLine {
+                        offset: initial_position,
+                        bytes: self.buf.split().freeze(),
+                    }),
+                    discarded_for_size_and_truncated,
+                })
             }
-            Ok(None) => {
+            Ok(ReadResult {
+                successfully_read: None,
+                discarded_for_size_and_truncated,
+            }) => {
                 if !self.file_findable() {
                     self.set_dead();
                     // File has been deleted, so return what we have in the buffer, even though it
@@ -236,16 +253,25 @@ impl FileWatcher {
                     if buf.is_empty() {
                         // EOF
                         self.reached_eof = true;
-                        Ok(None)
+                        Ok(RawLineResult {
+                            raw_line: None,
+                            discarded_for_size_and_truncated,
+                        })
                     } else {
-                        Ok(Some(RawLine {
-                            offset: initial_position,
-                            bytes: buf,
-                        }))
+                        Ok(RawLineResult {
+                            raw_line: Some(RawLine {
+                                offset: initial_position,
+                                bytes: buf,
+                            }),
+                            discarded_for_size_and_truncated,
+                        })
                     }
                 } else {
                     self.reached_eof = true;
-                    Ok(None)
+                    Ok(RawLineResult {
+                        raw_line: None,
+                        discarded_for_size_and_truncated,
+                    })
                 }
             }
             Err(e) => {

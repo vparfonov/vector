@@ -104,8 +104,10 @@ impl<'a, P: std::fmt::Debug> InternalEvent for FileIoError<'a, P> {
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
+    use bytes::BytesMut;
     use metrics::counter;
     use vector_lib::file_source::FileSourceInternalEvents;
+    use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL};
 
     use super::{FileOpen, InternalEvent};
     use vector_lib::emit;
@@ -501,6 +503,38 @@ mod source {
     }
 
 
+    #[derive(Debug)]
+    pub struct FileLineTooBigError<'a> {
+        pub truncated_bytes: &'a BytesMut,
+        pub configured_limit: usize,
+        pub encountered_size_so_far: usize,
+    }
+
+    impl InternalEvent for FileLineTooBigError<'_> {
+        fn emit(self) {
+            error!(
+                message = "Found line that exceeds max_line_bytes; discarding.",
+                truncated_bytes = ?self.truncated_bytes,
+                configured_limit = self.configured_limit,
+                encountered_size_so_far = self.encountered_size_so_far,
+                internal_log_rate_limit = true,
+                error_type = error_type::CONDITION_FAILED,
+                stage = error_stage::RECEIVING,
+                internal_log_rate_limit = true,
+            );
+            counter!(
+                "component_errors_total", 1,
+                "error_code" => "reading_line_from_file",
+                "error_type" => error_type::CONDITION_FAILED,
+                "stage" => error_stage::RECEIVING,
+            );
+            emit!(ComponentEventsDropped::<INTENTIONAL> {
+                count: 1,
+                reason: "Found line that exceeds max_line_bytes; discarding.",
+            });
+        }
+    }
+
     #[derive(Clone)]
     pub struct FileSourceInternalEventsEmitter {
         pub include_file_metric_tag: bool,
@@ -586,6 +620,19 @@ mod source {
 
         fn emit_gave_up_on_deleted_file(&self, file: &Path) {
             emit!(GaveUpOnDeletedFile { file });
+        }
+
+        fn emit_file_line_too_long(
+            &self,
+            truncated_bytes: &bytes::BytesMut,
+            configured_limit: usize,
+            encountered_size_so_far: usize,
+        ) {
+            emit!(FileLineTooBigError {
+                truncated_bytes,
+                configured_limit,
+                encountered_size_so_far
+            });
         }
     }
 }

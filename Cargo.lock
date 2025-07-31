@@ -6974,7 +6974,6 @@ checksum = "8288979acd84749c744a9014b4382d42b8f7b2592847b5afb2ed29e5d16ede07"
 dependencies = [
  "cc",
  "libc",
- "openssl-src",
  "pkg-config",
  "vcpkg",
 ]
@@ -11668,6 +11667,7 @@ dependencies = [
  "criterion",
  "crossbeam-queue",
  "crossbeam-utils",
+ "dashmap 6.1.0",
  "derivative",
  "fslock",
  "futures 0.3.31",
@@ -11677,6 +11677,7 @@ dependencies = [
  "metrics-tracing-context",
  "metrics-util",
  "num-traits",
+ "ordered-float 4.6.0",
  "paste",
  "proptest",
  "quickcheck",

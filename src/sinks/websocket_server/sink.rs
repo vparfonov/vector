@@ -4,6 +4,19 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use crate::{
+    codecs::{Encoder, Transformer},
+    common::http::server_auth::HttpServerAuthMatcher,
+    internal_events::{
+        ConnectionOpen, OpenGauge, WsListenerConnectionEstablished,
+        WsListenerConnectionFailedError, WsListenerConnectionShutdown, WsListenerMessageSent,
+        WsListenerSendError,
+    },
+    sinks::{
+        prelude::*,
+        websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
+    },
+};
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{
@@ -22,6 +35,7 @@ use tokio_util::codec::Encoder as _;
 use tracing::Instrument;
 use url::Url;
 use uuid::Uuid;
+use vector_lib::codecs::encoding::Serializer::Syslog;
 use vector_lib::{
     event::{Event, EventStatus},
     finalization::Finalizable,
@@ -31,20 +45,6 @@ use vector_lib::{
     sink::StreamSink,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
     EstimatedJsonEncodedSizeOf,
-};
-use vector_lib::codecs::encoding::Serializer::Syslog;
-use crate::{
-    codecs::{Encoder, Transformer},
-    common::http::server_auth::HttpServerAuthMatcher,
-    internal_events::{
-        ConnectionOpen, OpenGauge, WsListenerConnectionEstablished,
-        WsListenerConnectionFailedError, WsListenerConnectionShutdown, WsListenerMessageSent,
-        WsListenerSendError,
-    },
-    sinks::{
-        prelude::*,
-        websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
-    },
 };
 
 use super::{
@@ -94,7 +94,8 @@ impl WebSocketListenerSink {
 
         match self.encoder.serializer() {
             RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
-            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) | Syslog(_) => false,
+            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_)
+            | Syslog(_) => false,
         }
     }
 

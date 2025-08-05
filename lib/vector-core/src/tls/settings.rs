@@ -7,12 +7,12 @@ use std::{
 
 use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
+    nid::Nid,
     pkcs12::{ParsedPkcs12_2, Pkcs12},
     pkey::{PKey, Private},
     ssl::{select_next_proto, AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode},
     stack::Stack,
     x509::{store::X509StoreBuilder, X509},
-    nid::Nid,
 };
 use snafu::ResultExt;
 use vector_config::configurable_component;
@@ -671,7 +671,7 @@ fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> 
 
 #[cfg(test)]
 mod test {
-    use openssl::ssl::{SslMethod, SslVersion, ErrorEx};
+    use openssl::ssl::{ErrorEx, SslMethod, SslVersion};
 
     use super::*;
 
@@ -844,28 +844,56 @@ mod test {
     fn from_min_tls_version() {
         use std::result::Result;
 
-        let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
-        let orig_min_proto_version = builder.min_proto_version();
         struct TlsVersionTest {
             text: Option<String>,
-            num:  Option<SslVersion>,
+            num: Option<SslVersion>,
             want: Result<(), ErrorEx>,
         }
+        let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
+        let orig_min_proto_version = builder.min_proto_version();
         let tests = [
-            TlsVersionTest{text: None, num: orig_min_proto_version, want: Ok(())},
-            TlsVersionTest{text: Some("".to_string()), num: orig_min_proto_version, want: Err(ErrorEx::InvalidTlsVersion)},
-            TlsVersionTest{text: Some("foobar".to_string()), num: Some(SslVersion::TLS1), want: Err(ErrorEx::InvalidTlsVersion)},
-            TlsVersionTest{text: Some("VersionTLS10".to_string()), num: Some(SslVersion::TLS1), want: Ok(())},
-            TlsVersionTest{text: Some("VersionTLS11".to_string()), num: Some(SslVersion::TLS1_1), want: Ok(())},
-            TlsVersionTest{text: Some("VersionTLS12".to_string()), num: Some(SslVersion::TLS1_2), want: Ok(())},
-            TlsVersionTest{text: Some("VersionTLS13".to_string()), num: Some(SslVersion::TLS1_3), want: Ok(())},
+            TlsVersionTest {
+                text: None,
+                num: orig_min_proto_version,
+                want: Ok(()),
+            },
+            TlsVersionTest {
+                text: Some(String::new()),
+                num: orig_min_proto_version,
+                want: Err(ErrorEx::InvalidTlsVersion),
+            },
+            TlsVersionTest {
+                text: Some("foobar".to_string()),
+                num: Some(SslVersion::TLS1),
+                want: Err(ErrorEx::InvalidTlsVersion),
+            },
+            TlsVersionTest {
+                text: Some("VersionTLS10".to_string()),
+                num: Some(SslVersion::TLS1),
+                want: Ok(()),
+            },
+            TlsVersionTest {
+                text: Some("VersionTLS11".to_string()),
+                num: Some(SslVersion::TLS1_1),
+                want: Ok(()),
+            },
+            TlsVersionTest {
+                text: Some("VersionTLS12".to_string()),
+                num: Some(SslVersion::TLS1_2),
+                want: Ok(()),
+            },
+            TlsVersionTest {
+                text: Some("VersionTLS13".to_string()),
+                num: Some(SslVersion::TLS1_3),
+                want: Ok(()),
+            },
         ];
         for t in tests {
             match builder.set_min_tls_version_and_ciphersuites(&t.text, &None) {
                 Ok(()) => {
                     assert!(t.want.is_ok());
                     assert_eq!(builder.min_proto_version(), t.num);
-                },
+                }
                 Err(e) => assert_eq!(t.want.err().unwrap(), e),
             }
         }
@@ -875,16 +903,17 @@ mod test {
     fn from_min_tls_version_and_ciphersuites() {
         use std::result::Result;
 
-        let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
         struct TlsCiphersuiteTest {
             min_tls_version: Option<String>,
             ciphersuite: Option<String>,
             want: Result<(), ErrorEx>,
         }
+
+        let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
         let tests = [
             TlsCiphersuiteTest {
                 min_tls_version: Some("VersionTLS10".to_string()),
-                ciphersuite: Some("".to_string()),
+                ciphersuite: Some(String::new()),
                 want: Err(ErrorEx::InvalidCiphersuite),
             },
             TlsCiphersuiteTest {
@@ -894,7 +923,9 @@ mod test {
             },
             TlsCiphersuiteTest {
                 min_tls_version: Some("VersionTLS13".to_string()),
-                ciphersuite: Some("TLS_CHACHA20_POLY1305_SHA256,TLS_AES_256_GCM_SHA384".to_string()),
+                ciphersuite: Some(
+                    "TLS_CHACHA20_POLY1305_SHA256,TLS_AES_256_GCM_SHA384".to_string(),
+                ),
                 want: Ok(()),
             },
         ];

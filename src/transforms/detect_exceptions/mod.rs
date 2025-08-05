@@ -6,22 +6,25 @@ pub use exception_detector::*;
 use serde_with::serde_as;
 
 use crate::{
-    config::{DataType, Input, OutputId, TransformOutput, TransformConfig, TransformContext, TransformDescription},
+    config::{
+        DataType, Input, OutputId, TransformConfig, TransformContext, TransformDescription,
+        TransformOutput,
+    },
     event::{discriminant::Discriminant, Event},
     schema,
-    transforms::{TaskTransform, Transform}
+    transforms::{TaskTransform, Transform},
 };
 use async_stream::stream;
 use futures::{stream, Stream, StreamExt};
 use std::{collections::HashMap, pin::Pin, time::Duration};
 use vector_lib::{
+    config::{clone_input_definitions, log_schema, LogNamespace},
     configurable::configurable_component,
-    config::{log_schema,LogNamespace, clone_input_definitions},
     enrichment,
 };
 
-use vector_lib::lookup::path::OwnedTargetPath;
 use vector_lib::lookup::path::parse_target_path;
+use vector_lib::lookup::path::OwnedTargetPath;
 
 /// ProgrammingLanguages
 #[configurable_component]
@@ -66,7 +69,7 @@ pub enum ProgrammingLanguages {
 #[configurable_component(transform("detect_exceptions"))]
 #[derive(Debug, Clone)]
 #[serde(deny_unknown_fields, default)]
-pub struct DetectExceptionsConfig{
+pub struct DetectExceptionsConfig {
     /// Programming Languages for which to detect Exceptions
     ///
     /// Supported languages are
@@ -204,13 +207,12 @@ impl DetectExceptions {
         if config.languages.is_empty() {
             return Err("languages cannot be empty".into());
         }
-        let owned_target_path: OwnedTargetPath;
-        match parse_target_path(config.message_key.as_str()){
-            Err(e) => return Err(e.into()),
-            Ok(value) =>{
-                owned_target_path = value
-            },
-        };
+
+        let owned_target_path: OwnedTargetPath =
+            match parse_target_path(config.message_key.as_str()) {
+                Err(e) => return Err(e.into()),
+                Ok(value) => value,
+            };
 
         Ok(DetectExceptions {
             accumulators: HashMap::new(),
@@ -257,12 +259,11 @@ impl DetectExceptions {
         let mut for_removal: Vec<Discriminant> = vec![];
         for (k, v) in &mut self.accumulators {
             v.flush_stale_into(now, output);
-            if v.accumulated_messages.len() == 0 {
-                if now.timestamp_millis() - v.buffer_start_time.timestamp_millis()
+            if v.accumulated_messages.is_empty()
+                && now.timestamp_millis() - v.buffer_start_time.timestamp_millis()
                     > self.expire_after.as_millis().try_into().unwrap()
-                {
-                    for_removal.push(k.to_owned());
-                }
+            {
+                for_removal.push(k.to_owned());
             }
         }
         for d in for_removal {

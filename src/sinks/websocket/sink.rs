@@ -7,6 +7,19 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::{
+    codecs::{Encoder, Transformer},
+    dns,
+    event::{Event, EventStatus, Finalizable},
+    http::Auth,
+    internal_events::{
+        ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished,
+        WsConnectionFailedError, WsConnectionShutdown,
+    },
+    sinks::util::{retries::ExponentialBackoff, StreamSink},
+    sinks::websocket::config::WebSocketSinkConfig,
+    tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
+};
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{pin_mut, sink::SinkExt, stream::BoxStream, Sink, Stream, StreamExt};
@@ -24,26 +37,13 @@ use tokio_tungstenite::{
     WebSocketStream as WsStream,
 };
 use tokio_util::codec::Encoder as _;
+use vector_lib::codecs::encoding::Serializer::Syslog;
 use vector_lib::{
     emit,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
     EstimatedJsonEncodedSizeOf,
-};
-use vector_lib::codecs::encoding::Serializer::Syslog;
-use crate::{
-    codecs::{Encoder, Transformer},
-    dns,
-    event::{Event, EventStatus, Finalizable},
-    http::Auth,
-    internal_events::{
-        ConnectionOpen, OpenGauge, WsConnectionError, WsConnectionEstablished,
-        WsConnectionFailedError, WsConnectionShutdown,
-    },
-    sinks::util::{retries::ExponentialBackoff, StreamSink},
-    sinks::websocket::config::WebSocketSinkConfig,
-    tls::{MaybeTlsSettings, MaybeTlsStream, TlsError},
 };
 
 #[derive(Debug, Snafu)]
@@ -241,7 +241,8 @@ impl WebSocketSink {
 
         match self.encoder.serializer() {
             RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
-            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) | Syslog(_) => false,
+            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_)
+            | Syslog(_) => false,
         }
     }
 
@@ -631,4 +632,3 @@ mod tests {
         })
     }
 }
-

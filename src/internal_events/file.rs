@@ -501,7 +501,7 @@ mod source {
         pub file: &'a Path,
     }
 
-    impl<'a> InternalEvent for GaveUpOnDeletedFile<'a> {
+    impl InternalEvent for GaveUpOnDeletedFile<'_> {
         fn emit(self) {
             info!(
                 message = "Gave up on deleted file.",
@@ -511,10 +511,9 @@ mod source {
                 "files_deleted_given_up_total",
                 "file" => self.file.to_string_lossy().into_owned(),
             )
-                .increment(1);
+            .increment(1);
         }
     }
-
 
     #[derive(Clone)]
     pub struct FileSourceInternalEventsEmitter {

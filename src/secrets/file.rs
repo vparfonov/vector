@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 use std::fs::File;
+use std::io::{ErrorKind, Read};
 use std::path::Path;
-use std::io::{Read, ErrorKind};
 
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
 
@@ -20,17 +20,17 @@ impl GenerateConfig for FileBackend {
         toml::Value::try_from(FileBackend {
             base_path: String::from("/path/to/secrets"),
         })
-            .unwrap()
+        .unwrap()
     }
 }
 
 impl SecretBackend for FileBackend {
-   async fn retrieve(
+    async fn retrieve(
         &mut self,
         secret_keys: HashSet<String>,
         _signal_rx: &mut signal::SignalRx,
     ) -> crate::Result<HashMap<String, String>> {
-        return retrieve_secrets(&self.base_path, secret_keys);
+        retrieve_secrets(&self.base_path, secret_keys)
     }
 }
 
@@ -93,7 +93,10 @@ mod tests {
 
         let result = retrieve_secrets(&base_path, secret_keys);
         let error = result.expect_err("absolute key should produce error");
-        assert_eq!(error.to_string(), "secret key can not be absolute: /absolute/path");
+        assert_eq!(
+            error.to_string(),
+            "secret key can not be absolute: /absolute/path"
+        );
     }
 
     #[test]
@@ -115,6 +118,9 @@ mod tests {
 
         let result = retrieve_secrets(&base_path, secret_keys);
         let error = result.expect_err("secret should not be found");
-        assert_eq!(error.to_string(), "secret file for 'does_not_exist' not found");
+        assert_eq!(
+            error.to_string(),
+            "secret file for 'does_not_exist' not found"
+        );
     }
 }

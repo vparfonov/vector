@@ -51,7 +51,11 @@ pub struct Rule<'a> {
     pub to_state: ExceptionState,
 }
 
-fn rule(from_states: Vec<ExceptionState>, pattern_str: &str, to_state: ExceptionState) -> Rule {
+const fn rule(
+    from_states: Vec<ExceptionState>,
+    pattern_str: &str,
+    to_state: ExceptionState,
+) -> Rule {
     Rule {
         from_states,
         pattern: pattern_str,

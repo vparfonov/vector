@@ -9,7 +9,7 @@ use std::{
 };
 
 use futures::{future::BoxFuture, stream, FutureExt, Stream};
-use openssl::ssl::{Ssl, SslAcceptor, SslMethod, ErrorEx};
+use openssl::ssl::{ErrorEx, Ssl, SslAcceptor, SslMethod};
 use openssl::x509::X509;
 use snafu::ResultExt;
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
@@ -28,22 +28,25 @@ use crate::tcp::{self, TcpKeepaliveConfig};
 
 impl TlsSettings {
     pub fn acceptor(&self) -> crate::tls::Result<SslAcceptor> {
-        match self.identity {
-            None => Err(TlsError::MissingRequiredIdentity),
-            Some(_) => {
-                let mut acceptor = if self.min_tls_version.is_some() || self.ciphersuites.is_some() {
-                    SslAcceptor::custom(SslMethod::tls(), &self.min_tls_version, &self.ciphersuites)
+        if self.identity.is_some() {
+            let mut acceptor = if self.min_tls_version.is_some() || self.ciphersuites.is_some() {
+                SslAcceptor::custom(SslMethod::tls(), &self.min_tls_version, &self.ciphersuites)
                     .map_err(|error_ex| match error_ex {
-                        ErrorEx::OpenSslError{error_stack: e} => TlsError::CreateAcceptor{source:e},
+                        ErrorEx::OpenSslError { error_stack: e } => {
+                            TlsError::CreateAcceptor { source: e }
+                        }
                         ErrorEx::InvalidTlsVersion => TlsError::InvalidTlsVersion,
                         ErrorEx::InvalidCiphersuite => TlsError::InvalidCiphersuite,
                     })?
-                } else {
-                    SslAcceptor::mozilla_intermediate_v5(SslMethod::tls()).context(CreateAcceptorSnafu)?
-                };
-                self.apply_context_base(&mut acceptor, true)?;
-                Ok(acceptor.build())
-            }
+            } else {
+                SslAcceptor::mozilla_intermediate_v5(SslMethod::tls())
+                    .context(CreateAcceptorSnafu)?
+            };
+
+            self.apply_context_base(&mut acceptor, true)?;
+            Ok(acceptor.build())
+        } else {
+            Err(TlsError::MissingRequiredIdentity)
         }
     }
 }

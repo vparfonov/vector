@@ -13,8 +13,8 @@ pub use format::{
     JsonSerializer, JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer,
     LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
     NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,
-    ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
-    TextSerializerConfig, SyslogSerializer, SyslogSerializerConfig
+    ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, SyslogSerializer,
+    SyslogSerializerConfig, TextSerializer, TextSerializerConfig,
 };
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
@@ -268,7 +268,7 @@ pub enum SerializerConfig {
 
     /// Syslog encoding
     /// RFC 3164 and 5424 are supported
-    Syslog (SyslogSerializerConfig)
+    Syslog(SyslogSerializerConfig),
 }
 
 impl From<AvroSerializerConfig> for SerializerConfig {
@@ -394,7 +394,7 @@ impl SerializerConfig {
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
             | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
-            | SerializerConfig::Syslog(_) => FramingConfig::NewlineDelimited,
+            SerializerConfig::Syslog(_) => FramingConfig::NewlineDelimited,
             SerializerConfig::Gelf => {
                 FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
             }

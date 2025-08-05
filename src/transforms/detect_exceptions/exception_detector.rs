@@ -1,12 +1,11 @@
-use std::collections::HashMap;
-use std::usize;
-use chrono::{DateTime, Utc};
-use regex::Regex;
 use crate::{
     event::LogEvent, event::Value,
     internal_events::detect_exceptions::DetectExceptionsStaleEventFlushed,
     transforms::detect_exceptions::*,
 };
+use chrono::{DateTime, Utc};
+use regex::Regex;
+use std::collections::HashMap;
 use vector_lib::lookup::path::OwnedTargetPath;
 
 #[derive(Debug, Clone)]
@@ -34,7 +33,7 @@ pub fn get_state_machines(
                 to_state: rc.to_state,
             };
             for s in &rc.from_states {
-                let entry = rules.entry(*s).or_insert(vec![]);
+                let entry = rules.entry(*s).or_default();
                 entry.append(&mut vec![t.clone()]);
             }
         }
@@ -89,7 +88,7 @@ impl TraceAccumulator {
     pub fn push(&mut self, le: &LogEvent, output: &mut Vec<Event>) {
         let mut detection_status = DetectionStatus::NoTrace;
         let message = le.get(&self.message_key);
-        let message_copy = message.clone();
+        let message_copy = message;
 
         match message {
             None => self.detector.reset(),
@@ -116,13 +115,12 @@ impl TraceAccumulator {
         le: &LogEvent,
         output: &mut Vec<Event>,
     ) {
-        let trigger_emit = match detection_status {
-            DetectionStatus::NoTrace => true,
-            DetectionStatus::EndTrace => true,
-            _ => false,
-        };
+        let trigger_emit = matches!(
+            detection_status,
+            DetectionStatus::NoTrace | DetectionStatus::EndTrace
+        );
         if self.accumulated_messages.is_empty() && trigger_emit {
-            output.push(vector_lib::event::Event::Log(le.to_owned()));
+            output.push(Event::Log(le.to_owned()));
             return;
         }
 
@@ -164,10 +162,8 @@ impl TraceAccumulator {
                 output.push(Event::Log(self.first_event.to_owned()));
             }
             _ => {
-                self.first_event.insert(
-                    &self.message_key,
-                    self.accumulated_messages.join("\n"),
-                );
+                self.first_event
+                    .insert(&self.message_key, self.accumulated_messages.join("\n"));
                 output.push(Event::Log(self.first_event.clone()));
             }
         }
@@ -222,7 +218,7 @@ impl ExceptionDetector {
         let transitions = self.state_machine.get(&(self.current_state)).unwrap();
         for transition in transitions {
             if transition.regex.is_match(message.as_ref()) {
-                self.current_state = transition.to_state.clone();
+                self.current_state = transition.to_state;
                 return true;
             }
         }
@@ -245,11 +241,10 @@ mod exception_detector_tests {
         detector: &mut ExceptionDetector,
         expected_first: DetectionStatus,
         expected_last: DetectionStatus,
-        multiline: Vec<&str>
+        multiline: Vec<&str>,
     ) {
         let last_index = multiline.len() - 1;
-        let mut index = 0;
-        for line in multiline {
+        for (index, line) in multiline.into_iter().enumerate() {
             let action = detector.update(&line.to_string());
             if index == 0 {
                 assert_eq!(expected_first, action);
@@ -258,7 +253,6 @@ mod exception_detector_tests {
             } else {
                 assert_eq!(InsideTrace, action);
             }
-            index += 1;
         }
     }
 
@@ -294,12 +288,12 @@ mod exception_detector_tests {
 
     #[test]
     fn test_java() {
-        check_exception(&java_simple_exception(), false);
-        check_exception(&java_complex_exception(), false);
-        check_exception(&java_nested_exception(), false);
+        check_exception(java_simple_exception(), false);
+        check_exception(java_complex_exception(), false);
+        check_exception(java_nested_exception(), false);
     }
 
-    fn java_simple_exception() -> &'static str {
+    const fn java_simple_exception() -> &'static str {
         "
 Jul 09, 2015 3:23:29 PM com.google.devtools.search.cloud.feeder.MakeLog: RuntimeException: Run from this message!
     at com.my.app.Object.do$a1(MakeLog.java:50)
@@ -310,7 +304,7 @@ Jul 09, 2015 3:23:29 PM com.google.devtools.search.cloud.feeder.MakeLog: Runtime
             "
     }
 
-    fn java_complex_exception() -> &'static str {
+    const fn java_complex_exception() -> &'static str {
         "
 javax.servlet.ServletException: Something bad happened
     at com.example.myproject.OpenSessionInViewFilter.doFilter(OpenSessionInViewFilter.java:60)
@@ -344,7 +338,7 @@ Caused by: com.example.myproject.MyProjectServletException
             "
     }
 
-    fn java_nested_exception() -> &'static str {
+    const fn java_nested_exception() -> &'static str {
         "
 java.lang.RuntimeException: javax.mail.SendFailedException: Invalid Addresses;
   nested exception is:
@@ -376,12 +370,12 @@ Caused by: com.sun.mail.smtp.SMTPAddressFailedException: 550 5.7.1 <[REDACTED_EM
 
     #[test]
     fn test_js() {
-        check_exception(&node_js_exception(), false);
-        check_exception(&client_js_exception(), false);
-        check_exception(&v8_js_exception(), false);
+        check_exception(node_js_exception(), false);
+        check_exception(client_js_exception(), false);
+        check_exception(v8_js_exception(), false);
     }
 
-    fn node_js_exception() -> &'static str {
+    const fn node_js_exception() -> &'static str {
         "
 ReferenceError: myArray is not defined
   at next (/app/node_modules/express/lib/router/index.js:256:14)
@@ -397,7 +391,7 @@ ReferenceError: myArray is not defined
             "
     }
 
-    fn client_js_exception() -> &'static str {
+    const fn client_js_exception() -> &'static str {
         "
 Error
     at bls (<anonymous>:3:9)
@@ -408,7 +402,7 @@ Error
             "
     }
 
-    fn v8_js_exception() -> &'static str {
+    const fn v8_js_exception() -> &'static str {
         "
 V8 errors stack trace   
   eval at Foo.a (eval at Bar.z (myscript.js:10:3))
@@ -422,13 +416,13 @@ V8 errors stack trace
 
     #[test]
     fn test_golang() {
-        check_exception(&golang_exception(), false);
-        check_exception(&golang_on_gae_exception(), false);
-        check_exception(&golang_signal_exception(), false);
-        check_exception(&golang_http_exception(), false);
+        check_exception(golang_exception(), false);
+        check_exception(golang_on_gae_exception(), false);
+        check_exception(golang_signal_exception(), false);
+        check_exception(golang_http_exception(), false);
     }
 
-    fn golang_exception() -> &'static str {
+    const fn golang_exception() -> &'static str {
         "
 panic: my panic
 
@@ -484,7 +478,7 @@ created by runtime.gcenable
             "
     }
 
-    fn golang_on_gae_exception() -> &'static str {
+    const fn golang_on_gae_exception() -> &'static str {
         "
 panic: runtime error: index out of range
 
@@ -508,7 +502,7 @@ reflect.Value.Call(0x1243fe0, 0x15819b0, 0x113, 0xc010485f78, 0x3, 0x3, 0x0, 0x0
             "
     }
 
-    fn golang_signal_exception() -> &'static str {
+    const fn golang_signal_exception() -> &'static str {
         "
 panic: runtime error: invalid memory address or nil pointer dereference
 [signal SIGSEGV: segmentation violation code=0x1 addr=0x0 pc=0x7fd34f]
@@ -523,7 +517,7 @@ created by main.main
             "
     }
 
-    fn golang_http_exception() -> &'static str {
+    const fn golang_http_exception() -> &'static str {
         "
 2019/01/15 07:48:05 http: panic serving [::1]:54143: test panic
 goroutine 24 [running]:
@@ -548,11 +542,11 @@ created by net/http.(*Server).Serve
 
     #[test]
     fn test_ruby() {
-        check_exception(&ruby_exception(), false);
-        check_exception(&rails_exception(), false);
+        check_exception(ruby_exception(), false);
+        check_exception(rails_exception(), false);
     }
 
-    fn ruby_exception() -> &'static str {
+    const fn ruby_exception() -> &'static str {
         "
  NoMethodError (undefined method `resursivewordload' for #<BooksController:0x007f8dd9a0c738>):
   app/controllers/books_controller.rb:69:in `recursivewordload'
@@ -568,7 +562,7 @@ created by net/http.(*Server).Serve
             "
     }
 
-    fn rails_exception() -> &'static str {
+    const fn rails_exception() -> &'static str {
         r#"
  ActionController::RoutingError (No route matches [GET] "/settings"):
   
@@ -598,10 +592,10 @@ created by net/http.(*Server).Serve
 
     #[test]
     fn test_python() {
-        check_exception(&python_exception(), true);
+        check_exception(python_exception(), true);
     }
 
-    fn python_exception() -> &'static str {
+    const fn python_exception() -> &'static str {
         r#"
 Traceback (most recent call last):
   File "/base/data/home/runtimes/python27/python27_lib/versions/third_party/webapp2-2.5.2/webapp2.py", line 1535, in __call__

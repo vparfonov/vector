@@ -33,14 +33,18 @@ pub struct FieldsSpec {
     #[configurable(metadata(docs::examples = "k8s.ns_uid"))]
     #[configurable(metadata(docs::examples = ""))]
     pub namespace_uid: OptionalTargetPath,
-
 }
 
 impl Default for FieldsSpec {
     fn default() -> Self {
         Self {
-            namespace_labels: OwnedTargetPath::event(owned_value_path!("kubernetes", "namespace_labels")).into(),
-            namespace_uid: OwnedTargetPath::event(owned_value_path!("kubernetes", "namespace_uid")).into(),
+            namespace_labels: OwnedTargetPath::event(owned_value_path!(
+                "kubernetes",
+                "namespace_labels"
+            ))
+            .into(),
+            namespace_uid: OwnedTargetPath::event(owned_value_path!("kubernetes", "namespace_uid"))
+                .into(),
         }
     }
 }
@@ -107,7 +111,8 @@ fn annotate_from_metadata(
         }
     }
     if let Some(uid) = &metadata.uid {
-        let legacy_key = fields_spec.namespace_uid
+        let legacy_key = fields_spec
+            .namespace_uid
             .path
             .as_ref()
             .map(|k| &k.path)
@@ -156,7 +161,10 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert(metadata_path!("kubernetes_logs", "namespace_uid"), "sandbox0-uid");
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "namespace_uid"),
+                        "sandbox0-uid",
+                    );
                     log.insert(
                         metadata_path!("kubernetes_logs", "namespace_labels", "sandbox0-label0"),
                         "val0",
@@ -247,7 +255,10 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
-                    log.insert(metadata_path!("kubernetes_logs", "namespace_uid"), "sandbox0-uid");
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "namespace_uid"),
+                        "sandbox0-uid",
+                    );
                     log.insert(
                         metadata_path!("kubernetes_logs", "namespace_labels", "nested0.label0"),
                         "val0",

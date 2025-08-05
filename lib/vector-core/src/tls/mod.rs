@@ -4,7 +4,7 @@ use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
 
 use openssl::{
     error::ErrorStack,
-    ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod, ErrorEx},
+    ssl::{ConnectConfiguration, ErrorEx, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
 use std::num::TryFromIntError;
@@ -184,13 +184,13 @@ pub fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnector
     let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnectorSnafu)?;
     if let Some(settings) = settings.tls() {
         settings.apply_context(&mut builder)?;
-        builder.set_min_tls_version_and_ciphersuites(&settings.min_tls_version, &settings.ciphersuites)
-        .map_err(|error_ex| match error_ex {
-             ErrorEx::OpenSslError{error_stack: e} => TlsError::SslBuildError { source:e },
-             ErrorEx::InvalidTlsVersion => TlsError::InvalidTlsVersion,
-             ErrorEx::InvalidCiphersuite => TlsError::InvalidCiphersuite,
-            }
-        )?;
+        builder
+            .set_min_tls_version_and_ciphersuites(&settings.min_tls_version, &settings.ciphersuites)
+            .map_err(|error_ex| match error_ex {
+                ErrorEx::OpenSslError { error_stack: e } => TlsError::SslBuildError { source: e },
+                ErrorEx::InvalidTlsVersion => TlsError::InvalidTlsVersion,
+                ErrorEx::InvalidCiphersuite => TlsError::InvalidCiphersuite,
+            })?;
     }
     Ok(builder)
 }

@@ -40,6 +40,8 @@ mod datadog_traces;
 mod dedupe;
 #[cfg(feature = "sources-demo_logs")]
 mod demo_logs;
+#[cfg(feature = "transforms-detect_exceptions")]
+pub mod detect_exceptions;
 #[cfg(feature = "sources-dnstap")]
 mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
@@ -108,8 +110,6 @@ mod pulsar;
 mod redis;
 #[cfg(feature = "transforms-impl-reduce")]
 mod reduce;
-#[cfg(feature = "transforms-detect_exceptions")]
-pub mod detect_exceptions;
 mod remap;
 mod sample;
 #[cfg(feature = "sinks-sematext")]

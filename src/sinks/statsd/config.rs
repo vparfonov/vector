@@ -67,6 +67,7 @@ pub struct StatsdSinkConfig {
 #[derive(Clone, Debug)]
 #[serde(tag = "mode", rename_all = "snake_case")]
 #[configurable(metadata(docs::enum_tag_description = "The type of socket to use."))]
+#[allow(clippy::large_enum_variant)]
 pub enum Mode {
     /// Send over TCP.
     Tcp(TcpConnectorConfig),

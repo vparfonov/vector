@@ -183,6 +183,7 @@ enum ConnectionMetadata {
 }
 
 #[derive(Clone)]
+#[allow(clippy::large_enum_variant)]
 enum ConnectorType {
     Tcp(TcpConnector),
     Udp(UdpConnector),

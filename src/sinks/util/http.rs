@@ -635,9 +635,7 @@ impl RequestConfig {
 
 #[configurable_component]
 #[configurable(title = "Configuration for connection behavior in the HTTP client.")]
-#[configurable(
-    description = "Configuration for connection behavior in the HTTP client."
-)]
+#[configurable(description = "Configuration for connection behavior in the HTTP client.")]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct ConnectionConfig {
     /// Maximum idle time for a connection before it’s closed (seconds)
@@ -648,7 +646,10 @@ pub struct ConnectionConfig {
 }
 
 impl ConnectionConfig {
-    pub const DEFAULT: Self = Self { idle_timeout_secs: None, pool_idle_per_host: None };
+    pub const DEFAULT: Self = Self {
+        idle_timeout_secs: None,
+        pool_idle_per_host: None,
+    };
 }
 
 #[derive(Debug, Snafu)]

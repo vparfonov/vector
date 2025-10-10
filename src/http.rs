@@ -35,12 +35,12 @@ use vector_lib::sensitive_string::SensitiveString;
 #[cfg(feature = "aws-core")]
 use crate::aws::AwsAuthentication;
 
+use crate::sinks::util::http::ConnectionConfig;
 use crate::{
     config::ProxyConfig,
     internal_events::{http_client, HttpServerRequestReceived, HttpServerResponseSent},
     tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
 };
-use crate::sinks::util::http::ConnectionConfig;
 
 pub mod status {
     pub const FORBIDDEN: u16 = 403;

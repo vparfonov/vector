@@ -21,6 +21,7 @@ use super::{
 };
 #[cfg(feature = "aws-core")]
 use crate::aws::AwsAuthentication;
+use crate::sinks::util::http::ConnectionConfig;
 #[cfg(feature = "aws-core")]
 use crate::sinks::util::http::SigV4Config;
 use crate::{
@@ -34,7 +35,6 @@ use crate::{
         },
     },
 };
-use crate::sinks::util::http::ConnectionConfig;
 
 const CONTENT_TYPE_TEXT: &str = "text/plain";
 const CONTENT_TYPE_NDJSON: &str = "application/x-ndjson";

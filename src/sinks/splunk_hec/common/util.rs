@@ -13,6 +13,7 @@ use super::{
     service::{HttpRequestBuilder, MetadataFields},
     EndpointTarget,
 };
+use crate::sinks::util::http::ConnectionConfig;
 use crate::{
     http::HttpClient,
     internal_events::TemplateRenderingError,
@@ -24,7 +25,6 @@ use crate::{
     template::Template,
     tls::{TlsConfig, TlsSettings},
 };
-use crate::sinks::util::http::ConnectionConfig;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SplunkHecDefaultBatchSettings;
@@ -59,7 +59,11 @@ pub fn create_client_with_connection_config(
     let tls_settings = TlsSettings::from_options(tls)?;
 
     if let Some(conn) = connection {
-        Ok(HttpClient::new_with_connection_config(tls_settings, proxy_config, Some(conn))?)
+        Ok(HttpClient::new_with_connection_config(
+            tls_settings,
+            proxy_config,
+            Some(conn),
+        )?)
     } else {
         Ok(HttpClient::new(tls_settings, proxy_config)?)
     }

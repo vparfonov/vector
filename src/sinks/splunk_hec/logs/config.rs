@@ -6,6 +6,9 @@ use vector_lib::{
     sensitive_string::SensitiveString,
 };
 
+use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
+use crate::sinks::splunk_hec::common::create_client_with_connection_config;
+use crate::sinks::util::http::ConnectionConfig;
 use crate::{
     http::HttpClient,
     sinks::{
@@ -19,9 +22,6 @@ use crate::{
         util::http::HttpRetryLogic,
     },
 };
-use crate::sinks::splunk_hec::common::create_client_with_connection_config;
-use crate::sinks::util::http::ConnectionConfig;
-use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 
 /// Configuration for the `splunk_hec_logs` sink.
 #[configurable_component(sink(
@@ -205,7 +205,7 @@ impl SinkConfig for HecLogsSinkConfig {
         //let client = create_client(self.tls.as_ref(), cx.proxy())?;
 
         let client = if let Some(conn) = &self.connection {
-            create_client_with_connection_config(self.tls.as_ref(), cx.proxy(), Some(conn.clone()))?
+            create_client_with_connection_config(self.tls.as_ref(), cx.proxy(), Some(*conn))?
         } else {
             create_client(self.tls.as_ref(), cx.proxy())?
         };

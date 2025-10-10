@@ -40,6 +40,7 @@ use crate::{
     internal_events::{http_client, HttpServerRequestReceived, HttpServerResponseSent},
     tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
 };
+use crate::sinks::util::http::ConnectionConfig;
 
 pub mod status {
     pub const FORBIDDEN: u16 = 403;
@@ -92,7 +93,26 @@ where
         tls_settings: impl Into<MaybeTlsSettings>,
         proxy_config: &ProxyConfig,
     ) -> Result<HttpClient<B>, HttpError> {
-        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut Client::builder())
+        HttpClient::new_with_connection_config(tls_settings, proxy_config, None)
+    }
+
+    pub fn new_with_connection_config(
+        tls_settings: impl Into<MaybeTlsSettings>,
+        proxy_config: &ProxyConfig,
+        connection_config: Option<ConnectionConfig>,
+    ) -> Result<HttpClient<B>, HttpError> {
+        let mut builder = Client::builder();
+
+        if let Some(config) = connection_config {
+            if let Some(idle_secs) = config.idle_timeout_secs {
+                builder.pool_idle_timeout(Duration::from_secs(idle_secs));
+            }
+            if let Some(max_idle) = config.pool_idle_per_host {
+                builder.pool_max_idle_per_host(max_idle);
+            }
+        }
+
+        HttpClient::new_with_custom_client(tls_settings, proxy_config, &mut builder)
     }
 
     pub fn new_with_custom_client(

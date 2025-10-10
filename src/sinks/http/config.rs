@@ -34,6 +34,7 @@ use crate::{
         },
     },
 };
+use crate::sinks::util::http::ConnectionConfig;
 
 const CONTENT_TYPE_TEXT: &str = "text/plain";
 const CONTENT_TYPE_NDJSON: &str = "application/x-ndjson";
@@ -107,6 +108,10 @@ pub struct HttpSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub acknowledgements: AcknowledgementsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub connection: Option<ConnectionConfig>,
 }
 
 /// HTTP method.
@@ -392,6 +397,7 @@ mod tests {
                 acknowledgements: AcknowledgementsConfig::default(),
                 payload_prefix: String::new(),
                 payload_suffix: String::new(),
+                connection: None,
             };
 
             let external_resource = ExternalResource::new(
@@ -413,4 +419,32 @@ mod tests {
     }
 
     register_validatable_component!(HttpSinkConfig);
+
+    #[test]
+    fn deserialize_connection_config_defaults() {
+        let cfg: ConnectionConfig = serde_yaml::from_str("{}").unwrap();
+        // Defaults should be None
+        assert!(cfg.idle_timeout_secs.is_none());
+        assert!(cfg.pool_idle_per_host.is_none());
+    }
+
+    #[test]
+    fn http_sink_config_with_connection() {
+        let yaml = r#"
+uri: "http://example.com"
+encoding:
+  codec: "json"
+connection:
+  idle_timeout_secs: 120
+  pool_idle_per_host: 20
+"#;
+
+        let cfg: HttpSinkConfig = serde_yaml::from_str(yaml).unwrap();
+
+        assert_eq!(cfg.uri.uri, "http://example.com");
+        assert!(cfg.connection.is_some());
+        let conn = cfg.connection.unwrap();
+        assert_eq!(conn.idle_timeout_secs, Some(120));
+        assert_eq!(conn.pool_idle_per_host, Some(20));
+    }
 }

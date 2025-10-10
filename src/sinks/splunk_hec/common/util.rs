@@ -24,6 +24,7 @@ use crate::{
     template::Template,
     tls::{TlsConfig, TlsSettings},
 };
+use crate::sinks::util::http::ConnectionConfig;
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct SplunkHecDefaultBatchSettings;
@@ -48,6 +49,20 @@ pub fn create_client(
 ) -> crate::Result<HttpClient> {
     let tls_settings = TlsSettings::from_options(tls)?;
     Ok(HttpClient::new(tls_settings, proxy_config)?)
+}
+
+pub fn create_client_with_connection_config(
+    tls: Option<&TlsConfig>,
+    proxy_config: &ProxyConfig,
+    connection: Option<ConnectionConfig>,
+) -> crate::Result<HttpClient> {
+    let tls_settings = TlsSettings::from_options(tls)?;
+
+    if let Some(conn) = connection {
+        Ok(HttpClient::new_with_connection_config(tls_settings, proxy_config, Some(conn))?)
+    } else {
+        Ok(HttpClient::new(tls_settings, proxy_config)?)
+    }
 }
 
 // TODO: `HttpBatchService` has been deprecated for direct use in sinks.

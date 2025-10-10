@@ -133,6 +133,7 @@ impl SinkConfig for AxiomConfig {
             ),
             payload_prefix: "".into(), // Always newline delimited JSON
             payload_suffix: "".into(), // Always newline delimited JSON
+            connection: None,
         };
 
         http_sink_config.build(cx).await

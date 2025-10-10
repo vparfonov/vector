@@ -633,6 +633,24 @@ impl RequestConfig {
     }
 }
 
+#[configurable_component]
+#[configurable(title = "Configuration for connection behavior in the HTTP client.")]
+#[configurable(
+    description = "Configuration for connection behavior in the HTTP client."
+)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct ConnectionConfig {
+    /// Maximum idle time for a connection before it’s closed (seconds)
+    pub idle_timeout_secs: Option<u64>,
+
+    /// Maximum number of idle connections to keep per host
+    pub pool_idle_per_host: Option<usize>,
+}
+
+impl ConnectionConfig {
+    pub const DEFAULT: Self = Self { idle_timeout_secs: None, pool_idle_per_host: None };
+}
+
 #[derive(Debug, Snafu)]
 pub enum HeaderValidationError {
     #[snafu(display("{}: {}", source, name))]

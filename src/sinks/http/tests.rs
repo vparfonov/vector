@@ -60,6 +60,7 @@ fn default_cfg(encoding: EncodingConfigWithFraming) -> HttpSinkConfig {
         request: Default::default(),
         tls: Default::default(),
         acknowledgements: Default::default(),
+        connection: Default::default(),
     }
 }
 

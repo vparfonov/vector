@@ -209,6 +209,7 @@ impl HumioLogsConfig {
             timestamp_key: Some(config_timestamp_key_target_path()),
             endpoint_target: EndpointTarget::Event,
             auto_extract_timestamp: None,
+            connection: None,
         }
     }
 }

@@ -19,7 +19,8 @@ use crate::{
         util::http::HttpRetryLogic,
     },
 };
-
+use crate::sinks::splunk_hec::common::create_client_with_connection_config;
+use crate::sinks::util::http::ConnectionConfig;
 use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 
 /// Configuration for the `splunk_hec_logs` sink.
@@ -152,6 +153,15 @@ pub struct HecLogsSinkConfig {
     #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_endpoint_target")]
     pub endpoint_target: EndpointTarget,
+
+    /// Connection-level settings for the underlying HTTP client.
+    ///
+    /// This allows configuring parameters like connection idle timeout and
+    /// maximum idle connections per host. Useful when running behind load
+    /// balancers with strict idle policies.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub connection: Option<ConnectionConfig>,
 }
 
 const fn default_endpoint_target() -> EndpointTarget {
@@ -178,6 +188,7 @@ impl GenerateConfig for HecLogsSinkConfig {
             timestamp_key: None,
             auto_extract_timestamp: None,
             endpoint_target: EndpointTarget::Event,
+            connection: None,
         })
         .unwrap()
     }
@@ -191,7 +202,14 @@ impl SinkConfig for HecLogsSinkConfig {
             return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
         }
 
-        let client = create_client(self.tls.as_ref(), cx.proxy())?;
+        //let client = create_client(self.tls.as_ref(), cx.proxy())?;
+
+        let client = if let Some(conn) = &self.connection {
+            create_client_with_connection_config(self.tls.as_ref(), cx.proxy(), Some(conn.clone()))?
+        } else {
+            create_client(self.tls.as_ref(), cx.proxy())?
+        };
+
         let healthcheck = build_healthcheck(
             self.endpoint.clone(),
             self.default_token.inner().to_owned(),
@@ -334,6 +352,7 @@ mod tests {
                 timestamp_key: None,
                 auto_extract_timestamp: None,
                 endpoint_target: EndpointTarget::Raw,
+                connection: None,
             };
 
             let endpoint = format!("{endpoint}/services/collector/raw");
@@ -360,4 +379,25 @@ mod tests {
     }
 
     register_validatable_component!(HecLogsSinkConfig);
+
+    #[test]
+    fn splunk_config_with_connection() {
+        let yaml = r#"
+default_token: "test_token"
+endpoint: "http://splunk:8088"
+encoding:
+  codec: "json"
+connection:
+  idle_timeout_secs: 120
+  pool_idle_per_host: 15
+"#;
+
+        let cfg: HecLogsSinkConfig = serde_yaml::from_str(yaml).unwrap();
+        assert_eq!(cfg.default_token.inner(), "test_token");
+        assert!(cfg.connection.is_some());
+
+        let conn = cfg.connection.unwrap();
+        assert_eq!(conn.idle_timeout_secs, Some(120));
+        assert_eq!(conn.pool_idle_per_host, Some(15));
+    }
 }

@@ -48,6 +48,7 @@ impl Default for Protocol {
             request: Default::default(),
             tls: Default::default(),
             acknowledgements: Default::default(),
+            connection: None,
         })
     }
 }

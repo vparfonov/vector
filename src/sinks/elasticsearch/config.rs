@@ -35,6 +35,7 @@ use vector_lib::lookup::event_path;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vector_lib::schema::Requirement;
 use vrl::value::Kind;
+use crate::sinks::util::http::ConnectionConfig;
 
 /// The field name for the timestamp required by data stream mode
 pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
@@ -218,6 +219,16 @@ pub struct ElasticsearchConfig {
     )]
     #[configurable(derived)]
     pub acknowledgements: AcknowledgementsConfig,
+
+
+    /// Connection-level settings for the underlying HTTP client.
+    ///
+    /// This allows configuring parameters like connection idle timeout and
+    /// maximum idle connections per host. Useful when running behind load
+    /// balancers with strict idle policies.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub connection: Option<ConnectionConfig>,
 }
 
 fn default_doc_type() -> String {
@@ -255,6 +266,7 @@ impl Default for ElasticsearchConfig {
             data_stream: None,
             metrics: None,
             acknowledgements: Default::default(),
+            connection: None,
         }
     }
 }
@@ -541,7 +553,7 @@ impl SinkConfig for ElasticsearchConfig {
         let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
         let common = commons[0].clone();
 
-        let client = HttpClient::new(common.tls_settings.clone(), cx.proxy())?;
+        let client = HttpClient::new_with_connection_config(common.tls_settings.clone(), cx.proxy(), self.connection)?;
 
         let request_limits = self.request.tower.into_settings();
 

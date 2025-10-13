@@ -23,6 +23,7 @@ use crate::{
     tls::TlsSettings,
     transforms::metric_to_log::MetricToLog,
 };
+use crate::sinks::util::http::ConnectionConfig;
 
 #[derive(Debug, Clone)]
 pub struct ElasticsearchCommon {
@@ -190,6 +191,7 @@ impl ElasticsearchCommon {
                         &request,
                         &tls_settings,
                         proxy_config,
+                        config.connection
                     )
                     .await
                     {
@@ -341,6 +343,7 @@ async fn get_version(
     request: &RequestConfig,
     tls_settings: &TlsSettings,
     proxy_config: &ProxyConfig,
+    connection_config: Option<ConnectionConfig>,
 ) -> crate::Result<usize> {
     #[derive(Deserialize)]
     struct Version {
@@ -351,7 +354,7 @@ async fn get_version(
         version: Option<Version>,
     }
 
-    let client = HttpClient::new(tls_settings.clone(), proxy_config)?;
+    let client = HttpClient::new_with_connection_config(tls_settings.clone(), proxy_config, connection_config)?;
     let response = get(
         base_url,
         auth,

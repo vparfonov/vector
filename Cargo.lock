@@ -1285,7 +1285,7 @@ dependencies = [
  "h2 0.4.9",
  "http 0.2.9",
  "http-body 0.4.5",
- "hyper 0.14.28",
+ "hyper 0.14.32",
  "hyper-rustls 0.24.2",
  "pin-project-lite",
  "rustls 0.21.11",
@@ -1424,7 +1424,7 @@ dependencies = [
  "futures-util",
  "http 0.2.9",
  "http-body 0.4.5",
- "hyper 0.14.28",
+ "hyper 0.14.32",
  "itoa",
  "matchit",
  "memchr",
@@ -4710,7 +4710,9 @@ checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "hyper"
-version = "0.14.28"
+version = "0.14.32"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41dfc780fdec9373c01bae43289ea34c972e40ee3c9f6b3c8801a35f35586ce7"
 dependencies = [
  "bytes 1.10.1",
  "futures-channel",
@@ -4723,7 +4725,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.4.10",
+ "socket2 0.5.9",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
@@ -4773,7 +4775,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6ee5d7a8f718585d1c3c61dfde28ef5b0bb14734b4db13f5ada856cdc6c612b"
 dependencies = [
  "http 0.2.9",
- "hyper 0.14.28",
+ "hyper 0.14.32",
  "linked_hash_set",
  "once_cell",
  "openssl",
@@ -4813,7 +4815,7 @@ dependencies = [
  "futures 0.3.31",
  "headers",
  "http 0.2.9",
- "hyper 0.14.28",
+ "hyper 0.14.32",
  "openssl",
  "tokio",
  "tokio-openssl",
@@ -4828,7 +4830,7 @@ checksum = "ec3efd23720e2049821a693cbc7e65ea87c72f1c58ff2f9522ff332b1491e590"
 dependencies = [
  "futures-util",
  "http 0.2.9",
- "hyper 0.14.28",
+ "hyper 0.14.32",
  "log",
  "rustls 0.21.11",
  "rustls-native-certs 0.6.3",
@@ -4879,7 +4881,7 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bbb958482e8c7be4bc3cf272a766a2b0bf1a6755e7a6ae777f017a31d11b13b1"
 dependencies = [
- "hyper 0.14.28",
+ "hyper 0.14.32",
  "pin-project-lite",
  "tokio",
  "tokio-io-timeout",
@@ -4905,7 +4907,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d6183ddfa99b85da61a140bea0efc93fdf56ceaa041b37d553518030827f9905"
 dependencies = [
  "bytes 1.10.1",
- "hyper 0.14.28",
+ "hyper 0.14.32",
  "native-tls",
  "tokio",
  "tokio-native-tls",
@@ -8524,7 +8526,7 @@ dependencies = [
  "h2 0.3.26",
  "http 0.2.9",
  "http-body 0.4.5",
- "hyper 0.14.28",
+ "hyper 0.14.32",
  "hyper-rustls 0.24.2",
  "hyper-tls",
  "ipnet",
@@ -10676,7 +10678,7 @@ dependencies = [
  "h2 0.3.26",
  "http 0.2.9",
  "http-body 0.4.5",
- "hyper 0.14.28",
+ "hyper 0.14.32",
  "hyper-timeout 0.4.1",
  "percent-encoding",
  "pin-project",
@@ -11514,7 +11516,7 @@ dependencies = [
  "http 1.1.0",
  "http-body 0.4.5",
  "http-serde",
- "hyper 0.14.28",
+ "hyper 0.14.32",
  "hyper-openssl 0.9.2",
  "hyper-proxy",
  "indexmap 2.9.0",
@@ -12154,7 +12156,7 @@ dependencies = [
  "futures-util",
  "headers",
  "http 0.2.9",
- "hyper 0.14.28",
+ "hyper 0.14.32",
  "log",
  "mime",
  "mime_guess",

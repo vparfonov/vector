@@ -1,6 +1,0 @@
-query StarWarsQuery($episodeForHero: Episode!) {
-  hero(episode: $episodeForHero) {
-    name
-    __typename
-  }
-}

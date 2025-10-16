@@ -1,5 +1,0 @@
-query WithSchema1 {
-  currentSession {
-    accountId
-  }
-}

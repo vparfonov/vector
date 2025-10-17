@@ -2,6 +2,7 @@
 pub mod prelude;
 
 mod adaptive_concurrency;
+#[cfg(feature = "transforms-aggregate")]
 mod aggregate;
 #[cfg(any(feature = "sources-amqp", feature = "sinks-amqp"))]
 mod amqp;
@@ -80,6 +81,7 @@ mod kafka;
 mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
 mod log_to_metric;
+#[cfg(feature = "sources-heroku_logs")]
 mod logplex;
 #[cfg(feature = "sinks-loki")]
 mod loki;
@@ -94,6 +96,11 @@ mod mqtt;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
+#[cfg(any(
+    feature = "sources-kubernetes_logs",
+    feature = "transforms-log_to_metric",
+    feature = "sinks-datadog_events",
+))]
 mod parser;
 #[cfg(feature = "sources-postgresql_metrics")]
 mod postgresql_metrics;
@@ -110,7 +117,9 @@ mod pulsar;
 mod redis;
 #[cfg(feature = "transforms-impl-reduce")]
 mod reduce;
+#[cfg(feature = "transforms-remap")]
 mod remap;
+#[cfg(feature = "transforms-impl-sample")]
 mod sample;
 #[cfg(feature = "sinks-sematext")]
 mod sematext_metrics;
@@ -126,8 +135,9 @@ mod template;
 #[cfg(feature = "transforms-throttle")]
 mod throttle;
 mod udp;
+#[cfg(unix)]
 mod unix;
-#[cfg(feature = "sinks-websocket")]
+#[cfg(any(feature = "sources-websocket", feature = "sinks-websocket"))]
 mod websocket;
 #[cfg(feature = "sinks-websocket-server")]
 mod websocket_server;
@@ -140,8 +150,12 @@ mod window;
     feature = "sinks-file",
 ))]
 mod file;
+
+#[cfg(windows)]
 mod windows;
 
+#[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
+mod expansion;
 #[cfg(feature = "sources-mongodb_metrics")]
 pub(crate) use mongodb_metrics::*;
 
@@ -189,6 +203,8 @@ pub(crate) use self::docker_logs::*;
 pub(crate) use self::eventstoredb_metrics::*;
 #[cfg(feature = "sources-exec")]
 pub(crate) use self::exec::*;
+#[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
+pub use self::expansion::*;
 #[cfg(any(
     feature = "sources-file",
     feature = "sources-kubernetes_logs",
@@ -233,7 +249,11 @@ pub(crate) use self::metric_to_log::*;
 pub(crate) use self::mqtt::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
-#[allow(unused_imports)]
+#[cfg(any(
+    feature = "sources-kubernetes_logs",
+    feature = "transforms-log_to_metric",
+    feature = "sinks-datadog_events",
+))]
 pub(crate) use self::parser::*;
 #[cfg(feature = "sources-postgresql_metrics")]
 pub(crate) use self::postgresql_metrics::*;
@@ -265,7 +285,7 @@ pub(crate) use self::tag_cardinality_limit::*;
 pub(crate) use self::throttle::*;
 #[cfg(unix)]
 pub(crate) use self::unix::*;
-#[cfg(feature = "sinks-websocket")]
+#[cfg(any(feature = "sources-websocket", feature = "sinks-websocket"))]
 pub(crate) use self::websocket::*;
 #[cfg(feature = "sinks-websocket-server")]
 pub(crate) use self::websocket_server::*;

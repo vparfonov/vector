@@ -17,6 +17,8 @@ pub mod detect_exceptions;
 mod exclusive_route;
 #[cfg(feature = "transforms-filter")]
 pub mod filter;
+#[cfg(feature = "transforms-incremental_to_absolute")]
+pub mod incremental_to_absolute;
 #[cfg(feature = "transforms-log_to_metric")]
 pub mod log_to_metric;
 #[cfg(feature = "transforms-lua")]
@@ -49,8 +51,8 @@ mod test {
 
     use crate::{
         config::{
-            unit_test::{UnitTestStreamSinkConfig, UnitTestStreamSourceConfig},
             ConfigBuilder, TransformConfig,
+            unit_test::{UnitTestStreamSinkConfig, UnitTestStreamSourceConfig},
         },
         event::Event,
         test_util::start_topology,

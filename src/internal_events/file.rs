@@ -1,14 +1,17 @@
-use metrics::{counter, gauge};
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use std::borrow::Cow;
+
+use metrics::{counter, gauge};
 use vector_lib::{
     configurable::configurable_component,
-    internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL},
+    internal_event::{
+        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
 };
 
 #[cfg(any(feature = "sources-file", feature = "sources-kubernetes_logs"))]
 pub use self::source::*;
-
-use vector_lib::internal_event::{error_stage, error_type};
 
 /// Configuration of internal metrics for file-based components.
 #[configurable_component]
@@ -108,15 +111,14 @@ mod source {
 
     use bytes::BytesMut;
     use metrics::counter;
-    use vector_lib::file_source::FileSourceInternalEvents;
-    use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL};
-
-    use super::{FileOpen, InternalEvent};
-    use vector_lib::emit;
     use vector_lib::{
-        internal_event::{error_stage, error_type},
+        emit,
+        file_source_common::internal_events::FileSourceInternalEvents,
+        internal_event::{ComponentEventsDropped, INTENTIONAL, error_stage, error_type},
         json_size::JsonSize,
     };
+
+    use super::{FileOpen, InternalEvent};
 
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {
@@ -530,25 +532,6 @@ mod source {
         }
     }
 
-    #[derive(Debug)]
-    pub struct GaveUpOnDeletedFile<'a> {
-        pub file: &'a Path,
-    }
-
-    impl InternalEvent for GaveUpOnDeletedFile<'_> {
-        fn emit(self) {
-            info!(
-                message = "Gave up on deleted file.",
-                file = %self.file.display(),
-            );
-            counter!(
-                "files_deleted_given_up_total",
-                "file" => self.file.to_string_lossy().into_owned(),
-            )
-            .increment(1);
-        }
-    }
-
     #[derive(Clone)]
     pub struct FileSourceInternalEventsEmitter {
         pub include_file_metric_tag: bool,
@@ -630,10 +613,6 @@ mod source {
 
         fn emit_path_globbing_failed(&self, path: &Path, error: &Error) {
             emit!(PathGlobbingError { path, error });
-        }
-
-        fn emit_gave_up_on_deleted_file(&self, file: &Path) {
-            emit!(GaveUpOnDeletedFile { file });
         }
 
         fn emit_file_line_too_long(

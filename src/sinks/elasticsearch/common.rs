@@ -10,6 +10,7 @@ use super::{
     request_builder::ElasticsearchRequestBuilder, ElasticsearchApiVersion, ElasticsearchEncoder,
     InvalidHostSnafu, Request, VersionType,
 };
+use crate::sinks::util::http::ConnectionConfig;
 use crate::{
     http::{HttpClient, MaybeAuth, QueryParameterValue, QueryParameters},
     sinks::{
@@ -23,7 +24,6 @@ use crate::{
     tls::TlsSettings,
     transforms::metric_to_log::MetricToLog,
 };
-use crate::sinks::util::http::ConnectionConfig;
 
 #[derive(Debug, Clone)]
 pub struct ElasticsearchCommon {
@@ -191,7 +191,7 @@ impl ElasticsearchCommon {
                         &request,
                         &tls_settings,
                         proxy_config,
-                        config.connection
+                        config.connection,
                     )
                     .await
                     {
@@ -354,7 +354,11 @@ async fn get_version(
         version: Option<Version>,
     }
 
-    let client = HttpClient::new_with_connection_config(tls_settings.clone(), proxy_config, connection_config)?;
+    let client = HttpClient::new_with_connection_config(
+        tls_settings.clone(),
+        proxy_config,
+        connection_config,
+    )?;
     let response = get(
         base_url,
         auth,

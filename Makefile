@@ -189,7 +189,7 @@ environment-push: environment-prepare ## Publish a new version of the container 
 	$(CONTAINER_TOOL) push $(ENVIRONMENT_UPSTREAM)
 
 check-bans:
-	${MAYBE_ENVIRONMENT_EXEC} cargo deny --no-default-features --features ${FEATURES} --offline check bans
+	${MAYBE_ENVIRONMENT_EXEC} cargo deny --no-default-features --features ${FEATURES} check bans
 
 ##@ Building
 .PHONY: build
@@ -197,12 +197,20 @@ build: check-build-tools
 build: export CFLAGS += -g0 -O3
 build: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
 	if [ "$(shell arch)" = "ppc64le" ]; then export CARGO_PROFILE_RELEASE_OPT_LEVEL=2; fi
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${FEATURES}
+	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
+
+.PHONY: build-offline
+build-offline: check-build-tools
+build-offline: export CFLAGS += -g0 -O3
+build-offline: ## Build the project in release mode (Supports `ENVIRONMENT=true`)
+	if [ "$(shell arch)" = "ppc64le" ]; then export CARGO_PROFILE_RELEASE_OPT_LEVEL=2; fi
 	${MAYBE_ENVIRONMENT_EXEC} cargo build --release --no-default-features --features ${FEATURES} --offline
 	${MAYBE_ENVIRONMENT_COPY_ARTIFACTS}
 
 .PHONY: build-dev
 build-dev: ## Build the project in development mode (Supports `ENVIRONMENT=true`)
-	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${FEATURES} --offline
+	${MAYBE_ENVIRONMENT_EXEC} cargo build --no-default-features --features ${FEATURES}
 
 .PHONY: build-x86_64-unknown-linux-gnu
 build-x86_64-unknown-linux-gnu: target/x86_64-unknown-linux-gnu/release/vector ## Build a release binary for the x86_64-unknown-linux-gnu triple.
@@ -337,7 +345,7 @@ target/%/vector.tar.gz: target/%/vector CARGO_HANDLES_FRESHNESS
 # https://github.com/rust-lang/cargo/issues/6454
 .PHONY: test
 test: ## Run the unit test suite
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run -v --workspace --no-fail-fast --no-default-features --features "${FEATURES}" --test-threads 1 --offline ${SCOPE}
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run -v --workspace --no-fail-fast --no-default-features --features "${FEATURES}" --test-threads 1 ${SCOPE}
 
 .PHONY: test-docs
 test-docs: ## Run the docs test suite

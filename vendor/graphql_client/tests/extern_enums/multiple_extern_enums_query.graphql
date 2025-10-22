@@ -1,5 +1,0 @@
-query MultipleExternEnumsQuery {
-  distance
-  unit
-  direction
-}

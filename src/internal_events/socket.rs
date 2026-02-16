@@ -1,7 +1,11 @@
+use std::net::Ipv4Addr;
+
 use metrics::{counter, histogram};
-use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 use vector_lib::{
-    internal_event::{error_stage, error_type},
+    NamedInternalEvent,
+    internal_event::{
+        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
     json_size::JsonSize,
 };
 
@@ -22,7 +26,8 @@ impl SocketMode {
         }
     }
 }
-#[derive(Debug)]
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketBytesReceived {
     pub mode: SocketMode,
     pub byte_size: usize,
@@ -45,7 +50,7 @@ impl InternalEvent for SocketBytesReceived {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketEventsReceived {
     pub mode: SocketMode,
     pub byte_size: JsonSize,
@@ -68,7 +73,7 @@ impl InternalEvent for SocketEventsReceived {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketBytesSent {
     pub mode: SocketMode,
     pub byte_size: usize,
@@ -90,7 +95,7 @@ impl InternalEvent for SocketBytesSent {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketEventsSent {
     pub mode: SocketMode,
     pub count: u64,
@@ -106,7 +111,7 @@ impl InternalEvent for SocketEventsSent {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketBindError<E> {
     pub mode: SocketMode,
     pub error: E,
@@ -120,22 +125,58 @@ impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
             error = %self.error,
             error_code = "socket_bind",
             error_type = error_type::IO_FAILED,
-            stage = error_stage::RECEIVING,
+            stage = error_stage::INITIALIZING,
             %mode,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
             "error_code" => "socket_bind",
             "error_type" => error_type::IO_FAILED,
-            "stage" => error_stage::RECEIVING,
+            "stage" => error_stage::INITIALIZING,
             "mode" => mode,
         )
         .increment(1);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
+pub struct SocketMulticastGroupJoinError<E> {
+    pub error: E,
+    pub group_addr: Ipv4Addr,
+    pub interface: Ipv4Addr,
+}
+
+impl<E: std::fmt::Display> InternalEvent for SocketMulticastGroupJoinError<E> {
+    fn emit(self) {
+        // Multicast groups are only used in UDP mode
+        let mode = SocketMode::Udp.as_str();
+        let group_addr = self.group_addr.to_string();
+        let interface = self.interface.to_string();
+
+        error!(
+            message = "Error joining multicast group.",
+            error = %self.error,
+            error_code = "socket_multicast_group_join",
+            error_type = error_type::IO_FAILED,
+            stage = error_stage::INITIALIZING,
+            %mode,
+            %group_addr,
+            %interface,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "socket_multicast_group_join",
+            "error_type" => error_type::IO_FAILED,
+            "stage" => error_stage::INITIALIZING,
+            "mode" => mode,
+            "group_addr" => group_addr,
+            "interface" => interface,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketReceiveError<E> {
     pub mode: SocketMode,
     pub error: E,
@@ -151,7 +192,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketReceiveError<E> {
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
             %mode,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -164,7 +204,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketReceiveError<E> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketSendError<E> {
     pub mode: SocketMode,
     pub error: E,
@@ -181,7 +221,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketSendError<E> {
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
             %mode,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

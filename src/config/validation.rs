@@ -1,14 +1,23 @@
-use crate::config::schema;
-use futures_util::{stream, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use std::{collections::HashMap, path::PathBuf};
+
+use futures_util::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, stream};
 use heim::{disk::Partition, units::information::byte};
 use indexmap::IndexMap;
-use std::{collections::HashMap, path::PathBuf};
 use vector_lib::{buffers::config::DiskUsage, internal_event::DEFAULT_OUTPUT};
 
 use super::{
-    builder::ConfigBuilder, transform::get_transform_output_ids, ComponentKey, Config, OutputId,
-    Resource,
+    ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder,
+    transform::get_transform_output_ids,
 };
+use crate::config::schema;
+
+/// Minimum value (exclusive) for `utilization_ewma_alpha`.
+/// The alpha value must be strictly greater than this value.
+const EWMA_ALPHA_MIN: f64 = 0.0;
+
+/// Maximum value (exclusive) for `utilization_ewma_alpha`.
+/// The alpha value must be strictly less than this value.
+const EWMA_ALPHA_MAX: f64 = 1.0;
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
@@ -140,12 +149,23 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         Err(conflicting_components
             .into_iter()
             .map(|(resource, components)| {
-                format!(
-                    "Resource `{}` is claimed by multiple components: {:?}",
-                    resource, components
-                )
+                format!("Resource `{resource}` is claimed by multiple components: {components:?}")
             })
             .collect())
+    }
+}
+
+/// Validates that `buffer_utilization_ewma_alpha` value is within the valid range (0 < alpha < 1)
+/// for the global configuration.
+pub fn check_buffer_utilization_ewma_alpha(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+    if let Some(alpha) = config.global.buffer_utilization_ewma_alpha
+        && (alpha <= EWMA_ALPHA_MIN || alpha >= EWMA_ALPHA_MAX)
+    {
+        Err(vec![format!(
+            "Global `buffer_utilization_ewma_alpha` must be between 0 and 1 exclusive (0 < alpha < 1), got {alpha}"
+        )])
+    } else {
+        Ok(())
     }
 }
 

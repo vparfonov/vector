@@ -1,6 +1,8 @@
-use vector_lib::config::{clone_input_definitions, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{Count, InternalEventHandle as _, Registered};
+use vector_lib::{
+    config::clone_input_definitions,
+    configurable::configurable_component,
+    internal_event::{Count, InternalEventHandle as _, Registered},
+};
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -42,9 +44,10 @@ impl GenerateConfig for FilterConfig {
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Filter::new(
-            self.condition.build(&context.enrichment_tables)?,
-        )))
+        Ok(Transform::function(Filter::new(self.condition.build(
+            &context.enrichment_tables,
+            &context.metrics_storage,
+        )?)))
     }
 
     fn input(&self) -> Input {
@@ -53,9 +56,8 @@ impl TransformConfig for FilterConfig {
 
     fn outputs(
         &self,
-        _enrichment_tables: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::all_bits(),
@@ -100,13 +102,15 @@ mod test {
 
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::config::ComponentKey;
-    use vector_lib::event::{Metric, MetricKind, MetricValue};
+    use vector_lib::{
+        config::ComponentKey,
+        event::{Metric, MetricKind, MetricValue},
+    };
 
     use super::*;
-    use crate::config::schema::Definition;
     use crate::{
         conditions::ConditionConfig,
+        config::schema::Definition,
         event::{Event, LogEvent},
         test_util::components::assert_transform_compliance,
         transforms::test::create_topology,

@@ -69,7 +69,7 @@ pub enum Mode {
 ///
 /// See OpenSSL doc at [`EVP_EncryptInit`] for more information on each algorithms.
 ///
-/// [`EVP_EncryptInit`]: https://www.openssl.org/docs/manmaster/crypto/EVP_EncryptInit.html
+/// [`EVP_EncryptInit`]: https://docs.openssl.org/master/man3/EVP_EncryptInit/
 #[derive(Copy, Clone, PartialEq, Eq)]
 pub struct Cipher(*const ffi::EVP_CIPHER);
 
@@ -114,6 +114,7 @@ impl Cipher {
         unsafe { Cipher(ffi::EVP_aes_128_cfb1()) }
     }
 
+    #[cfg(not(boringssl))]
     pub fn aes_128_cfb128() -> Cipher {
         unsafe { Cipher(ffi::EVP_aes_128_cfb128()) }
     }
@@ -159,6 +160,7 @@ impl Cipher {
         unsafe { Cipher(ffi::EVP_aes_192_cfb1()) }
     }
 
+    #[cfg(not(boringssl))]
     pub fn aes_192_cfb128() -> Cipher {
         unsafe { Cipher(ffi::EVP_aes_192_cfb128()) }
     }
@@ -209,6 +211,7 @@ impl Cipher {
         unsafe { Cipher(ffi::EVP_aes_256_cfb1()) }
     }
 
+    #[cfg(not(boringssl))]
     pub fn aes_256_cfb128() -> Cipher {
         unsafe { Cipher(ffi::EVP_aes_256_cfb128()) }
     }
@@ -378,7 +381,7 @@ impl Cipher {
     }
 
     /// Requires OpenSSL 1.1.0 or newer.
-    #[cfg(all(any(ossl110, libressl310), not(osslconf = "OPENSSL_NO_CHACHA")))]
+    #[cfg(all(any(ossl110, libressl), not(osslconf = "OPENSSL_NO_CHACHA")))]
     pub fn chacha20() -> Cipher {
         unsafe { Cipher(ffi::EVP_chacha20()) }
     }
@@ -429,27 +432,27 @@ impl Cipher {
         unsafe { Cipher(ffi::EVP_seed_ofb()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_ecb() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_ecb()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_cbc() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_cbc()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_ctr() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_ctr()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_cfb128() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_cfb128()) }
     }
 
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM4")))]
     pub fn sm4_ofb() -> Cipher {
         unsafe { Cipher(ffi::EVP_sm4_ofb()) }
     }
@@ -916,7 +919,7 @@ pub fn decrypt_aead(
 }
 
 cfg_if! {
-    if #[cfg(any(boringssl, ossl110, libressl273, awslc))] {
+    if #[cfg(any(boringssl, ossl110, libressl, awslc))] {
         use ffi::{EVP_CIPHER_block_size, EVP_CIPHER_iv_length, EVP_CIPHER_key_length};
     } else {
         use crate::LenType;
@@ -1618,7 +1621,7 @@ mod tests {
     }
 
     #[test]
-    #[cfg(any(ossl110, libressl310))]
+    #[cfg(any(ossl110, libressl))]
     fn test_chacha20() {
         let key = "0000000000000000000000000000000000000000000000000000000000000000";
         let iv = "00000000000000000000000000000000";
@@ -1732,7 +1735,7 @@ mod tests {
     // GB/T 32907-2016
     // http://openstd.samr.gov.cn/bzgk/gb/newGbInfo?hcno=7803DE42D3BC5E80B0C3E5D8E873D56A
     #[test]
-    #[cfg(all(any(ossl111, libressl291), not(osslconf = "OPENSSL_NO_SM4")))]
+    #[cfg(all(any(ossl111, libressl), not(osslconf = "OPENSSL_NO_SM4")))]
     fn test_sm4_ecb() {
         use std::mem;
 

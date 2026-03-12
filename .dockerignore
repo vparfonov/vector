@@ -16,3 +16,6 @@
 !patch
 !.cargo
 !deny.toml
+
+# Exclude target directories to avoid copying build artifacts
+target

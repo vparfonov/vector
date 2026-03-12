@@ -203,10 +203,11 @@ impl Encoder<Framer> {
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
-                | Serializer::Text(_)
-                | Serializer::Syslog(_),
+                | Serializer::Text(_),
                 _,
             ) => "text/plain",
+            #[cfg(feature = "syslog")]
+            (Serializer::Syslog(_), _) => "text/plain",
             #[cfg(feature = "opentelemetry")]
             (Serializer::Otlp(_), _) => "application/x-protobuf",
         }

@@ -8,6 +8,7 @@ use vector_core::{config::DataType, event::Event, schema};
 use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(feature = "syslog")]
 use super::format::{SyslogSerializer, SyslogSerializerConfig};
 use super::{
     chunking::Chunker,
@@ -169,7 +170,7 @@ impl BatchSerializerConfig {
     ) -> Result<ArrowStreamSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
             BatchSerializerConfig::ArrowStream(arrow_config) => {
-                ArrowStreamSerializer::new(arrow_config.clone())
+                Ok(ArrowStreamSerializer::new(arrow_config.clone())?)
             }
         }
     }
@@ -405,6 +406,7 @@ pub enum Serializer {
     /// Uses a `TextSerializer` for serialization.
     Text(TextSerializer),
     /// Uses a `SyslogSerializer` for serialization.
+    #[cfg(feature = "syslog")]
     Syslog(SyslogSerializer),
 }
 

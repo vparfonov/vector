@@ -4,10 +4,9 @@ use std::{fmt::Debug, net::SocketAddr, num::TryFromIntError, path::PathBuf, time
 
 use openssl::{
     error::ErrorStack,
-    ssl::{ConnectConfiguration, ErrorEx, SslConnector, SslConnectorBuilder, SslMethod},
+    ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
-
 use tokio::net::TcpStream;
 use tokio_openssl::SslStream;
 
@@ -132,10 +131,6 @@ pub enum TlsError {
     NewCaStack { source: ErrorStack },
     #[snafu(display("Could not push intermediate certificate onto stack"))]
     CaStackPush { source: ErrorStack },
-    #[snafu(display("Invalid TLS version"))]
-    InvalidTlsVersion,
-    #[snafu(display("Invalid ciphersuite"))]
-    InvalidCiphersuite,
 }
 
 impl MaybeTlsStream<TcpStream> {
@@ -184,13 +179,6 @@ pub fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnector
     let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnectorSnafu)?;
     if let Some(settings) = settings.tls() {
         settings.apply_context(&mut builder)?;
-        builder
-            .set_min_tls_version_and_ciphersuites(&settings.min_tls_version, &settings.ciphersuites)
-            .map_err(|error_ex| match error_ex {
-                ErrorEx::OpenSslError { error_stack: e } => TlsError::SslBuildError { source: e },
-                ErrorEx::InvalidTlsVersion => TlsError::InvalidTlsVersion,
-                ErrorEx::InvalidCiphersuite => TlsError::InvalidCiphersuite,
-            })?;
     }
     Ok(builder)
 }

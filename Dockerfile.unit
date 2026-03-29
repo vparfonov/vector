@@ -28,6 +28,14 @@ RUN mkdir -p /src
 WORKDIR /src
 COPY . /src
 
+# Initialize git repository for build scripts that need git metadata
+RUN cd /src && \
+    git init && \
+    git config user.email "ci@redhat.com" && \
+    git config user.name "CI" && \
+    git add . && \
+    git commit --no-verify -m "CI build"
+
 # Use bundled protoc and set environment
 RUN chmod +x /src/thirdparty/protoc/protoc-linux-x86_64
 ENV PROTOC=/src/thirdparty/protoc/protoc-linux-x86_64

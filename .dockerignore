@@ -16,6 +16,7 @@
 !patch
 !.cargo
 !deny.toml
+!clippy.toml
 
 # Exclude target directories to avoid copying build artifacts
 target

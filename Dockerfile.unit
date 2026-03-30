@@ -44,6 +44,6 @@ ENV PATH=/src/thirdparty/protoc:$PATH
 RUN mkdir -p $CARGO_HOME && chmod -R 777 /src $CARGO_HOME $HOME
 RUN mkdir -p ~/.cargo/bin && \
     for plugin in nextest deny; do \
-        ln -s /src/thirdparty/cargo-${plugin}/cargo-${plugin}-linux-$(arch) ~/.cargo/bin/cargo-${plugin}; \
+        ln -s /src/thirdparty/cargo-${plugin}/cargo-${plugin}-linux-x86_64 ~/.cargo/bin/cargo-${plugin}; \
 	done
 

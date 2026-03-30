@@ -35,7 +35,7 @@ metrics-util.workspace = true
 mlua = { workspace = true, optional = true }
 no-proxy = { version = "0.3.6", default-features = false, features = ["serialize"] }
 ordered-float.workspace = true
-openssl = { version = "0.10.81", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.75", default-features = false }
 parking_lot = { version = "0.12.5", default-features = false }
 pin-project.workspace = true
 proptest = { workspace = true, optional = true }

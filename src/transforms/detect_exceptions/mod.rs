@@ -10,21 +10,20 @@ use crate::{
         DataType, Input, OutputId, TransformConfig, TransformContext, TransformDescription,
         TransformOutput,
     },
-    event::{discriminant::Discriminant, Event},
+    event::{Event, discriminant::Discriminant},
     schema,
     transforms::{TaskTransform, Transform},
 };
 use async_stream::stream;
-use futures::{stream, Stream, StreamExt};
+use futures::{Stream, StreamExt, stream};
 use std::{collections::HashMap, pin::Pin, time::Duration};
 use vector_lib::{
-    config::{clone_input_definitions, log_schema, LogNamespace},
+    config::{clone_input_definitions, log_schema},
     configurable::configurable_component,
-    enrichment,
 };
 
-use vector_lib::lookup::path::parse_target_path;
 use vector_lib::lookup::path::OwnedTargetPath;
+use vector_lib::lookup::path::parse_target_path;
 
 /// ProgrammingLanguages
 #[configurable_component]
@@ -179,9 +178,8 @@ impl TransformConfig for DetectExceptionsConfig {
 
     fn outputs(
         &self,
-        _: enrichment::TableRegistry,
+        _globals: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::Log,
@@ -208,11 +206,7 @@ impl DetectExceptions {
             return Err("languages cannot be empty".into());
         }
 
-        let owned_target_path: OwnedTargetPath =
-            match parse_target_path(config.message_key.as_str()) {
-                Err(e) => return Err(e.into()),
-                Ok(value) => value,
-            };
+        let owned_target_path: OwnedTargetPath = parse_target_path(config.message_key.as_str())?;
 
         Ok(DetectExceptions {
             accumulators: HashMap::new(),

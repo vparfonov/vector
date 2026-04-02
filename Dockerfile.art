@@ -39,5 +39,5 @@ LABEL \
         summary="Log collection agent for Red Hat Openshift Logging" \
         url="https://catalog.redhat.com/en/software/containers/openshift-logging/vector-rhel9/6447991f84aeefde2c9f2bcf" \
         vendor="Red Hat, Inc." \
-        version_minor="v0.47" \
-        version="v0.47.0"
+        version_minor="v0.54" \
+        version="v0.54.0"

@@ -1,13 +1,12 @@
 #![allow(clippy::missing_errors_doc)]
 
-use std::{fmt::Debug, net::SocketAddr, path::PathBuf, time::Duration};
+use std::{fmt::Debug, net::SocketAddr, num::TryFromIntError, path::PathBuf, time::Duration};
 
 use openssl::{
     error::ErrorStack,
-    ssl::{ConnectConfiguration, ErrorEx, SslConnector, SslConnectorBuilder, SslMethod},
+    ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
 };
 use snafu::{ResultExt, Snafu};
-use std::num::TryFromIntError;
 use tokio::net::TcpStream;
 use tokio_openssl::SslStream;
 
@@ -21,9 +20,9 @@ mod settings;
 pub use incoming::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener};
 pub use maybe_tls::MaybeTls;
 pub use settings::{
-    MaybeTlsSettings, TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig,
-    PEM_START_MARKER, TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH, TEST_PEM_CLIENT_KEY_PATH,
-    TEST_PEM_CRT_PATH, TEST_PEM_INTERMEDIATE_CA_PATH, TEST_PEM_KEY_PATH,
+    MaybeTlsSettings, PEM_START_MARKER, TEST_PEM_CA_PATH, TEST_PEM_CLIENT_CRT_PATH,
+    TEST_PEM_CLIENT_KEY_PATH, TEST_PEM_CRT_PATH, TEST_PEM_INTERMEDIATE_CA_PATH, TEST_PEM_KEY_PATH,
+    TlsConfig, TlsEnableableConfig, TlsSettings, TlsSourceConfig,
 };
 
 pub type Result<T> = std::result::Result<T, TlsError>;
@@ -132,10 +131,6 @@ pub enum TlsError {
     NewCaStack { source: ErrorStack },
     #[snafu(display("Could not push intermediate certificate onto stack"))]
     CaStackPush { source: ErrorStack },
-    #[snafu(display("Invalid TLS version"))]
-    InvalidTlsVersion,
-    #[snafu(display("Invalid ciphersuite"))]
-    InvalidCiphersuite,
 }
 
 impl MaybeTlsStream<TcpStream> {
@@ -184,13 +179,6 @@ pub fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnector
     let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnectorSnafu)?;
     if let Some(settings) = settings.tls() {
         settings.apply_context(&mut builder)?;
-        builder
-            .set_min_tls_version_and_ciphersuites(&settings.min_tls_version, &settings.ciphersuites)
-            .map_err(|error_ex| match error_ex {
-                ErrorEx::OpenSslError { error_stack: e } => TlsError::SslBuildError { source: e },
-                ErrorEx::InvalidTlsVersion => TlsError::InvalidTlsVersion,
-                ErrorEx::InvalidCiphersuite => TlsError::InvalidCiphersuite,
-            })?;
     }
     Ok(builder)
 }

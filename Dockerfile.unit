@@ -13,13 +13,15 @@ RUN INSTALL_PKGS=" \
       llvm \
       cyrus-sasl-devel \
       libtool \
+      python3.11 \
       " && \
     dnf install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS && \
-    dnf clean all
+    dnf clean all && \
+    ln -s /usr/bin/python3.11 /usr/bin/python
 
 ENV HOME=/root
-RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.83.0 -y
+RUN curl https://sh.rustup.rs -sSf | sh -s -- --default-toolchain 1.92.0 -y
 ENV CARGO_HOME=$HOME/.cargo
 ENV PATH=$CARGO_HOME/bin:$PATH
 
@@ -28,11 +30,22 @@ RUN mkdir -p /src
 WORKDIR /src
 COPY . /src
 
-ENV PROTOC=/src/thirdparty/protoc/protoc-linux-x86_64
+# Initialize git repository for build scripts that need git metadata
+RUN cd /src && \
+    git init && \
+    git config user.email "ci@redhat.com" && \
+    git config user.name "CI" && \
+    git add . && \
+    git commit --no-verify -m "CI build"
 
-RUN chmod -R 777 /src $CARGO_HOME $HOME
+# Use bundled protoc and set environment
+RUN chmod +x /src/thirdparty/protoc/protoc-linux-x86_64
+ENV PROTOC=/src/thirdparty/protoc/protoc-linux-x86_64
+ENV PATH=/src/thirdparty/protoc:$PATH
+
+RUN mkdir -p $CARGO_HOME && chmod -R 777 /src $CARGO_HOME $HOME
 RUN mkdir -p ~/.cargo/bin && \
     for plugin in nextest deny; do \
-        ln -s /src/thirdparty/cargo-${plugin}/cargo-${plugin}-linux-$(arch) ~/.cargo/bin/cargo-${plugin}; \
+        ln -s /src/thirdparty/cargo-${plugin}/cargo-${plugin}-linux-x86_64 ~/.cargo/bin/cargo-${plugin}; \
 	done
 

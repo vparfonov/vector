@@ -1,0 +1,28 @@
+# Fail immediately on any error
+$ErrorActionPreference = "Stop"
+Set-StrictMode -Version Latest
+
+# Set up our Cargo path so we can do Rust-y things.
+echo "$HOME\.cargo\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+if ($env:RELEASE_BUILDER -ne "true") {
+    bash scripts/environment/prepare.sh --modules=cargo-nextest
+} else {
+    bash scripts/environment/prepare.sh --modules=rustup
+}
+
+# Enable retries to avoid transient network issues.
+$env:NUGET_ENABLE_ENHANCED_HTTP_RETRY = "true"
+
+choco install make
+choco install protoc
+
+# Set a specific override path for libclang.
+echo "LIBCLANG_PATH=$( (gcm clang).source -replace "clang.exe" )" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+# Explicitly instruct the `openssl` crate to use Strawberry Perl instead of the Perl bundled with
+# git-bash, since the GHA Windows 2022 image has a poorly arranged PATH.
+echo "OPENSSL_SRC_PERL=C:\Strawberry\perl\bin\perl.exe" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+# Force the proto-build crate to avoid building the vendored protoc.
+echo "PROTO_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append

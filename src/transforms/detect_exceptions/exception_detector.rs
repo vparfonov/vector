@@ -226,7 +226,7 @@ impl ExceptionDetector {
         false
     }
 
-    pub fn reset(&mut self) {
+    pub const fn reset(&mut self) {
         self.current_state = ExceptionState::StartState;
     }
 }
@@ -396,7 +396,7 @@ ReferenceError: myArray is not defined
 Error
     at bls (<anonymous>:3:9)
     at <anonymous>:6:4
-    at a_function_name        
+    at a_function_name
     at Object.InjectedScript._evaluateOn (http://<anonymous>/file.js?foo=bar:875:140)
     at Object.InjectedScript.evaluate (<anonymous>)
             "
@@ -404,7 +404,7 @@ Error
 
     const fn v8_js_exception() -> &'static str {
         "
-V8 errors stack trace   
+V8 errors stack trace
   eval at Foo.a (eval at Bar.z (myscript.js:10:3))
   at new Contructor.Name (native)
   at new FunctionName (unknown location)

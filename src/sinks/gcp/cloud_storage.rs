@@ -22,7 +22,7 @@ use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
-    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
+    gcp::{scopes, GcpAuthConfig, GcpAuthenticator},
     http::{HttpClient, get_http_scheme_from_uri},
     serde::json::to_string,
     sinks::{
@@ -269,7 +269,7 @@ impl GenerateConfig for GcsSinkConfig {
 #[typetag::serde(name = "gcp_cloud_storage")]
 impl SinkConfig for GcsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let auth = self.auth.build(Scope::DevStorageReadWrite).await?;
+        let auth = self.auth.build(&[scopes::CLOUD_STORAGE]).await?;
         let base_url = format!("{}/{}/", self.endpoint, self.bucket);
         let tls = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls, cx.proxy())?;

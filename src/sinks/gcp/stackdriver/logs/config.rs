@@ -13,7 +13,7 @@ use super::{
     service::StackdriverLogsServiceRequestBuilder, sink::StackdriverLogsSink,
 };
 use crate::{
-    gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
+    gcp::{scopes, GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     schema,
     sinks::{
@@ -274,7 +274,7 @@ impl SinkConfig for StackdriverConfig {
             })
             .collect::<crate::Result<_>>()?;
 
-        let auth = self.auth.build(Scope::LoggingWrite).await?;
+        let auth = self.auth.build(&[scopes::LOGGING_WRITE]).await?;
 
         let request_builder = StackdriverLogsRequestBuilder {
             encoder: StackdriverLogsEncoder::new(

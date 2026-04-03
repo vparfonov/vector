@@ -6,10 +6,25 @@ use std::{
 };
 
 use super::{
-    AddCertToStoreSnafu, AddExtraChainCertSnafu, CaStackPushSnafu, EncodeAlpnProtocolsSnafu,
-    FileOpenFailedSnafu, FileReadFailedSnafu, MaybeTls, NewCaStackSnafu, NewStoreBuilderSnafu,
-    ParsePkcs12Snafu, PrivateKeyParseSnafu, Result, SetAlpnProtocolsSnafu, SetCertificateSnafu,
-    SetPrivateKeySnafu, SetVerifyCertSnafu, TlsError, X509ParseSnafu,
+    AddCertToStoreSnafu,
+    AddExtraChainCertSnafu,
+    CaStackPushSnafu,
+    EncodeAlpnProtocolsSnafu,
+    FileOpenFailedSnafu,
+    FileReadFailedSnafu,
+    MaybeTls,
+    NewCaStackSnafu,
+    NewStoreBuilderSnafu,
+    ParsePkcs12Snafu,
+    PrivateKeyParseSnafu,
+    Result,
+    SetAlpnProtocolsSnafu,
+    SetCertificateSnafu,
+    SetPrivateKeySnafu,
+    SetVerifyCertSnafu,
+    TlsError,
+    X509ParseSnafu,
+    apply_tls_security_profile, // RED HAT - TLS security profile support (LOG-3398)
 };
 use cfg_if::cfg_if;
 use lookup::lookup_v2::OptionalValuePath;
@@ -157,11 +172,13 @@ pub struct TlsConfig {
     #[configurable(metadata(docs::human_name = "Server Name"))]
     pub server_name: Option<String>,
 
+    // BEGIN RED HAT - TLS security profile support (LOG-3398)
     /// Minimal enabled TLS version.
     pub min_tls_version: Option<String>,
 
     /// TLS ciphersuites to enable.
     pub ciphersuites: Option<String>,
+    // END RED HAT - TLS security profile support (LOG-3398)
 }
 
 impl TlsConfig {
@@ -184,8 +201,10 @@ pub struct TlsSettings {
     pub(super) identity: Option<IdentityStore>,
     alpn_protocols: Option<Vec<u8>>,
     server_name: Option<String>,
+    // BEGIN RED HAT - TLS security profile support (LOG-3398)
     pub min_tls_version: Option<String>,
     pub ciphersuites: Option<String>,
+    // END RED HAT - TLS security profile support (LOG-3398)
 }
 
 /// Identity store in PEM format
@@ -228,6 +247,7 @@ impl TlsSettings {
             identity: options.load_identity()?,
             alpn_protocols: options.parse_alpn_protocols()?,
             server_name: options.server_name.clone(),
+            // RED HAT - TLS security profile support (LOG-3398)
             min_tls_version: options.min_tls_version.clone(),
             ciphersuites: options.ciphersuites.clone(),
         })
@@ -346,6 +366,9 @@ impl TlsSettings {
                     .context(SetAlpnProtocolsSnafu)?;
             }
         }
+
+        // RED HAT - TLS security profile support (LOG-3398)
+        apply_tls_security_profile(context, &self.min_tls_version, &self.ciphersuites)?;
 
         Ok(())
     }
@@ -662,7 +685,7 @@ fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> 
 
 #[cfg(test)]
 mod test {
-    use openssl::ssl::{ErrorEx, SslMethod, SslVersion};
+    use openssl::ssl::{SslMethod, SslVersion};
 
     use super::*;
 
@@ -831,102 +854,79 @@ mod test {
         assert!(config.is_tls());
     }
 
+    // BEGIN RED HAT - TLS security profile tests (LOG-3398)
     #[test]
     fn from_min_tls_version() {
-        use std::result::Result;
+        use super::super::apply_tls_security_profile;
 
-        struct TlsVersionTest {
-            text: Option<String>,
-            num: Option<SslVersion>,
-            want: Result<(), ErrorEx>,
-        }
-        let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
-        let orig_min_proto_version = builder.min_proto_version();
-        let tests = [
-            TlsVersionTest {
-                text: None,
-                num: orig_min_proto_version,
-                want: Ok(()),
-            },
-            TlsVersionTest {
-                text: Some(String::new()),
-                num: orig_min_proto_version,
-                want: Err(ErrorEx::InvalidTlsVersion),
-            },
-            TlsVersionTest {
-                text: Some("foobar".to_string()),
-                num: Some(SslVersion::TLS1),
-                want: Err(ErrorEx::InvalidTlsVersion),
-            },
-            TlsVersionTest {
-                text: Some("VersionTLS10".to_string()),
-                num: Some(SslVersion::TLS1),
-                want: Ok(()),
-            },
-            TlsVersionTest {
-                text: Some("VersionTLS11".to_string()),
-                num: Some(SslVersion::TLS1_1),
-                want: Ok(()),
-            },
-            TlsVersionTest {
-                text: Some("VersionTLS12".to_string()),
-                num: Some(SslVersion::TLS1_2),
-                want: Ok(()),
-            },
-            TlsVersionTest {
-                text: Some("VersionTLS13".to_string()),
-                num: Some(SslVersion::TLS1_3),
-                want: Ok(()),
-            },
+        // Valid version strings set the correct min protocol version
+        let valid_cases = [
+            ("VersionTLS10", SslVersion::TLS1),
+            ("VersionTLS11", SslVersion::TLS1_1),
+            ("VersionTLS12", SslVersion::TLS1_2),
+            ("VersionTLS13", SslVersion::TLS1_3),
         ];
-        for t in tests {
-            match builder.set_min_tls_version_and_ciphersuites(&t.text, &None) {
-                Ok(()) => {
-                    assert!(t.want.is_ok());
-                    assert_eq!(builder.min_proto_version(), t.num);
-                }
-                Err(e) => assert_eq!(t.want.err().unwrap(), e),
-            }
+        for (version_str, expected_version) in valid_cases {
+            let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
+            apply_tls_security_profile(&mut builder, &Some(version_str.to_string()), &None)
+                .unwrap_or_else(|_| panic!("should accept {version_str}"));
+            assert_eq!(builder.min_proto_version(), Some(expected_version));
+        }
+
+        // None leaves the default unchanged
+        let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
+        let orig = builder.min_proto_version();
+        apply_tls_security_profile(&mut builder, &None, &None).unwrap();
+        assert_eq!(builder.min_proto_version(), orig);
+
+        // Invalid version strings return InvalidTlsVersion
+        for bad in ["", "foobar"] {
+            let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
+            let err = apply_tls_security_profile(&mut builder, &Some(bad.to_string()), &None)
+                .expect_err(&format!("should reject {bad:?}"));
+            assert!(
+                matches!(err, TlsError::InvalidTlsVersion { .. }),
+                "expected InvalidTlsVersion for {bad:?}, got {err:?}"
+            );
         }
     }
 
     #[test]
     fn from_min_tls_version_and_ciphersuites() {
-        use std::result::Result;
+        use super::super::apply_tls_security_profile;
 
-        struct TlsCiphersuiteTest {
-            min_tls_version: Option<String>,
-            ciphersuite: Option<String>,
-            want: Result<(), ErrorEx>,
-        }
-
+        // Empty ciphersuite string returns InvalidCiphersuite
         let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
-        let tests = [
-            TlsCiphersuiteTest {
-                min_tls_version: Some("VersionTLS10".to_string()),
-                ciphersuite: Some(String::new()),
-                want: Err(ErrorEx::InvalidCiphersuite),
-            },
-            TlsCiphersuiteTest {
-                min_tls_version: Some("VersionTLS12".to_string()),
-                ciphersuite: Some("AES128-SHA256".to_string()),
-                want: Ok(()),
-            },
-            TlsCiphersuiteTest {
-                min_tls_version: Some("VersionTLS13".to_string()),
-                ciphersuite: Some(
-                    "TLS_CHACHA20_POLY1305_SHA256,TLS_AES_256_GCM_SHA384".to_string(),
-                ),
-                want: Ok(()),
-            },
-        ];
-        for t in tests {
-            match builder.set_min_tls_version_and_ciphersuites(&t.min_tls_version, &t.ciphersuite) {
-                Ok(()) => assert!(t.want.is_ok()),
-                Err(e) => assert_eq!(t.want.err().unwrap(), e),
-            }
-        }
+        let err = apply_tls_security_profile(
+            &mut builder,
+            &Some("VersionTLS10".to_string()),
+            &Some(String::new()),
+        )
+        .expect_err("should reject empty ciphersuite");
+        assert!(
+            matches!(err, TlsError::InvalidCiphersuite),
+            "expected InvalidCiphersuite, got {err:?}"
+        );
+
+        // TLS 1.2 cipher list is accepted
+        let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
+        apply_tls_security_profile(
+            &mut builder,
+            &Some("VersionTLS12".to_string()),
+            &Some("AES128-SHA256".to_string()),
+        )
+        .expect("should accept TLS 1.2 cipher list");
+
+        // TLS 1.3 ciphersuites are accepted
+        let mut builder = SslContextBuilder::new(SslMethod::tls()).unwrap();
+        apply_tls_security_profile(
+            &mut builder,
+            &Some("VersionTLS13".to_string()),
+            &Some("TLS_CHACHA20_POLY1305_SHA256,TLS_AES_256_GCM_SHA384".to_string()),
+        )
+        .expect("should accept TLS 1.3 ciphersuites");
     }
+    // END RED HAT - TLS security profile tests (LOG-3398)
 
     fn settings_from_config(
         enabled: Option<bool>,

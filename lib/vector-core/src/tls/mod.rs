@@ -4,7 +4,7 @@ use std::{fmt::Debug, net::SocketAddr, num::TryFromIntError, path::PathBuf, time
 
 use openssl::{
     error::ErrorStack,
-    ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod},
+    ssl::{ConnectConfiguration, SslConnector, SslConnectorBuilder, SslMethod, SslVersion},
 };
 use snafu::{ResultExt, Snafu};
 use tokio::net::TcpStream;
@@ -131,6 +131,16 @@ pub enum TlsError {
     NewCaStack { source: ErrorStack },
     #[snafu(display("Could not push intermediate certificate onto stack"))]
     CaStackPush { source: ErrorStack },
+    // BEGIN RED HAT - TLS security profile support (LOG-3398)
+    #[snafu(display("Invalid TLS version: {}", version))]
+    InvalidTlsVersion { version: String },
+    #[snafu(display("Invalid or empty ciphersuite string"))]
+    InvalidCiphersuite,
+    #[snafu(display("Could not set minimum TLS version: {}", source))]
+    SetMinTlsVersion { source: ErrorStack },
+    #[snafu(display("Could not set cipher list: {}", source))]
+    SetCipherList { source: ErrorStack },
+    // END RED HAT - TLS security profile support (LOG-3398)
 }
 
 impl MaybeTlsStream<TcpStream> {
@@ -174,6 +184,47 @@ impl MaybeTlsStream<TcpStream> {
         tcp::set_receive_buffer_size(stream, bytes)
     }
 }
+
+// BEGIN RED HAT - TLS security profile support (LOG-3398)
+/// Apply TLS security profile settings (min version, ciphersuites) to an SSL context builder.
+///
+/// Maps `OpenShift` TLS security profile version strings (`VersionTLS10`..`VersionTLS13`)
+/// to OpenSSL protocol versions and configures ciphersuites accordingly.
+pub fn apply_tls_security_profile(
+    ctx: &mut openssl::ssl::SslContextBuilder,
+    min_tls_version: &Option<String>,
+    ciphersuites: &Option<String>,
+) -> Result<()> {
+    let mut resolved_version = SslVersion::TLS1;
+    if let Some(version_str) = min_tls_version {
+        resolved_version = match version_str.as_str() {
+            "VersionTLS10" => SslVersion::TLS1,
+            "VersionTLS11" => SslVersion::TLS1_1,
+            "VersionTLS12" => SslVersion::TLS1_2,
+            "VersionTLS13" => SslVersion::TLS1_3,
+            _ => {
+                return Err(TlsError::InvalidTlsVersion {
+                    version: version_str.clone(),
+                });
+            }
+        };
+        ctx.set_min_proto_version(Some(resolved_version))
+            .context(SetMinTlsVersionSnafu)?;
+    }
+    if let Some(suites) = ciphersuites {
+        if suites.is_empty() {
+            return Err(TlsError::InvalidCiphersuite);
+        }
+        let suites = suites.replace(',', ":");
+        if resolved_version == SslVersion::TLS1_3 {
+            ctx.set_ciphersuites(&suites).context(SetCipherListSnafu)?;
+        } else {
+            ctx.set_cipher_list(&suites).context(SetCipherListSnafu)?;
+        }
+    }
+    Ok(())
+}
+// END RED HAT - TLS security profile support (LOG-3398)
 
 pub fn tls_connector_builder(settings: &MaybeTlsSettings) -> Result<SslConnectorBuilder> {
     let mut builder = SslConnector::builder(SslMethod::tls()).context(TlsBuildConnectorSnafu)?;

@@ -11,6 +11,7 @@ RUN INSTALL_PKGS=" \
       llvm-toolset \
       cyrus-sasl \
       llvm \
+      lld \
       cyrus-sasl-devel \
       libtool \
       " && \

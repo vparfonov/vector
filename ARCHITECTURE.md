@@ -23,23 +23,23 @@ The fork defines a custom Cargo feature `ocp-logging` in `Cargo.toml` that compi
 
 **Sinks:**
 
-| Sink | v0.47.0-rh | v0.54.0-rh |
-|------|:----------:|:----------:|
-| aws_cloudwatch_logs | yes | yes |
-| aws_s3 | yes | yes |
-| azure_logs_ingestion | — | yes |
-| azure_monitor_logs | yes | yes |
-| elasticsearch | yes | yes |
-| file | yes | yes |
-| kafka | yes | yes |
-| loki | yes | yes |
-| console | yes | yes |
-| prometheus | yes | yes |
-| gcp | yes | yes |
-| splunk_hec | yes | yes |
-| http | yes | yes |
-| socket | yes | yes |
-| opentelemetry | yes | yes |
+| Sink                 | v0.47.0-rh | v0.54.0-rh |
+|----------------------|:----------:|:----------:|
+| aws_cloudwatch_logs  |    yes     |    yes     |
+| aws_s3               |    yes     |    yes     |
+| azure_logs_ingestion |     —      |    yes     |
+| azure_monitor_logs   |    yes     |    yes     |
+| elasticsearch        |    yes     |    yes     |
+| file                 |    yes     |    yes     |
+| kafka                |    yes     |    yes     |
+| loki                 |    yes     |    yes     |
+| console              |    yes     |    yes     |
+| prometheus           |    yes     |    yes     |
+| gcp                  |    yes     |    yes     |
+| splunk_hec           |    yes     |    yes     |
+| http                 |    yes     |    yes     |
+| socket               |    yes     |    yes     |
+| opentelemetry        |    yes     |    yes     |
 
 Components not in `ocp-logging` exist in the source tree but are not compiled into the Red Hat binary.
 
@@ -69,12 +69,11 @@ Both were dropped in v0.54.0-rh (fixed upstream).
 
 ### Dockerfiles
 
-| File | Base | Rust | Purpose |
-|------|------|------|---------|
-| `Dockerfile` | `ubi9/ubi` | rustup | Local/developer builds |
-| `Dockerfile.art` | `ubi9/ubi-minimal` | RPM `rust-toolset` | ART production image (shipped to customers). Uses `make build-offline` for air-gapped builds |
-| `Dockerfile.in` | `ubi9/ubi-minimal` | RPM | OSBS/Brew template. Has `## EXCLUDE BEGIN ##` markers for OSBS processing. Uses `REMOTE_SOURCE` for Cachito-prefetched dependencies |
-| `Dockerfile.unit` | `ubi9/ubi` | rustup | CI unit test runner. Selective COPY for build cache efficiency |
+| File              | Base               | Rust               | Purpose                                                                                                                             |
+|-------------------|--------------------|--------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| `Dockerfile`      | `ubi9/ubi`         | rustup             | Local/developer builds                                                                                                              |
+| `Dockerfile.art`  | `ubi9/ubi-minimal` | RPM `rust-toolset` | ART production image (shipped to customers). Uses `make build-offline` for air-gapped builds                                        |
+| `Dockerfile.unit` | `ubi9/ubi`         | rustup             | CI unit test runner. Selective COPY for build cache efficiency                                                                      |
 
 ### Build constraints
 
@@ -87,7 +86,6 @@ Both were dropped in v0.54.0-rh (fixed upstream).
 
 No in-repo CI pipelines. Builds happen in Red Hat's internal ART/OSBS infrastructure:
 - `Dockerfile.art` → production image via ART (Automated Release Tooling)
-- `Dockerfile.in` → processed by OSBS (OpenShift Build Service) / Brew
 
 GitHub Actions on the dev branches are inherited from upstream and mostly not Red Hat-specific.
 
@@ -103,7 +101,7 @@ GitHub Actions on the dev branches are inherited from upstream and mostly not Re
 
 **Decision:** All TLS connections respect OpenShift's `TLSSecurityProfile` (cipher suites, min/max TLS version).
 **Why:** OpenShift cluster administrators expect uniform TLS policy enforcement across all components.
-**Depends on:** The OpenSSL patch above — upstream's Ring-based TLS does not support security profile configuration.
+**Depends on:** The OpenSSL patch above — upstreams Ring-based TLS does not support security profile configuration.
 
 ### `detect_exceptions` Transform (LOG-6155)
 
@@ -112,15 +110,15 @@ GitHub Actions on the dev branches are inherited from upstream and mostly not Re
 
 ## Differences Between Version Branches
 
-| Aspect | v0.47.0-rh | v0.54.0-rh |
-|--------|-----------|-----------|
-| Upstream base | Vector v0.47.0 | Vector v0.54.0 |
-| Rust edition | 2021 | 2024 |
-| MSRV (rust-toolchain.toml) | 1.85 | 1.92 |
-| `azure_logs_ingestion` sink | — | enabled |
-| `tokio-util` / `nix` patches | present | removed (fixed upstream) |
-| GCP Workload Identity Federation | — | LOG-9171 |
-| TLS curve configuration | — | LOG-8968 |
+| Aspect                           | v0.47.0-rh     | v0.54.0-rh               |
+|----------------------------------|----------------|--------------------------|
+| Upstream base                    | Vector v0.47.0 | Vector v0.54.0           |
+| Rust edition                     | 2021           | 2024                     |
+| MSRV (rust-toolchain.toml)       | 1.85           | 1.92                     |
+| `azure_logs_ingestion` sink      | —              | enabled                  |
+| `tokio-util` / `nix` patches     | present        | removed (fixed upstream) |
+| GCP Workload Identity Federation | —              | LOG-9171                 |
+| TLS curve configuration          | —              | LOG-8968                 |
 
 ## Upstream Sync Strategy
 

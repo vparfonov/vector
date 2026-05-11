@@ -13,10 +13,10 @@ A fork of [vectordotdev/vector](https://github.com/vectordotdev/vector) maintain
 
 **Never commit code to `rh-main`.** It contains only documentation.
 
-| Branch | Vector Version | Rust | Use |
-|--------|---------------|------|-----|
-| `v0.47.0-rh` | v0.47.0 | 1.85 | Stable — OpenShift 6.2–6.5 |
-| `v0.54.0-rh` | v0.54.0 | 1.92 | Next — future OpenShift releases |
+| Branch       | Vector Version | Rust | Use                              |
+|--------------|----------------|------|----------------------------------|
+| `v0.47.0-rh` | v0.47.0        | 1.85 | Stable — OpenShift 6.2–6.5       |
+| `v0.54.0-rh` | v0.54.0        | 1.92 | Next — future OpenShift releases |
 
 Always check out the appropriate version branch before making changes:
 
@@ -29,7 +29,7 @@ When a fix applies to both branches, submit separate PRs per branch.
 
 ## Build Quick Reference
 
-The Makefile defaults to `FEATURES=ocp-logging` on Linux (not upstream's `default` feature set).
+The Makefile defaults to `FEATURES=ocp-logging` on Linux (not upstreams `default` feature set).
 
 ```bash
 make build          # cargo build --release --no-default-features --features ocp-logging
@@ -64,17 +64,16 @@ Components not in this list are **not available** in the Red Hat binary even tho
 
 These files exist in this fork but not in upstream:
 
-| Path | Purpose |
-|------|---------|
-| `patch/openssl/` | Forked openssl crate — enables FIPS compliance and TLS security profile enforcement (LOG-2552, LOG-3398) |
-| `patch/hyper/` | Forked hyper crate — HTTP behavior modifications |
-| `thirdparty/` | Bundled binaries: `protoc`, `cargo-nextest`, `cargo-deny` (no external downloads in CI) |
-| `Dockerfile` | Developer/local build image (UBI 9 + rustup) |
-| `Dockerfile.art` | ART production build (UBI 9 minimal + RPM rust-toolset, `make build-offline`) |
-| `Dockerfile.in` | OSBS/Brew template with `REMOTE_SOURCE` markers for Cachito |
-| `Dockerfile.unit` | CI unit test runner |
-| `OWNERS` | Kubernetes-style code review assignments |
-| `CLAUDE.md` | Stub pointing to this file |
+| Path              | Purpose                                                                                                  |
+|-------------------|----------------------------------------------------------------------------------------------------------|
+| `patch/openssl/`  | Forked openssl crate — enables FIPS compliance and TLS security profile enforcement (LOG-2552, LOG-3398) |
+| `patch/hyper/`    | Forked hyper crate — HTTP behavior modifications                                                         |
+| `thirdparty/`     | Bundled binaries: `protoc`, `cargo-nextest`, `cargo-deny` (no external downloads in CI)                  |
+| `Dockerfile`      | Developer/local build image (UBI 9 + rustup)                                                             |
+| `Dockerfile.art`  | ART production build (UBI 9 minimal + RPM rust-toolset, `make build-offline`)                            |
+| `Dockerfile.unit` | CI unit test runner                                                                                      |
+| `OWNERS`          | Kubernetes-style code review assignments                                                                 |
+| `CLAUDE.md`       | Stub pointing to this file                                                                               |
 
 ## Patched Crates (`[patch.crates-io]`)
 
@@ -110,12 +109,12 @@ Dockerfile changes get the `midstream/Dockerfile` label automatically.
 
 For generic Vector development, use these upstream docs (they apply to this fork's Rust code):
 
-| Topic | Upstream Document |
-|-------|-------------------|
-| Dev commands, project structure, common patterns | [AGENTS.md](https://github.com/vectordotdev/vector/blob/master/AGENTS.md) |
-| Contribution workflow, PR format | [CONTRIBUTING.md](https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md) |
-| Internal engine architecture (topology, fanout, buffering) | [docs/ARCHITECTURE.md](https://github.com/vectordotdev/vector/blob/master/docs/ARCHITECTURE.md) |
-| Rust coding conventions (agent-oriented) | [docs/RUST_STYLE.md](https://github.com/vectordotdev/vector/blob/master/docs/RUST_STYLE.md) |
-| Code style (logging, metrics, error handling, concurrency) | [STYLE.md](https://github.com/vectordotdev/vector/blob/master/STYLE.md) |
-| Developer setup, testing, benchmarking | [docs/DEVELOPING.md](https://github.com/vectordotdev/vector/blob/master/docs/DEVELOPING.md) |
-| Component specification | [docs/specs/component.md](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md) |
+| Topic                                                      | Upstream Document                                                                                     |
+|------------------------------------------------------------|-------------------------------------------------------------------------------------------------------|
+| Dev commands, project structure, common patterns           | [AGENTS.md](https://github.com/vectordotdev/vector/blob/master/AGENTS.md)                             |
+| Contribution workflow, PR format                           | [CONTRIBUTING.md](https://github.com/vectordotdev/vector/blob/master/CONTRIBUTING.md)                 |
+| Internal engine architecture (topology, fanout, buffering) | [docs/ARCHITECTURE.md](https://github.com/vectordotdev/vector/blob/master/docs/ARCHITECTURE.md)       |
+| Rust coding conventions (agent-oriented)                   | [docs/RUST_STYLE.md](https://github.com/vectordotdev/vector/blob/master/docs/RUST_STYLE.md)           |
+| Code style (logging, metrics, error handling, concurrency) | [STYLE.md](https://github.com/vectordotdev/vector/blob/master/STYLE.md)                               |
+| Developer setup, testing, benchmarking                     | [docs/DEVELOPING.md](https://github.com/vectordotdev/vector/blob/master/docs/DEVELOPING.md)           |
+| Component specification                                    | [docs/specs/component.md](https://github.com/vectordotdev/vector/blob/master/docs/specs/component.md) |

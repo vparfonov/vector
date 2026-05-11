@@ -4,11 +4,11 @@ This guide covers what is specific to contributing to this fork. For generic Vec
 
 ## Branching Strategy
 
-| Branch | Purpose |
-|--------|---------|
-| `rh-main` | Documentation only — **never commit code here** |
-| `v0.47.0-rh` | Stable development — OpenShift 6.2–6.5 |
-| `v0.54.0-rh` | Next-gen development — future releases |
+| Branch       | Purpose                                         |
+|--------------|-------------------------------------------------|
+| `rh-main`    | Documentation only — **never commit code here** |
+| `v0.47.0-rh` | Stable development — OpenShift 6.2–6.5          |
+| `v0.54.0-rh` | Next-gen development — future releases          |
 
 ## Submitting Changes
 
@@ -30,11 +30,15 @@ fix(file-source): handle symlink rotation during log collection
 Fixes LOG-7506
 ```
 
-PR titles follow upstream's [conventional commits](https://www.conventionalcommits.org) format:
-```
+PR titles follow upstreams [conventional commits](https://www.conventionalcommits.org) format:
+```text
 feat(scope): description
 fix(scope): description
 chore(scope): description
+```
+or by adding Jira Issue Key like:
+```text
+LOG-7506: description
 ```
 
 ## Code Review

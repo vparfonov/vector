@@ -41,6 +41,10 @@ get_arch() {
     echo "aarch_64"
   elif [[ "${os}" == "Linux" && "${arch}" == "aarch64" ]]; then
     echo "aarch_64"
+  elif [[ "${arch}" == "s390x" ]]; then
+    echo "s390_64"
+  elif [[ "${arch}" == "ppc64le" ]]; then
+    echo "ppcle_64"
   else
     echo "${arch}"
   fi
@@ -59,20 +63,30 @@ install_protoc() {
   local install_path=$2
 
   local base_url="https://github.com/protocolbuffers/protobuf/releases/download"
-  local url
+  local filename
   if [[ "$(get_platform)" == "win64" ]]; then
     # Windows release assets are named without an explicit arch suffix.
-    url="${base_url}/v${version}/protoc-${version}-win64.zip"
+    filename="protoc-${version}-win64.zip"
   else
-    url="${base_url}/v${version}/protoc-${version}-$(get_platform)-$(get_arch).zip"
+    filename="protoc-${version}-$(get_platform)-$(get_arch).zip"
   fi
   local download_path="${TMP_DIR}/protoc.zip"
 
-  echo "Downloading ${url}"
-  # Stay compatible with the curl shipped by Ubuntu 20.04 focal (7.68.x) used
-  # in the ghcr.io/cross-rs/* base images: --retry-all-errors was only added
-  # in curl 7.71.0, so rely on the transport-level retry that --retry covers.
-  curl --retry 5 --retry-delay 10 -fsSL "${url}" -o "${download_path}"
+  # Prefer a locally-vendored copy from Hermeto/cachi2 for offline (ART) builds.
+  local cachi_file
+  cachi_file="/cachi2/output/deps/generic/${filename}"
+  if [ -e "${cachi_file}" ]; then
+    echo "Using ${filename} from cachi2"
+    cp "${cachi_file}" "${download_path}"
+  else
+    local url
+    url="${base_url}/v${version}/${filename}"
+    echo "Downloading ${url}"
+    # Stay compatible with the curl shipped by Ubuntu 20.04 focal (7.68.x) used
+    # in the ghcr.io/cross-rs/* base images: --retry-all-errors was only added
+    # in curl 7.71.0, so rely on the transport-level retry that --retry covers.
+    curl --retry 5 --retry-delay 10 -fsSL "${url}" -o "${download_path}"
+  fi
 
   unzip -qq "${download_path}" -d "${TMP_DIR}"
   mv -f -v "${TMP_DIR}/bin/$(get_bin_name)" "${install_path}"

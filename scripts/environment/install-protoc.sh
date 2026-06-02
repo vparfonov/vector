@@ -42,6 +42,10 @@ get_arch() {
     echo "aarch_64"
   elif [[ "${os}" == "Linux" && "${arch}" == "aarch64" ]]; then
     echo "aarch_64"
+  elif [[ "${arch}" == "s390x" ]]; then
+    echo "s390_64"
+  elif [[ "${arch}" == "ppc64le" ]]; then
+    echo "ppcle_64"
   else
     echo "${arch}"
   fi
@@ -52,12 +56,21 @@ install_protoc() {
   local install_path=$2
 
   local base_url="https://github.com/protocolbuffers/protobuf/releases/download"
-  local url
-  url="${base_url}/v${version}/protoc-${version}-$(get_platform)-$(get_arch).zip"
+  local filename
+  filename="protoc-${version}-$(get_platform)-$(get_arch).zip"
   local download_path="${TMP_DIR}/protoc.zip"
 
-  echo "Downloading ${url}"
-  curl -fsSL "${url}" -o "${download_path}"
+  local cachi_file
+  cachi_file="/cachi2/output/deps/generic/${filename}"
+  if [ -e "${cachi_file}" ]; then
+    echo "Using ${filename} from cachi2"
+    cp "${cachi_file}" "${download_path}"
+  else
+    local url
+    url="${base_url}/v${version}/${filename}"
+    echo "Downloading ${url}"
+    curl -fsSL "${url}" -o "${download_path}"
+  fi
 
   unzip -qq "${download_path}" -d "${TMP_DIR}"
   mv -f -v "${TMP_DIR}/bin/protoc" "${install_path}"

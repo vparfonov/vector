@@ -4,11 +4,11 @@ RUN INSTALL_PKGS=" \
       gcc-c++ \
       git \
       make \
+      unzip \
       openssl-devel \
       llvm-toolset \
       rust-toolset-1.88.0 \
       crypto-policies-scripts \
-      protobuf-compiler \
       " && \
     microdnf install -y $INSTALL_PKGS && \
     rpm -V $INSTALL_PKGS
@@ -19,6 +19,7 @@ RUN update-crypto-policies --set DEFAULT:PQ
 COPY . /opt/app-root/src
 WORKDIR /opt/app-root/src
 
+RUN scripts/environment/install-protoc.sh
 RUN make build-offline
 
 # Strip binary to reduce image size for DaemonSet deployment

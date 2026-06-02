@@ -15,7 +15,7 @@ mod ready_frames;
 pub use decoder_framed_read::DecoderFramedRead;
 pub use decoding::{
     BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
-    CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, Decoder, DecodingConfig,
+    CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, Decoder, DecodingConfig, OversizedAction,
     GelfDeserializer, GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig,
     LengthDelimitedDecoder, LengthDelimitedDecoderConfig, NativeDeserializer,
     NativeDeserializerConfig, NativeJsonDeserializer, NativeJsonDeserializerConfig,

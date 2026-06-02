@@ -2724,6 +2724,7 @@ impl ValidatableComponent for DatadogAgentConfig {
                 character_delimited: CharacterDelimitedDecoderOptions {
                     delimiter: b',',
                     max_length: Some(usize::MAX),
+                    oversized_action: Default::default(),
                 },
             }
             .into(),

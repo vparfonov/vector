@@ -8,7 +8,10 @@ use vrl::event_path;
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
-    aws::{AwsAuthentication, ImdsAuthentication, RegionOrEndpoint, create_client},
+    aws::{
+        AwsAuthentication, ImdsAuthentication, RegionOrEndpoint,
+        create_client_without_transport_metrics,
+    },
     config::{ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         elasticsearch::{
@@ -254,17 +257,19 @@ async fn firehose_client() -> aws_sdk_firehose::Client {
     let auth = AwsAuthentication::test_auth();
     let proxy = ProxyConfig::default();
 
-    create_client::<KinesisFirehoseClientBuilder>(
-        &KinesisFirehoseClientBuilder {},
-        &auth,
-        region_endpoint.region(),
-        region_endpoint.endpoint(),
-        &proxy,
-        None,
-        None,
-    )
-    .await
-    .unwrap()
+    let (client, _region) =
+        create_client_without_transport_metrics::<KinesisFirehoseClientBuilder>(
+            &KinesisFirehoseClientBuilder {},
+            &auth,
+            region_endpoint.region(),
+            region_endpoint.endpoint(),
+            &proxy,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+    client
 }
 
 /// creates ES domain with the given name and returns the ARN

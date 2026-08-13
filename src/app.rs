@@ -204,6 +204,11 @@ impl Application {
             opts.root.internal_log_rate_limit,
         );
 
+        #[cfg(unix)]
+        if opts.root.raise_fd_limit {
+            crate::cli::raise_file_descriptor_limit();
+        }
+
         // Can only log this after initializing the logging subsystem
         if opts.root.openssl_no_probe {
             debug!(message = "Disabled probing and configuration of root certificate locations on the system for OpenSSL.");

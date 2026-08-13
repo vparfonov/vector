@@ -573,7 +573,7 @@ async fn cloudwatch_healthcheck() {
         tags: None,
     };
 
-    let client = config.create_client(&ProxyConfig::default()).await.unwrap();
+    let (client, _region) = config.create_client(&ProxyConfig::default()).await.unwrap();
     healthcheck(config, client).await.unwrap();
 }
 

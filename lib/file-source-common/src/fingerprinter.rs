@@ -168,6 +168,15 @@ impl Fingerprinter {
         }
     }
 
+    /// Whether file identity is based solely on device and inode.
+    ///
+    /// When true, discovery can skip re-fingerprinting already-watched paths that
+    /// still point at the same inode. Checksum identity must re-fingerprint each
+    /// cycle so in-place rewrites (e.g. `copytruncate`) are still detected.
+    pub fn uses_dev_inode(&self) -> bool {
+        matches!(self.strategy, FingerprintStrategy::DevInode)
+    }
+
     /// Returns the `FileFingerprint` of a file, depending on `Fingerprinter::strategy`
     pub(crate) async fn fingerprint(&mut self, path: &Path) -> Result<FileFingerprint> {
         use FileFingerprint::*;
@@ -302,6 +311,22 @@ mod test {
         let mut content = Vec::new();
         file.read_to_end(&mut content).unwrap();
         content
+    }
+
+    #[test]
+    fn uses_dev_inode_matches_strategy() {
+        let checksum = Fingerprinter::new(
+            FingerprintStrategy::FirstLinesChecksum {
+                ignored_header_bytes: 0,
+                lines: 1,
+            },
+            1024,
+            false,
+        );
+        assert!(!checksum.uses_dev_inode());
+
+        let dev_inode = Fingerprinter::new(FingerprintStrategy::DevInode, 1024, false);
+        assert!(dev_inode.uses_dev_inode());
     }
 
     #[tokio::test]

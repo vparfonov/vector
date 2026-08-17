@@ -1,12 +1,13 @@
-use metrics::counter;
-use vector_lib::NamedInternalEvent;
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::{
+    NamedInternalEvent, counter,
+    internal_event::{CounterName, InternalEvent},
+};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct DetectExceptionsStaleEventFlushed;
 
 impl InternalEvent for DetectExceptionsStaleEventFlushed {
     fn emit(self) {
-        counter!("detect_exceptions_stale_flushed_total").increment(1);
+        counter!(CounterName::DetectExceptionsStaleFlushedTotal).increment(1);
     }
 }

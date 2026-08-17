@@ -466,7 +466,7 @@ mod tests {
     async fn falls_back_to_adc() {
         // With no credentials configured, build() attempts ADC.
         // The result is environment-dependent -- just verify no panic.
-        let _ = build_auth("").await;
+        let _result = build_auth("").await;
     }
 
     #[tokio::test]

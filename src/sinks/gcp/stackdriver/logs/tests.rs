@@ -328,7 +328,7 @@ async fn falls_back_to_adc() {
         "#})
     .unwrap();
 
-    let _ = config.build(SinkContext::default()).await;
+    let _result = config.build(SinkContext::default()).await;
 }
 
 #[test]

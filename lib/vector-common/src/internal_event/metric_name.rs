@@ -104,6 +104,8 @@ pub enum CounterName {
     // Red Hat / OpenShift Logging: legacy per-pod event counter consumed by
     // cluster-logging-operator dashboards. Kept for backward compatibility.
     EventsInTotal,
+    // Red Hat / OpenShift Logging: detect_exceptions transform stale-flush counter.
+    DetectExceptionsStaleFlushedTotal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -376,6 +378,7 @@ impl CounterName {
                 "datadog_logs_reserved_attribute_conflicts_total"
             }
             Self::EventsInTotal => "events_in_total",
+            Self::DetectExceptionsStaleFlushedTotal => "detect_exceptions_stale_flushed_total",
         }
     }
 }

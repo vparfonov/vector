@@ -41,6 +41,7 @@ where
 
 // Just a sort-of "trait alias" of `MakeService`, not to be implemented
 // by anyone, only used as bounds.
+#[allow(dead_code)]
 pub trait MakeServiceRef<Target, ReqBody>: self::sealed::Sealed<(Target, ReqBody)> {
     type ResBody: HttpBody;
     type Error: Into<Box<dyn StdError + Send + Sync>>;
@@ -179,9 +180,11 @@ mod sealed {
     pub trait Sealed<X> {}
 
     #[allow(unreachable_pub)] // This is intentional.
+    #[allow(dead_code)]
     pub trait CantImpl {}
 
     #[allow(missing_debug_implementations)]
+    #[allow(dead_code)]
     pub enum CantName {}
 
     impl CantImpl for CantName {}

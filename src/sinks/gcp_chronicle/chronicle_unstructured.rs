@@ -681,7 +681,9 @@ mod unit_tests {
     use super::*;
     use crate::test_util::{random_string, trace_init};
 
-    #[tokio::test]
+    // Multi-threaded runtime required: applying GCP auth fetches a token via
+    // `block_in_place`, which panics on the default current-thread test runtime.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn invalid_credentials_rejected_by_oauth_server() {
         trace_init();
 
@@ -724,6 +726,14 @@ mod unit_tests {
             creds_path, log_type
         ))
         .unwrap();
-        assert!(config.build(cx).await.is_err());
+        // With `google-cloud-auth`, credentials are validated lazily: `build()`
+        // constructs the credential from the file but does not fetch a token, so
+        // the invalid-credentials rejection now surfaces when the healthcheck
+        // requests a token (or fails to reach the unreachable endpoint).
+        let (_sink, healthcheck) = config
+            .build(cx)
+            .await
+            .expect("build should succeed; auth is validated lazily");
+        assert!(healthcheck.await.is_err());
     }
 }

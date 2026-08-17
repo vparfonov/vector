@@ -263,7 +263,7 @@ mod tests {
             "#})
         .unwrap();
 
-        let _ = config.build(SinkContext::default()).await;
+        let _result = config.build(SinkContext::default()).await;
     }
 }
 

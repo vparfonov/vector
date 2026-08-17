@@ -337,7 +337,13 @@ impl S3SinkConfig {
                 filename_tz_offset: offset,
             };
 
-            let sink = S3Sink::new(service, request_options, partitioner, batch_settings);
+            let sink = S3Sink::new(
+                service,
+                request_options,
+                partitioner,
+                batch_settings,
+                region,
+            );
             return Ok(VectorSink::from_event_streamsink(sink));
         }
 

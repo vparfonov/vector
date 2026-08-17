@@ -376,7 +376,7 @@ Jul 09, 2015 3:23:29 PM com.google.devtools.search.cloud.feeder.MakeLog: Runtime
             .split("\n")
             .map(|line| {
                 let mut le = LogEvent::from(line);
-                le.insert("counter", counter);
+                le.insert(vrl::event_path!("counter"), counter);
                 counter += 1;
                 Event::Log(le)
             })

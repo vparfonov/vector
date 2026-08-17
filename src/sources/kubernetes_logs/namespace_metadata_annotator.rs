@@ -29,6 +29,14 @@ pub struct FieldsSpec {
     #[configurable(metadata(docs::examples = "k8s.ns_labels"))]
     #[configurable(metadata(docs::examples = ""))]
     pub namespace_labels: OptionalTargetPath,
+
+    /// Event field for the Namespace's uid.
+    ///
+    /// Set to `""` to suppress this key.
+    #[configurable(metadata(docs::examples = ".k8s.ns_uid"))]
+    #[configurable(metadata(docs::examples = "k8s.ns_uid"))]
+    #[configurable(metadata(docs::examples = ""))]
+    pub namespace_uid: OptionalTargetPath,
 }
 
 impl Default for FieldsSpec {
@@ -39,6 +47,8 @@ impl Default for FieldsSpec {
                 "namespace_labels"
             ))
             .into(),
+            namespace_uid: OwnedTargetPath::event(owned_value_path!("kubernetes", "namespace_uid"))
+                .into(),
         }
     }
 }
@@ -104,6 +114,22 @@ fn annotate_from_metadata(
             )
         }
     }
+    if let Some(uid) = &metadata.uid {
+        let legacy_key = fields_spec
+            .namespace_uid
+            .path
+            .as_ref()
+            .map(|k| &k.path)
+            .map(LegacyKey::Overwrite);
+
+        log_namespace.insert_source_metadata(
+            Config::NAME,
+            log,
+            legacy_key,
+            path!("namespace_uid"),
+            uid.to_owned(),
+        );
+    }
 }
 
 #[cfg(test)]
@@ -140,6 +166,10 @@ mod tests {
                 {
                     let mut log = LogEvent::default();
                     log.insert(
+                        metadata_path!("kubernetes_logs", "namespace_uid"),
+                        "sandbox0-uid",
+                    );
+                    log.insert(
                         metadata_path!("kubernetes_logs", "namespace_labels", "sandbox0-label0"),
                         "val0",
                     );
@@ -168,6 +198,7 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
+                    log.insert(event_path!("kubernetes", "namespace_uid"), "sandbox0-uid");
                     log.insert(
                         event_path!("kubernetes", "namespace_labels", "sandbox0-label0"),
                         "val0",
@@ -183,6 +214,7 @@ mod tests {
             (
                 FieldsSpec {
                     namespace_labels: OwnedTargetPath::event(owned_value_path!("ns_labels")).into(),
+                    namespace_uid: OwnedTargetPath::event(owned_value_path!("ns_uid")).into(),
                 },
                 ObjectMeta {
                     name: Some("sandbox0-name".to_owned()),
@@ -199,6 +231,7 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
+                    log.insert(event_path!("ns_uid"), "sandbox0-uid");
                     log.insert(event_path!("ns_labels", "sandbox0-label0"), "val0");
                     log.insert(event_path!("ns_labels", "sandbox0-label1"), "val1");
                     log
@@ -226,6 +259,10 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
+                    log.insert(
+                        metadata_path!("kubernetes_logs", "namespace_uid"),
+                        "sandbox0-uid",
+                    );
                     log.insert(
                         metadata_path!("kubernetes_logs", "namespace_labels", "nested0.label0"),
                         "val0",
@@ -270,6 +307,7 @@ mod tests {
                 },
                 {
                     let mut log = LogEvent::default();
+                    log.insert(event_path!("kubernetes", "namespace_uid"), "sandbox0-uid");
                     log.insert(
                         event_path!("kubernetes", "namespace_labels", "nested0.label0"),
                         "val0",

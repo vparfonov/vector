@@ -433,7 +433,7 @@ async-nats = { version = "0.49.0", default-features = false, optional = true, fe
 nkeys = { version = "0.4.5", default-features = false, optional = true }
 nom = { workspace = true, optional = true }
 notify = { version = "8.1.0", default-features = false, features = ["macos_fsevent"] }
-openssl = { version = "0.10.73", default-features = false, features = ["vendored"] }
+openssl = { version = "0.10.73", default-features = false}
 openssl-probe = { version = "0.1.6", default-features = false }
 ordered-float.workspace = true
 percent-encoding = { version = "2.3.1", default-features = false }
@@ -532,9 +532,12 @@ wiremock = "0.6.4"
 zstd.workspace = true
 
 [patch.crates-io]
+nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
+openssl = { path = "patch/openssl" }
+hyper = { path = "patch/hyper" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin.
@@ -549,6 +552,51 @@ antithesis-scenario-memory = ["dep:antithesis-instrumentation"]
 antithesis-scenario-disk = ["dep:antithesis-instrumentation", "vector-lib/antithesis-disk-asserts"]
 # Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
 docs = ["enable-api-client", "sources-dnstap"]
+
+ocp-logging = [
+  "sources-stdin",
+  "sources-file_descriptor",
+  "sources-file",
+  "sources-journald",
+  "sources-kubernetes_logs",
+  "sources-prometheus",
+  "sources-internal_metrics",
+  "sources-demo_logs",
+  "sources-http_server",
+  "sources-syslog",
+  "sources-opentelemetry",
+
+  "transforms-route",
+  "transforms-dedupe",
+  "transforms-filter",
+  "transforms-remap",
+  "transforms-log_to_metric",
+  "transforms-lua",
+  "transforms-throttle",
+  "transforms-reduce",
+  "transforms-detect_exceptions",
+
+  "sinks-aws_cloudwatch_logs",
+  "sinks-aws_s3",
+  "sinks-azure_logs_ingestion",
+  "sinks-azure_monitor_logs",
+  "sinks-elasticsearch",
+  "sinks-file",
+  "sinks-kafka",
+  "sinks-loki",
+  "sinks-console",
+  "sinks-prometheus",
+  "sinks-gcp",
+  "sinks-splunk_hec",
+  "sinks-http",
+  "sinks-socket",
+  "sinks-opentelemetry",
+
+  "api",
+  "api-client",
+
+  "tikv-jemallocator"
+]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
 default-cmake = ["enable-api-client", "sources-dnstap", "tikv-jemallocator", "vendored", "rdkafka?/cmake_build"]
 
@@ -808,6 +856,7 @@ transforms-logs = [
   "transforms-aws_ec2_metadata",
   "transforms-dedupe",
   "transforms-delay",
+  "transforms-detect_exceptions",
   "transforms-filter",
   "transforms-window",
   "transforms-log_to_metric",
@@ -846,6 +895,7 @@ transforms-lua = ["dep:mlua", "vector-lib/lua"]
 transforms-metric_to_log = []
 transforms-reduce = ["transforms-impl-reduce"]
 transforms-remap = []
+transforms-detect_exceptions = []
 transforms-route = []
 transforms-exclusive-route = []
 transforms-sample = ["transforms-impl-sample"]

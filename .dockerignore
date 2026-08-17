@@ -3,6 +3,7 @@
 !lib
 !proto
 !src
+!Makefile
 !tests
 !build.rs
 !Cargo.lock
@@ -10,6 +11,11 @@
 !rust-toolchain.toml
 !scripts
 !vdev
+!vendor
+!thirdparty
+!patch
+!.cargo
+!deny.toml
 
 # Exclude target directories to avoid copying build artifacts
 target

@@ -1,0 +1,43 @@
+FROM registry.access.redhat.com/ubi9/ubi-minimal AS builder
+
+RUN INSTALL_PKGS=" \
+      gcc-c++ \
+      git \
+      make \
+      openssl-devel \
+      rust-toolset-1.84.1 \
+      " && \
+    microdnf install -y $INSTALL_PKGS && \
+    rpm -V $INSTALL_PKGS
+
+COPY . /opt/app-root/src
+WORKDIR /opt/app-root/src
+
+RUN PROTOC=/opt/app-root/src/thirdparty/protoc/protoc-linux-$(arch) make build-offline
+
+RUN cp /opt/app-root/src/target/release/vector /usr/bin
+
+FROM registry.access.redhat.com/ubi9/ubi-minimal
+
+COPY --from=builder /usr/bin/vector /usr/bin/
+RUN microdnf install -y systemd
+
+WORKDIR /usr/bin
+CMD ["/usr/bin/vector"]
+
+LABEL \
+        com.redhat.component="logging-vector-container" \
+        description="Vector container for collection of container logs" \
+        distribution-scope="subscription" \
+        io.k8s.description="Vector container for collection of container logs" \
+        io.k8s.display-name="Vector" \
+        io.openshift.maintainer.product="OpenShift Container Platform" \
+        io.openshift.tags="logging,vector,observability" \
+        license="Apache-2.0" \
+        maintainer="AOS Logging <team-logging@redhat.com>" \
+        name="openshift-logging/vector-rhel9" \
+        summary="Log collection agent for Red Hat Openshift Logging" \
+        url="https://catalog.redhat.com/en/software/containers/openshift-logging/vector-rhel9/6447991f84aeefde2c9f2bcf" \
+        vendor="Red Hat, Inc." \
+        version_minor="v0.47" \
+        version="v0.47.0"

@@ -1,0 +1,17 @@
+# See the OWNERS docs: https://git.k8s.io/community/contributors/guide/owners.md    
+filters:
+  ".*":
+    approvers:
+      - jcantrill
+      - alanconway
+      - xperimental
+    reviewers:
+      - jcantrill
+      - Clee2691
+      - syedriko
+      - vparfonov
+      - cahartma
+  "Dockerfile(?:\\.in)?$":
+    labels:
+      - midstream/Dockerfile
+component: "Logging"

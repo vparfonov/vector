@@ -52,3 +52,9 @@ ignore = [
   { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.39.2 quadratic-time duplicate attribute check - transitive dep via azure_core/typespec, no newer typespec release available" },
   { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.39.2 unbounded namespace-declaration allocation in NsReader - transitive dep via azure_core/typespec, no newer typespec release available" },
 ]
+
+[bans]
+multiple-versions = "allow"
+deny = [
+    { name = "ring", wrappers = ["rustls", "sct", "rustls-webpki", "aws-config"] },
+]

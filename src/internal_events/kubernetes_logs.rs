@@ -52,7 +52,7 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
                     "container_name" => container_name.clone(),
                 )
                 .increment(self.byte_size.get() as u64);
-                counter!("events_in_total", "pod_name" => pod_name, "pod_namespace" => pod_namespace, "container_name" => container_name.clone()).increment(1);
+                counter!(CounterName::EventsInTotal, "pod_name" => pod_name, "pod_namespace" => pod_namespace, "container_name" => container_name.clone()).increment(1);
             }
             None => {
                 counter!(CounterName::ComponentReceivedEventsTotal).increment(1);

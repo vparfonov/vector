@@ -101,6 +101,9 @@ pub enum CounterName {
     MemoryEnrichmentTableTtlExpirations,
     ComponentCpuUsageNsTotal,
     DatadogLogsReservedAttributeConflictsTotal,
+    // Red Hat / OpenShift Logging: legacy per-pod event counter consumed by
+    // cluster-logging-operator dashboards. Kept for backward compatibility.
+    EventsInTotal,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Display, AsRefStr, EnumIter)]
@@ -372,6 +375,7 @@ impl CounterName {
             Self::DatadogLogsReservedAttributeConflictsTotal => {
                 "datadog_logs_reserved_attribute_conflicts_total"
             }
+            Self::EventsInTotal => "events_in_total",
         }
     }
 }

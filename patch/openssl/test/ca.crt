@@ -33,21 +33,21 @@ Certificate:
                     15:bd
                 Exponent: 65537 (0x10001)
         X509v3 extensions:
-            X509v3 CRL Distribution Points:
+            X509v3 CRL Distribution Points: 
 
                 Full Name:
                   URI:http://127.0.0.1:8081/pki/test.crl
 
-            X509v3 Basic Constraints:
+            X509v3 Basic Constraints: 
                 CA:TRUE
-            X509v3 Subject Key Identifier:
+            X509v3 Subject Key Identifier: 
                 FD:82:45:39:A1:91:41:F2:66:CC:0D:75:D5:0D:40:D5:81:A7:A1:43
-            X509v3 Authority Key Identifier:
+            X509v3 Authority Key Identifier: 
                 keyid:C5:CC:F5:A1:8C:D9:E4:A7:BA:EC:21:F5:D1:84:23:EA:0D:C2:C7:30
                 DirName:/CN=TestCA
                 serial:33:E7:04:87:09:32:87:21:D9:CD:7C:AA:4C:5A:BB:2C:6C:7B:54:28
 
-            X509v3 Key Usage:
+            X509v3 Key Usage: 
                 Certificate Sign, CRL Sign
     Signature Algorithm: sha256WithRSAEncryption
          96:a0:ff:8a:4b:bd:45:96:c9:72:3c:63:e3:48:c4:ab:ef:7e:

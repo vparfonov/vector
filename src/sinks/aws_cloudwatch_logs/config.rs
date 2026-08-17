@@ -248,9 +248,11 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
             service: svc,
             region: resolved_region.to_string(),
         };
-
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -267,8 +269,8 @@ impl SinkConfig for CloudwatchLogsSinkConfig {
 }
 
 impl GenerateConfig for CloudwatchLogsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(default_config(JsonSerializerConfig::default().into())).unwrap()
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(default_config(JsonSerializerConfig::default().into())).unwrap()
     }
 }
 

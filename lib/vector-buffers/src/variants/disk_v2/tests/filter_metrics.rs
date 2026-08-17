@@ -11,7 +11,9 @@ use std::{error, fmt};
 use bytes::{Buf, BufMut};
 use vector_common::{
     byte_size_of::ByteSizeOf,
-    finalization::{AddBatchNotifier, BatchNotifier},
+    finalization::{
+        AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable, MergeFinalizable,
+    },
 };
 
 use super::create_default_buffer_v2_with_usage;
@@ -45,6 +47,18 @@ impl ByteSizeOf for FilterableBatch {
 impl EventCount for FilterableBatch {
     fn event_count(&self) -> usize {
         self.events as usize
+    }
+}
+
+impl Finalizable for FilterableBatch {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        EventFinalizers::DEFAULT
+    }
+}
+
+impl MergeFinalizable for FilterableBatch {
+    fn merge_finalizers(&mut self, _finalizers: EventFinalizers) {
+        // We never check acknowledgements for this type.
     }
 }
 

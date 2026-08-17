@@ -17,7 +17,7 @@ use crate::{
             build_healthcheck, build_http_batch_service, create_client,
             service::{HecService, HttpRequestBuilder},
         },
-        util::http::HttpRetryLogic,
+        util::{HttpEndpoint, http::HttpRetryLogic},
     },
     template::ConfinementConfig,
 };
@@ -48,7 +48,7 @@ pub struct HecLogsSinkConfig {
         docs::examples = "http://example.com"
     ))]
     #[configurable(validation(format = "uri"))]
-    pub endpoint: String,
+    pub endpoint: HttpEndpoint,
 
     /// Overrides the name of the log field used to retrieve the hostname to send to Splunk HEC.
     ///
@@ -59,13 +59,11 @@ pub struct HecLogsSinkConfig {
     // NOTE: The `OptionalTargetPath` is wrapped in an `Option` in order to distinguish between a true
     //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
     //       empty string to a `None` path internally.
-    #[configurable(metadata(docs::advanced))]
     pub host_key: Option<OptionalTargetPath>,
 
     /// Fields to be [added to Splunk index][splunk_field_index_docs].
     ///
     /// [splunk_field_index_docs]: https://docs.splunk.com/Documentation/Splunk/8.0.0/Data/IFXandHEC
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     #[configurable(metadata(docs::examples = "field1", docs::examples = "field2"))]
     pub indexed_fields: Vec<ConfigValuePath>,
@@ -79,7 +77,6 @@ pub struct HecLogsSinkConfig {
     /// The sourcetype of events sent to this sink.
     ///
     /// If unset, Splunk defaults to `httpevent`.
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "{{ sourcetype }}", docs::examples = "_json",))]
     pub sourcetype: Option<Template>,
 
@@ -88,7 +85,6 @@ pub struct HecLogsSinkConfig {
     /// This is typically the filename the logs originated from.
     ///
     /// If unset, the Splunk collector sets it.
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(
         docs::examples = "{{ file }}",
         docs::examples = "/var/log/syslog",
@@ -130,7 +126,6 @@ pub struct HecLogsSinkConfig {
     /// if log events are Legacy namespaced, or the semantic meaning of "timestamp" is used, if defined.
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
-    #[configurable(metadata(docs::advanced))]
     #[configurable(metadata(docs::examples = "timestamp", docs::examples = ""))]
     // NOTE: The `OptionalTargetPath` is wrapped in an `Option` in order to distinguish between a true
     //       `None` type and an empty string. This is necessary because `OptionalTargetPath` deserializes an
@@ -149,7 +144,6 @@ pub struct HecLogsSinkConfig {
     pub auto_extract_timestamp: Option<bool>,
 
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default = "default_endpoint_target")]
     pub endpoint_target: EndpointTarget,
 
@@ -163,10 +157,10 @@ const fn default_endpoint_target() -> EndpointTarget {
 }
 
 impl GenerateConfig for HecLogsSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::Value::try_from(Self {
+    fn generate_config() -> serde_json::Value {
+        serde_json::to_value(Self {
             default_token: "${VECTOR_SPLUNK_HEC_TOKEN}".to_owned().into(),
-            endpoint: "endpoint".to_owned(),
+            endpoint: HttpEndpoint::parse("http://example.com").unwrap(),
             host_key: None,
             indexed_fields: vec![],
             index: None,
@@ -189,12 +183,11 @@ impl GenerateConfig for HecLogsSinkConfig {
 }
 
 impl HecLogsSinkConfig {
-    /// Confinement + sink construction without emitting the per-sink
-    /// confinement gauge. `component_name` is used for both the gauge label
-    /// (by the caller) and the per-template security warnings emitted from
-    /// `Template::confine`, so wrapping sinks (Humio) see their own type in
-    /// logs and metrics rather than the delegated `splunk_hec_logs`.
-    pub(crate) fn build_without_confinement_gauge(
+    /// Confinement + sink construction. `component_name` is threaded into the
+    /// per-template security warnings emitted from `Template::confine`, so
+    /// wrapping sinks (Humio) see their own type in logs rather than the
+    /// delegated `splunk_hec_logs`.
+    pub(crate) fn build_with_component_type(
         &self,
         cx: SinkContext,
         component_name: &'static str,
@@ -203,28 +196,30 @@ impl HecLogsSinkConfig {
             return Err("`auto_extract_timestamp` cannot be set for the `raw` endpoint.".into());
         }
 
-        let mut confined_config = self.clone();
-        confined_config.index = confined_config
+        let index = self
             .index
+            .clone()
             .map(|t| t.confine(&self.confinement, component_name, "index"))
             .transpose()?;
-        confined_config.source = confined_config
+        let source = self
             .source
+            .clone()
             .map(|t| t.confine(&self.confinement, component_name, "source"))
             .transpose()?;
-        confined_config.sourcetype = confined_config
+        let sourcetype = self
             .sourcetype
+            .clone()
             .map(|t| t.confine(&self.confinement, component_name, "sourcetype"))
             .transpose()?;
 
         let client = create_client(self.tls.as_ref(), cx.proxy())?;
         let healthcheck = build_healthcheck(
-            self.endpoint.clone(),
+            self.endpoint.clone().into(),
             self.default_token.inner().to_owned(),
             client.clone(),
         )
         .boxed();
-        let sink = confined_config.build_processor(client, cx)?;
+        let sink = self.build_processor(client, cx, sourcetype, source, index)?;
 
         Ok((sink, healthcheck))
     }
@@ -234,9 +229,11 @@ impl HecLogsSinkConfig {
 #[typetag::serde(name = "splunk_hec_logs")]
 impl SinkConfig for HecLogsSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let result = self.build_without_confinement_gauge(cx, Self::NAME)?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
-        Ok(result)
+        self.build_with_component_type(cx, Self::NAME)
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -249,7 +246,14 @@ impl SinkConfig for HecLogsSinkConfig {
 }
 
 impl HecLogsSinkConfig {
-    pub fn build_processor(&self, client: HttpClient, _: SinkContext) -> crate::Result<VectorSink> {
+    pub fn build_processor(
+        &self,
+        client: HttpClient,
+        _: SinkContext,
+        sourcetype: Option<ConfinedTemplate>,
+        source: Option<ConfinedTemplate>,
+        index: Option<ConfinedTemplate>,
+    ) -> crate::Result<VectorSink> {
         let ack_client = if self.acknowledgements.indexer_acknowledgements_enabled {
             Some(client.clone())
         } else {
@@ -271,7 +275,7 @@ impl HecLogsSinkConfig {
 
         let request_settings = self.request.into_settings();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
-            self.endpoint.clone(),
+            self.endpoint.clone().into(),
             self.endpoint_target,
             self.default_token.inner().to_owned(),
             self.compression,
@@ -298,9 +302,9 @@ impl HecLogsSinkConfig {
             service,
             request_builder,
             batch_settings,
-            sourcetype: self.sourcetype.clone(),
-            source: self.source.clone(),
-            index: self.index.clone(),
+            sourcetype,
+            source,
+            index,
             indexed_fields: self
                 .indexed_fields
                 .iter()
@@ -361,7 +365,7 @@ mod tests {
 
     impl ValidatableComponent for HecLogsSinkConfig {
         fn validation_configuration() -> ValidationConfiguration {
-            let endpoint = "http://127.0.0.1:9001".to_string();
+            let endpoint = HttpEndpoint::parse("http://127.0.0.1:9001").unwrap();
 
             let mut batch = BatchConfig::default();
             batch.max_events = Some(1);
@@ -401,14 +405,14 @@ mod tests {
                 confinement: ConfinementConfig::default(),
             };
 
-            let endpoint = format!("{endpoint}/services/collector/raw");
+            let endpoint = endpoint
+                .append_path("services/collector/raw")
+                .unwrap()
+                .into_uri();
 
             let external_resource = ExternalResource::new(
                 ResourceDirection::Push,
-                HttpResourceConfig::from_parts(
-                    http::Uri::try_from(&endpoint).expect("should not fail to parse URI"),
-                    None,
-                ),
+                HttpResourceConfig::from_parts(endpoint, None),
                 config.encoding.clone(),
             );
 

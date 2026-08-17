@@ -176,11 +176,12 @@ impl HttpSinkConfig {
 }
 
 impl GenerateConfig for HttpSinkConfig {
-    fn generate_config() -> toml::Value {
-        toml::from_str(
-            r#"uri = "https://10.22.212.22:9000/endpoint"
-            encoding.codec = "json""#,
-        )
+    fn generate_config() -> serde_json::Value {
+        serde_yaml::from_str(indoc::indoc! {
+            r#"uri: https://10.22.212.22:9000/endpoint
+            encoding:
+              codec: json"#,
+        })
         .unwrap()
     }
 }
@@ -241,9 +242,11 @@ pub(super) fn validate_payload_wrapper(
 #[typetag::serde(name = "http")]
 impl SinkConfig for HttpSinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let result = self.build_without_confinement_gauge(cx, Self::NAME).await?;
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
-        Ok(result)
+        self.build_with_component_type(cx, Self::NAME).await
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {
@@ -269,12 +272,11 @@ impl SinkConfig for HttpSinkConfig {
 }
 
 impl HttpSinkConfig {
-    /// Confinement + sink construction without emitting the per-sink
-    /// confinement gauge. `component_name` is threaded through so both the
-    /// gauge (emitted by the caller) and per-template security warnings
-    /// carry the outer sink type — `http` when this is the top-level sink,
-    /// `opentelemetry` when [`OpenTelemetryConfig::build`] delegates here.
-    pub(crate) async fn build_without_confinement_gauge(
+    /// Confinement + sink construction. `component_name` is threaded through so
+    /// per-template security warnings carry the outer sink type — `http` when
+    /// this is the top-level sink, `opentelemetry` when
+    /// [`OpenTelemetryConfig::build`] delegates here.
+    pub(crate) async fn build_with_component_type(
         &self,
         cx: SinkContext,
         component_name: &'static str,

@@ -74,7 +74,7 @@ use crate::{
     },
     serde::bool_or_struct,
     sources::util::{decompression::CappedDecoder, http::capped_body},
-    tls::{MaybeTlsSettings, TlsEnableableConfig},
+    tls::{MaybeTlsSettings, TlsAcceptorReloader, TlsEnableableConfig},
 };
 
 mod acknowledgements;
@@ -149,7 +149,6 @@ pub struct SplunkConfig {
     /// channel, and the authentication token via `%splunk_hec.*` paths and
     /// `get_secret!("splunk_hec_token")` before the program executes.
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub event: CodecConfig,
 
@@ -160,7 +159,6 @@ pub struct SplunkConfig {
     /// swallowed and do not return an error to the Splunk client. When unset, the
     /// endpoint preserves its existing behavior of one event per request body.
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub raw: CodecConfig,
 }
@@ -175,7 +173,6 @@ pub struct CodecConfig {
     /// Only used when `decoding` is also set. Defaults to a per-codec choice
     /// (typically `bytes`) that produces one event per payload.
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub framing: Option<FramingConfig>,
 
@@ -186,7 +183,6 @@ pub struct CodecConfig {
     /// `framing` and `decoding`, and a single payload can fan out to multiple
     /// events.
     #[configurable(derived)]
-    #[configurable(metadata(docs::advanced))]
     #[serde(default)]
     pub decoding: Option<DeserializerConfig>,
 }
@@ -231,10 +227,19 @@ fn default_socket_address() -> SocketAddr {
     SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), 8088)
 }
 
-#[async_trait::async_trait]
-#[typetag::serde(name = "splunk_hec")]
-impl SourceConfig for SplunkConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+impl SplunkConfig {
+    /// The source's TLS configuration, if any. Exposed so a wrapping source can build a
+    /// [`TlsAcceptorReloader`] and watch the certificate files for rotation.
+    pub const fn tls_config(&self) -> Option<&TlsEnableableConfig> {
+        self.tls.as_ref()
+    }
+
+    /// Build the source serving a runtime-swappable TLS acceptor when `tls_reloader` is set.
+    pub async fn build_with_tls_reloader(
+        &self,
+        cx: SourceContext,
+        tls_reloader: Option<TlsAcceptorReloader>,
+    ) -> crate::Result<super::Source> {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), true)?;
         let shutdown = cx.shutdown.clone();
         let out = cx.out.clone();
@@ -269,7 +274,7 @@ impl SourceConfig for SplunkConfig {
             )
             .or_else(finish_err);
 
-        let listener = tls.bind(&self.address).await?;
+        let listener = tls.bind_reloadable(&self.address, tls_reloader).await?;
 
         let keepalive_settings = self.keepalive.clone();
         Ok(Box::pin(async move {
@@ -298,6 +303,14 @@ impl SourceConfig for SplunkConfig {
 
             Ok(())
         }))
+    }
+}
+
+#[async_trait::async_trait]
+#[typetag::serde(name = "splunk_hec")]
+impl SourceConfig for SplunkConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        self.build_with_tls_reloader(cx, None).await
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
@@ -2068,7 +2081,7 @@ mod tests {
         sinks::{
             Healthcheck, VectorSink,
             splunk_hec::logs::config::HecLogsSinkConfig,
-            util::{BatchConfig, Compression, TowerRequestConfig},
+            util::{BatchConfig, Compression, HttpEndpoint, TowerRequestConfig},
         },
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
         test_util::{
@@ -2158,7 +2171,7 @@ mod tests {
     ) -> (VectorSink, Healthcheck) {
         HecLogsSinkConfig {
             default_token: TOKEN.to_owned().into(),
-            endpoint: format!("http://{address}"),
+            endpoint: HttpEndpoint::parse(&format!("http://{address}")).unwrap(),
             host_key: None,
             indexed_fields: vec![],
             index: None,

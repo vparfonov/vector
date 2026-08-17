@@ -9,8 +9,12 @@ use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::value::Kind;
 
 use super::{
-    encoder::StackdriverLogsEncoder, request_builder::StackdriverLogsRequestBuilder,
-    service::StackdriverLogsServiceRequestBuilder, sink::StackdriverLogsSink,
+    encoder::{
+        ConfinedStackdriverLabelConfig, ConfinedStackdriverResource, StackdriverLogsEncoder,
+    },
+    request_builder::StackdriverLogsRequestBuilder,
+    service::StackdriverLogsServiceRequestBuilder,
+    sink::StackdriverLogsSink,
 };
 use crate::{
     gcp::{GcpAuthConfig, GcpAuthenticator, scopes},
@@ -20,7 +24,7 @@ use crate::{
         gcs_common::config::healthcheck_response,
         prelude::*,
         util::{
-            BoxedRawValue, RealtimeSizeBasedDefaultBatchSettings,
+            BoxedRawValue, HttpEndpoint, RealtimeSizeBasedDefaultBatchSettings,
             http::{HttpService, RetryStrategy, http_response_retry_logic},
             service::TowerRequestConfigDefaults,
         },
@@ -46,11 +50,13 @@ impl TowerRequestConfigDefaults for StackdriverTowerRequestConfigDefaults {
     "gcp_stackdriver_logs",
     "Deliver logs to GCP's Cloud Operations suite."
 ))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Derivative)]
+#[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct StackdriverConfig {
+    #[derivative(Default(value = "default_endpoint()"))]
     #[serde(skip, default = "default_endpoint")]
-    pub(super) endpoint: String,
+    pub(super) endpoint: HttpEndpoint,
 
     #[serde(flatten)]
     pub(super) log_name: StackdriverLogName,
@@ -117,8 +123,9 @@ pub(super) struct StackdriverConfig {
     pub confinement: ConfinementConfig,
 }
 
-pub(super) fn default_endpoint() -> String {
-    "https://logging.googleapis.com/v2/entries:write".to_string()
+pub(super) fn default_endpoint() -> HttpEndpoint {
+    HttpEndpoint::parse("https://logging.googleapis.com/v2/entries:write")
+        .expect("static default endpoint should be a valid http(s) URL")
 }
 
 // 10MB limit for entries.write: https://cloud.google.com/logging/quotas#api-limits
@@ -254,25 +261,33 @@ impl SinkConfig for StackdriverConfig {
         // controlled label like `resource.labels.zone: "{{ zone }}"` is as
         // steerable as `log_id` unless we confine it too. Same for arbitrary
         // log-entry labels in `label_config.labels`.
-        let mut resource = self.resource.clone();
-        resource.labels = resource
-            .labels
-            .into_iter()
-            .map(|(k, v)| {
-                v.confine(&self.confinement, Self::NAME, "resource.labels")
-                    .map(|v| (k, v))
-            })
-            .collect::<crate::Result<_>>()?;
+        let resource = ConfinedStackdriverResource {
+            type_: self.resource.type_.clone(),
+            labels: self
+                .resource
+                .labels
+                .clone()
+                .into_iter()
+                .map(|(k, v)| {
+                    v.confine(&self.confinement, Self::NAME, "resource.labels")
+                        .map(|v| (k, v))
+                })
+                .collect::<crate::Result<_>>()?,
+        };
 
-        let mut label_config = self.label_config.clone();
-        label_config.labels = label_config
-            .labels
-            .into_iter()
-            .map(|(k, v)| {
-                v.confine(&self.confinement, Self::NAME, "label_config.labels")
-                    .map(|v| (k, v))
-            })
-            .collect::<crate::Result<_>>()?;
+        let label_config = ConfinedStackdriverLabelConfig {
+            labels_key: self.label_config.labels_key.clone(),
+            labels: self
+                .label_config
+                .labels
+                .clone()
+                .into_iter()
+                .map(|(k, v)| {
+                    v.confine(&self.confinement, Self::NAME, "label_config.labels")
+                        .map(|v| (k, v))
+                })
+                .collect::<crate::Result<_>>()?,
+        };
 
         let auth = self.auth.build(&[scopes::LOGGING_WRITE]).await?;
 
@@ -298,7 +313,7 @@ impl SinkConfig for StackdriverConfig {
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(tls_settings, cx.proxy())?;
 
-        let uri: Uri = self.endpoint.parse()?;
+        let uri = self.endpoint.clone().into_uri();
 
         let stackdriver_logs_service_request_builder = StackdriverLogsServiceRequestBuilder {
             uri: uri.clone(),
@@ -319,9 +334,11 @@ impl SinkConfig for StackdriverConfig {
         let healthcheck = healthcheck(client, auth.clone(), uri).boxed();
 
         auth.spawn_regenerate_token();
-
-        self.confinement.set_confinement_gauge("sink", Self::NAME);
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
+    }
+
+    fn confinement_config(&self) -> Option<&crate::template::ConfinementConfig> {
+        Some(&self.confinement)
     }
 
     fn input(&self) -> Input {

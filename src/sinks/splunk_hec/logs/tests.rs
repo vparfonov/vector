@@ -22,13 +22,25 @@ use crate::{
             logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
         },
         util::{
-            Compression, encoding::Encoder as _, processed_event::ProcessedEvent,
+            Compression, HttpEndpoint, encoding::Encoder as _, processed_event::ProcessedEvent,
             test::build_test_server,
         },
     },
-    template::Template,
+    template::{ConfinedTemplate, ConfinementConfig, Template},
     test_util::addr::next_addr,
 };
+
+// Tests exercise the sink, not confinement; build a checkerless confined template.
+fn confined(s: &str) -> ConfinedTemplate {
+    Template::try_from(s)
+        .unwrap()
+        .confine(
+            &ConfinementConfig::unconfined(),
+            HecLogsSinkConfig::NAME,
+            "template",
+        )
+        .unwrap()
+}
 
 #[derive(Deserialize, Debug)]
 struct HecEventJson {
@@ -106,9 +118,9 @@ fn get_processed_event_timestamp(
         }
     }
 
-    let sourcetype = Template::try_from("{{ event_sourcetype }}".to_string()).ok();
-    let source = Template::try_from("{{ event_source }}".to_string()).ok();
-    let index = Template::try_from("{{ event_index }}".to_string()).ok();
+    let sourcetype = Some(confined("{{ event_sourcetype }}"));
+    let source = Some(confined("{{ event_source }}"));
+    let index = Some(confined("{{ event_index }}"));
     let indexed_fields = vec![
         owned_value_path!("event_field1"),
         owned_value_path!("event_field2"),
@@ -229,7 +241,7 @@ async fn splunk_passthrough_token() {
     let (_guard, addr) = next_addr();
     let config = HecLogsSinkConfig {
         default_token: "token".to_string().into(),
-        endpoint: format!("http://{addr}"),
+        endpoint: HttpEndpoint::parse(&format!("http://{addr}")).unwrap(),
         host_key: None,
         indexed_fields: Vec::new(),
         index: None,

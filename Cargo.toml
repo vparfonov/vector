@@ -575,6 +575,12 @@ ocp-logging = [
   "transforms-reduce",
   "transforms-detect_exceptions",
 
+  # Full VRL standard library. Upstream's `base` feature pulls this in via
+  # `vrl/stdlib`; the curated ocp-logging set skips `base`, so without this the
+  # env/system/network/crypto function groups (e.g. get_env_var) are gated out
+  # and CLO-generated remap configs fail to compile. See vectordotdev/vector#25267.
+  "vrl/stdlib",
+
   "sinks-aws_cloudwatch_logs",
   "sinks-aws_s3",
   "sinks-azure_logs_ingestion",

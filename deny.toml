@@ -49,14 +49,17 @@ ignore = [
   { id = "RUSTSEC-2024-0436", reason = "paste crate is unmaintained - transitive dependency via parquet v56.2.0, no safe upgrade available" },
   { id = "RUSTSEC-2026-0104", reason = "rustls-webpki 0.102/0.101 CRL parsing panic - tonic upgrade (https://github.com/vectordotdev/vector/issues/19179); 0.103 already patched to 0.103.13" },
   { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 is unmaintained - transitive dep via mlua_derive v0.11.0; unblocked when mlua upgrades its derive macro" },
-  { id = "RUSTSEC-2026-0194", reason = "quick-xml quadratic-time duplicate attribute check - versions needing upgrade are v0.31 (direct dep) and v0.37.4 (via opendal < 0.58)" },
-  { id = "RUSTSEC-2026-0195", reason = "quick-xml unbounded namespace-declaration allocation in NsReader - versions needing upgrade are v0.31 (direct dep) and v0.37.4 (via opendal < 0.58)" },
-  { id = "RUSTSEC-2026-0235", reason = "rkyv 0.7 is vulnerable but unmaintained; upgrading vector-buffers to rkyv 0.8 requires a breaking serialization migration" },
-  { id = "RUSTSEC-2026-0253", reason = "Vector uses lru 0.18.2; aws-sdk-s3 and ratatui still require lru ^0.16.3" },
+  { id = "RUSTSEC-2026-0194", reason = "quick-xml 0.39.2 quadratic-time duplicate attribute check - transitive dep via azure_core/typespec, no newer typespec release available" },
+  { id = "RUSTSEC-2026-0195", reason = "quick-xml 0.39.2 unbounded namespace-declaration allocation in NsReader - transitive dep via azure_core/typespec, no newer typespec release available" },
+  { id = "RUSTSEC-2026-0205", reason = "scc 2.4.0 Array::insert double-free on panicking comparator - dev-dependency only via serial_test v3.4.0, not in shipped binary" },
+  { id = "RUSTSEC-2026-0221", reason = "event-listener !Send unsoundness - already patched to 5.4.2; kept for the 2.5.3 line that has no fix available" },
+  { id = "RUSTSEC-2026-0235", reason = "rkyv 0.7.46 OOB reads in Rc/Arc archives - vector-buffers disk buffer serialization; rkyv 0.8 is a major breaking migration tracked upstream, and buffers only deserialize self-written on-disk data" },
+  { id = "RUSTSEC-2026-0253", reason = "lru 0.16.3 use-after-free in LruCache::pop panic path - transitive via aws-sdk-s3 v1.125.0 (^0.16.3) and ratatui-core, no compatible upgrade available" },
+  { id = "RUSTSEC-2026-0258", reason = "h2 0.3.26 unbounded empty DATA frames - transitive via aws-smithy-http-client (^0.3.24); the 0.4 line is already patched to 0.4.16" },
 ]
 
 [bans]
 multiple-versions = "allow"
 deny = [
-    { name = "ring", wrappers = ["rustls", "sct", "rustls-webpki", "aws-config"] },
+    { name = "ring", wrappers = ["rustls", "sct", "rustls-webpki", "aws-config", "async-nats", "hickory-proto", "tokio-websockets"] },
 ]

@@ -7,7 +7,7 @@ RUN INSTALL_PKGS=" \
       unzip \
       openssl-devel \
       llvm-toolset \
-      rust-toolset-1.92.0 \
+      rust-toolset-1.95.0 \
       crypto-policies-scripts \
       " && \
     microdnf install -y $INSTALL_PKGS && \

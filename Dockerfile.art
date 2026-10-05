@@ -32,10 +32,16 @@ RUN cp /opt/app-root/src/target/release/vector /usr/bin
 FROM registry.access.redhat.com/ubi9/ubi-minimal
 
 COPY --from=builder /usr/bin/vector /usr/bin/
-RUN microdnf install -y systemd crypto-policies-scripts
+RUN microdnf install -y systemd libcap crypto-policies-scripts
 
 # Copy PQ crypto-policies configuration from builder
 COPY --from=builder /etc/crypto-policies/ /etc/crypto-policies/
+
+# Grant CAP_DAC_READ_SEARCH capability to allow non-root collector to read files
+# it doesn't own (e.g., 0600 root:root container log files). This is recommended
+# by Vector upstream over running as root.
+# See: https://vector.dev/docs/reference/configuration/sources/file/#file-permissions
+RUN setcap cap_dac_read_search+ep /usr/bin/vector
 
 WORKDIR /usr/bin
 CMD ["/usr/bin/vector"]

@@ -45,6 +45,7 @@ RUN mkdir -p /mnt/rootfs && \
       --nodocs \
       systemd \
       tar \
+      libcap \
       crypto-policies-scripts && \
     dnf --installroot=/mnt/rootfs clean all
 
@@ -54,6 +55,12 @@ COPY --from=packages /mnt/rootfs/ /
 # Copy PQ crypto-policies configuration from builder
 COPY --from=builder /etc/crypto-policies/ /etc/crypto-policies/
 COPY --from=builder /src/target/release/vector /usr/bin/
+
+# Grant CAP_DAC_READ_SEARCH capability to allow non-root collector to read files
+# it doesn't own (e.g., 0600 root:root container log files). This is recommended
+# by Vector upstream over running as root.
+# See: https://vector.dev/docs/reference/configuration/sources/file/#file-permissions
+RUN setcap cap_dac_read_search+ep /usr/bin/vector
 
 WORKDIR /usr/bin
 CMD ["/usr/bin/vector"]
